@@ -127,7 +127,7 @@ class QvantumStatusSensor(QvantumGenericSensor):
         """Get status from API data."""
         match self.coordinator.data.get("metrics").get(self._metric_key):
             case 0:
-                return "NOP"
+                return "Idle"
             case 1:
                 return "Defrosting"
             case 2:
