@@ -1,0 +1,39 @@
+{
+    "config": {
+      "title": "Qvantum Värmepump",
+      "abort": {
+        "already_configured": "Enheten är redan konfigurerad",
+        "reconfigure_successful": "Omkonfiguration lyckades"
+      },
+      "error": {
+        "cannot_connect": "Kunde inte ansluta",
+        "invalid_auth": "Felaktig autentisiering",
+        "unknown": "Oväntat fel"
+      },
+      "step": {
+        "user": {
+          "data": {
+            "password": "Lösenord",
+            "username": "Användarnamn"
+          }
+        },
+        "reconfigure": {
+          "data": {
+            "password": "Lösenord",
+            "username": "Användarnamn"
+          }
+        }
+      }
+    },
+    "options": {
+      "step": {
+        "init": {
+          "data": {
+            "scan_interval": "Uppdateringsfrekvens (sekunder)"
+          },
+          "description": "Ändra alternativ.",
+          "title": "Alternativ"
+        }
+      }
+    }
+  }

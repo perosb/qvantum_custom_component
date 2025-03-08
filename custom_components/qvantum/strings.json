@@ -1,6 +1,6 @@
 {
   "config": {
-    "title": "Integration 101 Template Integration",
+    "title": "Qvantum Heat Pump",
     "abort": {
       "already_configured": "Device is already configured",
       "reconfigure_successful": "Reconfiguration successful"
@@ -13,14 +13,12 @@
     "step": {
       "user": {
         "data": {
-          "host": "Host",
           "password": "Password",
           "username": "Username"
         }
       },
       "reconfigure": {
         "data": {
-          "host": "Host",
           "password": "Password",
           "username": "Username"
         }
@@ -34,7 +32,7 @@
           "scan_interval": "Scan Interval (seconds)"
         },
         "description": "Amend your options.",
-        "title": "Qvantum Integration Options"
+        "title": "Options"
       }
     }
   }
