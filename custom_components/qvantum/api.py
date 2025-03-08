@@ -40,7 +40,7 @@ class QvantumAPI:
             "password":self._password,
             "clientType":"CLIENT_TYPE_WEB"
         }
-        
+
         async with self._session.post(f"{self._auth_url}/v1/accounts:signInWithPassword?key=AIzaSyCLQ22XHjH8LmId-PB1DY8FBsN53rWTpFw", json=payload, headers=headers) as response:
             if response.status == 200:
                 auth_data = await response.json()
@@ -48,7 +48,7 @@ class QvantumAPI:
                 expires_in = auth_data.get("expiresIn", 3600)  # Default to 1 hour if not provided
                 self._token_expiry = datetime.now() + timedelta(seconds=int(expires_in))
             else:
-                raise Exception(f"Authentication failed: {response.status}")
+                raise Exception(f"Authentication failed: {response}")
 
     async def _ensure_valid_token(self):
         """Ensure a valid token is available, refreshing if expired."""

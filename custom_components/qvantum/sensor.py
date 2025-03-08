@@ -64,6 +64,7 @@ class QvantumGenericSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._hpid = self.coordinator.data.get("metrics").get("hpid")
         self._attr_name = f"Qvantum {name}"
+        self._attr_friendly_name = name.capitalize()
         self._metric_key = metric_key
         self._attr_unique_id = f"qvantum_{metric_key}_{self._hpid}"
         self._attr_device_info = device
