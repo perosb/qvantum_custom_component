@@ -52,6 +52,8 @@ async def async_setup_entry(
         else:
             sensors.append(QvantumGenericSensor(coordinator, metric.get("name"), metric.get("name").replace("_", " ").lower(), device))
 
+    sensors.append(QvantumTotalEnergySensor(coordinator, "totalenergy", "total energy", device))
+
     async_add_entities(sensors)
 
 
@@ -94,6 +96,25 @@ class QvantumEnergySensor(QvantumGenericSensor):
         self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
         self._attr_device_class = SensorDeviceClass.ENERGY
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+class QvantumTotalEnergySensor(QvantumEnergySensor):
+    """Sensor for energy measurements."""
+
+    def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
+        super().__init__(coordinator, metric_key, name, device)
+
+    @property
+    def state(self):
+        """Get metric from API data."""
+        total = self.coordinator.data.get("metrics").get("compressorenergy") + self.coordinator.data.get("metrics").get("additionalenergy")
+        return total
+
+    @property
+    def available(self):
+        """Check if data is available."""
+        return "compressorenergy" in self.coordinator.data.get("metrics")
+    
+
 
 class QvantumStatusSensor(QvantumGenericSensor):
     """Sensor for status measurements."""
