@@ -14,7 +14,6 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.const import (
-    CONF_HOST,
     CONF_PASSWORD,
     CONF_SCAN_INTERVAL,
     CONF_USERNAME,
@@ -116,7 +115,6 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                user_input[CONF_HOST] = config_entry.data[CONF_HOST]
                 await validate_input(self.hass, user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
