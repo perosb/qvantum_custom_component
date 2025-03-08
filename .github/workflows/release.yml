@@ -7,6 +7,7 @@ on:
 
 env:
   COMPONENT_DIR: qvantum
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   release_zip_file:
