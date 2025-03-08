@@ -1,4 +1,5 @@
 {
     "name": "Qvantum Heat Pump",
-    "content_in_root": true
+    "zip_release": true,
+    "filename": "qvantum.zip"
   }
