@@ -77,65 +77,29 @@ class QvantumGenericSensor(CoordinatorEntity, SensorEntity):
         return self._metric_key in self.coordinator.data.get("metrics")
 
 
-class QvantumTemperatureSensor(CoordinatorEntity, SensorEntity):
+class QvantumTemperatureSensor(QvantumGenericSensor):
     """Sensor for temperature measurements."""
 
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
-        super().__init__(coordinator)
-        self._hpid = self.coordinator.data.get("metrics").get("hpid")
-        self._attr_name = f"Qvantum {name}"
-        self._metric_key = metric_key
-        self._attr_unique_id = f"qvantum_{self._hpid}_{metric_key}"
+        super().__init__(coordinator, metric_key, name, device)
         self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_device_info = device
 
-    @property
-    def state(self):
-        """Get temperature from API data."""
-        return self.coordinator.data.get("metrics").get(self._metric_key)
-
-    @property
-    def available(self):
-        """Check if data is available."""
-        return self._metric_key in self.coordinator.data.get("metrics")
-
-
-class QvantumEnergySensor(CoordinatorEntity, SensorEntity):
+class QvantumEnergySensor(QvantumGenericSensor):
     """Sensor for energy measurements."""
 
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
-        super().__init__(coordinator)
-        self._hpid = self.coordinator.data.get("metrics").get("hpid")
-        self._attr_name = f"Qvantum {name}"
-        self._metric_key = metric_key
-        self._attr_unique_id = f"qvantum_{self._hpid}_{metric_key}"
+        super().__init__(coordinator, metric_key, name, device)
         self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-        self._attr_device_class = "energy"
+        self._attr_device_class = SensorDeviceClass.ENERGY
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
-        self._attr_device_info = device
 
-    @property
-    def state(self):
-        """Get energy usage from API data."""
-        return self.coordinator.data.get("metrics").get(self._metric_key)
-
-    @property
-    def available(self):
-        """Check if data is available."""
-        return self._metric_key in self.coordinator.data.get("metrics")
-
-class QvantumStatusSensor(CoordinatorEntity, SensorEntity):
+class QvantumStatusSensor(QvantumGenericSensor):
     """Sensor for status measurements."""
 
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
-        super().__init__(coordinator)
-        self._hpid = self.coordinator.data.get("metrics").get("hpid")
-        self._attr_name = f"Qvantum {name}"
-        self._metric_key = metric_key
-        self._attr_unique_id = f"qvantum_{self._hpid}_{self._metric_key}"
-        self._attr_device_info = device
+        super().__init__(coordinator, metric_key, name, device)
 
     @property
     def state(self):
@@ -151,8 +115,3 @@ class QvantumStatusSensor(CoordinatorEntity, SensorEntity):
                 return "Heating"
             case _:
                 return "Unknown"
-
-    @property
-    def available(self):
-        """Check if data is available."""
-        return self._metric_key in self.coordinator.data.get("metrics")
