@@ -12,6 +12,9 @@ jobs:
   release_zip_file:
     name: Prepare release asset
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -37,4 +40,3 @@ jobs:
           asset_name: qvantum.zip
           tag: ${{ github.ref }}
           overwrite: true
-          
