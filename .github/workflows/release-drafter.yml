@@ -21,9 +21,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Get next version
+        uses: reecetech/version-increment@2024.10.1
         id: version
-        run: |
-            echo "version=$(jq .version -r ./custom_components/qvantum/manifest.json)" >> $GITHUB_OUTPUT
+        with:
+          scheme: calver
+          increment: patch
 
       - name: Run Release Drafter
         uses: release-drafter/release-drafter@v6
