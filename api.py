@@ -61,7 +61,7 @@ class QvantumAPI:
         await self._ensure_valid_token()
         headers = {"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"}
         
-        async with self._session.get(f"{self._api_url}/api/device-info/v1/devices/{device_id}/status?metrics=now", headers=headers) as response:
+        async with self._session.get(f"{self._api_url}/api/device-info/v1/devices/{device_id}/status?metrics=last", headers=headers) as response:
             if response.status == 200:
                 self._data = await response.json()
             else:
