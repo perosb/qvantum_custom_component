@@ -1,3 +1,5 @@
+[![qvantum_custom_component](https://img.shields.io/github/release/perosb/qvantum_custom_component/all.svg?label=current%20release)](https://github.com/perosb/qvantum_custom_component) [![downloads](https://img.shields.io/github/downloads/perosb/qvantum_custom_component/total?label=downloads)](https://github.com/perosb/qvantum_custom_component)
+
 ## Qvantum Heat Pump
 
 ### Energy for all – without compromises
@@ -9,7 +11,7 @@ Disrupting the ordinary takes courage, but with experience, deep knowledge and d
 
 ### Custom component for Qvantum API Integration
 
-To install:
+*To install:*
 1. Add the repository to HACS.
 2. Install Qvantum Heat Pump.
 3. Add Qvantum Heat Pump integration.
