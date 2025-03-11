@@ -1,39 +1,100 @@
 {
-    "config": {
-      "title": "Qvantum Heat Pump",
-      "abort": {
-        "already_configured": "Device is already configured",
-        "reconfigure_successful": "Reconfiguration successful"
+  "device":{
+    "name": "Qvantum Heat pump"
+  },
+  "entity": {
+    "sensor": {
+      "compressorenergy": {
+        "name": "Compressor energy"
       },
-      "error": {
-        "cannot_connect": "Failed to connect",
-        "invalid_auth": "Invalid authentication",
-        "unknown": "Unexpected error"
+      "totalenergy": {
+        "name": "Total energy"
       },
-      "step": {
-        "user": {
-          "data": {
-            "password": "Password",
-            "username": "Username"
-          }
-        },
-        "reconfigure": {
-          "data": {
-            "password": "Password",
-            "username": "Username"
-          }
+      "outdoor_temperature": {
+        "name": "Outdoor temperature"
+      },
+      "indoor_temperature": {
+        "name": "Indoor temperature"
+      },
+      "smart_sh_status": {
+        "name": "Smart status for heating"
+      },
+      "heating_flow_temperature": {
+        "name": "Heating medium, flow line, temperature"
+      },
+      "heating_flow_temperature_target": {
+        "name": "Heating medium, flow line, temperature target."
+      },
+      "tap_water_tank_temperature": {
+        "name": "Hot water tank temperature"
+      },
+      "tap_water_start": {
+        "name": "Hot water tank lower temperature limit"
+      },
+      "tap_water_stop": {
+        "name": "Hot water tank upper temperature limit"
+      },
+      "tap_water_capacity": {
+        "name": "Hot water capacity"
+      },
+      "additionalenergy": {
+        "name": "Additional energy"
+      },
+      "hp_status": {
+        "name": "Heat pump status",
+        "state":{
+          "0": "Idle",
+          "1": "Defrosting",
+          "2": "Hot water",
+          "3": "Heating"
         }
-      }
-    },
-    "options": {
-      "step": {
-        "init": {
-          "data": {
-            "scan_interval": "Scan Interval (seconds)"
-          },
-          "description": "Amend your options.",
-          "title": "Options"
+      },
+      "smart_dhw_status": {
+        "name": "Smart status for hot water"
+      },
+      "disconnect_reason": {
+        "name": "Disconnect reason",
+        "state":{
+          "client-disconnect": "Client disconnected"
         }
       }
     }
+  },  
+  "config": {
+    "title": "Qvantum Heat pump",
+    "abort": {
+      "already_configured": "Device is already configured",
+      "reconfigure_successful": "Reconfiguration successful"
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "password": "Password",
+          "username": "Username"
+        }
+      },
+      "reconfigure": {
+        "data": {
+          "password": "Password",
+          "username": "Username"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Scan Interval (seconds)"
+        },
+        "description": "Amend your options.",
+        "title": "Options"
+      }
+    }
   }
+}

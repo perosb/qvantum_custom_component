@@ -1,39 +1,100 @@
 {
-    "config": {
-      "title": "Qvantum Värmepump",
-      "abort": {
-        "already_configured": "Enheten är redan konfigurerad",
-        "reconfigure_successful": "Omkonfiguration lyckades"
+  "device":{
+    "name": "Qvantum Frånluftsvärmepump"
+  },
+  "entity": {
+    "sensor": {
+      "compressorenergy": {
+        "name": "Kompressorenergi"
       },
-      "error": {
-        "cannot_connect": "Kunde inte ansluta",
-        "invalid_auth": "Felaktig autentisiering",
-        "unknown": "Oväntat fel"
+      "totalenergy": {
+        "name": "Total energi"
       },
-      "step": {
-        "user": {
-          "data": {
-            "password": "Lösenord",
-            "username": "Användarnamn"
-          }
-        },
-        "reconfigure": {
-          "data": {
-            "password": "Lösenord",
-            "username": "Användarnamn"
-          }
+      "outdoor_temperature": {
+        "name": "Utomhustemperatur"
+      },
+      "indoor_temperature": {
+        "name": "Inomhustemperatur"
+      },
+      "smart_sh_status": {
+        "name": "Smart status för värme"
+      },
+      "heating_flow_temperature": {
+        "name": "Framledningstemperatur"
+      },
+      "heating_flow_temperature_target": {
+        "name": "Framledningstemperatur (mål)"
+      },
+      "tap_water_tank_temperature": {
+        "name": "Varmvattentemperatur"
+      },
+      "tap_water_start": {
+        "name": "Varmvattentemperatur start"
+      },
+      "tap_water_stop": {
+        "name": "Varmvattentemperatur stop"
+      },
+      "tap_water_capacity": {
+        "name": "Varmvattenkapacitet"
+      },
+      "additionalenergy": {
+        "name": "Tillsatsenergi"
+      },
+      "disconnect_reason": {
+        "name": "Frånkopplingsorsak",
+        "state":{
+          "client-disconnect": "Kunden bortkopplad"
         }
+      },
+      "hp_status": {
+        "name": "Status",
+        "state":{
+          "0": "Inaktiv",
+          "1": "Avfrostar",
+          "2": "Varmvatten",
+          "3": "Värmer"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Smart status för varmvatten"
       }
+    }
+  },
+  "config": {
+    "title": "Qvantum Frånluftsvärmepump",
+    "abort": {
+      "already_configured": "Enheten är redan konfigurerad",
+      "reconfigure_successful": "Omkonfiguration lyckades"
     },
-    "options": {
-      "step": {
-        "init": {
-          "data": {
-            "scan_interval": "Uppdateringsfrekvens (sekunder)"
-          },
-          "description": "Ändra alternativ.",
-          "title": "Alternativ"
+    "error": {
+      "cannot_connect": "Kunde inte ansluta",
+      "invalid_auth": "Felaktig autentisiering",
+      "unknown": "Oväntat fel"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "password": "Lösenord",
+          "username": "Användarnamn"
+        }
+      },
+      "reconfigure": {
+        "data": {
+          "password": "Lösenord",
+          "username": "Användarnamn"
         }
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Uppdateringsfrekvens (sekunder)"
+        },
+        "description": "Ändra alternativ.",
+        "title": "Alternativ"
+      }
+    }
   }
+}

@@ -35,7 +35,7 @@ async def async_setup_entry(
         },
         manufacturer=coordinator.data.get("device").get("vendor"),
         model=coordinator.data.get("device").get("model"),
-        name="Qvantum Heat Pump",
+        name="Qvantum",
         serial_number=coordinator.data.get("device").get("serial"),
         sw_version=f"{coordinator.data.get('device_metadata').get('display_fw_version')}/{coordinator.data.get('device_metadata').get('cc_fw_version')}/{coordinator.data.get('device_metadata').get('inv_fw_version')}",
     )
@@ -52,13 +52,12 @@ class QvantumConnectedSensor(CoordinatorEntity, BinarySensorEntity):
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
         super().__init__(coordinator)
         self._hpid = self.coordinator.data.get("metrics").get("hpid")
-        self._attr_name = f"Qvantum {name}"
-        self._attr_friendly_name = name.capitalize()
         self._metric_key = metric_key
         self._attr_unique_id = f"qvantum_{metric_key}_{self._hpid}"
         self._attr_device_info = device
         self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_has_entity_name = True
 
     @property
     def is_on(self):

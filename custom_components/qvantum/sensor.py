@@ -35,7 +35,7 @@ async def async_setup_entry(
         },
         manufacturer=coordinator.data.get("device").get("vendor"),
         model=coordinator.data.get("device").get("model"),
-        name="Qvantum Heat Pump",
+        name="Qvantum",
         serial_number=coordinator.data.get("device").get("serial"),
         sw_version=f"{coordinator.data.get('device_metadata').get('display_fw_version')}/{coordinator.data.get('device_metadata').get('cc_fw_version')}/{coordinator.data.get('device_metadata').get('inv_fw_version')}",
     )
@@ -47,8 +47,6 @@ async def async_setup_entry(
             sensors.append(QvantumTemperatureSensor(coordinator, metric.get("name"), metric.get("name").replace("_", " ").lower(), device))
         elif metric.get("unit") == UnitOfEnergy.KILO_WATT_HOUR:
             sensors.append(QvantumEnergySensor(coordinator, metric.get("name"), metric.get("name").replace("_", " ").lower(), device))
-        elif metric.get("name") == "hp_status":
-            sensors.append(QvantumStatusSensor(coordinator, metric.get("name"), metric.get("name").replace("_", " ").lower(), device))
         else:
             sensors.append(QvantumGenericSensor(coordinator, metric.get("name"), metric.get("name").replace("_", " ").lower(), device))
 
@@ -65,11 +63,11 @@ class QvantumGenericSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
         super().__init__(coordinator)
         self._hpid = self.coordinator.data.get("metrics").get("hpid")
-        self._attr_name = f"Qvantum {name}"
-        self._attr_friendly_name = name.capitalize()
+        self._attr_translation_key = metric_key
         self._metric_key = metric_key
         self._attr_unique_id = f"qvantum_{metric_key}_{self._hpid}"
         self._attr_device_info = device
+        self._attr_has_entity_name = True
 
     @property
     def state(self):
@@ -118,29 +116,7 @@ class QvantumTotalEnergySensor(QvantumEnergySensor):
         """Check if data is available."""
         return "compressorenergy" in self.coordinator.data.get("metrics") and \
                    self.coordinator.data.get("metrics").get("compressorenergy") is not None
-    
-
-class QvantumStatusSensor(QvantumGenericSensor):
-    """Sensor for status measurements."""
-
-    def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
-        super().__init__(coordinator, metric_key, name, device)
-
-    @property
-    def state(self):
-        """Get status from API data."""
-        match self.coordinator.data.get("metrics").get(self._metric_key):
-            case 0:
-                return "Idle"
-            case 1:
-                return "Defrosting"
-            case 2:
-                return "DHW"
-            case 3:
-                return "Heating"
-            case _:
-                return "Unknown"
-
+   
 class QvantumConnectivitySensor(QvantumGenericSensor):
     """Sensor for connectivity."""
 
