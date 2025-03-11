@@ -1,0 +1,72 @@
+"""Interfaces with the Qvantum Heat Pump api sensors."""
+
+import logging
+
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity
+)
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.const import EntityCategory
+
+
+from . import MyConfigEntry
+from .const import DOMAIN
+from .coordinator import QvantumDataUpdateCoordinator
+
+_LOGGER = logging.getLogger(__name__)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: MyConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+):
+    """Set up the Sensors."""
+    # This gets the data update coordinator from the config entry runtime data as specified in your __init__.py
+    coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
+
+    device = DeviceInfo(
+        identifiers={
+            (DOMAIN, f"qvantum-{coordinator.data.get('device').get('id')}"),
+        },
+        manufacturer=coordinator.data.get("device").get("vendor"),
+        model=coordinator.data.get("device").get("model"),
+        name="Qvantum Heat Pump",
+        serial_number=coordinator.data.get("device").get("serial"),
+        sw_version=f"{coordinator.data.get('device_metadata').get('display_fw_version')}/{coordinator.data.get('device_metadata').get('cc_fw_version')}/{coordinator.data.get('device_metadata').get('inv_fw_version')}",
+    )
+
+    sensors = []
+    sensors.append(QvantumConnectedSensor(coordinator, "connected", "connected", device))
+
+    async_add_entities(sensors)
+
+
+class QvantumConnectedSensor(CoordinatorEntity, BinarySensorEntity):
+    """Sensor for qvantum."""
+
+    def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
+        super().__init__(coordinator)
+        self._hpid = self.coordinator.data.get("metrics").get("hpid")
+        self._attr_name = f"Qvantum {name}"
+        self._attr_friendly_name = name.capitalize()
+        self._metric_key = metric_key
+        self._attr_unique_id = f"qvantum_{metric_key}_{self._hpid}"
+        self._attr_device_info = device
+        self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def is_on(self):
+        """Get metric from API data."""
+        return self.coordinator.data.get("connectivity").get(self._metric_key) == True
+
+    @property
+    def available(self):
+        """Check if data is available."""
+        return self._metric_key in self.coordinator.data.get("connectivity") and \
+                   self.coordinator.data.get("connectivity").get(self._metric_key) is not None
