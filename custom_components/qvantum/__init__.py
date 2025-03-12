@@ -12,7 +12,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.device_registry import DeviceInfo
 
+from .const import DOMAIN
 from .coordinator import QvantumDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,7 +29,7 @@ class RuntimeData:
     """Class to hold your data."""
 
     coordinator: DataUpdateCoordinator
-    #device: DeviceInfo | None = None
+    device: DeviceInfo | None = None
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
@@ -41,7 +43,18 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         config_entry.add_update_listener(_async_update_listener)
     )
 
-    config_entry.runtime_data = RuntimeData(coordinator)
+    device = DeviceInfo(
+        identifiers={
+            (DOMAIN, f"qvantum-{coordinator.data.get('device').get('id')}"),
+        },
+        manufacturer=coordinator.data.get("device").get("vendor"),
+        model=coordinator.data.get("device").get("model"),
+        name="Qvantum",
+        serial_number=coordinator.data.get("device").get("serial"),
+        sw_version=f"{coordinator.data.get('device_metadata').get('display_fw_version')}/{coordinator.data.get('device_metadata').get('cc_fw_version')}/{coordinator.data.get('device_metadata').get('inv_fw_version')}",
+    )    
+
+    config_entry.runtime_data = RuntimeData(coordinator, device)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True

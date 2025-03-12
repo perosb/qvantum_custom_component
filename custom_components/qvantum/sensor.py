@@ -7,8 +7,8 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfEnergy, UnitOfPower, UnitOfTemperature, EntityCategory
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import UnitOfEnergy, UnitOfTemperature, EntityCategory
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -28,20 +28,10 @@ async def async_setup_entry(
     """Set up the Sensors."""
     # This gets the data update coordinator from the config entry runtime data as specified in your __init__.py
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
-
-    device = DeviceInfo(
-        identifiers={
-            (DOMAIN, f"qvantum-{coordinator.data.get('device').get('id')}"),
-        },
-        manufacturer=coordinator.data.get("device").get("vendor"),
-        model=coordinator.data.get("device").get("model"),
-        name="Qvantum",
-        serial_number=coordinator.data.get("device").get("serial"),
-        sw_version=f"{coordinator.data.get('device_metadata').get('display_fw_version')}/{coordinator.data.get('device_metadata').get('cc_fw_version')}/{coordinator.data.get('device_metadata').get('inv_fw_version')}",
-    )
+    device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
-    metrics = await coordinator.api.fetch_metrics(coordinator.data.get('device').get('id'))
+    metrics = await coordinator.api.get_available_metrics(coordinator.data.get('device').get('id'))
     for metric in metrics.get("metrics"):
         if metric.get("unit") == UnitOfTemperature.CELSIUS:
             sensors.append(QvantumTemperatureSensor(coordinator, metric.get("name"), metric.get("name").replace("_", " ").lower(), device))

@@ -1,11 +1,7 @@
 """QvantumDataUpdateCoordinator."""
 
-from dataclasses import dataclass
 from datetime import timedelta
 import logging
-import json
-import async_timeout
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_PASSWORD,
@@ -30,7 +26,7 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         self.poll_interval = config_entry.options.get(
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
         )
-        self.api = QvantumAPI(user=self.user, pwd=self.pwd)
+        self.api = QvantumAPI(username=self.user, password=self.pwd)
         self._device = None
 
         super().__init__(
@@ -45,9 +41,9 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         """Fetch data from API endpoint."""
         try:
             if self._device is None:
-                self._device = await self.api.get_device()
+                self._device = await self.api.get_primary_device()
 
-            data = await self.api.fetch_data(self._device.get("id"))
+            data = await self.api.get_metrics(self._device.get("id"))
             data.update({"device": self._device})
 
             _LOGGER.debug("Fetched data: %s", data)

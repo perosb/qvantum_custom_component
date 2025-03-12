@@ -28,17 +28,7 @@ async def async_setup_entry(
     """Set up the Sensors."""
     # This gets the data update coordinator from the config entry runtime data as specified in your __init__.py
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
-
-    device = DeviceInfo(
-        identifiers={
-            (DOMAIN, f"qvantum-{coordinator.data.get('device').get('id')}"),
-        },
-        manufacturer=coordinator.data.get("device").get("vendor"),
-        model=coordinator.data.get("device").get("model"),
-        name="Qvantum",
-        serial_number=coordinator.data.get("device").get("serial"),
-        sw_version=f"{coordinator.data.get('device_metadata').get('display_fw_version')}/{coordinator.data.get('device_metadata').get('cc_fw_version')}/{coordinator.data.get('device_metadata').get('inv_fw_version')}",
-    )
+    device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
     sensors.append(QvantumConnectedSensor(coordinator, "connected", "connected", device))

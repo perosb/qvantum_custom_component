@@ -43,7 +43,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     api = QvantumAPI(data[CONF_USERNAME], data[CONF_PASSWORD])
     try:
         await api.authenticate()
-        device = await api.get_device()
+        device = await api.get_primary_device()
         return {"title": f"{device.get('vendor')} {device.get('model')} ({device.get('serial')})"}
     except APIAuthError as err:
         raise InvalidAuth from err
