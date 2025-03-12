@@ -40,6 +40,9 @@
       "additionalenergy": {
         "name": "Tillsatsenergi"
       },
+      "hpid": {
+        "name": "Id"
+      },
       "disconnect_reason": {
         "name": "Frånkopplingsorsak",
         "state":{

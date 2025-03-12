@@ -4,15 +4,13 @@ from datetime import timedelta
 import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    CONF_PASSWORD,
     CONF_SCAN_INTERVAL,
-    CONF_USERNAME,
 )
-from homeassistant.core import DOMAIN, HomeAssistant
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import QvantumAPI, APIAuthError
-from .const import DEFAULT_SCAN_INTERVAL
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,12 +19,11 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize coordinator."""
-        self.user = config_entry.data[CONF_USERNAME]
-        self.pwd = config_entry.data[CONF_PASSWORD]
         self.poll_interval = config_entry.options.get(
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
         )
-        self.api = QvantumAPI(username=self.user, password=self.pwd)
+
+        self.api = hass.data[DOMAIN]
         self._device = None
 
         super().__init__(

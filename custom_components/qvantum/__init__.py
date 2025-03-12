@@ -2,20 +2,25 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
 
+
+from homeassistant.const import (
+    CONF_PASSWORD,
+    CONF_USERNAME,
+)
+from .api import QvantumAPI
 from .const import DOMAIN
 from .coordinator import QvantumDataUpdateCoordinator
+from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,8 +40,11 @@ class RuntimeData:
 async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
     """Set up Qvantum Heat Pump Integration from a config entry."""
 
-    coordinator = QvantumDataUpdateCoordinator(hass, config_entry)
+    username = config_entry.data[CONF_USERNAME]
+    password = config_entry.data[CONF_PASSWORD]
+    hass.data[DOMAIN] = QvantumAPI(username=username, password=password)
 
+    coordinator = QvantumDataUpdateCoordinator(hass, config_entry)
     await coordinator.async_config_entry_first_refresh()
 
     config_entry.async_on_unload(
@@ -52,7 +60,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         name="Qvantum",
         serial_number=coordinator.data.get("device").get("serial"),
         sw_version=f"{coordinator.data.get('device_metadata').get('display_fw_version')}/{coordinator.data.get('device_metadata').get('cc_fw_version')}/{coordinator.data.get('device_metadata').get('inv_fw_version')}",
-    )    
+    )
+
+    await async_setup_services(hass)
 
     config_entry.runtime_data = RuntimeData(coordinator, device)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)

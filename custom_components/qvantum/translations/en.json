@@ -40,6 +40,9 @@
       "additionalenergy": {
         "name": "Additional energy"
       },
+      "hpid": {
+        "name": "Id"
+      },
       "hp_status": {
         "name": "Heat pump status",
         "state":{

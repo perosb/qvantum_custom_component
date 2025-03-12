@@ -1,0 +1,12 @@
+extra_hot_water:
+  name: extra_hot_water
+  description: >-
+    Additional hot water mode. Turned on explicitly, turned off by a timer.
+  fields:
+    device_id:
+      description: The Qvantum device id
+      example: "3010100111111111"
+
+    hours:
+      description: Hours to produce extra hot water
+      example: "2"

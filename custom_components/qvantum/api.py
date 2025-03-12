@@ -2,10 +2,8 @@
 
 import aiohttp
 from datetime import datetime, timedelta
-from dataclasses import dataclass
-from enum import StrEnum
-import logging
-from random import choice, randrange
+import logging, json
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +48,31 @@ class QvantumAPI:
             else:
                 raise Exception(f"Authentication failed: {response}")
 
+    async def update_extra_tap_water(self, device_id: str, hours: int):
+        """Update one or several settings."""
+
+        stop_time = int((datetime.now() + timedelta(hours=hours)).timestamp())
+        headers = {"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"}
+        payload = {
+            "settings": [
+                {
+                    "name": "extra_tap_water",
+                    "value": True
+                },
+                {
+                    "name": "extra_tap_water_stop",
+                    "value": stop_time
+                }
+            ]
+        }
+
+        _LOGGER.debug(json.dumps(payload))
+
+        async with self._session.patch(f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings?dispatch=false", json=payload, headers=headers) as response:
+            data = await response.json()
+            _LOGGER.debug(data)
+            return data
+
     async def _ensure_valid_token(self):
         """Ensure a valid token is available, refreshing if expired."""
         if not self._token or datetime.now() >= self._token_expiry:
@@ -64,8 +87,8 @@ class QvantumAPI:
         async with self._session.get(f"{self._api_url}/api/device-info/v1/devices/{device_id}/status?metrics=now", headers=headers) as response:
             if response.status == 200:
                 self._data = await response.json()
-            elif response.status == 401:
-                raise APIAuthError(response.status)
+            elif response.status == 403:
+                raise APIAuthError(response)
             else:
                 _LOGGER.error(f"Failed to fetch data, status: {response.status}")
                 self._data = {}
@@ -81,6 +104,8 @@ class QvantumAPI:
         async with self._session.get(f"{self._api_url}/api/inventory/v1/devices/{device_id}/metrics", headers=headers) as response:
             if response.status == 200:
                 return await response.json()
+            elif response.status == 403:
+                raise APIAuthError(response)
             else:
                 _LOGGER.error(f"Failed to fetch metrics, status: {response.status}")
                 return {}
@@ -102,6 +127,8 @@ class QvantumAPI:
                 devices_data = await response.json()
                 _LOGGER.debug(f"Devices fetched successfully: {devices_data}")
                 return devices_data.get('devices') if devices_data else None
+            elif response.status == 403:
+                raise APIAuthError(response)
             else:
                 _LOGGER.error(f"Failed to fetch devices, status: {response.status}")
                 raise APIConnectionError(f"Failed to fetch devices: {response.status}")

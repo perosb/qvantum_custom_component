@@ -43,6 +43,7 @@ async def async_setup_entry(
     sensors.append(QvantumTotalEnergySensor(coordinator, "totalenergy", "total energy", device))
     sensors.append(QvantumConnectivitySensor(coordinator, "timestamp", "timestamp", device))
     sensors.append(QvantumConnectivitySensor(coordinator, "disconnect_reason", "disconnect reason", device))
+    sensors.append(QvantumDiagnosticSensor(coordinator, "hpid", "heatpump id", device))
 
     async_add_entities(sensors)
 
@@ -106,7 +107,14 @@ class QvantumTotalEnergySensor(QvantumEnergySensor):
         """Check if data is available."""
         return "compressorenergy" in self.coordinator.data.get("metrics") and \
                    self.coordinator.data.get("metrics").get("compressorenergy") is not None
-   
+
+class QvantumDiagnosticSensor(QvantumGenericSensor):
+    """Sensor for diagnostic."""
+
+    def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
+        super().__init__(coordinator, metric_key, name, device)
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
 class QvantumConnectivitySensor(QvantumGenericSensor):
     """Sensor for connectivity."""
 
