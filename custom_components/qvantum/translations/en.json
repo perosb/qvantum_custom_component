@@ -61,6 +61,16 @@
           "client-disconnect": "Client disconnected"
         }
       }
+    },
+    "number": {
+      "tap_water_capacity_target": {
+        "name": "Hot water capacity"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Indoor climate"
+      }
     }
   },  
   "config": {

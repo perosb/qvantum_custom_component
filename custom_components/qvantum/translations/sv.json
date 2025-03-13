@@ -61,6 +61,16 @@
       "smart_dhw_status": {
         "name": "Smart status för varmvatten"
       }
+    },
+    "number": {
+      "tap_water_capacity_target": {
+        "name": "Varmvattenkapacitet"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Inomhusklimat"
+      }
     }
   },
   "config": {

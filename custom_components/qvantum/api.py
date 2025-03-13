@@ -80,6 +80,34 @@ class QvantumAPI:
 
         return await self._update_settings(device_id, payload)
 
+    async def set_tap_water_capacity_target(self, device_id: str, capacity: int):
+        """Update one or several settings."""
+
+        payload = {
+            "settings": [
+                {
+                    "name": "tap_water_capacity_target",
+                    "value": capacity
+                }
+            ]
+        }
+
+        return await self._update_settings(device_id, payload)
+
+    async def set_temperature(self, device_id: str, temperature: float):
+        """Update one or several settings."""
+
+        payload = {
+            "settings": [
+                {
+                    "name": "indoor_temperature_target",
+                    "value": temperature
+                }
+            ]
+        }
+
+        return await self._update_settings(device_id, payload)
+
     async def _ensure_valid_token(self):
         """Ensure a valid token is available, refreshing if expired."""
         if not self._token or datetime.now() >= self._token_expiry:
@@ -101,7 +129,7 @@ class QvantumAPI:
                 if method == "now" and \
                     "time" in self._data.get("metrics") and \
                     self._data.get("metrics").get("time") == None:
-                    _LOGGER.warning("Failed to get 'now' metrics, falling back to 'last'")
+                    _LOGGER.warning(f"Failed to get 'now' metrics, falling back to 'last': {self._data}")
                     return await self.get_metrics(device_id=device_id, method="last")
                 
             elif response.status == 403:
@@ -111,7 +139,6 @@ class QvantumAPI:
                 self._data = {}
 
         return self._data
-
     async def get_available_metrics(self, device_id: str):
         """Fetch metrics from the API with authentication."""
 
@@ -126,6 +153,25 @@ class QvantumAPI:
             else:
                 _LOGGER.error(f"Failed to fetch metrics, status: {response.status}")
                 return {}
+
+
+    async def get_settings(self, device_id: str):
+        """Fetch settings from the API with authentication."""
+
+        await self._ensure_valid_token()
+        headers = {"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"}
+        
+        async with self._session.get(f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings", headers=headers) as response:
+            if response.status == 200:
+                self._data = await response.json()
+            elif response.status == 403:
+                raise APIAuthError(response)
+            else:
+                _LOGGER.error(f"Failed to fetch settings, status: {response.status}")
+                self._data = {}
+
+        return self._data
+
 
     async def get_primary_device(self):
         """Fetch device from the API with authentication."""

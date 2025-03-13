@@ -9,7 +9,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import QvantumAPI, APIAuthError
+from .api import APIAuthError
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,7 +41,14 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                 self._device = await self.api.get_primary_device()
 
             data = await self.api.get_metrics(self._device.get("id"))
+            settings = await self.api.get_settings(self._device.get("id"))
             data.update({"device": self._device})
+
+            settings_dict = {}
+            for setting in settings.get("settings"):
+                settings_dict[setting.get("name")] = setting.get("value")
+
+            data.update({"settings": settings_dict})
 
             _LOGGER.debug("Fetched data: %s", data)
 
@@ -51,4 +58,5 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error(err)
             raise UpdateFailed(err) from err
         except Exception as err:
+            _LOGGER.error(f"Unexpected error: {err}")
             raise UpdateFailed(f"Error communicating with API: {err}") from err
