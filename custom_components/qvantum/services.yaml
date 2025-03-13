@@ -7,6 +7,6 @@ extra_hot_water:
       description: The Qvantum device id
       example: "3010100111111111"
 
-    hours:
-      description: Hours to produce extra hot water
-      example: "2"
+    minutes:
+      description: Minutes to produce extra hot water
+      example: "120"

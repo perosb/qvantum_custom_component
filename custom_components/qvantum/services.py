@@ -13,7 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 EXTRA_TAP_WATER_SCHEMA = vol.Schema(
     {
         vol.Required("device_id"): int,
-        vol.Required("hours", default=2): vol.All(vol.Coerce(int), vol.Range(min=1, max=8))
+        vol.Required("minutes", default=120): vol.All(vol.Coerce(int), vol.Range(min=30, max=480))
     }
 )
 
@@ -25,9 +25,9 @@ async def async_setup_services(hass: HomeAssistant):
         api = service_call.hass.data[DOMAIN]
 
         device_id = data['device_id']
-        hours = data['hours']
+        minutes = data['minutes']
         try:
-            response = await api.update_extra_tap_water(device_id, hours)
+            response = await api.update_extra_tap_water(device_id, minutes)
             return { 
                 "qvantum": [ response ]
             }

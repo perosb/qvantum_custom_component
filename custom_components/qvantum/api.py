@@ -61,10 +61,10 @@ class QvantumAPI:
             _LOGGER.debug(data)
             return data
 
-    async def update_extra_tap_water(self, device_id: str, hours: int):
+    async def update_extra_tap_water(self, device_id: str, minutes: int):
         """Update one or several settings."""
 
-        stop_time = int((datetime.now() + timedelta(hours=hours)).timestamp())
+        stop_time = int((datetime.now() + timedelta(minutes=minutes)).timestamp())
         payload = {
             "settings": [
                 {
