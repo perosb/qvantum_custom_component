@@ -63,8 +63,16 @@ class QvantumIndoorClimate(CoordinatorEntity, ClimateEntity):
     @property
     def supported_features(self):
         """Return the list of supported features."""
-        return ClimateEntityFeature.TARGET_TEMPERATURE
+        if self.coordinator.data.get("settings").get("sensor_mode") == "bt2":
+            return ClimateEntityFeature.TARGET_TEMPERATURE
+        
+        return {}
     
+    @property
+    def available(self):
+        """Check if data is available."""
+        return "indoor_temperature" in self.coordinator.data.get("metrics") and \
+                   self.coordinator.data.get("metrics").get("indoor_temperature") is not None
     
     @property
     def current_temperature(self):
