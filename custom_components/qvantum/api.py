@@ -102,7 +102,7 @@ class QvantumAPI:
                     "time" in self._data.get("metrics") and \
                     self._data.get("metrics").get("time") == None:
                     _LOGGER.warning("Failed to get 'now' metrics, falling back to 'last'")
-                    return self.get_metrics(device_id=device_id, method="last")
+                    return await self.get_metrics(device_id=device_id, method="last")
                 
             elif response.status == 403:
                 raise APIAuthError(response)
