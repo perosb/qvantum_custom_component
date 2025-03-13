@@ -48,11 +48,23 @@ class QvantumAPI:
             else:
                 raise Exception(f"Authentication failed: {response}")
 
+
+    async def _update_settings(self, device_id: str, payload: dict):
+        """Update one or several settings."""
+
+        headers = {"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"}
+
+        _LOGGER.debug(json.dumps(payload))
+
+        async with self._session.patch(f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings?dispatch=false", json=payload, headers=headers) as response:
+            data = await response.json()
+            _LOGGER.debug(data)
+            return data
+
     async def update_extra_tap_water(self, device_id: str, hours: int):
         """Update one or several settings."""
 
         stop_time = int((datetime.now() + timedelta(hours=hours)).timestamp())
-        headers = {"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"}
         payload = {
             "settings": [
                 {
@@ -66,27 +78,32 @@ class QvantumAPI:
             ]
         }
 
-        _LOGGER.debug(json.dumps(payload))
-
-        async with self._session.patch(f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings?dispatch=false", json=payload, headers=headers) as response:
-            data = await response.json()
-            _LOGGER.debug(data)
-            return data
+        return await self._update_settings(device_id, payload)
 
     async def _ensure_valid_token(self):
         """Ensure a valid token is available, refreshing if expired."""
         if not self._token or datetime.now() >= self._token_expiry:
             await self.authenticate()
 
-    async def get_metrics(self, device_id: str):
+    async def get_metrics(self, device_id: str, method="now"):
         """Fetch data from the API with authentication."""
 
         await self._ensure_valid_token()
         headers = {"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"}
         
-        async with self._session.get(f"{self._api_url}/api/device-info/v1/devices/{device_id}/status?metrics=now", headers=headers) as response:
+        async with self._session.get(f"{self._api_url}/api/device-info/v1/devices/{device_id}/status?metrics={method}", headers=headers) as response:
             if response.status == 200:
                 self._data = await response.json()
+
+                # "now" will return telemetry data to the API user only if current values can be returned to the caller
+                # "last" will return the "most recent metrics" device has reported, if the device has been connected last 7 days.                
+                # now (recent) or last (less recent if device offline short time period)
+                if method == "now" and \
+                    "time" in self._data.get("metrics") and \
+                    self._data.get("metrics").get("time") == None:
+                    _LOGGER.warning("Failed to get 'now' metrics, falling back to 'last'")
+                    return self.get_metrics(device_id=device_id, method="last")
+                
             elif response.status == 403:
                 raise APIAuthError(response)
             else:
