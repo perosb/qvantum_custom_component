@@ -9,6 +9,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import UnitOfEnergy, UnitOfTemperature, EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_utils
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -42,6 +43,8 @@ async def async_setup_entry(
 
     sensors.append(QvantumTotalEnergySensor(coordinator, "totalenergy", "total energy", device))
     sensors.append(QvantumConnectivitySensor(coordinator, "timestamp", "timestamp", device))
+    sensors.append(QvantumTimerSensor(coordinator, "extra_tap_water_stop", "extra tap water stop", device))
+    sensors.append(QvantumTimerSensor(coordinator, "ventilation_boost_stop", "ventilation boost stop", device))
     sensors.append(QvantumConnectivitySensor(coordinator, "disconnect_reason", "disconnect reason", device))
     sensors.append(QvantumDiagnosticSensor(coordinator, "hpid", "heatpump id", device))
 
@@ -70,7 +73,6 @@ class QvantumGenericSensor(CoordinatorEntity, SensorEntity):
         """Check if data is available."""
         return self._metric_key in self.coordinator.data.get("metrics") and \
                    self.coordinator.data.get("metrics").get(self._metric_key) is not None
-
 
 class QvantumTemperatureSensor(QvantumGenericSensor):
     """Sensor for temperature measurements."""
@@ -114,6 +116,27 @@ class QvantumDiagnosticSensor(QvantumGenericSensor):
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
         super().__init__(coordinator, metric_key, name, device)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+class QvantumTimerSensor(QvantumGenericSensor):
+    """Sensor for connectivity."""
+
+    def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
+        super().__init__(coordinator, metric_key, name, device)
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_device_class = "timestamp"
+
+    @property
+    def state(self):
+        """Get metric from API data."""
+        epoch = self.coordinator.data.get("settings").get(self._metric_key)
+        return dt_utils.utc_from_timestamp(epoch)
+
+    @property
+    def available(self):
+        """Check if data is available."""
+        return self._metric_key in self.coordinator.data.get("settings") and \
+                   self.coordinator.data.get("settings").get(self._metric_key) is not None and \
+                   self.coordinator.data.get("settings").get(self._metric_key) > 0
 
 class QvantumConnectivitySensor(QvantumGenericSensor):
     """Sensor for connectivity."""

@@ -55,6 +55,15 @@
       "smart_dhw_status": {
         "name": "Smart status for hot water"
       },
+      "extra_tap_water_stop": {
+        "name": "Extra hot water stop"
+      },
+      "ventilation_boost_stop": {
+        "name": "Boost ventilation stop"
+      },
+      "timestamp": {
+        "name": "Last update"
+      },
       "disconnect_reason": {
         "name": "Disconnect reason",
         "state":{
