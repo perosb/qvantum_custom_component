@@ -29,8 +29,8 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
-    sensors.append(QvantumCapacityNumber(coordinator, "tap_water_capacity_target", 1, 5, device))
-    sensors.append(QvantumCapacityNumber(coordinator, "room_comp_factor", 0, 10, device))
+    sensors.append(QvantumCapacityNumber(coordinator, "tap_water_capacity_target", 1, 5, 1, device))
+    sensors.append(QvantumCapacityNumber(coordinator, "room_comp_factor", 0, 10, 0.5, device))
 
     async_add_entities(sensors)
 
@@ -39,7 +39,7 @@ async def async_setup_entry(
 class QvantumCapacityNumber(CoordinatorEntity, NumberEntity):
     """Sensor for qvantum."""
 
-    def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, min: int, max: int, device: DeviceInfo) -> None:
+    def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, min: int, max: int, step: float, device: DeviceInfo) -> None:
         super().__init__(coordinator)
         self._hpid = self.coordinator.data.get("metrics").get("hpid")
         self._attr_translation_key = metric_key
@@ -49,7 +49,7 @@ class QvantumCapacityNumber(CoordinatorEntity, NumberEntity):
         self._attr_has_entity_name = True
         self._attr_native_min_value = min
         self._attr_native_max_value = max
-        self._attr_native_step = 1
+        self._attr_native_step = step
         
 
     async def async_set_native_value(self, value: float) -> None:
