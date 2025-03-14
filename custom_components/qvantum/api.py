@@ -64,12 +64,14 @@ class QvantumAPI:
     async def set_extra_tap_water(self, device_id: str, minutes: int):
         """Update extra_tap_water setting."""
 
+        enable = minutes > 0
         stop_time = int((datetime.now() + timedelta(minutes=minutes)).timestamp())
+
         payload = {
             "settings": [
                 {
                     "name": "extra_tap_water",
-                    "value": True
+                    "value": enable
                 },
                 {
                     "name": "extra_tap_water_stop",

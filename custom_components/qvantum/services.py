@@ -13,7 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 EXTRA_TAP_WATER_SCHEMA = vol.Schema(
     {
         vol.Required("device_id"): int,
-        vol.Required("minutes", default=120): vol.All(vol.Coerce(int), vol.Range(min=30, max=480))
+        vol.Required("minutes", default=120): vol.All(vol.Coerce(int), vol.Range(min=0, max=480))
     }
 )
 

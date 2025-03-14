@@ -8,5 +8,5 @@ extra_hot_water:
       example: "3010100111111111"
 
     minutes:
-      description: Minutes to produce extra hot water
+      description: Minutes to produce extra hot water (0 minutes turns off)
       example: "120"
