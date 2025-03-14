@@ -15,7 +15,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
-from .const import DOMAIN
 from .coordinator import QvantumDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,7 +26,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ):
     """Set up the Sensors."""
-    # This gets the data update coordinator from the config entry runtime data as specified in your __init__.py
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo = config_entry.runtime_data.device
 
@@ -146,6 +144,7 @@ class QvantumConnectivitySensor(QvantumGenericSensor):
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         if metric_key == "timestamp":
             self._attr_device_class = "timestamp"
+            self._attr_entity_registry_enabled_default = False
 
     @property
     def state(self):

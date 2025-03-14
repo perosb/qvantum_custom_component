@@ -82,6 +82,20 @@ class QvantumAPI:
 
         return await self._update_settings(device_id, payload)
 
+    async def set_indoor_temperature_offset(self, device_id: str, value: int):
+        """Update indoor_temperature_offset setting."""
+
+        payload = {
+            "settings": [
+                {
+                    "name": "indoor_temperature_offset",
+                    "value": value
+                }
+            ]
+        }
+
+        return await self._update_settings(device_id, payload)
+
     async def set_room_comp_factor(self, device_id: str, value: int):
         """Update room_comp_factor setting."""
 

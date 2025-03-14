@@ -12,7 +12,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
-from .const import DOMAIN
 from .coordinator import QvantumDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -24,19 +23,19 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ):
     """Set up the Number."""
-    # This gets the data update coordinator from the config entry runtime data as specified in your __init__.py
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
-    sensors.append(QvantumCapacityNumber(coordinator, "tap_water_capacity_target", 1, 5, 1, device))
-    sensors.append(QvantumCapacityNumber(coordinator, "room_comp_factor", 0, 10, 0.5, device))
+    sensors.append(QvantumNumber(coordinator, "tap_water_capacity_target", 1, 5, 1, device))
+    sensors.append(QvantumNumber(coordinator, "room_comp_factor", 0, 10, 0.5, device))
+    sensors.append(QvantumNumber(coordinator, "indoor_temperature_offset", -10, 10, 1, device))
 
     async_add_entities(sensors)
 
     _LOGGER.debug(f"Setting up platform NUMBER")
 
-class QvantumCapacityNumber(CoordinatorEntity, NumberEntity):
+class QvantumNumber(CoordinatorEntity, NumberEntity):
     """Sensor for qvantum."""
 
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, min: int, max: int, step: float, device: DeviceInfo) -> None:
@@ -50,6 +49,9 @@ class QvantumCapacityNumber(CoordinatorEntity, NumberEntity):
         self._attr_native_min_value = min
         self._attr_native_max_value = max
         self._attr_native_step = step
+
+        if self._metric_key == "indoor_temperature_offset":
+            self._attr_entity_registry_enabled_default = self.available
         
 
     async def async_set_native_value(self, value: float) -> None:
@@ -59,6 +61,8 @@ class QvantumCapacityNumber(CoordinatorEntity, NumberEntity):
                 await self.coordinator.api.set_tap_water_capacity_target(self._hpid, int(value))
             case "room_comp_factor":
                 await self.coordinator.api.set_room_comp_factor(self._hpid, int(value))
+            case "indoor_temperature_offset":
+                await self.coordinator.api.set_indoor_temperature_offset(self._hpid, int(value))
 
     @property
     def state(self):
@@ -68,5 +72,14 @@ class QvantumCapacityNumber(CoordinatorEntity, NumberEntity):
     @property
     def available(self):
         """Check if data is available."""
-        return self._metric_key in self.coordinator.data.get("settings") and \
-                   self.coordinator.data.get("settings").get(self._metric_key) is not None
+
+        avail = self._metric_key in self.coordinator.data.get("settings") and \
+                    self.coordinator.data.get("settings").get(self._metric_key) is not None
+
+        # if using outdoor sensor, allow setting parallel offset
+        if self._metric_key == "indoor_temperature_offset" and \
+            self.coordinator.data.get("settings").get("sensor_mode") != "bt1":
+            return False
+
+        return avail
+

@@ -72,6 +72,9 @@
       }
     },
     "number": {
+      "indoor_temperature_offset": {
+        "name": "Parallel curve offset"
+      },
       "tap_water_capacity_target": {
         "name": "Hot water capacity"
       },
