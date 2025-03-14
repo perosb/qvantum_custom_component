@@ -74,6 +74,9 @@
     "number": {
       "tap_water_capacity_target": {
         "name": "Hot water capacity"
+      },
+      "room_comp_factor": {
+        "name": "Room compensation factor"
       }
     },
     "climate": {

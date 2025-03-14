@@ -27,7 +27,7 @@ async def async_setup_services(hass: HomeAssistant):
         device_id = data['device_id']
         minutes = data['minutes']
         try:
-            response = await api.update_extra_tap_water(device_id, minutes)
+            response = await api.set_extra_tap_water(device_id, minutes)
             return { 
                 "qvantum": [ response ]
             }

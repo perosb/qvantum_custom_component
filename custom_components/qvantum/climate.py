@@ -53,7 +53,7 @@ class QvantumIndoorClimate(CoordinatorEntity, ClimateEntity):
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""
-        await self.coordinator.api.set_temperature(self._hpid, kwargs['temperature'])
+        await self.coordinator.api.set_indoor_temperature_target(self._hpid, kwargs['temperature'])
 
 
     async def async_set_hvac_mode(self, hvac_mode):

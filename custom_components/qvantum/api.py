@@ -61,8 +61,8 @@ class QvantumAPI:
             _LOGGER.debug(data)
             return data
 
-    async def update_extra_tap_water(self, device_id: str, minutes: int):
-        """Update one or several settings."""
+    async def set_extra_tap_water(self, device_id: str, minutes: int):
+        """Update extra_tap_water setting."""
 
         stop_time = int((datetime.now() + timedelta(minutes=minutes)).timestamp())
         payload = {
@@ -80,8 +80,22 @@ class QvantumAPI:
 
         return await self._update_settings(device_id, payload)
 
+    async def set_room_comp_factor(self, device_id: str, value: int):
+        """Update room_comp_factor setting."""
+
+        payload = {
+            "settings": [
+                {
+                    "name": "room_comp_factor",
+                    "value": value
+                }
+            ]
+        }
+
+        return await self._update_settings(device_id, payload)
+
     async def set_tap_water_capacity_target(self, device_id: str, capacity: int):
-        """Update one or several settings."""
+        """Update tap_water_capacity_target setting."""
 
         payload = {
             "settings": [
@@ -94,8 +108,8 @@ class QvantumAPI:
 
         return await self._update_settings(device_id, payload)
 
-    async def set_temperature(self, device_id: str, temperature: float):
-        """Update one or several settings."""
+    async def set_indoor_temperature_target(self, device_id: str, temperature: float):
+        """Update indoor_temperature_target setting."""
 
         payload = {
             "settings": [
