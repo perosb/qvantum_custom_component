@@ -7,8 +7,8 @@ import logging, json
 
 _LOGGER = logging.getLogger(__name__)
 
-AUTH_URL = "https://identitytoolkit.googleapis.com"  # Separate domain for authentication
-API_URL = "https://api.qvantum.com"    # Domain for data fetching
+AUTH_URL = "https://identitytoolkit.googleapis.com"
+API_URL = "https://api.qvantum.com"
 
 
 class QvantumAPI:

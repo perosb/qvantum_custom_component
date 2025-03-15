@@ -3,6 +3,11 @@
     "name": "Qvantum Frånluftsvärmepump"
   },
   "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Extra varmvatten (1h)"
+      }
+    },
     "sensor": {
       "compressorenergy": {
         "name": "Kompressorenergi"

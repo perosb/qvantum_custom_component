@@ -12,6 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
+from .const import SETTING_UPDATE_APPLIED
 from .coordinator import QvantumDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,13 +57,20 @@ class QvantumNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Update the current value."""
+
+        response = {}
         match self._metric_key:
             case "tap_water_capacity_target":
-                await self.coordinator.api.set_tap_water_capacity_target(self._hpid, int(value))
+                response = await self.coordinator.api.set_tap_water_capacity_target(self._hpid, int(value))
             case "room_comp_factor":
-                await self.coordinator.api.set_room_comp_factor(self._hpid, int(value))
+                response = await self.coordinator.api.set_room_comp_factor(self._hpid, int(value))
             case "indoor_temperature_offset":
-                await self.coordinator.api.set_indoor_temperature_offset(self._hpid, int(value))
+                response = await self.coordinator.api.set_indoor_temperature_offset(self._hpid, int(value))
+
+        if response.get("status") == SETTING_UPDATE_APPLIED:
+            self.coordinator.data.get("settings")[self._metric_key] = int(value)
+            self.coordinator.async_set_updated_data(self.coordinator.data)
+
 
     @property
     def state(self):

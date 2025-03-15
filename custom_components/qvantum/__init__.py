@@ -24,7 +24,13 @@ from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.CLIMATE, Platform.NUMBER]
+PLATFORMS: list[Platform] = [
+                             Platform.SENSOR, 
+                             Platform.BINARY_SENSOR, 
+                             Platform.CLIMATE, 
+                             Platform.NUMBER,
+                             Platform.SWITCH
+                            ]
 
 type MyConfigEntry = ConfigEntry[RuntimeData]
 

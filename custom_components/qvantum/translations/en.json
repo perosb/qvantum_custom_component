@@ -3,6 +3,11 @@
     "name": "Qvantum Heat pump"
   },
   "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Extra hot water (1h)"
+      }
+    },
     "sensor": {
       "compressorenergy": {
         "name": "Compressor energy"
