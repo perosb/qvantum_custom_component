@@ -9,5 +9,5 @@
     "documentation": "https://github.com/perosb/qvantum_custom_component",
     "iot_class": "cloud_polling",
     "single_config_entry": true,
-    "version": "2025.3.15"
+    "version": "2025.3.16"
 }
