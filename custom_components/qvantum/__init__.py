@@ -63,6 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         },
         manufacturer=coordinator.data.get("device").get("vendor"),
         model=coordinator.data.get("device").get("model"),
+        translation_key="qvantum_flvp",
         name="Qvantum",
         serial_number=coordinator.data.get("device").get("serial"),
         sw_version=f"{coordinator.data.get('device_metadata').get('display_fw_version')}/{coordinator.data.get('device_metadata').get('cc_fw_version')}/{coordinator.data.get('device_metadata').get('inv_fw_version')}",

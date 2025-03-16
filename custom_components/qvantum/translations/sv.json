@@ -1,6 +1,8 @@
 {
   "device":{
-    "name": "Qvantum Frånluftsvärmepump"
+    "qvantum_flvp":{
+      "name": "Qvantum Frånluftsvärmepump"
+    }
   },
   "entity": {
     "switch": {
@@ -127,6 +129,22 @@
         },
         "description": "Ändra alternativ.",
         "title": "Alternativ"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Extra varmvatten",
+      "description": "Aktivera extra varmvatten under en period",
+      "fields": {
+        "device_id": {
+          "name": "Device Id",
+          "description": "Qvantum device id"
+        },
+        "minutes": {
+          "name": "Minuter",
+          "description": "Antal minuter att producera extra varmvatten (0 minuter stänger av)"
+        }
       }
     }
   }

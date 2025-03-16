@@ -1,6 +1,8 @@
 {
   "device":{
-    "name": "Qvantum Heat pump"
+    "qvantum_flvp":{
+      "name": "Qvantum Heat pump"
+    }
   },
   "entity": {
     "switch": {
@@ -127,6 +129,22 @@
         },
         "description": "Amend your options.",
         "title": "Options"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Extra hot water",
+      "description": "Active extra hot water for a period",
+      "fields": {
+        "device_id": {
+          "name": "Device Id",
+          "description": "The Qvantum device id"
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "Minutes to produce extra hot water (0 minutes turns off)"
+        }
       }
     }
   }
