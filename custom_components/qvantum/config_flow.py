@@ -50,22 +50,17 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     except APIConnectionError as err:
         raise CannotConnect from err
 
-    return {"title": f"Qvantum Heat Pump"}
-
-
 class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Qvantum Integration."""
 
     VERSION = 1
     _input_data: dict[str, Any]
 
-    # @staticmethod
-    # @callback
-    # def async_get_options_flow(config_entry):
-    #     """Get the options flow for this handler."""
-    #     # Remove this method and the QvantumOptionsFlowHandler class
-    #     # if you do not want any options for your integration.
-    #     return QvantumOptionsFlowHandler(config_entry)
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Get the options flow for this handler."""
+        return QvantumOptionsFlowHandler(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -104,10 +99,6 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Add reconfigure step to allow to reconfigure a config entry."""
-        # This methid displays a reconfigure option in the integration and is
-        # different to options.
-        # It can be used to reconfigure any of the data submitted when first installed.
-        # This is optional and can be removed if you do not want to allow reconfiguration.
         errors: dict[str, str] = {}
         config_entry = self.hass.config_entries.async_get_entry(
             self.context["entry_id"]
@@ -144,33 +135,30 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
-# class QvantumOptionsFlowHandler(OptionsFlow):
-#     """Handles the options flow."""
+class QvantumOptionsFlowHandler(OptionsFlow):
+    """Handles the options flow."""
 
-#     def __init__(self, config_entry: ConfigEntry) -> None:
-#         """Initialize options flow."""
-#         self.config_entry = config_entry
-#         self.options = dict(config_entry.options)
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+        self.options = dict(config_entry.options)
 
-#     async def async_step_init(self, user_input=None):
-#         """Handle options flow."""
-#         if user_input is not None:
-#             options = self.config_entry.options | user_input
-#             return self.async_create_entry(title="", data=options)
+    async def async_step_init(self, user_input=None):
+        """Handle options flow."""
+        if user_input is not None:
+            options = self.config_entry.options | user_input
+            return self.async_create_entry(title="", data=options)
 
-#         # It is recommended to prepopulate options fields with default values if available.
-#         # These will be the same default values you use on your coordinator for setting variable values
-#         # if the option has not been set.
-#         data_schema = vol.Schema(
-#             {
-#                 vol.Required(
-#                     CONF_SCAN_INTERVAL,
-#                     default=self.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-#                 ): (vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL))),
-#             }
-#         )
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_SCAN_INTERVAL,
+                    default=self.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                ): (vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL))),
+            }
+        )
 
-#         return self.async_show_form(step_id="init", data_schema=data_schema)
+        return self.async_show_form(step_id="init", data_schema=data_schema)
 
 
 class CannotConnect(HomeAssistantError):
