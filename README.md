@@ -18,3 +18,9 @@ Disrupting the ordinary takes courage, but with experience, deep knowledge and d
 4. Sign in using email and password.
 
 The integration will pull your devices and use the first one. It will create sensors for all supported metrics.
+
+*Qvantum Controls:*  
+![image](https://github.com/user-attachments/assets/3b04bf83-3f1a-45d8-9aad-fdcb780abc9b)
+
+*Daily energy usage of Qvantum Heap Pump:*   
+![image](https://github.com/user-attachments/assets/4f2f58f8-eae2-4a72-a2e8-b8468f869da4)
