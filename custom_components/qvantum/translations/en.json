@@ -1,7 +1,7 @@
 {
   "device":{
     "qvantum_flvp":{
-      "name": "Qvantum Heat pump"
+      "name": "Qvantum Exhaust Air Heat Pump"
     }
   },
   "entity": {

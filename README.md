@@ -1,6 +1,6 @@
 [![qvantum_custom_component](https://img.shields.io/github/release/perosb/qvantum_custom_component/all.svg?label=current%20release)](https://github.com/perosb/qvantum_custom_component) [![downloads](https://img.shields.io/github/downloads/perosb/qvantum_custom_component/total?label=downloads)](https://github.com/perosb/qvantum_custom_component)
 
-## Qvantum Heat Pump
+## Qvantum Exhaust Air Heat Pump
 
 ### Energy for all – without compromises
 
