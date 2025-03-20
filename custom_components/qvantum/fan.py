@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from typing import Optional, Any
 
-from .const import SETTING_UPDATE_APPLIED, FAN_SPEED_STATE_OFF, FAN_SPEED_STATE_NORMAL, FAN_SPEED_STATE_EXTRA, FAN_SPEED_VALUE_OFF, FAN_SPEED_VALUE_NORMAL, FAN_SPEED_VALUE_EXTRA
+from .const import SETTING_UPDATE_APPLIED, FAN_SPEED_STATE_OFF, FAN_SPEED_STATE_NORMAL, FAN_SPEED_STATE_EXTRA
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
 

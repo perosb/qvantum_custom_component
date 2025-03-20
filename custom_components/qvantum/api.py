@@ -9,6 +9,7 @@ _LOGGER = logging.getLogger(__name__)
 
 AUTH_URL = "https://identitytoolkit.googleapis.com"
 API_URL = "https://api.qvantum.com"
+from .const import FAN_SPEED_STATE_OFF, FAN_SPEED_STATE_NORMAL, FAN_SPEED_STATE_EXTRA, FAN_SPEED_VALUE_OFF, FAN_SPEED_VALUE_NORMAL, FAN_SPEED_VALUE_EXTRA
 
 
 class QvantumAPI:
@@ -101,11 +102,11 @@ class QvantumAPI:
 
         match preset_mode:
             case "off":
-                value = 0
+                value = FAN_SPEED_VALUE_OFF
             case "normal":
-                value = 1
+                value = FAN_SPEED_VALUE_NORMAL
             case "extra":
-                value = 2
+                value = FAN_SPEED_VALUE_EXTRA
             case _:
                 raise ValueError(f"Invalid preset_mode: {preset_mode}")
 
