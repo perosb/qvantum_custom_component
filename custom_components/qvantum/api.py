@@ -117,6 +117,11 @@ class QvantumAPI:
                 raise ValueError(f"Invalid preset_mode: {preset_mode}")
 
         payload = {"settings": [{"name": "fanspeedselector", "value": value}]}
+        if value == FAN_SPEED_VALUE_EXTRA:
+            stop_time = int((datetime.now() + timedelta(minutes=120)).timestamp())
+            payload["settings"].append(
+                {"name": "ventilation_boost_stop", "value": stop_time}
+            )
 
         return await self._update_settings(device_id, payload)
 
