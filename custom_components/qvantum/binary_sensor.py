@@ -31,12 +31,12 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
-    sensors.append(QvantumConnectedSensor(coordinator, "connected", "connected", device))
+    sensors.append(QvantumConnectedEntity(coordinator, "connected", "connected", device))
 
     async_add_entities(sensors)
 
 
-class QvantumConnectedSensor(CoordinatorEntity, BinarySensorEntity):
+class QvantumConnectedEntity(CoordinatorEntity, BinarySensorEntity):
     """Sensor for qvantum."""
 
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:

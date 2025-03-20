@@ -1,7 +1,7 @@
 {
-  "device":{
-    "qvantum_flvp":{
-      "name": "Qvantum Exhaust Air Heat Pump"
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
     }
   },
   "entity": {
@@ -52,7 +52,7 @@
       },
       "hp_status": {
         "name": "Heat pump status",
-        "state":{
+        "state": {
           "0": "Idle",
           "1": "Defrosting",
           "2": "Hot water",
@@ -73,7 +73,7 @@
       },
       "disconnect_reason": {
         "name": "Disconnect reason",
-        "state":{
+        "state": {
           "client-disconnect": "Client disconnected"
         }
       }
@@ -93,8 +93,22 @@
       "indoor_climate": {
         "name": "Indoor climate"
       }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Fan speed",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Off",
+              "normal": "Normal",
+              "extra": "Extra"
+            }
+          }
+        }
+      }
     }
-  },  
+  },
   "config": {
     "title": "Qvantum Heat pump",
     "abort": {

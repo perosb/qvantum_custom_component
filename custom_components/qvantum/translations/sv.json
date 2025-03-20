@@ -1,7 +1,7 @@
 {
-  "device":{
-    "qvantum_flvp":{
-      "name": "Qvantum Frånluftsvärmepump"
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
     }
   },
   "entity": {
@@ -61,13 +61,13 @@
       },
       "disconnect_reason": {
         "name": "Frånkopplingsorsak",
-        "state":{
+        "state": {
           "client-disconnect": "Kunden bortkopplad"
         }
       },
       "hp_status": {
         "name": "Status",
-        "state":{
+        "state": {
           "0": "Inaktiv",
           "1": "Avfrostar",
           "2": "Varmvatten",
@@ -92,6 +92,20 @@
     "climate": {
       "indoor_climate": {
         "name": "Inomhusklimat"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Fläkthastighet",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Av",
+              "normal": "Normal",
+              "extra": "Extra"
+            }
+          }
+        }
       }
     }
   },

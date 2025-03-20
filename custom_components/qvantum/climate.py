@@ -32,13 +32,13 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
-    sensors.append(QvantumIndoorClimate(coordinator, device))
+    sensors.append(QvantumIndoorClimateEntity(coordinator, device))
 
     async_add_entities(sensors)
 
     _LOGGER.debug(f"Setting up platform CLIMATE")
 
-class QvantumIndoorClimate(CoordinatorEntity, ClimateEntity):
+class QvantumIndoorClimateEntity(CoordinatorEntity, ClimateEntity):
     """Sensor for qvantum."""
 
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, device: DeviceInfo) -> None:

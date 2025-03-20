@@ -58,7 +58,7 @@ class QvantumAPI:
 
         async with self._session.patch(f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings?dispatch=false", json=payload, headers=headers) as response:
             data = await response.json()
-            _LOGGER.debug(data)
+            _LOGGER.debug(f"Response received {response.status}: {data}")
             return data
 
     async def set_extra_tap_water(self, device_id: str, minutes: int):
@@ -89,6 +89,30 @@ class QvantumAPI:
             "settings": [
                 {
                     "name": "indoor_temperature_offset",
+                    "value": value
+                }
+            ]
+        }
+
+        return await self._update_settings(device_id, payload)
+
+    async def set_fanspeedselector(self, device_id: str, preset_mode: str):
+        """Update set_fanspeedselector setting."""
+
+        match preset_mode:
+            case "off":
+                value = 0
+            case "normal":
+                value = 1
+            case "extra":
+                value = 2
+            case _:
+                raise ValueError(f"Invalid preset_mode: {preset_mode}")
+
+        payload = {
+            "settings": [
+                {
+                    "name": "fanspeedselector",
                     "value": value
                 }
             ]

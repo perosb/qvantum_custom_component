@@ -29,13 +29,13 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
-    sensors.append(QvantumSwitch(coordinator, "extra_tap_water", device))
+    sensors.append(QvantumSwitchEntity(coordinator, "extra_tap_water", device))
 
     async_add_entities(sensors)
 
     _LOGGER.debug(f"Setting up platform SWITCH")
 
-class QvantumSwitch(CoordinatorEntity, SwitchEntity):
+class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
     """Sensor for qvantum."""
 
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, device: DeviceInfo) -> None:

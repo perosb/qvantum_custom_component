@@ -28,15 +28,15 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
-    sensors.append(QvantumNumber(coordinator, "tap_water_capacity_target", 1, 5, 1, device))
-    sensors.append(QvantumNumber(coordinator, "room_comp_factor", 0, 10, 0.5, device))
-    sensors.append(QvantumNumber(coordinator, "indoor_temperature_offset", -10, 10, 1, device))
+    sensors.append(QvantumNumberEntity(coordinator, "tap_water_capacity_target", 1, 5, 1, device))
+    sensors.append(QvantumNumberEntity(coordinator, "room_comp_factor", 0, 10, 0.5, device))
+    sensors.append(QvantumNumberEntity(coordinator, "indoor_temperature_offset", -10, 10, 1, device))
 
     async_add_entities(sensors)
 
     _LOGGER.debug(f"Setting up platform NUMBER")
 
-class QvantumNumber(CoordinatorEntity, NumberEntity):
+class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
     """Sensor for qvantum."""
 
     def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, min: int, max: int, step: float, device: DeviceInfo) -> None:
