@@ -27,10 +27,7 @@ from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL
 _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
-    {
-        vol.Required("username"): str,
-        vol.Required("password"): str
-    }
+    {vol.Required("username"): str, vol.Required("password"): str}
 )
 
 
@@ -44,11 +41,14 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     try:
         await api.authenticate()
         device = await api.get_primary_device()
-        return {"title": f"{device.get('vendor')} {device.get('model')} ({device.get('serial')})"}
+        return {
+            "title": f"{device.get('vendor')} {device.get('model')} ({device.get('serial')})"
+        }
     except APIAuthError as err:
         raise InvalidAuth from err
     except APIConnectionError as err:
         raise CannotConnect from err
+
 
 class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Qvantum Integration."""

@@ -4,7 +4,7 @@ import logging
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
-    BinarySensorEntity
+    BinarySensorEntity,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -31,7 +31,9 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
-    sensors.append(QvantumConnectedEntity(coordinator, "connected", "connected", device))
+    sensors.append(
+        QvantumConnectedEntity(coordinator, "connected", "connected", device)
+    )
 
     async_add_entities(sensors)
 
@@ -39,7 +41,13 @@ async def async_setup_entry(
 class QvantumConnectedEntity(CoordinatorEntity, BinarySensorEntity):
     """Sensor for qvantum."""
 
-    def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, name: str, device: DeviceInfo) -> None:
+    def __init__(
+        self,
+        coordinator: QvantumDataUpdateCoordinator,
+        metric_key: str,
+        name: str,
+        device: DeviceInfo,
+    ) -> None:
         super().__init__(coordinator)
         self._hpid = self.coordinator.data.get("metrics").get("hpid")
         self._metric_key = metric_key
@@ -57,5 +65,8 @@ class QvantumConnectedEntity(CoordinatorEntity, BinarySensorEntity):
     @property
     def available(self):
         """Check if data is available."""
-        return self._metric_key in self.coordinator.data.get("connectivity") and \
-                   self.coordinator.data.get("connectivity").get(self._metric_key) is not None
+        return (
+            self._metric_key in self.coordinator.data.get("connectivity")
+            and self.coordinator.data.get("connectivity").get(self._metric_key)
+            is not None
+        )

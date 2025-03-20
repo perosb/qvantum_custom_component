@@ -2,10 +2,7 @@
 
 import logging
 
-from homeassistant.components.switch import (
-    SwitchEntity,
-    SwitchDeviceClass
-)
+from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -35,10 +32,16 @@ async def async_setup_entry(
 
     _LOGGER.debug(f"Setting up platform SWITCH")
 
+
 class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
     """Sensor for qvantum."""
 
-    def __init__(self, coordinator: QvantumDataUpdateCoordinator, metric_key: str, device: DeviceInfo) -> None:
+    def __init__(
+        self,
+        coordinator: QvantumDataUpdateCoordinator,
+        metric_key: str,
+        device: DeviceInfo,
+    ) -> None:
         super().__init__(coordinator)
         self._hpid = self.coordinator.data.get("metrics").get("hpid")
         self._attr_translation_key = metric_key
@@ -49,14 +52,14 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
         self._attr_has_entity_name = True
         self._attr_icon = "mdi:water-boiler"
         self._attr_is_on = False
-       
+
     async def async_turn_off(self, **kwargs):
         """Update the current value."""
         response = {}
         match self._metric_key:
             case "extra_tap_water":
                 response = await self.coordinator.api.set_extra_tap_water(self._hpid, 0)
-        
+
         if response.get("status") == SETTING_UPDATE_APPLIED:
             self.coordinator.data.get("settings")[self._metric_key] = STATE_OFF
             self.coordinator.async_set_updated_data(self.coordinator.data)
@@ -66,8 +69,10 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
         response = {}
         match self._metric_key:
             case "extra_tap_water":
-                response = await self.coordinator.api.set_extra_tap_water(self._hpid, 60)
-        
+                response = await self.coordinator.api.set_extra_tap_water(
+                    self._hpid, 60
+                )
+
         if response.get("status") == SETTING_UPDATE_APPLIED:
             self.coordinator.data.get("settings")[self._metric_key] = STATE_ON
             self.coordinator.async_set_updated_data(self.coordinator.data)
@@ -78,5 +83,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
 
     @property
     def available(self):
-        return self._metric_key in self.coordinator.data.get("settings") and \
-                    self.coordinator.data.get("settings").get(self._metric_key) is not None
+        return (
+            self._metric_key in self.coordinator.data.get("settings")
+            and self.coordinator.data.get("settings").get(self._metric_key) is not None
+        )
