@@ -9,9 +9,14 @@ Our needs, lifestyles and ways of working have changed rapidly. Demands on our s
 Disrupting the ordinary takes courage, but with experience, deep knowledge and determination, we have the power to change everything. We have to break free from the past with technology for the future. To focus on values and experience. To give access to millions of homes, to be part of the energy transition without sacrificing their livelihood or their comfort.
 
 
-### Custom component for Qvantum API Integration
+### home-assistant custom component for Qvantum Exhaust Air Heat Pump integration
 
-*To install:*
+*Installation:*
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=perosb&repository=qvantum_custom_component&category=integration)
+
+
+or manually:
 1. Add the repository to HACS.
 2. Install Qvantum Heat Pump.
 3. Add Qvantum Heat Pump integration.
