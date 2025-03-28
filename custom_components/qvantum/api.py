@@ -8,6 +8,7 @@ import logging, json
 _LOGGER = logging.getLogger(__name__)
 
 AUTH_URL = "https://identitytoolkit.googleapis.com"
+TOKEN_URL = "https://securetoken.googleapis.com"
 API_URL = "https://api.qvantum.com"
 from .const import (
     FAN_SPEED_STATE_OFF,
@@ -25,12 +26,14 @@ class QvantumAPI:
     def __init__(self, username: str, password: str) -> None:
         """Initialise."""
         self._auth_url = AUTH_URL
+        self._token_url = TOKEN_URL
         self._api_url = API_URL
         self._username = username
         self._password = password
         self._session = aiohttp.ClientSession(headers={})
         self._data = {}
         self._token = None
+        self._refreshtoken = None
         self._token_expiry = None
 
     async def close(self):
@@ -53,14 +56,58 @@ class QvantumAPI:
             headers=headers,
         ) as response:
             if response.status == 200:
+                _LOGGER.debug(f"Authentication successful: {response.status}")
                 auth_data = await response.json()
                 self._token = auth_data.get("idToken")
+                self._refreshtoken = auth_data.get("refreshToken")
                 expires_in = auth_data.get("expiresIn", 3540)
                 self._token_expiry = datetime.now() + timedelta(
                     seconds=int(expires_in) - 60
                 )
             else:
+                _LOGGER.error(f"Authentication failed: {response.status}")
                 raise Exception(f"Authentication failed: {response}")
+
+    async def _refresh_authentication_token(self):
+        """Refresh the authentication token."""
+
+        if not self._refreshtoken:
+            return
+
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "grant_type": "refresh_token",
+            "refresh_token": self._refreshtoken
+        }
+
+        self._token = None
+
+        async with self._session.post(
+            f"{self._token_url}/v1/token?key=AIzaSyCLQ22XHjH8LmId-PB1DY8FBsN53rWTpFw",
+            json=payload,
+            headers=headers,
+        ) as response:
+            if response.status == 200:
+                _LOGGER.debug(f"Token refreshed successfully: {response.status}")
+                auth_data = await response.json()
+                self._token = auth_data.get("access_token")
+                self._refreshtoken = auth_data.get("refresh_token")
+                expires_in = auth_data.get("expires_in", 3540)
+                self._token_expiry = datetime.now() + timedelta(
+                    seconds=int(expires_in) - 60
+                )
+            else:
+                _LOGGER.error(f"Token refresh failed: {response.status}")
+
+    async def _ensure_valid_token(self):
+        """Ensure a valid token is available, refreshing if expired."""
+        if not self._token or datetime.now() >= self._token_expiry:
+            await self._refresh_authentication_token()
+            if not self._token:
+                await self.authenticate()
+                if not self._token:
+                    raise Exception("Failed to authenticate.")
+
 
     async def _update_settings(self, device_id: str, payload: dict):
         """Update one or several settings."""
@@ -149,11 +196,6 @@ class QvantumAPI:
         }
 
         return await self._update_settings(device_id, payload)
-
-    async def _ensure_valid_token(self):
-        """Ensure a valid token is available, refreshing if expired."""
-        if not self._token or datetime.now() >= self._token_expiry:
-            await self.authenticate()
 
     async def get_metrics(self, device_id: str, method="now"):
         """Fetch data from the API with authentication."""
