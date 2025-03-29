@@ -31,10 +31,13 @@ class QvantumAPI:
         self._username = username
         self._password = password
         self._session = aiohttp.ClientSession(headers={})
-        self._data = {}
         self._token = None
         self._refreshtoken = None
         self._token_expiry = None
+        self._settings_data = {}
+        self._settings_etag = None
+        self._metrics_data = {}
+        self._metrics_etag = None
 
     async def close(self):
         """Close the session."""
@@ -206,34 +209,39 @@ class QvantumAPI:
             "Authorization": f"Bearer {self._token}",
             "Content-Type": "application/json",
         }
+        if self._metrics_etag:
+            headers["If-None-Match"] = self._metrics_etag
 
         async with self._session.get(
             f"{self._api_url}/api/device-info/v1/devices/{device_id}/status?metrics={method}",
             headers=headers,
         ) as response:
             if response.status == 200:
-                self._data = await response.json()
+                self._metrics_data = await response.json()
+                self._metrics_etag = response.headers.get("ETag")
 
                 # "now" will return telemetry data to the API user only if current values can be returned to the caller
                 # "last" will return the "most recent metrics" device has reported, if the device has been connected last 7 days.
                 # now (recent) or last (less recent if device offline short time period)
                 if (
                     method == "now"
-                    and "time" in self._data.get("metrics")
-                    and self._data.get("metrics").get("time") == None
+                    and "time" in self._metrics_data.get("metrics")
+                    and self._metrics_data.get("metrics").get("time") is None
                 ):
                     _LOGGER.warning(
-                        f"Failed to get 'now' metrics, falling back to 'last': {self._data}"
+                        f"Failed to get 'now' metrics, falling back to 'last': {self._metrics_data}"
                     )
                     return await self.get_metrics(device_id=device_id, method="last")
 
             elif response.status == 403:
                 raise APIAuthError(response)
+            elif response.status == 304:
+                _LOGGER.debug("Metrics not modified, using cached data.")
             else:
                 _LOGGER.error(f"Failed to fetch data, status: {response.status}")
-                self._data = {}
+                self._metrics_data = {}
 
-        return self._data
+        return self._metrics_data
 
     async def get_available_metrics(self, device_id: str):
         """Fetch metrics from the API with authentication."""
@@ -264,20 +272,25 @@ class QvantumAPI:
             "Authorization": f"Bearer {self._token}",
             "Content-Type": "application/json",
         }
+        if self._settings_etag:
+            headers["If-None-Match"] = self._settings_etag
 
         async with self._session.get(
             f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings",
             headers=headers,
         ) as response:
             if response.status == 200:
-                self._data = await response.json()
+                self._settings_data = await response.json()
+                self._settings_etag = response.headers.get("ETag")
             elif response.status == 403:
                 raise APIAuthError(response)
+            elif response.status == 304:
+                _LOGGER.debug("Settings not modified, using cached data.")
             else:
                 _LOGGER.error(f"Failed to fetch settings, status: {response.status}")
-                self._data = {}
+                self._settings_data = {}
 
-        return self._data
+        return self._settings_data
 
     async def get_primary_device(self):
         """Fetch device from the API with authentication."""
