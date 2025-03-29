@@ -7,7 +7,7 @@
   "entity": {
     "switch": {
       "extra_tap_water": {
-        "name": "Extra hot water (1h)"
+        "name": "Extra hot water"
       }
     },
     "sensor": {

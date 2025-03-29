@@ -70,7 +70,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
         match self._metric_key:
             case "extra_tap_water":
                 response = await self.coordinator.api.set_extra_tap_water(
-                    self._hpid, 60
+                    self._hpid, -1
                 )
 
         if response.get("status") == SETTING_UPDATE_APPLIED:
