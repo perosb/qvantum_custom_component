@@ -1,6 +1,7 @@
 """Interfaces with the Qvantum Heat Pump api sensors."""
 
 import logging
+from datetime import datetime
 
 from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
 from homeassistant.core import HomeAssistant
@@ -79,6 +80,18 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
 
     @property
     def is_on(self):
+        match self._metric_key:
+            case "extra_tap_water":
+                stop = self.coordinator.data.get("settings").get("extra_tap_water_stop")
+                if stop == -1:
+                    return True
+                if stop == 0:
+                    return False
+
+                now = int((datetime.now()).timestamp())
+                if stop < now:
+                    return False
+
         return self.coordinator.data.get("settings").get(self._metric_key) == STATE_ON
 
     @property
