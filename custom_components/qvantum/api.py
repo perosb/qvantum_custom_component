@@ -23,14 +23,15 @@ from .const import (
 class QvantumAPI:
     """Class for Qvantum API."""
 
-    def __init__(self, username: str, password: str) -> None:
+    def __init__(self, username: str, password: str, user_agent: str) -> None:
         """Initialise."""
         self._auth_url = AUTH_URL
         self._token_url = TOKEN_URL
         self._api_url = API_URL
         self._username = username
         self._password = password
-        self._session = aiohttp.ClientSession(headers={})
+        self._user_agent = user_agent
+        self._session = aiohttp.ClientSession(headers={"User-Agent": self._user_agent})
         self._token = None
         self._refreshtoken = None
         self._token_expiry = None

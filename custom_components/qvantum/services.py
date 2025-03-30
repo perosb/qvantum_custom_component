@@ -32,7 +32,7 @@ async def async_setup_services(hass: HomeAssistant):
         try:
             response = await api.set_extra_tap_water(device_id, minutes)
             return {"qvantum": [response]}
-        except Exception as err:
+        except Exception:
             return {"qvantum": {"exception": "failure"}}
 
     hass.services.async_register(

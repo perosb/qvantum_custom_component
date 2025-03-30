@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+import json
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
+from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -18,20 +20,20 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from .api import QvantumAPI
-from .const import DOMAIN
+from .const import DOMAIN, VERSION
 from .coordinator import QvantumDataUpdateCoordinator
 from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [
-                             Platform.SENSOR, 
-                             Platform.BINARY_SENSOR, 
-                             Platform.CLIMATE, 
-                             Platform.NUMBER,
-                             Platform.SWITCH,
-                             Platform.FAN,
-                            ]
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.CLIMATE,
+    Platform.NUMBER,
+    Platform.SWITCH,
+    Platform.FAN,
+]
 
 type MyConfigEntry = ConfigEntry[RuntimeData]
 
@@ -49,7 +51,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     username = config_entry.data[CONF_USERNAME]
     password = config_entry.data[CONF_PASSWORD]
-    hass.data[DOMAIN] = QvantumAPI(username=username, password=password)
+    user_agent = f"Home Assistant/{ha_version} Qvantum/{VERSION}"
+
+    hass.data[DOMAIN] = QvantumAPI(
+        username=username, password=password, user_agent=user_agent
+    )
 
     coordinator = QvantumDataUpdateCoordinator(hass, config_entry)
     await coordinator.async_config_entry_first_refresh()
