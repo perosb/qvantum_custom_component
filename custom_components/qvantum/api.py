@@ -31,7 +31,9 @@ class QvantumAPI:
         self._username = username
         self._password = password
         self._user_agent = user_agent
-        self._session = aiohttp.ClientSession(headers={"User-Agent": self._user_agent})
+        self._session = aiohttp.ClientSession(
+            headers={"Content-Type": "application/json", "User-Agent": self._user_agent}
+        )
         self._token = None
         self._refreshtoken = None
         self._token_expiry = None
@@ -46,7 +48,6 @@ class QvantumAPI:
 
     async def authenticate(self):
         """Authenticate with the API using username and password to retrieve a token."""
-        headers = {"Content-Type": "application/json"}
         payload = {
             "returnSecureToken": "true",
             "email": self._username,
@@ -57,7 +58,6 @@ class QvantumAPI:
         async with self._session.post(
             f"{self._auth_url}/v1/accounts:signInWithPassword?key=AIzaSyCLQ22XHjH8LmId-PB1DY8FBsN53rWTpFw",
             json=payload,
-            headers=headers,
         ) as response:
             if response.status == 200:
                 _LOGGER.debug(f"Authentication successful: {response.status}")
@@ -78,18 +78,13 @@ class QvantumAPI:
         if not self._refreshtoken:
             return
 
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "grant_type": "refresh_token",
-            "refresh_token": self._refreshtoken
-        }
+        payload = {"grant_type": "refresh_token", "refresh_token": self._refreshtoken}
 
         self._token = None
 
         async with self._session.post(
             f"{self._token_url}/v1/token?key=AIzaSyCLQ22XHjH8LmId-PB1DY8FBsN53rWTpFw",
             json=payload,
-            headers=headers,
         ) as response:
             if response.status == 200:
                 _LOGGER.debug(f"Token refreshed successfully: {response.status}")
@@ -112,21 +107,23 @@ class QvantumAPI:
                 if not self._token:
                     raise Exception("Failed to authenticate.")
 
+    def _request_headers(self):
+        """Get request headers for API calls."""
+        return {
+            "Authorization": f"Bearer {self._token}",
+        }
 
     async def _update_settings(self, device_id: str, payload: dict):
         """Update one or several settings."""
 
-        headers = {
-            "Authorization": f"Bearer {self._token}",
-            "Content-Type": "application/json",
-        }
-
         _LOGGER.debug(json.dumps(payload))
+
+        await self._ensure_valid_token()
 
         async with self._session.patch(
             f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings?dispatch=false",
             json=payload,
-            headers=headers,
+            headers=self._request_headers(),
         ) as response:
             data = await response.json()
             _LOGGER.debug(f"Response received {response.status}: {data}")
@@ -206,10 +203,7 @@ class QvantumAPI:
         """Fetch data from the API with authentication."""
 
         await self._ensure_valid_token()
-        headers = {
-            "Authorization": f"Bearer {self._token}",
-            "Content-Type": "application/json",
-        }
+        headers = self._request_headers()
         if self._metrics_etag:
             headers["If-None-Match"] = self._metrics_etag
 
@@ -248,14 +242,10 @@ class QvantumAPI:
         """Fetch metrics from the API with authentication."""
 
         await self._ensure_valid_token()
-        headers = {
-            "Authorization": f"Bearer {self._token}",
-            "Content-Type": "application/json",
-        }
 
         async with self._session.get(
             f"{self._api_url}/api/inventory/v1/devices/{device_id}/metrics",
-            headers=headers,
+            headers=self._request_headers(),
         ) as response:
             if response.status == 200:
                 return await response.json()
@@ -269,10 +259,7 @@ class QvantumAPI:
         """Fetch settings from the API with authentication."""
 
         await self._ensure_valid_token()
-        headers = {
-            "Authorization": f"Bearer {self._token}",
-            "Content-Type": "application/json",
-        }
+        headers = self._request_headers()
         if self._settings_etag:
             headers["If-None-Match"] = self._settings_etag
 
@@ -303,13 +290,10 @@ class QvantumAPI:
         """Fetch devices from the API with authentication."""
 
         await self._ensure_valid_token()
-        headers = {
-            "Authorization": f"Bearer {self._token}",
-            "Content-Type": "application/json",
-        }
 
         async with self._session.get(
-            f"{self._api_url}/api/inventory/v1/users/me/devices", headers=headers
+            f"{self._api_url}/api/inventory/v1/users/me/devices",
+            headers=self._request_headers(),
         ) as response:
             if response.status == 200:
                 devices_data = await response.json()
