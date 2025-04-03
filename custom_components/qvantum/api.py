@@ -212,18 +212,21 @@ class QvantumAPI:
             headers=headers,
         ) as response:
             if response.status == 200:
-                self._metrics_data = await response.json()
-                self._metrics_etag = response.headers.get("ETag")
+                data = await response.json()
 
                 # "now" will return telemetry data to the API user only if current values can be returned to the caller
                 if (
                     method == "now"
-                    and "time" in self._metrics_data.get("metrics")
-                    and self._metrics_data.get("metrics").get("time") is None
+                    and "time" in data.get("metrics")
+                    and data.get("metrics").get("time") is None
                 ):
                     _LOGGER.warning(
-                        f"Failed to get 'now' metrics, metrics might be stale: {self._metrics_data}"
+                        f"Failed to get 'now' metrics, metrics might be stale: {data}"
                     )
+                else:
+                    self._metrics_data = data
+                    self._metrics_etag = response.headers.get("ETag")
+
 
             elif response.status == 403:
                 raise APIAuthError(response)
