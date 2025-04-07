@@ -46,6 +46,16 @@ class QvantumAPI:
         """Close the session."""
         await self._session.close()
 
+    async def unauthenticate(self):
+        """Unauthenticate from the API."""
+        self._token = None
+        self._refreshtoken = None
+        self._token_expiry = None
+        self._settings_data = {}
+        self._settings_etag = None
+        self._metrics_data = {}
+        self._metrics_etag = None
+
     async def authenticate(self):
         """Authenticate with the API using username and password to retrieve a token."""
         payload = {
@@ -232,6 +242,10 @@ class QvantumAPI:
                 raise APIAuthError(response)
             elif response.status == 304:
                 _LOGGER.debug("Metrics not modified, using cached data.")
+            elif response.status == 500:
+                _LOGGER.error("Internal server error, clearing data...")
+                await self.unauthenticate()
+                raise APIConnectionError(response)
             else:
                 _LOGGER.error(f"Failed to fetch data, status: {response.status}")
                 self._metrics_data = {}
@@ -274,6 +288,10 @@ class QvantumAPI:
                 raise APIAuthError(response)
             elif response.status == 304:
                 _LOGGER.debug("Settings not modified, using cached data.")
+            elif response.status == 500:
+                _LOGGER.error("Internal server error, clearing data...")
+                await self.unauthenticate()
+                raise APIConnectionError(response)
             else:
                 _LOGGER.error(f"Failed to fetch settings, status: {response.status}")
                 self._settings_data = {}
