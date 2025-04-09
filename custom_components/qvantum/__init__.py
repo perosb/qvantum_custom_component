@@ -60,6 +60,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     coordinator = QvantumDataUpdateCoordinator(hass, config_entry)
     await coordinator.async_config_entry_first_refresh()
 
+    if not coordinator.data.get('device') or not coordinator.data.get('device_metadata'):
+        _LOGGER.error("No device data found when setting up Qvantum integration, 2nd attempt")
+        await coordinator.async_config_entry_first_refresh()
+
+    if not coordinator.data.get('device') or not coordinator.data.get('device_metadata'):
+        _LOGGER.error("No device data found when setting up Qvantum integration, failure")
+        return False
+
+
     config_entry.async_on_unload(
         config_entry.add_update_listener(_async_update_listener)
     )

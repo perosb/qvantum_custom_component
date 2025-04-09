@@ -239,15 +239,19 @@ class QvantumAPI:
 
 
             elif response.status == 403:
+                _LOGGER.error(f"Authentication failure: {response.status}")
+                _LOGGER.debug(f"Authentication failure: {response}")
                 raise APIAuthError(response)
             elif response.status == 304:
                 _LOGGER.debug("Metrics not modified, using cached data.")
             elif response.status == 500:
-                _LOGGER.error("Internal server error, clearing data...")
+                _LOGGER.error(f"Internal server error, clearing data: {response.status}")
+                _LOGGER.debug(f"Internal server error, clearing data: {response}")
                 await self.unauthenticate()
                 raise APIConnectionError(response)
             else:
                 _LOGGER.error(f"Failed to fetch data, status: {response.status}")
+                _LOGGER.debug(f"Failed to fetch data, status: {response}")
                 self._metrics_data = {}
 
         return self._metrics_data
