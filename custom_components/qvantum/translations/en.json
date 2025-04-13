@@ -87,6 +87,9 @@
       },
       "room_comp_factor": {
         "name": "Room compensation factor"
+      },
+      "tap_water_stop": {
+        "name": "Hot water tank upper temperature limit"
       }
     },
     "climate": {

@@ -87,6 +87,9 @@
       },
       "room_comp_factor": {
         "name": "Innegivare kompensationsfaktor"
+      },
+      "tap_water_stop": {
+        "name": "Varmvattentemperatur stopp"
       }
     },
     "climate": {

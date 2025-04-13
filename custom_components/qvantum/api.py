@@ -200,6 +200,15 @@ class QvantumAPI:
 
         return await self._update_settings(device_id, payload)
 
+    async def set_tap_water_stop(self, device_id: str, stop: int):
+        """Update tap_water_stop setting."""
+
+        payload = {
+            "settings": [{"name": "tap_water_stop", "value": stop}]
+        }
+
+        return await self._update_settings(device_id, payload)
+
     async def set_indoor_temperature_target(self, device_id: str, temperature: float):
         """Update indoor_temperature_target setting."""
 
