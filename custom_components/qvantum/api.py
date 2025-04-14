@@ -146,10 +146,15 @@ class QvantumAPI:
             stop_time = int((datetime.now() + timedelta(minutes=minutes)).timestamp())
         else:
             stop_time = -1 # -1 means "always on"
-    
+
+        dhw_mode = 1
+        if minutes != 0:
+            dhw_mode = 2
+
         payload = {
             "settings": [
                 {"name": "extra_tap_water_stop", "value": stop_time},
+                {"name": "dhw_mode", "value": dhw_mode},
             ]
         }
 
