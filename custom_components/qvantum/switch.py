@@ -83,6 +83,8 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
         match self._metric_key:
             case "extra_tap_water":
                 stop = self.coordinator.data.get("settings").get("extra_tap_water_stop")
+                if stop is None:
+                    return False
                 if stop == -1:
                     return True
                 if stop == 0:
