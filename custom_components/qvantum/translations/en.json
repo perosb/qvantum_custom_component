@@ -90,6 +90,9 @@
       },
       "tap_water_stop": {
         "name": "Hot water tank upper temperature limit"
+      },
+      "tap_water_start": {
+        "name": "Hot water tank lower temperature limit"
       }
     },
     "climate": {
