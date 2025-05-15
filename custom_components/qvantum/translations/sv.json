@@ -89,10 +89,10 @@
         "name": "Innegivare kompensationsfaktor"
       },
       "tap_water_stop": {
-        "name": "Varmvattentemperatur start"
+        "name": "Varmvattentemperatur stopp"
       },
       "tap_water_start": {
-        "name": "Varmvattentemperatur stopp"
+        "name": "Varmvattentemperatur start"
       }
     },
     "climate": {
