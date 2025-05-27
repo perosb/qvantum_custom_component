@@ -247,11 +247,14 @@ class QvantumAPI:
             if response.status == 200:
                 data = await response.json()
 
+                _LOGGER.debug(f"Metrics fetched: {data}")
+
                 # "now" will return telemetry data to the API user only if current values can be returned to the caller
+                metrics = data.get("metrics")
                 if (
-                    method == "now"
-                    and "time" in data.get("metrics")
-                    and data.get("metrics").get("time") is None
+                    metrics is None
+                    or not isinstance(metrics, dict)
+                    or (method == "now" and not metrics.get("time"))
                 ):
                     _LOGGER.warning(
                         f"Failed to get 'now' metrics, metrics might be stale: {data}"
@@ -323,6 +326,7 @@ class QvantumAPI:
                 _LOGGER.error(f"Failed to fetch settings, status: {response.status}")
                 self._settings_data = {}
 
+        _LOGGER.debug(f"Settings fetched: {self._settings_data}")
         return self._settings_data
 
     async def get_primary_device(self):
