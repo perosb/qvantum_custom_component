@@ -199,29 +199,45 @@ class QvantumAPI:
     async def set_tap_water_capacity_target(self, device_id: str, capacity: int):
         """Update tap_water_capacity_target setting."""
 
+        if capacity == 6:
+            return await self.set_tap_water(device_id, 74, 55)
+
+        if capacity == 7:
+            return await self.set_tap_water(device_id, 76, 55)
+
         payload = {
             "settings": [{"name": "tap_water_capacity_target", "value": capacity}]
         }
 
         return await self._update_settings(device_id, payload)
 
-    async def set_tap_water_start(self, device_id: str, stop: int):
+    async def set_tap_water(self, device_id: str, stop: int = 0, start: int = 0):
         """Update tap_water_start setting."""
 
+        if stop == 0 and start == 0:
+            _LOGGER.debug("No tap water settings to update, both stop and start are 0.")
+            return
+
         payload = {
-            "settings": [{"name": "tap_water_start", "value": stop}]
+            "settings": []
         }
 
+        if stop:
+            payload["settings"].append({"name": "tap_water_stop", "value": stop})
+        if start:
+            payload["settings"].append({"name": "tap_water_start", "value": start})
+
         return await self._update_settings(device_id, payload)
+
+    async def set_tap_water_start(self, device_id: str, start: int):
+        """Update tap_water_start setting."""
+
+        return await self.set_tap_water(device_id, start=start)
 
     async def set_tap_water_stop(self, device_id: str, stop: int):
         """Update tap_water_stop setting."""
 
-        payload = {
-            "settings": [{"name": "tap_water_stop", "value": stop}]
-        }
-
-        return await self._update_settings(device_id, payload)
+        return await self.set_tap_water(device_id, stop=stop)
 
     async def set_indoor_temperature_target(self, device_id: str, temperature: float):
         """Update indoor_temperature_target setting."""
