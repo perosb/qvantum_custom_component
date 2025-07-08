@@ -27,7 +27,7 @@ async def async_setup_entry(
 
     sensors = []
     sensors.append(
-        QvantumNumberEntity(coordinator, "tap_water_capacity_target", 1, 5, 1, device)
+        QvantumNumberEntity(coordinator, "tap_water_capacity_target", 1, 7, 1, device)
     )
     # sensors.append(
     #     QvantumNumberEntity(coordinator, "room_comp_factor", 0, 10, 0.5, device)
