@@ -14,7 +14,7 @@ from homeassistant.const import EntityCategory
 
 
 from . import MyConfigEntry
-from .const import DOMAIN
+from .const import DOMAIN, NAMES
 from .coordinator import QvantumDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,33 +30,34 @@ async def async_setup_entry(
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo = config_entry.runtime_data.device
     sensors = []
- 
+
     sensor_names = [
         "op_man_addition",
         "op_man_cooling",
         "op_man_dhw",
         "enable_sc_dhw",
-        "cooling_enabled",
+        # "cooling_enabled",
         "use_adaptive",
         "picpin_relay_heat_l1",
         "picpin_relay_heat_l2",
         "picpin_relay_heat_l3",
-        "picpin_relay_qm10",
-        "qn8position"
+        # "picpin_relay_qm10",
+        # "qn8position"
     ]
 
     for sensor_name in sensor_names:
-        sensors.append(
-            QvantumBaseBinaryEntity(
-                coordinator,
-                sensor_name,
-                sensor_name,
-                device,
+        if sensor_name in NAMES:
+            sensors.append(
+                QvantumBaseBinaryEntity(
+                    coordinator,
+                    sensor_name,
+                    sensor_name,
+                    device,
+                )
             )
-        )
-
 
     async_add_entities(sensors)
+
 
 class QvantumBaseBinaryEntity(CoordinatorEntity, BinarySensorEntity):
     """Sensor for qvantum."""
@@ -89,7 +90,7 @@ class QvantumBaseBinaryEntity(CoordinatorEntity, BinarySensorEntity):
         # if self._metric_key.startswith("op_man_"):
         #     if self.coordinator.data.get(self._data_bearer).get("op_mode") != 1:
         #         return False
-            
+
         return data.get(self._metric_key) is not None
 
 
@@ -108,4 +109,3 @@ class QvantumConnectedEntity(QvantumBaseBinaryEntity):
         self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._data_bearer = "connectivity"
-
