@@ -87,22 +87,6 @@ async def async_setup_entry(
     sensors.append(QvantumDiagnosticEntity(coordinator, "latency", device))
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device))
 
-    # sensors.append(
-    #     QvantumTimerEntity(
-    #         coordinator, "extra_tap_water_stop", "extra tap water stop", device
-    #     )
-    # )
-    # sensors.append(
-    #     QvantumTimerEntity(
-    #         coordinator, "ventilation_boost_stop", "ventilation boost stop", device
-    #     )
-    # )
-    # sensors.append(
-    #     QvantumConnectivityEntity(
-    #         coordinator, "disconnect_reason", "disconnect reason", device
-    #     )
-    # )
-
     async_add_entities(sensors)
 
 
@@ -122,6 +106,7 @@ class QvantumBaseEntity(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"qvantum_{metric_key}_{self._hpid}"
         self._attr_device_info = device
         self._attr_has_entity_name = True
+
 
         if "fan" in metric_key or metric_key.startswith("gp"):
             self._attr_native_unit_of_measurement = "%"

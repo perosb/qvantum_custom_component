@@ -31,7 +31,7 @@ async def async_setup_entry(
 
     async_add_entities(sensors)
 
-    _LOGGER.debug(f"Setting up platform SWITCH")
+    _LOGGER.debug("Setting up platform SWITCH")
 
 
 class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
