@@ -8,11 +8,13 @@ import json
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
+from homeassistant.core import callback
 from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_registry import async_migrate_entries
 
 
 from homeassistant.const import (
@@ -20,7 +22,7 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from .api import QvantumAPI
-from .const import DOMAIN, VERSION
+from .const import DOMAIN, VERSION, CONFIG_VERSION
 from .coordinator import QvantumDataUpdateCoordinator
 from .services import async_setup_services
 
@@ -108,3 +110,48 @@ async def async_remove_config_entry_device(
 async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
+
+async def async_migrate_entry(hass, config_entry: ConfigEntry):
+    """Migrate old entry."""
+    _LOGGER.debug("Migrating configuration from version %s.%s", config_entry.version, config_entry.minor_version)
+
+    if config_entry.version > 1:
+        
+        @callback
+        def update_unique_id(entity_entry):
+            """Update unique ID of entity entry."""
+
+            if entity_entry.domain in ["switch", "climate", "fan", "number"]:
+                _LOGGER.debug("Skipping migration of entity %s in domain %s", entity_entry.entity_id, entity_entry.domain)
+                return None
+
+            old_unique_id = entity_entry.unique_id
+            new_unique_id = entity_entry.unique_id
+            new_unique_id = new_unique_id.replace("_bt1_", "_outdoor_temperature_")
+            new_unique_id = new_unique_id.replace("_bt2_", "_indoor_temperature_")
+            new_unique_id = new_unique_id.replace("_cal_heat_temp_", "_heating_flow_temperature_target_")
+            new_unique_id = new_unique_id.replace("_bt11_", "_heating_flow_temperature_")
+            new_unique_id = new_unique_id.replace("_bt30_", "_tap_water_tank_temperature_")
+            new_unique_id = new_unique_id.replace("_tap_water_cap", "_tap_water_capacity")
+            new_unique_id = new_unique_id.replace("_dhw_normal_start_", "_tap_water_start_")
+            new_unique_id = new_unique_id.replace("_dhw_normal_stop_", "_tap_water_stop_")
+
+            if old_unique_id == new_unique_id:
+                return None
+
+            _LOGGER.debug("Updating unique ID for entity %s from %s to %s",
+                entity_entry.entity_id, old_unique_id, new_unique_id
+            )
+            return {
+                "new_unique_id": entity_entry.unique_id.replace(
+                    old_unique_id, new_unique_id
+                )
+            }
+
+        await async_migrate_entries(hass, config_entry.entry_id, update_unique_id)
+
+        hass.config_entries.async_update_entry(config_entry, version=CONFIG_VERSION)
+
+        _LOGGER.debug("Migration to configuration version %s.%s successful", config_entry.version, config_entry.minor_version)
+
+    return True
