@@ -7,7 +7,12 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfEnergy, UnitOfTemperature, EntityCategory
+from homeassistant.const import (
+    UnitOfEnergy,
+    UnitOfTemperature,
+    EntityCategory,
+    UnitOfPressure,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_utils
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -30,25 +35,42 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
-    metrics = await coordinator.api.get_available_metrics(
-        coordinator.data.get("device").get("id")
-    )
-    for metric in metrics.get("metrics"):
-        if metric.get("unit") == UnitOfTemperature.CELSIUS:
+    metrics = await coordinator.api.get_available_metrics()
+    for metric in metrics:
+        if (
+            metric.startswith("op_man_")
+            or "enable" in metric
+            or metric.startswith("picpin_")
+            or metric.startswith("qn8")
+            or metric.startswith("use_")
+        ):
+            continue
+
+        if (
+            "temp" in metric
+            or metric.startswith("bt")
+            or metric.startswith("dhw_normal_st")
+        ):
             sensors.append(
                 QvantumTemperatureEntity(
                     coordinator,
-                    metric.get("name"),
-                    metric.get("name").replace("_", " ").lower(),
+                    metric,
                     device,
                 )
             )
-        elif metric.get("unit") == UnitOfEnergy.KILO_WATT_HOUR:
+        elif "energy" in metric:
             sensors.append(
                 QvantumEnergyEntity(
                     coordinator,
-                    metric.get("name"),
-                    metric.get("name").replace("_", " ").lower(),
+                    metric,
+                    device,
+                )
+            )
+        elif "pressure" in metric:
+            sensors.append(
+                QvantumPressureEntity(
+                    coordinator,
+                    metric,
                     device,
                 )
             )
@@ -56,34 +78,30 @@ async def async_setup_entry(
             sensors.append(
                 QvantumBaseEntity(
                     coordinator,
-                    metric.get("name"),
-                    metric.get("name").replace("_", " ").lower(),
+                    metric,
                     device,
                 )
             )
 
-    sensors.append(
-        QvantumTotalEnergyEntity(coordinator, "totalenergy", "total energy", device)
-    )
-    sensors.append(
-        QvantumConnectivityEntity(coordinator, "timestamp", "timestamp", device)
-    )
-    sensors.append(
-        QvantumTimerEntity(
-            coordinator, "extra_tap_water_stop", "extra tap water stop", device
-        )
-    )
-    sensors.append(
-        QvantumTimerEntity(
-            coordinator, "ventilation_boost_stop", "ventilation boost stop", device
-        )
-    )
-    sensors.append(
-        QvantumConnectivityEntity(
-            coordinator, "disconnect_reason", "disconnect reason", device
-        )
-    )
-    sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", "heatpump id", device))
+    sensors.append(QvantumTotalEnergyEntity(coordinator, "totalenergy", device))
+    sensors.append(QvantumDiagnosticEntity(coordinator, "latency", device))
+    sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device))
+
+    # sensors.append(
+    #     QvantumTimerEntity(
+    #         coordinator, "extra_tap_water_stop", "extra tap water stop", device
+    #     )
+    # )
+    # sensors.append(
+    #     QvantumTimerEntity(
+    #         coordinator, "ventilation_boost_stop", "ventilation boost stop", device
+    #     )
+    # )
+    # sensors.append(
+    #     QvantumConnectivityEntity(
+    #         coordinator, "disconnect_reason", "disconnect reason", device
+    #     )
+    # )
 
     async_add_entities(sensors)
 
@@ -95,7 +113,6 @@ class QvantumBaseEntity(CoordinatorEntity, SensorEntity):
         self,
         coordinator: QvantumDataUpdateCoordinator,
         metric_key: str,
-        name: str,
         device: DeviceInfo,
     ) -> None:
         super().__init__(coordinator)
@@ -106,6 +123,15 @@ class QvantumBaseEntity(CoordinatorEntity, SensorEntity):
         self._attr_device_info = device
         self._attr_has_entity_name = True
 
+        if "fan" in metric_key or metric_key.startswith("gp"):
+            self._attr_native_unit_of_measurement = "%"
+
+        if "compressormeasuredspeed" in metric_key:
+            self._attr_native_unit_of_measurement = "rpm"
+
+        if "bf1_l_min" == metric_key:
+            self._attr_native_unit_of_measurement = "l/m"
+
     @property
     def state(self):
         """Get metric from API data."""
@@ -114,10 +140,8 @@ class QvantumBaseEntity(CoordinatorEntity, SensorEntity):
     @property
     def available(self):
         """Check if data is available."""
-        return (
-            self._metric_key in self.coordinator.data.get("metrics")
-            and self.coordinator.data.get("metrics").get(self._metric_key) is not None
-        )
+        metrics = self.coordinator.data.get("metrics", {})
+        return metrics.get(self._metric_key) is not None
 
 
 class QvantumTemperatureEntity(QvantumBaseEntity):
@@ -127,10 +151,9 @@ class QvantumTemperatureEntity(QvantumBaseEntity):
         self,
         coordinator: QvantumDataUpdateCoordinator,
         metric_key: str,
-        name: str,
         device: DeviceInfo,
     ) -> None:
-        super().__init__(coordinator, metric_key, name, device)
+        super().__init__(coordinator, metric_key, device)
         self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -143,13 +166,35 @@ class QvantumEnergyEntity(QvantumBaseEntity):
         self,
         coordinator: QvantumDataUpdateCoordinator,
         metric_key: str,
-        name: str,
         device: DeviceInfo,
     ) -> None:
-        super().__init__(coordinator, metric_key, name, device)
+        super().__init__(coordinator, metric_key, device)
         self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
         self._attr_device_class = SensorDeviceClass.ENERGY
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    @property
+    def available(self):
+        """Check if data is available."""
+        return (
+            super().available
+            and self.coordinator.data.get("metrics").get(self._metric_key) > 0
+        )
+
+
+class QvantumPressureEntity(QvantumBaseEntity):
+    """Sensor for pressure measurements."""
+
+    def __init__(
+        self,
+        coordinator: QvantumDataUpdateCoordinator,
+        metric_key: str,
+        device: DeviceInfo,
+    ) -> None:
+        super().__init__(coordinator, metric_key, device)
+        self._attr_native_unit_of_measurement = UnitOfPressure.BAR
+        self._attr_device_class = SensorDeviceClass.PRESSURE
+        self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
     def available(self):
@@ -167,10 +212,9 @@ class QvantumTotalEnergyEntity(QvantumEnergyEntity):
         self,
         coordinator: QvantumDataUpdateCoordinator,
         metric_key: str,
-        name: str,
         device: DeviceInfo,
     ) -> None:
-        super().__init__(coordinator, metric_key, name, device)
+        super().__init__(coordinator, metric_key, device)
 
     @property
     def state(self):
@@ -196,11 +240,13 @@ class QvantumDiagnosticEntity(QvantumBaseEntity):
         self,
         coordinator: QvantumDataUpdateCoordinator,
         metric_key: str,
-        name: str,
         device: DeviceInfo,
     ) -> None:
-        super().__init__(coordinator, metric_key, name, device)
+        super().__init__(coordinator, metric_key, device)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        if "latency" in metric_key:
+            self._attr_device_class = SensorDeviceClass.DURATION
+            self._attr_native_unit_of_measurement = "ms"
 
 
 class QvantumTimerEntity(QvantumBaseEntity):
@@ -210,10 +256,9 @@ class QvantumTimerEntity(QvantumBaseEntity):
         self,
         coordinator: QvantumDataUpdateCoordinator,
         metric_key: str,
-        name: str,
         device: DeviceInfo,
     ) -> None:
-        super().__init__(coordinator, metric_key, name, device)
+        super().__init__(coordinator, metric_key, device)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_device_class = "timestamp"
 
@@ -233,32 +278,25 @@ class QvantumTimerEntity(QvantumBaseEntity):
         )
 
 
-class QvantumConnectivityEntity(QvantumBaseEntity):
+class QvantumLatencyEntity(QvantumBaseEntity):
     """Sensor for connectivity."""
 
     def __init__(
         self,
         coordinator: QvantumDataUpdateCoordinator,
         metric_key: str,
-        name: str,
         device: DeviceInfo,
     ) -> None:
-        super().__init__(coordinator, metric_key, name, device)
+        super().__init__(coordinator, metric_key, device)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        if metric_key == "timestamp":
-            self._attr_device_class = "timestamp"
-            self._attr_entity_registry_enabled_default = False
 
     @property
     def state(self):
         """Get metric from API data."""
-        return self.coordinator.data.get("connectivity").get(self._metric_key)
+        return self.coordinator.data.get(self._metric_key)
 
     @property
     def available(self):
         """Check if data is available."""
-        return (
-            self._metric_key in self.coordinator.data.get("connectivity")
-            and self.coordinator.data.get("connectivity").get(self._metric_key)
-            is not None
-        )
+        latency = self.coordinator.data.get(self._metric_key)
+        return latency is not None

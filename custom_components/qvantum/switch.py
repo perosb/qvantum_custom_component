@@ -27,7 +27,7 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
 
     sensors = []
-    sensors.append(QvantumSwitchEntity(coordinator, "extra_tap_water", device))
+    #sensors.append(QvantumSwitchEntity(coordinator, "extra_tap_water", device))
 
     async_add_entities(sensors)
 

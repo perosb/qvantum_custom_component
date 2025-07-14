@@ -79,15 +79,15 @@ class QvantumIndoorClimateEntity(CoordinatorEntity, ClimateEntity):
     def available(self):
         """Check if data is available."""
         return (
-            "indoor_temperature" in self.coordinator.data.get("metrics")
-            and self.coordinator.data.get("metrics").get("indoor_temperature")
+            "bt2" in self.coordinator.data.get("metrics")
+            and self.coordinator.data.get("metrics").get("bt2")
             is not None
         )
 
     @property
     def current_temperature(self):
         """Return the temperature we try to reach."""
-        return self.coordinator.data.get("metrics").get("indoor_temperature")
+        return self.coordinator.data.get("metrics").get("bt2")
 
     @property
     def target_temperature(self):

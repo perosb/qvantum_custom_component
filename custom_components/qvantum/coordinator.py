@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import APIAuthError
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
+import traceback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,5 +60,5 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error(err)
             raise UpdateFailed(err) from err
         except Exception as err:
-            _LOGGER.error(f"Unexpected error: {err}")
-            raise UpdateFailed(f"Error communicating with API: {err}") from err
+            stack_trace = traceback.format_exc()
+            raise UpdateFailed(f"Error communicating with API: {err}\nStack trace:\n{stack_trace}") from err

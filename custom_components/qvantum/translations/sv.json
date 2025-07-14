@@ -10,38 +10,182 @@
         "name": "Extra varmvatten"
       }
     },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Driftläge manuell addition"
+      },
+      "op_man_cooling": {
+        "name": "Driftläge manuell cooling"
+      },
+      "op_man_dhw": {
+        "name": "Driftläge manuell DHW"
+      },
+      "enable_sc_dhw": {
+        "name": "Enable SC DHW"
+      },
+      "cooling_enabled": {
+        "name": "Cooling enabled"
+      },
+      "use_adaptive": {
+        "name": "Smart Control"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Eltillsats L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Eltillsats L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Eltillsats L3"
+      },
+      "picpin_relay_qm10": {
+        "name": "Växelventil, Varmvatten/Uppvärmning (QM10)"
+      },
+      "qn8position": {
+        "name": "Shuntventil, tillsats (QN8)"
+      }
+    },
     "sensor": {
+      "bf1_l_min": {
+        "name": "Flödesgivare för Varmvatten"
+      },
+      "bp1_pressure": {
+        "name": "Lågtryck bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Lågtryckstemp (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "Högtryck (BP2)"
+      },
+      "bp2_temp": {
+        "name": "Högtryckstemp (BP2)"
+      },
+      "bt10": {
+        "name": "Kondensortemp ut (BT10)"
+      },
+      "bt12": {
+        "name": "Extern framledning (BT12)"
+      },
+      "bt13": {
+        "name": "Kondensortemp in (BT13)"
+      },
+      "bt14": {
+        "name": "Frånluftstemp (BT14)"
+      },
+      "bt15": {
+        "name": "Avluftstemp (BT15)"
+      },
+      "bt20": {
+        "name": "Hetgastemp (BT20)"
+      },
+      "bt21": {
+        "name": "Vätsketemp (BT21)"
+      },
+      "bt22": {
+        "name": "Förångartemp (BT22)"
+      },
+      "bt23": {
+        "name": "Suggastemp (BT23)"
+      },
+      "bt31": {
+        "name": "Laddtemp in (BT31)"
+      },
+      "bt33": {
+        "name": "Kallvattentemp in (BT33)"
+      },
+      "bt34": {
+        "name": "Varmvattentemp ut (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Kompressorhastighet"
+      },
+      "dhw_outl_temp_15": {
+        "name": "DHW outlet temperature 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "DHW outlet temperature 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "DHW outlet temperature max"
+      },
+      "dhw_prioritytime": {
+        "name": "DHW priority time"
+      },
+      "fan0_10v": {
+        "name": "Fläkthastighet"
+      },
+      "gp1_speed": {
+        "name": "Cirkulationspump (GP1)"
+      },
+      "gp2_speed": {
+        "name": "Laddpump (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Guide desired temperature"
+      },
+      "guide_he": {
+        "name": "Guide heating"
+      },
+      "man_mode": {
+        "name": "Manual mode"
+      },
+      "op_mode": {
+        "name": "Driftläge",
+        "state": {
+          "0": "Auto",
+          "1": "Manuell",
+          "2": "Tillsats"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Operation mode sensor"
+      },
+      "price_region": {
+        "name": "Elprisområde"
+      },
+      "room_temp_ext": {
+        "name": "Room temperature external"
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH mode",
+        "state": {
+          "0": "Eko",
+          "1": "Balanserat",
+          "2": "Komfort"
+        }
+      },
       "compressorenergy": {
         "name": "Kompressorenergi"
       },
       "totalenergy": {
         "name": "Total energi"
       },
-      "outdoor_temperature": {
-        "name": "Utomhustemperatur"
+      "bt1": {
+        "name": "Utomhustemperatur (BT1)"
       },
-      "indoor_temperature": {
-        "name": "Inomhustemperatur"
+      "bt2": {
+        "name": "Inomhustemperatur (BT2)"
       },
       "smart_sh_status": {
         "name": "Smart status för värme"
       },
-      "heating_flow_temperature": {
-        "name": "Framledningstemperatur"
+      "bt11": {
+        "name": "Framledningstemperatur (BT11)"
       },
-      "heating_flow_temperature_target": {
+      "cal_heat_temp": {
         "name": "Framledningstemperatur (mål)"
       },
-      "tap_water_tank_temperature": {
-        "name": "Varmvattentemperatur"
+      "bt30": {
+        "name": "Varmvattentemperatur (BT30)"
       },
-      "tap_water_start": {
+      "dhw_normal_start": {
         "name": "Varmvattentemperatur start"
       },
-      "tap_water_stop": {
+      "dhw_normal_stop": {
         "name": "Varmvattentemperatur stopp"
       },
-      "tap_water_capacity": {
+      "tap_water_cap": {
         "name": "Varmvattenkapacitet"
       },
       "additionalenergy": {
@@ -76,6 +220,9 @@
       },
       "smart_dhw_status": {
         "name": "Smart status för varmvatten"
+      },
+      "latency": {
+        "name": "Latens"
       }
     },
     "number": {

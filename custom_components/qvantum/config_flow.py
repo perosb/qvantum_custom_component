@@ -1,4 +1,4 @@
-"""Config flow for Integration 101 Template integration."""
+"""Config flow for Qvantum integration."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
 from .api import QvantumAPI, APIAuthError, APIConnectionError
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL, VERSION
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL, VERSION, CONFIG_VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Qvantum Integration."""
 
-    VERSION = 1
+    VERSION = CONFIG_VERSION
     _input_data: dict[str, Any]
 
     @staticmethod
