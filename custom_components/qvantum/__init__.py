@@ -127,14 +127,14 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
 
             old_unique_id = entity_entry.unique_id
             new_unique_id = entity_entry.unique_id
-            new_unique_id = new_unique_id.replace("bt1", "outdoor_temperature")
-            new_unique_id = new_unique_id.replace("bt2", "indoor_temperature")
-            new_unique_id = new_unique_id.replace("cal_heat_temp", "heating_flow_temperature_target")
-            new_unique_id = new_unique_id.replace("bt11", "heating_flow_temperature")
-            new_unique_id = new_unique_id.replace("bt30", "tap_water_tank_temperature")
-            new_unique_id = new_unique_id.replace("tap_water_cap", "tap_water_capacity")
-            new_unique_id = new_unique_id.replace("dhw_normal_start", "tap_water_start")
-            new_unique_id = new_unique_id.replace("dhw_normal_stop", "tap_water_stop")
+            new_unique_id = new_unique_id.replace("_bt1_", "_outdoor_temperature_")
+            new_unique_id = new_unique_id.replace("_bt2_", "_indoor_temperature_")
+            new_unique_id = new_unique_id.replace("_cal_heat_temp_", "_heating_flow_temperature_target_")
+            new_unique_id = new_unique_id.replace("_bt11_", "_heating_flow_temperature_")
+            new_unique_id = new_unique_id.replace("_bt30_", "_tap_water_tank_temperature_")
+            new_unique_id = new_unique_id.replace("_tap_water_cap", "_tap_water_capacity")
+            new_unique_id = new_unique_id.replace("_dhw_normal_start_", "_tap_water_start_")
+            new_unique_id = new_unique_id.replace("_dhw_normal_stop_", "_tap_water_stop_")
 
             if old_unique_id == new_unique_id:
                 return None
