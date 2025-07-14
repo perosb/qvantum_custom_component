@@ -10,38 +10,174 @@
         "name": "Extra hot water"
       }
     },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Operation manual addition"
+      },
+      "op_man_cooling": {
+        "name": "Operation manual cooling"
+      },
+      "op_man_dhw": {
+        "name": "Operation manual DHW"
+      },
+      "use_adaptive": {
+        "name": "Smart Control"
+      },
+      "cooling_enabled": {
+        "name": "Cooling enabled"
+      },
+      "enable_sc_dhw": {
+        "name": "Enable SC DHW"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Additional power L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Additional power L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Additional power L3"
+      },
+      "picpin_relay_qm10": {
+        "name": "Divertingvalve, DHW/heating (QM10)"
+      },
+      "qn8position": {
+        "name": "Shuntvalve, addition (QN8)"
+      }
+    },
     "sensor": {
+      "bf1_l_min": {
+        "name": "Flow sensor DHW (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Low pressure bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Low pressure temp (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "High pressure bar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "High pressure temp (BP2)"
+      },
+      "bt10": {
+        "name": "Condenser temp out (BT10)"
+      },
+      "bt12": {
+        "name": "Heating medium, external flow line (BT12)"
+      },
+      "bt13": {
+        "name": "Condenser temp in (BT13)"
+      },
+      "bt14": {
+        "name": "Exhaust temp air (BT14)"
+      },
+      "bt15": {
+        "name": "Extract temp air (BT15)"
+      },
+      "bt20": {
+        "name": "Discharge line (BT20)"
+      },
+      "bt21": {
+        "name": "Liquid line (BT21)"
+      },
+      "bt22": {
+        "name": "Evaporator inlet temp (BT22)"
+      },
+      "bt23": {
+        "name": "Suction line (BT23)"
+      },
+      "bt31": {
+        "name": "DHW primary, chargetemp in (BT31)"
+      },
+      "bt33": {
+        "name": "DHW secondary, Coldwater in (BT33)"
+      },
+      "bt34": {
+        "name": "DHW secondary, Hotwater out (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Compressor speed"
+      },
+      "dhw_outl_temp_15": {
+        "name": "DHW outlet temperature 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "DHW outlet temperature 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "DHW outlet temperature max"
+      },
+      "dhw_prioritytime": {
+        "name": "DHW priority time"
+      },
+      "fan0_10v": {
+        "name": "Fan speed"
+      },
+      "gp1_speed": {
+        "name": "Circulation pump (GP1)"
+      },
+      "gp2_speed": {
+        "name": "DHW charge pump (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Guide desired temperature"
+      },
+      "guide_he": {
+        "name": "Guide heating"
+      },
+      "man_mode": {
+        "name": "Manual mode"
+      },
+      "op_mode": {
+        "name": "Operation mode",
+        "state": {
+          "0": "Auto",
+          "1": "Manual",
+          "2": "Addition"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Operation mode sensor"
+      },
+      "price_region": {
+        "name": "Price region"
+      },
+      "room_temp_ext": {
+        "name": "Room temperature external"
+      },
       "compressorenergy": {
         "name": "Compressor energy"
       },
       "totalenergy": {
         "name": "Total energy"
       },
-      "outdoor_temperature": {
-        "name": "Outdoor temperature"
+      "bt1": {
+        "name": "Outdoor (BT1)"
       },
-      "indoor_temperature": {
-        "name": "Indoor temperature"
+      "bt2": {
+        "name": "Indoor (BT2)"
       },
       "smart_sh_status": {
         "name": "Smart status for heating"
       },
-      "heating_flow_temperature": {
-        "name": "Heating medium, flow line, temperature"
+      "bt11": {
+        "name": "Heating medium, flow line (BT11)"
       },
-      "heating_flow_temperature_target": {
-        "name": "Heating medium, flow line, temperature target."
+      "cal_heat_temp": {
+        "name": "Heating medium, flow line, target."
       },
-      "tap_water_tank_temperature": {
-        "name": "Hot water tank temperature"
+      "bt30": {
+        "name": "Hot water tank (BT30)"
       },
-      "tap_water_start": {
-        "name": "Hot water tank lower temperature limit"
+      "dhw_normal_start": {
+        "name": "Hot water tank lower limit"
       },
-      "tap_water_stop": {
-        "name": "Hot water tank upper temperature limit"
+      "dhw_normal_stop": {
+        "name": "Hot water tank upper limit"
       },
-      "tap_water_capacity": {
+      "tap_water_cap": {
         "name": "Hot water capacity"
       },
       "additionalenergy": {
@@ -49,6 +185,14 @@
       },
       "hpid": {
         "name": "Id"
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH mode",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
       },
       "hp_status": {
         "name": "Heat pump status",
@@ -70,6 +214,9 @@
       },
       "timestamp": {
         "name": "Last update"
+      },
+      "latency": {
+        "name": "Latency"
       },
       "disconnect_reason": {
         "name": "Disconnect reason",
