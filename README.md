@@ -13,14 +13,9 @@ Disrupting the ordinary takes courage, but with experience, deep knowledge and d
 
 *Installation:*
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=perosb&repository=qvantum_custom_component&category=integration)
-
-
-or manually:
-1. Add the repository to HACS.
-2. Install Qvantum Heat Pump.
-3. Add Qvantum Heat Pump integration.
-4. Sign in using email and password.
+1. Search for Qvantum Heat Pump in HACS.
+2. Add Qvantum Heat Pump integration.
+3. Sign in using email and password.
 
 The integration will pull your devices and use the first one. It will create sensors for all supported metrics.
 
