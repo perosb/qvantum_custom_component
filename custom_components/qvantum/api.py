@@ -275,12 +275,13 @@ class QvantumAPI:
                     self._device_metadata = await response.json()
                     self._device_metadata_etag = response.headers.get("ETag")
                 case 403:
+                    await self.unauthenticate()
                     raise APIAuthError(response)
                 case 304:
                     _LOGGER.debug("Device metadata not modified, using cached data.")
                 case 500:
                     _LOGGER.error("Internal server error, clearing data...")
-                    await self.unauthenticate()
+                    #await self.unauthenticate()
                     raise APIConnectionError(response)
                 case _:
                     _LOGGER.error(
@@ -337,6 +338,7 @@ class QvantumAPI:
                 case 403:
                     _LOGGER.error(f"Authentication failure: {response.status}")
                     _LOGGER.debug(f"Authentication failure: {response}")
+                    await self.unauthenticate()
                     raise APIAuthError(response)
                 case 304:
                     _LOGGER.debug("Metrics not modified, using cached data.")
@@ -345,7 +347,7 @@ class QvantumAPI:
                         f"Internal server error, clearing data: {response.status}"
                     )
                     _LOGGER.debug(f"Internal server error, clearing data: {response}")
-                    await self.unauthenticate()
+                    #await self.unauthenticate()
                     raise APIConnectionError(response)
                 case _:
                     _LOGGER.error(f"Failed to fetch data, status: {response.status}")
@@ -377,12 +379,13 @@ class QvantumAPI:
                     self._settings_etag = response.headers.get("ETag")
                     _LOGGER.debug(f"Settings fetched: {self._settings_data}")
                 case 403:
+                    await self.unauthenticate()
                     raise APIAuthError(response)
                 case 304:
                     _LOGGER.debug("Settings not modified, using cached data.")
                 case 500:
                     _LOGGER.error("Internal server error, clearing data...")
-                    await self.unauthenticate()
+                    #await self.unauthenticate()
                     raise APIConnectionError(response)
                 case _:
                     _LOGGER.error(
@@ -425,6 +428,7 @@ class QvantumAPI:
                     _LOGGER.debug(f"Devices fetched successfully: {devices_data}")
                     return devices_data.get("devices") if devices_data else None
                 case 403:
+                    await self.unauthenticate()
                     raise APIAuthError(response)
                 case _:
                     _LOGGER.error(f"Failed to fetch devices, status: {response.status}")
