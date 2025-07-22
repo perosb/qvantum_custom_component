@@ -63,7 +63,7 @@ NAMES = [
     # "picpin_relay_qm10",
     # "price_region",
     # "qn8position",
-    "room_temp_ext",
+    # "room_temp_ext",
     # "smart_sh_mode",
     "tap_water_cap",
     # "use_adaptive",
