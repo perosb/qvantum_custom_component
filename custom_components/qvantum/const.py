@@ -15,10 +15,10 @@ CONFIG_VERSION = 4
 
 NAMES = [
     "bf1_l_min",
-    # "bp1_pressure",
-    # "bp1_temp",
-    # "bp2_pressure",
-    # "bp2_temp",
+    "bp1_pressure",
+    "bp1_temp",
+    "bp2_pressure",
+    "bp2_temp",
     "bt1",
     # "bt10",
     "bt11",
