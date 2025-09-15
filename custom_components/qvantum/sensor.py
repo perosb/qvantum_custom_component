@@ -12,6 +12,7 @@ from homeassistant.const import (
     UnitOfTemperature,
     EntityCategory,
     UnitOfPressure,
+    PERCENTAGE
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_utils
@@ -61,6 +62,14 @@ async def async_setup_entry(
         elif "energy" in metric:
             sensors.append(
                 QvantumEnergyEntity(
+                    coordinator,
+                    metric,
+                    device,
+                )
+            )
+        elif metric.startswith("gp"):
+            sensors.append(
+                QvantumPercentageEntity(
                     coordinator,
                     metric,
                     device,
@@ -143,6 +152,18 @@ class QvantumTemperatureEntity(QvantumBaseEntity):
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
+class QvantumPercentageEntity(QvantumBaseEntity):
+    """Sensor for percentage measurements."""
+
+    def __init__(
+        self,
+        coordinator: QvantumDataUpdateCoordinator,
+        metric_key: str,
+        device: DeviceInfo,
+    ) -> None:
+        super().__init__(coordinator, metric_key, device)
+        self._attr_native_unit_of_measurement = PERCENTAGE
+        self._attr_state_class = SensorStateClass.MEASUREMENT
 
 class QvantumEnergyEntity(QvantumBaseEntity):
     """Sensor for energy measurements."""
