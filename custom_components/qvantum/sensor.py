@@ -67,14 +67,6 @@ async def async_setup_entry(
                     device,
                 )
             )
-        elif metric.startswith("gp"):
-            sensors.append(
-                QvantumPercentageEntity(
-                    coordinator,
-                    metric,
-                    device,
-                )
-            )
         elif "pressure" in metric:
             sensors.append(
                 QvantumPressureEntity(
@@ -150,19 +142,6 @@ class QvantumTemperatureEntity(QvantumBaseEntity):
         super().__init__(coordinator, metric_key, device)
         self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-
-class QvantumPercentageEntity(QvantumBaseEntity):
-    """Sensor for percentage measurements."""
-
-    def __init__(
-        self,
-        coordinator: QvantumDataUpdateCoordinator,
-        metric_key: str,
-        device: DeviceInfo,
-    ) -> None:
-        super().__init__(coordinator, metric_key, device)
-        self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
 class QvantumEnergyEntity(QvantumBaseEntity):
