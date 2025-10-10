@@ -46,6 +46,25 @@
       }
     },
     "sensor": {
+      "dhwpower": {
+        "name": "DHW Power"
+      },
+      "heatingpower": {
+        "name": "Heating Power"
+      },
+      "powertotal": {
+        "name": "Total Power"
+      },
+      "inputcurrent1": {
+        "name": "Input current L1"
+      },
+      "inputcurrent2": {
+        "name": "Input current L2"
+      },
+      "inputcurrent3": {
+        "name": "Input current L3"
+      },
+
       "bf1_l_min": {
         "name": "Flow sensor DHW (BF1)"
       },

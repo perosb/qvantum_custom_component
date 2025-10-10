@@ -69,4 +69,10 @@ NAMES = [
     # "use_adaptive",
     "compressorenergy",
     "additionalenergy",
+    "dhwpower",
+    "heatingpower",
+    "powertotal",
+    "inputcurrent1",
+    "inputcurrent2",
+    "inputcurrent3"
 ]

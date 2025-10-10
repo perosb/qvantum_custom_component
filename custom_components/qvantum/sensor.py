@@ -10,8 +10,10 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     UnitOfEnergy,
     UnitOfTemperature,
+    UnitOfPower,
     EntityCategory,
     UnitOfPressure,
+    UnitOfElectricCurrent,
     PERCENTAGE
 )
 from homeassistant.core import HomeAssistant
@@ -62,6 +64,22 @@ async def async_setup_entry(
         elif "energy" in metric:
             sensors.append(
                 QvantumEnergyEntity(
+                    coordinator,
+                    metric,
+                    device,
+                )
+            )
+        elif "power" in metric:
+            sensors.append(
+                QvantumPowerEntity(
+                    coordinator,
+                    metric,
+                    device,
+                )
+            )
+        elif "current" in metric:
+            sensors.append(
+                QvantumCurrentEntity(
                     coordinator,
                     metric,
                     device,
@@ -165,6 +183,34 @@ class QvantumEnergyEntity(QvantumBaseEntity):
             super().available
             and self.coordinator.data.get("metrics").get(self._metric_key) > 0
         )
+
+class QvantumPowerEntity(QvantumBaseEntity):
+    """Sensor for power measurements."""
+
+    def __init__(
+        self,
+        coordinator: QvantumDataUpdateCoordinator,
+        metric_key: str,
+        device: DeviceInfo,
+    ) -> None:
+        super().__init__(coordinator, metric_key, device)
+        self._attr_native_unit_of_measurement = UnitOfPower.WATT
+        self._attr_device_class = SensorDeviceClass.POWER
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+
+class QvantumCurrentEntity(QvantumBaseEntity):
+    """Sensor for current measurements."""
+
+    def __init__(
+        self,
+        coordinator: QvantumDataUpdateCoordinator,
+        metric_key: str,
+        device: DeviceInfo,
+    ) -> None:
+        super().__init__(coordinator, metric_key, device)
+        self._attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+        self._attr_device_class = SensorDeviceClass.CURRENT
+        self._attr_state_class = SensorStateClass.MEASUREMENT
 
 
 class QvantumPressureEntity(QvantumBaseEntity):

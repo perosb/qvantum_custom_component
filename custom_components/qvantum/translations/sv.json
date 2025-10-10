@@ -46,6 +46,25 @@
       }
     },
     "sensor": {
+      "dhwpower": {
+        "name": "DHW Effekt"
+      },
+      "heatingpower": {
+        "name": "Värmeeffekt"
+      },
+      "powertotal": {
+        "name": "Total effekt"
+      },
+      "inputcurrent1": {
+        "name": "Ingångsström L1"
+      },
+      "inputcurrent2": {
+        "name": "Ingångsström L2"
+      },
+      "inputcurrent3": {
+        "name": "Ingångsström L3"
+      },
+
       "bf1_l_min": {
         "name": "Flödesgivare för Varmvatten"
       },
