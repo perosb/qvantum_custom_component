@@ -228,6 +228,66 @@
           "client-disconnect": "Kunden bortkopplad"
         }
       },
+      "dhwdemand": {
+        "name": "DHW Efterfrågan"
+      },
+      "heatingdemand": {
+        "name": "Värmeefterfrågan"
+      },
+      "coolingdemand": {
+        "name": "Kylningsefterfrågan"
+      },
+      "heatingreleased": {
+        "name": "Värme frigjord"
+      },
+      "coolingreleased": {
+        "name": "Kylning frigjord"
+      },
+      "compressorreleased": {
+        "name": "Kompressor frigjord"
+      },
+      "additionreleased": {
+        "name": "Tillsats frigjord"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "DHW prioritetstid kvar"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Värmeprioritetstid kvar"
+      },
+      "cooling_priotitytimeleft": {
+        "name": "Kylningsprioritetstid kvar"
+      },
+      "switch_state": {
+        "name": "Växel tillstånd"
+      },
+      "dhwstop_temp": {
+        "name": "DHW stopptemperatur"
+      },
+      "dhwstart_temp": {
+        "name": "DHW starttemperatur"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Filtrerad utomhustemperatur (60s)"
+      },
+      "max_freq_env": {
+        "name": "Max frekvens miljö"
+      },
+      "calc_suppy_cpr": {
+        "name": "Beräknad försörjning CPR"
+      },
+      "dhw_set": {
+        "name": "DHW inställd"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "BP1 temp 20min filter"
+      },
+      "max_bp2_env": {
+        "name": "Max BP2 miljö"
+      },
+      "picpin_mask": {
+        "name": "PIC pin mask"
+      },
       "hp_status": {
         "name": "Status",
         "state": {

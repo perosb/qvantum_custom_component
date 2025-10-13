@@ -69,7 +69,7 @@ async def async_setup_entry(
                     device,
                 )
             )
-        elif "power" in metric:
+        elif "powertotal" in metric:
             sensors.append(
                 QvantumPowerEntity(
                     coordinator,

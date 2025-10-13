@@ -242,6 +242,66 @@
         "state": {
           "client-disconnect": "Client disconnected"
         }
+      },
+      "dhwdemand": {
+        "name": "DHW Demand"
+      },
+      "heatingdemand": {
+        "name": "Heating Demand"
+      },
+      "coolingdemand": {
+        "name": "Cooling Demand"
+      },
+      "heatingreleased": {
+        "name": "Heating Released"
+      },
+      "coolingreleased": {
+        "name": "Cooling Released"
+      },
+      "compressorreleased": {
+        "name": "Compressor Released"
+      },
+      "additionreleased": {
+        "name": "Additional Released"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "DHW Priority Time Left"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Heating Priority Time Left"
+      },
+      "cooling_priotitytimeleft": {
+        "name": "Cooling Priority Time Left"
+      },
+      "switch_state": {
+        "name": "Switch State"
+      },
+      "dhwstop_temp": {
+        "name": "DHW Stop Temperature"
+      },
+      "dhwstart_temp": {
+        "name": "DHW Start Temperature"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Filtered Outdoor Temperature (60s)"
+      },
+      "max_freq_env": {
+        "name": "Max Frequency Environment"
+      },
+      "calc_suppy_cpr": {
+        "name": "Calculated Supply CPR"
+      },
+      "dhw_set": {
+        "name": "DHW Set"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "BP1 Temp 20min Filter"
+      },
+      "max_bp2_env": {
+        "name": "Max BP2 Environment"
+      },
+      "picpin_mask": {
+        "name": "PIC Pin Mask"
       }
     },
     "number": {

@@ -72,7 +72,27 @@ NAMES = [
     "dhwpower",
     "heatingpower",
     "powertotal",
-    "inputcurrent1",
-    "inputcurrent2",
-    "inputcurrent3"
+    # "dhwdemand",
+    # "heatingdemand",
+    # "coolingdemand",
+    # "heatingreleased",
+    # "coolingreleased",
+    # "compressorreleased",
+    # "additionreleased", # Note: Additional typo is in the original data
+    # "dhw_prioritytimeleft",
+    # "heating_prioritytimeleft",
+    # "cooling_priotitytimeleft", # Note: Typo is in the original data
+    # "switch_state",
+    # "dhwstop_temp",
+    # "dhwstart_temp",
+    # "filtered60sec_outdoortemp",
+    # "max_freq_env",
+    "calc_suppy_cpr", # Note: Typo is in the original data
+    # "dhw_set",
+    # "bp1_temp_20min_filter",
+    # "max_bp2_env",
+    # "inputcurrent1",
+    # "inputcurrent2",
+    # "inputcurrent3",
+    # "picpin_mask",
 ]
