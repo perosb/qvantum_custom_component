@@ -209,6 +209,9 @@ class QvantumAPI:
     async def set_tap_water_capacity_target(self, device_id: str, capacity: int):
         """Update tap_water_capacity_target setting."""
 
+        if capacity == 1:
+            return await self.set_tap_water(device_id, 59, 50)
+
         if capacity == 6:
             return await self.set_tap_water(device_id, 74, 55)
 
