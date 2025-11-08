@@ -76,9 +76,6 @@ class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
         self._attr_native_max_value = max
         self._attr_native_step = step
 
-        if self._metric_key == "indoor_temperature_offset":
-            self._attr_entity_registry_enabled_default = self.available
-
     async def async_set_native_value(self, value: float) -> None:
         """Update the current value."""
 
@@ -122,12 +119,5 @@ class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
             self._metric_key in self.coordinator.data.get("settings")
             and self.coordinator.data.get("settings").get(self._metric_key) is not None
         )
-
-        # if using outdoor sensor, allow setting parallel offset
-        if (
-            self._metric_key == "indoor_temperature_offset"
-            and self.coordinator.data.get("settings").get("sensor_mode") != "bt1"
-        ):
-            return False
 
         return avail
