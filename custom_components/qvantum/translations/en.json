@@ -197,7 +197,7 @@
         "name": "Hot water tank upper limit"
       },
       "tap_water_cap": {
-        "name": "Hot water capacity"
+        "name": "Hot water capacity target"
       },
       "additionalenergy": {
         "name": "Additional energy"

@@ -205,7 +205,7 @@
         "name": "Varmvattentemperatur stopp"
       },
       "tap_water_cap": {
-        "name": "Varmvattenkapacitet"
+        "name": "Varmvattenkapacitet (mål)"
       },
       "additionalenergy": {
         "name": "Tillsatsenergi"
