@@ -93,6 +93,14 @@ async def async_setup_entry(
                     device,
                 )
             )
+        elif "tap_water_capacity" in metric:
+            sensors.append(
+                QvantumTapWaterCapacityEntity(
+                    coordinator,
+                    metric,
+                    device,
+                )
+            )
         else:
             sensors.append(
                 QvantumBaseEntity(
@@ -147,6 +155,18 @@ class QvantumBaseEntity(CoordinatorEntity, SensorEntity):
         metrics = self.coordinator.data.get("metrics", {})
         return metrics.get(self._metric_key) is not None
 
+class QvantumTapWaterCapacityEntity(QvantumBaseEntity):
+    """Sensor for tap water capacity measurements."""
+
+    @property
+    def state(self):
+        """Get metric from API data."""
+        value = super().state
+        if value is not None:
+            # Note: The API returns the capacity as "number of half-people",
+            #       I.e. a value of 4 means capacity for 2 people.
+            return value / 2
+        return None
 
 class QvantumTemperatureEntity(QvantumBaseEntity):
     """Sensor for temperature measurements."""
