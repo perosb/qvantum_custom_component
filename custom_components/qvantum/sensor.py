@@ -93,7 +93,7 @@ async def async_setup_entry(
                     device,
                 )
             )
-        elif "tap_water_capacity" in metric:
+        elif "tap_water_cap" in metric:
             sensors.append(
                 QvantumTapWaterCapacityEntity(
                     coordinator,
