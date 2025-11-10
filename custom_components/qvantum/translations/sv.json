@@ -205,7 +205,7 @@
         "name": "Varmvattentemperatur stopp"
       },
       "tap_water_cap": {
-        "name": "Varmvattenkapacitet (mål)"
+        "name": "Varmvattenkapacitet"
       },
       "additionalenergy": {
         "name": "Tillsatsenergi"
@@ -309,7 +309,7 @@
         "name": "Förskjutning av värmekurva"
       },
       "tap_water_capacity_target": {
-        "name": "Varmvattenkapacitet"
+        "name": "Varmvattenkapacitet (mål)"
       },
       "room_comp_factor": {
         "name": "Innegivare kompensationsfaktor"

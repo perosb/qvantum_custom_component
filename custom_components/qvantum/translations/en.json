@@ -197,7 +197,7 @@
         "name": "Hot water tank upper limit"
       },
       "tap_water_cap": {
-        "name": "Hot water capacity target"
+        "name": "Hot water capacity"
       },
       "additionalenergy": {
         "name": "Additional energy"
@@ -309,7 +309,7 @@
         "name": "Parallel curve offset"
       },
       "tap_water_capacity_target": {
-        "name": "Hot water capacity"
+        "name": "Hot water capacity target"
       },
       "room_comp_factor": {
         "name": "Room compensation factor"
