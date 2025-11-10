@@ -186,6 +186,12 @@
       "bt2": {
         "name": "Inomhustemperatur (BT2)"
       },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
       "smart_sh_status": {
         "name": "Smart status för värme"
       },

@@ -178,6 +178,12 @@
       "bt2": {
         "name": "Indoor (BT2)"
       },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
       "smart_sh_status": {
         "name": "Smart status for heating"
       },

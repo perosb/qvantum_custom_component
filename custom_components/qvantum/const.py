@@ -72,6 +72,8 @@ NAMES = [
     "dhwpower",
     "heatingpower",
     "powertotal",
+    "btx",
+    "bt4",
     # "dhwdemand",
     # "heatingdemand",
     # "coolingdemand",
