@@ -14,7 +14,7 @@ from homeassistant.const import EntityCategory
 
 
 from . import MyConfigEntry
-from .const import DOMAIN, NAMES
+from .const import DOMAIN, DEFAULT_ENABLED_METRICS
 from .coordinator import QvantumDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ async def async_setup_entry(
     ]
 
     for sensor_name in sensor_names:
-        if sensor_name in NAMES:
+        if sensor_name in DEFAULT_ENABLED_METRICS:
             sensors.append(
                 QvantumBaseBinaryEntity(
                     coordinator,
