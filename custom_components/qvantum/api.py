@@ -20,7 +20,9 @@ from .const import (
     FAN_SPEED_VALUE_OFF,
     FAN_SPEED_VALUE_NORMAL,
     FAN_SPEED_VALUE_EXTRA,
-    NAMES,
+    DEFAULT_ENABLED_METRICS,
+    DEFAULT_DISABLED_METRICS,
+    DOMAIN,
 )
 
 
@@ -35,6 +37,7 @@ class QvantumAPI:
         self._username = username
         self._password = password
         self._user_agent = user_agent
+        self.hass = None
         self._session = aiohttp.ClientSession(
             headers={"Content-Type": "application/json", "User-Agent": self._user_agent}
         )
@@ -155,7 +158,7 @@ class QvantumAPI:
         if minutes >= 0:
             stop_time = int((datetime.now() + timedelta(minutes=minutes)).timestamp())
         else:
-            stop_time = -1 # -1 means "always on"
+            stop_time = -1  # -1 means "always on"
 
         dhw_mode = 1
         if minutes != 0:
@@ -231,9 +234,7 @@ class QvantumAPI:
             _LOGGER.debug("No tap water settings to update, both stop and start are 0.")
             return
 
-        payload = {
-            "settings": []
-        }
+        payload = {"settings": []}
 
         if stop:
             payload["settings"].append({"name": "tap_water_stop", "value": stop})
@@ -284,7 +285,7 @@ class QvantumAPI:
                     _LOGGER.debug("Device metadata not modified, using cached data.")
                 case 500:
                     _LOGGER.error("Internal server error, clearing data...")
-                    #await self.unauthenticate()
+                    # await self.unauthenticate()
                     raise APIConnectionError(response)
                 case _:
                     _LOGGER.error(
@@ -303,10 +304,10 @@ class QvantumAPI:
         if self._metrics_etag:
             headers["If-None-Match"] = self._metrics_etag
 
-        names = await self.get_available_metrics()
+        names = await self.get_available_metrics(device_id)
         names_list = ""
-        for name in names:
-            names_list += f"&names[]={name}"
+        for metric_name in names:
+            names_list += f"&names[]={metric_name}"
 
         async with self._session.get(
             f"{API_INTERNAL_URL}/api/internal/v1/devices/{device_id}/values?use_internal_names=true&timeout=12{names_list}",
@@ -322,17 +323,21 @@ class QvantumAPI:
                     metrics["hpid"] = device_id
 
                     metrics_data = data.get("values", {})
-                    metrics["latency"] = data["total_latency"] if "total_latency" in data else None
+                    metrics["latency"] = (
+                        data["total_latency"] if "total_latency" in data else None
+                    )
 
-                    for name in names:
-                        if name in metrics_data:
-                            metrics[name] = metrics_data[name]
+                    for metric_name in names:
+                        if metric_name in metrics_data:
+                            metrics[metric_name] = metrics_data[metric_name]
 
-                            if name == "fan0_10v":
-                                metrics[name] = int(float(metrics[name]) * 10)
+                            if metric_name == "fan0_10v":
+                                metrics[metric_name] = int(
+                                    float(metrics[metric_name]) * 10
+                                )
                         else:
                             _LOGGER.warning(
-                                f"Metric {name} not found in response data."
+                                f"Metric {metric_name} not found in response data."
                             )
 
                     self._metrics_data = {"metrics": metrics}
@@ -350,7 +355,7 @@ class QvantumAPI:
                         f"Internal server error, clearing data: {response.status}"
                     )
                     _LOGGER.debug(f"Internal server error, clearing data: {response}")
-                    #await self.unauthenticate()
+                    # await self.unauthenticate()
                     raise APIConnectionError(response)
                 case _:
                     _LOGGER.error(f"Failed to fetch data, status: {response.status}")
@@ -359,10 +364,38 @@ class QvantumAPI:
 
         return self._metrics_data
 
-    async def get_available_metrics(self):
+    async def get_available_metrics(self, device_id: str):
         """Fetch metrics from the API with authentication."""
 
-        return NAMES
+        device_registry = self.hass.data["device_registry"]
+        device_reg_id = None
+        for device in device_registry.devices.values():
+            if (DOMAIN, f"qvantum-{device_id}") in device.identifiers:
+                device_reg_id = device.id
+                break
+        if device_reg_id:
+            registry = self.hass.data["entity_registry"]
+            enabled_metrics = set()
+            for entity in registry.entities.values():
+                if (
+                    entity.device_id == device_reg_id
+                    and entity.disabled_by is None
+                    and entity.unique_id.startswith("qvantum_")
+                    and entity.unique_id.endswith(f"_{device_id}")
+                ):
+                    metric_key = entity.unique_id[
+                        len("qvantum_") : -len(f"_{device_id}")
+                    ]
+                    if metric_key in DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_METRICS:
+                        enabled_metrics.add(metric_key)
+            _LOGGER.debug(
+                f"Enabled metrics for device {device_id}: {list(enabled_metrics)}"
+            )
+            return list(enabled_metrics)
+        _LOGGER.debug(
+            f"No device registry entry found for device {device_id}, returning all DEFAULT_ENABLED_METRICS"
+        )
+        return DEFAULT_ENABLED_METRICS
 
     async def get_settings(self, device_id: str):
         """Fetch settings from the API with authentication."""
@@ -388,7 +421,7 @@ class QvantumAPI:
                     _LOGGER.debug("Settings not modified, using cached data.")
                 case 500:
                     _LOGGER.error("Internal server error, clearing data...")
-                    #await self.unauthenticate()
+                    # await self.unauthenticate()
                     raise APIConnectionError(response)
                 case _:
                     _LOGGER.error(
