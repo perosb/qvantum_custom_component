@@ -93,6 +93,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                 now = int((datetime.now()).timestamp())
                 if stop < now:
                     return False
+                return True
 
         return self.coordinator.data.get("settings").get(self._metric_key) == STATE_ON
 
