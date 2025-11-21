@@ -9,7 +9,7 @@ import json
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import callback
-from homeassistant.const import __version__ as ha_version
+from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -53,7 +53,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     username = config_entry.data[CONF_USERNAME]
     password = config_entry.data[CONF_PASSWORD]
-    user_agent = f"Home Assistant/{ha_version} Qvantum/{VERSION}"
+    user_agent = f"Home Assistant/{MAJOR_VERSION}.{MINOR_VERSION}.{PATCH_VERSION} Qvantum/{VERSION}"
 
     hass.data[DOMAIN] = QvantumAPI(
         username=username, password=password, user_agent=user_agent

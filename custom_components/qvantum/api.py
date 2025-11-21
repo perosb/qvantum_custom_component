@@ -1,6 +1,5 @@
 """Qvantum API."""
 
-from distro import name
 import aiohttp
 from datetime import datetime, timedelta
 import logging, json
@@ -90,6 +89,7 @@ class QvantumAPI:
                     self._token_expiry = datetime.now() + timedelta(
                         seconds=int(expires_in) - 60
                     )
+                    return True
                 case _:
                     _LOGGER.error(f"Authentication failed: {response.status}")
                     raise Exception(f"Authentication failed: {response}")
