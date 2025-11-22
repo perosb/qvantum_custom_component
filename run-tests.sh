@@ -24,7 +24,8 @@ fi
 
 # Run tests
 echo "Running pytest..."
-PYTHONPATH=/home/perosb/build/qvantum_custom_component:/home/perosb/build/qvantum_custom_component/custom_components \
+PROJECT_ROOT=$(pwd)
+PYTHONPATH=${PROJECT_ROOT}:${PROJECT_ROOT}/custom_components \
     python -m pytest \
     tests/ \
     -v --tb=short --cov=custom_components.qvantum --cov-report=xml
