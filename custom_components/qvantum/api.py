@@ -513,7 +513,7 @@ class QvantumAPI:
                 case _:
                     _LOGGER.error(f"Failed to fetch devices, status: {response.status}")
                     raise APIConnectionError(
-                        f"Failed to fetch devices: {response.status}"
+                        response=response, message="Failed to fetch devices"
                     )
 
 
@@ -539,11 +539,18 @@ class APIConnectionError(Exception):
     """Exception raised for connection/API errors."""
 
     def __init__(
-        self, response: aiohttp.ClientResponse, message: str = "API request failed"
+        self,
+        response: Optional[aiohttp.ClientResponse],
+        message: str = "API request failed",
     ):
-        self.response = response
-        self.status = response.status
-        super().__init__(f"{message}: {response.status}")
+        if response is not None:
+            self.response = response
+            self.status = response.status
+            super().__init__(f"{message}: {response.status}")
+        else:
+            self.response = None
+            self.status = None
+            super().__init__(message)
 
 
 class APIRateLimitError(Exception):
@@ -552,7 +559,7 @@ class APIRateLimitError(Exception):
     def __init__(
         self,
         response: Optional[aiohttp.ClientResponse],
-        message: str = "Rate limit exceeded"
+        message: str = "Rate limit exceeded",
     ):
         if response is not None:
             self.response = response
