@@ -1,0 +1,403 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Extra warm water"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Handmatige toevoeging"
+      },
+      "op_man_cooling": {
+        "name": "Handmatige koeling"
+      },
+      "op_man_dhw": {
+        "name": "Handmatig WTW"
+      },
+      "use_adaptive": {
+        "name": "Slimme controle"
+      },
+      "cooling_enabled": {
+        "name": "Koeling ingeschakeld"
+      },
+      "enable_sc_dhw": {
+        "name": "SC WTW inschakelen"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Toegevoegde temperatuur L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Toegevoegde temperatuur L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Toegevoegde temperatuur L3"
+      },
+      "picpin_relay_qm10": {
+        "name": "Omloopklep, tapwater/verwarming (QM10)"
+      },
+      "qn8position": {
+        "name": "Sluitklep, toevoeging (QN8)"
+      }
+    },
+    "sensor": {
+      "dhwpower": {
+        "name": "WTW-vermogen"
+      },
+      "heatingpower": {
+        "name": "Verwarmingsvermogen"
+      },
+      "powertotal": {
+        "name": "Totaal (L1+L2+L3)"
+      },
+      "inputcurrent1": {
+        "name": "Ingangsstroom L1"
+      },
+      "inputcurrent2": {
+        "name": "Ingangsstroom L2"
+      },
+      "inputcurrent3": {
+        "name": "Ingangsstroom L3"
+      },
+
+      "bf1_l_min": {
+        "name": "Flowsensor tapwater (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Hoge druk - bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Lagedruktemperatuur (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "Lage druk - bar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "Hogedruktemperatuur (BP2)"
+      },
+      "bt10": {
+        "name": "Condensor temperatuur uit (BT10)"
+      },
+      "bt12": {
+        "name": "Verwarmingsmedium, externe aanvoerleiding (BT12)"
+      },
+      "bt13": {
+        "name": "Condensor temperatuur in (BT13)"
+      },
+      "bt14": {
+        "name": "Uitlaatluchttemperatuur (BT14)"
+      },
+      "bt15": {
+        "name": "Ontrokken luchttemperatuur (BT15)"
+      },
+      "bt20": {
+        "name": "Persleiding (BT20)"
+      },
+      "bt21": {
+        "name": "Vloeistofleiding (BT21)"
+      },
+      "bt22": {
+        "name": "Inlaattemperatuur verdamper (BT22)"
+      },
+      "bt23": {
+        "name": "Zuigleiding (BT23)"
+      },
+      "bt31": {
+        "name": "WTW primair, laadt temperatuur in (BT31)"
+      },
+      "bt33": {
+        "name": "WTW secundair, koudwater in (BT33)"
+      },
+      "bt34": {
+        "name": "WTW secundair, warm water uit (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Compressorsnelheid"
+      },
+      "dhw_outl_temp_15": {
+        "name": "WTW uitlaat temperatuur 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "WTW uitlaat temperatuur 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "WTW uitlaat temperatuur max"
+      },
+      "dhw_prioritytime": {
+        "name": "WTW prioriteitstijd"
+      },
+      "fan0_10v": {
+        "name": "Ventilatorsnelheid"
+      },
+      "gp1_speed": {
+        "name": "Circulatiepomp (GP1)"
+      },
+      "gp2_speed": {
+        "name": "WTW-laadpomp (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Gids gewenste temperatuur"
+      },
+      "guide_he": {
+        "name": "Gids verwarming"
+      },
+      "man_mode": {
+        "name": "Handmatige modus"
+      },
+      "op_mode": {
+        "name": "Bedrijfsmodus",
+        "state": {
+          "0": "Auto",
+          "1": "Handmatig",
+          "2": "Toevoeging"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Bedrijfsmodus sensor"
+      },
+      "price_region": {
+        "name": "Prijsregio"
+      },
+      "room_temp_ext": {
+        "name": "Kamertemperatuur extern"
+      },
+      "compressorenergy": {
+        "name": "Compressor energie"
+      },
+      "totalenergy": {
+        "name": "Totale energie"
+      },
+      "bt1": {
+        "name": "Buitensensor (BT1)"
+      },
+      "bt2": {
+        "name": "Binnensensor (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Slimme status voor verwarming"
+      },
+      "bt11": {
+        "name": "Verwarmingsmedium, aanvoerleiding (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "Verwarmingsmedium, aanvoerleiding, doel."
+      },
+      "bt30": {
+        "name": "Tank sensor"
+      },
+      "dhw_normal_start": {
+        "name": "Warmwater tank onderste limiet"
+      },
+      "dhw_normal_stop": {
+        "name": "Warmwater tank bovenste limiet"
+      },
+      "tap_water_cap": {
+        "name": "Warmwater capaciteit"
+      },
+      "additionalenergy": {
+        "name": "Extra energie"
+      },
+      "hpid": {
+        "name": "Id"
+      },
+      "smart_sh_mode": {
+        "name": "Slimme SH modus",
+        "state": {
+          "0": "Eco",
+          "1": "Gebalanceerd",
+          "2": "Comfort"
+        }
+      },
+      "hp_status": {
+        "name": "Warmtepomp status",
+        "state": {
+          "0": "Inactief",
+          "1": "Ontdooien",
+          "2": "Warm water",
+          "3": "Verwarming"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Slimme status voor warm water"
+      },
+      "extra_tap_water_stop": {
+        "name": "Extra warm water stop"
+      },
+      "ventilation_boost_stop": {
+        "name": "Boost ventilatie stop"
+      },
+      "timestamp": {
+        "name": "Laatste update"
+      },
+      "latency": {
+        "name": "Latentie"
+      },
+      "disconnect_reason": {
+        "name": "Verbindingsreden",
+        "state": {
+          "client-disconnect": "Client verbroken"
+        }
+      },
+      "dhwdemand": {
+        "name": "WTW vraag"
+      },
+      "heatingdemand": {
+        "name": "Verwarmingsvraag"
+      },
+      "coolingdemand": {
+        "name": "Koelingsvraag"
+      },
+      "heatingreleased": {
+        "name": "Verwarming vrijgegeven"
+      },
+      "coolingreleased": {
+        "name": "Koeling vrijgegeven"
+      },
+      "compressorreleased": {
+        "name": "Compressor vrijgegeven"
+      },
+      "additionreleased": {
+        "name": "Toevoeging vrijgegeven"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "WTW prioriteitstijd over"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Verwarming prioriteitstijd over"
+      },
+      "cooling_priotitytimeleft": {
+        "name": "Koeling prioriteitstijd over"
+      },
+      "switch_state": {
+        "name": "Schakelaar status"
+      },
+      "dhwstop_temp": {
+        "name": "WTW stop temperatuur"
+      },
+      "dhwstart_temp": {
+        "name": "WTW start temperatuur"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Gefilterde buiten temperatuur (60s)"
+      },
+      "max_freq_env": {
+        "name": "Max frequentie omgeving"
+      },
+      "calc_suppy_cpr": {
+        "name": "Berekende levering CPR"
+      },
+      "dhw_set": {
+        "name": "WTW ingesteld"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "BP1 Temp 20min Filter"
+      },
+      "max_bp2_env": {
+        "name": "Max BP2 omgeving"
+      },
+      "picpin_mask": {
+        "name": "PIC pin masker"
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Parallelle curve offset"
+      },
+      "tap_water_capacity_target": {
+        "name": "Warmwater capaciteit doel"
+      },
+      "room_comp_factor": {
+        "name": "Kamertemperatuur compensatie factor"
+      },
+      "tap_water_stop": {
+        "name": "Warmwater tank bovenste temperatuur limiet"
+      },
+      "tap_water_start": {
+        "name": "Warmwater tank onderste temperatuur limiet"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Binnenklimaat"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Ventilatorsnelheid",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Uit",
+              "normal": "Normaal",
+              "extra": "Extra"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Qvantum Warmtepomp",
+    "abort": {
+      "already_configured": "Apparaat is al geconfigureerd",
+      "reconfigure_successful": "Herconfiguratie succesvol"
+    },
+    "error": {
+      "cannot_connect": "Kan niet verbinden",
+      "invalid_auth": "Ongeldige authenticatie",
+      "unknown": "Onbekende fout"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "password": "Wachtwoord",
+          "username": "Gebruikersnaam"
+        }
+      },
+      "reconfigure": {
+        "data": {
+          "password": "Wachtwoord",
+          "username": "Gebruikersnaam"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Scan interval (seconden)"
+        },
+        "description": "Wijzig uw opties.",
+        "title": "Opties"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Extra warm water",
+      "description": "Activeer extra warm water voor een periode",
+      "fields": {
+        "device_id": {
+          "name": "Apparaat Id",
+          "description": "Het Qvantum apparaat id"
+        },
+        "minutes": {
+          "name": "Minuten",
+          "description": "Minuten om extra warm water te produceren (0 minuten schakelt uit)"
+        }
+      }
+    }
+  }
+}
