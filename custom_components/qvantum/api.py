@@ -550,8 +550,15 @@ class APIRateLimitError(Exception):
     """Exception raised for rate limiting."""
 
     def __init__(
-        self, response: aiohttp.ClientResponse, message: str = "Rate limit exceeded"
+        self,
+        response: Optional[aiohttp.ClientResponse],
+        message: str = "Rate limit exceeded"
     ):
-        self.response = response
-        self.status = response.status
-        super().__init__(f"{message}: {response.status}")
+        if response is not None:
+            self.response = response
+            self.status = response.status
+            super().__init__(f"{message}: {response.status}")
+        else:
+            self.response = None
+            self.status = None
+            super().__init__(message)
