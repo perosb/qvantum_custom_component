@@ -21,6 +21,7 @@ with patch(
     with patch("homeassistant.components.binary_sensor.BinarySensorEntity", MockBinarySensorEntity):
         from homeassistant.helpers.device_registry import DeviceInfo
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+        from homeassistant.const import EntityCategory
 
         from custom_components.qvantum.binary_sensor import (
             QvantumBaseBinaryEntity,
@@ -98,8 +99,8 @@ class TestQvantumConnectedEntity:
         """Test connected entity initialization."""
         entity = QvantumConnectedEntity(mock_coordinator, "connected", "Connected", mock_device)
 
-        assert entity._attr_device_class == "connectivity"
-        assert entity._attr_entity_category == "diagnostic"
+        assert entity._attr_device_class == BinarySensorDeviceClass.CONNECTIVITY
+        assert entity._attr_entity_category == EntityCategory.DIAGNOSTIC
         assert entity._data_bearer == "connectivity"
 
     def test_is_on_connected(self, mock_coordinator, mock_device):

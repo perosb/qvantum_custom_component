@@ -3,7 +3,7 @@
 import aiohttp
 from datetime import datetime, timedelta
 import logging, json
-from typing import Optional, Dict, Any, List
+from typing import Optional
 
 from .const import (
     FAN_SPEED_VALUE_OFF,
