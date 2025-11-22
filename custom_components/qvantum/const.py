@@ -101,3 +101,20 @@ DEFAULT_DISABLED_METRICS = [
     "inputcurrent3",
     "picpin_mask",
 ]
+
+# Sensor filtering patterns
+EXCLUDED_METRIC_PATTERNS = [
+    "op_man_",
+    "enable",
+    "picpin_",
+    "qn8",
+    "use_",
+]
+
+# Sensor type classification
+TEMPERATURE_METRICS = ["temp", "bt", "dhw_normal_st"]
+ENERGY_METRICS = ["energy"]
+POWER_METRICS = ["powertotal"]
+CURRENT_METRICS = ["current"]
+PRESSURE_METRICS = ["pressure"]
+TAP_WATER_CAPACITY_METRICS = ["tap_water_cap"]
