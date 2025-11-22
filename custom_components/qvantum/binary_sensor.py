@@ -42,7 +42,7 @@ async def async_setup_entry(
         "picpin_relay_heat_l2",
         "picpin_relay_heat_l3",
         "picpin_relay_qm10",
-        "qn8position"
+        "qn8position",
     ]
 
     for sensor_name in sensor_names:
@@ -77,7 +77,6 @@ class QvantumBaseBinaryEntity(CoordinatorEntity, BinarySensorEntity):
         self._attr_device_info = device
         self._attr_has_entity_name = True
         self._data_bearer = "metrics"
-
 
     @property
     def is_on(self):

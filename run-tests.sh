@@ -24,6 +24,9 @@ fi
 
 # Run tests
 echo "Running pytest..."
-PYTHONPATH=/home/perosb/build/qvantum_custom_component:/home/perosb/build/qvantum_custom_component/custom_components python -m pytest tests/test_api.py tests/test_init.py tests/test_sensor_working.py tests/test_binary_sensor_working.py tests/test_number_working.py tests/test_climate_working.py tests/test_switch_working.py tests/test_fan_working.py tests/test_services_working.py -v --tb=short --cov=custom_components.qvantum --cov-report=xml
+PYTHONPATH=/home/perosb/build/qvantum_custom_component:/home/perosb/build/qvantum_custom_component/custom_components \
+    python -m pytest -p no:homeassistant_custom_component \
+    tests/test_api.py tests/test_init.py tests/test_sensor_working.py tests/test_binary_sensor_working.py tests/test_number_working.py tests/test_climate_working.py tests/test_switch_working.py tests/test_fan_working.py tests/test_services_working.py \
+    -v --tb=short --cov=custom_components.qvantum --cov-report=xml
 
 echo "Tests completed!"
