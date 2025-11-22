@@ -1,0 +1,12 @@
+{
+  "user_id": "test_user_123",
+  "devices": [
+    {
+      "id": "test_device_123",
+      "type": "heatpump",
+      "vendor": "Qvantum",
+      "serial": "test_device_123",
+      "model": "QE-6"
+    }
+  ]
+}

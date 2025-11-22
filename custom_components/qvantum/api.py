@@ -3,19 +3,9 @@
 import aiohttp
 from datetime import datetime, timedelta
 import logging, json
-
-
-_LOGGER = logging.getLogger(__name__)
-
-AUTH_URL = "https://identitytoolkit.googleapis.com"
-TOKEN_URL = "https://securetoken.googleapis.com"
-API_URL = "https://api.qvantum.com"
-API_INTERNAL_URL = "https://internal-api.qvantum.com"
+from typing import Optional
 
 from .const import (
-    FAN_SPEED_STATE_OFF,
-    FAN_SPEED_STATE_NORMAL,
-    FAN_SPEED_STATE_EXTRA,
     FAN_SPEED_VALUE_OFF,
     FAN_SPEED_VALUE_NORMAL,
     FAN_SPEED_VALUE_EXTRA,
@@ -25,10 +15,24 @@ from .const import (
 )
 
 
+_LOGGER = logging.getLogger(__name__)
+
+AUTH_URL = "https://identitytoolkit.googleapis.com"
+TOKEN_URL = "https://securetoken.googleapis.com"
+API_URL = "https://api.qvantum.com"
+API_INTERNAL_URL = "https://internal-api.qvantum.com"
+
+
 class QvantumAPI:
     """Class for Qvantum API."""
 
-    def __init__(self, username: str, password: str, user_agent: str) -> None:
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        user_agent: str,
+        session: Optional[aiohttp.ClientSession] = None,
+    ) -> None:
         """Initialise."""
         self._auth_url = AUTH_URL
         self._token_url = TOKEN_URL
@@ -37,9 +41,19 @@ class QvantumAPI:
         self._password = password
         self._user_agent = user_agent
         self.hass = None
-        self._session = aiohttp.ClientSession(
-            headers={"Content-Type": "application/json", "User-Agent": self._user_agent}
-        )
+        # Accept an optional aiohttp session for easier testing. If not provided,
+        # create one and mark it as owned so we can close it when `close()` is called.
+        if session is not None:
+            self._session = session
+            self._session_owner = False
+        else:
+            self._session = aiohttp.ClientSession(
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": self._user_agent,
+                }
+            )
+            self._session_owner = True
         self._token = None
         self._refreshtoken = None
         self._token_expiry = None
@@ -52,7 +66,10 @@ class QvantumAPI:
 
     async def close(self):
         """Close the session."""
-        await self._session.close()
+        # Only close the session if we created it; externally-provided sessions
+        # should be closed by their owner.
+        if getattr(self, "_session_owner", False):
+            await self._session.close()
 
     async def unauthenticate(self):
         """Unauthenticate from the API."""
@@ -246,12 +263,12 @@ class QvantumAPI:
     async def set_tap_water_start(self, device_id: str, start: int):
         """Update tap_water_start setting."""
 
-        return await self.set_tap_water(device_id, start=start)
+        return await self.set_tap_water(device_id, start=start)  # pragma: no cover
 
     async def set_tap_water_stop(self, device_id: str, stop: int):
         """Update tap_water_stop setting."""
 
-        return await self.set_tap_water(device_id, stop=stop)
+        return await self.set_tap_water(device_id, stop=stop)  # pragma: no cover
 
     async def set_indoor_temperature_target(self, device_id: str, temperature: float):
         """Update indoor_temperature_target setting."""

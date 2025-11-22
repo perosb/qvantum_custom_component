@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "last_reported": "2025-11-22T06:15:02.368Z",
+    "validity": "valid_now"
+  },
+  "settings": [
+    {
+      "name": "indoor_temperature_offset",
+      "value": 0,
+      "read_only": false
+    },
+    {
+      "name": "vacation_mode",
+      "value": "off",
+      "read_only": false
+    },
+    {
+      "name": "indoor_temperature_target",
+      "value": 20.1,
+      "read_only": false
+    },
+    {
+      "name": "sensor_mode",
+      "value": "bt2",
+      "read_only": true
+    },
+    {
+      "name": "tap_water_stop",
+      "value": 62,
+      "read_only": false
+    },
+    {
+      "name": "extra_tap_water",
+      "value": "off",
+      "read_only": true
+    },
+    {
+      "name": "tap_water_capacity_target",
+      "value": 2,
+      "read_only": false
+    },
+    {
+      "name": "tap_water_start",
+      "value": 52,
+      "read_only": false
+    }
+  ]
+}
