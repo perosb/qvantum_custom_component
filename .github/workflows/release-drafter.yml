@@ -1,7 +1,10 @@
 name: Release Drafter
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Test", "Validate with hassfest"]
+    types:
+      - completed
     branches:
       - main
 
@@ -16,6 +19,7 @@ jobs:
 
     name: Release Drafter
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
