@@ -513,7 +513,7 @@ class QvantumAPI:
                 case _:
                     _LOGGER.error(f"Failed to fetch devices, status: {response.status}")
                     raise APIConnectionError(
-                        response, f"Failed to fetch devices"
+                        response=response, message="Failed to fetch devices"
                     )
 
 
