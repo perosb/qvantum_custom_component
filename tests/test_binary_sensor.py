@@ -20,7 +20,6 @@ with patch(
 ):
     with patch("homeassistant.components.binary_sensor.BinarySensorEntity", MockBinarySensorEntity):
         from homeassistant.helpers.device_registry import DeviceInfo
-        from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
         from custom_components.qvantum.binary_sensor import (
             QvantumBaseBinaryEntity,
