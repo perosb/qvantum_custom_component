@@ -194,7 +194,7 @@
         "name": "Verwarmingsmedium, aanvoerleiding, doel."
       },
       "bt30": {
-        "name": "Tank sensor"
+        "name": "Warmwater tank (BT30)"
       },
       "dhw_normal_start": {
         "name": "Warmwater tank onderste limiet"
