@@ -43,6 +43,7 @@ with patch(
             QvantumDiagnosticEntity,
             QvantumTotalEnergyEntity,
             QvantumLatencyEntity,
+            _get_sensor_type,
         )
 
 
@@ -308,3 +309,45 @@ class TestQvantumLatencyEntity:
         mock_coordinator.data["latency"] = None
         entity = QvantumLatencyEntity(mock_coordinator, "latency", mock_device, True)
         assert entity.available is False
+
+
+class TestGetSensorType:
+    """Test the _get_sensor_type function."""
+
+    def test_temperature_metrics(self):
+        """Test temperature metric classification."""
+        # Test various temperature patterns
+        assert _get_sensor_type("bt1") == QvantumTemperatureEntity
+        assert _get_sensor_type("bt2") == QvantumTemperatureEntity
+        assert _get_sensor_type("bp1_temp") == QvantumTemperatureEntity
+        assert _get_sensor_type("dhw_normal_start") == QvantumTemperatureEntity
+
+    def test_energy_metrics(self):
+        """Test energy metric classification."""
+        assert _get_sensor_type("compressorenergy") == QvantumEnergyEntity
+        assert _get_sensor_type("additionalenergy") == QvantumEnergyEntity
+
+    def test_power_metrics(self):
+        """Test power metric classification."""
+        assert _get_sensor_type("powertotal") == QvantumPowerEntity
+
+    def test_current_metrics(self):
+        """Test current metric classification."""
+        assert _get_sensor_type("inputcurrent1") == QvantumCurrentEntity
+        assert _get_sensor_type("inputcurrent2") == QvantumCurrentEntity
+
+    def test_pressure_metrics(self):
+        """Test pressure metric classification."""
+        assert _get_sensor_type("bp1_pressure") == QvantumPressureEntity
+        assert _get_sensor_type("bp2_pressure") == QvantumPressureEntity
+
+    def test_tap_water_capacity_metrics(self):
+        """Test tap water capacity metric classification."""
+        assert _get_sensor_type("tap_water_cap") == QvantumTapWaterCapacityEntity
+
+    def test_base_entity_default(self):
+        """Test that unknown metrics default to base entity."""
+        assert _get_sensor_type("unknown_metric") == QvantumBaseEntity
+        assert _get_sensor_type("fan0_10v") == QvantumBaseEntity
+        assert _get_sensor_type("compressormeasuredspeed") == QvantumBaseEntity
+        assert _get_sensor_type("bf1_l_min") == QvantumBaseEntity
