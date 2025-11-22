@@ -1,0 +1,403 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Extra heißes Wasser"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Betrieb manuell Zusatz"
+      },
+      "op_man_cooling": {
+        "name": "Betrieb manuell Kühlung"
+      },
+      "op_man_dhw": {
+        "name": "Betrieb manuell Brauchwasser"
+      },
+      "use_adaptive": {
+        "name": "Intelligente Steuerung"
+      },
+      "cooling_enabled": {
+        "name": "Kühlung aktiviert"
+      },
+      "enable_sc_dhw": {
+        "name": "SC Brauchwasser aktivieren"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Zusätzliche Wärme L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Zusätzliche Wärme L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Zusätzliche Wärme L3"
+      },
+      "picpin_relay_qm10": {
+        "name": "Drei-Wege-Ventil, Brauchwasser/Heizung (QM10)"
+      },
+      "qn8position": {
+        "name": "Mischventil, Zusatz (QN8)"
+      }
+    },
+    "sensor": {
+      "dhwpower": {
+        "name": "Brauchwasser-Leistung"
+      },
+      "heatingpower": {
+        "name": "Heizleistung"
+      },
+      "powertotal": {
+        "name": "Gesamt (L1+L2+L3)"
+      },
+      "inputcurrent1": {
+        "name": "Eingangsstrom L1"
+      },
+      "inputcurrent2": {
+        "name": "Eingangsstrom L2"
+      },
+      "inputcurrent3": {
+        "name": "Eingangsstrom L3"
+      },
+
+      "bf1_l_min": {
+        "name": "Durchflusssensor für Brauchwasser (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Niedriger Druckbalken (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Niederdrucktemperatur (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "Hochdruckbalken (BP2)"
+      },
+      "bp2_temp": {
+        "name": "Hochdrucktemperatur (BP2)"
+      },
+      "bt10": {
+        "name": "Heizmedium, Durchflussleitung Kondensator (BT10)"
+      },
+      "bt12": {
+        "name": "Heizmedium, externe Durchflussleitung (BT12)"
+      },
+      "bt13": {
+        "name": "Heizmedium, Rücklaufleitung (BT13)"
+      },
+      "bt14": {
+        "name": "Quellfluss (BT14)"
+      },
+      "bt15": {
+        "name": "Quellrücklauf (BT15)"
+      },
+      "bt20": {
+        "name": "Ablaufleitung (BT20)"
+      },
+      "bt21": {
+        "name": "Flüssigkeitsleitung (BT21)"
+      },
+      "bt22": {
+        "name": "Verdampfer-Einlassleitung (BT22)"
+      },
+      "bt23": {
+        "name": "Saugleitung (BT23)"
+      },
+      "bt31": {
+        "name": "Brauchwasser-Vorlauf, Plattenwärmetauscher Einlass (BT31)"
+      },
+      "bt33": {
+        "name": "Brauchwasser-Rücklauf, Plattenwärmetauscher Einlass (BT33)"
+      },
+      "bt34": {
+        "name": "Brauchwasser-Rücklauf, Plattenwärmetauscher Auslass (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Kompressordrehzahl"
+      },
+      "dhw_outl_temp_15": {
+        "name": "Brauchwasser-Auslasstemperatur 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "Brauchwasser-Auslasstemperatur 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "Brauchwasser-Auslasstemperatur max"
+      },
+      "dhw_prioritytime": {
+        "name": "Brauchwasser-Prioritätszeit"
+      },
+      "fan0_10v": {
+        "name": "Lüftergeschwindigkeit"
+      },
+      "gp1_speed": {
+        "name": "Heizmedium-Pumpe (GP1)"
+      },
+      "gp2_speed": {
+        "name": "Brauchwasser-Plattenwärmetauscherpumpe (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Führung Soll-Temperatur"
+      },
+      "guide_he": {
+        "name": "Führung Heizung"
+      },
+      "man_mode": {
+        "name": "Manueller Modus"
+      },
+      "op_mode": {
+        "name": "Betriebsmodus",
+        "state": {
+          "0": "Auto",
+          "1": "Manuell",
+          "2": "Zusatz"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Betriebsmodus-Sensor"
+      },
+      "price_region": {
+        "name": "Preisregion"
+      },
+      "room_temp_ext": {
+        "name": "Raumtemperatur extern"
+      },
+      "compressorenergy": {
+        "name": "Kompressorenergie"
+      },
+      "totalenergy": {
+        "name": "Gesamtenergie"
+      },
+      "bt1": {
+        "name": "Außensensor (BT1)"
+      },
+      "bt2": {
+        "name": "Innensensor (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Intelligenter Status für Heizung"
+      },
+      "bt11": {
+        "name": "Heizmedium, Durchflussleitung mit Zusatz (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "Heizmedium, Durchflussleitung, Sollwert."
+      },
+      "bt30": {
+        "name": "Trinkwassererwärmer, Steuersensor (BT30)"
+      },
+      "dhw_normal_start": {
+        "name": "Brauchwasserbehälter Untergrenze"
+      },
+      "dhw_normal_stop": {
+        "name": "Brauchwasserbehälter Obergrenze"
+      },
+      "tap_water_cap": {
+        "name": "Brauchwasserkapazität"
+      },
+      "additionalenergy": {
+        "name": "Zusätzliche Energie"
+      },
+      "hpid": {
+        "name": "ID"
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH Modus",
+        "state": {
+          "0": "Eco",
+          "1": "Ausgewogen",
+          "2": "Komfort"
+        }
+      },
+      "hp_status": {
+        "name": "Wärmepumpenstatus",
+        "state": {
+          "0": "Leerlauf",
+          "1": "Abtauen",
+          "2": "Heißes Wasser",
+          "3": "Heizung"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Intelligenter Status für Brauchwasser"
+      },
+      "extra_tap_water_stop": {
+        "name": "Extra Brauchwasser Stopp"
+      },
+      "ventilation_boost_stop": {
+        "name": "Boost Belüftung Stopp"
+      },
+      "timestamp": {
+        "name": "Letzte Aktualisierung"
+      },
+      "latency": {
+        "name": "Latenz"
+      },
+      "disconnect_reason": {
+        "name": "Trennungsgrund",
+        "state": {
+          "client-disconnect": "Client getrennt"
+        }
+      },
+      "dhwdemand": {
+        "name": "Brauchwasser-Nachfrage"
+      },
+      "heatingdemand": {
+        "name": "Heiznachfrage"
+      },
+      "coolingdemand": {
+        "name": "Kühlungsnachfrage"
+      },
+      "heatingreleased": {
+        "name": "Heizung freigegeben"
+      },
+      "coolingreleased": {
+        "name": "Kühlung freigegeben"
+      },
+      "compressorreleased": {
+        "name": "Kompressor freigegeben"
+      },
+      "additionreleased": {
+        "name": "Zusatz freigegeben"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "Brauchwasser-Prioritätszeit verbleibend"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Heiz-Prioritätszeit verbleibend"
+      },
+      "cooling_priotitytimeleft": {
+        "name": "Kühl-Prioritätszeit verbleibend"
+      },
+      "switch_state": {
+        "name": "Schalterzustand"
+      },
+      "dhwstop_temp": {
+        "name": "Brauchwasser-Stopp-Temperatur"
+      },
+      "dhwstart_temp": {
+        "name": "Brauchwasser-Start-Temperatur"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Gefilterte Außentemperatur (60s)"
+      },
+      "max_freq_env": {
+        "name": "Max Frequenz Umgebung"
+      },
+      "calc_suppy_cpr": {
+        "name": "Berechnete Versorgung CPR"
+      },
+      "dhw_set": {
+        "name": "Brauchwasser eingestellt"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "BP1 Temp 20min Filter"
+      },
+      "max_bp2_env": {
+        "name": "Max BP2 Umgebung"
+      },
+      "picpin_mask": {
+        "name": "PIC Pin Maske"
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Parallelkurven-Offset"
+      },
+      "tap_water_capacity_target": {
+        "name": "Brauchwasserkapazität Ziel"
+      },
+      "room_comp_factor": {
+        "name": "Raumkompensationsfaktor"
+      },
+      "tap_water_stop": {
+        "name": "Brauchwasserbehälter obere Temperaturgrenze"
+      },
+      "tap_water_start": {
+        "name": "Brauchwasserbehälter untere Temperaturgrenze"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Innenklima"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Lüftergeschwindigkeit",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Aus",
+              "normal": "Normal",
+              "extra": "Extra"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Qvantum Wärmepumpe",
+    "abort": {
+      "already_configured": "Gerät ist bereits konfiguriert",
+      "reconfigure_successful": "Rekonfiguration erfolgreich"
+    },
+    "error": {
+      "cannot_connect": "Verbindung fehlgeschlagen",
+      "invalid_auth": "Ungültige Authentifizierung",
+      "unknown": "Unerwarteter Fehler"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "password": "Passwort",
+          "username": "Benutzername"
+        }
+      },
+      "reconfigure": {
+        "data": {
+          "password": "Passwort",
+          "username": "Benutzername"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Scan-Intervall (Sekunden)"
+        },
+        "description": "Ändern Sie Ihre Optionen.",
+        "title": "Optionen"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Extra heißes Wasser",
+      "description": "Aktiviert extra heißes Wasser für einen Zeitraum",
+      "fields": {
+        "device_id": {
+          "name": "Geräte-ID",
+          "description": "Die Qvantum-Geräte-ID"
+        },
+        "minutes": {
+          "name": "Minuten",
+          "description": "Minuten zum Produzieren von extra heißem Wasser (0 Minuten schaltet aus)"
+        }
+      }
+    }
+  }
+}
