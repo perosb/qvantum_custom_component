@@ -69,16 +69,16 @@
         "name": "Flowsensor tapwater (BF1)"
       },
       "bp1_pressure": {
-        "name": "Hoge druk - bar (BP1)"
+        "name": "Lage druk - bar (BP1)"
       },
       "bp1_temp": {
-        "name": "Lagedruktemperatuur (BP1)"
+        "name": "Lage druk temperatuur (BP1)"
       },
       "bp2_pressure": {
-        "name": "Lage druk - bar (BP2)"
+        "name": "Hoge druk - bar (BP2)"
       },
       "bp2_temp": {
-        "name": "Hogedruktemperatuur (BP2)"
+        "name": "Hoge druk temperatuur (BP2)"
       },
       "bt10": {
         "name": "Condensor temperatuur uit (BT10)"
