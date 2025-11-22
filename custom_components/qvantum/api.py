@@ -17,10 +17,20 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# API Configuration
 AUTH_URL = "https://identitytoolkit.googleapis.com"
 TOKEN_URL = "https://securetoken.googleapis.com"
 API_URL = "https://api.qvantum.com"
 API_INTERNAL_URL = "https://internal-api.qvantum.com"
+
+# Timeouts and buffers
+DEFAULT_TOKEN_BUFFER_SECONDS = 60
+DEFAULT_TOKEN_EXPIRY_SECONDS = 3540
+METRICS_TIMEOUT_SECONDS = 12
+VENTILATION_BOOST_MINUTES = 120
+
+# Firebase API Key (consider moving to config if needed)
+FIREBASE_API_KEY = "AIzaSyCLQ22XHjH8LmId-PB1DY8FBsN53rWTpFw"
 
 
 class QvantumAPI:
@@ -93,7 +103,7 @@ class QvantumAPI:
         }
 
         async with self._session.post(
-            f"{self._auth_url}/v1/accounts:signInWithPassword?key=AIzaSyCLQ22XHjH8LmId-PB1DY8FBsN53rWTpFw",
+            f"{self._auth_url}/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}",
             json=payload,
         ) as response:
             match response.status:
@@ -102,14 +112,16 @@ class QvantumAPI:
                     auth_data = await response.json()
                     self._token = auth_data.get("idToken")
                     self._refreshtoken = auth_data.get("refreshToken")
-                    expires_in = auth_data.get("expiresIn", 3540)
+                    expires_in = auth_data.get(
+                        "expiresIn", DEFAULT_TOKEN_EXPIRY_SECONDS
+                    )
                     self._token_expiry = datetime.now() + timedelta(
-                        seconds=int(expires_in) - 60
+                        seconds=int(expires_in) - DEFAULT_TOKEN_BUFFER_SECONDS
                     )
                     return True
                 case _:
                     _LOGGER.error(f"Authentication failed: {response.status}")
-                    raise Exception(f"Authentication failed: {response}")
+                    raise APIAuthError(response)
 
     async def _refresh_authentication_token(self):
         """Refresh the authentication token."""
@@ -122,7 +134,7 @@ class QvantumAPI:
         self._token = None
 
         async with self._session.post(
-            f"{self._token_url}/v1/token?key=AIzaSyCLQ22XHjH8LmId-PB1DY8FBsN53rWTpFw",
+            f"{self._token_url}/v1/token?key={FIREBASE_API_KEY}",
             json=payload,
         ) as response:
             match response.status:
@@ -131,21 +143,32 @@ class QvantumAPI:
                     auth_data = await response.json()
                     self._token = auth_data.get("access_token")
                     self._refreshtoken = auth_data.get("refresh_token")
-                    expires_in = auth_data.get("expires_in", 3540)
+                    expires_in = auth_data.get(
+                        "expires_in", DEFAULT_TOKEN_EXPIRY_SECONDS
+                    )
                     self._token_expiry = datetime.now() + timedelta(
-                        seconds=int(expires_in) - 60
+                        seconds=int(expires_in) - DEFAULT_TOKEN_BUFFER_SECONDS
                     )
                 case _:
                     _LOGGER.error(f"Token refresh failed: {response.status}")
+                    # Don't raise exception here, let _ensure_valid_token handle it
 
     async def _ensure_valid_token(self):
         """Ensure a valid token is available, refreshing if expired."""
         if not self._token or datetime.now() >= self._token_expiry:
-            await self._refresh_authentication_token()
-            if not self._token:
+            try:
+                await self._refresh_authentication_token()
+                if not self._token:
+                    await self.authenticate()
+                    if not self._token:
+                        raise APIAuthError(
+                            None, "Failed to obtain authentication token"
+                        )
+            except APIAuthError:
+                # If refresh fails, try fresh authentication
                 await self.authenticate()
                 if not self._token:
-                    raise Exception("Failed to authenticate.")
+                    raise APIAuthError(None, "Failed to obtain authentication token")
 
     def _request_headers(self):
         """Get request headers for API calls."""
@@ -212,7 +235,11 @@ class QvantumAPI:
 
         payload = {"settings": [{"name": "fanspeedselector", "value": value}]}
         if value == FAN_SPEED_VALUE_EXTRA:
-            stop_time = int((datetime.now() + timedelta(minutes=120)).timestamp())
+            stop_time = int(
+                (
+                    datetime.now() + timedelta(minutes=VENTILATION_BOOST_MINUTES)
+                ).timestamp()
+            )
             payload["settings"].append(
                 {"name": "ventilation_boost_stop", "value": stop_time}
             )
@@ -327,7 +354,7 @@ class QvantumAPI:
             names_list += f"&names[]={metric_name}"
 
         async with self._session.get(
-            f"{API_INTERNAL_URL}/api/internal/v1/devices/{device_id}/values?use_internal_names=true&timeout=12{names_list}",
+            f"{API_INTERNAL_URL}/api/internal/v1/devices/{device_id}/values?use_internal_names=true&timeout={METRICS_TIMEOUT_SECONDS}{names_list}",
             headers=headers,
         ) as response:
             match response.status:
@@ -486,13 +513,59 @@ class QvantumAPI:
                 case _:
                     _LOGGER.error(f"Failed to fetch devices, status: {response.status}")
                     raise APIConnectionError(
-                        f"Failed to fetch devices: {response.status}"
+                        response=response, message="Failed to fetch devices"
                     )
 
 
 class APIAuthError(Exception):
-    """Exception class for auth error."""
+    """Exception raised for authentication errors."""
+
+    def __init__(
+        self,
+        response: Optional[aiohttp.ClientResponse],
+        message: str = "Authentication failed",
+    ):
+        if response is not None:
+            self.response = response
+            self.status = response.status
+            super().__init__(f"{message}: {response.status}")
+        else:
+            self.response = None
+            self.status = None
+            super().__init__(message)
 
 
 class APIConnectionError(Exception):
-    """Exception class for connection error."""
+    """Exception raised for connection/API errors."""
+
+    def __init__(
+        self,
+        response: Optional[aiohttp.ClientResponse],
+        message: str = "API request failed",
+    ):
+        if response is not None:
+            self.response = response
+            self.status = response.status
+            super().__init__(f"{message}: {response.status}")
+        else:
+            self.response = None
+            self.status = None
+            super().__init__(message)
+
+
+class APIRateLimitError(Exception):
+    """Exception raised for rate limiting."""
+
+    def __init__(
+        self,
+        response: Optional[aiohttp.ClientResponse],
+        message: str = "Rate limit exceeded",
+    ):
+        if response is not None:
+            self.response = response
+            self.status = response.status
+            super().__init__(f"{message}: {response.status}")
+        else:
+            self.response = None
+            self.status = None
+            super().__init__(message)
