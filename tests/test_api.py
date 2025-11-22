@@ -19,7 +19,7 @@ const_mock.FAN_SPEED_VALUE_NORMAL = 1
 const_mock.FAN_SPEED_VALUE_EXTRA = 2
 const_mock.DEFAULT_ENABLED_METRICS = ["bt1", "bt2"]
 const_mock.DEFAULT_DISABLED_METRICS = ["bt3", "bt4"]
-sys.modules['custom_components.qvantum.const'] = const_mock
+sys.modules["custom_components.qvantum.const"] = const_mock
 
 # Import the real QvantumAPI after mocking
 QvantumAPI = importlib.import_module("custom_components.qvantum.api").QvantumAPI
@@ -60,7 +60,7 @@ class TestQvantumAPI:
 
     def test_init(self):
         """Test API initialization."""
-        with patch('aiohttp.ClientSession'):
+        with patch("aiohttp.ClientSession"):
             api = QvantumAPI("test@example.com", "password", "test-agent")
 
             assert api._username == "test@example.com"
@@ -160,7 +160,7 @@ class TestQvantumAPI:
 
         mock_hass.data = {
             "device_registry": mock_device_registry,
-            "entity_registry": mock_entity_registry
+            "entity_registry": mock_entity_registry,
         }
         api.hass = mock_hass
 
@@ -184,6 +184,7 @@ class TestQvantumAPI:
 
         # Should return DEFAULT_ENABLED_METRICS
         from custom_components.qvantum.const import DEFAULT_ENABLED_METRICS
+
         assert result == DEFAULT_ENABLED_METRICS
 
     @pytest.mark.asyncio
@@ -294,7 +295,9 @@ class TestQvantumAPI:
             api._refresh_authentication_token = AsyncMock(return_value=None)
             api.authenticate = AsyncMock(return_value=None)
 
-            with pytest.raises(Exception, match="Failed to authenticate"):
+            with pytest.raises(
+                Exception, match="Failed to obtain authentication token"
+            ):
                 await api._ensure_valid_token()
 
     @pytest.mark.asyncio

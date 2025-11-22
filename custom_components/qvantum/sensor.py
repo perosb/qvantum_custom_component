@@ -1,6 +1,7 @@
 """Interfaces with the Qvantum Heat Pump api sensors."""
 
 import logging
+from typing import Type
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -22,7 +23,17 @@ from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DEFAULT_ENABLED_METRICS, DEFAULT_DISABLED_METRICS
+from .const import (
+    DEFAULT_ENABLED_METRICS,
+    DEFAULT_DISABLED_METRICS,
+    EXCLUDED_METRIC_PATTERNS,
+    TEMPERATURE_METRICS,
+    ENERGY_METRICS,
+    POWER_METRICS,
+    CURRENT_METRICS,
+    PRESSURE_METRICS,
+    TAP_WATER_CAPACITY_METRICS,
+)
 from .coordinator import QvantumDataUpdateCoordinator
 from . import MyConfigEntry
 
@@ -40,85 +51,24 @@ async def async_setup_entry(
 
     sensors = []
     metrics = DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_METRICS
+
     for metric in metrics:
-        enabled_default = metric not in DEFAULT_DISABLED_METRICS
-        if (
-            metric.startswith("op_man_")
-            or "enable" in metric
-            or metric.startswith("picpin_")
-            or metric.startswith("qn8")
-            or metric.startswith("use_")
-        ):
+        if _should_exclude_metric(metric):
             continue
 
-        if (
-            "temp" in metric
-            or metric.startswith("bt")
-            or metric.startswith("dhw_normal_st")
-        ):
-            sensors.append(
-                QvantumTemperatureEntity(
-                    coordinator,
-                    metric,
-                    device,
-                    enabled_default,
-                )
-            )
-        elif "energy" in metric:
-            sensors.append(
-                QvantumEnergyEntity(
-                    coordinator,
-                    metric,
-                    device,
-                    enabled_default,
-                )
-            )
-        elif "powertotal" in metric:
-            sensors.append(
-                QvantumPowerEntity(
-                    coordinator,
-                    metric,
-                    device,
-                    enabled_default,
-                )
-            )
-        elif "current" in metric:
-            sensors.append(
-                QvantumCurrentEntity(
-                    coordinator,
-                    metric,
-                    device,
-                    enabled_default,
-                )
-            )
-        elif "pressure" in metric:
-            sensors.append(
-                QvantumPressureEntity(
-                    coordinator,
-                    metric,
-                    device,
-                    enabled_default,
-                )
-            )
-        elif "tap_water_cap" in metric:
-            sensors.append(
-                QvantumTapWaterCapacityEntity(
-                    coordinator,
-                    metric,
-                    device,
-                    enabled_default,
-                )
-            )
-        else:
-            sensors.append(
-                QvantumBaseEntity(
-                    coordinator,
-                    metric,
-                    device,
-                    enabled_default,
-                )
-            )
+        enabled_default = metric not in DEFAULT_DISABLED_METRICS
+        sensor_class = _get_sensor_type(metric)
 
+        sensors.append(
+            sensor_class(
+                coordinator,
+                metric,
+                device,
+                enabled_default,
+            )
+        )
+
+    # Add special sensors
     sensors.append(QvantumTotalEnergyEntity(coordinator, "totalenergy", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "latency", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device, True))
@@ -155,13 +105,16 @@ class QvantumBaseEntity(CoordinatorEntity, SensorEntity):
         self._attr_has_entity_name = True
         self._attr_entity_registry_enabled_default = enabled_default
 
+        # Set units based on metric patterns
+        self._set_units_from_metric(metric_key)
+
+    def _set_units_from_metric(self, metric_key: str) -> None:
+        """Set appropriate units based on metric key patterns."""
         if "fan" in metric_key or metric_key.startswith("gp"):
             self._attr_native_unit_of_measurement = "%"
-
-        if "compressormeasuredspeed" in metric_key:
+        elif "compressormeasuredspeed" in metric_key:
             self._attr_native_unit_of_measurement = "rpm"
-
-        if "bf1_l_min" == metric_key:
+        elif "bf1_l_min" == metric_key:
             self._attr_native_unit_of_measurement = "l/m"
 
     @property
@@ -385,3 +338,26 @@ class QvantumLatencyEntity(QvantumBaseEntity):
         """Check if data is available."""
         latency = self.coordinator.data.get(self._metric_key)
         return latency is not None
+
+
+def _should_exclude_metric(metric: str) -> bool:
+    """Check if a metric should be excluded from sensor creation."""
+    return any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
+
+
+def _get_sensor_type(metric: str) -> Type[QvantumBaseEntity]:
+    """Determine the appropriate sensor type for a metric."""
+    if any(pattern in metric for pattern in TEMPERATURE_METRICS):
+        return QvantumTemperatureEntity
+    elif any(pattern in metric for pattern in ENERGY_METRICS):
+        return QvantumEnergyEntity
+    elif any(pattern in metric for pattern in POWER_METRICS):
+        return QvantumPowerEntity
+    elif any(pattern in metric for pattern in CURRENT_METRICS):
+        return QvantumCurrentEntity
+    elif any(pattern in metric for pattern in PRESSURE_METRICS):
+        return QvantumPressureEntity
+    elif any(pattern in metric for pattern in TAP_WATER_CAPACITY_METRICS):
+        return QvantumTapWaterCapacityEntity
+    else:
+        return QvantumBaseEntity
