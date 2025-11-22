@@ -30,13 +30,13 @@
         "name": "SC WTW inschakelen"
       },
       "picpin_relay_heat_l1": {
-        "name": "Toegevoegde temperatuur L1"
+        "name": "Extra vermogen L1"
       },
       "picpin_relay_heat_l2": {
-        "name": "Toegevoegde temperatuur L2"
+        "name": "Extra vermogen L2"
       },
       "picpin_relay_heat_l3": {
-        "name": "Toegevoegde temperatuur L3"
+        "name": "Extra vermogen L3"
       },
       "picpin_relay_qm10": {
         "name": "Omloopklep, tapwater/verwarming (QM10)"
