@@ -138,7 +138,7 @@
         "name": "Heizmedium-Pumpe (GP1)"
       },
       "gp2_speed": {
-        "name": "Brauchwasser-Platten wärmetauscherpumpe (GP2)"
+        "name": "Brauchwasser-Plattenwärmetauscherpumpe (GP2)"
       },
       "guide_des_temp": {
         "name": "Führung Soll-Temperatur"
