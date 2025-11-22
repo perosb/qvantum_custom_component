@@ -156,16 +156,8 @@ class QvantumAPI:
     async def _ensure_valid_token(self):
         """Ensure a valid token is available, refreshing if expired."""
         if not self._token or datetime.now() >= self._token_expiry:
-            try:
-                await self._refresh_authentication_token()
-                if not self._token:
-                    await self.authenticate()
-                    if not self._token:
-                        raise APIAuthError(
-                            None, "Failed to obtain authentication token"
-                        )
-            except APIAuthError:
-                # If refresh fails, try fresh authentication
+            await self._refresh_authentication_token()
+            if not self._token:
                 await self.authenticate()
                 if not self._token:
                     raise APIAuthError(None, "Failed to obtain authentication token")
