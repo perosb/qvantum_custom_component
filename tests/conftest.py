@@ -29,7 +29,6 @@ def hass():
 @pytest.fixture
 def mock_session():
     """Provide a reusable mocked aiohttp ClientSession for tests."""
-    from unittest.mock import AsyncMock, Mock
     
     def make_cm_response(status=200, json_data=None, headers=None):
         resp = Mock()
