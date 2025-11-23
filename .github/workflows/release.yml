@@ -27,7 +27,7 @@ jobs:
           git config user.email github-actions@github.com
           git add ./custom_components/qvantum/manifest.json ./custom_components/qvantum/const.py
           git commit -m "Update for new version ${{ github.event.release.tag_name }}"
-          git push origin HEAD:main
+          git push origin HEAD:main --force
       - name: Create zip
         run: |
           cd custom_components/qvantum
