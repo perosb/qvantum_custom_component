@@ -1,14 +1,13 @@
 {
-    "domain": "qvantum",
-    "name": "Qvantum Heat Pump",
-    "codeowners": [
-        "@perosb"
-    ],
-    "config_flow": true,
-    "dependencies": [],
-    "documentation": "https://github.com/perosb/qvantum_custom_component",
-    "iot_class": "cloud_polling",
-    "issue_tracker": "https://github.com/perosb/qvantum_custom_component/issues",
-    "single_config_entry": true,
-    "version": "2025.11.3"
+  "domain": "qvantum",
+  "name": "Qvantum Heat Pump",
+  "codeowners": ["@perosb"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/perosb/qvantum_custom_component",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/perosb/qvantum_custom_component/issues",
+  "single_config_entry": true,
+  "version": "2025.11.3",
+  "homeassistant": "2023.6.0"
 }
