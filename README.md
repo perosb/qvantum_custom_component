@@ -1,6 +1,17 @@
 [![qvantum_custom_component](https://img.shields.io/github/release/perosb/qvantum_custom_component/all.svg?label=current%20release)](https://github.com/perosb/qvantum_custom_component) [![downloads](https://img.shields.io/github/downloads/perosb/qvantum_custom_component/total?label=downloads)](https://github.com/perosb/qvantum_custom_component) [![codecov](https://codecov.io/gh/perosb/qvantum_custom_component/graph/badge.svg)](https://codecov.io/gh/perosb/qvantum_custom_component)
 
-## Qvantum Exhaust Air Heat Pump
+## Qvantum Exhaust Air Heat Pump Integration for Home Assistant
+
+### Transform Your Home's Energy Efficiency with Qvantum
+
+Discover the power of intelligent home climate control with the Qvantum Exhaust Air Heat Pump integration for Home Assistant. Seamlessly monitor and control your Qvantum heat pump directly from your smart home dashboard, giving you unprecedented insight into your energy usage and system performance.
+
+**Why choose this integration?**
+- **Complete Control**: Monitor temperatures, energy consumption, and system status in real-time
+- **Smart Automation**: Create automations based on heat pump data for optimal comfort and efficiency
+- **Energy Insights**: Track daily energy usage and optimize your heating costs
+- **Professional Integration**: Built with reliability and performance in mind for Qvantum systems
+- **Easy Setup**: Install via HACS with just a few clicks
 
 ### Energy for all – without compromises
 
@@ -8,19 +19,35 @@ Our needs, lifestyles and ways of working have changed rapidly. Demands on our s
 
 Disrupting the ordinary takes courage, but with experience, deep knowledge and determination, we have the power to change everything. We have to break free from the past with technology for the future. To focus on values and experience. To give access to millions of homes, to be part of the energy transition without sacrificing their livelihood or their comfort.
 
+### Installation
 
-### home-assistant custom component for Qvantum Exhaust Air Heat Pump integration
+1. **Install via HACS** (recommended):
+   - Search for "Qvantum Heat Pump" in HACS
+   - Install the Qvantum Heat Pump integration
+   - Restart Home Assistant
 
-*Installation:*
+2. **Manual Installation**:
+   - Download the latest release
+   - Extract to `custom_components/qvantum/`
+   - Restart Home Assistant
 
-1. Search for Qvantum Heat Pump in HACS.
-2. Add Qvantum Heat Pump integration.
-3. Sign in using email and password.
+3. **Setup**:
+   - Go to Settings → Devices & Services → Add Integration
+   - Search for "Qvantum Heat Pump"
+   - Sign in using your Qvantum account email and password
 
-The integration will pull your devices and use the first one. It will create sensors for all supported metrics.
+The integration will automatically discover your Qvantum devices and create comprehensive sensors for all supported metrics.
 
-*Qvantum Controls:*  
+### Features
+
+- **Real-time Monitoring**: Temperature sensors, pressure readings, energy consumption
+- **System Control**: Adjust operation modes, set temperatures, control ventilation
+- **Energy Analytics**: Daily and total energy usage tracking
+- **Smart Status**: Heat pump status, defrost cycles, priority modes
+- **Comprehensive Coverage**: Supports all major Qvantum heat pump parameters
+
+*Qvantum Controls in Home Assistant:*  
 ![image](https://github.com/user-attachments/assets/3b04bf83-3f1a-45d8-9aad-fdcb780abc9b)
 
-*Daily energy usage of Qvantum Heap Pump:*   
+*Daily energy usage of Qvantum Heat Pump:*   
 ![image](https://github.com/user-attachments/assets/4f2f58f8-eae2-4a72-a2e8-b8468f869da4)
