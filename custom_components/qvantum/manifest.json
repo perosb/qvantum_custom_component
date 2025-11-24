@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/perosb/qvantum_custom_component/issues",
   "single_config_entry": true,
   "version": "2025.11.3",
-  "homeassistant": "2023.6.0"
+  "min_homeassistant_version": "2023.6.0"
 }
