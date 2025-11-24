@@ -23,7 +23,13 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
 from .api import QvantumAPI, APIAuthError, APIConnectionError
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL, VERSION, CONFIG_VERSION
+from .const import (
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    MIN_SCAN_INTERVAL,
+    VERSION,
+    CONFIG_VERSION,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -141,6 +147,7 @@ class QvantumOptionsFlowHandler(OptionsFlow):
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
+        super().__init__(config_entry)
         self.options = dict(config_entry.options)
 
     async def async_step_init(self, user_input=None):
