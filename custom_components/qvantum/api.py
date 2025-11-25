@@ -176,6 +176,21 @@ class QvantumAPI:
             "Authorization": f"Bearer {self._token}",
         }
 
+    async def update_setting(self, device_id: str, name: str, value: any):
+        """Update one setting."""
+
+        payload = {"settings": [{"name": name, "value": value}]}
+        await self._ensure_valid_token()
+
+        async with self._session.patch(
+            f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings?dispatch=false",
+            json=payload,
+            headers=self._request_headers(),
+        ) as response:
+            data = await response.json()
+            _LOGGER.debug(f"Response received {response.status}: {data}")
+            return data
+
     async def _update_settings(self, device_id: str, payload: dict):
         """Update one or several settings."""
 

@@ -33,8 +33,8 @@ PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.CLIMATE,
     Platform.NUMBER,
-    #Platform.SWITCH,
-    #Platform.FAN,
+    Platform.SWITCH,
+    # Platform.FAN,
 ]
 
 type MyConfigEntry = ConfigEntry[RuntimeData]

@@ -8,23 +8,32 @@
     "switch": {
       "extra_tap_water": {
         "name": "Extra varmvatten"
+      },
+      "op_man_addition": {
+        "name": "Tillåt tillsats i manuellt läge"
+      },
+      "op_man_dhw": {
+        "name": "Tillåt varmvatten i manuellt läge"
+      },
+      "op_mode": {
+        "name": "Manuellt driftläge"
       }
     },
     "binary_sensor": {
       "op_man_addition": {
-        "name": "Driftläge manuell addition"
+        "name": "Driftläge manuell tillsats"
       },
       "op_man_cooling": {
-        "name": "Driftläge manuell cooling"
+        "name": "Driftläge manuell kylning"
       },
       "op_man_dhw": {
-        "name": "Driftläge manuell DHW"
+        "name": "Driftläge manuell varmvatten"
       },
       "enable_sc_dhw": {
-        "name": "Enable SC DHW"
+        "name": "Tillåt smart styrning varmvatten"
       },
       "cooling_enabled": {
-        "name": "Cooling enabled"
+        "name": "Kylning aktiverad"
       },
       "use_adaptive": {
         "name": "Smart Control"
@@ -147,7 +156,7 @@
         "name": "Guide heating"
       },
       "man_mode": {
-        "name": "Manual mode"
+        "name": "Manuellt läge"
       },
       "op_mode": {
         "name": "Driftläge",
