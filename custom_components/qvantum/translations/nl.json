@@ -7,7 +7,16 @@
   "entity": {
     "switch": {
       "extra_tap_water": {
-        "name": "Extra warm water"
+        "name": "Extra WTW"
+      },
+      "op_man_addition": {
+        "name": "Toevoeging in handmatige modus toestaan"
+      },
+      "op_man_dhw": {
+        "name": "WTW in handmatige modus toestaan"
+      },
+      "op_mode": {
+        "name": "Handmatige bedrijfsmodus"
       }
     },
     "binary_sensor": {

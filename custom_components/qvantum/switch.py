@@ -29,6 +29,10 @@ async def async_setup_entry(
     sensors = []
     #sensors.append(QvantumSwitchEntity(coordinator, "extra_tap_water", device))
 
+    sensors.append(QvantumSwitchEntity(coordinator, "op_mode", device))
+    sensors.append(QvantumSwitchEntity(coordinator, "op_man_dhw", device))
+    sensors.append(QvantumSwitchEntity(coordinator, "op_man_addition", device))
+
     async_add_entities(sensors)
 
     _LOGGER.debug("Setting up platform SWITCH")
@@ -51,8 +55,17 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
         self._attr_device_info = device
         self._attr_device_class = SwitchDeviceClass.SWITCH
         self._attr_has_entity_name = True
-        self._attr_icon = "mdi:water-boiler"
         self._attr_is_on = False
+
+        match self._metric_key:
+            case "op_mode":
+                self._attr_icon = "mdi:auto-mode"
+            case "op_man_dhw":
+                self._attr_icon = "mdi:water-outline"
+            case "op_man_addition":
+                self._attr_icon = "mdi:transmission-tower-import"
+            case _:
+                self._attr_icon = "mdi:water-boiler"
 
     async def async_turn_off(self, **kwargs):
         """Update the current value."""
@@ -60,9 +73,13 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
         match self._metric_key:
             case "extra_tap_water":
                 response = await self.coordinator.api.set_extra_tap_water(self._hpid, 0)
+            case _:
+                response = await self.coordinator.api.update_setting(
+                    self._hpid, self._metric_key, 0
+                )
 
         if response.get("status") == SETTING_UPDATE_APPLIED:
-            self.coordinator.data.get("settings")[self._metric_key] = STATE_OFF
+            self.coordinator.data.get("metrics")[self._metric_key] = 0
             self.coordinator.async_set_updated_data(self.coordinator.data)
 
     async def async_turn_on(self, **kwargs):
@@ -73,9 +90,13 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                 response = await self.coordinator.api.set_extra_tap_water(
                     self._hpid, -1
                 )
+            case _:
+                response = await self.coordinator.api.update_setting(
+                    self._hpid, self._metric_key, 1
+                )
 
         if response.get("status") == SETTING_UPDATE_APPLIED:
-            self.coordinator.data.get("settings")[self._metric_key] = STATE_ON
+            self.coordinator.data.get("metrics")[self._metric_key] = 1
             self.coordinator.async_set_updated_data(self.coordinator.data)
 
     @property
@@ -95,11 +116,31 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     return False
                 return True
 
-        return self.coordinator.data.get("settings").get(self._metric_key) == STATE_ON
+        return self.coordinator.data.get("metrics").get(self._metric_key) == 1
 
     @property
     def available(self):
-        return (
-            self._metric_key in self.coordinator.data.get("settings")
-            and self.coordinator.data.get("settings").get(self._metric_key) is not None
-        )
+        match self._metric_key:
+            case "extra_tap_water":
+                return (
+                    "extra_tap_water_stop" in self.coordinator.data.get("settings", {})
+                    and self.coordinator.data.get("settings", {}).get(
+                        "extra_tap_water_stop"
+                    )
+                    is not None
+                )
+            case _:
+                if (
+                    self._metric_key == "op_man_addition"
+                    or self._metric_key == "op_man_dhw"
+                ):
+                    return (
+                        self._metric_key in self.coordinator.data.get("metrics", {})
+                        and self.coordinator.data.get("metrics", {}).get("op_mode") == 1
+                    )
+
+                return (
+                    self._metric_key in self.coordinator.data.get("metrics", {})
+                    and self.coordinator.data.get("metrics", {}).get(self._metric_key)
+                    is not None
+                )

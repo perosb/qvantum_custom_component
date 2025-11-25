@@ -41,6 +41,9 @@ DEFAULT_ENABLED_METRICS = [
     "compressorenergy",
     "additionalenergy",
     "powertotal",
+    "op_man_addition",
+    "op_man_dhw",
+    "op_mode",
 ]
 
 DEFAULT_DISABLED_METRICS = [
@@ -67,10 +70,7 @@ DEFAULT_DISABLED_METRICS = [
     "guide_des_temp",
     "guide_he",
     "man_mode",
-    "op_man_addition",
     "op_man_cooling",
-    "op_man_dhw",
-    "op_mode",
     "op_mode_sensor",
     "picpin_relay_qm10",
     "price_region",

@@ -122,20 +122,20 @@ class TestQvantumSwitchEntity:
         assert entity.is_on is False
 
     def test_is_on_other_metric_on(self, mock_coordinator, mock_device):
-        """Test is_on for other metrics when set to STATE_ON."""
+        """Test is_on for other metrics when set to 1."""
         entity = QvantumSwitchEntity(mock_coordinator, "other_switch", mock_device)
-        mock_coordinator.data["settings"]["other_switch"] = STATE_ON
+        mock_coordinator.data["metrics"]["other_switch"] = 1
         assert entity.is_on is True
 
     def test_is_on_other_metric_off(self, mock_coordinator, mock_device):
-        """Test is_on for other metrics when set to STATE_OFF."""
+        """Test is_on for other metrics when set to 0."""
         entity = QvantumSwitchEntity(mock_coordinator, "other_switch", mock_device)
-        mock_coordinator.data["settings"]["other_switch"] = STATE_OFF
+        mock_coordinator.data["metrics"]["other_switch"] = 0
         assert entity.is_on is False
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test entity availability when data exists."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = STATE_OFF
+        mock_coordinator.data["settings"]["extra_tap_water_stop"] = 1234567890
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is True
 
@@ -148,6 +148,47 @@ class TestQvantumSwitchEntity:
         """Test entity availability when value is None."""
         mock_coordinator.data["settings"]["extra_tap_water"] = None
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
+        assert entity.available is False
+
+    def test_available_extra_tap_water_with_stop_data(
+        self, mock_coordinator, mock_device
+    ):
+        """Test availability for extra_tap_water when stop data exists."""
+        mock_coordinator.data["settings"]["extra_tap_water_stop"] = 1234567890
+        entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
+        assert entity.available is True
+
+    def test_available_extra_tap_water_without_stop_data(
+        self, mock_coordinator, mock_device
+    ):
+        """Test availability for extra_tap_water when stop data is missing."""
+        # Remove extra_tap_water_stop from settings
+        if "extra_tap_water_stop" in mock_coordinator.data["settings"]:
+            del mock_coordinator.data["settings"]["extra_tap_water_stop"]
+        entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
+        assert entity.available is False
+
+    def test_available_extra_tap_water_stop_none(self, mock_coordinator, mock_device):
+        """Test availability for extra_tap_water when stop data is None."""
+        mock_coordinator.data["settings"]["extra_tap_water_stop"] = None
+        entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
+        assert entity.available is False
+
+    def test_available_other_switch_with_data(self, mock_coordinator, mock_device):
+        """Test availability for other switches when data exists."""
+        mock_coordinator.data["metrics"]["op_mode"] = 1
+        entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
+        assert entity.available is True
+
+    def test_available_other_switch_without_data(self, mock_coordinator, mock_device):
+        """Test availability for other switches when data is missing."""
+        entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
+        assert entity.available is False
+
+    def test_available_other_switch_none_value(self, mock_coordinator, mock_device):
+        """Test availability for other switches when value is None."""
+        mock_coordinator.data["settings"]["op_mode"] = None
+        entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
         assert entity.available is False
 
     @pytest.mark.asyncio
@@ -165,7 +206,8 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", -1
         )
-        assert mock_coordinator.data["settings"]["extra_tap_water"] == STATE_ON
+        # The method updates metrics, not settings
+        assert mock_coordinator.data["metrics"]["extra_tap_water"] == 1
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
@@ -185,31 +227,50 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", 0
         )
-        assert mock_coordinator.data["settings"]["extra_tap_water"] == STATE_OFF
+        # The method updates metrics, not settings
+        assert mock_coordinator.data["metrics"]["extra_tap_water"] == 0
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
 
     @pytest.mark.asyncio
     async def test_async_turn_on_other_metric(self, mock_coordinator, mock_device):
-        """Test turning on other metrics (should not call API)."""
+        """Test turning on other metrics."""
         entity = QvantumSwitchEntity(mock_coordinator, "other_switch", mock_device)
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
 
         await entity.async_turn_on()
 
-        # Should not call any API methods for unknown metrics
-        mock_coordinator.api.set_extra_tap_water.assert_not_called()
-        # async_set_updated_data should not be called either
-        mock_coordinator.async_set_updated_data.assert_not_called()
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "other_switch", 1
+        )
+        # The method updates metrics
+        assert mock_coordinator.data["metrics"]["other_switch"] == 1
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
 
     @pytest.mark.asyncio
     async def test_async_turn_off_other_metric(self, mock_coordinator, mock_device):
-        """Test turning off other metrics (should not call API)."""
+        """Test turning off other metrics."""
         entity = QvantumSwitchEntity(mock_coordinator, "other_switch", mock_device)
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
 
         await entity.async_turn_off()
 
-        # Should not call any API methods for unknown metrics
-        mock_coordinator.api.set_extra_tap_water.assert_not_called()
-        # async_set_updated_data should not be called either
-        mock_coordinator.async_set_updated_data.assert_not_called()
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "other_switch", 0
+        )
+        # The method updates metrics
+        assert mock_coordinator.data["metrics"]["other_switch"] == 0
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )

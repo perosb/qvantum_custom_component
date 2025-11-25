@@ -8,6 +8,15 @@
     "switch": {
       "extra_tap_water": {
         "name": "Extra hot water"
+      },
+      "op_man_addition": {
+        "name": "Allow addition in manual mode"
+      },
+      "op_man_dhw": {
+        "name": "Allow hot water in manual mode"
+      },
+      "op_mode": {
+        "name": "Manual operation mode"
       }
     },
     "binary_sensor": {
