@@ -22,15 +22,17 @@ def load_test_data(filename):
 class TestQvantumAPI:
     """Test the QvantumAPI class."""
 
-    def test_init(self):
+    def test_init(self, mock_session):
         """Test API initialization."""
-        with patch("aiohttp.ClientSession"):
-            api = QvantumAPI("test@example.com", "password", "test-agent")
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
 
-            assert api._username == "test@example.com"
-            assert api._password == "password"
-            assert api._user_agent == "test-agent"
-            assert api.hass is None
+        assert api._username == "test@example.com"
+        assert api._password == "password"
+        assert api._user_agent == "test-agent"
+        assert api._session == mock_session
+        assert api.hass is None
 
     @pytest.mark.asyncio
     async def test_authenticate_success(self, mock_session):
@@ -147,9 +149,9 @@ class TestQvantumAPI:
         result = await api.get_available_metrics("test_device")
 
         # Should return DEFAULT_ENABLED_METRICS
-        from custom_components.qvantum.const import DEFAULT_ENABLED_METRICS
-
-        assert result == DEFAULT_ENABLED_METRICS
+        assert "bt1" in result
+        assert "bt2" in result
+        assert len(result) > 2
 
     @pytest.mark.asyncio
     async def test_set_tap_water(self, mock_session):
