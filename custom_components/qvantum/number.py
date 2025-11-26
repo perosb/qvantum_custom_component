@@ -46,7 +46,7 @@ async def async_setup_entry(
 
     async_add_entities(sensors)
 
-    _LOGGER.debug(f"Setting up platform NUMBER")
+    _LOGGER.debug("Setting up platform NUMBER")
 
 
 class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
