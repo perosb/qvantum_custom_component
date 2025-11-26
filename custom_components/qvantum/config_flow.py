@@ -148,13 +148,12 @@ class QvantumOptionsFlowHandler(OptionsFlow):
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
         super().__init__()
-        self.config_entry = config_entry
         self.options = dict(config_entry.options)
 
     async def async_step_init(self, user_input=None):
         """Handle options flow."""
         if user_input is not None:
-            options = self.config_entry.options | user_input
+            options = self.options | user_input
             return self.async_create_entry(title="", data=options)
 
         data_schema = vol.Schema(
