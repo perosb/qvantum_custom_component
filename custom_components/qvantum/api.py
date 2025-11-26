@@ -277,12 +277,16 @@ class QvantumAPI:
 
         if capacity in capacity_to_stop_start:
             stop, start = capacity_to_stop_start[capacity]
+            _LOGGER.debug(
+                f"Setting tap water capacity {capacity} maps to stop {stop} and start {start}."
+            )
             return await self.set_tap_water(device_id, stop, start)
 
         payload = {
             "settings": [{"name": "tap_water_capacity_target", "value": capacity}]
         }
 
+        _LOGGER.debug(f"Setting tap water capacity target to {capacity}.")
         return await self._update_settings(device_id, payload)
 
     async def set_tap_water(self, device_id: str, stop: int = 0, start: int = 0):

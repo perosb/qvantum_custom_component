@@ -121,7 +121,8 @@ TAP_WATER_CAPACITY_METRICS = ["tap_water_cap"]
 
 # Tap water capacity mappings (stop, start) -> capacity
 TAP_WATER_CAPACITY_MAPPINGS = {
-    (59, 52): 1,  # Capacity 1
+    (58, 52): 1,  # Capacity 1
+    (62, 52): 2,  # Capacity 2
     (74, 55): 6,  # Capacity 6
     (76, 55): 7,  # Capacity 7
 }
