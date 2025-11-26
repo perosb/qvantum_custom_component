@@ -88,7 +88,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         sw_version=f"{device_metadata.get('display_fw_version')}/{device_metadata.get('cc_fw_version')}/{device_metadata.get('inv_fw_version')}",
     )
 
-    #await async_setup_services(hass)
+    await async_setup_services(hass)
 
     config_entry.runtime_data = RuntimeData(coordinator, device)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
