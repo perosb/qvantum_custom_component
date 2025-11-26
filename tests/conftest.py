@@ -106,7 +106,14 @@ def mock_api():
 def mock_coordinator():
     """Mock QvantumDataUpdateCoordinator instance."""
     coordinator = Mock()
-    coordinator.data = {}
+    coordinator.data = {
+        "settings": {
+            "tap_water_capacity_target": 4,
+            "tap_water_stop": 60,
+            "tap_water_start": 50,
+        },
+        "metrics": {"hpid": "test_device_123"},
+    }
     coordinator.async_config_entry_first_refresh = AsyncMock()
     return coordinator
 

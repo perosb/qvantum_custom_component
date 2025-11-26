@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
-from .const import SETTING_UPDATE_APPLIED
+from .const import SETTING_UPDATE_APPLIED, TAP_WATER_CAPACITY_MAPPINGS
 from .coordinator import QvantumDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,14 +38,10 @@ async def async_setup_entry(
         )
     )
     sensors.append(
-        QvantumNumberEntity(
-            coordinator, "tap_water_stop", 60, 90, 1, device
-        )
+        QvantumNumberEntity(coordinator, "tap_water_stop", 60, 90, 1, device)
     )
     sensors.append(
-        QvantumNumberEntity(
-            coordinator, "tap_water_start", 50, 65, 1, device
-        )
+        QvantumNumberEntity(coordinator, "tap_water_start", 50, 65, 1, device)
     )
 
     async_add_entities(sensors)
@@ -109,7 +105,17 @@ class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
     @property
     def state(self):
         """Get metric from API data."""
-        return self.coordinator.data.get("settings").get(self._metric_key)
+        if self._metric_key == "tap_water_capacity_target":
+            # Check for custom overrides as seen in api.py
+            stop = self.coordinator.data.get("settings", {}).get("tap_water_stop")
+            start = self.coordinator.data.get("settings", {}).get("tap_water_start")
+            if (stop, start) in TAP_WATER_CAPACITY_MAPPINGS:
+                return TAP_WATER_CAPACITY_MAPPINGS[(stop, start)]
+            else:
+                # For other cases, return the stored capacity value
+                return self.coordinator.data.get("settings", {}).get(self._metric_key)
+        else:
+            return self.coordinator.data.get("settings", {}).get(self._metric_key)
 
     @property
     def available(self):

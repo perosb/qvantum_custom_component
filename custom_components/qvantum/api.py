@@ -12,6 +12,7 @@ from .const import (
     DEFAULT_ENABLED_METRICS,
     DEFAULT_DISABLED_METRICS,
     DOMAIN,
+    TAP_WATER_CAPACITY_MAPPINGS,
 )
 
 
@@ -271,14 +272,12 @@ class QvantumAPI:
     async def set_tap_water_capacity_target(self, device_id: str, capacity: int):
         """Update tap_water_capacity_target setting."""
 
-        if capacity == 1:
-            return await self.set_tap_water(device_id, 59, 50)
+        # Create reverse mapping: capacity -> (stop, start)
+        capacity_to_stop_start = {v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()}
 
-        if capacity == 6:
-            return await self.set_tap_water(device_id, 74, 55)
-
-        if capacity == 7:
-            return await self.set_tap_water(device_id, 76, 55)
+        if capacity in capacity_to_stop_start:
+            stop, start = capacity_to_stop_start[capacity]
+            return await self.set_tap_water(device_id, stop, start)
 
         payload = {
             "settings": [{"name": "tap_water_capacity_target", "value": capacity}]
