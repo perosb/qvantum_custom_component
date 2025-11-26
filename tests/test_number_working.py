@@ -122,6 +122,111 @@ class TestQvantumNumberEntity:
         )
         assert entity.state == 4
 
+    def test_state_with_mapping_capacity_1(self, mock_device):
+        """Test getting entity state when stop/start match capacity 1 mapping."""
+        from unittest.mock import Mock
+        from unittest.mock import AsyncMock
+
+        coordinator = Mock()
+        coordinator.data = {
+            "settings": {
+                "tap_water_capacity_target": 5,  # Different stored value
+                "tap_water_stop": 59,
+                "tap_water_start": 52,
+            },
+            "metrics": {"hpid": "test_device_123"},
+        }
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+
+        entity = QvantumNumberEntity(
+            coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+        assert entity.state == 1  # Should return mapped value, not stored value
+
+    def test_state_with_mapping_capacity_6(self, mock_device):
+        """Test getting entity state when stop/start match capacity 6 mapping."""
+        from unittest.mock import Mock
+        from unittest.mock import AsyncMock
+
+        coordinator = Mock()
+        coordinator.data = {
+            "settings": {
+                "tap_water_capacity_target": 2,  # Different stored value
+                "tap_water_stop": 74,
+                "tap_water_start": 55,
+            },
+            "metrics": {"hpid": "test_device_123"},
+        }
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+
+        entity = QvantumNumberEntity(
+            coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+        assert entity.state == 6  # Should return mapped value
+
+    def test_state_with_no_mapping(self, mock_device):
+        """Test getting entity state when stop/start don't match any mapping."""
+        from unittest.mock import Mock
+        from unittest.mock import AsyncMock
+
+        coordinator = Mock()
+        coordinator.data = {
+            "settings": {
+                "tap_water_capacity_target": 3,
+                "tap_water_stop": 61,
+                "tap_water_start": 50,
+            },
+            "metrics": {"hpid": "test_device_123"},
+        }
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+
+        entity = QvantumNumberEntity(
+            coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+        assert entity.state == 3  # Should return stored value
+
+    def test_state_with_none_stop(self, mock_device):
+        """Test getting entity state when tap_water_stop is None."""
+        from unittest.mock import Mock
+        from unittest.mock import AsyncMock
+
+        coordinator = Mock()
+        coordinator.data = {
+            "settings": {
+                "tap_water_capacity_target": 2,
+                "tap_water_stop": None,
+                "tap_water_start": 50,
+            },
+            "metrics": {"hpid": "test_device_123"},
+        }
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+
+        entity = QvantumNumberEntity(
+            coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+        assert entity.state == 2  # Should return stored value when stop is None
+
+    def test_state_with_none_start(self, mock_device):
+        """Test getting entity state when tap_water_start is None."""
+        from unittest.mock import Mock
+        from unittest.mock import AsyncMock
+
+        coordinator = Mock()
+        coordinator.data = {
+            "settings": {
+                "tap_water_capacity_target": 2,
+                "tap_water_stop": 61,
+                "tap_water_start": None,
+            },
+            "metrics": {"hpid": "test_device_123"},
+        }
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+
+        entity = QvantumNumberEntity(
+            coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+        assert entity.state == 2  # Should return stored value when start is None
+
     def test_available_true(self, mock_coordinator, mock_device):
         """Test entity availability when data exists."""
         entity = QvantumNumberEntity(
