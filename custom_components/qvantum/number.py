@@ -111,11 +111,7 @@ class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
             start = self.coordinator.data.get("settings", {}).get("tap_water_start")
             if (stop, start) in TAP_WATER_CAPACITY_MAPPINGS:
                 return TAP_WATER_CAPACITY_MAPPINGS[(stop, start)]
-            else:
-                # For other cases, return the stored capacity value
-                return self.coordinator.data.get("settings", {}).get(self._metric_key)
-        else:
-            return self.coordinator.data.get("settings", {}).get(self._metric_key)
+        return self.coordinator.data.get("settings", {}).get(self._metric_key)
 
     @property
     def available(self):
