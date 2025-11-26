@@ -131,7 +131,7 @@ class TestQvantumNumberEntity:
         coordinator.data = {
             "settings": {
                 "tap_water_capacity_target": 5,  # Different stored value
-                "tap_water_stop": 59,
+                "tap_water_stop": 58,
                 "tap_water_start": 52,
             },
             "metrics": {"hpid": "test_device_123"},
