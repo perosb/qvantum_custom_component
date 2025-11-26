@@ -106,7 +106,7 @@ class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
     def state(self):
         """Get metric from API data."""
         if self._metric_key == "tap_water_capacity_target":
-            # Check for custom overrides as seen in api.py
+            # Map (stop, start) pairs to capacity values using TAP_WATER_CAPACITY_MAPPINGS
             stop = self.coordinator.data.get("settings", {}).get("tap_water_stop")
             start = self.coordinator.data.get("settings", {}).get("tap_water_start")
             if (stop, start) in TAP_WATER_CAPACITY_MAPPINGS:
