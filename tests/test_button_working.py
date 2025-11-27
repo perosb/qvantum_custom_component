@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from custom_components.qvantum.button import QvantumButtonEntity, async_setup_entry
+from custom_components.qvantum import RuntimeData
 
 
 @pytest.fixture
@@ -77,8 +78,9 @@ class TestButtonSetup:
         self, hass, mock_config_entry, mock_coordinator, mock_device
     ):
         """Test setting up button entities."""
-        mock_config_entry.runtime_data.coordinator = mock_coordinator
-        mock_config_entry.runtime_data.device = mock_device
+        mock_config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator, device=mock_device
+        )
 
         async_add_entities = MagicMock()
 
