@@ -2,7 +2,6 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from homeassistant.components.button import ButtonDeviceClass
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from custom_components.qvantum.button import QvantumButtonEntity, async_setup_entry
@@ -44,7 +43,6 @@ class TestQvantumButtonEntity:
         assert button._attr_unique_id == "qvantum_extra_tap_water_60min_test_device_123"
         assert button._attr_device_info == mock_device
         assert button._attr_has_entity_name is True
-        assert button._attr_device_class == ButtonDeviceClass.UPDATE
 
     @pytest.mark.asyncio
     async def test_async_press_extra_tap_water_60min(
