@@ -34,6 +34,7 @@ PLATFORMS: list[Platform] = [
     Platform.CLIMATE,
     Platform.NUMBER,
     Platform.SWITCH,
+    Platform.BUTTON,
     # Platform.FAN,
 ]
 

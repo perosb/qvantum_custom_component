@@ -72,6 +72,9 @@ async def async_setup_entry(
     sensors.append(QvantumTotalEnergyEntity(coordinator, "totalenergy", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "latency", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device, True))
+    sensors.append(
+        QvantumTimerEntity(coordinator, "extra_tap_water_stop", device, True)
+    )
 
     async_add_entities(sensors)
 
