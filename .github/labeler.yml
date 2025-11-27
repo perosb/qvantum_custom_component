@@ -58,12 +58,6 @@ bug:
 enhancement:
   - title: "^feat:"
 
-# Add 'home-assistant' label for HA integration specific changes
-home-assistant:
-  - changed-files:
-      - any-glob-to-any-file:
-          ["custom_components/**/*", "manifest.json", "hacs.json"]
-
 # Add 'breaking-change' label to any changes with 'breaking' in the title or body
 breaking-change:
   - title: "(?i)(breaking change|breaking|major)"

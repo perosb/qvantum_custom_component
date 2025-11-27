@@ -1,3 +1,4 @@
+include-pre-releases: true
 change-template: "- #$NUMBER $TITLE @$AUTHOR"
 sort-direction: ascending
 template: |
@@ -5,35 +6,12 @@ template: |
 
   $CHANGES
 
-  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$RESOLVED_VERSION
-
 include-labels:
-  - "beta"
-  - "breaking-change"
-  - "bugfix"
+  - "bug"
   - "enhancement"
-  - "feature"
-  - "refactor"
 categories:
-  - title: "Breaking changes"
-    label: "breaking-change"
-
-  - title: "Beta changes"
-    label: "beta"
-    collapse-after: 1
-
   - title: "New features"
-    label: "feature"
-
-  - title: "Performance"
     label: "enhancement"
 
-  - title: "Refactor"
-    label: "refactor"
-
   - title: "Bug fixes"
-    label: "bugfix"
-
-  - title: "Dependency updates"
-    label: "dependencies"
-    collapse-after: 1
+    label: "bug"
