@@ -5,54 +5,66 @@
 # changes to .md files
 documentation:
   - changed-files:
-      - any-glob-to-any-file: ['**/*.md', 'docs/**/*']
-  - title: 'docs:'
+      - any-glob-to-any-file: ["**/*.md", "docs/**/*"]
+  - title: "docs:"
 
 # Add 'dependencies' label to any changes within 'requirements' files or dependency bumps
 dependencies:
   - changed-files:
-      - any-glob-to-any-file: ['requirements*.txt', 'setup.py', 'pyproject.toml']
-  - title: 'bump|update.*dependency|dependency.*update'
+      - any-glob-to-any-file:
+          ["requirements*.txt", "setup.py", "pyproject.toml"]
+  - title: "(?i)(bump|deps|chore|update.*dependency|dependency.*update)"
 
 # Add 'tests' label to any changes within 'tests' folder
 tests:
   - changed-files:
-      - any-glob-to-any-file: ['tests/**/*', 'test_*.py']
+      - any-glob-to-any-file: ["tests/**/*", "test_*.py"]
 
 # Add 'github-actions' label to any changes within '.github' folder
 github-actions:
   - changed-files:
-      - any-glob-to-any-file: ['.github/**/*']
+      - any-glob-to-any-file: [".github/**/*"]
 
 # Add 'python' label to any changes to Python files
 python:
   - changed-files:
-      - any-glob-to-any-file: ['**/*.py']
+      - any-glob-to-any-file: ["**/*.py"]
 
 # Add 'translations' label to any changes within 'translations' folder
 translations:
   - changed-files:
-      - any-glob-to-any-file: ['custom_components/qvantum/translations/**/*']
+      - any-glob-to-any-file: ["custom_components/qvantum/translations/**/*"]
 
 # Add 'configuration' label to any changes to configuration files
 configuration:
   - changed-files:
-      - any-glob-to-any-file: ['*.yml', '*.yaml', '*.json', '*.ini', '*.cfg', 'manifest.json', 'hacs.json']
+      - any-glob-to-any-file:
+          [
+            "*.yml",
+            "*.yaml",
+            "*.json",
+            "*.ini",
+            "*.cfg",
+            "manifest.json",
+            "hacs.json",
+            "!.github/labeler.yml",
+          ]
 
 # Add 'bug' label to fix commits and bug-related titles
 bug:
-  - title: '^fix:'
+  - title: "^fix:"
 
 # Add 'enhancement' label to feat commits and feature-related titles
 enhancement:
-  - title: '^feat:'
+  - title: "^feat:"
 
 # Add 'home-assistant' label for HA integration specific changes
 home-assistant:
   - changed-files:
-      - any-glob-to-any-file: ['custom_components/**/*', 'manifest.json', 'hacs.json']
+      - any-glob-to-any-file:
+          ["custom_components/**/*", "manifest.json", "hacs.json"]
 
 # Add 'breaking-change' label to any changes with 'breaking' in the title or body
 breaking-change:
-  - title: 'breaking|major'
-  - body: 'breaking|major'
+  - title: "(?i)(breaking change|breaking|major)"
+  - body: "(?i)(breaking change|breaking|major)"
