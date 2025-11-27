@@ -1,13 +1,10 @@
 name: Release Drafter
 
 on:
-  workflow_run:
-    workflows: ["Test", "Validate with hassfest"]
-    types:
-      - completed
+  push:
     branches:
       - main
-
+      
 permissions:
   contents: read
 
