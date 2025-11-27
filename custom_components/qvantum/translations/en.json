@@ -19,6 +19,11 @@
         "name": "Manual operation mode"
       }
     },
+    "button": {
+      "extra_tap_water_60min": {
+        "name": "Extra hot water 60 min"
+      }
+    },
     "binary_sensor": {
       "op_man_addition": {
         "name": "Operation manual addition"
