@@ -13,7 +13,7 @@ dependencies:
   - changed-files:
       - any-glob-to-any-file:
           ["requirements*.txt", "setup.py", "pyproject.toml"]
-  - title: "^(?i)(bump|deps|chore).*"
+  - title: "(?i)(bump|deps|chore|update.*dependency|dependency.*update)"
 
 # Add 'tests' label to any changes within 'tests' folder
 tests:
