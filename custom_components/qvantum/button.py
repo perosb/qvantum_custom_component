@@ -48,9 +48,7 @@ class QvantumButtonEntity(CoordinatorEntity, ButtonEntity):
         self._attr_device_info = device
         self._attr_has_entity_name = True
 
-        if button_key == "extra_tap_water_60min":
-            self._attr_device_class = ButtonDeviceClass.UPDATE
-
+        # No device class is set for "extra_tap_water_60min" as none semantically fits.
     async def async_press(self) -> None:
         """Handle the button press."""
         if self._button_key == "extra_tap_water_60min":
