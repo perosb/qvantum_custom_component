@@ -104,4 +104,10 @@ class QvantumFanEntity(CoordinatorEntity, FanEntity):
 
     async def set_fanspeedselector(self, preset: str) -> None:
         response = await self.coordinator.api.set_fanspeedselector(self._hpid, preset)
-        await handle_setting_update_response(response, self.coordinator, "settings", self._metric_key, preset)
+        await handle_setting_update_response(
+            response,
+            self.coordinator,
+            "settings",
+            self._metric_key,
+            preset,
+        )
