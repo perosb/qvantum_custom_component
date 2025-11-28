@@ -1,7 +1,10 @@
 """QvantumDataUpdateCoordinator."""
 
+from __future__ import annotations
+
 from datetime import timedelta
 import logging
+from typing import Any, Optional
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_SCAN_INTERVAL,
@@ -10,10 +13,24 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import APIAuthError
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, SETTING_UPDATE_APPLIED
 import traceback
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def handle_setting_update_response(
+    api_response: Optional[dict[str, Any]],
+    coordinator: QvantumDataUpdateCoordinator,
+    data_section: str,
+    key: str,
+    value: Any,
+) -> None:
+    """Handle API response for setting updates and update coordinator data if successful."""
+    if api_response and api_response.get("status") == SETTING_UPDATE_APPLIED:
+        coordinator.data.get(data_section)[key] = value
+        # async_set_updated_data is a synchronous method despite the name
+        coordinator.async_set_updated_data(coordinator.data)
 
 
 class QvantumDataUpdateCoordinator(DataUpdateCoordinator):

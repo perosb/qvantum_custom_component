@@ -1,8 +1,8 @@
 """Tests for Qvantum switch entities (working version that avoids metaclass issues)."""
 
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
-from datetime import datetime
 
 
 # Create mock base classes that don't have metaclass conflicts
@@ -206,11 +206,8 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", -1
         )
-        # The method updates metrics, not settings
-        assert mock_coordinator.data["metrics"]["extra_tap_water"] == 1
-        mock_coordinator.async_set_updated_data.assert_called_once_with(
-            mock_coordinator.data
-        )
+        # Data is updated via coordinator refresh, not manual update
+        mock_coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_turn_off_extra_tap_water(self, mock_coordinator, mock_device):
@@ -227,11 +224,8 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", 0
         )
-        # The method updates metrics, not settings
-        assert mock_coordinator.data["metrics"]["extra_tap_water"] == 0
-        mock_coordinator.async_set_updated_data.assert_called_once_with(
-            mock_coordinator.data
-        )
+        # Data is updated via coordinator refresh, not manual update
+        mock_coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_turn_on_other_metric(self, mock_coordinator, mock_device):

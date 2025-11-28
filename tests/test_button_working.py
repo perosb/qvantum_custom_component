@@ -15,7 +15,7 @@ def mock_coordinator():
     coordinator.data = {"metrics": {"hpid": "test_device_123"}}
     coordinator.async_refresh = AsyncMock()
     coordinator.api = MagicMock()
-    coordinator.api.set_extra_tap_water = AsyncMock()
+    coordinator.api.set_extra_tap_water = AsyncMock(return_value={"status": "APPLIED"})
     return coordinator
 
 

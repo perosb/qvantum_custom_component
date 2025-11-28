@@ -48,15 +48,15 @@ class QvantumButtonEntity(CoordinatorEntity, ButtonEntity):
         self._attr_device_info = device
         self._attr_has_entity_name = True
 
-        # No device class is set for "extra_tap_water_60min" as none semantically fits.
     async def async_press(self) -> None:
         """Handle the button press."""
         if self._button_key == "extra_tap_water_60min":
             # Activate extra tap water for 60 minutes
             await self.coordinator.api.set_extra_tap_water(self._hpid, 60)
             _LOGGER.info("Extra tap water activated for 60 minutes via button press")
-            # Refresh data to show the updated state
-            await self.coordinator.async_refresh()
+            # Data will be updated via coordinator refresh
+
+        await self.coordinator.async_refresh()
 
     @property
     def available(self):

@@ -13,8 +13,7 @@ from homeassistant.components.climate.const import HVACAction
 from homeassistant.components.climate.const import ClimateEntityFeature
 
 from . import MyConfigEntry
-from .const import SETTING_UPDATE_APPLIED
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,11 +56,13 @@ class QvantumIndoorClimateEntity(CoordinatorEntity, ClimateEntity):
         response = await self.coordinator.api.set_indoor_temperature_target(
             self._hpid, temperature
         )
-        if response.get("status") == SETTING_UPDATE_APPLIED:
-            self.coordinator.data.get("settings")[
-                "indoor_temperature_target"
-            ] = temperature
-            self.coordinator.async_set_updated_data(self.coordinator.data)
+        await handle_setting_update_response(
+            response,
+            self.coordinator,
+            "settings",
+            "indoor_temperature_target",
+            temperature,
+        )
 
     async def async_set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""

@@ -8,11 +8,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.const import STATE_ON, STATE_OFF
 
-from .const import SETTING_UPDATE_APPLIED
 from . import MyConfigEntry
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,14 +71,15 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
         match self._metric_key:
             case "extra_tap_water":
                 response = await self.coordinator.api.set_extra_tap_water(self._hpid, 0)
+                # Data will be updated via coordinator refresh
+
             case _:
                 response = await self.coordinator.api.update_setting(
                     self._hpid, self._metric_key, 0
                 )
-
-        if response.get("status") == SETTING_UPDATE_APPLIED:
-            self.coordinator.data.get("metrics")[self._metric_key] = 0
-            self.coordinator.async_set_updated_data(self.coordinator.data)
+                await handle_setting_update_response(
+                    response, self.coordinator, "metrics", self._metric_key, 0
+                )
 
     async def async_turn_on(self, **kwargs):
         """Update the current value."""
@@ -90,31 +89,32 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                 response = await self.coordinator.api.set_extra_tap_water(
                     self._hpid, -1
                 )
+                # Data will be updated via coordinator refresh
+
             case _:
                 response = await self.coordinator.api.update_setting(
                     self._hpid, self._metric_key, 1
                 )
-
-        if response.get("status") == SETTING_UPDATE_APPLIED:
-            self.coordinator.data.get("metrics")[self._metric_key] = 1
-            self.coordinator.async_set_updated_data(self.coordinator.data)
+                await handle_setting_update_response(
+                    response, self.coordinator, "metrics", self._metric_key, 1
+                )
 
     @property
     def is_on(self):
         match self._metric_key:
             case "extra_tap_water":
-                stop = self.coordinator.data.get("settings").get("extra_tap_water_stop")
-                if stop is None:
+                stop_time = self.coordinator.data.get("settings", {}).get(
+                    "extra_tap_water_stop"
+                )
+                if stop_time is None:
                     return False
-                if stop == -1:
-                    return True
-                if stop == 0:
-                    return False
-
-                now = int((datetime.now()).timestamp())
-                if stop < now:
-                    return False
-                return True
+                elif stop_time == -1:
+                    return True  # Always on
+                elif stop_time == 0:
+                    return False  # Off
+                else:
+                    # Check if the stop time is in the future
+                    return stop_time > datetime.now().timestamp()
 
         return self.coordinator.data.get("metrics").get(self._metric_key) == 1
 
