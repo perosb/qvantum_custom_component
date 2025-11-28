@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 
-from homeassistant.const import STATE_OFF, STATE_ON
+from homeassistant.const import STATE_ON
 from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -72,9 +72,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
         match self._metric_key:
             case "extra_tap_water":
                 response = await self.coordinator.api.set_extra_tap_water(self._hpid, 0)
-                await handle_setting_update_response(
-                    response, self.coordinator, "settings", self._metric_key, STATE_OFF
-                )
+                # Data will be updated via coordinator refresh
 
             case _:
                 response = await self.coordinator.api.update_setting(
@@ -92,9 +90,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                 response = await self.coordinator.api.set_extra_tap_water(
                     self._hpid, -1
                 )
-                await handle_setting_update_response(
-                    response, self.coordinator, "settings", self._metric_key, STATE_ON
-                )
+                # Data will be updated via coordinator refresh
 
             case _:
                 response = await self.coordinator.api.update_setting(

@@ -55,13 +55,14 @@ class QvantumButtonEntity(CoordinatorEntity, ButtonEntity):
 
         if self._button_key == "extra_tap_water_60min":
             # Activate extra tap water for 60 minutes
-            _metric_key = "extra_tap_water"
             response = await self.coordinator.api.set_extra_tap_water(self._hpid, 60)
             _LOGGER.info("Extra tap water activated for 60 minutes via button press")
+            # Data will be updated via coordinator refresh
 
-        await handle_setting_update_response(
-            response, self.coordinator, "metrics", _metric_key, 1
-        )
+        else:
+            await handle_setting_update_response(
+                response, self.coordinator, "metrics", _metric_key, 1
+            )
 
         await self.coordinator.async_refresh()
 

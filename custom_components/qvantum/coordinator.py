@@ -29,6 +29,7 @@ async def handle_setting_update_response(
     """Handle API response for setting updates and update coordinator data if successful."""
     if api_response and api_response.get("status") == SETTING_UPDATE_APPLIED:
         coordinator.data.get(data_section)[key] = value
+        # async_set_updated_data is a synchronous method despite the name
         coordinator.async_set_updated_data(coordinator.data)
 
 

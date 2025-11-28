@@ -1,5 +1,6 @@
 """Tests for Qvantum switch entities (working version that avoids metaclass issues)."""
 
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
@@ -89,32 +90,34 @@ class TestQvantumSwitchEntity:
         assert entity._attr_translation_key == "extra_tap_water"
 
     def test_is_on_none_stop(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water is None."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = None
+        """Test is_on when extra_tap_water_stop is None."""
+        mock_coordinator.data["settings"]["extra_tap_water_stop"] = None
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is False
 
     def test_is_on_stop_minus_one(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water is STATE_ON."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = STATE_ON
+        """Test is_on when extra_tap_water_stop is -1 (always on)."""
+        mock_coordinator.data["settings"]["extra_tap_water_stop"] = -1
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is True
 
     def test_is_on_stop_zero(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water is STATE_OFF."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = STATE_OFF
+        """Test is_on when extra_tap_water_stop is 0 (off)."""
+        mock_coordinator.data["settings"]["extra_tap_water_stop"] = 0
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is False
 
     def test_is_on_stop_future_timestamp(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water is STATE_ON."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = STATE_ON
+        """Test is_on when extra_tap_water_stop is a future timestamp."""
+        future_time = int((datetime.now()).timestamp()) + 3600  # 1 hour from now
+        mock_coordinator.data["settings"]["extra_tap_water_stop"] = future_time
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is True
 
     def test_is_on_stop_past_timestamp(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water is STATE_OFF."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = STATE_OFF
+        """Test is_on when extra_tap_water_stop is a past timestamp."""
+        past_time = int((datetime.now()).timestamp()) - 3600  # 1 hour ago
+        mock_coordinator.data["settings"]["extra_tap_water_stop"] = past_time
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is False
 
@@ -203,11 +206,8 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", -1
         )
-        # The method updates settings, not metrics
-        assert mock_coordinator.data["settings"]["extra_tap_water"] == STATE_ON
-        mock_coordinator.async_set_updated_data.assert_called_once_with(
-            mock_coordinator.data
-        )
+        # Data is updated via coordinator refresh, not manual update
+        mock_coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_turn_off_extra_tap_water(self, mock_coordinator, mock_device):
@@ -224,11 +224,8 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", 0
         )
-        # The method updates settings, not metrics
-        assert mock_coordinator.data["settings"]["extra_tap_water"] == STATE_OFF
-        mock_coordinator.async_set_updated_data.assert_called_once_with(
-            mock_coordinator.data
-        )
+        # Data is updated via coordinator refresh, not manual update
+        mock_coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_turn_on_other_metric(self, mock_coordinator, mock_device):

@@ -98,7 +98,13 @@ class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
                     self._hpid, int(value)
                 )
 
-        await handle_setting_update_response(response, self.coordinator, "settings", self._metric_key, int(value))
+        await handle_setting_update_response(
+            response,
+            self.coordinator,
+            "settings",
+            self._metric_key,
+            int(value),
+        )
 
     @property
     def state(self):
