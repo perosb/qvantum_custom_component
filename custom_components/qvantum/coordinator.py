@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import timedelta
-import inspect
 import logging
 from typing import Any, Optional
 from homeassistant.config_entries import ConfigEntry
@@ -30,9 +29,7 @@ async def handle_setting_update_response(
     """Handle API response for setting updates and update coordinator data if successful."""
     if api_response and api_response.get("status") == SETTING_UPDATE_APPLIED:
         coordinator.data.get(data_section)[key] = value
-        update_call = coordinator.async_set_updated_data(coordinator.data)
-        if inspect.isawaitable(update_call):
-            await update_call
+        coordinator.async_set_updated_data(coordinator.data)
 
 
 class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
