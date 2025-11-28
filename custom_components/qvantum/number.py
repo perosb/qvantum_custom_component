@@ -10,8 +10,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
-from .const import SETTING_UPDATE_APPLIED, TAP_WATER_CAPACITY_MAPPINGS
-from .coordinator import QvantumDataUpdateCoordinator
+from .const import TAP_WATER_CAPACITY_MAPPINGS
+from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,9 +98,7 @@ class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
                     self._hpid, int(value)
                 )
 
-        if response.get("status") == SETTING_UPDATE_APPLIED:
-            self.coordinator.data.get("settings")[self._metric_key] = int(value)
-            self.coordinator.async_set_updated_data(self.coordinator.data)
+        await handle_setting_update_response(response, self.coordinator, "settings", self._metric_key, int(value))
 
     @property
     def state(self):

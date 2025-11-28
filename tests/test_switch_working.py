@@ -2,7 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
-from datetime import datetime
 
 
 # Create mock base classes that don't have metaclass conflicts
@@ -90,34 +89,32 @@ class TestQvantumSwitchEntity:
         assert entity._attr_translation_key == "extra_tap_water"
 
     def test_is_on_none_stop(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water_stop is None."""
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = None
+        """Test is_on when extra_tap_water is None."""
+        mock_coordinator.data["settings"]["extra_tap_water"] = None
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is False
 
     def test_is_on_stop_minus_one(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water_stop is -1 (always on)."""
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = -1
+        """Test is_on when extra_tap_water is STATE_ON."""
+        mock_coordinator.data["settings"]["extra_tap_water"] = STATE_ON
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is True
 
     def test_is_on_stop_zero(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water_stop is 0 (off)."""
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = 0
+        """Test is_on when extra_tap_water is STATE_OFF."""
+        mock_coordinator.data["settings"]["extra_tap_water"] = STATE_OFF
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is False
 
     def test_is_on_stop_future_timestamp(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water_stop is a future timestamp."""
-        future_time = int((datetime.now()).timestamp()) + 3600  # 1 hour from now
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = future_time
+        """Test is_on when extra_tap_water is STATE_ON."""
+        mock_coordinator.data["settings"]["extra_tap_water"] = STATE_ON
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is True
 
     def test_is_on_stop_past_timestamp(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water_stop is a past timestamp."""
-        past_time = int((datetime.now()).timestamp()) - 3600  # 1 hour ago
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = past_time
+        """Test is_on when extra_tap_water is STATE_OFF."""
+        mock_coordinator.data["settings"]["extra_tap_water"] = STATE_OFF
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is False
 
@@ -206,8 +203,8 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", -1
         )
-        # The method updates metrics, not settings
-        assert mock_coordinator.data["metrics"]["extra_tap_water"] == 1
+        # The method updates settings, not metrics
+        assert mock_coordinator.data["settings"]["extra_tap_water"] == STATE_ON
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
@@ -227,8 +224,8 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", 0
         )
-        # The method updates metrics, not settings
-        assert mock_coordinator.data["metrics"]["extra_tap_water"] == 0
+        # The method updates settings, not metrics
+        assert mock_coordinator.data["settings"]["extra_tap_water"] == STATE_OFF
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )

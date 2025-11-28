@@ -10,13 +10,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from typing import Optional, Any
 
 from .const import (
-    SETTING_UPDATE_APPLIED,
     FAN_SPEED_STATE_OFF,
     FAN_SPEED_STATE_NORMAL,
     FAN_SPEED_STATE_EXTRA,
 )
 from . import MyConfigEntry
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -105,6 +104,4 @@ class QvantumFanEntity(CoordinatorEntity, FanEntity):
 
     async def set_fanspeedselector(self, preset: str) -> None:
         response = await self.coordinator.api.set_fanspeedselector(self._hpid, preset)
-        if response.get("status") == SETTING_UPDATE_APPLIED:
-            self.coordinator.data["settings"][self._metric_key] = preset
-            self.coordinator.async_set_updated_data(self.coordinator.data)
+        await handle_setting_update_response(response, self.coordinator, "settings", self._metric_key, preset)
