@@ -21,14 +21,14 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def handle_setting_update_response(
-    response: Optional[dict[str, Any]],
+    api_response: Optional[dict[str, Any]],
     coordinator: QvantumDataUpdateCoordinator,
     data_section: str,
     key: str,
     value: Any,
 ) -> None:
     """Handle API response for setting updates and update coordinator data if successful."""
-    if response and response.get("status") == SETTING_UPDATE_APPLIED:
+    if api_response and api_response.get("status") == SETTING_UPDATE_APPLIED:
         coordinator.data.get(data_section)[key] = value
         update_call = coordinator.async_set_updated_data(coordinator.data)
         if inspect.isawaitable(update_call):
