@@ -3,7 +3,6 @@
 import logging
 from datetime import datetime
 
-from homeassistant.const import STATE_ON
 from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -104,10 +103,18 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
     def is_on(self):
         match self._metric_key:
             case "extra_tap_water":
-                return (
-                    self.coordinator.data.get("settings").get(self._metric_key)
-                    == STATE_ON
+                stop_time = self.coordinator.data.get("settings", {}).get(
+                    "extra_tap_water_stop"
                 )
+                if stop_time is None:
+                    return False
+                elif stop_time == -1:
+                    return True  # Always on
+                elif stop_time == 0:
+                    return False  # Off
+                else:
+                    # Check if the stop time is in the future
+                    return stop_time > datetime.now().timestamp()
 
         return self.coordinator.data.get("metrics").get(self._metric_key) == 1
 
