@@ -67,6 +67,7 @@ def mock_coordinator():
     }
     coordinator.api = MagicMock()
     coordinator.async_set_updated_data = MagicMock()
+    coordinator.async_refresh = AsyncMock()
     return coordinator
 
 

@@ -59,6 +59,7 @@ def mock_coordinator():
     }
     coordinator.api = MagicMock()
     coordinator.async_set_updated_data = MagicMock()
+    coordinator.async_refresh = AsyncMock()
     return coordinator
 
 
@@ -206,7 +207,8 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", -1
         )
-        # Data is updated via coordinator refresh, not manual update
+        # Data is updated via coordinator refresh
+        mock_coordinator.async_refresh.assert_called_once()
         mock_coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
@@ -224,7 +226,8 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", 0
         )
-        # Data is updated via coordinator refresh, not manual update
+        # Data is updated via coordinator refresh
+        mock_coordinator.async_refresh.assert_called_once()
         mock_coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio

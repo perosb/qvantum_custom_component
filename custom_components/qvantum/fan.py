@@ -34,7 +34,7 @@ async def async_setup_entry(
 
     async_add_entities(fans)
 
-    _LOGGER.debug(f"Setting up platform FAN")
+    _LOGGER.debug("Setting up platform FAN")
 
 
 class QvantumFanEntity(CoordinatorEntity, FanEntity):
