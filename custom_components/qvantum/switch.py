@@ -67,11 +67,12 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs):
         """Update the current value."""
-        response = {}
         match self._metric_key:
             case "extra_tap_water":
                 response = await self.coordinator.api.set_extra_tap_water(self._hpid, 0)
-                # Data will be updated via coordinator refresh
+                await handle_setting_update_response(
+                    response, self.coordinator, data_section=None, key=None, value=None
+                )
 
             case _:
                 response = await self.coordinator.api.update_setting(
@@ -83,13 +84,14 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         """Update the current value."""
-        response = {}
         match self._metric_key:
             case "extra_tap_water":
                 response = await self.coordinator.api.set_extra_tap_water(
                     self._hpid, -1
                 )
-                # Data will be updated via coordinator refresh
+                await handle_setting_update_response(
+                    response, self.coordinator, data_section=None, key=None, value=None
+                )
 
             case _:
                 response = await self.coordinator.api.update_setting(

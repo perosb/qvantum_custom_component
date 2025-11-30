@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,11 +52,11 @@ class QvantumButtonEntity(CoordinatorEntity, ButtonEntity):
         """Handle the button press."""
         if self._button_key == "extra_tap_water_60min":
             # Activate extra tap water for 60 minutes
-            await self.coordinator.api.set_extra_tap_water(self._hpid, 60)
+            response = await self.coordinator.api.set_extra_tap_water(self._hpid, 60)
+            await handle_setting_update_response(
+                response, self.coordinator, data_section=None, key=None, value=None
+            )
             _LOGGER.info("Extra tap water activated for 60 minutes via button press")
-            # Data will be updated via coordinator refresh
-
-        await self.coordinator.async_refresh()
 
     @property
     def available(self):
