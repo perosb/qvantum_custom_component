@@ -6,14 +6,12 @@
 documentation:
   - changed-files:
       - any-glob-to-any-file: ["**/*.md", "docs/**/*"]
-  - title: "docs:"
 
 # Add 'dependencies' label to any changes within 'requirements' files or dependency bumps
 dependencies:
   - changed-files:
       - any-glob-to-any-file:
           ["requirements*.txt", "setup.py", "pyproject.toml"]
-  - title: "(?i)(bump|deps|chore|update.*dependency|dependency.*update)"
 
 # Add 'tests' label to any changes within 'tests' folder
 tests:
@@ -49,16 +47,3 @@ configuration:
             "hacs.json",
             "!.github/labeler.yml",
           ]
-
-# Add 'bug' label to fix commits and bug-related titles
-bug:
-  - title: "^fix:"
-
-# Add 'enhancement' label to feat commits and feature-related titles
-enhancement:
-  - title: "^feat:"
-
-# Add 'breaking-change' label to any changes with 'breaking' in the title or body
-breaking-change:
-  - title: "(?i)(breaking change|breaking|major)"
-  - body: "(?i)(breaking change|breaking|major)"
