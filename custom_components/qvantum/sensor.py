@@ -84,8 +84,14 @@ async def async_setup_entry(
         if not sensor._attr_entity_registry_enabled_default:
             entity_entry = entity_registry.async_get(sensor.entity_id)
             if entity_entry and entity_entry.disabled_by is None:
+                # Entity is currently enabled, respect user's choice
+                continue
+            if (
+                entity_entry is None
+                or entity_entry.disabled_by != RegistryEntryDisabler.USER
+            ):
                 entity_registry.async_update_entity(
-                    sensor.entity_id, disabled_by=RegistryEntryDisabler.USER
+                    sensor.entity_id, disabled_by=RegistryEntryDisabler.INTEGRATION
                 )
 
 

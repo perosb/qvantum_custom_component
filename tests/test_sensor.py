@@ -44,7 +44,9 @@ with patch(
             QvantumTotalEnergyEntity,
             QvantumLatencyEntity,
             _get_sensor_type,
+            async_setup_entry,
         )
+        from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
 
 @pytest.fixture
@@ -351,3 +353,201 @@ class TestGetSensorType:
         assert _get_sensor_type("fan0_10v") == QvantumBaseEntity
         assert _get_sensor_type("compressormeasuredspeed") == QvantumBaseEntity
         assert _get_sensor_type("bf1_l_min") == QvantumBaseEntity
+
+
+class TestSensorSetup:
+    """Test sensor setup and entity registry handling."""
+
+    @pytest.fixture
+    def mock_config_entry(self, mock_coordinator, mock_device):
+        """Mock config entry with runtime data."""
+        from homeassistant.config_entries import ConfigEntry
+        from custom_components.qvantum import RuntimeData
+
+        config_entry = MagicMock(spec=ConfigEntry)
+        config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator, device=mock_device
+        )
+        return config_entry
+
+    @pytest.fixture
+    def mock_entity_registry(self):
+        """Mock entity registry."""
+        registry = MagicMock()
+        return registry
+
+    @pytest.fixture
+    def mock_hass(self, mock_entity_registry):
+        """Mock Home Assistant instance with entity registry."""
+        hass = MagicMock()
+        hass.data = {"entity_registry": mock_entity_registry}
+        return hass
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_disables_default_disabled_entities(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Test that entities in DEFAULT_DISABLED_METRICS are disabled on first setup."""
+        from custom_components.qvantum.const import DEFAULT_DISABLED_METRICS
+
+        # Mock entity registry - entities don't exist yet (first setup)
+        mock_entity_registry = mock_hass.data["entity_registry"]
+        mock_entity_registry.async_get.return_value = None
+        mock_entity_registry.async_update_entity = MagicMock()
+
+        # Mock async_add_entities to assign entity_ids
+        def mock_async_add_entities(entities):
+            for sensor in entities:
+                sensor.entity_id = f"sensor.qvantum_{sensor._metric_key}_{sensor._hpid}"
+
+        async_add_entities = MagicMock(side_effect=mock_async_add_entities)
+
+        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        # Verify entities were added
+        assert async_add_entities.called
+        entities = async_add_entities.call_args[0][0]
+
+        # Find disabled entities
+        disabled_entities = [
+            entity
+            for entity in entities
+            if not entity._attr_entity_registry_enabled_default
+        ]
+
+        # Verify that async_update_entity was called for each disabled entity
+        assert mock_entity_registry.async_update_entity.call_count == len(
+            disabled_entities
+        )
+
+        # Verify calls were made with correct parameters
+        calls = mock_entity_registry.async_update_entity.call_args_list
+        for call in calls:
+            args, kwargs = call
+            assert "disabled_by" in kwargs
+            assert kwargs["disabled_by"] == RegistryEntryDisabler.INTEGRATION
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_respects_user_enabled_entities(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Test that manually enabled entities remain enabled after restart."""
+        # Mock entity registry - entity exists and is enabled (user enabled it)
+        mock_entity_registry = mock_hass.data["entity_registry"]
+
+        # Create mock entity entry that's enabled
+        mock_entity = MagicMock()
+        mock_entity.disabled = False  # Entity is enabled
+        mock_entity.disabled_by = None  # No one disabled it
+        mock_entity_registry.async_get.return_value = mock_entity
+        mock_entity_registry.async_update_entity = MagicMock()
+
+        # Mock async_add_entities to assign entity_ids
+        def mock_async_add_entities(entities):
+            for sensor in entities:
+                sensor.entity_id = f"sensor.qvantum_{sensor._metric_key}_{sensor._hpid}"
+
+        async_add_entities = MagicMock(side_effect=mock_async_add_entities)
+
+        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        # Verify that async_update_entity was NOT called for the enabled entity
+        # (since we respect user's choice to enable it)
+        mock_entity_registry.async_update_entity.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_respects_user_disabled_entities(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Test that manually disabled entities remain disabled after restart."""
+        # Mock entity registry - entity exists and is disabled by user
+        mock_entity_registry = mock_hass.data["entity_registry"]
+
+        # Create mock entity entry that's disabled by user
+        mock_entity = MagicMock()
+        mock_entity.disabled = True  # Entity is disabled
+        mock_entity.disabled_by = RegistryEntryDisabler.USER
+        mock_entity_registry.async_get.return_value = mock_entity
+        mock_entity_registry.async_update_entity = MagicMock()
+
+        # Mock async_add_entities to assign entity_ids
+        def mock_async_add_entities(entities):
+            for sensor in entities:
+                sensor.entity_id = f"sensor.qvantum_{sensor._metric_key}_{sensor._hpid}"
+
+        async_add_entities = MagicMock(side_effect=mock_async_add_entities)
+
+        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        # Verify that async_update_entity was NOT called
+        # (since we respect user's choice to disable it)
+        mock_entity_registry.async_update_entity.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_updates_integration_disabled_entities(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Test that entities disabled by integration can be updated on subsequent restarts."""
+        from custom_components.qvantum.const import DEFAULT_DISABLED_METRICS
+
+        # Define the exclusion patterns locally (same as in sensor.py)
+        EXCLUDED_METRIC_PATTERNS = [
+            "op_man_",
+            "enable",
+            "picpin_",
+            "qn8",
+            "use_",
+        ]
+
+        # Calculate how many disabled metrics are actually created (not excluded)
+        def _should_exclude_metric(metric: str) -> bool:
+            return any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
+
+        actual_disabled_metrics = [
+            metric
+            for metric in DEFAULT_DISABLED_METRICS
+            if not _should_exclude_metric(metric)
+        ]
+        expected_calls = len(actual_disabled_metrics)
+
+        # Mock entity registry - all disabled entities exist and are disabled by integration
+        mock_entity_registry = mock_hass.data["entity_registry"]
+
+        # Create mock entity entry that's disabled by integration
+        mock_entity = MagicMock()
+        mock_entity.disabled = True  # Entity is disabled
+        mock_entity.disabled_by = RegistryEntryDisabler.INTEGRATION
+
+        # Mock async_get to return the entity for all disabled metrics that are actually created
+        def mock_async_get(entity_id):
+            # Extract metric key from entity_id (format: sensor.qvantum_{metric_key}_{hpid})
+            parts = entity_id.split("_")
+            if len(parts) >= 2:
+                metric_key = "_".join(
+                    parts[1:-1]
+                )  # Handle metric keys with underscores
+                if metric_key in actual_disabled_metrics:
+                    return mock_entity
+            return None
+
+        mock_entity_registry.async_get.side_effect = mock_async_get
+        mock_entity_registry.async_update_entity = MagicMock()
+
+        # Mock async_add_entities to assign entity_ids
+        def mock_async_add_entities(entities):
+            for sensor in entities:
+                sensor.entity_id = f"sensor.qvantum_{sensor._metric_key}_{sensor._hpid}"
+
+        async_add_entities = MagicMock(side_effect=mock_async_add_entities)
+
+        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        # Verify that async_update_entity was called for all disabled entities that are actually created
+        assert mock_entity_registry.async_update_entity.call_count == expected_calls
+
+        # Verify calls were made with correct parameters
+        calls = mock_entity_registry.async_update_entity.call_args_list
+        for call in calls:
+            args, kwargs = call
+            assert "disabled_by" in kwargs
+            assert kwargs["disabled_by"] == RegistryEntryDisabler.INTEGRATION
