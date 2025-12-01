@@ -83,7 +83,7 @@ async def async_setup_entry(
     for sensor in sensors:
         if not sensor._attr_entity_registry_enabled_default:
             entity_entry = entity_registry.async_get(sensor.entity_id)
-            if entity_entry and not entity_entry.disabled:
+            if entity_entry and entity_entry.disabled_by is None:
                 # Entity is currently enabled, respect user's choice
                 continue
             if (
