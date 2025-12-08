@@ -114,7 +114,7 @@ EXCLUDED_METRIC_PATTERNS = [
 # Sensor type classification
 TEMPERATURE_METRICS = ["temp", "bt", "dhw_normal_st"]
 ENERGY_METRICS = ["energy"]
-POWER_METRICS = ["powertotal"]
+POWER_METRICS = ["powertotal", "heatingpower", "dhwpower"]
 CURRENT_METRICS = ["current"]
 PRESSURE_METRICS = ["pressure"]
 TAP_WATER_CAPACITY_METRICS = ["tap_water_cap"]
