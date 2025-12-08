@@ -203,9 +203,13 @@ class QvantumPowerEntity(QvantumBaseEntity):
         enabled_default: bool = True,
     ) -> None:
         super().__init__(coordinator, metric_key, device, enabled_default)
-        self._attr_native_unit_of_measurement = UnitOfPower.WATT
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_state_class = SensorStateClass.MEASUREMENT
+        if metric_key in ["heatingpower", "dhwpower"]:
+            self._attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
+            self._attr_suggested_display_precision = 2
+        else:
+            self._attr_native_unit_of_measurement = UnitOfPower.WATT
 
 
 class QvantumCurrentEntity(QvantumBaseEntity):

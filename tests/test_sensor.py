@@ -62,6 +62,8 @@ def mock_coordinator():
             "compressorenergy": 100.0,  # Energy
             "additionalenergy": 50.0,  # Additional energy
             "powertotal": 1500.0,  # Power
+            "heatingpower": 2.5,  # Heating power in kW
+            "dhwpower": 1.8,  # DHW power in kW
             "bp1_pressure": 2.1,  # Pressure
             "inputcurrent1": 5.2,  # Current
             "tap_water_cap": 4,  # Capacity (should be divided by 2)
@@ -188,7 +190,28 @@ class TestQvantumPowerEntity:
         assert entity._attr_device_class == SensorDeviceClass.POWER
         assert entity._attr_native_unit_of_measurement == UnitOfPower.WATT
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
+        assert not hasattr(entity, "_attr_suggested_display_precision")
         assert entity.state == 1500.0
+
+    def test_heatingpower_init(self, mock_coordinator, mock_device):
+        """Test heating power entity initialization with kW unit and precision."""
+        entity = QvantumPowerEntity(mock_coordinator, "heatingpower", mock_device, True)
+
+        assert entity._attr_device_class == SensorDeviceClass.POWER
+        assert entity._attr_native_unit_of_measurement == UnitOfPower.KILO_WATT
+        assert entity._attr_state_class == SensorStateClass.MEASUREMENT
+        assert entity._attr_suggested_display_precision == 2
+        assert entity.state == 2.5
+
+    def test_dhwpower_init(self, mock_coordinator, mock_device):
+        """Test DHW power entity initialization with kW unit and precision."""
+        entity = QvantumPowerEntity(mock_coordinator, "dhwpower", mock_device, True)
+
+        assert entity._attr_device_class == SensorDeviceClass.POWER
+        assert entity._attr_native_unit_of_measurement == UnitOfPower.KILO_WATT
+        assert entity._attr_state_class == SensorStateClass.MEASUREMENT
+        assert entity._attr_suggested_display_precision == 2
+        assert entity.state == 1.8
 
 
 class TestQvantumPressureEntity:
