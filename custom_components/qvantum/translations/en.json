@@ -148,6 +148,9 @@
       "fan0_10v": {
         "name": "Fan speed"
       },
+      "fanrpm": {
+        "name": "Fan speed"
+      },
       "gp1_speed": {
         "name": "Circulation pump (GP1)"
       },

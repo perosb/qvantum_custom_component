@@ -148,6 +148,9 @@
       "fan0_10v": {
         "name": "Ventilatorsnelheid"
       },
+      "fanrpm": {
+        "name": "Ventilatorsnelheid"
+      },
       "gp1_speed": {
         "name": "Circulatiepomp (GP1)"
       },
