@@ -148,6 +148,9 @@
       "fan0_10v": {
         "name": "Lüftergeschwindigkeit"
       },
+      "fanrpm": {
+        "name": "Lüftergeschwindigkeit"
+      },
       "gp1_speed": {
         "name": "Heizmedium-Pumpe (GP1)"
       },

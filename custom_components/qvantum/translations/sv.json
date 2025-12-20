@@ -148,6 +148,9 @@
       "fan0_10v": {
         "name": "Fläkthastighet"
       },
+      "fanrpm": {
+        "name": "Fläkthastighet"
+      },
       "gp1_speed": {
         "name": "Cirkulationspump (GP1)"
       },

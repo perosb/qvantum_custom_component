@@ -29,6 +29,7 @@ DEFAULT_ENABLED_METRICS = [
     "bt34",
     "cal_heat_temp",
     "compressormeasuredspeed",
+    "fanrpm",
     "dhw_normal_start",
     "dhw_normal_stop",
     "fan0_10v",

@@ -131,6 +131,11 @@ class TestQvantumBaseEntity:
         )
         assert entity._attr_native_unit_of_measurement == "rpm"
 
+    def test_fanrpm_unit_assignment(self, mock_coordinator, mock_device):
+        """Test fanrpm RPM unit assignment."""
+        entity = QvantumBaseEntity(mock_coordinator, "fanrpm", mock_device, True)
+        assert entity._attr_native_unit_of_measurement == "rpm"
+
     def test_flow_unit_assignment(self, mock_coordinator, mock_device):
         """Test flow rate unit assignment."""
         entity = QvantumBaseEntity(mock_coordinator, "bf1_l_min", mock_device, True)
