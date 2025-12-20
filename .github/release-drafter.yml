@@ -6,12 +6,11 @@ template: |
 
   $CHANGES
 
-  ```
-  **DANGER WILL ROBINSON**
-  Uses internal API for all metrics (also used by the app)
-  Given that there is a 3-6s latency, this API might pull live metrics from FLVP.
-  Use at your own risk ;)
-  ```
+
+  > [!CAUTION]
+  >Uses the same internal API for all metrics that is also used by the app.
+  >This API pulls live metrics from FLVP.
+  >Use at your own risk ;)
 
 include-labels:
   - "bug"
