@@ -118,7 +118,6 @@ ENERGY_METRICS = ["energy"]
 POWER_METRICS = ["powertotal", "heatingpower", "dhwpower"]
 CURRENT_METRICS = ["current"]
 PRESSURE_METRICS = ["pressure"]
-TAP_WATER_CAPACITY_METRICS = ["tap_water_cap"]
 
 # Tap water capacity mappings (stop, start) -> capacity
 TAP_WATER_CAPACITY_MAPPINGS = {
