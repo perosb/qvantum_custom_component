@@ -46,7 +46,6 @@ with patch(
                 QvantumPowerEntity,
                 QvantumPressureEntity,
                 QvantumCurrentEntity,
-                QvantumTapWaterCapacityEntity,
                 QvantumDiagnosticEntity,
                 QvantumTotalEnergyEntity,
                 QvantumLatencyEntity,
@@ -238,18 +237,6 @@ class TestQvantumCurrentEntity:
         assert entity._attr_native_unit_of_measurement == UnitOfElectricCurrent.AMPERE
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
         assert entity.state == 5.2
-
-
-class TestQvantumTapWaterCapacityEntity:
-    """Test the QvantumTapWaterCapacityEntity class."""
-
-    def test_state_calculation(self, mock_coordinator, mock_device):
-        """Test tap water capacity state calculation (divided by 2)."""
-        entity = QvantumTapWaterCapacityEntity(
-            mock_coordinator, "tap_water_cap", mock_device, True
-        )
-        assert entity.state == 2  # 4 / 2 = 2
-
 
 class TestQvantumTotalEnergyEntity:
     """Test the QvantumTotalEnergyEntity class."""

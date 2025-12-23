@@ -31,8 +31,7 @@ from .const import (
     ENERGY_METRICS,
     POWER_METRICS,
     CURRENT_METRICS,
-    PRESSURE_METRICS,
-    TAP_WATER_CAPACITY_METRICS,
+    PRESSURE_METRICS
 )
 from .coordinator import QvantumDataUpdateCoordinator
 from . import MyConfigEntry
@@ -136,21 +135,6 @@ class QvantumBaseEntity(CoordinatorEntity, SensorEntity):
         """Check if data is available."""
         metrics = self.coordinator.data.get("metrics", {})
         return metrics.get(self._metric_key) is not None
-
-
-class QvantumTapWaterCapacityEntity(QvantumBaseEntity):
-    """Sensor for tap water capacity measurements."""
-
-    @property
-    def state(self):
-        """Get metric from API data."""
-        value = super().state
-        if value is not None:
-            # Note: The API returns the capacity as "number of half-people",
-            #       I.e. a value of 4 means capacity for 2 people.
-            return value / 2
-        return None
-
 
 class QvantumTemperatureEntity(QvantumBaseEntity):
     """Sensor for temperature measurements."""
@@ -370,7 +354,5 @@ def _get_sensor_type(metric: str) -> Type[QvantumBaseEntity]:
         return QvantumCurrentEntity
     elif any(pattern in metric for pattern in PRESSURE_METRICS):
         return QvantumPressureEntity
-    elif any(pattern in metric for pattern in TAP_WATER_CAPACITY_METRICS):
-        return QvantumTapWaterCapacityEntity
     else:
         return QvantumBaseEntity
