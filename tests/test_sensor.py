@@ -502,9 +502,6 @@ class TestSensorSetup:
         """Test that entities disabled by integration can be updated on subsequent restarts."""
         from custom_components.qvantum.const import DEFAULT_DISABLED_METRICS
 
-        print(f"DEBUG: len(DEFAULT_DISABLED_METRICS) = {len(DEFAULT_DISABLED_METRICS)}")
-        print(f"DEBUG: DEFAULT_DISABLED_METRICS[:5] = {DEFAULT_DISABLED_METRICS[:5]}")
-
         # Define the exclusion patterns locally (same as in sensor.py)
         EXCLUDED_METRIC_PATTERNS = [
             "op_man_",
