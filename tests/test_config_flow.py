@@ -230,8 +230,6 @@ class TestQvantumConfigFlow:
                 config_entry,
                 unique_id="test_unique_id",
                 data={
-                    "username": "old@example.com",
-                    "password": "oldpass",
                     "username": "new@example.com",
                     "password": "newpass",
                 },
