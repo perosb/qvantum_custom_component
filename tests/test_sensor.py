@@ -511,7 +511,14 @@ class TestSensorSetup:
             "use_",
         ]
 
-        expected_calls = 46  # Should be len(DEFAULT_DISABLED_METRICS) - excluded count
+        # Calculate expected calls dynamically to avoid relying on a magic number
+        expected_calls = len(
+            [
+                metric
+                for metric in DEFAULT_DISABLED_METRICS
+                if not any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
+            ]
+        )
 
         # Mock entity registry - all disabled entities exist and are disabled by integration
         mock_entity_registry = mock_hass.data["entity_registry"]
