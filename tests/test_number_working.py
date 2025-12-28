@@ -28,7 +28,10 @@ with patch(
         with patch("homeassistant.const.EntityCategory", MockEntityCategory):
             from homeassistant.helpers.device_registry import DeviceInfo
 
-            from custom_components.qvantum.number import QvantumNumberEntity
+            from custom_components.qvantum.number import (
+                QvantumNumberEntity,
+                async_setup_entry,
+            )
 
 
 @pytest.fixture
@@ -325,3 +328,40 @@ class TestQvantumNumberEntity:
             "test_device_123", 58
         )
         # Note: async_set_updated_data would be called if the API response status was correct
+
+
+class TestNumberSetup:
+    """Test number platform setup."""
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry(
+        self, hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Test setting up number entities."""
+        from custom_components.qvantum import RuntimeData
+
+        mock_config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator, device=mock_device
+        )
+
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+        # Check that entities were added
+        assert async_add_entities.called
+        entities = async_add_entities.call_args[0][0]
+        assert (
+            len(entities) == 4
+        )  # tap_water_capacity_target, indoor_temperature_offset, tap_water_stop, tap_water_start
+        assert all(isinstance(entity, QvantumNumberEntity) for entity in entities)
+
+        # Check entity keys
+        entity_keys = [entity._metric_key for entity in entities]
+        expected_keys = [
+            "tap_water_capacity_target",
+            "indoor_temperature_offset",
+            "tap_water_stop",
+            "tap_water_start",
+        ]
+        assert entity_keys == expected_keys

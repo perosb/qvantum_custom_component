@@ -218,9 +218,7 @@ class QvantumAPI:
         else:
             stop_time = -1  # -1 means "always on"
 
-        dhw_mode = 1
-        if minutes != 0:
-            dhw_mode = 2
+        dhw_mode = 2 if minutes != 0 else 1
 
         payload = {
             "settings": [

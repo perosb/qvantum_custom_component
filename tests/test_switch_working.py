@@ -36,7 +36,8 @@ with patch(
             with patch("homeassistant.const.STATE_ON", STATE_ON):
                 with patch("homeassistant.const.STATE_OFF", STATE_OFF):
                     with patch(
-                        "custom_components.qvantum.const.SETTING_UPDATE_APPLIED", "APPLIED"
+                        "custom_components.qvantum.const.SETTING_UPDATE_APPLIED",
+                        "APPLIED",
                     ):
                         from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -89,6 +90,26 @@ class TestQvantumSwitchEntity:
         assert entity._attr_icon == "mdi:water-boiler"
         assert entity._attr_is_on is False
         assert entity._attr_translation_key == "extra_tap_water"
+
+    def test_init_op_mode_icon(self, mock_coordinator, mock_device):
+        """Test switch entity initialization with op_mode icon."""
+        entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
+        assert entity._attr_icon == "mdi:auto-mode"
+
+    def test_init_op_man_dhw_icon(self, mock_coordinator, mock_device):
+        """Test switch entity initialization with op_man_dhw icon."""
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_dhw", mock_device)
+        assert entity._attr_icon == "mdi:water-outline"
+
+    def test_init_op_man_addition_icon(self, mock_coordinator, mock_device):
+        """Test switch entity initialization with op_man_addition icon."""
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
+        assert entity._attr_icon == "mdi:transmission-tower-import"
+
+    def test_init_default_icon(self, mock_coordinator, mock_device):
+        """Test switch entity initialization with default icon."""
+        entity = QvantumSwitchEntity(mock_coordinator, "unknown_metric", mock_device)
+        assert entity._attr_icon == "mdi:water-boiler"
 
     def test_is_on_none_stop(self, mock_coordinator, mock_device):
         """Test is_on when extra_tap_water_stop is None."""
@@ -192,6 +213,46 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
         assert entity.available is False
 
+    def test_available_op_man_addition_available(self, mock_coordinator, mock_device):
+        """Test availability for op_man_addition when op_mode is 1."""
+        mock_coordinator.data["metrics"]["op_man_addition"] = 0
+        mock_coordinator.data["metrics"]["op_mode"] = 1
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
+        assert entity.available is True
+
+    def test_available_op_man_addition_unavailable_wrong_op_mode(
+        self, mock_coordinator, mock_device
+    ):
+        """Test availability for op_man_addition when op_mode is not 1."""
+        mock_coordinator.data["metrics"]["op_man_addition"] = 0
+        mock_coordinator.data["metrics"]["op_mode"] = 0
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
+        assert entity.available is False
+
+    def test_available_op_man_addition_unavailable_missing_metric(
+        self, mock_coordinator, mock_device
+    ):
+        """Test availability for op_man_addition when metric is missing."""
+        mock_coordinator.data["metrics"]["op_mode"] = 1
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
+        assert entity.available is False
+
+    def test_available_op_man_dhw_available(self, mock_coordinator, mock_device):
+        """Test availability for op_man_dhw when op_mode is 1."""
+        mock_coordinator.data["metrics"]["op_man_dhw"] = 0
+        mock_coordinator.data["metrics"]["op_mode"] = 1
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_dhw", mock_device)
+        assert entity.available is True
+
+    def test_available_op_man_dhw_unavailable_wrong_op_mode(
+        self, mock_coordinator, mock_device
+    ):
+        """Test availability for op_man_dhw when op_mode is not 1."""
+        mock_coordinator.data["metrics"]["op_man_dhw"] = 0
+        mock_coordinator.data["metrics"]["op_mode"] = 0
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_dhw", mock_device)
+        assert entity.available is False
+
     @pytest.mark.asyncio
     async def test_async_turn_on_extra_tap_water(self, mock_coordinator, mock_device):
         """Test turning on extra tap water."""
@@ -268,6 +329,90 @@ class TestQvantumSwitchEntity:
         )
         # The method updates metrics
         assert mock_coordinator.data["metrics"]["other_switch"] == 0
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_turn_on_enable_sc_dhw(self, mock_coordinator, mock_device):
+        """Test turning on enable_sc_dhw."""
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_dhw", mock_device)
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_turn_on()
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "enable_sc_dhw", True
+        )
+        # The method updates metrics
+        assert mock_coordinator.data["metrics"]["enable_sc_dhw"] is True
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_turn_off_enable_sc_dhw(self, mock_coordinator, mock_device):
+        """Test turning off enable_sc_dhw."""
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_dhw", mock_device)
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_turn_off()
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "enable_sc_dhw", False
+        )
+        # The method updates metrics
+        assert mock_coordinator.data["metrics"]["enable_sc_dhw"] is False
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_turn_on_enable_sc_sh(self, mock_coordinator, mock_device):
+        """Test turning on enable_sc_sh."""
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_sh", mock_device)
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_turn_on()
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "enable_sc_sh", True
+        )
+        # The method updates metrics
+        assert mock_coordinator.data["metrics"]["enable_sc_sh"] is True
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_turn_off_enable_sc_sh(self, mock_coordinator, mock_device):
+        """Test turning off enable_sc_sh."""
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_sh", mock_device)
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_turn_off()
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "enable_sc_sh", False
+        )
+        # The method updates metrics
+        assert mock_coordinator.data["metrics"]["enable_sc_sh"] is False
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
