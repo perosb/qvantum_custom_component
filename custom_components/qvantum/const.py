@@ -68,6 +68,7 @@ DEFAULT_DISABLED_METRICS = [
     "dhw_outl_temp_max",
     "dhw_prioritytime",
     "enable_sc_dhw",
+    "enable_sc_sh",
     "guide_des_temp",
     "guide_he",
     "man_mode",

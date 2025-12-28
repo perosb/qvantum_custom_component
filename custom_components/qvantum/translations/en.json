@@ -41,7 +41,10 @@
         "name": "Cooling enabled"
       },
       "enable_sc_dhw": {
-        "name": "Enable SC DHW"
+        "name": "Enable SmartControl DHW"
+      },
+      "enable_sc_sh": {
+        "name": "Enable SmartControl heating"
       },
       "picpin_relay_heat_l1": {
         "name": "Additional power L1"

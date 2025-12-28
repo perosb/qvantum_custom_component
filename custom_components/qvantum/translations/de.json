@@ -41,7 +41,10 @@
         "name": "Kühlung aktiviert"
       },
       "enable_sc_dhw": {
-        "name": "SC Brauchwasser aktivieren"
+        "name": "SmartControl Brauchwasser aktivieren"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl Heizung aktivieren"
       },
       "picpin_relay_heat_l1": {
         "name": "Zusätzliche Wärme L1"
