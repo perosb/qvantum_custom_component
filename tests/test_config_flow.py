@@ -93,6 +93,7 @@ class TestQvantumConfigFlow:
 
     @pytest.mark.asyncio
     async def test_user_step_cannot_connect(self, hass, config_flow):
+        """Test user step when connection to the API cannot be established."""
         # Mock the hass.config_entries.flow property
         hass.config_entries = MagicMock()
         hass.config_entries.flow = MagicMock()
