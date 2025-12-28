@@ -37,6 +37,9 @@
       "enable_sc_dhw": {
         "name": "Tillåt smart styrning varmvatten"
       },
+      "enable_sc_sh": {
+        "name": "Tillåt smart styrning uppvärmning"
+      },
       "cooling_enabled": {
         "name": "Kylning aktiverad"
       },
