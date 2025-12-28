@@ -46,6 +46,9 @@
       "enable_sc_sh": {
         "name": "SmartControl verwarming inschakelen"
       },
+      "enable_sc_sh": {
+        "name": "SC verwarming inschakelen"
+      },
       "picpin_relay_heat_l1": {
         "name": "Extra vermogen L1"
       },
