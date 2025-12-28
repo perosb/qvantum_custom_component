@@ -36,7 +36,8 @@ with patch(
             with patch("homeassistant.const.STATE_ON", STATE_ON):
                 with patch("homeassistant.const.STATE_OFF", STATE_OFF):
                     with patch(
-                        "custom_components.qvantum.const.SETTING_UPDATE_APPLIED", "APPLIED"
+                        "custom_components.qvantum.const.SETTING_UPDATE_APPLIED",
+                        "APPLIED",
                     ):
                         from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -328,6 +329,90 @@ class TestQvantumSwitchEntity:
         )
         # The method updates metrics
         assert mock_coordinator.data["metrics"]["other_switch"] == 0
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_turn_on_enable_sc_dhw(self, mock_coordinator, mock_device):
+        """Test turning on enable_sc_dhw."""
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_dhw", mock_device)
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_turn_on()
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "enable_sc_dhw", True
+        )
+        # The method updates metrics
+        assert mock_coordinator.data["metrics"]["enable_sc_dhw"] is True
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_turn_off_enable_sc_dhw(self, mock_coordinator, mock_device):
+        """Test turning off enable_sc_dhw."""
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_dhw", mock_device)
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_turn_off()
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "enable_sc_dhw", False
+        )
+        # The method updates metrics
+        assert mock_coordinator.data["metrics"]["enable_sc_dhw"] is False
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_turn_on_enable_sc_sh(self, mock_coordinator, mock_device):
+        """Test turning on enable_sc_sh."""
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_sh", mock_device)
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_turn_on()
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "enable_sc_sh", True
+        )
+        # The method updates metrics
+        assert mock_coordinator.data["metrics"]["enable_sc_sh"] is True
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_turn_off_enable_sc_sh(self, mock_coordinator, mock_device):
+        """Test turning off enable_sc_sh."""
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_sh", mock_device)
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_turn_off()
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "enable_sc_sh", False
+        )
+        # The method updates metrics
+        assert mock_coordinator.data["metrics"]["enable_sc_sh"] is False
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )

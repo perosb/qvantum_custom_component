@@ -152,6 +152,8 @@ class TestQvantumConfigFlow:
                 {"username": "test@example.com", "password": "testpass"}
             )
 
+            assert result == {"type": "create_entry"}
+
             mock_validate.assert_called_once_with(
                 hass, {"username": "test@example.com", "password": "testpass"}
             )
@@ -223,6 +225,8 @@ class TestQvantumConfigFlow:
             result = await config_flow.async_step_reconfigure(
                 {"username": "new@example.com", "password": "newpass"}
             )
+
+            assert result == {"type": "abort"}
 
             mock_validate.assert_called_once_with(
                 hass, {"username": "new@example.com", "password": "newpass"}
@@ -304,6 +308,8 @@ class TestQvantumConfigFlow:
             mock_create_entry.return_value = {"type": "create_entry"}
 
             result = await flow.async_step_init({"scan_interval": 300})
+
+            assert result == {"type": "create_entry"}
 
             mock_create_entry.assert_called_once_with(
                 title="", data={"scan_interval": 300}
