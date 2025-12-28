@@ -10,11 +10,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 from homeassistant.const import EntityCategory
 
 
 from . import MyConfigEntry
-from .const import DOMAIN, DEFAULT_ENABLED_METRICS
+from .const import DOMAIN, DEFAULT_ENABLED_METRICS, DEFAULT_DISABLED_METRICS
 from .coordinator import QvantumDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,17 +48,34 @@ async def async_setup_entry(
     ]
 
     for sensor_name in sensor_names:
-        if sensor_name in DEFAULT_ENABLED_METRICS:
-            sensors.append(
-                QvantumBaseBinaryEntity(
-                    coordinator,
-                    sensor_name,
-                    sensor_name,
-                    device,
-                )
+        enabled_default = sensor_name not in DEFAULT_DISABLED_METRICS
+        sensors.append(
+            QvantumBaseBinaryEntity(
+                coordinator,
+                sensor_name,
+                sensor_name,
+                device,
+                enabled_default,
             )
+        )
 
     async_add_entities(sensors)
+
+    # Disable entities that should be disabled by default
+    entity_registry = hass.data["entity_registry"]
+    for sensor in sensors:
+        if not sensor._attr_entity_registry_enabled_default:
+            entity_entry = entity_registry.async_get(sensor.entity_id)
+            if entity_entry and entity_entry.disabled_by is None:
+                # Entity is currently enabled, respect user's choice
+                continue
+            if (
+                entity_entry is None
+                or entity_entry.disabled_by != RegistryEntryDisabler.USER
+            ):
+                entity_registry.async_update_entity(
+                    sensor.entity_id, disabled_by=RegistryEntryDisabler.INTEGRATION
+                )
 
 
 class QvantumBaseBinaryEntity(CoordinatorEntity, BinarySensorEntity):
@@ -69,6 +87,7 @@ class QvantumBaseBinaryEntity(CoordinatorEntity, BinarySensorEntity):
         metric_key: str,
         name: str,
         device: DeviceInfo,
+        enabled_default: bool = True,
     ) -> None:
         super().__init__(coordinator)
         self._hpid = self.coordinator.data.get("metrics").get("hpid")
@@ -77,6 +96,7 @@ class QvantumBaseBinaryEntity(CoordinatorEntity, BinarySensorEntity):
         self._attr_unique_id = f"qvantum_{metric_key}_{self._hpid}"
         self._attr_device_info = device
         self._attr_has_entity_name = True
+        self._attr_entity_registry_enabled_default = enabled_default
         self._data_bearer = "metrics"
 
     @property
@@ -104,8 +124,9 @@ class QvantumConnectedEntity(QvantumBaseBinaryEntity):
         metric_key: str,
         name: str,
         device: DeviceInfo,
+        enabled_default: bool = True,
     ) -> None:
-        super().__init__(coordinator, metric_key, name, device)
+        super().__init__(coordinator, metric_key, name, device, enabled_default)
 
         self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
