@@ -31,6 +31,9 @@ async def async_setup_entry(
     sensors.append(QvantumSwitchEntity(coordinator, "op_man_dhw", device))
     sensors.append(QvantumSwitchEntity(coordinator, "op_man_addition", device))
 
+    # sensors.append(QvantumSwitchEntity(coordinator, "enable_sc_sh", device))
+    # sensors.append(QvantumSwitchEntity(coordinator, "enable_sc_dhw", device))
+
     async_add_entities(sensors)
 
     _LOGGER.debug("Setting up platform SWITCH")
@@ -74,6 +77,14 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     response, self.coordinator, data_section=None, key=None, value=None
                 )
 
+            case "enable_sc_dhw" | "enable_sc_sh":
+                response = await self.coordinator.api.update_setting(
+                    self._hpid, self._metric_key, False
+                )
+                await handle_setting_update_response(
+                    response, self.coordinator, "metrics", self._metric_key, False
+                )
+
             case _:
                 response = await self.coordinator.api.update_setting(
                     self._hpid, self._metric_key, 0
@@ -93,6 +104,14 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     response, self.coordinator, data_section=None, key=None, value=None
                 )
 
+            case "enable_sc_dhw" | "enable_sc_sh":
+                response = await self.coordinator.api.update_setting(
+                    self._hpid, self._metric_key, True
+                )
+                await handle_setting_update_response(
+                    response, self.coordinator, "metrics", self._metric_key, True
+                )
+
             case _:
                 response = await self.coordinator.api.update_setting(
                     self._hpid, self._metric_key, 1
@@ -103,6 +122,9 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
 
     @property
     def is_on(self):
+        if not self.coordinator.data:
+            return False
+
         match self._metric_key:
             case "extra_tap_water":
                 stop_time = self.coordinator.data.get("settings", {}).get(
@@ -118,29 +140,31 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     # Check if the stop time is in the future
                     return stop_time > datetime.now().timestamp()
 
-        return self.coordinator.data.get("metrics").get(self._metric_key) == 1
+        # Handle both integer (== 1) and boolean (True) values
+        value = self.coordinator.data.get("metrics").get(self._metric_key)
+        return value is True or value == 1
 
     @property
     def available(self):
+        if not self.coordinator.data:
+            return False
+
         match self._metric_key:
             case "extra_tap_water":
                 return (
-                    "extra_tap_water_stop" in self.coordinator.data.get("settings", {})
+                    "extra_tap_water_stop"
+                    in self.coordinator.data.get("settings", {})
                     and self.coordinator.data.get("settings", {}).get(
                         "extra_tap_water_stop"
                     )
                     is not None
                 )
+            case "op_man_addition" | "op_man_dhw":
+                return (
+                    self._metric_key in self.coordinator.data.get("metrics", {})
+                    and self.coordinator.data.get("metrics", {}).get("op_mode") == 1
+                )
             case _:
-                if (
-                    self._metric_key == "op_man_addition"
-                    or self._metric_key == "op_man_dhw"
-                ):
-                    return (
-                        self._metric_key in self.coordinator.data.get("metrics", {})
-                        and self.coordinator.data.get("metrics", {}).get("op_mode") == 1
-                    )
-
                 return (
                     self._metric_key in self.coordinator.data.get("metrics", {})
                     and self.coordinator.data.get("metrics", {}).get(self._metric_key)

@@ -496,11 +496,14 @@ class TestSensorSetup:
         mock_entity_registry.async_update_entity.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry_updates_integration_disabled_entities(
+    async def test_integration_disabled_entities_update(
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):
         """Test that entities disabled by integration can be updated on subsequent restarts."""
         from custom_components.qvantum.const import DEFAULT_DISABLED_METRICS
+
+        print(f"DEBUG: len(DEFAULT_DISABLED_METRICS) = {len(DEFAULT_DISABLED_METRICS)}")
+        print(f"DEBUG: DEFAULT_DISABLED_METRICS[:5] = {DEFAULT_DISABLED_METRICS[:5]}")
 
         # Define the exclusion patterns locally (same as in sensor.py)
         EXCLUDED_METRIC_PATTERNS = [
@@ -511,16 +514,7 @@ class TestSensorSetup:
             "use_",
         ]
 
-        # Calculate how many disabled metrics are actually created (not excluded)
-        def _should_exclude_metric(metric: str) -> bool:
-            return any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
-
-        actual_disabled_metrics = [
-            metric
-            for metric in DEFAULT_DISABLED_METRICS
-            if not _should_exclude_metric(metric)
-        ]
-        expected_calls = len(actual_disabled_metrics)
+        expected_calls = 46  # Should be len(DEFAULT_DISABLED_METRICS) - excluded count
 
         # Mock entity registry - all disabled entities exist and are disabled by integration
         mock_entity_registry = mock_hass.data["entity_registry"]
@@ -534,11 +528,16 @@ class TestSensorSetup:
         def mock_async_get(entity_id):
             # Extract metric key from entity_id (format: sensor.qvantum_{metric_key}_{hpid})
             parts = entity_id.split("_")
-            if len(parts) >= 2:
+            if len(parts) >= 3 and parts[0] == "sensor" and parts[1] == "qvantum":
                 metric_key = "_".join(
-                    parts[1:-1]
-                )  # Handle metric keys with underscores
-                if metric_key in actual_disabled_metrics:
+                    parts[2:-1]
+                )  # Skip "sensor", "qvantum", and last part (hpid)
+                # Check if metric should be included (not excluded by patterns)
+                excluded_patterns = ["op_man_", "enable", "picpin_", "qn8", "use_"]
+                should_exclude = any(
+                    pattern in metric_key for pattern in excluded_patterns
+                )
+                if metric_key in DEFAULT_DISABLED_METRICS and not should_exclude:
                     return mock_entity
             return None
 

@@ -90,6 +90,26 @@ class TestQvantumSwitchEntity:
         assert entity._attr_is_on is False
         assert entity._attr_translation_key == "extra_tap_water"
 
+    def test_init_op_mode_icon(self, mock_coordinator, mock_device):
+        """Test switch entity initialization with op_mode icon."""
+        entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
+        assert entity._attr_icon == "mdi:auto-mode"
+
+    def test_init_op_man_dhw_icon(self, mock_coordinator, mock_device):
+        """Test switch entity initialization with op_man_dhw icon."""
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_dhw", mock_device)
+        assert entity._attr_icon == "mdi:water-outline"
+
+    def test_init_op_man_addition_icon(self, mock_coordinator, mock_device):
+        """Test switch entity initialization with op_man_addition icon."""
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
+        assert entity._attr_icon == "mdi:transmission-tower-import"
+
+    def test_init_default_icon(self, mock_coordinator, mock_device):
+        """Test switch entity initialization with default icon."""
+        entity = QvantumSwitchEntity(mock_coordinator, "unknown_metric", mock_device)
+        assert entity._attr_icon == "mdi:water-boiler"
+
     def test_is_on_none_stop(self, mock_coordinator, mock_device):
         """Test is_on when extra_tap_water_stop is None."""
         mock_coordinator.data["settings"]["extra_tap_water_stop"] = None
@@ -190,6 +210,46 @@ class TestQvantumSwitchEntity:
         """Test availability for other switches when value is None."""
         mock_coordinator.data["settings"]["op_mode"] = None
         entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
+        assert entity.available is False
+
+    def test_available_op_man_addition_available(self, mock_coordinator, mock_device):
+        """Test availability for op_man_addition when op_mode is 1."""
+        mock_coordinator.data["metrics"]["op_man_addition"] = 0
+        mock_coordinator.data["metrics"]["op_mode"] = 1
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
+        assert entity.available is True
+
+    def test_available_op_man_addition_unavailable_wrong_op_mode(
+        self, mock_coordinator, mock_device
+    ):
+        """Test availability for op_man_addition when op_mode is not 1."""
+        mock_coordinator.data["metrics"]["op_man_addition"] = 0
+        mock_coordinator.data["metrics"]["op_mode"] = 0
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
+        assert entity.available is False
+
+    def test_available_op_man_addition_unavailable_missing_metric(
+        self, mock_coordinator, mock_device
+    ):
+        """Test availability for op_man_addition when metric is missing."""
+        mock_coordinator.data["metrics"]["op_mode"] = 1
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
+        assert entity.available is False
+
+    def test_available_op_man_dhw_available(self, mock_coordinator, mock_device):
+        """Test availability for op_man_dhw when op_mode is 1."""
+        mock_coordinator.data["metrics"]["op_man_dhw"] = 0
+        mock_coordinator.data["metrics"]["op_mode"] = 1
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_dhw", mock_device)
+        assert entity.available is True
+
+    def test_available_op_man_dhw_unavailable_wrong_op_mode(
+        self, mock_coordinator, mock_device
+    ):
+        """Test availability for op_man_dhw when op_mode is not 1."""
+        mock_coordinator.data["metrics"]["op_man_dhw"] = 0
+        mock_coordinator.data["metrics"]["op_mode"] = 0
+        entity = QvantumSwitchEntity(mock_coordinator, "op_man_dhw", mock_device)
         assert entity.available is False
 
     @pytest.mark.asyncio
