@@ -41,10 +41,10 @@
         "name": "Koeling ingeschakeld"
       },
       "enable_sc_dhw": {
-        "name": "SC WTW inschakelen"
+        "name": "SmartControl WTW inschakelen"
       },
       "enable_sc_sh": {
-        "name": "SC verwarming inschakelen"
+        "name": "SmartControl verwarming inschakelen"
       },
       "picpin_relay_heat_l1": {
         "name": "Extra vermogen L1"
