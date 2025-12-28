@@ -141,7 +141,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     return stop_time > datetime.now().timestamp()
 
         # Handle both integer (== 1) and boolean (True) values
-        value = self.coordinator.data.get("metrics").get(self._metric_key)
+        value = self.coordinator.data.get("metrics", {}).get(self._metric_key)
         return value is True or value == 1
 
     @property
