@@ -537,9 +537,8 @@ class TestSensorSetup:
                     parts[2:-1]
                 )  # Skip "sensor", "qvantum", and last part (hpid)
                 # Check if metric should be included (not excluded by patterns)
-                excluded_patterns = ["op_man_", "enable", "picpin_", "qn8", "use_"]
                 should_exclude = any(
-                    pattern in metric_key for pattern in excluded_patterns
+                    pattern in metric_key for pattern in EXCLUDED_METRIC_PATTERNS
                 )
                 if metric_key in DEFAULT_DISABLED_METRICS and not should_exclude:
                     return mock_entity
