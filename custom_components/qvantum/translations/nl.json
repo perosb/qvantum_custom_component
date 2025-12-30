@@ -10,13 +10,25 @@
         "name": "Extra WTW"
       },
       "op_man_addition": {
-        "name": "Toevoeging in handmatige modus toestaan"
+        "name": "Handmatige Bedrijfsmodus: Toevoeging"
       },
       "op_man_dhw": {
-        "name": "WTW in handmatige modus toestaan"
+        "name": "Handmatige Bedrijfsmodus: WTW"
       },
       "op_mode": {
-        "name": "Handmatige bedrijfsmodus"
+        "name": "Handmatige Bedrijfsmodus"
+      },
+      "man_mode": {
+        "name": "Handmatige Bedrijfsmodus: Verwarming"
+      },
+      "use_adaptive": {
+        "name": "SmartControl"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: WTW"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Verwarming"
       }
     },
     "button": {
@@ -26,25 +38,25 @@
     },
     "binary_sensor": {
       "op_man_addition": {
-        "name": "Handmatige toevoeging"
+        "name": "Handmatige Bedrijfsmodus: Toevoeging"
       },
       "op_man_cooling": {
-        "name": "Handmatige koeling"
+        "name": "Handmatige Bedrijfsmodus: Koeling"
       },
       "op_man_dhw": {
-        "name": "Handmatig WTW"
+        "name": "Handmatige Bedrijfsmodus: WTW"
       },
       "use_adaptive": {
-        "name": "Slimme controle"
+        "name": "SmartControl"
       },
       "cooling_enabled": {
         "name": "Koeling ingeschakeld"
       },
       "enable_sc_dhw": {
-        "name": "SmartControl WTW inschakelen"
+        "name": "SmartControl: WTW"
       },
       "enable_sc_sh": {
-        "name": "SmartControl verwarming inschakelen"
+        "name": "SmartControl: Verwarming"
       },
       "picpin_relay_heat_l1": {
         "name": "Extra vermogen L1"

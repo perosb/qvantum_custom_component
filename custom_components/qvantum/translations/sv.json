@@ -10,13 +10,25 @@
         "name": "Extra varmvatten"
       },
       "op_man_addition": {
-        "name": "Tillåt tillsats i manuellt läge"
+        "name": "Manuellt Driftläge: Tillsats"
       },
       "op_man_dhw": {
-        "name": "Tillåt varmvatten i manuellt läge"
+        "name": "Manuellt Driftläge: Varmvatten"
       },
       "op_mode": {
-        "name": "Manuellt driftläge"
+        "name": "Manuellt Driftläge"
+      },
+      "man_mode": {
+        "name": "Manuellt Driftläge: Uppvärmning"
+      },
+      "use_adaptive": {
+        "name": "SmartControl"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: Varmvatten"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Uppvärmning"
       }
     },
     "button": {
@@ -26,25 +38,25 @@
     },
     "binary_sensor": {
       "op_man_addition": {
-        "name": "Driftläge manuell tillsats"
+        "name": "Manuellt Driftläge: Tillsats"
       },
       "op_man_cooling": {
-        "name": "Driftläge manuell kylning"
+        "name": "Manuellt Driftläge: Kylning"
       },
       "op_man_dhw": {
-        "name": "Driftläge manuell varmvatten"
+        "name": "Manuellt Driftläge: Varmvatten"
       },
       "enable_sc_dhw": {
-        "name": "Tillåt smart styrning varmvatten"
+        "name": "SmartControl: Varmvatten"
       },
       "enable_sc_sh": {
-        "name": "Tillåt smart styrning uppvärmning"
+        "name": "SmartControl: Uppvärmning"
       },
       "cooling_enabled": {
         "name": "Kylning aktiverad"
       },
       "use_adaptive": {
-        "name": "Smart Control"
+        "name": "SmartControl"
       },
       "picpin_relay_heat_l1": {
         "name": "Eltillsats L1"

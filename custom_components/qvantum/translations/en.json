@@ -10,13 +10,25 @@
         "name": "Extra hot water"
       },
       "op_man_addition": {
-        "name": "Allow addition in manual mode"
+        "name": "Manual Operation Mode: Addition"
       },
       "op_man_dhw": {
-        "name": "Allow hot water in manual mode"
+        "name": "Manual Operation Mode: Hot Water"
       },
       "op_mode": {
-        "name": "Manual operation mode"
+        "name": "Manual Operation Mode"
+      },
+      "man_mode": {
+        "name": "Manual Operation Mode: Heating"
+      },
+      "use_adaptive": {
+        "name": "SmartControl"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: DHW"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Heating"
       }
     },
     "button": {
@@ -26,25 +38,25 @@
     },
     "binary_sensor": {
       "op_man_addition": {
-        "name": "Operation manual addition"
+        "name": "Manual Operation Mode: Addition"
       },
       "op_man_cooling": {
-        "name": "Operation manual cooling"
+        "name": "Manual Operation Mode: Cooling"
       },
       "op_man_dhw": {
-        "name": "Operation manual DHW"
-      },
-      "use_adaptive": {
-        "name": "Smart Control"
+        "name": "Manual Operation Mode: Hot Water"
       },
       "cooling_enabled": {
         "name": "Cooling enabled"
       },
+      "use_adaptive": {
+        "name": "SmartControl"
+      },
       "enable_sc_dhw": {
-        "name": "Enable SmartControl DHW"
+        "name": "SmartControl: DHW"
       },
       "enable_sc_sh": {
-        "name": "Enable SmartControl heating"
+        "name": "SmartControl: Heating"
       },
       "picpin_relay_heat_l1": {
         "name": "Additional power L1"
