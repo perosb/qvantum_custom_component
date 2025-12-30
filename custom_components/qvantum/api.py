@@ -224,6 +224,7 @@ class QvantumAPI:
             "settings": [
                 {"name": "extra_tap_water_stop", "value": stop_time},
                 {"name": "dhw_mode", "value": dhw_mode},
+                {"name": "extra_tap_water", "value": minutes != 0},
             ]
         }
 
