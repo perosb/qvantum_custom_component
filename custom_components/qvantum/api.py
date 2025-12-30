@@ -224,6 +224,8 @@ class QvantumAPI:
             "settings": [
                 {"name": "extra_tap_water_stop", "value": stop_time},
                 {"name": "dhw_mode", "value": dhw_mode},
+                # Note: API expects boolean values for setting, but returns "on"/"off" strings when reading
+                {"name": "extra_tap_water", "value": minutes != 0},
             ]
         }
 

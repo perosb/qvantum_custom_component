@@ -28,6 +28,7 @@ def test_api():
         const_mock.FAN_SPEED_VALUE_EXTRA = 2
         const_mock.DEFAULT_ENABLED_METRICS = ["bt1", "bt2"]
         const_mock.DEFAULT_DISABLED_METRICS = ["bt3", "bt4"]
+        original_const = sys.modules.get("custom_components.qvantum.const")
         sys.modules['custom_components.qvantum.const'] = const_mock
 
         # Import the API
@@ -46,8 +47,17 @@ def test_api():
     except Exception as e:
         print(f"✗ QvantumAPI test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
+    finally:
+        # Clean up sys.modules
+        if "custom_components.qvantum.const" in sys.modules:
+            if original_const is not None:
+                sys.modules["custom_components.qvantum.const"] = original_const
+            else:
+                del sys.modules["custom_components.qvantum.const"]
 
 def test_syntax():
     """Test that all Python files compile correctly."""
