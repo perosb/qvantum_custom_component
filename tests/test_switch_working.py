@@ -251,12 +251,11 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", -1
         )
-        # Data is optimistically updated locally, then refreshed
-        assert mock_coordinator.data["settings"]["extra_tap_water"] is True
-        mock_coordinator.async_set_updated_data.assert_called_once_with(
-            mock_coordinator.data
-        )
-        mock_coordinator.async_refresh.assert_called_once()
+        # Data is updated after successful API response
+        mock_coordinator.async_set_updated_data.assert_called_once()
+        updated_data = mock_coordinator.async_set_updated_data.call_args[0][0]
+        assert updated_data["settings"]["extra_tap_water"] == "on"
+        # No immediate refresh to avoid overwriting the update
 
     @pytest.mark.asyncio
     async def test_async_turn_off_extra_tap_water(self, mock_coordinator, mock_device):
@@ -273,12 +272,11 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", 0
         )
-        # Data is optimistically updated locally, then refreshed
-        assert mock_coordinator.data["settings"]["extra_tap_water"] is False
-        mock_coordinator.async_set_updated_data.assert_called_once_with(
-            mock_coordinator.data
-        )
-        mock_coordinator.async_refresh.assert_called_once()
+        # Data is updated after successful API response
+        mock_coordinator.async_set_updated_data.assert_called_once()
+        updated_data = mock_coordinator.async_set_updated_data.call_args[0][0]
+        assert updated_data["settings"]["extra_tap_water"] == "off"
+        # No immediate refresh to avoid overwriting the update
 
     @pytest.mark.asyncio
     async def test_async_turn_on_other_metric(self, mock_coordinator, mock_device):

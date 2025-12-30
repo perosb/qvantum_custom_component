@@ -25,7 +25,7 @@ class TestHandleSettingUpdateResponse:
 
         assert coordinator.data["settings"]["new_key"] == "new_value"
         coordinator.async_set_updated_data.assert_called_once_with(coordinator.data)
-        coordinator.async_refresh.assert_called_once()
+        # No immediate refresh to avoid overwriting the update
 
     @pytest.mark.asyncio
     async def test_handle_setting_update_no_response(self):
@@ -67,9 +67,9 @@ class TestHandleSettingUpdateResponse:
             api_response, coordinator, None, "key", "value"
         )
 
-        # Should not update data but should refresh
+        # Should not update data or refresh
         coordinator.async_set_updated_data.assert_not_called()
-        coordinator.async_refresh.assert_called_once()
+        # No refresh called
 
     @pytest.mark.asyncio
     async def test_handle_setting_update_no_key(self):
@@ -83,6 +83,6 @@ class TestHandleSettingUpdateResponse:
             api_response, coordinator, "settings", None, "value"
         )
 
-        # Should not update data but should refresh
+        # Should not update data or refresh
         coordinator.async_set_updated_data.assert_not_called()
-        coordinator.async_refresh.assert_called_once()
+        # No refresh called

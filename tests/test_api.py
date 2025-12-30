@@ -374,13 +374,13 @@ class TestQvantumAPI:
 
     @pytest.mark.asyncio
     async def test_set_extra_tap_water(self, mock_session):
-        """Test setting extra tap water."""
+        """Test setting extra tap water with positive minutes (duration)."""
         update_data = load_test_data("settings_update_test_device.json")
 
         cm, mock_response = mock_session.make_cm_response(
             status=200, json_data=update_data
         )
-        mock_session.patch.return_value = cm
+        mock_session.post.return_value = cm
 
         api = QvantumAPI(
             "test@example.com", "password", "test-agent", session=mock_session
@@ -388,9 +388,64 @@ class TestQvantumAPI:
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
 
+        # Capture current time before API call to avoid race condition
+        current_time = int(datetime.datetime.now().timestamp())
+
         result = await api.set_extra_tap_water("test_device", 60)
 
         assert result == update_data
+        # Verify the payload contains the command structure
+        call_args = mock_session.post.call_args
+        payload = call_args[1]["json"]
+        assert "command" in payload
+        assert "set_additional_hot_water" in payload["command"]
+        # For positive minutes, stopTime should be approximately current_time + 60 minutes
+        stop_time = payload["command"]["set_additional_hot_water"]["stopTime"]
+        assert isinstance(stop_time, int)
+        expected_stop_time = int(
+            current_time + datetime.timedelta(minutes=60).total_seconds()
+        )
+        assert (
+            abs(stop_time - expected_stop_time) <= 3
+        )  # Allow 3 second tolerance for CI/CD environments
+        assert payload["command"]["set_additional_hot_water"]["indefinite"] is False
+        assert payload["command"]["set_additional_hot_water"]["cancel"] is False
+
+    @pytest.mark.asyncio
+    async def test_set_extra_tap_water_cancel(self, mock_session):
+        """Test canceling extra tap water (minutes == 0)."""
+        update_data = load_test_data("settings_update_test_device.json")
+
+        cm, mock_response = mock_session.make_cm_response(
+            status=200, json_data=update_data
+        )
+        mock_session.post.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        # Capture current time before API call to avoid race condition
+        current_time = int(datetime.datetime.now().timestamp())
+
+        result = await api.set_extra_tap_water("test_device", 0)
+
+        assert result == update_data
+        # Verify the payload contains the command structure
+        call_args = mock_session.post.call_args
+        payload = call_args[1]["json"]
+        assert "command" in payload
+        assert "set_additional_hot_water" in payload["command"]
+        # For cancel (minutes == 0), stopTime should be current timestamp
+        stop_time = payload["command"]["set_additional_hot_water"]["stopTime"]
+        assert isinstance(stop_time, int)
+        assert (
+            abs(stop_time - current_time) <= 3
+        )  # Allow 3 second tolerance for CI/CD environments
+        assert payload["command"]["set_additional_hot_water"]["indefinite"] is False
+        assert payload["command"]["set_additional_hot_water"]["cancel"] is True
 
     @pytest.mark.asyncio
     async def test_set_indoor_temperature_offset(self, mock_session):
@@ -540,7 +595,7 @@ class TestQvantumAPI:
         cm, mock_response = mock_session.make_cm_response(
             status=200, json_data=update_data
         )
-        mock_session.patch.return_value = cm
+        mock_session.post.return_value = cm
 
         api = QvantumAPI(
             "test@example.com", "password", "test-agent", session=mock_session
@@ -551,11 +606,14 @@ class TestQvantumAPI:
         result = await api.set_extra_tap_water("test_device", -1)
 
         assert result == update_data
-        # Verify the payload contains stop_time = -1 and dhw_mode = 2
-        call_args = mock_session.patch.call_args
+        # Verify the payload contains the command structure
+        call_args = mock_session.post.call_args
         payload = call_args[1]["json"]
-        assert payload["settings"][0]["value"] == -1  # stop_time
-        assert payload["settings"][1]["value"] == 2  # dhw_mode
+        assert "command" in payload
+        assert "set_additional_hot_water" in payload["command"]
+        assert payload["command"]["set_additional_hot_water"]["stopTime"] == -1
+        assert payload["command"]["set_additional_hot_water"]["indefinite"] is True
+        assert payload["command"]["set_additional_hot_water"]["cancel"] is False
 
     @pytest.mark.asyncio
     async def test_set_fanspeedselector_off(self, mock_session):

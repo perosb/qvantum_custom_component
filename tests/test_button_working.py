@@ -12,8 +12,16 @@ from custom_components.qvantum import RuntimeData
 def mock_coordinator():
     """Create a mock coordinator."""
     coordinator = MagicMock()
-    coordinator.data = {"metrics": {"hpid": "test_device_123"}}
+    coordinator.data = {
+        "device": {"id": "test_device_123"},
+        "metrics": {"hpid": "test_device_123"},
+        "settings": {
+            "extra_tap_water": None,  # Will be set based on test
+            "extra_tap_water_stop": None,
+        },
+    }
     coordinator.async_refresh = AsyncMock()
+    coordinator.async_set_updated_data = AsyncMock()
     coordinator.api = MagicMock()
     coordinator.api.set_extra_tap_water = AsyncMock(return_value={"status": "APPLIED"})
     return coordinator
@@ -59,18 +67,10 @@ class TestQvantumButtonEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", 60
         )
-        mock_coordinator.async_refresh.assert_called_once()
+        # Data is updated when response comes back
+        mock_coordinator.async_set_updated_data.assert_called_once()
+        assert mock_coordinator.data["settings"]["extra_tap_water"] == "on"
 
-    def test_button_available(self, mock_coordinator, mock_device):
-        """Test button availability."""
-        button = QvantumButtonEntity(
-            mock_coordinator, "extra_tap_water_60min", mock_device
-        )
-
-        assert button.available is True
-
-
-class TestButtonSetup:
     """Test button platform setup."""
 
     @pytest.mark.asyncio

@@ -27,14 +27,14 @@ async def handle_setting_update_response(
     value: Any,
 ) -> None:
     """Handle API response for setting updates and update coordinator data if successful."""
-    if api_response and api_response.get("status") == SETTING_UPDATE_APPLIED:
+    if api_response and (
+        api_response.get("status") == SETTING_UPDATE_APPLIED or
+        api_response.get("heatpump_status") == SETTING_UPDATE_APPLIED
+    ):
         if data_section and key is not None:
             coordinator.data.get(data_section)[key] = value
             # async_set_updated_data is a synchronous method despite the name
             coordinator.async_set_updated_data(coordinator.data)
-
-        await coordinator.async_refresh()
-
 
 class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
     """Qvantum coordinator."""
@@ -81,4 +81,6 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(err) from err
         except Exception as err:
             stack_trace = traceback.format_exc()
-            raise UpdateFailed(f"Error communicating with API: {err}\nStack trace:\n{stack_trace}") from err
+            raise UpdateFailed(
+                f"Error communicating with API: {err}\nStack trace:\n{stack_trace}"
+            ) from err
