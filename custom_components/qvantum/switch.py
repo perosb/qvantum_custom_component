@@ -29,9 +29,11 @@ async def async_setup_entry(
     sensors.append(QvantumSwitchEntity(coordinator, "op_mode", device))
     sensors.append(QvantumSwitchEntity(coordinator, "op_man_dhw", device))
     sensors.append(QvantumSwitchEntity(coordinator, "op_man_addition", device))
+    sensors.append(QvantumSwitchEntity(coordinator, "man_mode", device))
 
-    # sensors.append(QvantumSwitchEntity(coordinator, "enable_sc_sh", device))
-    # sensors.append(QvantumSwitchEntity(coordinator, "enable_sc_dhw", device))
+    sensors.append(QvantumSwitchEntity(coordinator, "use_adaptive", device))
+    sensors.append(QvantumSwitchEntity(coordinator, "enable_sc_sh", device))
+    sensors.append(QvantumSwitchEntity(coordinator, "enable_sc_dhw", device))
 
     async_add_entities(sensors)
 
@@ -60,6 +62,8 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
         match self._metric_key:
             case "op_mode":
                 self._attr_icon = "mdi:auto-mode"
+            case "man_mode":
+                self._attr_icon = "mdi:radiator"
             case "op_man_dhw":
                 self._attr_icon = "mdi:water-outline"
             case "op_man_addition":
@@ -76,7 +80,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     response, self.coordinator, "settings", self._metric_key, "off"
                 )
 
-            case "enable_sc_dhw" | "enable_sc_sh":
+            case "enable_sc_dhw" | "enable_sc_sh" | "use_adaptive":
                 response = await self.coordinator.api.update_setting(
                     self._hpid, self._metric_key, False
                 )
@@ -103,7 +107,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     response, self.coordinator, "settings", self._metric_key, "on"
                 )
 
-            case "enable_sc_dhw" | "enable_sc_sh":
+            case "enable_sc_dhw" | "enable_sc_sh" | "use_adaptive":
                 response = await self.coordinator.api.update_setting(
                     self._hpid, self._metric_key, True
                 )
@@ -149,10 +153,16 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     )
                     is not None
                 )
-            case "op_man_addition" | "op_man_dhw":
+            case "op_man_addition" | "op_man_dhw" | "man_mode":
                 return (
                     self._metric_key in self.coordinator.data.get("metrics", {})
                     and self.coordinator.data.get("metrics", {}).get("op_mode") == 1
+                )
+            case "enable_sc_dhw" | "enable_sc_sh":
+                return (
+                    self._metric_key in self.coordinator.data.get("metrics", {})
+                    and self.coordinator.data.get("metrics", {}).get("use_adaptive")
+                    is True
                 )
             case _:
                 return (

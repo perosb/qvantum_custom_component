@@ -10,13 +10,25 @@
         "name": "Extra heißes Wasser"
       },
       "op_man_addition": {
-        "name": "Zusatz im manuellen Modus erlauben"
+        "name": "Manueller Betriebsmodus: Zusatz"
       },
       "op_man_dhw": {
-        "name": "Brauchwasser im manuellen Modus erlauben"
+        "name": "Manueller Betriebsmodus: Brauchwasser"
       },
       "op_mode": {
         "name": "Manueller Betriebsmodus"
+      },
+      "man_mode": {
+        "name": "Manueller Betriebsmodus: Heizung"
+      },
+      "use_adaptive": {
+        "name": "SmartControl"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: Brauchwasser"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Heizung"
       }
     },
     "button": {
@@ -26,25 +38,25 @@
     },
     "binary_sensor": {
       "op_man_addition": {
-        "name": "Betrieb manuell Zusatz"
+        "name": "Manueller Betriebsmodus: Zusatz"
       },
       "op_man_cooling": {
-        "name": "Betrieb manuell Kühlung"
+        "name": "Manueller Betriebsmodus: Kühlung"
       },
       "op_man_dhw": {
-        "name": "Betrieb manuell Brauchwasser"
+        "name": "Manueller Betriebsmodus: Brauchwasser"
       },
       "use_adaptive": {
-        "name": "Intelligente Steuerung"
+        "name": "SmartControl"
       },
       "cooling_enabled": {
         "name": "Kühlung aktiviert"
       },
       "enable_sc_dhw": {
-        "name": "SmartControl Brauchwasser aktivieren"
+        "name": "SmartControl: Brauchwasser"
       },
       "enable_sc_sh": {
-        "name": "SmartControl Heizung aktivieren"
+        "name": "SmartControl: Heizung"
       },
       "picpin_relay_heat_l1": {
         "name": "Zusätzliche Wärme L1"

@@ -45,6 +45,10 @@ DEFAULT_ENABLED_METRICS = [
     "op_man_addition",
     "op_man_dhw",
     "op_mode",
+    "man_mode",
+    "enable_sc_dhw",
+    "enable_sc_sh",
+    "use_adaptive",
 ]
 
 DEFAULT_DISABLED_METRICS = [
@@ -67,11 +71,8 @@ DEFAULT_DISABLED_METRICS = [
     "dhw_outl_temp_5",
     "dhw_outl_temp_max",
     "dhw_prioritytime",
-    "enable_sc_dhw",
-    "enable_sc_sh",
     "guide_des_temp",
     "guide_he",
-    "man_mode",
     "op_man_cooling",
     "op_mode_sensor",
     "picpin_relay_qm10",
@@ -79,7 +80,6 @@ DEFAULT_DISABLED_METRICS = [
     "qn8position",
     "room_temp_ext",
     "smart_sh_mode",
-    "use_adaptive",
     "dhwdemand",
     "heatingdemand",
     "coolingdemand",
