@@ -251,9 +251,12 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", -1
         )
-        # Data is updated via coordinator refresh
+        # Data is optimistically updated locally, then refreshed
+        assert mock_coordinator.data["settings"]["extra_tap_water"] is True
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
         mock_coordinator.async_refresh.assert_called_once()
-        mock_coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_turn_off_extra_tap_water(self, mock_coordinator, mock_device):
@@ -270,9 +273,12 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
             "test_device_123", 0
         )
-        # Data is updated via coordinator refresh
+        # Data is optimistically updated locally, then refreshed
+        assert mock_coordinator.data["settings"]["extra_tap_water"] is False
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
         mock_coordinator.async_refresh.assert_called_once()
-        mock_coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_turn_on_other_metric(self, mock_coordinator, mock_device):
