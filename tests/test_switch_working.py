@@ -1,6 +1,5 @@
 """Tests for Qvantum switch entities (working version that avoids metaclass issues)."""
 
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
@@ -111,35 +110,21 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "unknown_metric", mock_device)
         assert entity._attr_icon == "mdi:water-boiler"
 
-    def test_is_on_none_stop(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water_stop is None."""
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = None
+    def test_is_on_extra_tap_water_off(self, mock_coordinator, mock_device):
+        """Test is_on when extra_tap_water is 'off'."""
+        mock_coordinator.data["settings"]["extra_tap_water"] = "off"
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is False
 
-    def test_is_on_stop_minus_one(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water_stop is -1 (always on)."""
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = -1
+    def test_is_on_extra_tap_water_on(self, mock_coordinator, mock_device):
+        """Test is_on when extra_tap_water is 'on'."""
+        mock_coordinator.data["settings"]["extra_tap_water"] = "on"
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is True
 
-    def test_is_on_stop_zero(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water_stop is 0 (off)."""
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = 0
-        entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
-        assert entity.is_on is False
-
-    def test_is_on_stop_future_timestamp(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water_stop is a future timestamp."""
-        future_time = int((datetime.now()).timestamp()) + 3600  # 1 hour from now
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = future_time
-        entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
-        assert entity.is_on is True
-
-    def test_is_on_stop_past_timestamp(self, mock_coordinator, mock_device):
-        """Test is_on when extra_tap_water_stop is a past timestamp."""
-        past_time = int((datetime.now()).timestamp()) - 3600  # 1 hour ago
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = past_time
+    def test_is_on_extra_tap_water_none(self, mock_coordinator, mock_device):
+        """Test is_on when extra_tap_water is None."""
+        mock_coordinator.data["settings"]["extra_tap_water"] = None
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is False
 
@@ -157,7 +142,7 @@ class TestQvantumSwitchEntity:
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test entity availability when data exists."""
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = 1234567890
+        mock_coordinator.data["settings"]["extra_tap_water"] = "on"
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is True
 
@@ -172,11 +157,9 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is False
 
-    def test_available_extra_tap_water_with_stop_data(
-        self, mock_coordinator, mock_device
-    ):
-        """Test availability for extra_tap_water when stop data exists."""
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = 1234567890
+    def test_available_extra_tap_water_with_data(self, mock_coordinator, mock_device):
+        """Test availability for extra_tap_water when data exists."""
+        mock_coordinator.data["settings"]["extra_tap_water"] = "on"
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is True
 
@@ -184,15 +167,15 @@ class TestQvantumSwitchEntity:
         self, mock_coordinator, mock_device
     ):
         """Test availability for extra_tap_water when stop data is missing."""
-        # Remove extra_tap_water_stop from settings
-        if "extra_tap_water_stop" in mock_coordinator.data["settings"]:
-            del mock_coordinator.data["settings"]["extra_tap_water_stop"]
+        # Remove extra_tap_water from settings
+        if "extra_tap_water" in mock_coordinator.data["settings"]:
+            del mock_coordinator.data["settings"]["extra_tap_water"]
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is False
 
-    def test_available_extra_tap_water_stop_none(self, mock_coordinator, mock_device):
-        """Test availability for extra_tap_water when stop data is None."""
-        mock_coordinator.data["settings"]["extra_tap_water_stop"] = None
+    def test_available_extra_tap_water_none(self, mock_coordinator, mock_device):
+        """Test availability for extra_tap_water when data is None."""
+        mock_coordinator.data["settings"]["extra_tap_water"] = None
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is False
 

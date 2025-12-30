@@ -557,6 +557,7 @@ class TestSensorSetup:
         await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
 
         # Verify that async_update_entity was called for all disabled entities that are actually created
+
         assert mock_entity_registry.async_update_entity.call_count == expected_calls
 
         # Verify calls were made with correct parameters
