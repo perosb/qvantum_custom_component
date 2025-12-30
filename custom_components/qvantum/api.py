@@ -208,28 +208,54 @@ class QvantumAPI:
             _LOGGER.debug(f"Response received {response.status}: {data}")
             return data
 
+    async def _send_command(self, device_id: str, payload: dict):
+        """Send a command to a device."""
+
+        wrapped_payload = {"command": payload}
+        _LOGGER.debug(json.dumps(wrapped_payload))
+
+        await self._ensure_valid_token()
+
+        async with self._session.post(
+            f"{self._api_url}/api/commands/v1/devices/{device_id}/commands?wait=true&use_internal_names=true",
+            json=wrapped_payload,
+            headers=self._request_headers(),
+        ) as response:
+            data = await response.json()
+            _LOGGER.debug(f"Response received {response.status}: {data}")
+            return data
+
     async def set_extra_tap_water(self, device_id: str, minutes: int):
         """Update extra_tap_water setting."""
 
-        if minutes == 0:
-            stop_time = 0
-        elif minutes > 0:
-            stop_time = int((datetime.now() + timedelta(minutes=minutes)).timestamp())
-        else:
-            stop_time = -1  # -1 means "always on"
+        # Capture current time once to ensure consistency across all code paths
+        current_time = datetime.now()
 
-        dhw_mode = 2 if minutes != 0 else 1
+        if minutes == 0:
+            # Cancel extra tap water
+            stop_time = int(current_time.timestamp())
+            indefinite = False
+            cancel = True
+        elif minutes > 0:
+            # Set specific duration
+            stop_time = int((current_time + timedelta(minutes=minutes)).timestamp())
+            indefinite = False
+            cancel = False
+        else:
+            # Set indefinite (always on)
+            stop_time = -1
+            indefinite = True
+            cancel = False
 
         payload = {
-            "settings": [
-                {"name": "extra_tap_water_stop", "value": stop_time},
-                {"name": "dhw_mode", "value": dhw_mode},
-                # Note: API expects boolean values for setting, but returns "on"/"off" strings when reading
-                {"name": "extra_tap_water", "value": minutes != 0},
-            ]
+            "set_additional_hot_water": {
+                "stopTime": stop_time,
+                "indefinite": indefinite,
+                "cancel": cancel,
+            }
         }
 
-        return await self._update_settings(device_id, payload)
+        return await self._send_command(device_id, payload)
 
     async def set_indoor_temperature_offset(self, device_id: str, value: int):
         """Update indoor_temperature_offset setting."""

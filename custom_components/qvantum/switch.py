@@ -73,7 +73,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
             case "extra_tap_water":
                 response = await self.coordinator.api.set_extra_tap_water(self._hpid, 0)
                 await handle_setting_update_response(
-                    response, self.coordinator, data_section=None, key=None, value=None
+                    response, self.coordinator, "settings", self._metric_key, "off"
                 )
 
             case "enable_sc_dhw" | "enable_sc_sh":
@@ -100,7 +100,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     self._hpid, -1
                 )
                 await handle_setting_update_response(
-                    response, self.coordinator, data_section=None, key=None, value=None
+                    response, self.coordinator, "settings", self._metric_key, "on"
                 )
 
             case "enable_sc_dhw" | "enable_sc_sh":
