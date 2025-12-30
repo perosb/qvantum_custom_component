@@ -126,6 +126,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
 
         match self._metric_key:
             case "extra_tap_water":
+                # Note: API sets boolean values but returns "on"/"off" strings when reading
                 value = self.coordinator.data.get("settings", {}).get("extra_tap_water")
                 return value == "on"
 
