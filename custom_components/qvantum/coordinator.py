@@ -19,6 +19,7 @@ from .const import (
     SETTING_UPDATE_APPLIED,
     DEFAULT_ENABLED_METRICS,
     DEFAULT_DISABLED_METRICS,
+    REQUIRED_METRICS,
 )
 import traceback
 
@@ -89,13 +90,23 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(
                 "Enabled metrics for device %s: %s", device_id, list(enabled_metrics)
             )
-            # If no enabled metrics found from entities, fall back to defaults
-            return list(enabled_metrics) if enabled_metrics else DEFAULT_ENABLED_METRICS
+            # Always include required metrics
+            final_metrics = set(REQUIRED_METRICS)
+            if enabled_metrics:
+                # If there are enabled entity metrics, include them
+                final_metrics.update(enabled_metrics)
+            else:
+                # If no entity metrics, include all default metrics
+                final_metrics.update(DEFAULT_ENABLED_METRICS)
+            return sorted(final_metrics)
         _LOGGER.debug(
             "No device registry entry found for device %s, returning all DEFAULT_ENABLED_METRICS",
             device_id,
         )
-        return DEFAULT_ENABLED_METRICS
+        # Always include required metrics
+        final_metrics = set(DEFAULT_ENABLED_METRICS)
+        final_metrics.update(REQUIRED_METRICS)
+        return sorted(final_metrics)
 
     async def async_update_data(self):
         """Fetch data from API endpoint."""

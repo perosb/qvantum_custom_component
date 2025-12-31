@@ -10,6 +10,7 @@ from custom_components.qvantum.coordinator import (
 from custom_components.qvantum.const import (
     DEFAULT_ENABLED_METRICS,
     DOMAIN,
+    REQUIRED_METRICS,
 )
 
 
@@ -155,6 +156,10 @@ class TestQvantumDataUpdateCoordinator:
         assert "bt2" in result
         assert "bt4" not in result  # Disabled entity should not be included
 
+        # Verify that all REQUIRED_METRICS are always included
+        for metric in REQUIRED_METRICS:
+            assert metric in result
+
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_no_device_found(self, mock_super_init):
         """Test _get_enabled_metrics when no device is found in registry."""
@@ -176,8 +181,9 @@ class TestQvantumDataUpdateCoordinator:
 
         result = coordinator._get_enabled_metrics("test_device")
 
-        # Should return DEFAULT_ENABLED_METRICS
-        assert result == DEFAULT_ENABLED_METRICS
+        # Should return DEFAULT_ENABLED_METRICS plus REQUIRED_METRICS
+        expected_metrics = set(DEFAULT_ENABLED_METRICS) | set(REQUIRED_METRICS)
+        assert set(result) == expected_metrics
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_no_matching_entities(self, mock_super_init):
@@ -218,5 +224,6 @@ class TestQvantumDataUpdateCoordinator:
 
         result = coordinator._get_enabled_metrics("test_device")
 
-        # Should return DEFAULT_ENABLED_METRICS since no matching entities found
-        assert result == DEFAULT_ENABLED_METRICS
+        # Should return DEFAULT_ENABLED_METRICS plus REQUIRED_METRICS since no matching entities found
+        expected_metrics = set(DEFAULT_ENABLED_METRICS) | set(REQUIRED_METRICS)
+        assert set(result) == expected_metrics
