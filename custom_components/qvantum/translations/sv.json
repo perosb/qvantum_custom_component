@@ -16,7 +16,7 @@
         }
       },
       "smart_sh_mode": {
-        "name": "Smart SH mode",
+        "name": "Smart SH läge",
         "state": {
           "0": "Eko",
           "1": "Balanserat",
@@ -24,7 +24,7 @@
         }
       },
       "smart_dhw_mode": {
-        "name": "Smart DHW mode",
+        "name": "Smart DHW läge",
         "state": {
           "0": "Eko",
           "1": "Balanserat",
@@ -226,7 +226,7 @@
         "name": "Room temperature external"
       },
       "smart_sh_mode": {
-        "name": "Smart SH mode",
+        "name": "Smart SH läge",
         "state": {
           "0": "Eko",
           "1": "Balanserat",
@@ -364,6 +364,14 @@
       },
       "smart_dhw_status": {
         "name": "Smart status för varmvatten"
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW läge",
+        "state": {
+          "0": "Eko",
+          "1": "Balanserat",
+          "2": "Komfort"
+        }
       },
       "latency": {
         "name": "Latens"

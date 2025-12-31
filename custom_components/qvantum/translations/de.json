@@ -287,6 +287,14 @@
       "smart_dhw_status": {
         "name": "Intelligenter Status für Brauchwasser"
       },
+      "smart_dhw_mode": {
+        "name": "Smart DHW Modus",
+        "state": {
+          "0": "Eco",
+          "1": "Ausgewogen",
+          "2": "Komfort"
+        }
+      },
       "extra_tap_water_stop": {
         "name": "Extra Brauchwasser Stopp"
       },
