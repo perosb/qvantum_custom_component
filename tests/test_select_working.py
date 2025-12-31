@@ -164,6 +164,10 @@ class TestQvantumSelectEntity:
         # Should be available when data exists
         assert entity.available is True
 
+        # Should still be available when use_adaptive is False
+        mock_coordinator.data["metrics"]["use_adaptive"] = False
+        assert entity.available is True
+
         # Should not be available when coordinator data is None
         mock_coordinator.data = None
         assert entity.available is False
