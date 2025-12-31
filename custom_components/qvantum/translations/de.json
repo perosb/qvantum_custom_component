@@ -30,7 +30,7 @@
     },
     "select": {
       "use_adaptive": {
-        "name": "Smart Control",
+        "name": "SmartControl",
         "state": {
           "-1": "Aus",
           "0": "Eco",
