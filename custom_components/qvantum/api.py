@@ -2,7 +2,8 @@
 
 import aiohttp
 from datetime import datetime, timedelta
-import logging, json
+import logging
+import json
 from typing import Optional
 
 from .const import (
@@ -10,8 +11,6 @@ from .const import (
     FAN_SPEED_VALUE_NORMAL,
     FAN_SPEED_VALUE_EXTRA,
     DEFAULT_ENABLED_METRICS,
-    DEFAULT_DISABLED_METRICS,
-    DOMAIN,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
 
