@@ -92,66 +92,12 @@ class TestQvantumAPI:
         mock_response.headers = {"ETag": "etag123"}
         authenticated_api._session.get.return_value = cm
 
-        authenticated_api.get_available_metrics = AsyncMock(return_value=["bt1", "bt2"])
-
         result = await authenticated_api.get_metrics("test_device")
 
         assert "metrics" in result
         assert result["metrics"]["bt1"] == metrics_data["values"]["bt1"]
         assert result["metrics"]["bt2"] == metrics_data["values"]["bt2"]
         assert result["metrics"]["latency"] == metrics_data["total_latency"]
-
-    @pytest.mark.asyncio
-    async def test_get_available_metrics_with_registry(self):
-        """Test getting available metrics when device registry exists."""
-        api = QvantumAPI("test@example.com", "password", "test-agent")
-
-        # Mock hass and registries
-        mock_hass = MagicMock()
-        mock_device_registry = MagicMock()
-        mock_entity_registry = MagicMock()
-
-        # Mock device
-        mock_device = MagicMock()
-        mock_device.id = "device_id"
-        mock_device.identifiers = {("qvantum", "qvantum-test_device")}
-        mock_device_registry.devices.values.return_value = [mock_device]
-
-        # Mock entity
-        mock_entity = MagicMock()
-        mock_entity.device_id = "device_id"
-        mock_entity.disabled_by = None
-        mock_entity.unique_id = "qvantum_bt1_test_device"
-        mock_entity_registry.entities.values.return_value = [mock_entity]
-
-        mock_hass.data = {
-            "device_registry": mock_device_registry,
-            "entity_registry": mock_entity_registry,
-        }
-        api.hass = mock_hass
-
-        result = await api.get_available_metrics("test_device")
-
-        assert "bt1" in result
-
-    @pytest.mark.asyncio
-    async def test_get_available_metrics_no_registry(self):
-        """Test getting available metrics when no device registry found."""
-        api = QvantumAPI("test@example.com", "password", "test-agent")
-
-        mock_hass = MagicMock()
-        mock_device_registry = MagicMock()
-        mock_device_registry.devices.values.return_value = []
-
-        mock_hass.data = {"device_registry": mock_device_registry}
-        api.hass = mock_hass
-
-        result = await api.get_available_metrics("test_device")
-
-        # Should return DEFAULT_ENABLED_METRICS
-        assert "bt1" in result
-        assert "bt2" in result
-        assert len(result) > 2
 
     @pytest.mark.asyncio
     async def test_set_tap_water(self, mock_session):
@@ -309,7 +255,6 @@ class TestQvantumAPI:
         api._token = "old_token"
         api._token_expiry = datetime.datetime.now() - datetime.timedelta(hours=1)
         api._refreshtoken = "refresh_token"
-        api.get_available_metrics = AsyncMock(return_value=["bt1", "bt2"])
 
         result = await api.get_metrics("test_device")
 
@@ -327,7 +272,6 @@ class TestQvantumAPI:
         )
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
-        api.get_available_metrics = AsyncMock(return_value=["bt1"])
 
         with pytest.raises(Exception):  # APIAuthError
             await api.get_metrics("test_device")
@@ -344,7 +288,6 @@ class TestQvantumAPI:
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
         api._metrics_etag = "etag123"
-        api.get_available_metrics = AsyncMock(return_value=["bt1"])
 
         result = await api.get_metrics("test_device")
 
@@ -838,7 +781,6 @@ class TestQvantumAPI:
         )
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
-        api.get_available_metrics = AsyncMock(return_value=["bt1"])
 
         with pytest.raises(Exception):  # APIConnectionError
             await api.get_metrics("test_device")
@@ -854,11 +796,78 @@ class TestQvantumAPI:
         )
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
-        api.get_available_metrics = AsyncMock(return_value=["bt1"])
 
         result = await api.get_metrics("test_device")
 
         assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_with_custom_enabled_metrics(self, authenticated_api):
+        """Test getting metrics with custom enabled_metrics list."""
+        metrics_data = load_test_data("metrics_test_device.json")
+
+        cm, mock_response = authenticated_api._session.make_cm_response(
+            status=200, json_data=metrics_data, headers={"ETag": "etag123"}
+        )
+        mock_response.headers = {"ETag": "etag123"}
+        authenticated_api._session.get.return_value = cm
+
+        # Test with custom enabled metrics list
+        custom_metrics = ["bt1", "latency"]
+        result = await authenticated_api.get_metrics(
+            "test_device", enabled_metrics=custom_metrics
+        )
+
+        assert "metrics" in result
+        assert "bt1" in result["metrics"]
+        assert "bt2" not in result["metrics"]  # bt2 should not be included
+        assert result["metrics"]["bt1"] == metrics_data["values"]["bt1"]
+        assert result["metrics"]["latency"] == metrics_data["total_latency"]
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_with_empty_enabled_metrics(self, authenticated_api):
+        """Test getting metrics with empty enabled_metrics list."""
+        metrics_data = load_test_data("metrics_test_device.json")
+
+        cm, mock_response = authenticated_api._session.make_cm_response(
+            status=200, json_data=metrics_data, headers={"ETag": "etag123"}
+        )
+        mock_response.headers = {"ETag": "etag123"}
+        authenticated_api._session.get.return_value = cm
+
+        # Test with empty enabled metrics list
+        result = await authenticated_api.get_metrics("test_device", enabled_metrics=[])
+
+        assert "metrics" in result
+        # Should only contain hpid and latency (no actual metrics)
+        assert "hpid" in result["metrics"]
+        assert result["metrics"]["hpid"] == "test_device"
+        assert result["metrics"]["latency"] == metrics_data["total_latency"]
+        # No bt1 or bt2 should be present
+        assert "bt1" not in result["metrics"]
+        assert "bt2" not in result["metrics"]
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_with_none_enabled_metrics(self, authenticated_api):
+        """Test getting metrics with None enabled_metrics (should use defaults)."""
+        metrics_data = load_test_data("metrics_test_device.json")
+
+        cm, mock_response = authenticated_api._session.make_cm_response(
+            status=200, json_data=metrics_data, headers={"ETag": "etag123"}
+        )
+        mock_response.headers = {"ETag": "etag123"}
+        authenticated_api._session.get.return_value = cm
+
+        # Test with None enabled_metrics (should default to DEFAULT_ENABLED_METRICS)
+        result = await authenticated_api.get_metrics(
+            "test_device", enabled_metrics=None
+        )
+
+        assert "metrics" in result
+        # Should contain default metrics
+        assert result["metrics"]["bt1"] == metrics_data["values"]["bt1"]
+        assert result["metrics"]["bt2"] == metrics_data["values"]["bt2"]
+        assert result["metrics"]["latency"] == metrics_data["total_latency"]
 
     @pytest.mark.asyncio
     async def test_update_settings_non_200_response(self, mock_session):

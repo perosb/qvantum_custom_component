@@ -106,23 +106,11 @@ class QvantumSelectEntity(CoordinatorEntity, SelectEntity):
 
         metrics = self.coordinator.data.get("metrics", {})
         use_adaptive = metrics.get(self._metric_key)
-
-        _LOGGER.debug(
-            "Current option calculation for %s: use_adaptive=%s",
-            self._metric_key,
-            use_adaptive,
-        )
-
         if use_adaptive is False:
             return "off"  # Off
 
         smart_sh_mode = metrics.get("smart_sh_mode")
         smart_dhw_mode = metrics.get("smart_dhw_mode")
-        _LOGGER.debug(
-            "Determining current option: smart_sh_mode=%s, smart_dhw_mode=%s",
-            smart_sh_mode,
-            smart_dhw_mode,
-        )
 
         # Normal, consistent cases where both modes match
         if smart_sh_mode == 0 and smart_dhw_mode == 0:

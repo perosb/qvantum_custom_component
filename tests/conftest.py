@@ -147,7 +147,4 @@ async def authenticated_api():
     api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
     api._refreshtoken = "test_refresh"
 
-    # Mock get_available_metrics
-    api.get_available_metrics = AsyncMock(return_value=["bt1", "bt2"])
-
     return api
