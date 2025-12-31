@@ -99,19 +99,14 @@ class TestHandleSettingUpdateResponse:
 class TestQvantumDataUpdateCoordinator:
     """Test the QvantumDataUpdateCoordinator class."""
 
-    @pytest.mark.asyncio
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
-    @patch("homeassistant.helpers.device_registry.async_get", new_callable=AsyncMock)
-    @patch("homeassistant.helpers.entity_registry.async_get", new_callable=AsyncMock)
-    async def test_get_enabled_metrics_with_device_found(
-        self, mock_entity_async_get, mock_device_async_get, mock_super_init
-    ):
+    def test_get_enabled_metrics_with_device_found(self, mock_super_init):
         """Test _get_enabled_metrics when device is found in registry."""
-        # Create mock registries
+        # Create mock hass with registries and API
+        mock_hass = MagicMock()
         mock_device_registry = MagicMock()
         mock_entity_registry = MagicMock()
-        mock_device_async_get.return_value = mock_device_registry
-        mock_entity_async_get.return_value = mock_entity_registry
+        mock_api = MagicMock()
 
         # Mock device
         mock_device = MagicMock()
@@ -141,10 +136,11 @@ class TestQvantumDataUpdateCoordinator:
             mock_entity3,
         ]
 
-        # Create mock hass
-        mock_hass = MagicMock()
-        mock_api = MagicMock()
-        mock_hass.data = {DOMAIN: mock_api}
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": mock_device_registry,
+            "entity_registry": mock_entity_registry,
+        }
 
         # Create coordinator with mocked __init__
         mock_super_init.return_value = None
@@ -154,31 +150,22 @@ class TestQvantumDataUpdateCoordinator:
         coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
         coordinator.hass = mock_hass
 
-        result = await coordinator._get_enabled_metrics("test_device")
+        result = coordinator._get_enabled_metrics("test_device")
 
         assert "bt1" in result
         assert "bt2" in result
         assert "bt3" not in result  # Disabled entity should not be included
 
-    @pytest.mark.asyncio
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
-    @patch("homeassistant.helpers.device_registry.async_get", new_callable=AsyncMock)
-    @patch("homeassistant.helpers.entity_registry.async_get", new_callable=AsyncMock)
-    async def test_get_enabled_metrics_no_device_found(
-        self, mock_entity_async_get, mock_device_async_get, mock_super_init
-    ):
+    def test_get_enabled_metrics_no_device_found(self, mock_super_init):
         """Test _get_enabled_metrics when no device is found in registry."""
-        # Create mock registries
+        # Create mock hass with empty registries
+        mock_hass = MagicMock()
         mock_device_registry = MagicMock()
-        mock_entity_registry = MagicMock()
-        mock_device_async_get.return_value = mock_device_registry
-        mock_entity_async_get.return_value = mock_entity_registry
+        mock_api = MagicMock()
         mock_device_registry.devices.values.return_value = []
 
-        # Create mock hass
-        mock_hass = MagicMock()
-        mock_api = MagicMock()
-        mock_hass.data = {DOMAIN: mock_api}
+        mock_hass.data = {DOMAIN: mock_api, "device_registry": mock_device_registry}
 
         # Create coordinator with mocked __init__
         mock_super_init.return_value = None
@@ -188,24 +175,19 @@ class TestQvantumDataUpdateCoordinator:
         coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
         coordinator.hass = mock_hass
 
-        result = await coordinator._get_enabled_metrics("test_device")
+        result = coordinator._get_enabled_metrics("test_device")
 
         # Should return DEFAULT_ENABLED_METRICS
         assert result == DEFAULT_ENABLED_METRICS
 
-    @pytest.mark.asyncio
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
-    @patch("homeassistant.helpers.device_registry.async_get", new_callable=AsyncMock)
-    @patch("homeassistant.helpers.entity_registry.async_get", new_callable=AsyncMock)
-    async def test_get_enabled_metrics_no_matching_entities(
-        self, mock_entity_async_get, mock_device_async_get, mock_super_init
-    ):
+    def test_get_enabled_metrics_no_matching_entities(self, mock_super_init):
         """Test _get_enabled_metrics when device exists but no matching entities."""
-        # Create mock registries
+        # Create mock hass with registries
+        mock_hass = MagicMock()
         mock_device_registry = MagicMock()
         mock_entity_registry = MagicMock()
-        mock_device_async_get.return_value = mock_device_registry
-        mock_entity_async_get.return_value = mock_entity_registry
+        mock_api = MagicMock()
 
         # Mock device
         mock_device = MagicMock()
@@ -221,10 +203,11 @@ class TestQvantumDataUpdateCoordinator:
 
         mock_entity_registry.entities.values.return_value = [mock_entity]
 
-        # Create mock hass
-        mock_hass = MagicMock()
-        mock_api = MagicMock()
-        mock_hass.data = {DOMAIN: mock_api}
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": mock_device_registry,
+            "entity_registry": mock_entity_registry,
+        }
 
         # Create coordinator with mocked __init__
         mock_super_init.return_value = None
@@ -234,7 +217,7 @@ class TestQvantumDataUpdateCoordinator:
         coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
         coordinator.hass = mock_hass
 
-        result = await coordinator._get_enabled_metrics("test_device")
+        result = coordinator._get_enabled_metrics("test_device")
 
         # Should return empty list since no matching entities
         assert result == []
