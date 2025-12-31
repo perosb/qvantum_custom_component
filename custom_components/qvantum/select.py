@@ -23,10 +23,10 @@ async def async_setup_entry(
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo = config_entry.runtime_data.device
 
-    sensors = []
-    sensors.append(QvantumSelectEntity(coordinator, "use_adaptive", device))
+    entities = []
+    entities.append(QvantumSelectEntity(coordinator, "use_adaptive", device))
 
-    async_add_entities(sensors)
+    async_add_entities(entities)
 
     _LOGGER.debug("Setting up platform SELECT")
 
