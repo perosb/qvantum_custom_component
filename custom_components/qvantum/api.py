@@ -330,7 +330,7 @@ class QvantumAPI:
             "settings": [{"name": "tap_water_capacity_target", "value": capacity}]
         }
 
-        _LOGGER.debug(f"Setting tap water capacity target to {capacity}.")
+        _LOGGER.debug("Setting tap water capacity target to %s.", capacity)
         return await self._update_settings(device_id, payload)
 
     async def set_tap_water(self, device_id: str, stop: int = 0, start: int = 0):
@@ -489,7 +489,7 @@ class QvantumAPI:
                 case 200:
                     self._settings_data = await response.json()
                     self._settings_etag = response.headers.get("ETag")
-                    _LOGGER.debug(f"Settings fetched: {self._settings_data}")
+                    _LOGGER.debug("Settings fetched: %s", self._settings_data)
                 case 403:
                     await self.unauthenticate()
                     raise APIAuthError(response)
@@ -501,7 +501,7 @@ class QvantumAPI:
                     raise APIConnectionError(response)
                 case _:
                     _LOGGER.error(
-                        f"Failed to fetch settings, status: {response.status}"
+                        "Failed to fetch settings, status: %s", response.status
                     )
                     self._settings_data = {}
 
