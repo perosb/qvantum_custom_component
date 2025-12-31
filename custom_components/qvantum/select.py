@@ -181,8 +181,5 @@ class QvantumSelectEntity(CoordinatorEntity, SelectEntity):
         if not self.coordinator.data:
             return False
 
-        return (
-            self._metric_key in self.coordinator.data.get("metrics", {})
-            and self.coordinator.data.get("metrics", {}).get(self._metric_key)
-            is not None
-        )
+        metrics = self.coordinator.data.get("metrics") or {}
+        return self._metric_key in metrics
