@@ -26,12 +26,13 @@ async def async_setup_entry(
     sensors = []
     sensors.append(QvantumSwitchEntity(coordinator, "extra_tap_water", device))
 
+    # Manual operation mode related switches
     sensors.append(QvantumSwitchEntity(coordinator, "op_mode", device))
     sensors.append(QvantumSwitchEntity(coordinator, "op_man_dhw", device))
     sensors.append(QvantumSwitchEntity(coordinator, "op_man_addition", device))
     sensors.append(QvantumSwitchEntity(coordinator, "man_mode", device))
 
-    sensors.append(QvantumSwitchEntity(coordinator, "use_adaptive", device))
+    # SmartControl related switches
     sensors.append(QvantumSwitchEntity(coordinator, "enable_sc_sh", device))
     sensors.append(QvantumSwitchEntity(coordinator, "enable_sc_dhw", device))
 
@@ -80,7 +81,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     response, self.coordinator, "settings", self._metric_key, "off"
                 )
 
-            case "enable_sc_dhw" | "enable_sc_sh" | "use_adaptive":
+            case "enable_sc_dhw" | "enable_sc_sh":
                 response = await self.coordinator.api.update_setting(
                     self._hpid, self._metric_key, False
                 )
@@ -107,7 +108,7 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
                     response, self.coordinator, "settings", self._metric_key, "on"
                 )
 
-            case "enable_sc_dhw" | "enable_sc_sh" | "use_adaptive":
+            case "enable_sc_dhw" | "enable_sc_sh":
                 response = await self.coordinator.api.update_setting(
                     self._hpid, self._metric_key, True
                 )

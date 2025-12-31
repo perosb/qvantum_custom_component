@@ -21,14 +21,38 @@
       "man_mode": {
         "name": "Manual Operation Mode: Heating"
       },
-      "use_adaptive": {
-        "name": "SmartControl"
-      },
       "enable_sc_dhw": {
         "name": "SmartControl: DHW"
       },
       "enable_sc_sh": {
         "name": "SmartControl: Heating"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "SmartControl",
+        "state": {
+          "off": "Off",
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH mode",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW mode",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
       }
     },
     "button": {

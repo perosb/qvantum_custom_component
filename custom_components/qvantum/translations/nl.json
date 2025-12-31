@@ -21,14 +21,38 @@
       "man_mode": {
         "name": "Handmatige Bedrijfsmodus: Verwarming"
       },
-      "use_adaptive": {
-        "name": "SmartControl"
-      },
       "enable_sc_dhw": {
         "name": "SmartControl: WTW"
       },
       "enable_sc_sh": {
         "name": "SmartControl: Verwarming"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "SmartControl",
+        "state": {
+          "off": "Uit",
+          "0": "Eco",
+          "1": "Gebalanceerd",
+          "2": "Comfort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH modus",
+        "state": {
+          "0": "Eco",
+          "1": "Gebalanceerd",
+          "2": "Comfort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW modus",
+        "state": {
+          "0": "Eco",
+          "1": "Gebalanceerd",
+          "2": "Comfort"
+        }
       }
     },
     "button": {

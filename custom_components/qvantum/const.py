@@ -49,6 +49,8 @@ DEFAULT_ENABLED_METRICS = [
     "enable_sc_dhw",
     "enable_sc_sh",
     "use_adaptive",
+    "smart_sh_mode",
+    "smart_dhw_mode",
 ]
 
 DEFAULT_DISABLED_METRICS = [
@@ -79,7 +81,6 @@ DEFAULT_DISABLED_METRICS = [
     "price_region",
     "qn8position",
     "room_temp_ext",
-    "smart_sh_mode",
     "dhwdemand",
     "heatingdemand",
     "coolingdemand",

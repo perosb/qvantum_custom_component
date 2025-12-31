@@ -21,14 +21,38 @@
       "man_mode": {
         "name": "Manueller Betriebsmodus: Heizung"
       },
-      "use_adaptive": {
-        "name": "SmartControl"
-      },
       "enable_sc_dhw": {
         "name": "SmartControl: Brauchwasser"
       },
       "enable_sc_sh": {
         "name": "SmartControl: Heizung"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "SmartControl",
+        "state": {
+          "off": "Aus",
+          "0": "Eco",
+          "1": "Ausgewogen",
+          "2": "Komfort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH Modus",
+        "state": {
+          "0": "Eco",
+          "1": "Ausgewogen",
+          "2": "Komfort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW Modus",
+        "state": {
+          "0": "Eco",
+          "1": "Ausgewogen",
+          "2": "Komfort"
+        }
       }
     },
     "button": {

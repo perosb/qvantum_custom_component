@@ -5,6 +5,33 @@
     }
   },
   "entity": {
+    "select": {
+      "use_adaptive": {
+        "name": "SmartControl",
+        "state": {
+          "off": "Av",
+          "0": "Eko",
+          "1": "Balanserat",
+          "2": "Komfort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH mode",
+        "state": {
+          "0": "Eko",
+          "1": "Balanserat",
+          "2": "Komfort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW mode",
+        "state": {
+          "0": "Eko",
+          "1": "Balanserat",
+          "2": "Komfort"
+        }
+      }
+    },
     "switch": {
       "extra_tap_water": {
         "name": "Extra varmvatten"
