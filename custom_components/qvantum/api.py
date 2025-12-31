@@ -402,7 +402,9 @@ class QvantumAPI:
         _LOGGER.debug(f"Device metadata fetched: {self._device_metadata}")
         return self._device_metadata
 
-    async def get_metrics(self, device_id: str, method="now"):
+    async def get_metrics(
+        self, device_id: str, method="now", enabled_metrics: Optional[list[str]] = None
+    ):
         """Fetch data from the API with authentication."""
 
         await self._ensure_valid_token()
@@ -410,7 +412,9 @@ class QvantumAPI:
         if self._metrics_etag:
             headers["If-None-Match"] = self._metrics_etag
 
-        names = await self.get_available_metrics(device_id)
+        names = (
+            enabled_metrics if enabled_metrics is not None else DEFAULT_ENABLED_METRICS
+        )
         names_list = ""
         for metric_name in names:
             names_list += f"&names[]={metric_name}"
@@ -468,39 +472,6 @@ class QvantumAPI:
                     _LOGGER.debug(f"Failed to fetch data, status: {response}")
 
         return self._metrics_data
-
-    async def get_available_metrics(self, device_id: str):
-        """Fetch metrics from the API with authentication."""
-
-        device_registry = self.hass.data["device_registry"]
-        device_reg_id = None
-        for device in device_registry.devices.values():
-            if (DOMAIN, f"qvantum-{device_id}") in device.identifiers:
-                device_reg_id = device.id
-                break
-        if device_reg_id:
-            registry = self.hass.data["entity_registry"]
-            enabled_metrics = set()
-            for entity in registry.entities.values():
-                if (
-                    entity.device_id == device_reg_id
-                    and entity.disabled_by is None
-                    and entity.unique_id.startswith("qvantum_")
-                    and entity.unique_id.endswith(f"_{device_id}")
-                ):
-                    metric_key = entity.unique_id[
-                        len("qvantum_") : -len(f"_{device_id}")
-                    ]
-                    if metric_key in DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_METRICS:
-                        enabled_metrics.add(metric_key)
-            _LOGGER.debug(
-                f"Enabled metrics for device {device_id}: {list(enabled_metrics)}"
-            )
-            return list(enabled_metrics)
-        _LOGGER.debug(
-            f"No device registry entry found for device {device_id}, returning all DEFAULT_ENABLED_METRICS"
-        )
-        return DEFAULT_ENABLED_METRICS
 
     async def get_settings(self, device_id: str):
         """Fetch settings from the API with authentication."""

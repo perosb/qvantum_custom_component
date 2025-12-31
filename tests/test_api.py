@@ -92,66 +92,12 @@ class TestQvantumAPI:
         mock_response.headers = {"ETag": "etag123"}
         authenticated_api._session.get.return_value = cm
 
-        authenticated_api.get_available_metrics = AsyncMock(return_value=["bt1", "bt2"])
-
         result = await authenticated_api.get_metrics("test_device")
 
         assert "metrics" in result
         assert result["metrics"]["bt1"] == metrics_data["values"]["bt1"]
         assert result["metrics"]["bt2"] == metrics_data["values"]["bt2"]
         assert result["metrics"]["latency"] == metrics_data["total_latency"]
-
-    @pytest.mark.asyncio
-    async def test_get_available_metrics_with_registry(self):
-        """Test getting available metrics when device registry exists."""
-        api = QvantumAPI("test@example.com", "password", "test-agent")
-
-        # Mock hass and registries
-        mock_hass = MagicMock()
-        mock_device_registry = MagicMock()
-        mock_entity_registry = MagicMock()
-
-        # Mock device
-        mock_device = MagicMock()
-        mock_device.id = "device_id"
-        mock_device.identifiers = {("qvantum", "qvantum-test_device")}
-        mock_device_registry.devices.values.return_value = [mock_device]
-
-        # Mock entity
-        mock_entity = MagicMock()
-        mock_entity.device_id = "device_id"
-        mock_entity.disabled_by = None
-        mock_entity.unique_id = "qvantum_bt1_test_device"
-        mock_entity_registry.entities.values.return_value = [mock_entity]
-
-        mock_hass.data = {
-            "device_registry": mock_device_registry,
-            "entity_registry": mock_entity_registry,
-        }
-        api.hass = mock_hass
-
-        result = await api.get_available_metrics("test_device")
-
-        assert "bt1" in result
-
-    @pytest.mark.asyncio
-    async def test_get_available_metrics_no_registry(self):
-        """Test getting available metrics when no device registry found."""
-        api = QvantumAPI("test@example.com", "password", "test-agent")
-
-        mock_hass = MagicMock()
-        mock_device_registry = MagicMock()
-        mock_device_registry.devices.values.return_value = []
-
-        mock_hass.data = {"device_registry": mock_device_registry}
-        api.hass = mock_hass
-
-        result = await api.get_available_metrics("test_device")
-
-        # Should return DEFAULT_ENABLED_METRICS
-        assert "bt1" in result
-        assert "bt2" in result
-        assert len(result) > 2
 
     @pytest.mark.asyncio
     async def test_set_tap_water(self, mock_session):
@@ -309,7 +255,6 @@ class TestQvantumAPI:
         api._token = "old_token"
         api._token_expiry = datetime.datetime.now() - datetime.timedelta(hours=1)
         api._refreshtoken = "refresh_token"
-        api.get_available_metrics = AsyncMock(return_value=["bt1", "bt2"])
 
         result = await api.get_metrics("test_device")
 
@@ -327,7 +272,6 @@ class TestQvantumAPI:
         )
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
-        api.get_available_metrics = AsyncMock(return_value=["bt1"])
 
         with pytest.raises(Exception):  # APIAuthError
             await api.get_metrics("test_device")
@@ -344,7 +288,6 @@ class TestQvantumAPI:
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
         api._metrics_etag = "etag123"
-        api.get_available_metrics = AsyncMock(return_value=["bt1"])
 
         result = await api.get_metrics("test_device")
 
@@ -838,7 +781,6 @@ class TestQvantumAPI:
         )
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
-        api.get_available_metrics = AsyncMock(return_value=["bt1"])
 
         with pytest.raises(Exception):  # APIConnectionError
             await api.get_metrics("test_device")
@@ -854,7 +796,6 @@ class TestQvantumAPI:
         )
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
-        api.get_available_metrics = AsyncMock(return_value=["bt1"])
 
         result = await api.get_metrics("test_device")
 

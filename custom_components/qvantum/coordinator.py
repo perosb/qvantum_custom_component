@@ -13,7 +13,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import APIAuthError
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, SETTING_UPDATE_APPLIED
+from .const import (
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    SETTING_UPDATE_APPLIED,
+    DEFAULT_ENABLED_METRICS,
+    DEFAULT_DISABLED_METRICS,
+)
 import traceback
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,13 +34,14 @@ async def handle_setting_update_response(
 ) -> None:
     """Handle API response for setting updates and update coordinator data if successful."""
     if api_response and (
-        api_response.get("status") == SETTING_UPDATE_APPLIED or
-        api_response.get("heatpump_status") == SETTING_UPDATE_APPLIED
+        api_response.get("status") == SETTING_UPDATE_APPLIED
+        or api_response.get("heatpump_status") == SETTING_UPDATE_APPLIED
     ):
         if data_section and key is not None:
             coordinator.data.get(data_section)[key] = value
             # async_set_updated_data is a synchronous method despite the name
             coordinator.async_set_updated_data(coordinator.data)
+
 
 class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
     """Qvantum coordinator."""
@@ -56,13 +63,48 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=self.poll_interval),
         )
 
+    def _get_enabled_metrics(self, device_id: str) -> list[str]:
+        """Get list of enabled metrics for a device based on entity registry."""
+        device_registry = self.hass.data["device_registry"]
+        device_reg_id = None
+        for device in device_registry.devices.values():
+            if (DOMAIN, f"qvantum-{device_id}") in device.identifiers:
+                device_reg_id = device.id
+                break
+        if device_reg_id:
+            registry = self.hass.data["entity_registry"]
+            enabled_metrics = set()
+            for entity in registry.entities.values():
+                if (
+                    entity.device_id == device_reg_id
+                    and entity.disabled_by is None
+                    and entity.unique_id.startswith("qvantum_")
+                    and entity.unique_id.endswith(f"_{device_id}")
+                ):
+                    metric_key = entity.unique_id[
+                        len("qvantum_") : -len(f"_{device_id}")
+                    ]
+                    if metric_key in DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_METRICS:
+                        enabled_metrics.add(metric_key)
+            _LOGGER.debug(
+                f"Enabled metrics for device {device_id}: {list(enabled_metrics)}"
+            )
+            return list(enabled_metrics)
+        _LOGGER.debug(
+            f"No device registry entry found for device {device_id}, returning all DEFAULT_ENABLED_METRICS"
+        )
+        return DEFAULT_ENABLED_METRICS
+
     async def async_update_data(self):
         """Fetch data from API endpoint."""
         try:
             if self._device is None:
                 self._device = await self.api.get_primary_device()
 
-            data = await self.api.get_metrics(self._device.get("id"))
+            enabled_metrics = self._get_enabled_metrics(self._device.get("id"))
+            data = await self.api.get_metrics(
+                self._device.get("id"), enabled_metrics=enabled_metrics
+            )
             settings = await self.api.get_settings(self._device.get("id"))
             data.update({"device": self._device})
 
