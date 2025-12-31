@@ -79,8 +79,9 @@ class QvantumAPI:
         """Close the session."""
         # Only close the session if we created it; externally-provided sessions
         # should be closed by their owner.
-        if getattr(self, "_session_owner", False):
+        if getattr(self, "_session_owner", False) and self._session:
             await self._session.close()
+            self._session = None
 
     async def unauthenticate(self):
         """Unauthenticate from the API."""

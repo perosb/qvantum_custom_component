@@ -89,7 +89,8 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(
                 f"Enabled metrics for device {device_id}: {list(enabled_metrics)}"
             )
-            return list(enabled_metrics)
+            # If no enabled metrics found from entities, fall back to defaults
+            return list(enabled_metrics) if enabled_metrics else DEFAULT_ENABLED_METRICS
         _LOGGER.debug(
             f"No device registry entry found for device {device_id}, returning all DEFAULT_ENABLED_METRICS"
         )
@@ -109,8 +110,15 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             data.update({"device": self._device})
 
             settings_dict = {}
-            for setting in settings.get("settings"):
-                settings_dict[setting.get("name")] = setting.get("value")
+            settings_list = settings.get("settings", [])
+            if isinstance(settings_list, list):
+                for setting in settings_list:
+                    if (
+                        isinstance(setting, dict)
+                        and "name" in setting
+                        and "value" in setting
+                    ):
+                        settings_dict[setting.get("name")] = setting.get("value")
 
             data.update({"settings": settings_dict})
 

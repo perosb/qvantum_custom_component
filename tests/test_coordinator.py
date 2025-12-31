@@ -219,5 +219,5 @@ class TestQvantumDataUpdateCoordinator:
 
         result = coordinator._get_enabled_metrics("test_device")
 
-        # Should return empty list since no matching entities
-        assert result == []
+        # Should return DEFAULT_ENABLED_METRICS since no matching entities found
+        assert result == DEFAULT_ENABLED_METRICS
