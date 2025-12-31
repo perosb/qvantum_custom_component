@@ -51,7 +51,7 @@ class QvantumSelectEntity(CoordinatorEntity, SelectEntity):
         match self._metric_key:
             case "use_adaptive":
                 self._attr_options = [
-                    "-1",
+                    "off",
                     "0",
                     "1",
                     "2",
@@ -82,7 +82,10 @@ class QvantumSelectEntity(CoordinatorEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Update the current value."""
         # Map option to smart control modes
-        mode_value = int(option)
+        if option == "off":
+            mode_value = -1
+        else:
+            mode_value = int(option)
         sh_mode = mode_value
         dhw_mode = mode_value
 
@@ -90,7 +93,7 @@ class QvantumSelectEntity(CoordinatorEntity, SelectEntity):
             self._hpid, sh_mode, dhw_mode
         )
         # Handle response for use_adaptive
-        use_adaptive_value = option != "-1"
+        use_adaptive_value = option != "off"
         await handle_setting_update_response(
             response, self.coordinator, "metrics", self._metric_key, use_adaptive_value
         )
@@ -111,7 +114,7 @@ class QvantumSelectEntity(CoordinatorEntity, SelectEntity):
         )
 
         if use_adaptive is False:
-            return "-1"  # Off
+            return "off"  # Off
 
         smart_sh_mode = metrics.get("smart_sh_mode")
         smart_dhw_mode = metrics.get("smart_dhw_mode")
@@ -173,7 +176,7 @@ class QvantumSelectEntity(CoordinatorEntity, SelectEntity):
             smart_sh_mode,
             smart_dhw_mode,
         )
-        return "-1"  # Off (fallback when data is inconsistent/invalid)
+        return "off"  # Off (fallback when data is inconsistent/invalid)
 
     @property
     def available(self):

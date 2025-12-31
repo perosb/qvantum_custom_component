@@ -9,7 +9,7 @@
       "use_adaptive": {
         "name": "SmartControl",
         "state": {
-          "-1": "Av",
+          "off": "Av",
           "0": "Eko",
           "1": "Balanserat",
           "2": "Komfort"

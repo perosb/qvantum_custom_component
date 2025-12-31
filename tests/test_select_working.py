@@ -77,7 +77,7 @@ class TestQvantumSelectEntity:
         assert entity._attr_unique_id == "qvantum_use_adaptive_test_device_123"
         assert entity._attr_device_info == mock_device
         assert entity._attr_has_entity_name is True
-        assert entity._attr_options == ["-1", "0", "1", "2"]
+        assert entity._attr_options == ["off", "0", "1", "2"]
         assert entity._attr_icon == "mdi:leaf"
         assert entity._attr_translation_key == "use_adaptive"
 
@@ -87,7 +87,7 @@ class TestQvantumSelectEntity:
 
         # Test Off (use_adaptive = False)
         mock_coordinator.data["metrics"]["use_adaptive"] = False
-        assert entity.current_option == "-1"
+        assert entity.current_option == "off"
 
         # Test Eco (use_adaptive = True, smart_sh_mode = 0)
         mock_coordinator.data["metrics"]["use_adaptive"] = True
@@ -108,7 +108,7 @@ class TestQvantumSelectEntity:
         # Test default case (use_adaptive = True, smart_sh_mode = unknown)
         mock_coordinator.data["metrics"]["smart_sh_mode"] = 99
         mock_coordinator.data["metrics"]["smart_dhw_mode"] = 99
-        assert entity.current_option == "-1"
+        assert entity.current_option == "off"
 
         # Test mismatched modes case (use_adaptive = True, sh_mode=0, dhw_mode=1)
         mock_coordinator.data["metrics"]["smart_sh_mode"] = 0
@@ -134,7 +134,7 @@ class TestQvantumSelectEntity:
         mock_coordinator.api.set_smartcontrol = AsyncMock()
 
         # Test selecting Off
-        await entity.async_select_option("-1")
+        await entity.async_select_option("off")
         mock_coordinator.api.set_smartcontrol.assert_called_with(
             "test_device_123", -1, -1
         )

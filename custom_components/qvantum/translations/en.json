@@ -32,7 +32,7 @@
       "use_adaptive": {
         "name": "SmartControl",
         "state": {
-          "-1": "Off",
+          "off": "Off",
           "0": "Eco",
           "1": "Balanced",
           "2": "Comfort"
