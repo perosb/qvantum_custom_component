@@ -47,6 +47,7 @@ def mock_coordinator():
             "hpid": "test_device_123",
             "use_adaptive": True,  # Default to enabled
             "smart_sh_mode": 0,  # Default to Eco
+            "smart_dhw_mode": 0,  # Default to Eco
         },
     }
     coordinator.api = MagicMock()
@@ -151,11 +152,117 @@ class TestQvantumSelectEntity:
             "test_device_123", 1, 1
         )
 
-        # Test selecting Comfort
-        await entity.async_select_option("2")
-        mock_coordinator.api.set_smartcontrol.assert_called_with(
-            "test_device_123", 2, 2
+    @pytest.mark.asyncio
+    async def test_async_select_option_mode_synchronization_success(
+        self, mock_coordinator, mock_device
+    ):
+        """Test that smart_sh_mode and smart_dhw_mode are updated on successful API response."""
+        entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
+
+        # Mock successful API response
+        mock_coordinator.api.set_smartcontrol = AsyncMock(
+            return_value={"status": "APPLIED"}
         )
+
+        # Test selecting Eco (option "0")
+        await entity.async_select_option("0")
+
+        # Verify both modes are updated in coordinator data
+        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == 0
+        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == 0
+
+        # Test selecting Balanced (option "1")
+        await entity.async_select_option("1")
+
+        # Verify both modes are updated
+        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == 1
+        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == 1
+
+    @pytest.mark.asyncio
+    async def test_async_select_option_mode_synchronization_heatpump_status(
+        self, mock_coordinator, mock_device
+    ):
+        """Test that modes are updated when heatpump_status indicates success."""
+        entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
+
+        # Mock API response with heatpump_status success
+        mock_coordinator.api.set_smartcontrol = AsyncMock(
+            return_value={"heatpump_status": "APPLIED"}
+        )
+
+        # Test selecting Comfort (option "2")
+        await entity.async_select_option("2")
+
+        # Verify both modes are updated
+        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == 2
+        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == 2
+
+    @pytest.mark.asyncio
+    async def test_async_select_option_mode_synchronization_failure(
+        self, mock_coordinator, mock_device
+    ):
+        """Test that modes are not updated when API response indicates failure."""
+        entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
+
+        # Set initial mode values
+        initial_sh_mode = mock_coordinator.data["metrics"]["smart_sh_mode"]
+        initial_dhw_mode = mock_coordinator.data["metrics"]["smart_dhw_mode"]
+
+        # Mock failed API response
+        mock_coordinator.api.set_smartcontrol = AsyncMock(
+            return_value={"status": "FAILED"}
+        )
+
+        # Test selecting Eco (option "0")
+        await entity.async_select_option("0")
+
+        # Verify modes are NOT updated
+        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == initial_sh_mode
+        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == initial_dhw_mode
+
+    @pytest.mark.asyncio
+    async def test_async_select_option_mode_synchronization_off_option(
+        self, mock_coordinator, mock_device
+    ):
+        """Test that modes are not updated when selecting 'off' option."""
+        entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
+
+        # Set initial mode values
+        initial_sh_mode = mock_coordinator.data["metrics"]["smart_sh_mode"]
+        initial_dhw_mode = mock_coordinator.data["metrics"]["smart_dhw_mode"]
+
+        # Mock successful API response
+        mock_coordinator.api.set_smartcontrol = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        # Test selecting Off
+        await entity.async_select_option("off")
+
+        # Verify modes are NOT updated (use_adaptive_value is False for "off")
+        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == initial_sh_mode
+        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == initial_dhw_mode
+
+    @pytest.mark.asyncio
+    async def test_async_select_option_mode_synchronization_no_response(
+        self, mock_coordinator, mock_device
+    ):
+        """Test that modes are not updated when API returns no response."""
+        entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
+
+        # Set initial mode values
+        initial_sh_mode = mock_coordinator.data["metrics"]["smart_sh_mode"]
+        initial_dhw_mode = mock_coordinator.data["metrics"]["smart_dhw_mode"]
+
+        # Mock None response
+        mock_coordinator.api.set_smartcontrol = AsyncMock(return_value=None)
+
+        # Test selecting Balanced (option "1")
+        await entity.async_select_option("1")
+
+        # Verify modes are NOT updated
+        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == initial_sh_mode
+        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == initial_dhw_mode
 
     def test_available(self, mock_coordinator, mock_device):
         """Test availability check."""
