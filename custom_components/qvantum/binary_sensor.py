@@ -39,7 +39,6 @@ async def async_setup_entry(
         "enable_sc_dhw",
         "enable_sc_sh",
         "cooling_enabled",
-        "use_adaptive",
         "picpin_relay_heat_l1",
         "picpin_relay_heat_l2",
         "picpin_relay_heat_l3",

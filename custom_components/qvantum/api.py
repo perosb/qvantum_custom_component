@@ -184,6 +184,13 @@ class QvantumAPI:
 
         return await self._send_command(device_id, payload)
 
+    async def update_settings(self, device_id: str, settings: dict):
+        """Update multiple settings from a dictionary."""
+
+        payload = {"update_settings": settings}
+
+        return await self._send_command(device_id, payload)
+
     async def _update_settings(self, device_id: str, payload: dict):
         """Update one or several settings."""
 
@@ -216,6 +223,23 @@ class QvantumAPI:
             data = await response.json()
             _LOGGER.debug(f"Response received {response.status}: {data}")
             return data
+
+    async def set_smartcontrol(self, device_id: str, sh: int, dhw: int):
+        """Update smartcontrol setting."""
+
+        use_adaptive = sh != -1 and dhw != -1
+        if not use_adaptive:
+            payload = {
+                "use_adaptive": False,
+            }
+        else:
+            payload = {
+                "use_adaptive": use_adaptive,
+                "smart_sh_mode": sh,
+                "smart_dhw_mode": dhw,
+            }
+
+        return await self.update_settings(device_id, payload)
 
     async def set_extra_tap_water(self, device_id: str, minutes: int):
         """Update extra_tap_water setting."""
@@ -442,7 +466,6 @@ class QvantumAPI:
                 case _:
                     _LOGGER.error(f"Failed to fetch data, status: {response.status}")
                     _LOGGER.debug(f"Failed to fetch data, status: {response}")
-                    self._metrics_data = {}
 
         return self._metrics_data
 
