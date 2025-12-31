@@ -288,7 +288,7 @@
         "name": "Slimme status voor warm water"
       },
       "smart_dhw_mode": {
-        "name": "Smart DHW mode",
+        "name": "Slimme DHW modus",
         "state": {
           "0": "Eco",
           "1": "Gebalanceerd",
