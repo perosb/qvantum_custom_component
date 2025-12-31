@@ -128,7 +128,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_entity3 = MagicMock()  # Disabled entity
         mock_entity3.device_id = "device_id_123"
         mock_entity3.disabled_by = "user"
-        mock_entity3.unique_id = "qvantum_bt3_test_device"
+        mock_entity3.unique_id = "qvantum_bt4_test_device"
 
         mock_entity_registry.entities.values.return_value = [
             mock_entity1,
@@ -154,7 +154,7 @@ class TestQvantumDataUpdateCoordinator:
 
         assert "bt1" in result
         assert "bt2" in result
-        assert "bt3" not in result  # Disabled entity should not be included
+        assert "bt4" not in result  # Disabled entity should not be included
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_no_device_found(self, mock_super_init):
