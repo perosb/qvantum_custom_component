@@ -177,7 +177,7 @@ class TestQvantumDataUpdateCoordinator:
         result = coordinator._get_enabled_metrics("test_device")
 
         # Should return DEFAULT_ENABLED_METRICS
-        assert result == DEFAULT_ENABLED_METRICS
+        assert set(result) == set(DEFAULT_ENABLED_METRICS)
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_no_matching_entities(self, mock_super_init):
@@ -219,4 +219,4 @@ class TestQvantumDataUpdateCoordinator:
         result = coordinator._get_enabled_metrics("test_device")
 
         # Should return DEFAULT_ENABLED_METRICS since no matching entities found
-        assert result == DEFAULT_ENABLED_METRICS
+        assert set(result) == set(DEFAULT_ENABLED_METRICS)

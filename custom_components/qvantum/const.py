@@ -105,6 +105,18 @@ DEFAULT_DISABLED_METRICS = [
     "picpin_mask",
 ]
 
+# Metrics that must always be fetched regardless of entity enablement
+REQUIRED_METRICS = [
+    "bt2",  # Required by climate component for current temperature
+    "man_mode",  # Required by switch component
+    "op_man_addition",  # Required by switch component
+    "op_man_dhw",  # Required by switch component
+    "op_mode",  # Required by switch components for availability checks
+    "smart_sh_mode",  # Required by select component
+    "smart_dhw_mode",  # Required by select component
+    "use_adaptive",  # Required by select component and switch components
+]
+
 # Sensor filtering patterns
 EXCLUDED_METRIC_PATTERNS = [
     "op_man_",
