@@ -466,7 +466,6 @@ class QvantumAPI:
                 case _:
                     _LOGGER.error(f"Failed to fetch data, status: {response.status}")
                     _LOGGER.debug(f"Failed to fetch data, status: {response}")
-                    self._metrics_data = {}
 
         return self._metrics_data
 
