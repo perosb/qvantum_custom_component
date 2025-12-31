@@ -39,7 +39,7 @@
         }
       },
       "smart_sh_mode": {
-        "name": "Smart SH modus",
+        "name": "Slimme SH modus",
         "state": {
           "0": "Eco",
           "1": "Gebalanceerd",
@@ -47,7 +47,7 @@
         }
       },
       "smart_dhw_mode": {
-        "name": "Smart DHW modus",
+        "name": "Slimme DHW modus",
         "state": {
           "0": "Eco",
           "1": "Gebalanceerd",
