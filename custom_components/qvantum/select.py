@@ -97,7 +97,7 @@ class QvantumSelectEntity(CoordinatorEntity, SelectEntity):
         # Handle response
         use_adaptive_value = option != "off"
 
-        # This need to be handled here to update both modes together
+        # This needs to be handled here to update both modes together
         if use_adaptive_value:
             if response and (
                 response.get("status") == SETTING_UPDATE_APPLIED
