@@ -9,7 +9,6 @@ from custom_components.qvantum.coordinator import (
 )
 from custom_components.qvantum.const import (
     DEFAULT_ENABLED_METRICS,
-    DEFAULT_DISABLED_METRICS,
     DOMAIN,
 )
 

@@ -87,12 +87,13 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                     if metric_key in DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_METRICS:
                         enabled_metrics.add(metric_key)
             _LOGGER.debug(
-                f"Enabled metrics for device {device_id}: {list(enabled_metrics)}"
+                "Enabled metrics for device %s: %s", device_id, list(enabled_metrics)
             )
             # If no enabled metrics found from entities, fall back to defaults
             return list(enabled_metrics) if enabled_metrics else DEFAULT_ENABLED_METRICS
         _LOGGER.debug(
-            f"No device registry entry found for device {device_id}, returning all DEFAULT_ENABLED_METRICS"
+            "No device registry entry found for device %s, returning all DEFAULT_ENABLED_METRICS",
+            device_id,
         )
         return DEFAULT_ENABLED_METRICS
 

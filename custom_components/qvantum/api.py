@@ -109,7 +109,7 @@ class QvantumAPI:
         ) as response:
             match response.status:
                 case 200:
-                    _LOGGER.debug(f"Authentication successful: {response.status}")
+                    _LOGGER.debug("Authentication successful: %s", response.status)
                     auth_data = await response.json()
                     self._token = auth_data.get("idToken")
                     self._refreshtoken = auth_data.get("refreshToken")
@@ -121,7 +121,7 @@ class QvantumAPI:
                     )
                     return True
                 case _:
-                    _LOGGER.error(f"Authentication failed: {response.status}")
+                    _LOGGER.error("Authentication failed: %s", response.status)
                     raise APIAuthError(response)
 
     async def _refresh_authentication_token(self):
@@ -140,7 +140,7 @@ class QvantumAPI:
         ) as response:
             match response.status:
                 case 200:
-                    _LOGGER.debug(f"Token refreshed successfully: {response.status}")
+                    _LOGGER.debug("Token refreshed successfully: %s", response.status)
                     auth_data = await response.json()
                     self._token = auth_data.get("access_token")
                     self._refreshtoken = auth_data.get("refresh_token")
@@ -151,7 +151,7 @@ class QvantumAPI:
                         seconds=int(expires_in) - DEFAULT_TOKEN_BUFFER_SECONDS
                     )
                 case _:
-                    _LOGGER.error(f"Token refresh failed: {response.status}")
+                    _LOGGER.error("Token refresh failed: %s", response.status)
                     # Don't raise exception here, let _ensure_valid_token handle it
 
     async def _ensure_valid_token(self):
@@ -399,7 +399,7 @@ class QvantumAPI:
                     )
                     self._device_metadata = {}
 
-        _LOGGER.debug(f"Device metadata fetched: {self._device_metadata}")
+        _LOGGER.debug("Device metadata fetched: %s", self._device_metadata)
         return self._device_metadata
 
     async def get_metrics(
@@ -427,7 +427,7 @@ class QvantumAPI:
                 case 200:
                     data = await response.json()
 
-                    _LOGGER.debug(f"Metrics fetched: {data}")
+                    _LOGGER.debug("Metrics fetched: %s", data)
 
                     metrics = {}
                     metrics["hpid"] = device_id
@@ -454,22 +454,22 @@ class QvantumAPI:
                     self._metrics_etag = response.headers.get("ETag")
 
                 case 403:
-                    _LOGGER.error(f"Authentication failure: {response.status}")
-                    _LOGGER.debug(f"Authentication failure: {response}")
+                    _LOGGER.error("Authentication failure: %s", response.status)
+                    _LOGGER.debug("Authentication failure: %s", response)
                     await self.unauthenticate()
                     raise APIAuthError(response)
                 case 304:
                     _LOGGER.debug("Metrics not modified, using cached data.")
                 case 500:
                     _LOGGER.error(
-                        f"Internal server error, clearing data: {response.status}"
+                        "Internal server error, clearing data: %s", response.status
                     )
-                    _LOGGER.debug(f"Internal server error, clearing data: {response}")
+                    _LOGGER.debug("Internal server error, clearing data: %s", response)
                     # await self.unauthenticate()
                     raise APIConnectionError(response)
                 case _:
-                    _LOGGER.error(f"Failed to fetch data, status: {response.status}")
-                    _LOGGER.debug(f"Failed to fetch data, status: {response}")
+                    _LOGGER.error("Failed to fetch data, status: %s", response.status)
+                    _LOGGER.debug("Failed to fetch data, status: %s", response)
 
         return self._metrics_data
 
@@ -537,13 +537,15 @@ class QvantumAPI:
             match response.status:
                 case 200:
                     devices_data = await response.json()
-                    _LOGGER.debug(f"Devices fetched successfully: {devices_data}")
+                    _LOGGER.debug("Devices fetched successfully: %s", devices_data)
                     return devices_data.get("devices") if devices_data else None
                 case 403:
                     await self.unauthenticate()
                     raise APIAuthError(response)
                 case _:
-                    _LOGGER.error(f"Failed to fetch devices, status: {response.status}")
+                    _LOGGER.error(
+                        "Failed to fetch devices, status: %s", response.status
+                    )
                     raise APIConnectionError(
                         response=response, message="Failed to fetch devices"
                     )
