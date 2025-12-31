@@ -288,7 +288,7 @@
         "name": "Intelligenter Status für Brauchwasser"
       },
       "smart_dhw_mode": {
-        "name": "Smart DHW mode",
+        "name": "Smart DHW Modus",
         "state": {
           "0": "Eco",
           "1": "Ausgewogen",
