@@ -8,6 +8,8 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from custom_components.qvantum.const import SETTING_UPDATE_APPLIED
+
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 
@@ -92,8 +94,18 @@ class QvantumSelectEntity(CoordinatorEntity, SelectEntity):
         response = await self.coordinator.api.set_smartcontrol(
             self._hpid, sh_mode, dhw_mode
         )
-        # Handle response for use_adaptive
+        # Handle response
         use_adaptive_value = option != "off"
+
+        # This needs to be handled here to update both modes together
+        if use_adaptive_value:
+            if response and (
+                response.get("status") == SETTING_UPDATE_APPLIED
+                or response.get("heatpump_status") == SETTING_UPDATE_APPLIED
+            ):
+                self.coordinator.data.get("metrics")["smart_sh_mode"] = sh_mode
+                self.coordinator.data.get("metrics")["smart_dhw_mode"] = dhw_mode
+
         await handle_setting_update_response(
             response, self.coordinator, "metrics", self._metric_key, use_adaptive_value
         )
