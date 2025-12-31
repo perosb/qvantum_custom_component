@@ -802,6 +802,74 @@ class TestQvantumAPI:
         assert result == {}
 
     @pytest.mark.asyncio
+    async def test_get_metrics_with_custom_enabled_metrics(self, authenticated_api):
+        """Test getting metrics with custom enabled_metrics list."""
+        metrics_data = load_test_data("metrics_test_device.json")
+
+        cm, mock_response = authenticated_api._session.make_cm_response(
+            status=200, json_data=metrics_data, headers={"ETag": "etag123"}
+        )
+        mock_response.headers = {"ETag": "etag123"}
+        authenticated_api._session.get.return_value = cm
+
+        # Test with custom enabled metrics list
+        custom_metrics = ["bt1", "latency"]
+        result = await authenticated_api.get_metrics(
+            "test_device", enabled_metrics=custom_metrics
+        )
+
+        assert "metrics" in result
+        assert "bt1" in result["metrics"]
+        assert "bt2" not in result["metrics"]  # bt2 should not be included
+        assert result["metrics"]["bt1"] == metrics_data["values"]["bt1"]
+        assert result["metrics"]["latency"] == metrics_data["total_latency"]
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_with_empty_enabled_metrics(self, authenticated_api):
+        """Test getting metrics with empty enabled_metrics list."""
+        metrics_data = load_test_data("metrics_test_device.json")
+
+        cm, mock_response = authenticated_api._session.make_cm_response(
+            status=200, json_data=metrics_data, headers={"ETag": "etag123"}
+        )
+        mock_response.headers = {"ETag": "etag123"}
+        authenticated_api._session.get.return_value = cm
+
+        # Test with empty enabled metrics list
+        result = await authenticated_api.get_metrics("test_device", enabled_metrics=[])
+
+        assert "metrics" in result
+        # Should only contain hpid and latency (no actual metrics)
+        assert "hpid" in result["metrics"]
+        assert result["metrics"]["hpid"] == "test_device"
+        assert result["metrics"]["latency"] == metrics_data["total_latency"]
+        # No bt1 or bt2 should be present
+        assert "bt1" not in result["metrics"]
+        assert "bt2" not in result["metrics"]
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_with_none_enabled_metrics(self, authenticated_api):
+        """Test getting metrics with None enabled_metrics (should use defaults)."""
+        metrics_data = load_test_data("metrics_test_device.json")
+
+        cm, mock_response = authenticated_api._session.make_cm_response(
+            status=200, json_data=metrics_data, headers={"ETag": "etag123"}
+        )
+        mock_response.headers = {"ETag": "etag123"}
+        authenticated_api._session.get.return_value = cm
+
+        # Test with None enabled_metrics (should default to DEFAULT_ENABLED_METRICS)
+        result = await authenticated_api.get_metrics(
+            "test_device", enabled_metrics=None
+        )
+
+        assert "metrics" in result
+        # Should contain default metrics
+        assert result["metrics"]["bt1"] == metrics_data["values"]["bt1"]
+        assert result["metrics"]["bt2"] == metrics_data["values"]["bt2"]
+        assert result["metrics"]["latency"] == metrics_data["total_latency"]
+
+    @pytest.mark.asyncio
     async def test_update_settings_non_200_response(self, mock_session):
         """Test _update_settings with non-200 response."""
         cm, mock_response = mock_session.make_cm_response(status=400)
