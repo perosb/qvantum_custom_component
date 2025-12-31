@@ -175,3 +175,21 @@ class TestQvantumSelectEntity:
         # Reset and test when metric is missing
         mock_coordinator.data = {"metrics": {}}
         assert entity.available is False
+
+    def test_is_valid_mode(self, mock_coordinator, mock_device):
+        """Test the _is_valid_mode helper method."""
+        entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
+
+        # Test valid modes
+        assert entity._is_valid_mode(0, {0, 1, 2}) is True
+        assert entity._is_valid_mode(1, {0, 1, 2}) is True
+        assert entity._is_valid_mode(2, {0, 1, 2}) is True
+        assert entity._is_valid_mode("0", {0, 1, 2}) is True
+        assert entity._is_valid_mode("1", {0, 1, 2}) is True
+
+        # Test invalid modes
+        assert entity._is_valid_mode(3, {0, 1, 2}) is False
+        assert entity._is_valid_mode(99, {0, 1, 2}) is False
+        assert entity._is_valid_mode("abc", {0, 1, 2}) is False
+        assert entity._is_valid_mode(None, {0, 1, 2}) is False
+        assert entity._is_valid_mode([], {0, 1, 2}) is False
