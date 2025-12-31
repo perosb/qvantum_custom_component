@@ -5,11 +5,14 @@ from __future__ import annotations
 from datetime import timedelta
 import logging
 from typing import Any, Optional
+import asyncio
+import traceback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_SCAN_INTERVAL,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry, entity_registry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import APIAuthError
@@ -20,7 +23,6 @@ from .const import (
     DEFAULT_ENABLED_METRICS,
     DEFAULT_DISABLED_METRICS,
 )
-import traceback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,6 +56,9 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
 
         self.api = hass.data[DOMAIN]
         self._device = None
+        self._device_registry = None
+        self._entity_registry = None
+        self._registry_lock = asyncio.Lock()
 
         super().__init__(
             hass,
@@ -63,18 +68,27 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=self.poll_interval),
         )
 
-    def _get_enabled_metrics(self, device_id: str) -> list[str]:
+    async def _ensure_registries_initialized(self) -> None:
+        """Ensure device and entity registries are initialized with thread-safe locking."""
+
+        async with self._registry_lock:
+            # Double-check after acquiring lock and initialize both registries together
+            if self._device_registry is None or self._entity_registry is None:
+                self._device_registry = await device_registry.async_get(self.hass)
+                self._entity_registry = await entity_registry.async_get(self.hass)
+
+    async def _get_enabled_metrics(self, device_id: str) -> list[str]:
         """Get list of enabled metrics for a device based on entity registry."""
-        device_registry = self.hass.data["device_registry"]
+        await self._ensure_registries_initialized()
+
         device_reg_id = None
-        for device in device_registry.devices.values():
+        for device in self._device_registry.devices.values():
             if (DOMAIN, f"qvantum-{device_id}") in device.identifiers:
                 device_reg_id = device.id
                 break
         if device_reg_id:
-            registry = self.hass.data["entity_registry"]
             enabled_metrics = set()
-            for entity in registry.entities.values():
+            for entity in self._entity_registry.entities.values():
                 if (
                     entity.device_id == device_reg_id
                     and entity.disabled_by is None
@@ -87,11 +101,12 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                     if metric_key in DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_METRICS:
                         enabled_metrics.add(metric_key)
             _LOGGER.debug(
-                f"Enabled metrics for device {device_id}: {list(enabled_metrics)}"
+                "Enabled metrics for device %s: %s", device_id, list(enabled_metrics)
             )
             return list(enabled_metrics)
         _LOGGER.debug(
-            f"No device registry entry found for device {device_id}, returning all DEFAULT_ENABLED_METRICS"
+            "No device registry entry found for device %s, returning all DEFAULT_ENABLED_METRICS",
+            device_id,
         )
         return DEFAULT_ENABLED_METRICS
 
@@ -101,7 +116,7 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             if self._device is None:
                 self._device = await self.api.get_primary_device()
 
-            enabled_metrics = self._get_enabled_metrics(self._device.get("id"))
+            enabled_metrics = await self._get_enabled_metrics(self._device.get("id"))
             data = await self.api.get_metrics(
                 self._device.get("id"), enabled_metrics=enabled_metrics
             )
