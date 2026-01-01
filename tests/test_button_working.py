@@ -31,7 +31,7 @@ def mock_coordinator():
 def mock_device():
     """Create a mock device."""
     return DeviceInfo(
-        identifiers={("qvantum", "test_device_123")},
+        identifiers={("qvantum", "qvantum-test_device_123")},
         name="Qvantum Heat Pump",
         manufacturer="Qvantum",
         model="QE-6",
@@ -47,7 +47,7 @@ class TestQvantumButtonEntity:
             mock_coordinator, "extra_tap_water_60min", mock_device
         )
 
-        assert button._button_key == "extra_tap_water_60min"
+        assert button._metric_key == "extra_tap_water_60min"
         assert button._attr_translation_key == "extra_tap_water_60min"
         assert button._attr_unique_id == "qvantum_extra_tap_water_60min_test_device_123"
         assert button._attr_device_info == mock_device
@@ -91,4 +91,4 @@ class TestQvantumButtonEntity:
         entities = async_add_entities.call_args[0][0]
         assert len(entities) == 1
         assert isinstance(entities[0], QvantumButtonEntity)
-        assert entities[0]._button_key == "extra_tap_water_60min"
+        assert entities[0]._metric_key == "extra_tap_water_60min"

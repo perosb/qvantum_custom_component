@@ -88,7 +88,7 @@ def mock_coordinator():
 def mock_device():
     """Create a mock device info."""
     return DeviceInfo(
-        identifiers={("qvantum", "test_device_123")},
+        identifiers={("qvantum", "qvantum-test_device_123")},
         manufacturer="Qvantum",
         model="QE-6",
     )

@@ -17,6 +17,7 @@ from homeassistant.const import EntityCategory
 from . import MyConfigEntry
 from .const import DOMAIN, DEFAULT_ENABLED_METRICS, DEFAULT_DISABLED_METRICS
 from .coordinator import QvantumDataUpdateCoordinator
+from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,14 +48,14 @@ async def async_setup_entry(
     ]
 
     for sensor_name in sensor_names:
-        enabled_default = sensor_name not in DEFAULT_DISABLED_METRICS
+        enabled_by_default = sensor_name not in DEFAULT_DISABLED_METRICS
         sensors.append(
             QvantumBaseBinaryEntity(
                 coordinator,
                 sensor_name,
                 sensor_name,
                 device,
-                enabled_default,
+                enabled_by_default,
             )
         )
 
@@ -77,7 +78,7 @@ async def async_setup_entry(
                 )
 
 
-class QvantumBaseBinaryEntity(CoordinatorEntity, BinarySensorEntity):
+class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
     """Sensor for qvantum."""
 
     def __init__(
@@ -86,16 +87,9 @@ class QvantumBaseBinaryEntity(CoordinatorEntity, BinarySensorEntity):
         metric_key: str,
         name: str,
         device: DeviceInfo,
-        enabled_default: bool = True,
+        enabled_by_default: bool = True,
     ) -> None:
-        super().__init__(coordinator)
-        self._hpid = self.coordinator.data.get("metrics").get("hpid")
-        self._metric_key = metric_key
-        self._attr_translation_key = metric_key
-        self._attr_unique_id = f"qvantum_{metric_key}_{self._hpid}"
-        self._attr_device_info = device
-        self._attr_has_entity_name = True
-        self._attr_entity_registry_enabled_default = enabled_default
+        super().__init__(coordinator, metric_key, device, enabled_by_default)
         self._data_bearer = "metrics"
 
     @property
@@ -123,9 +117,9 @@ class QvantumConnectedEntity(QvantumBaseBinaryEntity):
         metric_key: str,
         name: str,
         device: DeviceInfo,
-        enabled_default: bool = True,
+        enabled_by_default: bool = True,
     ) -> None:
-        super().__init__(coordinator, metric_key, name, device, enabled_default)
+        super().__init__(coordinator, metric_key, name, device, enabled_by_default)
 
         self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
         self._attr_entity_category = EntityCategory.DIAGNOSTIC

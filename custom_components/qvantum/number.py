@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import MyConfigEntry
 from .const import TAP_WATER_CAPACITY_MAPPINGS
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ async def async_setup_entry(
     _LOGGER.debug("Setting up platform NUMBER")
 
 
-class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
+class QvantumNumberEntity(QvantumEntity, NumberEntity):
     """Sensor for qvantum."""
 
     def __init__(
@@ -61,13 +62,7 @@ class QvantumNumberEntity(CoordinatorEntity, NumberEntity):
         step: float,
         device: DeviceInfo,
     ) -> None:
-        super().__init__(coordinator)
-        self._hpid = self.coordinator.data.get("metrics").get("hpid")
-        self._attr_translation_key = metric_key
-        self._metric_key = metric_key
-        self._attr_unique_id = f"qvantum_{metric_key}_{self._hpid}"
-        self._attr_device_info = device
-        self._attr_has_entity_name = True
+        super().__init__(coordinator, metric_key, device)
         self._attr_native_min_value = min
         self._attr_native_max_value = max
         self._attr_native_step = step

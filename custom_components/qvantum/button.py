@@ -10,6 +10,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ async def async_setup_entry(
     _LOGGER.debug("Setting up platform BUTTON")
 
 
-class QvantumButtonEntity(CoordinatorEntity, ButtonEntity):
+class QvantumButtonEntity(QvantumEntity, ButtonEntity):
     """Button for qvantum."""
 
     def __init__(
@@ -40,17 +41,11 @@ class QvantumButtonEntity(CoordinatorEntity, ButtonEntity):
         button_key: str,
         device: DeviceInfo,
     ) -> None:
-        super().__init__(coordinator)
-        self._hpid = self.coordinator.data.get("metrics").get("hpid")
-        self._attr_translation_key = button_key
-        self._button_key = button_key
-        self._attr_unique_id = f"qvantum_{button_key}_{self._hpid}"
-        self._attr_device_info = device
-        self._attr_has_entity_name = True
+        super().__init__(coordinator, button_key, device)
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        if self._button_key == "extra_tap_water_60min":
+        if self._metric_key == "extra_tap_water_60min":
             # Activate extra tap water for 60 minutes
             response = await self.coordinator.api.set_extra_tap_water(self._hpid, 60)
             await handle_setting_update_response(

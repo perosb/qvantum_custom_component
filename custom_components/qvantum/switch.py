@@ -10,6 +10,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ async def async_setup_entry(
     _LOGGER.debug("Setting up platform SWITCH")
 
 
-class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
+class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
     """Sensor for qvantum."""
 
     def __init__(
@@ -50,14 +51,8 @@ class QvantumSwitchEntity(CoordinatorEntity, SwitchEntity):
         metric_key: str,
         device: DeviceInfo,
     ) -> None:
-        super().__init__(coordinator)
-        self._hpid = self.coordinator.data.get("metrics").get("hpid")
-        self._attr_translation_key = metric_key
-        self._metric_key = metric_key
-        self._attr_unique_id = f"qvantum_{metric_key}_{self._hpid}"
-        self._attr_device_info = device
+        super().__init__(coordinator, metric_key, device)
         self._attr_device_class = SwitchDeviceClass.SWITCH
-        self._attr_has_entity_name = True
         self._attr_is_on = False
 
         match self._metric_key:

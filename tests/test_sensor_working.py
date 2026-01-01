@@ -40,7 +40,7 @@ with patch(
             from homeassistant.helpers.device_registry import DeviceInfo
 
             from custom_components.qvantum.sensor import (
-                QvantumBaseEntity,
+                QvantumBaseSensorEntity,
                 QvantumTemperatureEntity,
                 QvantumEnergyEntity,
                 QvantumPowerEntity,
@@ -84,18 +84,18 @@ def mock_coordinator():
 def mock_device():
     """Create a mock device info."""
     return DeviceInfo(
-        identifiers={("qvantum", "test_device_123")},
+        identifiers={("qvantum", "qvantum-test_device_123")},
         manufacturer="Qvantum",
         model="QE-6",
     )
 
 
-class TestQvantumBaseEntity:
-    """Test the QvantumBaseEntity class."""
+class TestQvantumBaseSensorEntity:
+    """Test the QvantumBaseSensorEntity class."""
 
     def test_init_basic(self, mock_coordinator, mock_device):
         """Test basic entity initialization."""
-        entity = QvantumBaseEntity(mock_coordinator, "bt1", mock_device, True)
+        entity = QvantumBaseSensorEntity(mock_coordinator, "bt1", mock_device, True)
 
         assert entity._metric_key == "bt1"
         assert entity._attr_unique_id == "qvantum_bt1_test_device_123"
@@ -105,36 +105,40 @@ class TestQvantumBaseEntity:
 
     def test_state(self, mock_coordinator, mock_device):
         """Test getting entity state."""
-        entity = QvantumBaseEntity(mock_coordinator, "bt1", mock_device, True)
+        entity = QvantumBaseSensorEntity(mock_coordinator, "bt1", mock_device, True)
         assert entity.state == 20.5
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test entity availability when data exists."""
-        entity = QvantumBaseEntity(mock_coordinator, "bt1", mock_device, True)
+        entity = QvantumBaseSensorEntity(mock_coordinator, "bt1", mock_device, True)
         assert entity.available is True
 
     def test_available_false(self, mock_coordinator, mock_device):
         """Test entity availability when data is missing."""
-        entity = QvantumBaseEntity(
+        entity = QvantumBaseSensorEntity(
             mock_coordinator, "missing_metric", mock_device, True
         )
         assert entity.available is False
 
     def test_fan_unit_assignment(self, mock_coordinator, mock_device):
         """Test fan speed unit assignment."""
-        entity = QvantumBaseEntity(mock_coordinator, "fan0_10v", mock_device, True)
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "fan0_10v", mock_device, True
+        )
         assert entity._attr_native_unit_of_measurement == "%"
 
     def test_rpm_unit_assignment(self, mock_coordinator, mock_device):
         """Test RPM unit assignment."""
-        entity = QvantumBaseEntity(
+        entity = QvantumBaseSensorEntity(
             mock_coordinator, "compressormeasuredspeed", mock_device, True
         )
         assert entity._attr_native_unit_of_measurement == "rpm"
 
     def test_flow_unit_assignment(self, mock_coordinator, mock_device):
         """Test flow rate unit assignment."""
-        entity = QvantumBaseEntity(mock_coordinator, "bf1_l_min", mock_device, True)
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "bf1_l_min", mock_device, True
+        )
         assert entity._attr_native_unit_of_measurement == "l/m"
 
 

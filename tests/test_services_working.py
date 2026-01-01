@@ -126,7 +126,7 @@ class TestQvantumServices:
         mock_api.set_extra_tap_water.assert_called_once_with(123, 60)
 
         # Verify exception response
-        assert result == {"qvantum": {"exception": "failure"}}
+        assert result == {"qvantum": {"exception": "unknown_error", "details": "API error"}}
 
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_different_device(self, mock_hass, mock_api):
