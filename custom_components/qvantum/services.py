@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 import homeassistant.helpers.config_validation as cv
 
 from .const import DOMAIN
-from .api import APIAuthError
+from .api import APIAuthError, APIConnectionError, APIRateLimitError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,8 +32,26 @@ async def async_setup_services(hass: HomeAssistant):
         try:
             response = await api.set_extra_tap_water(device_id, minutes)
             return {"qvantum": [response]}
-        except Exception:
-            return {"qvantum": {"exception": "failure"}}
+        except APIAuthError as err:
+            _LOGGER.error(
+                "Authentication failed while handling extra tap water request: %s", err
+            )
+            return {"qvantum": {"exception": "authentication_failed", "details": str(err)}}
+        except APIConnectionError as err:
+            _LOGGER.error(
+                "Connection failed while handling extra tap water request: %s", err
+            )
+            return {"qvantum": {"exception": "connection_failed", "details": str(err)}}
+        except APIRateLimitError as err:
+            _LOGGER.error(
+                "Rate limit exceeded while handling extra tap water request: %s", err
+            )
+            return {"qvantum": {"exception": "rate_limit_exceeded", "details": str(err)}}
+        except Exception as err:
+            _LOGGER.exception(
+                "Unexpected error while handling extra tap water request: %s", err
+            )
+            return {"qvantum": {"exception": "unknown_error", "details": str(err)}}
 
     hass.services.async_register(
         domain=DOMAIN,
