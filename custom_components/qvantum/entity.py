@@ -1,11 +1,13 @@
 """Base entity classes for Qvantum integration."""
 
 import logging
+from typing import Union
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN
 from .coordinator import QvantumDataUpdateCoordinator
+from .firmware_coordinator import QvantumFirmwareUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,7 +17,9 @@ class QvantumEntity(CoordinatorEntity):
 
     def __init__(
         self,
-        coordinator: QvantumDataUpdateCoordinator,
+        coordinator: Union[
+            QvantumDataUpdateCoordinator, QvantumFirmwareUpdateCoordinator
+        ],
         metric_key: str,
         device: DeviceInfo | dict[str, object],
         enabled_by_default: bool = True,

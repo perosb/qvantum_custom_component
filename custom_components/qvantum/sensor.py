@@ -1,6 +1,7 @@
 """Interfaces with the Qvantum Heat Pump api sensors."""
 
 import logging
+from datetime import datetime
 from typing import Type
 
 from homeassistant.components.sensor import (
@@ -36,6 +37,7 @@ from .const import (
 from .entity import QvantumEntity
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
+from .firmware_coordinator import QvantumFirmwareUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,6 +76,27 @@ async def async_setup_entry(
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device, True))
     sensors.append(
         QvantumTimerEntity(coordinator, "extra_tap_water_stop", device, True)
+    )
+
+    # Add firmware sensors
+    firmware_coordinator = config_entry.runtime_data.firmware_coordinator
+    sensors.append(
+        QvantumFirmwareSensorEntity(
+            firmware_coordinator, "display_fw_version", device, True
+        )
+    )
+    sensors.append(
+        QvantumFirmwareSensorEntity(firmware_coordinator, "cc_fw_version", device, True)
+    )
+    sensors.append(
+        QvantumFirmwareSensorEntity(
+            firmware_coordinator, "inv_fw_version", device, True
+        )
+    )
+    sensors.append(
+        QvantumFirmwareLastCheckSensorEntity(
+            firmware_coordinator, "firmware_last_check", device, True
+        )
     )
 
     async_add_entities(sensors)
@@ -350,3 +373,108 @@ def _get_sensor_type(metric: str) -> Type[QvantumBaseSensorEntity]:
         return QvantumPressureEntity
     else:
         return QvantumBaseSensorEntity
+
+
+class QvantumFirmwareSensorEntity(QvantumEntity, SensorEntity):
+    """Firmware version sensor for Qvantum device."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        coordinator: QvantumFirmwareUpdateCoordinator,
+        firmware_key: str,
+        device: DeviceInfo,
+        enabled_by_default: bool,
+    ) -> None:
+        """Initialize the firmware sensor."""
+        super().__init__(coordinator, firmware_key, device)
+        self.firmware_key = firmware_key
+        self._attr_entity_registry_enabled_default = enabled_by_default
+        self._attr_translation_key = f"firmware_{firmware_key}"
+
+    @property
+    def state(self) -> str | None:
+        """Return the firmware version."""
+        # First try to get from firmware coordinator data (updated every 60 minutes)
+        if self.coordinator.data and "firmware_versions" in self.coordinator.data:
+            firmware_versions = self.coordinator.data.get("firmware_versions", {})
+            version = firmware_versions.get(self.firmware_key)
+            if version is not None:
+                return version
+
+        # Fall back to device metadata from main coordinator (available immediately)
+        if (
+            self.coordinator.main_coordinator
+            and self.coordinator.main_coordinator.data
+            and "device" in self.coordinator.main_coordinator.data
+        ):
+            device_data = self.coordinator.main_coordinator.data["device"]
+            device_metadata = device_data.get("device_metadata", {})
+            version = device_metadata.get(self.firmware_key)
+            if version is not None:
+                return version
+
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        # Check if firmware coordinator has data
+        firmware_available = (
+            super().available
+            and self.coordinator.data is not None
+            and "firmware_versions" in self.coordinator.data
+            and self.firmware_key in self.coordinator.data.get("firmware_versions", {})
+        )
+
+        # Check if main coordinator has device metadata
+        device_available = (
+            self.coordinator.main_coordinator
+            and self.coordinator.main_coordinator.data
+            and "device" in self.coordinator.main_coordinator.data
+            and self.firmware_key
+            in self.coordinator.main_coordinator.data["device"].get(
+                "device_metadata", {}
+            )
+        )
+
+        return firmware_available or device_available
+
+
+class QvantumFirmwareLastCheckSensorEntity(QvantumEntity, SensorEntity):
+    """Firmware last check timestamp sensor for Qvantum device."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self,
+        coordinator: QvantumFirmwareUpdateCoordinator,
+        sensor_key: str,
+        device: DeviceInfo,
+        enabled_by_default: bool,
+    ) -> None:
+        """Initialize the firmware last check sensor."""
+        super().__init__(coordinator, sensor_key, device)
+        self._attr_entity_registry_enabled_default = enabled_by_default
+        self._attr_translation_key = sensor_key
+
+    @property
+    def state(self) -> datetime | None:
+        """Return the last firmware check timestamp."""
+        if not self.coordinator.data:
+            return None
+        last_check = self.coordinator.data.get("last_check")
+        if last_check:
+            return dt_utils.parse_datetime(last_check)
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return (
+            super().available
+            and self.coordinator.data is not None
+            and "last_check" in self.coordinator.data
+        )
