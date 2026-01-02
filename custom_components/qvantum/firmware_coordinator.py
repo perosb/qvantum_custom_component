@@ -159,7 +159,6 @@ class QvantumFirmwareUpdateCoordinator(DataUpdateCoordinator):
                 # Create unique notification ID
                 notification_id = f"qvantum_firmware_update_{device_id}_{component}"
 
-                # Create the notification
                 message = f"""
 **Qvantum Firmware Update Detected**
 

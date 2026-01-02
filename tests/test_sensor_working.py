@@ -1,6 +1,6 @@
 """Tests for Qvantum sensors (working version that avoids metaclass issues)."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -419,6 +419,8 @@ class TestQvantumFirmwareLastCheckSensorEntity:
         assert state.hour == 12
         assert state.minute == 0
         assert state.second == 0
+        assert state.tzinfo is not None
+        assert state.tzinfo == timezone.utc
 
     def test_state_none_when_no_data(self, mock_firmware_coordinator, mock_device):
         """Test last check returns None when no data available."""
