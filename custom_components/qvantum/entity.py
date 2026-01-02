@@ -15,7 +15,7 @@ class QvantumEntity(CoordinatorEntity):
 
     def __init__(
         self,
-        coordinator: QvantumDataUpdateCoordinator,
+        coordinator,  # QvantumDataUpdateCoordinator | QvantumFirmwareUpdateCoordinator
         metric_key: str,
         device: DeviceInfo | dict[str, object],
         enabled_by_default: bool = True,

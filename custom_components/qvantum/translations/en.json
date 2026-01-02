@@ -372,6 +372,18 @@
       },
       "picpin_mask": {
         "name": "PIC Pin Mask"
+      },
+      "firmware_display_fw_version": {
+        "name": "Display firmware version"
+      },
+      "firmware_cc_fw_version": {
+        "name": "CC firmware version"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Inverter firmware version"
+      },
+      "firmware_last_check": {
+        "name": "Firmware last checked"
       }
     },
     "number": {

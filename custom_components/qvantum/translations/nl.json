@@ -372,6 +372,18 @@
       },
       "picpin_mask": {
         "name": "PIC pin masker"
+      },
+      "firmware_display_fw_version": {
+        "name": "Display firmware versie"
+      },
+      "firmware_cc_fw_version": {
+        "name": "CC firmware versie"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Omvormer firmware versie"
+      },
+      "firmware_last_check": {
+        "name": "Firmware laatst gecontroleerd"
       }
     },
     "number": {

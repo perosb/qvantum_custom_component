@@ -375,6 +375,18 @@
       },
       "latency": {
         "name": "Latens"
+      },
+      "firmware_display_fw_version": {
+        "name": "Skärmfirmwareversion"
+      },
+      "firmware_cc_fw_version": {
+        "name": "CC-firmwareversion"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Inverter-firmwareversion"
+      },
+      "firmware_last_check": {
+        "name": "Firmware senast kontrollerad"
       }
     },
     "number": {

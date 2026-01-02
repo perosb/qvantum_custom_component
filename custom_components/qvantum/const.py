@@ -133,6 +133,9 @@ POWER_METRICS = ["powertotal", "heatingpower", "dhwpower"]
 CURRENT_METRICS = ["current"]
 PRESSURE_METRICS = ["pressure"]
 
+# Firmware component keys
+FIRMWARE_KEYS = ["display_fw_version", "cc_fw_version", "inv_fw_version"]
+
 # Tap water capacity mappings (stop, start) -> capacity
 TAP_WATER_CAPACITY_MAPPINGS = {
     (58, 52): 1,  # Capacity 1

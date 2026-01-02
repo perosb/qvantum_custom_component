@@ -1,5 +1,6 @@
 """Tests for Qvantum sensors (working version that avoids metaclass issues)."""
 
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -8,6 +9,11 @@ import pytest
 class MockCoordinatorEntity:
     def __init__(self, coordinator):
         self.coordinator = coordinator
+
+    @property
+    def available(self):
+        """Mock available property."""
+        return self.coordinator is not None
 
 
 class MockSensorEntity:
@@ -49,6 +55,8 @@ with patch(
                 QvantumDiagnosticEntity,
                 QvantumTotalEnergyEntity,
                 QvantumLatencyEntity,
+                QvantumFirmwareSensorEntity,
+                QvantumFirmwareLastCheckSensorEntity,
             )
 
 
@@ -57,7 +65,16 @@ def mock_coordinator():
     """Create a mock coordinator with test data."""
     coordinator = MagicMock()
     coordinator.data = {
-        "device": {"id": "test_device_123"},
+        "device": {
+            "id": "test_device_123",
+            "model": "QE-6",
+            "vendor": "Qvantum",
+            "device_metadata": {
+                "display_fw_version": "1.3.6",
+                "cc_fw_version": "140",
+                "inv_fw_version": "140",
+            },
+        },
         "latency": 45,  # Latency at top level for QvantumLatencyEntity
         "metrics": {
             "hpid": "test_device_123",
@@ -88,6 +105,22 @@ def mock_device():
         manufacturer="Qvantum",
         model="QE-6",
     )
+
+
+@pytest.fixture
+def mock_firmware_coordinator(mock_coordinator):
+    """Create a mock firmware coordinator with test data."""
+    firmware_coordinator = MagicMock()
+    firmware_coordinator.main_coordinator = mock_coordinator
+    firmware_coordinator.data = {
+        "firmware_versions": {
+            "display_fw_version": "1.3.6",
+            "cc_fw_version": "140",
+            "inv_fw_version": "140",
+        },
+        "last_check": "2024-01-01T12:00:00.000Z",
+    }
+    return firmware_coordinator
 
 
 class TestQvantumBaseSensorEntity:
@@ -306,3 +339,93 @@ class TestQvantumLatencyEntity:
         mock_coordinator.data["latency"] = None
         entity = QvantumLatencyEntity(mock_coordinator, "latency", mock_device, True)
         assert entity.available is False
+
+
+class TestQvantumFirmwareSensorEntity:
+    """Test the QvantumFirmwareSensorEntity class."""
+
+    def test_init(self, mock_firmware_coordinator, mock_device):
+        """Test firmware sensor entity initialization."""
+        entity = QvantumFirmwareSensorEntity(
+            mock_firmware_coordinator, "display_fw_version", mock_device, True
+        )
+
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+        assert entity.firmware_key == "display_fw_version"
+        assert entity._attr_translation_key == "firmware_display_fw_version"
+
+    def test_state_from_firmware_coordinator(
+        self, mock_firmware_coordinator, mock_device
+    ):
+        """Test firmware version from firmware coordinator data."""
+        entity = QvantumFirmwareSensorEntity(
+            mock_firmware_coordinator, "display_fw_version", mock_device, True
+        )
+
+        assert entity.state == "1.3.6"
+
+    def test_state_fallback_to_device_metadata(
+        self, mock_firmware_coordinator, mock_device
+    ):
+        """Test firmware version fallback to device metadata."""
+        # Clear firmware coordinator data to test fallback
+        mock_firmware_coordinator.data = {}
+
+        entity = QvantumFirmwareSensorEntity(
+            mock_firmware_coordinator, "display_fw_version", mock_device, True
+        )
+
+        # The mock_coordinator fixture has device metadata
+        assert entity.state == "1.3.6"  # From device metadata in main coordinator
+
+    def test_state_none_when_no_data(self, mock_firmware_coordinator, mock_device):
+        """Test firmware version returns None when no data available."""
+        mock_firmware_coordinator.data = {}
+        mock_firmware_coordinator.main_coordinator.data = {}
+
+        entity = QvantumFirmwareSensorEntity(
+            mock_firmware_coordinator, "display_fw_version", mock_device, True
+        )
+
+        assert entity.state is None
+
+
+class TestQvantumFirmwareLastCheckSensorEntity:
+    """Test the QvantumFirmwareLastCheckSensorEntity class."""
+
+    def test_init(self, mock_firmware_coordinator, mock_device):
+        """Test firmware last check sensor entity initialization."""
+        entity = QvantumFirmwareLastCheckSensorEntity(
+            mock_firmware_coordinator, "firmware_last_check", mock_device, True
+        )
+
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+        assert entity._attr_device_class == SensorDeviceClass.TIMESTAMP
+
+    def test_state_with_last_check(self, mock_firmware_coordinator, mock_device):
+        """Test last check timestamp parsing."""
+        entity = QvantumFirmwareLastCheckSensorEntity(
+            mock_firmware_coordinator, "firmware_last_check", mock_device, True
+        )
+
+        state = entity.state
+        assert state is not None
+        # Should be a datetime object for TIMESTAMP device class
+        assert isinstance(state, datetime)
+        # Should parse the expected timestamp "2024-01-01T12:00:00.000Z"
+        assert state.year == 2024
+        assert state.month == 1
+        assert state.day == 1
+        assert state.hour == 12
+        assert state.minute == 0
+        assert state.second == 0
+
+    def test_state_none_when_no_data(self, mock_firmware_coordinator, mock_device):
+        """Test last check returns None when no data available."""
+        mock_firmware_coordinator.data = {}
+
+        entity = QvantumFirmwareLastCheckSensorEntity(
+            mock_firmware_coordinator, "firmware_last_check", mock_device, True
+        )
+
+        assert entity.state is None

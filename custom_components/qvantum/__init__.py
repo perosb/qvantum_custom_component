@@ -15,6 +15,7 @@ from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_registry import async_migrate_entries
+from homeassistant.components.persistent_notification import async_dismiss
 
 
 from homeassistant.const import (
@@ -22,8 +23,9 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from .api import QvantumAPI
-from .const import DOMAIN, VERSION, CONFIG_VERSION
+from .const import DOMAIN, VERSION, CONFIG_VERSION, FIRMWARE_KEYS
 from .coordinator import QvantumDataUpdateCoordinator
+from .firmware_coordinator import QvantumFirmwareUpdateCoordinator
 from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,6 +49,7 @@ class RuntimeData:
     """Class to hold your data."""
 
     coordinator: QvantumDataUpdateCoordinator
+    firmware_coordinator: QvantumFirmwareUpdateCoordinator | None = None
     device: DeviceInfo | None = None
 
 
@@ -65,19 +68,23 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     coordinator = QvantumDataUpdateCoordinator(hass, config_entry)
     await coordinator.async_config_entry_first_refresh()
 
-    if not coordinator.data.get('device') or not coordinator.data.get('device').get('device_metadata'):
-        _LOGGER.error("No device data found when setting up Qvantum integration, 2nd attempt")
+    if not coordinator.data.get("device") or not coordinator.data.get("device").get(
+        "device_metadata"
+    ):
+        _LOGGER.error(
+            "No device data found when setting up Qvantum integration, 2nd attempt"
+        )
         await coordinator.async_config_entry_first_refresh()
 
-    if not coordinator.data.get('device') or not coordinator.data.get('device').get('device_metadata'):
-        _LOGGER.error("No device data found when setting up Qvantum integration, failure")
+    if not coordinator.data.get("device") or not coordinator.data.get("device").get(
+        "device_metadata"
+    ):
+        _LOGGER.error(
+            "No device data found when setting up Qvantum integration, failure"
+        )
         return False
 
-    config_entry.async_on_unload(
-        config_entry.add_update_listener(_async_update_listener)
-    )
-
-    device_metadata = coordinator.data.get('device').get('device_metadata')
+    device_metadata = coordinator.data.get("device").get("device_metadata")
     device = DeviceInfo(
         identifiers={
             (DOMAIN, f"qvantum-{coordinator.data.get('device').get('id')}"),
@@ -94,7 +101,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     if not hass.services.has_service(DOMAIN, "extra_hot_water"):
         await async_setup_services(hass)
 
-    config_entry.runtime_data = RuntimeData(coordinator, device)
+    # Initialize firmware coordinator
+    firmware_coordinator = QvantumFirmwareUpdateCoordinator(
+        hass, config_entry, coordinator
+    )
+
+    config_entry.runtime_data = RuntimeData(coordinator, firmware_coordinator, device)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True
@@ -164,3 +176,45 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
         _LOGGER.debug("Migration to configuration version %s.%s successful", config_entry.version, config_entry.minor_version)
 
     return True
+
+
+async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
+    """Unload Qvantum Heat Pump Integration."""
+    unload_ok = await hass.config_entries.async_unload_platforms(
+        config_entry, PLATFORMS
+    )
+
+    if (
+        unload_ok
+        and config_entry.runtime_data
+        and config_entry.runtime_data.firmware_coordinator
+    ):
+        # Clear any firmware update notifications when unloading
+        firmware_coordinator = config_entry.runtime_data.firmware_coordinator
+
+        # Only attempt to clear notifications if we have a real coordinator with a main coordinator
+        if (
+            hasattr(firmware_coordinator, "main_coordinator")
+            and firmware_coordinator.main_coordinator
+            and hasattr(firmware_coordinator.main_coordinator, "_device")
+            and firmware_coordinator.main_coordinator._device
+        ):
+            device_id = firmware_coordinator.main_coordinator._device.get("id")
+
+            if device_id:
+                # Clear notifications for all firmware components
+                for fw_key in FIRMWARE_KEYS:
+                    notification_id = f"qvantum_firmware_update_{device_id}_{fw_key}"
+                    try:
+                        await async_dismiss(hass, notification_id)
+                        _LOGGER.debug(
+                            "Cleared firmware notification %s", notification_id
+                        )
+                    except Exception as err:
+                        _LOGGER.debug(
+                            "Could not clear firmware notification %s: %s",
+                            notification_id,
+                            err,
+                        )
+
+    return unload_ok
