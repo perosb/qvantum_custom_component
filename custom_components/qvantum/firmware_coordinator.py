@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class QvantumFirmwareUpdateCoordinator(DataUpdateCoordinator):
-    """Qvantum firmware update coordinator that checks for firmware changes every 60 minutes."""
+    """Qvantum firmware update coordinator that checks for firmware changes every 2 hours."""
 
     def __init__(
         self,
@@ -41,7 +41,7 @@ class QvantumFirmwareUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name=f"{DOMAIN} Firmware ({config_entry.unique_id})",
             update_method=self.async_check_firmware_updates,
-            update_interval=timedelta(minutes=60),  # Check every 60 minutes
+            update_interval=timedelta(hours=2),  # Check every 2 hours
         )
 
     async def async_check_firmware_updates(self):
