@@ -172,10 +172,11 @@ class TestQvantumFirmwareUpdateCoordinator:
         ]
 
         with (
-            patch(
-                "custom_components.qvantum.firmware_coordinator.async_create",
+            patch.object(
+                firmware_coordinator.hass.services,
+                "async_call",
                 new_callable=AsyncMock,
-            ) as mock_async_create,
+            ) as mock_async_call,
             patch.object(
                 firmware_coordinator,
                 "_update_device_registry_firmware_versions",
@@ -187,12 +188,13 @@ class TestQvantumFirmwareUpdateCoordinator:
             )
 
             # Verify notification was created
-            mock_async_create.assert_called_once()
-            call_args = mock_async_create.call_args
-            assert "Qvantum Firmware Updated" in call_args[1]["title"]
-            assert (
-                "1.3.5 → 1.3.6" in call_args[0][1]
-            )  # message is second positional arg
+            mock_async_call.assert_called_once()
+            call_args = mock_async_call.call_args
+            assert call_args[0][0] == "persistent_notification"  # domain
+            assert call_args[0][1] == "create"  # service
+            service_data = call_args[0][2]  # service data
+            assert "Qvantum Firmware Updated" in service_data["title"]
+            assert "1.3.5 → 1.3.6" in service_data["message"]
 
             # Verify device registry was updated
             mock_update_registry.assert_called_once_with("test_device_123")

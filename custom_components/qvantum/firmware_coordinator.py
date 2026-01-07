@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.components.persistent_notification import async_create
 
 from homeassistant.helpers.device_registry import async_get
 
@@ -169,11 +168,15 @@ Version: {from_version} → {to_version}
 The firmware has been automatically updated. No action is required.
 """
 
-                await async_create(
-                    self.hass,
-                    message,
-                    title="Qvantum Firmware Updated",
-                    notification_id=notification_id,
+                # Use service call instead of direct async_create to avoid import issues
+                await self.hass.services.async_call(
+                    "persistent_notification",
+                    "create",
+                    {
+                        "message": message,
+                        "title": "Qvantum Firmware Updated",
+                        "notification_id": notification_id,
+                    },
                 )
 
                 _LOGGER.info(

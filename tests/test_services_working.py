@@ -64,14 +64,15 @@ class TestQvantumServices:
 
         await async_setup_services(mock_hass)
 
-        # Verify service was registered
-        mock_hass.services.async_register.assert_called_once()
-        call_args = mock_hass.services.async_register.call_args
-        assert call_args[1]["domain"] == DOMAIN
-        assert call_args[1]["service"] == "extra_hot_water"
-        assert "service_func" in call_args[1]
-        assert "schema" in call_args[1]
-        # supports_response is mocked, so we don't check the exact value
+        # Verify services were registered
+        assert mock_hass.services.async_register.call_count == 1
+
+        # Check first call (extra_hot_water)
+        first_call = mock_hass.services.async_register.call_args_list[0]
+        assert first_call[1]["domain"] == DOMAIN
+        assert first_call[1]["service"] == "extra_hot_water"
+        assert "service_func" in first_call[1]
+        assert "schema" in first_call[1]
 
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_success(self, mock_hass, mock_api):
@@ -81,9 +82,9 @@ class TestQvantumServices:
         # Set up the service
         await async_setup_services(mock_hass)
 
-        # Get the registered service function
-        call_args = mock_hass.services.async_register.call_args
-        service_func = call_args[1]["service_func"]
+        # Get the registered extra_hot_water service function (first call)
+        first_call = mock_hass.services.async_register.call_args_list[0]
+        service_func = first_call[1]["service_func"]
 
         # Create a mock service call
         service_call = MagicMock()
@@ -110,9 +111,9 @@ class TestQvantumServices:
         # Set up the service
         await async_setup_services(mock_hass)
 
-        # Get the registered service function
-        call_args = mock_hass.services.async_register.call_args
-        service_func = call_args[1]["service_func"]
+        # Get the registered extra_hot_water service function (first call)
+        first_call = mock_hass.services.async_register.call_args_list[0]
+        service_func = first_call[1]["service_func"]
 
         # Create a mock service call
         service_call = MagicMock()
@@ -126,7 +127,9 @@ class TestQvantumServices:
         mock_api.set_extra_tap_water.assert_called_once_with(123, 60)
 
         # Verify exception response
-        assert result == {"qvantum": {"exception": "unknown_error", "details": "API error"}}
+        assert result == {
+            "qvantum": {"exception": "unknown_error", "details": "API error"}
+        }
 
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_different_device(self, mock_hass, mock_api):
@@ -136,13 +139,16 @@ class TestQvantumServices:
         # Set up the service
         await async_setup_services(mock_hass)
 
-        # Get the registered service function
-        call_args = mock_hass.services.async_register.call_args
-        service_func = call_args[1]["service_func"]
+        # Get the registered extra_hot_water service function (first call)
+        first_call = mock_hass.services.async_register.call_args_list[0]
+        service_func = first_call[1]["service_func"]
 
         # Create a mock service call with only device_id (minutes should default to 120)
         service_call = MagicMock()
-        service_call.data = {"device_id": 456, "minutes": 120}  # Include default minutes
+        service_call.data = {
+            "device_id": 456,
+            "minutes": 120,
+        }  # Include default minutes
         service_call.hass = mock_hass
 
         # Call the service

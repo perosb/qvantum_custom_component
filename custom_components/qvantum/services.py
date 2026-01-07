@@ -36,7 +36,9 @@ async def async_setup_services(hass: HomeAssistant):
             _LOGGER.error(
                 "Authentication failed while handling extra tap water request: %s", err
             )
-            return {"qvantum": {"exception": "authentication_failed", "details": str(err)}}
+            return {
+                "qvantum": {"exception": "authentication_failed", "details": str(err)}
+            }
         except APIConnectionError as err:
             _LOGGER.error(
                 "Connection failed while handling extra tap water request: %s", err
@@ -46,7 +48,9 @@ async def async_setup_services(hass: HomeAssistant):
             _LOGGER.error(
                 "Rate limit exceeded while handling extra tap water request: %s", err
             )
-            return {"qvantum": {"exception": "rate_limit_exceeded", "details": str(err)}}
+            return {
+                "qvantum": {"exception": "rate_limit_exceeded", "details": str(err)}
+            }
         except Exception as err:
             _LOGGER.exception(
                 "Unexpected error while handling extra tap water request: %s", err

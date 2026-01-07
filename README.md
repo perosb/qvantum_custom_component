@@ -46,6 +46,25 @@ The integration will automatically discover your Qvantum devices and create comp
 - **Smart Status**: Heat pump status, defrost cycles, priority modes
 - **Comprehensive Coverage**: Supports all major Qvantum heat pump parameters
 
+### Services
+
+The integration provides the following services for advanced control and testing:
+
+#### `qvantum.extra_hot_water`
+Schedule extra hot water production for a specified duration.
+
+**Parameters:**
+- `device_id` (integer, required): The device ID to control
+- `minutes` (integer, optional, default: 120): Duration in minutes (0-480)
+
+**Example:**
+```yaml
+service: qvantum.extra_hot_water
+data:
+  device_id: 123
+  minutes: 60
+```
+
 *Qvantum Controls in Home Assistant:*  
 ![image](https://github.com/user-attachments/assets/3b04bf83-3f1a-45d8-9aad-fdcb780abc9b)
 
