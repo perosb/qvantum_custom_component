@@ -30,9 +30,9 @@ async def async_setup_entry(
     sensors.append(
         QvantumNumberEntity(coordinator, "tap_water_capacity_target", 1, 7, 1, device)
     )
-    # sensors.append(
-    #     QvantumNumberEntity(coordinator, "room_comp_factor", 0, 10, 0.5, device)
-    # )
+    sensors.append(
+        QvantumNumberEntity(coordinator, "room_comp_factor", 0, 10, 0.5, device)
+    )
     sensors.append(
         QvantumNumberEntity(
             coordinator, "indoor_temperature_offset", -10, 10, 1, device
@@ -77,8 +77,8 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                     self._hpid, int(value)
                 )
             case "room_comp_factor":
-                response = await self.coordinator.api.set_room_comp_factor(
-                    self._hpid, int(value)
+                response = await self.coordinator.api.update_setting(
+                    self._hpid, "room_comp_factor", int(value)
                 )
             case "indoor_temperature_offset":
                 response = await self.coordinator.api.set_indoor_temperature_offset(
