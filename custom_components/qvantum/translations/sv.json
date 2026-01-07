@@ -377,7 +377,7 @@
         "name": "Latens"
       },
       "firmware_display_fw_version": {
-        "name": "Skärmfirmwareversion"
+        "name": "Display-firmwareversion"
       },
       "firmware_cc_fw_version": {
         "name": "CC-firmwareversion"
