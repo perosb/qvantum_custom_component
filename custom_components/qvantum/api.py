@@ -306,13 +306,6 @@ class QvantumAPI:
 
         return await self._update_settings(device_id, payload)
 
-    async def set_room_comp_factor(self, device_id: str, value: int):
-        """Update room_comp_factor setting."""
-
-        payload = {"settings": [{"name": "room_comp_factor", "value": value}]}
-
-        return await self._update_settings(device_id, payload)
-
     async def set_tap_water_capacity_target(self, device_id: str, capacity: int):
         """Update tap_water_capacity_target setting."""
 

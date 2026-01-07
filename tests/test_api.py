@@ -431,26 +431,6 @@ class TestQvantumAPI:
         assert result == update_data
 
     @pytest.mark.asyncio
-    async def test_set_room_comp_factor(self, mock_session):
-        """Test setting room compensation factor."""
-        update_data = load_test_data("settings_update_test_device.json")
-
-        cm, mock_response = mock_session.make_cm_response(
-            status=200, json_data=update_data
-        )
-        mock_session.patch.return_value = cm
-
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-        api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
-
-        result = await api.set_room_comp_factor("test_device", 10)
-
-        assert result == update_data
-
-    @pytest.mark.asyncio
     async def test_set_tap_water_capacity_target(self, mock_session):
         """Test setting tap water capacity target."""
         update_data = load_test_data("settings_update_test_device.json")
