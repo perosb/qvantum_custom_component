@@ -45,6 +45,7 @@ def mock_coordinator():
         },
         "settings": {
             "tap_water_capacity_target": 4,
+            "room_comp_factor": 2.5,
             "indoor_temperature_offset": 2,
             "tap_water_stop": 75,
             "tap_water_start": 55,
@@ -86,16 +87,16 @@ class TestQvantumNumberEntity:
         assert entity._attr_native_max_value == 7
         assert entity._attr_native_step == 1
 
-    def test_init_indoor_temperature_offset(self, mock_coordinator, mock_device):
-        """Test indoor temperature offset number entity initialization."""
+    def test_init_room_comp_factor(self, mock_coordinator, mock_device):
+        """Test room comp factor number entity initialization."""
         entity = QvantumNumberEntity(
-            mock_coordinator, "indoor_temperature_offset", -10, 10, 1, mock_device
+            mock_coordinator, "room_comp_factor", 0, 10, 0.5, mock_device
         )
 
-        assert entity._metric_key == "indoor_temperature_offset"
-        assert entity._attr_native_min_value == -10
+        assert entity._metric_key == "room_comp_factor"
+        assert entity._attr_native_min_value == 0
         assert entity._attr_native_max_value == 10
-        assert entity._attr_native_step == 1
+        assert entity._attr_native_step == 0.5
 
     def test_init_tap_water_stop(self, mock_coordinator, mock_device):
         """Test tap water stop number entity initialization."""
@@ -267,23 +268,23 @@ class TestQvantumNumberEntity:
         # Note: async_set_updated_data would be called if the API response status was correct
 
     @pytest.mark.asyncio
-    async def test_async_set_native_value_indoor_temperature_offset(
+    async def test_async_set_native_value_room_comp_factor(
         self, mock_coordinator, mock_device
     ):
-        """Test setting indoor temperature offset value."""
+        """Test setting room comp factor value."""
         entity = QvantumNumberEntity(
-            mock_coordinator, "indoor_temperature_offset", -10, 10, 1, mock_device
+            mock_coordinator, "room_comp_factor", 0, 10, 0.5, mock_device
         )
 
         # Mock the API response
-        mock_coordinator.api.set_indoor_temperature_offset = AsyncMock(
+        mock_coordinator.api.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
-        await entity.async_set_native_value(-3.0)
+        await entity.async_set_native_value(3.5)
 
-        mock_coordinator.api.set_indoor_temperature_offset.assert_called_once_with(
-            "test_device_123", -3
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "room_comp_factor", 3
         )
         # Note: async_set_updated_data would be called if the API response status was correct
 
@@ -352,14 +353,15 @@ class TestNumberSetup:
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
         assert (
-            len(entities) == 4
-        )  # tap_water_capacity_target, indoor_temperature_offset, tap_water_stop, tap_water_start
+            len(entities) == 5
+        )  # tap_water_capacity_target, room_comp_factor, indoor_temperature_offset, tap_water_stop, tap_water_start
         assert all(isinstance(entity, QvantumNumberEntity) for entity in entities)
 
         # Check entity keys
         entity_keys = [entity._metric_key for entity in entities]
         expected_keys = [
             "tap_water_capacity_target",
+            "room_comp_factor",
             "indoor_temperature_offset",
             "tap_water_stop",
             "tap_water_start",
