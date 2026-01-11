@@ -1139,7 +1139,6 @@ class TestQvantumAPI:
     async def test_claim_grant(self, authenticated_api):
         """Test _claim_grant method."""
         claim_data = {"message": "ok"}
-        approve_data = {"status": "approved"}
 
         # Mock claim grant
         cm, mock_response = authenticated_api._session.make_cm_response(
