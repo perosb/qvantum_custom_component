@@ -115,6 +115,7 @@ REQUIRED_METRICS = [
     "smart_sh_mode",  # Required by select component
     "smart_dhw_mode",  # Required by select component
     "use_adaptive",  # Required by select component and switch components
+    "room_comp_factor",  # Required by number component
 ]
 
 # Sensor filtering patterns
