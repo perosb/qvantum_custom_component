@@ -34,6 +34,7 @@ def mock_session():
         resp = Mock()
         resp.status = status
         resp.headers = headers or {}
+        resp.ok = 200 <= status < 400
         resp.json = AsyncMock(return_value=json_data or {})
 
         cm = Mock()
@@ -131,6 +132,7 @@ async def authenticated_api():
         resp = Mock()
         resp.status = status
         resp.headers = headers or {}
+        resp.ok = 200 <= status < 400
         resp.json = AsyncMock(return_value=json_data or {})
 
         cm = Mock()
@@ -144,7 +146,7 @@ async def authenticated_api():
 
     # Set up authentication
     api._token = "test_token"
-    api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+    api._token_expiry = datetime.datetime(2100, 1, 1)
     api._refreshtoken = "test_refresh"
 
     return api

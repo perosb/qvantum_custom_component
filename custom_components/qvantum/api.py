@@ -82,6 +82,16 @@ class QvantumAPI:
             await self._session.close()
             self._session = None
 
+    async def _handle_response(self, response: aiohttp.ClientResponse):
+        """Handle API response, raising exceptions for errors."""
+        if not response.ok:
+            if response.status == 401:
+                raise APIAuthError(response)
+            elif response.status == 429:
+                raise APIRateLimitError(response)
+            else:
+                raise APIConnectionError(response)
+
     async def unauthenticate(self):
         """Unauthenticate from the API."""
         self._token = None
@@ -204,7 +214,7 @@ class QvantumAPI:
             headers=self._request_headers(),
         ) as response:
             data = await response.json()
-            _LOGGER.debug(f"Response received {response.status}: {data}")
+            _LOGGER.debug("Response received %s: %s", response.status, data)
             return data
 
     async def _send_command(self, device_id: str, payload: dict):
@@ -221,8 +231,116 @@ class QvantumAPI:
             headers=self._request_headers(),
         ) as response:
             data = await response.json()
-            _LOGGER.debug(f"Response received {response.status}: {data}")
+            _LOGGER.debug("Response received %s: %s", response.status, data)
             return data
+
+    async def elevate_access(self, device_id: str):
+        """Elevate access for a device."""
+
+        await self._ensure_valid_token()
+
+        async with self._session.get(
+            f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
+            headers=self._request_headers(),
+        ) as response:
+            await self._handle_response(response)
+            data = await response.json()
+            _LOGGER.debug("Response received %s: %s", response.status, data)
+
+            if data.get("writeAccessLevel", 0) >= 20:
+                return data
+
+            # Access insufficient, elevate it
+            code_data = await self._generate_code(device_id)
+            if not code_data:
+                return None
+            access_code = code_data.get("accessCode")
+            if not access_code:
+                return None
+
+            claim_status = await self._claim_grant(device_id, access_code)
+            if not claim_status:
+                return None
+
+            approve_status = await self._approve_access(device_id, access_code)
+            if not approve_status:
+                return None
+
+            # Get updated access level
+            async with self._session.get(
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
+                headers=self._request_headers(),
+            ) as response:
+                await self._handle_response(response)
+                data = await response.json()
+                _LOGGER.debug("Response received %s: %s", response.status, data)
+                return data
+
+    async def _generate_code(self, device_id: str):
+        """Generate an access code for a device."""
+
+        await self._ensure_valid_token()
+
+        async with self._session.post(
+            f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/generate-access-code?use_internal_names=true",
+            headers=self._request_headers(),
+        ) as response:
+            if response.ok:
+                data = await response.json()
+                _LOGGER.debug("Response received %s: %s", response.status, data)
+                return data
+            else:
+                _LOGGER.error(
+                    "Failed to generate access code for device %s, status: %s",
+                    device_id,
+                    response.status,
+                )
+                return None
+
+    async def _claim_grant(self, device_id: str, access_code: str):
+        """Claim a grant for a device."""
+
+        await self._ensure_valid_token()
+
+        _LOGGER.debug(
+            "Claiming grant for device %s with access code %s.", device_id, access_code
+        )
+
+        async with self._session.post(
+            f"{API_INTERNAL_URL}/api/internal/v1/auth/device/claim-grant?access_code={access_code}&use_internal_names=true",
+            headers=self._request_headers(),
+        ) as response:
+            if response.ok:
+                data = await response.json()
+                _LOGGER.debug("Response received %s: %s", response.status, data)
+                return True
+            else:
+                _LOGGER.error(
+                    "Failed to claim grant for device %s, status: %s",
+                    device_id,
+                    response.status,
+                )
+                return False
+
+    async def _approve_access(self, device_id: str, access_code: str):
+        """Approve an access grant for a device."""
+
+        await self._ensure_valid_token()
+
+        async with self._session.post(
+            f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/access-grants?access_code={access_code}&approve=true&use_internal_names=true",
+            headers=self._request_headers(),
+        ) as response:
+            if response.ok:
+                _LOGGER.debug("Access approved for device %s.", device_id)
+            else:
+                _LOGGER.error(
+                    "Failed to approve access for device %s, status: %s",
+                    device_id,
+                    response.status,
+                )
+
+            return response.ok
 
     async def set_smartcontrol(self, device_id: str, sh: int, dhw: int):
         """Update smartcontrol setting."""
@@ -514,7 +632,7 @@ class QvantumAPI:
         if metadata:
             device = {**device, **metadata}
 
-        _LOGGER.debug(f"Primary device fetched: {device}")
+        _LOGGER.debug("Primary device fetched: %s", device)
 
         return device
 
