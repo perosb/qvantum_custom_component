@@ -202,10 +202,11 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
                 for fw_key in FIRMWARE_KEYS:
                     notification_id = f"qvantum_firmware_update_{device_id}_{fw_key}"
                     try:
-                        await async_dismiss(hass, notification_id)
-                        _LOGGER.debug(
-                            "Cleared firmware notification %s", notification_id
-                        )
+                        if async_dismiss is not None:
+                            await async_dismiss(hass, notification_id)
+                            _LOGGER.debug(
+                                "Cleared firmware notification %s", notification_id
+                            )
                     except Exception as err:
                         _LOGGER.debug(
                             "Could not clear firmware notification %s: %s",
