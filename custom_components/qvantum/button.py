@@ -67,7 +67,7 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
                     "Extra tap water activated for 60 minutes via button press"
                 )
             case "elevate_access":
-                # Generate a new access code
+                # Elevate access level for the device
                 response = await self.coordinator.api.elevate_access(self._hpid)
 
                 if response is None:
