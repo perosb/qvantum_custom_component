@@ -1,4 +1,4 @@
-"""QvantumFirmwareUpdateCoordinator for firmware monitoring."""
+"""QvantumMaintenanceCoordinator for firmware and access level monitoring."""
 
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ import traceback
 _LOGGER = logging.getLogger(__name__)
 
 
-class QvantumFirmwareUpdateCoordinator(DataUpdateCoordinator):
-    """Qvantum firmware update coordinator that checks for firmware changes every 2 hours."""
+class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
+    """Qvantum maintenance coordinator that checks for firmware changes and access level every 2 hours."""
 
     def __init__(
         self,
@@ -63,6 +63,9 @@ class QvantumFirmwareUpdateCoordinator(DataUpdateCoordinator):
             if not metadata or "device_metadata" not in metadata:
                 _LOGGER.debug("No device metadata available for firmware check")
                 return {}
+
+            # Fetch access level
+            access_level = await self.api.get_access_level(device_id)
 
             current_versions = metadata["device_metadata"]
             firmware_changed = False
@@ -113,6 +116,7 @@ class QvantumFirmwareUpdateCoordinator(DataUpdateCoordinator):
             return {
                 "device_id": device_id,
                 "firmware_versions": current_versions,
+                "access_level": access_level,
                 "firmware_changed": firmware_changed,
                 "last_check": datetime.now(timezone.utc)
                 .isoformat()

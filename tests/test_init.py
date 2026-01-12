@@ -32,6 +32,9 @@ class TestIntegrationSetup:
             "settings": {},
         }
 
+        mock_firmware_coordinator = MagicMock()
+        mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock()
+
         with (
             patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
             patch(
@@ -39,8 +42,8 @@ class TestIntegrationSetup:
                 return_value=mock_coordinator,
             ),
             patch(
-                "custom_components.qvantum.QvantumFirmwareUpdateCoordinator",
-                return_value=MagicMock(),
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
+                return_value=mock_firmware_coordinator,
             ),
             patch("custom_components.qvantum.services.async_setup_services"),
         ):
@@ -60,7 +63,7 @@ class TestIntegrationSetup:
                 return_value=mock_coordinator,
             ),
             patch(
-                "custom_components.qvantum.QvantumFirmwareUpdateCoordinator",
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
                 return_value=MagicMock(),
             ),
             patch("custom_components.qvantum.services.async_setup_services"),

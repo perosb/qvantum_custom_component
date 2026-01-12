@@ -276,6 +276,22 @@ class QvantumAPI:
                 _LOGGER.debug("Response received %s: %s", response.status, data)
                 return data
 
+    async def get_access_level(self, device_id: str):
+        """Get current access level for a device."""
+
+        await self._ensure_valid_token()
+
+        async with self._session.get(
+            f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
+            headers=self._request_headers(),
+        ) as response:
+            await self._handle_response(response)
+            data = await response.json()
+            _LOGGER.debug(
+                "Access level response received %s: %s", response.status, data
+            )
+            return data
+
     async def _generate_code(self, device_id: str):
         """Generate an access code for a device."""
 

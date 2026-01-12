@@ -7,7 +7,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN
 from .coordinator import QvantumDataUpdateCoordinator
-from .firmware_coordinator import QvantumFirmwareUpdateCoordinator
+from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,9 +17,7 @@ class QvantumEntity(CoordinatorEntity):
 
     def __init__(
         self,
-        coordinator: Union[
-            QvantumDataUpdateCoordinator, QvantumFirmwareUpdateCoordinator
-        ],
+        coordinator: Union[QvantumDataUpdateCoordinator, QvantumMaintenanceCoordinator],
         metric_key: str,
         device: DeviceInfo | dict[str, object],
         enabled_by_default: bool = True,

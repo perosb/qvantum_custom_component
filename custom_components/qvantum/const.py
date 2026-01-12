@@ -122,6 +122,7 @@ REQUIRED_METRICS = [
 EXCLUDED_METRIC_PATTERNS = [
     "op_man_",
     "enable",
+    "smart_",
     "picpin_",
     "qn8",
     "use_",
