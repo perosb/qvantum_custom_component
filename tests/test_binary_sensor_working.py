@@ -166,3 +166,64 @@ class TestQvantumConnectedEntity:
             True,
         )
         assert entity.available is False
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry(
+    hass, mock_config_entry, mock_coordinator, mock_device
+):
+    """Test setting up binary sensor entities."""
+    from custom_components.qvantum.binary_sensor import (
+        async_setup_entry,
+        QvantumBaseBinaryEntity,
+    )
+    from custom_components.qvantum import RuntimeData
+
+    # Mock the entity registry
+    mock_entity_registry = MagicMock()
+    hass.data["entity_registry"] = mock_entity_registry
+
+    mock_config_entry.runtime_data = RuntimeData(
+        coordinator=mock_coordinator,
+        device=mock_device,
+    )
+
+    async_add_entities = MagicMock()
+
+    # Add entity_id property to the class for the test
+    @property
+    def entity_id(self):
+        return f"binary_sensor.{self._attr_unique_id}"
+
+    QvantumBaseBinaryEntity.entity_id = entity_id
+
+    try:
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+        # Check that entities were added
+        assert async_add_entities.called
+        entities = async_add_entities.call_args[0][0]
+        assert len(entities) == 11  # 11 sensor names
+
+        # Check that we have the expected sensor types
+        sensor_names = [
+            "op_man_addition",
+            "op_man_cooling",
+            "op_man_dhw",
+            "enable_sc_dhw",
+            "enable_sc_sh",
+            "cooling_enabled",
+            "picpin_relay_heat_l1",
+            "picpin_relay_heat_l2",
+            "picpin_relay_heat_l3",
+            "picpin_relay_qm10",
+            "qn8position",
+        ]
+
+        for i, sensor_name in enumerate(sensor_names):
+            assert entities[i]._metric_key == sensor_name
+            assert entities[i]._attr_translation_key == sensor_name
+    finally:
+        # Clean up
+        if hasattr(QvantumBaseBinaryEntity, "entity_id"):
+            delattr(QvantumBaseBinaryEntity, "entity_id")
