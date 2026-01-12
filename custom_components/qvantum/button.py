@@ -27,7 +27,7 @@ async def async_setup_entry(
 ):
     """Set up the Button."""
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
-    maintenance_coordinator: QvantumMaintenanceCoordinator = (
+    maintenance_coordinator: QvantumMaintenanceCoordinator | None = (
         config_entry.runtime_data.maintenance_coordinator
     )
     device: DeviceInfo = config_entry.runtime_data.device
