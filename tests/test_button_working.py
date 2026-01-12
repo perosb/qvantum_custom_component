@@ -30,6 +30,14 @@ def mock_coordinator():
 
 
 @pytest.fixture
+def mock_maintenance_coordinator():
+    """Create a mock maintenance coordinator."""
+    coordinator = MagicMock()
+    coordinator.async_refresh = AsyncMock()
+    return coordinator
+
+
+@pytest.fixture
 def mock_device():
     """Create a mock device."""
     return DeviceInfo(
@@ -57,7 +65,10 @@ class TestQvantumButtonEntity:
 
         # Test elevate_access button
         elevate_button = QvantumButtonEntity(
-            mock_coordinator, "elevate_access", mock_device
+            mock_coordinator,
+            "elevate_access",
+            mock_device,
+            mock_maintenance_coordinator,
         )
 
         assert elevate_button._metric_key == "elevate_access"
@@ -89,11 +100,14 @@ class TestQvantumButtonEntity:
 
     @pytest.mark.asyncio
     async def test_async_press_elevate_access(
-        self, mock_coordinator, mock_device
+        self, mock_coordinator, mock_device, mock_maintenance_coordinator
     ):
         """Test pressing the elevate access button."""
         button = QvantumButtonEntity(
-            mock_coordinator, "elevate_access", mock_device
+            mock_coordinator,
+            "elevate_access",
+            mock_device,
+            mock_maintenance_coordinator,
         )
 
         await button.async_press()
@@ -101,16 +115,23 @@ class TestQvantumButtonEntity:
         mock_coordinator.api.elevate_access.assert_called_once_with(
             "test_device_123"
         )
+        # Verify maintenance coordinator is refreshed after elevating access
+        mock_maintenance_coordinator.async_refresh.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_async_press_elevate_access_failure(
-        self, mock_coordinator, mock_device, caplog
+        self, mock_coordinator, mock_device, mock_maintenance_coordinator, caplog
     ):
         """Test pressing the elevate access button when elevation fails."""
         # Mock the API to return None (failure)
         mock_coordinator.api.elevate_access = AsyncMock(return_value=None)
 
-        button = QvantumButtonEntity(mock_coordinator, "elevate_access", mock_device)
+        button = QvantumButtonEntity(
+            mock_coordinator,
+            "elevate_access",
+            mock_device,
+            mock_maintenance_coordinator,
+        )
 
         await button.async_press()
 
@@ -118,14 +139,23 @@ class TestQvantumButtonEntity:
 
         # Verify error is logged
         assert "Failed to elevate access" in caplog.text
+        # Verify maintenance coordinator is not refreshed on failure
+        mock_maintenance_coordinator.async_refresh.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_setup_entry(
-        self, hass, mock_config_entry, mock_coordinator, mock_device
+        self,
+        hass,
+        mock_config_entry,
+        mock_coordinator,
+        mock_device,
+        mock_maintenance_coordinator,
     ):
         """Test setting up button entities."""
         mock_config_entry.runtime_data = RuntimeData(
-            coordinator=mock_coordinator, device=mock_device
+            coordinator=mock_coordinator,
+            device=mock_device,
+            maintenance_coordinator=mock_maintenance_coordinator,
         )
 
         async_add_entities = MagicMock()

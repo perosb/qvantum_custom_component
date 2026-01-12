@@ -14,6 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,12 +27,19 @@ async def async_setup_entry(
 ):
     """Set up the Button."""
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
+    maintenance_coordinator: QvantumMaintenanceCoordinator = (
+        config_entry.runtime_data.maintenance_coordinator
+    )
     device: DeviceInfo = config_entry.runtime_data.device
 
     buttons = []
     buttons.append(QvantumButtonEntity(coordinator, "extra_tap_water_60min", device))
 
-    buttons.append(QvantumButtonEntity(coordinator, "elevate_access", device))
+    buttons.append(
+        QvantumButtonEntity(
+            coordinator, "elevate_access", device, maintenance_coordinator
+        )
+    )
 
     async_add_entities(buttons)
 
@@ -46,8 +54,10 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
         coordinator: QvantumDataUpdateCoordinator,
         button_key: str,
         device: DeviceInfo,
+        maintenance_coordinator: QvantumMaintenanceCoordinator | None = None,
     ) -> None:
         super().__init__(coordinator, button_key, device)
+        self._maintenance_coordinator = maintenance_coordinator
 
         if button_key == "elevate_access":
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -75,6 +85,10 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
                     return
 
                 _LOGGER.info("Access level: %s", response)
+
+                # Refresh maintenance coordinator to update access level data
+                if self._maintenance_coordinator:
+                    await self._maintenance_coordinator.async_refresh()
 
     @property
     def available(self):

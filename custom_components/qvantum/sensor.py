@@ -78,26 +78,26 @@ async def async_setup_entry(
     )
 
     # Add firmware sensors
-    firmware_coordinator = config_entry.runtime_data.firmware_coordinator
+    maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
     sensors.append(
-        QvantumAccessExpireEntity(firmware_coordinator, "expiresAt", device, True)
+        QvantumAccessExpireEntity(maintenance_coordinator, "expiresAt", device, True)
     )
     sensors.append(
         QvantumFirmwareSensorEntity(
-            firmware_coordinator, "display_fw_version", device, True
+            maintenance_coordinator, "display_fw_version", device, True
         )
     )
     sensors.append(
-        QvantumFirmwareSensorEntity(firmware_coordinator, "cc_fw_version", device, True)
+        QvantumFirmwareSensorEntity(maintenance_coordinator, "cc_fw_version", device, True)
     )
     sensors.append(
         QvantumFirmwareSensorEntity(
-            firmware_coordinator, "inv_fw_version", device, True
+            maintenance_coordinator, "inv_fw_version", device, True
         )
     )
     sensors.append(
         QvantumFirmwareLastCheckSensorEntity(
-            firmware_coordinator, "firmware_last_check", device, True
+            maintenance_coordinator, "firmware_last_check", device, True
         )
     )
 
