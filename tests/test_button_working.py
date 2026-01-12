@@ -51,7 +51,9 @@ def mock_device():
 class TestQvantumButtonEntity:
     """Test the Qvantum button entity."""
 
-    def test_button_entity_initialization(self, mock_coordinator, mock_device):
+    def test_button_entity_initialization(
+        self, mock_coordinator, mock_device, mock_maintenance_coordinator
+    ):
         """Test button entity initialization."""
         button = QvantumButtonEntity(
             mock_coordinator, "extra_tap_water_60min", mock_device
