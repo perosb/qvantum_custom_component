@@ -49,7 +49,7 @@ class RuntimeData:
     """Class to hold your data."""
 
     coordinator: QvantumDataUpdateCoordinator
-    firmware_coordinator: QvantumMaintenanceCoordinator | None = None
+    maintenance_coordinator: QvantumMaintenanceCoordinator | None = None
     device: DeviceInfo | None = None
 
 

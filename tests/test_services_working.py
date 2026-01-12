@@ -159,3 +159,117 @@ class TestQvantumServices:
 
         # Verify response
         assert result == {"qvantum": [{"status": "success"}]}
+
+    @pytest.mark.asyncio
+    async def test_extra_hot_water_service_auth_error(self, mock_hass, mock_api):
+        """Test the extra_hot_water service with authentication error."""
+        from custom_components.qvantum.api import APIAuthError
+
+        mock_hass.data[DOMAIN] = mock_api
+
+        # Make the API call raise an authentication error
+        mock_api.set_extra_tap_water.side_effect = APIAuthError(
+            None, "Invalid credentials"
+        )
+
+        # Set up the service
+        await async_setup_services(mock_hass)
+
+        # Get the registered extra_hot_water service function
+        first_call = mock_hass.services.async_register.call_args_list[0]
+        service_func = first_call[1]["service_func"]
+
+        # Create a mock service call
+        service_call = MagicMock()
+        service_call.data = {"device_id": 123, "minutes": 60}
+        service_call.hass = mock_hass
+
+        # Call the service
+        result = await service_func(service_call)
+
+        # Verify API was called
+        mock_api.set_extra_tap_water.assert_called_once_with(123, 60)
+
+        # Verify authentication error response
+        assert result == {
+            "qvantum": {
+                "exception": "authentication_failed",
+                "details": "Invalid credentials",
+            }
+        }
+
+    @pytest.mark.asyncio
+    async def test_extra_hot_water_service_connection_error(self, mock_hass, mock_api):
+        """Test the extra_hot_water service with connection error."""
+        from custom_components.qvantum.api import APIConnectionError
+
+        mock_hass.data[DOMAIN] = mock_api
+
+        # Make the API call raise a connection error
+        mock_api.set_extra_tap_water.side_effect = APIConnectionError(
+            None, "Connection timeout"
+        )
+
+        # Set up the service
+        await async_setup_services(mock_hass)
+
+        # Get the registered extra_hot_water service function
+        first_call = mock_hass.services.async_register.call_args_list[0]
+        service_func = first_call[1]["service_func"]
+
+        # Create a mock service call
+        service_call = MagicMock()
+        service_call.data = {"device_id": 123, "minutes": 60}
+        service_call.hass = mock_hass
+
+        # Call the service
+        result = await service_func(service_call)
+
+        # Verify API was called
+        mock_api.set_extra_tap_water.assert_called_once_with(123, 60)
+
+        # Verify connection error response
+        assert result == {
+            "qvantum": {
+                "exception": "connection_failed",
+                "details": "Connection timeout",
+            }
+        }
+
+    @pytest.mark.asyncio
+    async def test_extra_hot_water_service_rate_limit_error(self, mock_hass, mock_api):
+        """Test the extra_hot_water service with rate limit error."""
+        from custom_components.qvantum.api import APIRateLimitError
+
+        mock_hass.data[DOMAIN] = mock_api
+
+        # Make the API call raise a rate limit error
+        mock_api.set_extra_tap_water.side_effect = APIRateLimitError(
+            None, "Too many requests"
+        )
+
+        # Set up the service
+        await async_setup_services(mock_hass)
+
+        # Get the registered extra_hot_water service function
+        first_call = mock_hass.services.async_register.call_args_list[0]
+        service_func = first_call[1]["service_func"]
+
+        # Create a mock service call
+        service_call = MagicMock()
+        service_call.data = {"device_id": 123, "minutes": 60}
+        service_call.hass = mock_hass
+
+        # Call the service
+        result = await service_func(service_call)
+
+        # Verify API was called
+        mock_api.set_extra_tap_water.assert_called_once_with(123, 60)
+
+        # Verify rate limit error response
+        assert result == {
+            "qvantum": {
+                "exception": "rate_limit_exceeded",
+                "details": "Too many requests",
+            }
+        }
