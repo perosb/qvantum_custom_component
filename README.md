@@ -2,6 +2,17 @@
 
 ## Qvantum Exhaust Air Heat Pump Integration for Home Assistant
 
+
+> [!CAUTION]
+>This custom component uses the same internal API for all metrics that is also used by the app.  
+>It pulls live metrics from FLVP.  
+>Use at your own risk ;)  
+
+> [!WARNING]
+>The Elevate access rights works by creating a "Remote Service" access to your user.  
+>Essentially it gives you service tech/installer access.  
+>This is apparently required for us to change some settings on our own pumps.  
+
 ### Transform Your Home's Energy Efficiency with Qvantum
 
 Discover the power of intelligent home climate control with the Qvantum Exhaust Air Heat Pump integration for Home Assistant. Seamlessly monitor and control your Qvantum heat pump directly from your smart home dashboard, giving you unprecedented insight into your energy usage and system performance.
