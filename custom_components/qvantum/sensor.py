@@ -347,10 +347,11 @@ class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
         """Initialize the access expire sensor."""
         super().__init__(coordinator, metric_key, device)
         self._attr_entity_registry_enabled_default = enabled_by_default
+        self._attr_translation_key = "expires_at"
 
     @property
     def state(self) -> datetime | None:
-        """Get expiresAt from access_level data."""
+        """Get expires_at from access_level data."""
         expire_at_str = self.coordinator.data.get("access_level", {}).get(
             self._metric_key
         )

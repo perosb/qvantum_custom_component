@@ -388,7 +388,7 @@
       "firmware_last_check": {
         "name": "Firmware last checked"
       },
-      "expiresAt": {
+      "expires_at": {
         "name": "Elevated access expiration"
       }
     },
