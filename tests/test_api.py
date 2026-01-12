@@ -865,3 +865,311 @@ class TestQvantumAPI:
 
         # Should still return the response data even on error status
         assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_sufficient_level(self, authenticated_api):
+        """Test elevate_access when access level is already sufficient."""
+        access_data = {"writeAccessLevel": 25}
+
+        cm, mock_response = authenticated_api._session.make_cm_response(
+            status=200, json_data=access_data
+        )
+        authenticated_api._session.get.return_value = cm
+
+        result = await authenticated_api.elevate_access("test_device")
+
+        assert result == access_data
+        authenticated_api._session.get.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_insufficient_level(self, authenticated_api):
+        """Test elevate_access when access level is low and elevates access."""
+        initial_access_data = {"writeAccessLevel": 15}
+        generate_data = {"accessCode": "12345"}
+        claim_data = {"message": "ok"}
+        approve_data = {"status": "approved"}
+        updated_access_data = {"writeAccessLevel": 25}
+
+        # Mock initial access level check
+        cm1, mock_response1 = authenticated_api._session.make_cm_response(
+            status=200, json_data=initial_access_data
+        )
+        # Mock generate code
+        cm2, mock_response2 = authenticated_api._session.make_cm_response(
+            status=200, json_data=generate_data
+        )
+        # Mock claim grant
+        cm3, mock_response3 = authenticated_api._session.make_cm_response(
+            status=200, json_data=claim_data
+        )
+        # Mock approve access
+        cm4, mock_response4 = authenticated_api._session.make_cm_response(
+            status=200, json_data=approve_data
+        )
+        # Mock updated access level
+        cm5, mock_response5 = authenticated_api._session.make_cm_response(
+            status=200, json_data=updated_access_data
+        )
+
+        get_call_count = 0
+
+        def get_side_effect(*args, **kwargs):
+            nonlocal get_call_count
+            get_call_count += 1
+            if get_call_count == 1:
+                return cm1
+            elif get_call_count == 2:
+                return cm5
+            else:
+                raise ValueError(f"Unexpected get call count: {get_call_count}")
+
+        post_call_count = 0
+
+        def post_side_effect(*args, **kwargs):
+            nonlocal post_call_count
+            post_call_count += 1
+            if post_call_count == 1:
+                return cm2
+            elif post_call_count == 2:
+                return cm3
+            elif post_call_count == 3:
+                return cm4
+            else:
+                raise ValueError(
+                    f"Unexpected post call count: {post_call_count}, url: {args[0]}"
+                )
+
+        authenticated_api._session.get.side_effect = get_side_effect
+        authenticated_api._session.post.side_effect = post_side_effect
+
+        result = await authenticated_api.elevate_access("test_device")
+
+        assert result == updated_access_data
+        assert get_call_count == 2
+        assert post_call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_generate_code_failure(self, authenticated_api):
+        """Test elevate_access when code generation fails."""
+        initial_access_data = {"writeAccessLevel": 15}
+
+        # Mock initial access level check (insufficient)
+        cm1, mock_response1 = authenticated_api._session.make_cm_response(
+            status=200, json_data=initial_access_data
+        )
+        # Mock generate code failure (400 error)
+        cm2, mock_response2 = authenticated_api._session.make_cm_response(
+            status=400, json_data={"error": "Failed to generate code"}
+        )
+
+        get_call_count = 0
+
+        def get_side_effect(*args, **kwargs):
+            nonlocal get_call_count
+            get_call_count += 1
+            if get_call_count == 1:
+                return cm1
+            else:
+                raise ValueError(f"Unexpected get call count: {get_call_count}")
+
+        authenticated_api._session.get.side_effect = get_side_effect
+        authenticated_api._session.post.return_value = cm2
+
+        result = await authenticated_api.elevate_access("test_device")
+
+        assert result is None
+        assert get_call_count == 1  # Only initial check, no final verification
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_missing_access_code(self, authenticated_api):
+        """Test elevate_access when generate_code response lacks accessCode."""
+        initial_access_data = {"writeAccessLevel": 15}
+        generate_data = {"someOtherField": "value"}  # Missing accessCode
+
+        # Mock initial access level check
+        cm1, mock_response1 = authenticated_api._session.make_cm_response(
+            status=200, json_data=initial_access_data
+        )
+        # Mock generate code (successful but missing accessCode)
+        cm2, mock_response2 = authenticated_api._session.make_cm_response(
+            status=200, json_data=generate_data
+        )
+
+        get_call_count = 0
+
+        def get_side_effect(*args, **kwargs):
+            nonlocal get_call_count
+            get_call_count += 1
+            if get_call_count == 1:
+                return cm1
+            else:
+                raise ValueError(f"Unexpected get call count: {get_call_count}")
+
+        authenticated_api._session.get.side_effect = get_side_effect
+        authenticated_api._session.post.return_value = cm2
+
+        result = await authenticated_api.elevate_access("test_device")
+
+        assert result is None
+        assert get_call_count == 1  # Only initial check
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_claim_grant_failure(self, authenticated_api):
+        """Test elevate_access when grant claiming fails."""
+        initial_access_data = {"writeAccessLevel": 15}
+        generate_data = {"accessCode": "12345"}
+
+        # Mock initial access level check
+        cm1, mock_response1 = authenticated_api._session.make_cm_response(
+            status=200, json_data=initial_access_data
+        )
+        # Mock generate code
+        cm2, mock_response2 = authenticated_api._session.make_cm_response(
+            status=200, json_data=generate_data
+        )
+        # Mock claim grant failure
+        cm3, mock_response3 = authenticated_api._session.make_cm_response(
+            status=400, json_data={"error": "Failed to claim grant"}
+        )
+
+        get_call_count = 0
+
+        def get_side_effect(*args, **kwargs):
+            nonlocal get_call_count
+            get_call_count += 1
+            if get_call_count == 1:
+                return cm1
+            else:
+                raise ValueError(f"Unexpected get call count: {get_call_count}")
+
+        post_call_count = 0
+
+        def post_side_effect(*args, **kwargs):
+            nonlocal post_call_count
+            post_call_count += 1
+            if post_call_count == 1:
+                return cm2
+            elif post_call_count == 2:
+                return cm3
+            else:
+                raise ValueError(f"Unexpected post call count: {post_call_count}")
+
+        authenticated_api._session.get.side_effect = get_side_effect
+        authenticated_api._session.post.side_effect = post_side_effect
+
+        result = await authenticated_api.elevate_access("test_device")
+
+        assert result is None
+        assert get_call_count == 1  # Only initial check
+        assert post_call_count == 2  # Generate and failed claim
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_approve_failure(self, authenticated_api):
+        """Test elevate_access when access approval fails."""
+        initial_access_data = {"writeAccessLevel": 15}
+        generate_data = {"accessCode": "12345"}
+        claim_data = {"message": "ok"}
+
+        # Mock initial access level check
+        cm1, mock_response1 = authenticated_api._session.make_cm_response(
+            status=200, json_data=initial_access_data
+        )
+        # Mock generate code
+        cm2, mock_response2 = authenticated_api._session.make_cm_response(
+            status=200, json_data=generate_data
+        )
+        # Mock claim grant
+        cm3, mock_response3 = authenticated_api._session.make_cm_response(
+            status=200, json_data=claim_data
+        )
+        # Mock approve access failure
+        cm4, mock_response4 = authenticated_api._session.make_cm_response(status=400)
+
+        get_call_count = 0
+
+        def get_side_effect(*args, **kwargs):
+            nonlocal get_call_count
+            get_call_count += 1
+            if get_call_count == 1:
+                return cm1
+            else:
+                raise ValueError(f"Unexpected get call count: {get_call_count}")
+
+        post_call_count = 0
+
+        def post_side_effect(*args, **kwargs):
+            nonlocal post_call_count
+            post_call_count += 1
+            if post_call_count == 1:
+                return cm2
+            elif post_call_count == 2:
+                return cm3
+            elif post_call_count == 3:
+                return cm4
+            else:
+                raise ValueError(f"Unexpected post call count: {post_call_count}")
+
+        authenticated_api._session.get.side_effect = get_side_effect
+        authenticated_api._session.post.side_effect = post_side_effect
+
+        result = await authenticated_api.elevate_access("test_device")
+
+        assert result is None
+        assert get_call_count == 1  # Only initial check
+        assert post_call_count == 3  # Generate, claim, failed approve
+
+    @pytest.mark.asyncio
+    async def test_generate_code(self, authenticated_api):
+        """Test _generate_code method."""
+        generate_data = {"accessCode": "12345"}
+
+        # Mock generate code
+        cm, mock_response = authenticated_api._session.make_cm_response(
+            status=200, json_data=generate_data
+        )
+
+        authenticated_api._session.post.return_value = cm
+
+        result = await authenticated_api._generate_code("test_device")
+
+        assert result == generate_data
+        authenticated_api._session.post.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_claim_grant(self, authenticated_api):
+        """Test _claim_grant method."""
+        claim_data = {"message": "ok"}
+
+        # Mock claim grant
+        cm, mock_response = authenticated_api._session.make_cm_response(
+            status=200, json_data=claim_data
+        )
+
+        authenticated_api._session.post.return_value = cm
+
+        result = await authenticated_api._claim_grant("test_device", "12345")
+
+        assert result is True
+        authenticated_api._session.post.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_approve_access(self, authenticated_api):
+        """Test _approve_access method."""
+        cm, mock_response = authenticated_api._session.make_cm_response(status=200)
+        authenticated_api._session.post.return_value = cm
+
+        result = await authenticated_api._approve_access("test_device", "12345")
+
+        assert result is True
+        authenticated_api._session.post.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_approve_access_failure(self, authenticated_api):
+        """Test _approve_access method with failure."""
+        cm, mock_response = authenticated_api._session.make_cm_response(status=400)
+        authenticated_api._session.post.return_value = cm
+
+        result = await authenticated_api._approve_access("test_device", "12345")
+
+        assert result is False
+        authenticated_api._session.post.assert_called_once()

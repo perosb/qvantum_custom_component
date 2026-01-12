@@ -61,6 +61,9 @@
     "button": {
       "extra_tap_water_60min": {
         "name": "Extra varmvatten 60 min"
+      },
+      "elevate_access": {
+        "name": "Höj åtkomst"
       }
     },
     "binary_sensor": {

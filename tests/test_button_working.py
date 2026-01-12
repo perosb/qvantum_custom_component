@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from custom_components.qvantum.button import QvantumButtonEntity, async_setup_entry
@@ -24,6 +25,7 @@ def mock_coordinator():
     coordinator.async_set_updated_data = AsyncMock()
     coordinator.api = MagicMock()
     coordinator.api.set_extra_tap_water = AsyncMock(return_value={"status": "APPLIED"})
+    coordinator.api.elevate_access = AsyncMock(return_value={"writeAccessLevel": 30})
     return coordinator
 
 
@@ -53,6 +55,20 @@ class TestQvantumButtonEntity:
         assert button._attr_device_info == mock_device
         assert button._attr_has_entity_name is True
 
+        # Test elevate_access button
+        elevate_button = QvantumButtonEntity(
+            mock_coordinator, "elevate_access", mock_device
+        )
+
+        assert elevate_button._metric_key == "elevate_access"
+        assert elevate_button._attr_translation_key == "elevate_access"
+        assert (
+            elevate_button._attr_unique_id == "qvantum_elevate_access_test_device_123"
+        )
+        assert elevate_button._attr_device_info == mock_device
+        assert elevate_button._attr_has_entity_name is True
+        assert elevate_button._attr_entity_category == EntityCategory.DIAGNOSTIC
+
     @pytest.mark.asyncio
     async def test_async_press_extra_tap_water_60min(
         self, mock_coordinator, mock_device
@@ -71,7 +87,37 @@ class TestQvantumButtonEntity:
         mock_coordinator.async_set_updated_data.assert_called_once()
         assert mock_coordinator.data["settings"]["extra_tap_water"] == "on"
 
-    """Test button platform setup."""
+    @pytest.mark.asyncio
+    async def test_async_press_elevate_access(
+        self, mock_coordinator, mock_device
+    ):
+        """Test pressing the elevate access button."""
+        button = QvantumButtonEntity(
+            mock_coordinator, "elevate_access", mock_device
+        )
+
+        await button.async_press()
+
+        mock_coordinator.api.elevate_access.assert_called_once_with(
+            "test_device_123"
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_press_elevate_access_failure(
+        self, mock_coordinator, mock_device, caplog
+    ):
+        """Test pressing the elevate access button when elevation fails."""
+        # Mock the API to return None (failure)
+        mock_coordinator.api.elevate_access = AsyncMock(return_value=None)
+
+        button = QvantumButtonEntity(mock_coordinator, "elevate_access", mock_device)
+
+        await button.async_press()
+
+        mock_coordinator.api.elevate_access.assert_called_once_with("test_device_123")
+
+        # Verify error is logged
+        assert "Failed to elevate access" in caplog.text
 
     @pytest.mark.asyncio
     async def test_async_setup_entry(
@@ -89,6 +135,8 @@ class TestQvantumButtonEntity:
         # Check that entities were added
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
-        assert len(entities) == 1
+        assert len(entities) == 2
         assert isinstance(entities[0], QvantumButtonEntity)
         assert entities[0]._metric_key == "extra_tap_water_60min"
+        assert isinstance(entities[1], QvantumButtonEntity)
+        assert entities[1]._metric_key == "elevate_access"

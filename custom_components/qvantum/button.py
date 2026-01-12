@@ -2,11 +2,15 @@
 
 import logging
 
+from homeassistant.const import (
+    EntityCategory,
+)
+
+
 from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
@@ -27,6 +31,8 @@ async def async_setup_entry(
     buttons = []
     buttons.append(QvantumButtonEntity(coordinator, "extra_tap_water_60min", device))
 
+    buttons.append(QvantumButtonEntity(coordinator, "elevate_access", device))
+
     async_add_entities(buttons)
 
     _LOGGER.debug("Setting up platform BUTTON")
@@ -43,15 +49,32 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
     ) -> None:
         super().__init__(coordinator, button_key, device)
 
+        if button_key == "elevate_access":
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
     async def async_press(self) -> None:
         """Handle the button press."""
-        if self._metric_key == "extra_tap_water_60min":
-            # Activate extra tap water for 60 minutes
-            response = await self.coordinator.api.set_extra_tap_water(self._hpid, 60)
-            await handle_setting_update_response(
-                response, self.coordinator, "settings", "extra_tap_water", "on"
-            )
-            _LOGGER.info("Extra tap water activated for 60 minutes via button press")
+        match self._metric_key:
+            case "extra_tap_water_60min":
+                # Activate extra tap water for 60 minutes
+                response = await self.coordinator.api.set_extra_tap_water(
+                    self._hpid, 60
+                )
+                await handle_setting_update_response(
+                    response, self.coordinator, "settings", "extra_tap_water", "on"
+                )
+                _LOGGER.info(
+                    "Extra tap water activated for 60 minutes via button press"
+                )
+            case "elevate_access":
+                # Elevate access level for the device
+                response = await self.coordinator.api.elevate_access(self._hpid)
+
+                if response is None:
+                    _LOGGER.error("Failed to elevate access")
+                    return
+
+                _LOGGER.info("Access level: %s", response)
 
     @property
     def available(self):

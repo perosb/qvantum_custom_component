@@ -58,6 +58,9 @@
     "button": {
       "extra_tap_water_60min": {
         "name": "Extra heißes Wasser 60 Min"
+      },
+      "elevate_access": {
+        "name": "Zugriff erhöhen"
       }
     },
     "binary_sensor": {
