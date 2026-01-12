@@ -77,7 +77,7 @@ async def async_setup_entry(
         QvantumTimerEntity(coordinator, "extra_tap_water_stop", device, True)
     )
 
-    # Add firmware sensors
+    # Add maintenance sensors (firmware and access level)
     maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
     sensors.append(
         QvantumAccessExpireEntity(maintenance_coordinator, "expiresAt", device, True)
