@@ -102,6 +102,22 @@ class TestQvantumButtonEntity:
             "test_device_123"
         )
 
+    @pytest.mark.asyncio
+    async def test_async_press_elevate_access_failure(
+        self, mock_coordinator, mock_device, caplog
+    ):
+        """Test pressing the elevate access button when elevation fails."""
+        # Mock the API to return None (failure)
+        mock_coordinator.api.elevate_access = AsyncMock(return_value=None)
+
+        button = QvantumButtonEntity(mock_coordinator, "elevate_access", mock_device)
+
+        await button.async_press()
+
+        mock_coordinator.api.elevate_access.assert_called_once_with("test_device_123")
+
+        # Verify error is logged
+        assert "Failed to elevate access" in caplog.text
 
     @pytest.mark.asyncio
     async def test_async_setup_entry(
