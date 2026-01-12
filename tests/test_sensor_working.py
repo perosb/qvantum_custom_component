@@ -57,6 +57,7 @@ with patch(
                 QvantumLatencyEntity,
                 QvantumFirmwareSensorEntity,
                 QvantumFirmwareLastCheckSensorEntity,
+                QvantumAccessExpireEntity,
             )
 
 
@@ -117,6 +118,11 @@ def mock_firmware_coordinator(mock_coordinator):
             "display_fw_version": "1.3.6",
             "cc_fw_version": "140",
             "inv_fw_version": "140",
+        },
+        "access_level": {
+            "readAccessLevel": 20,
+            "writeAccessLevel": 20,
+            "expiresAt": "2026-01-26T18:35:29.768Z",
         },
         "last_check": "2024-01-01T12:00:00.000Z",
     }
@@ -431,3 +437,119 @@ class TestQvantumFirmwareLastCheckSensorEntity:
         )
 
         assert entity.state is None
+
+
+class TestQvantumAccessExpireEntity:
+    """Test the QvantumAccessExpireEntity class."""
+
+    def test_init(self, mock_firmware_coordinator, mock_device):
+        """Test access expire sensor entity initialization."""
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+        assert entity._attr_device_class == "timestamp"
+        assert entity._metric_key == "expiresAt"
+        assert entity._attr_translation_key == "expires_at"
+
+    def test_state_with_valid_data(self, mock_firmware_coordinator, mock_device):
+        """Test access expiration timestamp parsing with valid data."""
+
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        state = entity.state
+        assert isinstance(state, datetime)
+        assert state.year == 2026
+        assert state.month == 1
+        assert state.day == 26
+        assert state.hour == 18
+        assert state.minute == 35
+        assert state.second == 29
+
+    def test_state_with_none_data(self, mock_firmware_coordinator, mock_device):
+        """Test access expiration returns None when no data available."""
+        mock_firmware_coordinator.data = {}
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.state is None
+
+    def test_state_with_missing_access_level(
+        self, mock_firmware_coordinator, mock_device
+    ):
+        """Test access expiration returns None when access_level is missing."""
+        mock_firmware_coordinator.data = {"firmware_versions": {}}
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.state is None
+
+    def test_state_with_missing_expires_at(
+        self, mock_firmware_coordinator, mock_device
+    ):
+        """Test access expiration returns None when expiresAt key is missing."""
+        mock_firmware_coordinator.data = {
+            "access_level": {
+                "readAccessLevel": 20,
+                "writeAccessLevel": 20,
+            }
+        }
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.state is None
+
+    def test_available_with_data(self, mock_firmware_coordinator, mock_device):
+        """Test entity availability when data is present."""
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.available is True
+
+    def test_available_without_data(self, mock_firmware_coordinator, mock_device):
+        """Test entity availability when no data is present."""
+        mock_firmware_coordinator.data = {}
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.available is False
+
+    def test_available_without_access_level(
+        self, mock_firmware_coordinator, mock_device
+    ):
+        """Test entity availability when access_level is missing."""
+        mock_firmware_coordinator.data = {"firmware_versions": {}}
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.available is False
+
+    def test_available_without_expires_at(self, mock_firmware_coordinator, mock_device):
+        """Test entity availability when expiresAt key is missing."""
+        mock_firmware_coordinator.data = {
+            "access_level": {
+                "readAccessLevel": 20,
+                "writeAccessLevel": 20,
+            }
+        }
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.available is False

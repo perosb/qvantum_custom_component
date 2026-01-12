@@ -387,6 +387,9 @@
       },
       "firmware_last_check": {
         "name": "Firmware laatst gecontroleerd"
+      },
+      "expires_at": {
+        "name": "Verhoogde toegang verloopt"
       }
     },
     "number": {

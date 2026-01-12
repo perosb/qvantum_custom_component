@@ -390,6 +390,9 @@
       },
       "firmware_last_check": {
         "name": "Firmware senast kontrollerad"
+      },
+      "expires_at": {
+        "name": "Förhöjd åtkomst upphör"
       }
     },
     "number": {

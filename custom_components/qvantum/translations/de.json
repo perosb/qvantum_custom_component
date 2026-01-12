@@ -387,6 +387,9 @@
       },
       "firmware_last_check": {
         "name": "Firmware zuletzt überprüft"
+      },
+      "expires_at": {
+        "name": "Ablauf des erweiterten Zugriffs"
       }
     },
     "number": {

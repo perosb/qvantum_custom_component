@@ -1,17 +1,17 @@
-"""Tests for Qvantum firmware coordinator."""
+"""Tests for Qvantum maintenance coordinator."""
 
 import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
-from custom_components.qvantum.firmware_coordinator import (
-    QvantumFirmwareUpdateCoordinator,
+from custom_components.qvantum.maintenance_coordinator import (
+    QvantumMaintenanceCoordinator,
 )
 
 
-class TestQvantumFirmwareUpdateCoordinator:
-    """Test the firmware update coordinator."""
+class TestQvantumMaintenanceCoordinator:
+    """Test the maintenance coordinator that handles firmware updates and access level monitoring."""
 
     @pytest.fixture
     def mock_config_entry(self):
@@ -42,10 +42,10 @@ class TestQvantumFirmwareUpdateCoordinator:
         return coordinator
 
     @pytest_asyncio.fixture
-    async def firmware_coordinator(
+    async def maintenance_coordinator(
         self, hass, mock_config_entry, mock_main_coordinator
     ):
-        """Create firmware coordinator instance."""
+        """Create maintenance coordinator instance."""
         # Set up hass.data with API instance
         from custom_components.qvantum.const import DOMAIN
 
@@ -54,7 +54,7 @@ class TestQvantumFirmwareUpdateCoordinator:
 
         # Patch frame.report_usage to avoid frame helper issues in tests
         with patch("homeassistant.helpers.frame.report_usage"):
-            coordinator = QvantumFirmwareUpdateCoordinator(
+            coordinator = QvantumMaintenanceCoordinator(
                 hass=hass,
                 config_entry=mock_config_entry,
                 main_coordinator=mock_main_coordinator,
@@ -63,33 +63,33 @@ class TestQvantumFirmwareUpdateCoordinator:
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_no_device(
-        self, firmware_coordinator, mock_main_coordinator
+        self, maintenance_coordinator, mock_main_coordinator
     ):
         """Test firmware check when no device is available."""
         mock_main_coordinator._device = None
 
-        result = await firmware_coordinator.async_check_firmware_updates()
+        result = await maintenance_coordinator.async_check_firmware_updates()
 
         assert result == {}
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_no_device_id(
-        self, firmware_coordinator, mock_main_coordinator
+        self, maintenance_coordinator, mock_main_coordinator
     ):
         """Test firmware check when device has no ID."""
         mock_main_coordinator._device = {"model": "QE-6"}
 
-        result = await firmware_coordinator.async_check_firmware_updates()
+        result = await maintenance_coordinator.async_check_firmware_updates()
 
         assert result == {}
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_initial_versions(
-        self, firmware_coordinator, mock_main_coordinator
+        self, maintenance_coordinator, mock_main_coordinator
     ):
         """Test firmware check with initial version detection."""
         # Mock the API call
-        firmware_coordinator.api.get_device_metadata = AsyncMock(
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
             return_value={
                 "device_metadata": {
                     "display_fw_version": "1.3.6",
@@ -98,30 +98,38 @@ class TestQvantumFirmwareUpdateCoordinator:
                 }
             }
         )
+        maintenance_coordinator.api.get_access_level = AsyncMock(
+            return_value={
+                "readAccessLevel": 20,
+                "writeAccessLevel": 20,
+                "expiresAt": "2026-01-26T18:35:29.768Z",
+            }
+        )
 
-        result = await firmware_coordinator.async_check_firmware_updates()
+        result = await maintenance_coordinator.async_check_firmware_updates()
 
         assert result["device_id"] == "test_device_123"
         assert result["firmware_versions"]["display_fw_version"] == "1.3.6"
         assert result["firmware_versions"]["cc_fw_version"] == "140"
         assert result["firmware_versions"]["inv_fw_version"] == "140"
+        assert result["access_level"]["expiresAt"] == "2026-01-26T18:35:29.768Z"
         assert result["firmware_changed"] is False
         assert "last_check" in result
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_version_change(
-        self, firmware_coordinator, mock_main_coordinator
+        self, maintenance_coordinator, mock_main_coordinator
     ):
         """Test firmware check with version changes detected."""
         # Set initial versions
-        firmware_coordinator._last_firmware_versions = {
+        maintenance_coordinator._last_firmware_versions = {
             "display_fw_version": "1.3.5",
             "cc_fw_version": "139",
             "inv_fw_version": "139",
         }
 
         # Mock the API call with updated versions
-        firmware_coordinator.api.get_device_metadata = AsyncMock(
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
             return_value={
                 "device_metadata": {
                     "display_fw_version": "1.3.6",
@@ -130,13 +138,20 @@ class TestQvantumFirmwareUpdateCoordinator:
                 }
             }
         )
+        maintenance_coordinator.api.get_access_level = AsyncMock(
+            return_value={
+                "readAccessLevel": 20,
+                "writeAccessLevel": 20,
+                "expiresAt": "2026-01-26T18:35:29.768Z",
+            }
+        )
 
         with patch.object(
-            firmware_coordinator,
+            maintenance_coordinator,
             "_create_firmware_update_notifications",
             new_callable=AsyncMock,
         ) as mock_notifications:
-            result = await firmware_coordinator.async_check_firmware_updates()
+            result = await maintenance_coordinator.async_check_firmware_updates()
 
             assert result["device_id"] == "test_device_123"
             assert result["firmware_changed"] is True
@@ -146,21 +161,40 @@ class TestQvantumFirmwareUpdateCoordinator:
             mock_notifications.assert_called_once()
             call_args = mock_notifications.call_args[0]
             assert call_args[0] == "test_device_123"
-            assert len(call_args[1]) == 3  # Three firmware changes
+            firmware_changes = call_args[1]
+            assert len(firmware_changes) == 3  # Three firmware changes
+
+            # Verify the correct components changed
+            expected_changes = {
+                "display_fw_version": {"from_version": "1.3.5", "to_version": "1.3.6"},
+                "cc_fw_version": {"from_version": "139", "to_version": "140"},
+                "inv_fw_version": {"from_version": "139", "to_version": "140"},
+            }
+
+            for change in firmware_changes:
+                component = change["component"]
+                assert component in expected_changes
+                assert (
+                    change["from_version"]
+                    == expected_changes[component]["from_version"]
+                )
+                assert change["to_version"] == expected_changes[component]["to_version"]
 
     @pytest.mark.asyncio
-    async def test_async_check_firmware_updates_api_error(self, firmware_coordinator):
+    async def test_async_check_firmware_updates_api_error(
+        self, maintenance_coordinator
+    ):
         """Test firmware check with API authentication error."""
-        firmware_coordinator.api.get_device_metadata = AsyncMock(
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
             side_effect=Exception("API Error")
         )
 
         with pytest.raises(Exception):
-            await firmware_coordinator.async_check_firmware_updates()
+            await maintenance_coordinator.async_check_firmware_updates()
 
     @pytest.mark.asyncio
     async def test_create_firmware_update_notifications(
-        self, firmware_coordinator, mock_main_coordinator
+        self, maintenance_coordinator, mock_main_coordinator
     ):
         """Test creating firmware update notifications."""
         firmware_changes = [
@@ -173,17 +207,17 @@ class TestQvantumFirmwareUpdateCoordinator:
 
         with (
             patch.object(
-                firmware_coordinator.hass.services,
+                maintenance_coordinator.hass.services,
                 "async_call",
                 new_callable=AsyncMock,
             ) as mock_async_call,
             patch.object(
-                firmware_coordinator,
+                maintenance_coordinator,
                 "_update_device_registry_firmware_versions",
                 new_callable=AsyncMock,
             ) as mock_update_registry,
         ):
-            await firmware_coordinator._create_firmware_update_notifications(
+            await maintenance_coordinator._create_firmware_update_notifications(
                 "test_device_123", firmware_changes
             )
 
@@ -201,11 +235,11 @@ class TestQvantumFirmwareUpdateCoordinator:
 
     @pytest.mark.asyncio
     async def test_update_device_registry_firmware_versions_success(
-        self, firmware_coordinator
+        self, maintenance_coordinator
     ):
         """Test successful device registry firmware version update."""
         # Set up firmware coordinator data
-        firmware_coordinator.data = {
+        maintenance_coordinator.data = {
             "firmware_versions": {
                 "display_fw_version": "1.3.6",
                 "cc_fw_version": "140",
@@ -222,10 +256,10 @@ class TestQvantumFirmwareUpdateCoordinator:
         mock_device_registry.async_update_device = MagicMock()
 
         with patch(
-            "custom_components.qvantum.firmware_coordinator.async_get",
+            "custom_components.qvantum.maintenance_coordinator.async_get",
             return_value=mock_device_registry,
         ):
-            await firmware_coordinator._update_device_registry_firmware_versions(
+            await maintenance_coordinator._update_device_registry_firmware_versions(
                 "test_device_123"
             )
 
@@ -236,7 +270,7 @@ class TestQvantumFirmwareUpdateCoordinator:
 
     @pytest.mark.asyncio
     async def test_update_device_registry_firmware_versions_no_device(
-        self, firmware_coordinator
+        self, maintenance_coordinator
     ):
         """Test device registry update when device is not found."""
         # Mock device registry with no matching device
@@ -244,10 +278,10 @@ class TestQvantumFirmwareUpdateCoordinator:
         mock_device_registry.devices.values.return_value = []
 
         with patch(
-            "custom_components.qvantum.firmware_coordinator.async_get",
+            "custom_components.qvantum.maintenance_coordinator.async_get",
             return_value=mock_device_registry,
         ):
-            await firmware_coordinator._update_device_registry_firmware_versions(
+            await maintenance_coordinator._update_device_registry_firmware_versions(
                 "test_device_123"
             )
 
@@ -256,11 +290,11 @@ class TestQvantumFirmwareUpdateCoordinator:
 
     @pytest.mark.asyncio
     async def test_update_device_registry_firmware_versions_incomplete_data(
-        self, firmware_coordinator
+        self, maintenance_coordinator
     ):
         """Test device registry update with incomplete firmware data."""
         # Set up incomplete firmware coordinator data
-        firmware_coordinator.data = {
+        maintenance_coordinator.data = {
             "firmware_versions": {
                 "display_fw_version": "1.3.6",
                 "cc_fw_version": "140",
@@ -275,10 +309,10 @@ class TestQvantumFirmwareUpdateCoordinator:
         mock_device_registry.devices.values.return_value = [mock_device_entry]
 
         with patch(
-            "custom_components.qvantum.firmware_coordinator.async_get",
+            "custom_components.qvantum.maintenance_coordinator.async_get",
             return_value=mock_device_registry,
         ):
-            await firmware_coordinator._update_device_registry_firmware_versions(
+            await maintenance_coordinator._update_device_registry_firmware_versions(
                 "test_device_123"
             )
 
@@ -287,11 +321,11 @@ class TestQvantumFirmwareUpdateCoordinator:
 
     @pytest.mark.asyncio
     async def test_update_device_registry_firmware_versions_error(
-        self, firmware_coordinator
+        self, maintenance_coordinator
     ):
         """Test device registry update with error handling."""
         # Set up firmware coordinator data
-        firmware_coordinator.data = {
+        maintenance_coordinator.data = {
             "firmware_versions": {
                 "display_fw_version": "1.3.6",
                 "cc_fw_version": "140",
@@ -304,10 +338,10 @@ class TestQvantumFirmwareUpdateCoordinator:
         mock_device_registry.devices.values.side_effect = Exception("Registry error")
 
         with patch(
-            "custom_components.qvantum.firmware_coordinator.async_get",
+            "custom_components.qvantum.maintenance_coordinator.async_get",
             return_value=mock_device_registry,
         ):
             # Should not raise exception, just log error
-            await firmware_coordinator._update_device_registry_firmware_versions(
+            await maintenance_coordinator._update_device_registry_firmware_versions(
                 "test_device_123"
             )

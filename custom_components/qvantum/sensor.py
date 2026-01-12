@@ -36,7 +36,7 @@ from .const import (
 from .entity import QvantumEntity
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
-from .firmware_coordinator import QvantumFirmwareUpdateCoordinator
+from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,6 +79,9 @@ async def async_setup_entry(
 
     # Add firmware sensors
     firmware_coordinator = config_entry.runtime_data.firmware_coordinator
+    sensors.append(
+        QvantumAccessExpireEntity(firmware_coordinator, "expiresAt", device, True)
+    )
     sensors.append(
         QvantumFirmwareSensorEntity(
             firmware_coordinator, "display_fw_version", device, True
@@ -328,6 +331,45 @@ class QvantumTimerEntity(QvantumBaseSensorEntity):
         )
 
 
+class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
+    """Sensor for access expiration."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self,
+        coordinator: QvantumMaintenanceCoordinator,
+        metric_key: str,
+        device: DeviceInfo,
+        enabled_by_default: bool,
+    ) -> None:
+        """Initialize the access expire sensor."""
+        super().__init__(coordinator, metric_key, device)
+        self._attr_entity_registry_enabled_default = enabled_by_default
+        self._attr_translation_key = "expires_at"
+
+    @property
+    def state(self) -> datetime | None:
+        """Get expires_at from access_level data."""
+        expire_at_str = self.coordinator.data.get("access_level", {}).get(
+            self._metric_key
+        )
+        if expire_at_str:
+            return dt_utils.parse_datetime(expire_at_str)
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Check if data is available."""
+        return (
+            self.coordinator.data is not None
+            and "access_level" in self.coordinator.data
+            and self.coordinator.data.get("access_level", {}).get(self._metric_key)
+            is not None
+        )
+
+
 class QvantumLatencyEntity(QvantumBaseSensorEntity):
     """Sensor for connectivity."""
 
@@ -381,7 +423,7 @@ class QvantumFirmwareSensorEntity(QvantumEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: QvantumFirmwareUpdateCoordinator,
+        coordinator: QvantumMaintenanceCoordinator,
         firmware_key: str,
         device: DeviceInfo,
         enabled_by_default: bool,
@@ -449,7 +491,7 @@ class QvantumFirmwareLastCheckSensorEntity(QvantumEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: QvantumFirmwareUpdateCoordinator,
+        coordinator: QvantumMaintenanceCoordinator,
         sensor_key: str,
         device: DeviceInfo,
         enabled_by_default: bool,

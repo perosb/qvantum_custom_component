@@ -25,7 +25,7 @@ from homeassistant.const import (
 from .api import QvantumAPI
 from .const import DOMAIN, VERSION, CONFIG_VERSION, FIRMWARE_KEYS
 from .coordinator import QvantumDataUpdateCoordinator
-from .firmware_coordinator import QvantumFirmwareUpdateCoordinator
+from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class RuntimeData:
     """Class to hold your data."""
 
     coordinator: QvantumDataUpdateCoordinator
-    firmware_coordinator: QvantumFirmwareUpdateCoordinator | None = None
+    firmware_coordinator: QvantumMaintenanceCoordinator | None = None
     device: DeviceInfo | None = None
 
 
@@ -102,9 +102,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         await async_setup_services(hass)
 
     # Initialize firmware coordinator
-    firmware_coordinator = QvantumFirmwareUpdateCoordinator(
+    firmware_coordinator = QvantumMaintenanceCoordinator(
         hass, config_entry, coordinator
     )
+    await firmware_coordinator.async_config_entry_first_refresh()
 
     config_entry.runtime_data = RuntimeData(coordinator, firmware_coordinator, device)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
