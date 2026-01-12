@@ -65,6 +65,37 @@ data:
   minutes: 60
 ```
 
+### Elevate Access Button
+
+The **Elevate Access** button grants temporary elevated permissions to access advanced heat pump settings and maintenance functions.
+
+**Features:**
+- Temporarily elevates access level for configuration tasks
+- Automatically expires after a set time period
+- Includes expiration timestamp sensor for monitoring
+
+**Entities:**
+- `button.qvantum_elevate_access_<device_id>` - Press to elevate access
+- `sensor.qvantum_expires_at_<device_id>` - Shows when access expires
+
+**Auto-renewal automation:**
+```yaml
+automation:
+  - alias: "Auto-Elevate Access"
+    trigger:
+      - platform: time_pattern
+        hours: "9"
+    condition:
+      - condition: template
+        value_template: >
+          {% set expire_time = as_datetime(states('sensor.qvantum_expires_at_test_device_123')) %}
+          {{ expire_time is not none and (expire_time - now()).days < 1 }}
+    action:
+      - service: button.press
+        target:
+          entity_id: button.qvantum_elevate_access_test_device_123
+```
+
 *Qvantum Controls in Home Assistant:*  
 ![image](https://github.com/user-attachments/assets/3b04bf83-3f1a-45d8-9aad-fdcb780abc9b)
 
