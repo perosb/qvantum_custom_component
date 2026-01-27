@@ -16,4 +16,4 @@ updates:
     ignore:
       - dependency-name: "release-drafter/release-drafter"
         versions:
-          - "v6.1.0"
+          - "v6.5.0"
