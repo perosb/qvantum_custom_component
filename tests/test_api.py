@@ -885,7 +885,7 @@ class TestQvantumAPI:
     @pytest.mark.asyncio
     async def test_elevate_access_expires_soon(self, authenticated_api):
         """Test elevate_access when access expires within 1 day."""
-        # Set expiresAt to tomorrow (within 1 day)
+        # Set expiresAt to 12 hours from now (within 1 day)
         tomorrow = datetime.datetime.now(timezone.utc) + timedelta(hours=12)
         expires_at_str = tomorrow.isoformat().replace("+00:00", "Z")
         access_data = {"writeAccessLevel": 15, "expiresAt": expires_at_str}
