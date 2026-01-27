@@ -1,6 +1,7 @@
 """Tests for Qvantum API."""
 
 import datetime
+from datetime import timedelta, timezone
 import json
 import os
 import pytest
@@ -880,6 +881,161 @@ class TestQvantumAPI:
 
         assert result == access_data
         authenticated_api._session.get.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_expires_soon(self, authenticated_api):
+        """Test elevate_access when access expires within 1 day."""
+        # Set expiresAt to 12 hours from now (within 1 day)
+        tomorrow = datetime.datetime.now(timezone.utc) + timedelta(hours=12)
+        expires_at_str = tomorrow.isoformat().replace("+00:00", "Z")
+        access_data = {"writeAccessLevel": 15, "expiresAt": expires_at_str}
+
+        cm, mock_response = authenticated_api._session.make_cm_response(
+            status=200, json_data=access_data
+        )
+        authenticated_api._session.get.return_value = cm
+
+        result = await authenticated_api.elevate_access("test_device")
+
+        assert result == access_data
+        authenticated_api._session.get.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_expires_later(self, authenticated_api):
+        """Test elevate_access when access expires more than 1 day away."""
+        # Set expiresAt to 2 days from now
+        future = datetime.datetime.now(timezone.utc) + timedelta(days=2)
+        expires_at_str = future.isoformat().replace("+00:00", "Z")
+        initial_access_data = {"writeAccessLevel": 15, "expiresAt": expires_at_str}
+        generate_data = {"accessCode": "12345"}
+        claim_data = {"message": "ok"}
+        approve_data = {"status": "approved"}
+        updated_access_data = {"writeAccessLevel": 25}
+
+        # Mock initial access level check
+        cm1, mock_response1 = authenticated_api._session.make_cm_response(
+            status=200, json_data=initial_access_data
+        )
+        # Mock generate code
+        cm2, mock_response2 = authenticated_api._session.make_cm_response(
+            status=200, json_data=generate_data
+        )
+        # Mock claim grant
+        cm3, mock_response3 = authenticated_api._session.make_cm_response(
+            status=200, json_data=claim_data
+        )
+        # Mock approve access
+        cm4, mock_response4 = authenticated_api._session.make_cm_response(
+            status=200, json_data=approve_data
+        )
+        # Mock updated access level
+        cm5, mock_response5 = authenticated_api._session.make_cm_response(
+            status=200, json_data=updated_access_data
+        )
+
+        get_call_count = 0
+
+        def get_side_effect(*args, **kwargs):
+            nonlocal get_call_count
+            get_call_count += 1
+            if get_call_count == 1:
+                return cm1
+            elif get_call_count == 2:
+                return cm5
+            else:
+                raise ValueError(f"Unexpected get call count: {get_call_count}")
+
+        post_call_count = 0
+
+        def post_side_effect(*args, **kwargs):
+            nonlocal post_call_count
+            post_call_count += 1
+            if post_call_count == 1:
+                return cm2
+            elif post_call_count == 2:
+                return cm3
+            elif post_call_count == 3:
+                return cm4
+            else:
+                raise ValueError(
+                    f"Unexpected post call count: {post_call_count}, url: {args[0]}"
+                )
+
+        authenticated_api._session.get.side_effect = get_side_effect
+        authenticated_api._session.post.side_effect = post_side_effect
+
+        result = await authenticated_api.elevate_access("test_device")
+
+        assert result == updated_access_data
+        assert get_call_count == 2
+        assert post_call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_invalid_expires_at(self, authenticated_api):
+        """Test elevate_access when expiresAt is invalid."""
+        access_data = {"writeAccessLevel": 15, "expiresAt": "invalid-date"}
+        generate_data = {"accessCode": "12345"}
+        claim_data = {"message": "ok"}
+        approve_data = {"status": "approved"}
+        updated_access_data = {"writeAccessLevel": 25}
+
+        # Mock initial access level check
+        cm1, mock_response1 = authenticated_api._session.make_cm_response(
+            status=200, json_data=access_data
+        )
+        # Mock generate code
+        cm2, mock_response2 = authenticated_api._session.make_cm_response(
+            status=200, json_data=generate_data
+        )
+        # Mock claim grant
+        cm3, mock_response3 = authenticated_api._session.make_cm_response(
+            status=200, json_data=claim_data
+        )
+        # Mock approve access
+        cm4, mock_response4 = authenticated_api._session.make_cm_response(
+            status=200, json_data=approve_data
+        )
+        # Mock updated access level
+        cm5, mock_response5 = authenticated_api._session.make_cm_response(
+            status=200, json_data=updated_access_data
+        )
+
+        get_call_count = 0
+
+        def get_side_effect(*args, **kwargs):
+            nonlocal get_call_count
+            get_call_count += 1
+            if get_call_count == 1:
+                return cm1
+            elif get_call_count == 2:
+                return cm5
+            else:
+                raise ValueError(f"Unexpected get call count: {get_call_count}")
+
+        post_call_count = 0
+
+        def post_side_effect(*args, **kwargs):
+            nonlocal post_call_count
+            post_call_count += 1
+            if post_call_count == 1:
+                return cm2
+            elif post_call_count == 2:
+                return cm3
+            elif post_call_count == 3:
+                return cm4
+            else:
+                raise ValueError(
+                    f"Unexpected post call count: {post_call_count}, url: {args[0]}"
+                )
+
+        authenticated_api._session.get.side_effect = get_side_effect
+        authenticated_api._session.post.side_effect = post_side_effect
+
+        result = await authenticated_api.elevate_access("test_device")
+
+        assert result == updated_access_data
+        assert get_call_count == 2
+        assert post_call_count == 3
 
     @pytest.mark.asyncio
     async def test_elevate_access_insufficient_level(self, authenticated_api):
