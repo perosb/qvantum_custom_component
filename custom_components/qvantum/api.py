@@ -1,7 +1,7 @@
 """Qvantum API."""
 
 import aiohttp
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import json
 from typing import Optional
@@ -247,7 +247,18 @@ class QvantumAPI:
             data = await response.json()
             _LOGGER.debug("Response received %s: %s", response.status, data)
 
-            if data.get("writeAccessLevel", 0) >= 20:
+            expires_at = data.get("expiresAt")
+            has_sufficient_access = data.get("writeAccessLevel", 0) >= 20
+            if not has_sufficient_access and expires_at:
+                try:
+                    expires_at_dt = datetime.fromisoformat(
+                        expires_at.replace("Z", "+00:00")
+                    )
+                    if expires_at_dt < datetime.now(timezone.utc) + timedelta(days=1):
+                        has_sufficient_access = True
+                except ValueError:
+                    pass
+            if has_sufficient_access:
                 return data
 
             # Access insufficient, elevate it
