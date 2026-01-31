@@ -69,6 +69,7 @@ def mock_coordinator():
             "fan0_10v": 75,  # Fan percentage
             "compressormeasuredspeed": 3000,  # RPM
             "bf1_l_min": 25.5,  # Flow rate
+            "qn8position": 1,  # Position sensor
         },
         "settings": {
             "tap_water_start": 3600,

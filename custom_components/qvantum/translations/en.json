@@ -96,9 +96,6 @@
       },
       "picpin_relay_qm10": {
         "name": "Divertingvalve, DHW/heating (QM10)"
-      },
-      "qn8position": {
-        "name": "Shuntvalve, addition (QN8)"
       }
     },
     "sensor": {
@@ -192,6 +189,9 @@
       },
       "fanrpm": {
         "name": "Fan speed"
+      },
+      "qn8position": {
+        "name": "Shuntvalve, addition (QN8)"
       },
       "gp1_speed": {
         "name": "Circulation pump (GP1)"

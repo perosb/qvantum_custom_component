@@ -96,9 +96,6 @@
       },
       "picpin_relay_qm10": {
         "name": "Omloopklep, tapwater/verwarming (QM10)"
-      },
-      "qn8position": {
-        "name": "Sluitklep, toevoeging (QN8)"
       }
     },
     "sensor": {
@@ -192,6 +189,9 @@
       },
       "fanrpm": {
         "name": "Ventilatorsnelheid"
+      },
+      "qn8position": {
+        "name": "Sluitklep, toevoeging (QN8)"
       },
       "gp1_speed": {
         "name": "Circulatiepomp (GP1)"

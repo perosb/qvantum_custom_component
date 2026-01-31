@@ -96,9 +96,6 @@
       },
       "picpin_relay_qm10": {
         "name": "Drei-Wege-Ventil, Brauchwasser/Heizung (QM10)"
-      },
-      "qn8position": {
-        "name": "Mischventil, Zusatz (QN8)"
       }
     },
     "sensor": {
@@ -192,6 +189,9 @@
       },
       "fanrpm": {
         "name": "Lüftergeschwindigkeit"
+      },
+      "qn8position": {
+        "name": "Mischventil, Zusatz (QN8)"
       },
       "gp1_speed": {
         "name": "Heizmedium-Pumpe (GP1)"
