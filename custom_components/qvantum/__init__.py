@@ -101,13 +101,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     if not hass.services.has_service(DOMAIN, "extra_hot_water"):
         await async_setup_services(hass)
 
-    # Initialize firmware coordinator
-    firmware_coordinator = QvantumMaintenanceCoordinator(
+    # Initialize maintenance coordinator (handles firmware updates and maintenance tasks)
+    maintenance_coordinator = QvantumMaintenanceCoordinator(
         hass, config_entry, coordinator
     )
-    await firmware_coordinator.async_config_entry_first_refresh()
+    await maintenance_coordinator.async_config_entry_first_refresh()
 
-    config_entry.runtime_data = RuntimeData(coordinator, firmware_coordinator, device)
+    config_entry.runtime_data = RuntimeData(
+        coordinator, maintenance_coordinator, device
+    )
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True
@@ -184,19 +186,19 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
     if (
         unload_ok
         and config_entry.runtime_data
-        and config_entry.runtime_data.firmware_coordinator
+        and config_entry.runtime_data.maintenance_coordinator
     ):
         # Clear any firmware update notifications when unloading
-        firmware_coordinator = config_entry.runtime_data.firmware_coordinator
+        maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
 
         # Only attempt to clear notifications if we have a real coordinator with a main coordinator
         if (
-            hasattr(firmware_coordinator, "main_coordinator")
-            and firmware_coordinator.main_coordinator
-            and hasattr(firmware_coordinator.main_coordinator, "_device")
-            and firmware_coordinator.main_coordinator._device
+            hasattr(maintenance_coordinator, "main_coordinator")
+            and maintenance_coordinator.main_coordinator
+            and hasattr(maintenance_coordinator.main_coordinator, "_device")
+            and maintenance_coordinator.main_coordinator._device
         ):
-            device_id = firmware_coordinator.main_coordinator._device.get("id")
+            device_id = maintenance_coordinator.main_coordinator._device.get("id")
 
             if device_id:
                 # Clear notifications for all firmware components

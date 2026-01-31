@@ -106,7 +106,9 @@ class TestIntegrationSetup:
 
         # Add runtime_data to config entry
         mock_config_entry.runtime_data = MagicMock()
-        mock_config_entry.runtime_data.firmware_coordinator = mock_firmware_coordinator
+        mock_config_entry.runtime_data.maintenance_coordinator = (
+            mock_firmware_coordinator
+        )
 
         with patch(
             "custom_components.qvantum.async_dismiss", new_callable=AsyncMock
