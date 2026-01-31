@@ -139,7 +139,11 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
         """Set appropriate units based on metric key patterns."""
         if metric_key in ["compressormeasuredspeed", "fanrpm"]:
             self._attr_native_unit_of_measurement = "rpm"
-        elif "fan" in metric_key or metric_key.startswith("gp"):
+        elif (
+            "fan" in metric_key
+            or metric_key.startswith("gp")
+            or metric_key.startswith("qn8")
+        ):
             self._attr_native_unit_of_measurement = "%"
         elif "bf1_l_min" == metric_key:
             self._attr_native_unit_of_measurement = "l/m"

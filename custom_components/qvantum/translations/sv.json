@@ -99,9 +99,6 @@
       },
       "picpin_relay_qm10": {
         "name": "Växelventil, Varmvatten/Uppvärmning (QM10)"
-      },
-      "qn8position": {
-        "name": "Shuntventil, tillsats (QN8)"
       }
     },
     "sensor": {
@@ -195,6 +192,9 @@
       },
       "fanrpm": {
         "name": "Fläkthastighet"
+      },
+      "qn8position": {
+        "name": "Shuntventil, tillsats (QN8)"
       },
       "gp1_speed": {
         "name": "Cirkulationspump (GP1)"

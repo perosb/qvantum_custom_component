@@ -51,6 +51,7 @@ DEFAULT_ENABLED_METRICS = [
     "use_adaptive",
     "smart_sh_mode",
     "smart_dhw_mode",
+    "qn8position",
 ]
 
 DEFAULT_DISABLED_METRICS = [
@@ -79,7 +80,6 @@ DEFAULT_DISABLED_METRICS = [
     "op_mode_sensor",
     "picpin_relay_qm10",
     "price_region",
-    "qn8position",
     "room_temp_ext",
     "dhwdemand",
     "heatingdemand",
@@ -124,7 +124,6 @@ EXCLUDED_METRIC_PATTERNS = [
     "enable",
     "smart_",
     "picpin_",
-    "qn8",
     "use_",
 ]
 
