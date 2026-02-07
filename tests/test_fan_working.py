@@ -49,7 +49,11 @@ with patch(
                         ):
                             from homeassistant.helpers.device_registry import DeviceInfo
 
-                            from custom_components.qvantum.fan import QvantumFanEntity
+                            from custom_components.qvantum.fan import (
+                                QvantumFanEntity,
+                                async_setup_entry,
+                            )
+                            from custom_components.qvantum import RuntimeData
 
 
 @pytest.fixture
@@ -221,3 +225,47 @@ class TestQvantumFanEntity:
         # Data should not be updated
         assert mock_coordinator.data["settings"]["fanspeedselector"] == FAN_SPEED_STATE_NORMAL
         mock_coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_with_fan_support(
+        self, hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Test setting up fan entities when device supports fan control."""
+        mock_config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator,
+            device=mock_device,
+            maintenance_coordinator=None,
+        )
+
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+        # Check that entities were added
+        assert async_add_entities.called
+        entities = async_add_entities.call_args[0][0]
+        assert len(entities) == 1
+        assert isinstance(entities[0], QvantumFanEntity)
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_without_fan_support(
+        self, hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Test setting up fan entities when device does not support fan control."""
+        # Remove fanspeedselector from settings
+        mock_coordinator.data["settings"].pop("fanspeedselector", None)
+
+        mock_config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator,
+            device=mock_device,
+            maintenance_coordinator=None,
+        )
+
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+        # Check that no entities were added
+        assert async_add_entities.called
+        entities = async_add_entities.call_args[0][0]
+        assert len(entities) == 0

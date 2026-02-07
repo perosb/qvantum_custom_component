@@ -5,8 +5,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Import real functions before mocking
-from custom_components.qvantum import async_setup_entry, async_unload_entry
-from custom_components.qvantum.api import QvantumAPI
+from custom_components.qvantum import async_setup_entry, async_unload_entry, PLATFORMS
 
 # Mock HA imports after importing real functions
 # sys.modules['custom_components.qvantum'] = MagicMock()
@@ -50,6 +49,10 @@ class TestIntegrationSetup:
             result = await async_setup_entry(hass, mock_config_entry)
 
             assert result is True
+            # Verify that all platforms are forwarded
+            hass.config_entries.async_forward_entry_setups.assert_called_once_with(
+                mock_config_entry, PLATFORMS
+            )
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_no_device_data(

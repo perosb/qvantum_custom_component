@@ -428,28 +428,32 @@ class QvantumAPI:
     async def set_fanspeedselector(self, device_id: str, preset_mode: str):
         """Update set_fanspeedselector setting."""
 
+        # Capture current time once to ensure consistency across all code paths
+        current_time = datetime.now()
+
         match preset_mode:
             case "off":
-                value = FAN_SPEED_VALUE_OFF
+                payload = {"set_fan_mode": {"mode": 0}}
             case "normal":
-                value = FAN_SPEED_VALUE_NORMAL
+                stop_time = int(current_time.timestamp())
+                indefinite = False
+                payload = {
+                    "set_fan_mode": {"stopTime": stop_time, "indefinite": indefinite}
+                }
             case "extra":
-                value = FAN_SPEED_VALUE_EXTRA
+                stop_time = int(
+                    (
+                        current_time + timedelta(minutes=VENTILATION_BOOST_MINUTES)
+                    ).timestamp()
+                )
+                indefinite = False
+                payload = {
+                    "set_fan_mode": {"stopTime": stop_time, "indefinite": indefinite}
+                }
             case _:
                 raise ValueError(f"Invalid preset_mode: {preset_mode}")
 
-        payload = {"settings": [{"name": "fanspeedselector", "value": value}]}
-        if value == FAN_SPEED_VALUE_EXTRA:
-            stop_time = int(
-                (
-                    datetime.now() + timedelta(minutes=VENTILATION_BOOST_MINUTES)
-                ).timestamp()
-            )
-            payload["settings"].append(
-                {"name": "ventilation_boost_stop", "value": stop_time}
-            )
-
-        return await self._update_settings(device_id, payload)
+        return await self._send_command(device_id, payload)
 
     async def set_tap_water_capacity_target(self, device_id: str, capacity: int):
         """Update tap_water_capacity_target setting."""

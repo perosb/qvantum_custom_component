@@ -26,12 +26,14 @@ async def async_setup_entry(
     config_entry: MyConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
-    """Set up the Select."""
+    """Set up the Fan."""
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo = config_entry.runtime_data.device
 
     fans = []
-    fans.append(QvantumFanEntity(coordinator, "fanspeedselector", device))
+    # Only create fan entity if the device supports fan speed control
+    if "fanspeedselector" in coordinator.data.get("settings", {}):
+        fans.append(QvantumFanEntity(coordinator, "fanspeedselector", device))
 
     async_add_entities(fans)
 
