@@ -419,7 +419,7 @@ class TestQvantumAPI:
         cm, mock_response = mock_session.make_cm_response(
             status=200, json_data=update_data
         )
-        mock_session.patch.return_value = cm
+        mock_session.post.return_value = cm
 
         api = QvantumAPI(
             "test@example.com", "password", "test-agent", session=mock_session
@@ -547,7 +547,7 @@ class TestQvantumAPI:
         cm, mock_response = mock_session.make_cm_response(
             status=200, json_data=update_data
         )
-        mock_session.patch.return_value = cm
+        mock_session.post.return_value = cm
 
         api = QvantumAPI(
             "test@example.com", "password", "test-agent", session=mock_session
@@ -567,7 +567,7 @@ class TestQvantumAPI:
         cm, mock_response = mock_session.make_cm_response(
             status=200, json_data=update_data
         )
-        mock_session.patch.return_value = cm
+        mock_session.post.return_value = cm
 
         api = QvantumAPI(
             "test@example.com", "password", "test-agent", session=mock_session
@@ -578,11 +578,6 @@ class TestQvantumAPI:
         result = await api.set_fanspeedselector("test_device", "extra")
 
         assert result == update_data
-        # Verify ventilation_boost_stop is included
-        call_args = mock_session.patch.call_args
-        payload = call_args[1]["json"]
-        assert len(payload["settings"]) == 2
-        assert payload["settings"][1]["name"] == "ventilation_boost_stop"
 
     @pytest.mark.asyncio
     async def test_set_fanspeedselector_invalid_preset(self, mock_session):

@@ -38,7 +38,7 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
     Platform.BUTTON,
     Platform.SELECT,
-    # Platform.FAN,
+    Platform.FAN,
 ]
 
 type MyConfigEntry = ConfigEntry[RuntimeData]
