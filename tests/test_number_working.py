@@ -49,6 +49,8 @@ def mock_coordinator():
             "indoor_temperature_offset": 2,
             "tap_water_stop": 75,
             "tap_water_start": 55,
+            "fan_normal": 50,
+            "fan_speed_2": 25,
         },
     }
     coordinator.api = MagicMock()
@@ -130,6 +132,28 @@ class TestQvantumNumberEntity:
         assert entity._attr_native_min_value == 50
         assert entity._attr_native_max_value == 65
         assert entity._attr_native_step == 1
+
+    def test_init_fan_normal(self, mock_coordinator, mock_device):
+        """Test fan normal number entity initialization."""
+        entity = QvantumNumberEntity(
+            mock_coordinator, "fan_normal", 0, 100, 5, mock_device
+        )
+
+        assert entity._metric_key == "fan_normal"
+        assert entity._attr_native_min_value == 0
+        assert entity._attr_native_max_value == 100
+        assert entity._attr_native_step == 5
+
+    def test_init_fan_speed_2(self, mock_coordinator, mock_device):
+        """Test fan speed 2 number entity initialization."""
+        entity = QvantumNumberEntity(
+            mock_coordinator, "fan_speed_2", 0, 100, 5, mock_device
+        )
+
+        assert entity._metric_key == "fan_speed_2"
+        assert entity._attr_native_min_value == 0
+        assert entity._attr_native_max_value == 100
+        assert entity._attr_native_step == 5
 
     def test_state(self, mock_coordinator, mock_device):
         """Test getting entity state."""
@@ -362,6 +386,48 @@ class TestQvantumNumberEntity:
         )
         # Note: async_set_updated_data would be called if the API response status was correct
 
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_fan_normal(
+        self, mock_coordinator, mock_device
+    ):
+        """Test setting fan normal value."""
+        entity = QvantumNumberEntity(
+            mock_coordinator, "fan_normal", 0, 100, 5, mock_device
+        )
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_set_native_value(75.0)
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "fan_normal", 75
+        )
+        # Note: async_set_updated_data would be called if the API response status was correct
+
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_fan_speed_2(
+        self, mock_coordinator, mock_device
+    ):
+        """Test setting fan speed 2 value."""
+        entity = QvantumNumberEntity(
+            mock_coordinator, "fan_speed_2", 0, 100, 5, mock_device
+        )
+
+        # Mock the API response
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_set_native_value(40.0)
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "fan_speed_2", 40
+        )
+        # Note: async_set_updated_data would be called if the API response status was correct
+
 
 class TestNumberSetup:
     """Test number platform setup."""
@@ -385,8 +451,8 @@ class TestNumberSetup:
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
         assert (
-            len(entities) == 5
-        )  # tap_water_capacity_target, room_comp_factor, indoor_temperature_offset, tap_water_stop, tap_water_start
+            len(entities) == 7
+        )  # tap_water_capacity_target, room_comp_factor, indoor_temperature_offset, tap_water_stop, tap_water_start, fan_normal, fan_speed_2
         assert all(isinstance(entity, QvantumNumberEntity) for entity in entities)
 
         # Check entity keys
@@ -397,5 +463,7 @@ class TestNumberSetup:
             "indoor_temperature_offset",
             "tap_water_stop",
             "tap_water_start",
+            "fan_normal",
+            "fan_speed_2",
         ]
         assert entity_keys == expected_keys

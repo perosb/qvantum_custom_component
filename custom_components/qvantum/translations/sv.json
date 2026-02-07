@@ -410,6 +410,12 @@
       },
       "tap_water_start": {
         "name": "Varmvattentemperatur start"
+      },
+      "fan_normal": {
+        "name": "Normal fläkthastighet"
+      },
+      "fan_speed_2": {
+        "name": "Min fläkthastighet för kompressor"
       }
     },
     "climate": {

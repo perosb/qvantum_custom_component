@@ -407,6 +407,12 @@
       },
       "tap_water_start": {
         "name": "Brauchwasserbehälter untere Temperaturgrenze"
+      },
+      "fan_normal": {
+        "name": "Normale Lüftergeschwindigkeit"
+      },
+      "fan_speed_2": {
+        "name": "Min Lüftergeschwindigkeit für Kompressor"
       }
     },
     "climate": {
