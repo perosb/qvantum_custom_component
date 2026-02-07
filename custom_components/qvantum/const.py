@@ -116,6 +116,8 @@ REQUIRED_METRICS = [
     "smart_dhw_mode",  # Required by select component
     "use_adaptive",  # Required by select component and switch components
     "room_comp_factor",  # Required by number component
+    "fan_normal",  # Required by number component
+    "fan_speed_2",  # Required by number component
 ]
 
 # Sensor filtering patterns
