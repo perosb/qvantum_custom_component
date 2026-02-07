@@ -407,6 +407,12 @@
       },
       "tap_water_start": {
         "name": "Warmwater tank onderste temperatuur limiet"
+      },
+      "fan_normal": {
+        "name": "Normale ventilatorsnelheid"
+      },
+      "fan_speed_2": {
+        "name": "Min ventilatorsnelheid voor compressor"
       }
     },
     "climate": {

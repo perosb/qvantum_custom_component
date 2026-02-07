@@ -407,6 +407,12 @@
       },
       "tap_water_start": {
         "name": "Hot water tank lower temperature limit"
+      },
+      "fan_normal": {
+        "name": "Normal fan speed"
+      },
+      "fan_speed_2": {
+        "name": "Minimum fan speed for compressor"
       }
     },
     "climate": {

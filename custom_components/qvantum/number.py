@@ -44,6 +44,8 @@ async def async_setup_entry(
     sensors.append(
         QvantumNumberEntity(coordinator, "tap_water_start", 50, 65, 1, device)
     )
+    sensors.append(QvantumNumberEntity(coordinator, "fan_normal", 0, 100, 5, device))
+    sensors.append(QvantumNumberEntity(coordinator, "fan_speed_2", 0, 100, 5, device))
 
     async_add_entities(sensors)
 
@@ -91,6 +93,14 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
             case "tap_water_start":
                 response = await self.coordinator.api.set_tap_water_start(
                     self._hpid, int(value)
+                )
+            case "fan_normal":
+                response = await self.coordinator.api.update_setting(
+                    self._hpid, "fan_normal", int(value)
+                )
+            case "fan_speed_2":
+                response = await self.coordinator.api.update_setting(
+                    self._hpid, "fan_speed_2", int(value)
                 )
 
         await handle_setting_update_response(
