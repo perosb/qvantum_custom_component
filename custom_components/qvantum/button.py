@@ -86,9 +86,10 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
 
                 _LOGGER.info("Access level: %s", response)
 
-                # Refresh maintenance coordinator to update access level data
+                # Refresh coordinators to update access level and metrics data
                 if self._maintenance_coordinator:
                     await self._maintenance_coordinator.async_refresh()
+                await self.coordinator.async_refresh()
 
     @property
     def available(self):
