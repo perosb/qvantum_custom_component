@@ -142,27 +142,28 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
         match self._metric_key:
             case "extra_tap_water":
                 return (
-                    "extra_tap_water"
-                    in self.coordinator.data.get("settings", {})
-                    and self.coordinator.data.get("settings", {}).get(
-                        "extra_tap_water"
-                    )
+                    "extra_tap_water" in self.coordinator.data.get("settings", {})
+                    and self.coordinator.data.get("settings", {}).get("extra_tap_water")
                     is not None
+                    and self._has_write_access
                 )
             case "op_man_addition" | "op_man_dhw" | "man_mode":
                 return (
                     self._metric_key in self.coordinator.data.get("metrics", {})
                     and self.coordinator.data.get("metrics", {}).get("op_mode") == 1
+                    and self._has_write_access
                 )
             case "enable_sc_dhw" | "enable_sc_sh":
                 return (
                     self._metric_key in self.coordinator.data.get("metrics", {})
                     and self.coordinator.data.get("metrics", {}).get("use_adaptive")
                     is True
+                    and self._has_write_access
                 )
             case _:
                 return (
                     self._metric_key in self.coordinator.data.get("metrics", {})
                     and self.coordinator.data.get("metrics", {}).get(self._metric_key)
                     is not None
+                    and self._has_write_access
                 )

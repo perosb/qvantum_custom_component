@@ -76,9 +76,11 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
 
     @property
     def available(self):
+        """Return true if entity is available."""
         return (
             self._metric_key in self.coordinator.data.get("settings")
             and self.coordinator.data.get("settings").get(self._metric_key) is not None
+            and self._has_write_access
         )
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:

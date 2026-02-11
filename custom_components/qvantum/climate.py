@@ -12,8 +12,10 @@ from homeassistant.components.climate.const import HVACMode
 from homeassistant.components.climate.const import HVACAction
 from homeassistant.components.climate.const import ClimateEntityFeature
 
+from .entity import QvantumAccessMixin
+from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import handle_setting_update_response
 from . import MyConfigEntry
-from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +38,7 @@ async def async_setup_entry(
     _LOGGER.debug(f"Setting up platform CLIMATE")
 
 
-class QvantumIndoorClimateEntity(CoordinatorEntity, ClimateEntity):
+class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateEntity):
     """Sensor for qvantum."""
 
     def __init__(
@@ -81,8 +83,8 @@ class QvantumIndoorClimateEntity(CoordinatorEntity, ClimateEntity):
         """Check if data is available."""
         return (
             "bt2" in self.coordinator.data.get("metrics")
-            and self.coordinator.data.get("metrics").get("bt2")
-            is not None
+            and self.coordinator.data.get("metrics").get("bt2") is not None
+            and self._has_write_access
         )
 
     @property

@@ -12,7 +12,39 @@ from .maintenance_coordinator import QvantumMaintenanceCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 
-class QvantumEntity(CoordinatorEntity):
+class QvantumAccessMixin:
+    """Mixin to provide write access checking for Qvantum entities."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._write_access_warning_logged = False
+
+    @property
+    def _has_write_access(self) -> bool:
+        """Check if the user has write access level >= 20."""
+        try:
+            if not isinstance(self.coordinator, QvantumDataUpdateCoordinator):
+                return True  # Maintenance entities always available
+            maintenance_coordinator = (
+                self.coordinator.config_entry.runtime_data.maintenance_coordinator
+            )
+            if not maintenance_coordinator or not maintenance_coordinator.data:
+                return False
+            access_level = maintenance_coordinator.data.get("access_level", {})
+            return access_level.get("writeAccessLevel", 0) >= 20
+        except AttributeError:
+            # For tests or incomplete setup, deny write access and log misconfiguration once per entity
+            if not self._write_access_warning_logged:
+                _LOGGER.debug(
+                    "Qvantum write access check failed due to missing coordinator runtime data; "
+                    "denying write access for entity %s",
+                    getattr(self, "_attr_unique_id", self),
+                )
+                self._write_access_warning_logged = True
+            return False
+
+
+class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
     """Base class for all Qvantum entities with common initialization."""
 
     def __init__(

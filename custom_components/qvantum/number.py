@@ -141,4 +141,4 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 is not None
             )
 
-        return avail
+        return avail and self._has_write_access
