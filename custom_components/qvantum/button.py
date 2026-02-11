@@ -93,4 +93,9 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
     @property
     def available(self):
         """Check if button is available."""
-        return True
+        if self._metric_key == "elevate_access":
+            # Elevate access button is always available
+            return True
+        else:
+            # Other action buttons require write access
+            return self._has_write_access

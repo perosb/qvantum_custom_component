@@ -180,4 +180,4 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
             return False
 
         metrics = self.coordinator.data.get("metrics") or {}
-        return self._metric_key in metrics
+        return self._metric_key in metrics and self._has_write_access

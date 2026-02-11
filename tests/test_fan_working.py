@@ -72,6 +72,14 @@ def mock_coordinator():
     coordinator.api = MagicMock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
+
+    # Mock config_entry and runtime_data for access level check
+    config_entry = MagicMock()
+    maintenance_coordinator = MagicMock()
+    maintenance_coordinator.data = {"access_level": {"writeAccessLevel": 20}}
+    config_entry.runtime_data.maintenance_coordinator = maintenance_coordinator
+    coordinator.config_entry = config_entry
+
     return coordinator
 
 
