@@ -13,6 +13,7 @@ from homeassistant.components.climate.const import HVACAction
 from homeassistant.components.climate.const import ClimateEntityFeature
 
 from .entity import QvantumAccessMixin
+from .coordinator import QvantumDataUpdateCoordinator
 from .coordinator import handle_setting_update_response
 from . import MyConfigEntry
 
