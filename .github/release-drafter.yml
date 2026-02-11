@@ -7,6 +7,12 @@ template: |
   $CHANGES
 
 
+  > [!WARNING]
+  >The Elevate access rights works by assigning "Remote Service" access to your user.
+  >Essentially it gives you service tech access.
+  >This is apparently required to us to change some settings on our pumps.
+  
+  
   > [!CAUTION]
   >Uses the same internal API for all metrics that is also used by the app.
   >This API pulls live metrics from FLVP.
