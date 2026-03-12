@@ -1,0 +1,491 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Agua caliente extra"
+      },
+      "op_man_addition": {
+        "name": "Modo de operación manual: Adición"
+      },
+      "op_man_dhw": {
+        "name": "Modo de operación manual: Agua caliente sanitaria"
+      },
+      "op_mode": {
+        "name": "Modo de operación manual"
+      },
+      "man_mode": {
+        "name": "Modo de operación manual: Calefacción"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: ACS"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Calefacción"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "SmartControl",
+        "state": {
+          "off": "Apagado",
+          "0": "Eco",
+          "1": "Equilibrado",
+          "2": "Confort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Modo Smart calefacción",
+        "state": {
+          "0": "Eco",
+          "1": "Equilibrado",
+          "2": "Confort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Modo Smart ACS",
+        "state": {
+          "0": "Eco",
+          "1": "Equilibrado",
+          "2": "Confort"
+        }
+      }
+    },
+    "button": {
+      "extra_tap_water_60min": {
+        "name": "Agua caliente extra 60 min"
+      },
+      "elevate_access": {
+        "name": "Elevar acceso"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Modo de operación manual: Adición"
+      },
+      "op_man_cooling": {
+        "name": "Modo de operación manual: Refrigeración"
+      },
+      "op_man_dhw": {
+        "name": "Modo de operación manual: Agua caliente sanitaria"
+      },
+      "cooling_enabled": {
+        "name": "Refrigeración activada"
+      },
+      "use_adaptive": {
+        "name": "SmartControl"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: ACS"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Calefacción"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Potencia adicional L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Potencia adicional L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Potencia adicional L3"
+      },
+      "picpin_relay_qm10": {
+        "name": "Válvula desviadora, ACS/calefacción (QM10)"
+      }
+    },
+    "sensor": {
+      "dhwpower": {
+        "name": "Potencia ACS"
+      },
+      "heatingpower": {
+        "name": "Potencia calefacción"
+      },
+      "powertotal": {
+        "name": "Potencia total"
+      },
+      "inputcurrent1": {
+        "name": "Corriente de entrada L1"
+      },
+      "inputcurrent2": {
+        "name": "Corriente de entrada L2"
+      },
+      "inputcurrent3": {
+        "name": "Corriente de entrada L3"
+      },
+
+      "bf1_l_min": {
+        "name": "Sensor de caudal ACS (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Presión baja en bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Temperatura presión baja (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "Presión alta en bar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "Temperatura presión alta (BP2)"
+      },
+      "bt10": {
+        "name": "Temperatura salida condensador (BT10)"
+      },
+      "bt12": {
+        "name": "Medio calefactor, línea de flujo externa (BT12)"
+      },
+      "bt13": {
+        "name": "Temperatura entrada condensador (BT13)"
+      },
+      "bt14": {
+        "name": "Temperatura aire expulsado (BT14)"
+      },
+      "bt15": {
+        "name": "Temperatura aire extraído (BT15)"
+      },
+      "bt20": {
+        "name": "Línea de descarga (BT20)"
+      },
+      "bt21": {
+        "name": "Línea de líquido (BT21)"
+      },
+      "bt22": {
+        "name": "Temperatura entrada evaporador (BT22)"
+      },
+      "bt23": {
+        "name": "Línea de aspiración (BT23)"
+      },
+      "bt31": {
+        "name": "ACS primario, temperatura de carga entrada (BT31)"
+      },
+      "bt33": {
+        "name": "ACS secundario, entrada agua fría (BT33)"
+      },
+      "bt34": {
+        "name": "ACS secundario, salida agua caliente (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Velocidad compresor"
+      },
+      "dhw_outl_temp_15": {
+        "name": "Temperatura salida ACS 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "Temperatura salida ACS 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "Temperatura salida ACS máx"
+      },
+      "dhw_prioritytime": {
+        "name": "Tiempo de prioridad ACS"
+      },
+      "fan0_10v": {
+        "name": "Velocidad ventilador"
+      },
+      "fanrpm": {
+        "name": "Velocidad ventilador"
+      },
+      "qn8position": {
+        "name": "Válvula mezcladora, adición (QN8)"
+      },
+      "gp1_speed": {
+        "name": "Bomba de circulación (GP1)"
+      },
+      "gp2_speed": {
+        "name": "Bomba de carga ACS (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Temperatura deseada de guía"
+      },
+      "guide_he": {
+        "name": "Guía calefacción"
+      },
+      "man_mode": {
+        "name": "Modo manual"
+      },
+      "op_mode": {
+        "name": "Modo de operación",
+        "state": {
+          "0": "Auto",
+          "1": "Manual",
+          "2": "Adición"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Sensor modo de operación"
+      },
+      "price_region": {
+        "name": "Región de precio"
+      },
+      "room_temp_ext": {
+        "name": "Temperatura de habitación externa"
+      },
+      "compressorenergy": {
+        "name": "Energía compresor"
+      },
+      "totalenergy": {
+        "name": "Energía total"
+      },
+      "bt1": {
+        "name": "Exterior (BT1)"
+      },
+      "bt2": {
+        "name": "Interior (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Estado inteligente calefacción"
+      },
+      "bt11": {
+        "name": "Medio calefactor, línea de flujo (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "Medio calefactor, línea de flujo, objetivo."
+      },
+      "bt30": {
+        "name": "Depósito de agua caliente (BT30)"
+      },
+      "dhw_normal_start": {
+        "name": "Límite inferior depósito ACS"
+      },
+      "dhw_normal_stop": {
+        "name": "Límite superior depósito ACS"
+      },
+      "tap_water_cap": {
+        "name": "Capacidad agua caliente"
+      },
+      "additionalenergy": {
+        "name": "Energía adicional"
+      },
+      "hpid": {
+        "name": "ID"
+      },
+      "smart_sh_mode": {
+        "name": "Modo Smart calefacción",
+        "state": {
+          "0": "Eco",
+          "1": "Equilibrado",
+          "2": "Confort"
+        }
+      },
+      "hp_status": {
+        "name": "Estado bomba de calor",
+        "state": {
+          "0": "Inactivo",
+          "1": "Descongelando",
+          "2": "Agua caliente",
+          "3": "Calefacción"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Estado inteligente agua caliente sanitaria"
+      },
+      "smart_dhw_mode": {
+        "name": "Modo Smart ACS",
+        "state": {
+          "0": "Eco",
+          "1": "Equilibrado",
+          "2": "Confort"
+        }
+      },
+      "extra_tap_water_stop": {
+        "name": "Parada agua caliente extra"
+      },
+      "ventilation_boost_stop": {
+        "name": "Parada ventilación reforzada"
+      },
+      "timestamp": {
+        "name": "Última actualización"
+      },
+      "latency": {
+        "name": "Latencia"
+      },
+      "disconnect_reason": {
+        "name": "Motivo de desconexión",
+        "state": {
+          "client-disconnect": "Cliente desconectado"
+        }
+      },
+      "dhwdemand": {
+        "name": "Demanda ACS"
+      },
+      "heatingdemand": {
+        "name": "Demanda calefacción"
+      },
+      "coolingdemand": {
+        "name": "Demanda refrigeración"
+      },
+      "heatingreleased": {
+        "name": "Calefacción liberada"
+      },
+      "coolingreleased": {
+        "name": "Refrigeración liberada"
+      },
+      "compressorreleased": {
+        "name": "Compresor liberado"
+      },
+      "additionreleased": {
+        "name": "Adición liberada"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "Tiempo de prioridad ACS restante"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Tiempo de prioridad calefacción restante"
+      },
+      "cooling_priotitytimeleft": {
+        "name": "Tiempo de prioridad refrigeración restante"
+      },
+      "switch_state": {
+        "name": "Estado del interruptor"
+      },
+      "dhwstop_temp": {
+        "name": "Temperatura de parada ACS"
+      },
+      "dhwstart_temp": {
+        "name": "Temperatura de inicio ACS"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Temperatura exterior filtrada (60s)"
+      },
+      "max_freq_env": {
+        "name": "Frecuencia máxima del entorno"
+      },
+      "calc_suppy_cpr": {
+        "name": "Suministro CPR calculado"
+      },
+      "dhw_set": {
+        "name": "Ajuste ACS"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "Filtro temperatura BP1 20 min"
+      },
+      "max_bp2_env": {
+        "name": "BP2 máx del entorno"
+      },
+      "picpin_mask": {
+        "name": "Máscara PIC Pin"
+      },
+      "firmware_display_fw_version": {
+        "name": "Versión firmware pantalla"
+      },
+      "firmware_cc_fw_version": {
+        "name": "Versión firmware CC"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Versión firmware inversor"
+      },
+      "firmware_last_check": {
+        "name": "Última comprobación firmware"
+      },
+      "expires_at": {
+        "name": "Expiración acceso elevado"
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Desplazamiento curva paralela"
+      },
+      "tap_water_capacity_target": {
+        "name": "Objetivo de capacidad de agua caliente"
+      },
+      "room_comp_factor": {
+        "name": "Factor de compensación de habitación"
+      },
+      "tap_water_stop": {
+        "name": "Límite superior de temperatura del depósito ACS"
+      },
+      "tap_water_start": {
+        "name": "Límite inferior de temperatura del depósito ACS"
+      },
+      "fan_normal": {
+        "name": "Velocidad normal del ventilador"
+      },
+      "fan_speed_2": {
+        "name": "Velocidad mínima del ventilador para el compresor"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Clima interior"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Velocidad ventilador",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Apagado",
+              "normal": "Normal",
+              "extra": "Extra"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Bomba de calor Qvantum",
+    "abort": {
+      "already_configured": "El dispositivo ya está configurado",
+      "reconfigure_successful": "Reconfiguración correcta"
+    },
+    "error": {
+      "cannot_connect": "Error al conectar",
+      "invalid_auth": "Autenticación no válida",
+      "unknown": "Error inesperado"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "password": "Contraseña",
+          "username": "Nombre de usuario"
+        }
+      },
+      "reconfigure": {
+        "data": {
+          "password": "Contraseña",
+          "username": "Nombre de usuario"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Intervalo de exploración (segundos)"
+        },
+        "description": "Modifique sus opciones.",
+        "title": "Opciones"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Agua caliente extra",
+      "description": "Activa agua caliente extra durante un período",
+      "fields": {
+        "device_id": {
+          "name": "ID del dispositivo",
+          "description": "El id del dispositivo Qvantum"
+        },
+        "minutes": {
+          "name": "Minutos",
+          "description": "Minutos para producir agua caliente extra (0 minutos desactiva)"
+        }
+      }
+    }
+  }
+}
