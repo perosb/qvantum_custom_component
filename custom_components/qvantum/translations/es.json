@@ -479,7 +479,7 @@
       "fields": {
         "device_id": {
           "name": "ID del dispositivo",
-          "description": "El id del dispositivo Qvantum"
+          "description": "El ID del dispositivo Qvantum"
         },
         "minutes": {
           "name": "Minutos",
