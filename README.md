@@ -91,20 +91,16 @@ The **Elevate Access** button grants temporary elevated permissions to access ad
 
 **Auto-renewal automation:**
 ```yaml
-automation:
-  - alias: "Auto-Elevate Access"
-    trigger:
-      - platform: time_pattern
-        hours: "9"
-    condition:
-      - condition: template
-        value_template: >
-          {% set expire_time = as_datetime(states('sensor.qvantum_expires_at_test_device_123')) %}
-          {{ expire_time is not none and (expire_time - now()).days < 1 }}
-    action:
-      - service: button.press
-        target:
-          entity_id: button.qvantum_elevate_access_test_device_123
+alias: "Qvantum: Elevate Access Before Expiration"
+triggers:
+  - trigger: time
+    at:
+      entity_id: sensor.qvantum_forhojd_atkomst_upphor
+      offset: "10"
+actions:
+  - target:
+      entity_id: button.qvantum_hoj_atkomst
+    action: button.press
 ```
 
 *Qvantum Controls in Home Assistant:*  
