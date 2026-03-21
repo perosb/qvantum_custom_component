@@ -54,7 +54,6 @@ def mock_coordinator():
         },
         "settings": {
             "extra_tap_water": None,  # Will be set based on test
-            "extra_tap_water_stop": None,
         },
     }
     coordinator.api = MagicMock()

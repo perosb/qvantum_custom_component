@@ -284,7 +284,7 @@
       "timestamp": {
         "name": "Senaste uppdatering"
       },
-      "extra_tap_water_stop": {
+      "tap_stop": {
         "name": "Extra varmvatten stopp"
       },
       "ventilation_boost_stop": {

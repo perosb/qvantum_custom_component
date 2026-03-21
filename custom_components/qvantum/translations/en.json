@@ -298,7 +298,7 @@
           "2": "Comfort"
         }
       },
-      "extra_tap_water_stop": {
+      "tap_stop": {
         "name": "Extra hot water stop"
       },
       "ventilation_boost_stop": {

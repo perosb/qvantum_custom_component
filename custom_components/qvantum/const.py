@@ -118,6 +118,7 @@ REQUIRED_METRICS = [
     "room_comp_factor",  # Required by number component
     "fan_normal",  # Required by number component
     "fan_speed_2",  # Required by number component
+    "tap_stop",  # Required for tap water stop calculation
 ]
 
 # Sensor filtering patterns
