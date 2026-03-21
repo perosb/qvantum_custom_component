@@ -73,9 +73,7 @@ async def async_setup_entry(
     sensors.append(QvantumTotalEnergyEntity(coordinator, "totalenergy", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "latency", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device, True))
-    sensors.append(
-        QvantumTimerEntity(coordinator, "extra_tap_water_stop", device, True)
-    )
+    sensors.append(QvantumTimerEntity(coordinator, "tap_stop", device, True))
 
     # Add maintenance sensors (firmware and access level)
     maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
@@ -322,16 +320,16 @@ class QvantumTimerEntity(QvantumBaseSensorEntity):
     @property
     def state(self):
         """Get metric from API data."""
-        epoch = self.coordinator.data.get("settings").get(self._metric_key)
+        epoch = self.coordinator.data.get("metrics").get(self._metric_key)
         return dt_utils.utc_from_timestamp(epoch)
 
     @property
     def available(self):
         """Check if data is available."""
         return (
-            self._metric_key in self.coordinator.data.get("settings")
-            and self.coordinator.data.get("settings").get(self._metric_key) is not None
-            and self.coordinator.data.get("settings").get(self._metric_key) > 0
+            self._metric_key in self.coordinator.data.get("metrics")
+            and self.coordinator.data.get("metrics").get(self._metric_key) is not None
+            and self.coordinator.data.get("metrics").get(self._metric_key) > 0
         )
 
 

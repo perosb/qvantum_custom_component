@@ -18,7 +18,6 @@ def mock_coordinator():
         "metrics": {"hpid": "test_device_123"},
         "settings": {
             "extra_tap_water": None,  # Will be set based on test
-            "extra_tap_water_stop": None,
         },
     }
     coordinator.async_refresh = AsyncMock()
