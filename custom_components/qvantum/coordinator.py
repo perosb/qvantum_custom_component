@@ -186,6 +186,11 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("Fetching primary device info")
                 self._device = await self.api.get_primary_device()
 
+            # Validate device information before accessing it
+            if self._device is None:
+                raise UpdateFailed("No devices found")
+            if not isinstance(self._device, dict):
+                raise UpdateFailed(f"Invalid device data type: {type(self._device)}")
             device_id = self._device.get("id")
             if not device_id:
                 raise UpdateFailed("Device ID not found in device data")
