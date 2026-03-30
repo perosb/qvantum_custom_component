@@ -25,6 +25,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     DEFAULT_ENABLED_METRICS,
+    DEFAULT_DISABLED_HTTP_METRICS,
     EXCLUDED_METRIC_PATTERNS,
     TEMPERATURE_METRICS,
     ENERGY_METRICS,
@@ -50,18 +51,28 @@ async def async_setup_entry(
     device: DeviceInfo | dict = config_entry.runtime_data.device
 
     sensors = []
-    metrics = DEFAULT_ENABLED_METRICS
+
+    if coordinator.modbus_enabled:
+        # In Modbus mode, only include the core supported default metrics.
+        metrics = DEFAULT_ENABLED_METRICS
+    else:
+        # In HTTP mode we also expose the optional HTTP-only metrics (disabled by default).
+        metrics = DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_HTTP_METRICS
 
     for metric in metrics:
         if _should_exclude_metric(metric):
             continue
 
+        enabled_by_default = metric not in DEFAULT_DISABLED_HTTP_METRICS
+
         sensor_class = _get_sensor_type(metric)
+
         sensors.append(
             sensor_class(
                 coordinator,
                 metric,
                 device,
+                enabled_by_default,
             )
         )
 
@@ -208,8 +219,7 @@ class QvantumPowerEntity(QvantumBaseSensorEntity):
         super().__init__(coordinator, metric_key, device, enabled_by_default)
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        if getattr(self, "_attr_native_unit_of_measurement", None) is None:
-            self._attr_native_unit_of_measurement = UnitOfPower.WATT
+        self._attr_native_unit_of_measurement = UnitOfPower.WATT
 
 
 class QvantumCurrentEntity(QvantumBaseSensorEntity):

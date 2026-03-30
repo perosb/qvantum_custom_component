@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import APIAuthError
 from .const import (
+    DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     SETTING_UPDATE_APPLIED,
@@ -54,12 +55,12 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         )
 
         # Modbus may be configured in options or in legacy config entry data.
-        modbus_enabled = config_entry.options.get(
+        self.modbus_enabled = config_entry.options.get(
             CONF_MODBUS_TCP,
             config_entry.data.get(CONF_MODBUS_TCP, False),
         )
 
-        if modbus_enabled:
+        if self.modbus_enabled:
             self.poll_interval = min(self.poll_interval, 15)  # Faster for Modbus
 
         self.api = hass.data[DOMAIN]
@@ -94,7 +95,14 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                     metric_key = entity.unique_id[
                         len("qvantum_") : -len(f"_{device_id}")
                     ]
-                    if metric_key in DEFAULT_ENABLED_METRICS:
+
+                    # Known metrics include the default metrics always.
+                    # HTTP-only disabled metrics are only known in HTTP mode.
+                    allowed_metrics = set(DEFAULT_ENABLED_METRICS)
+                    if not self.modbus_enabled:
+                        allowed_metrics |= set(DEFAULT_DISABLED_HTTP_METRICS)
+
+                    if metric_key in allowed_metrics:
                         known_metrics.add(metric_key)
                         if entity.disabled_by is None:
                             enabled_metrics.add(metric_key)

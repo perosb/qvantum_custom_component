@@ -385,8 +385,8 @@ class TestSensorSetup:
     async def test_async_setup_entry_disables_default_disabled_entities(
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):
-        """Test that entities in DEFAULT_DISABLED_METRICS are disabled on first setup."""
-        from custom_components.qvantum.const import DEFAULT_DISABLED_METRICS
+        """Test that entities in DEFAULT_DISABLED_HTTP_METRICS are disabled on first setup."""
+        from custom_components.qvantum.const import DEFAULT_DISABLED_HTTP_METRICS
 
         # Mock entity registry - entities don't exist yet (first setup)
         mock_entity_registry = mock_hass.data["entity_registry"]
@@ -424,6 +424,43 @@ class TestSensorSetup:
             args, kwargs = call
             assert "disabled_by" in kwargs
             assert kwargs["disabled_by"] == RegistryEntryDisabler.INTEGRATION
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_excludes_http_disabled_metrics(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Test that in Modbus mode HTTP-only disabled metrics are not created."""
+        from custom_components.qvantum.const import (
+            CONF_MODBUS_TCP,
+            DEFAULT_DISABLED_HTTP_METRICS,
+        )
+
+        # Mark config entry as Modbus mode
+        mock_config_entry.options = {CONF_MODBUS_TCP: True}
+        mock_coordinator.modbus_enabled = True
+
+        # Mock async_add_entities to assign entity_ids
+        def mock_async_add_entities(entities):
+            for sensor in entities:
+                sensor.entity_id = f"sensor.qvantum_{sensor._metric_key}_{sensor._hpid}"
+
+        async_add_entities = MagicMock(side_effect=mock_async_add_entities)
+
+        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        assert async_add_entities.called
+        entities = async_add_entities.call_args[0][0]
+
+        disabled_entities = [
+            entity
+            for entity in entities
+            if entity._metric_key in DEFAULT_DISABLED_HTTP_METRICS
+        ]
+
+        assert disabled_entities == []
+
+        mock_entity_registry = mock_hass.data["entity_registry"]
+        assert mock_entity_registry.async_update_entity.call_count == 0
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_respects_user_enabled_entities(
@@ -487,7 +524,7 @@ class TestSensorSetup:
     ):
         """Test that entities disabled by integration can be updated on subsequent restarts."""
         from custom_components.qvantum.const import (
-            DEFAULT_DISABLED_METRICS,
+            DEFAULT_DISABLED_HTTP_METRICS,
             EXCLUDED_METRIC_PATTERNS,
         )
 
@@ -495,10 +532,13 @@ class TestSensorSetup:
         expected_calls = len(
             [
                 metric
-                for metric in DEFAULT_DISABLED_METRICS
+                for metric in DEFAULT_DISABLED_HTTP_METRICS
                 if not any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
             ]
         )
+
+        # Ensure this test runs in HTTP mode (not modbus), since we expect HTTP-disabled metrics to be created.
+        mock_coordinator.modbus_enabled = False
 
         # Mock entity registry - all disabled entities exist and are disabled by integration
         mock_entity_registry = mock_hass.data["entity_registry"]
@@ -520,7 +560,7 @@ class TestSensorSetup:
                 should_exclude = any(
                     pattern in metric_key for pattern in EXCLUDED_METRIC_PATTERNS
                 )
-                if metric_key in DEFAULT_DISABLED_METRICS and not should_exclude:
+                if metric_key in DEFAULT_DISABLED_HTTP_METRICS and not should_exclude:
                     return mock_entity
             return None
 
@@ -536,9 +576,6 @@ class TestSensorSetup:
 
         await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
 
-        # Since this integration now only creates enabled-by-default sensors,
-        # no entities should be updated to disabled_by=INTEGRATION on restart.
-        assert mock_entity_registry.async_update_entity.call_count == 0
-
-        # Verify no integration-disabling calls were made
-        assert mock_entity_registry.async_update_entity.call_args_list == []
+        # The integration still checks and updates disabled HTTP metrics, so we expect
+        # integration-disabled call for each disabled metric that is included.
+        assert mock_entity_registry.async_update_entity.call_count == expected_calls

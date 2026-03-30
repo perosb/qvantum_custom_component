@@ -22,7 +22,7 @@ from .const import (
     FAN_SPEED_STATE_OFF,
     DEFAULT_ENABLED_METRICS,
     TAP_WATER_CAPACITY_MAPPINGS,
-    MODBUS_REGISTER_MAP,
+    MODBUS_INPUT_REGISTER_MAP,
     MODBUS_HOLDING_REGISTER_MAP,
     RELAY_BIT_MAP,
     MODBUS_SPEC_TO_INTERNAL_MAP,
@@ -315,7 +315,7 @@ class QvantumAPI:
         metrics = await self._read_modbus_registers(
             device_id=device_id,
             enabled_items=enabled_metrics_original,
-            register_map=MODBUS_REGISTER_MAP,
+            register_map=MODBUS_INPUT_REGISTER_MAP,
             use_input_registers=True,
             handle_relay_bits=True,
         )

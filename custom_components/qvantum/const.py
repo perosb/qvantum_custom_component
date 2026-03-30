@@ -82,7 +82,7 @@ DEFAULT_ENABLED_METRICS = [
     "powertotal",
 ]
 
-DEFAULT_DISABLED_METRICS = [
+DEFAULT_DISABLED_HTTP_METRICS = [
     "gp2_speed",
     "calc_suppy_cpr",  # Note: Typo is in the original data
     "btx",
@@ -206,7 +206,7 @@ RELAY_STAGE_POWER_MAP = {
 }
 
 # Modbus data mappings moved from api.py
-MODBUS_REGISTER_MAP = {
+MODBUS_INPUT_REGISTER_MAP = {
     "bt1 - fast filtered (1min) outdoor temp": (0, "int16", 0.1),
     "bt2 - indoor temperature": (2, "int16", 0.1),
     "bt4 sensor value": (4, "int16", 0.1),
@@ -265,143 +265,133 @@ MODBUS_REGISTER_MAP = {
 }
 
 MODBUS_HOLDING_REGISTER_MAP = {
-    # System control
-    "unit_on_off": (0, "uint16", 1.0),  # Unit On/Off (0=Off, 1=On)
+    "unit_on_off": (0, "uint16", 1.0),
     "operation_mode": (
         1,
         "uint16",
         1.0,
-    ),  # Operation mode (see Modbus specification for value definitions)
-    "allow_heating": (2, "uint16", 1.0),  # Allow heating in manual mode (0=No, 1=Yes)
-    "allow_cooling": (3, "uint16", 1.0),  # Allow cooling in manual mode (0=No, 1=Yes)
-    "allow_addition": (4, "uint16", 1.0),  # Allow addition in manual mode (0=No, 1=Yes)
-    "allow_dhw": (5, "uint16", 1.0),  # Allow DHW in manual mode (0=No, 1=Yes)
-    # Timing and protection
-    "time_between_modes": (6, "uint16", 1.0),  # Time between heating and cooling (h)
+    ),
+    "allow_heating": (2, "uint16", 1.0),
+    "allow_cooling": (3, "uint16", 1.0),
+    "allow_addition": (4, "uint16", 1.0),
+    "allow_dhw": (5, "uint16", 1.0),
+    "time_between_modes": (6, "uint16", 1.0),
     "allow_addition_temp": (
         7,
         "int16",
         1.0,
-    ),  # Allow addition temperature (°C, -29=Off)
-    "filtertime_outdoor": (8, "uint16", 1.0),  # Filter time outdoor sensor (h)
+    ),
+    "filtertime_outdoor": (8, "uint16", 1.0),
     "use_operation_sensor": (
         9,
         "uint16",
         1.0,
-    ),  # Use operation mode sensor (0=No, 1=BT2, 2=BT3, 3=AUX, 4=External)
-    # Temperature settings
-    "desired_indoor_temp": (12, "int16", 0.1),  # Desired indoor temperature (°C)
-    "room_compensation": (13, "uint16", 0.1),  # Room compensation factor
-    "room_temp_external": (14, "int16", 0.1),  # Room temp external (°C)
-    "heating_offset": (15, "int16", 1.0),  # Heating curve parallel offset (°C)
-    "outdoor_stop_heating": (18, "int16", 1.0),  # Outdoor temperature stop heating (°C)
-    "max_heating_supply": (19, "int16", 1.0),  # Maximum heating supply temperature (°C)
+    ),
+    "desired_indoor_temp": (12, "int16", 0.1),
+    "room_compensation": (13, "uint16", 0.1),
+    "room_temp_external": (14, "int16", 0.1),
+    "heating_offset": (15, "int16", 1.0),
+    "outdoor_stop_heating": (18, "int16", 1.0),
+    "max_heating_supply": (19, "int16", 1.0),
     "min_heating_supply": (
         20,
         "uint16",
         1.0,
-    ),  # Minimum heating supply temperature (°C)
-    # Heating curve settings
+    ),
     "curve_type_heating": (
         22,
         "uint16",
         1.0,
-    ),  # Curve type heating (0=Auto, 1=User defined)
+    ),
     "temp_compensation_curve": (
         23,
         "uint16",
         1.0,
-    ),  # Temperature compensation curve heating
-    "heating_curve_neg30": (24, "uint16", 1.0),  # User defined heating curve @ -30°C
-    "heating_curve_neg20": (25, "uint16", 1.0),  # User defined heating curve @ -20°C
-    "heating_curve_neg10": (26, "uint16", 1.0),  # User defined heating curve @ -10°C
-    "heating_curve_0": (27, "uint16", 1.0),  # User defined heating curve @ 0°C
-    "heating_curve_10": (28, "uint16", 1.0),  # User defined heating curve @ 10°C
-    "heating_curve_20": (29, "uint16", 1.0),  # User defined heating curve @ 20°C
-    "heating_curve_30": (30, "uint16", 1.0),  # User defined heating curve @ 30°C
-    # Cooling settings
-    "cooling_offset": (36, "int16", 1.0),  # Cooling curve parallel offset (°C)
-    "start_cooling_temp": (38, "int16", 1.0),  # Start cooling temperature (°C)
+    ),
+    "heating_curve_neg30": (24, "uint16", 1.0),
+    "heating_curve_neg20": (25, "uint16", 1.0),
+    "heating_curve_neg10": (26, "uint16", 1.0),
+    "heating_curve_0": (27, "uint16", 1.0),
+    "heating_curve_10": (28, "uint16", 1.0),
+    "heating_curve_20": (29, "uint16", 1.0),
+    "heating_curve_30": (30, "uint16", 1.0),
+    "cooling_offset": (36, "int16", 1.0),
+    "start_cooling_temp": (38, "int16", 1.0),
     "dew_point_protection": (
         39,
         "uint16",
         1.0,
-    ),  # Dew point protection cooling (0=No, 1=Yes)
-    "min_cooling_supply": (40, "int16", 1.0),  # Minimum cooling supply temperature (°C)
-    # DHW settings
-    "dhw_mode": (53, "uint16", 1.0),  # DHW Mode (0=Eco, 1=Normal, 2=Extra, 3=Smart)
-    "dhw_start_normal": (56, "uint16", 1.0),  # DHW start temperature Normal (°C)
-    "dhw_stop_normal": (57, "uint16", 1.0),  # DHW stop temperature Normal (°C)
-    "dhw_start_extra": (58, "uint16", 1.0),  # DHW start temperature Extra (°C)
-    "dhw_stop_extra": (59, "uint16", 1.0),  # DHW stop temperature Extra (°C)
+    ),
+    "min_cooling_supply": (40, "int16", 1.0),
+    "dhw_mode": (53, "uint16", 1.0),
+    "dhw_start_normal": (56, "uint16", 1.0),
+    "dhw_stop_normal": (57, "uint16", 1.0),
+    "dhw_start_extra": (58, "uint16", 1.0),
+    "dhw_stop_extra": (59, "uint16", 1.0),
     "dhw_outlet_temp": (
         60,
         "uint16",
         1.0,
-    ),  # DHW outlet temperature level (0=Normal, 1=+, 2=++)
+    ),
     "dhw_uninterrupted_cooling": (
         61,
         "uint16",
         1.0,
-    ),  # DHW uninterrupted cooling (0=No, 1=Yes)
-    # Pump speeds
+    ),
     "pump_speed_heating": (
         63,
         "uint16",
         1.0,
-    ),  # Distribution circulation pump speed heating (%)
+    ),
     "pump_speed_cooling": (
         64,
         "uint16",
         1.0,
-    ),  # Distribution circulation pump speed cooling (%)
-    "pump_speed_dhw": (65, "uint16", 1.0),  # DHW circulation pump speed (%)
+    ),
+    "pump_speed_dhw": (65, "uint16", 1.0),
     "pump_idle_speed": (
         66,
         "uint16",
         1.0,
-    ),  # Distribution circulation pump idle speed (%)
-    # Ventilation
+    ),
     "ventilation_state": (
         68,
         "uint16",
         1.0,
-    ),  # Ventilation State (0=Off, 1=Normal, 2=Extra, 3=Reduced)
-    "fan_speed_reduced": (69, "uint16", 1.0),  # Reduced ventilation fan speed (%)
-    "fan_speed_normal": (70, "uint16", 1.0),  # Normal ventilation fan speed (%)
-    "fan_speed_extra": (71, "uint16", 1.0),  # Extra ventilation fan speed (%)
-    "compressor_fan_speed": (72, "uint16", 1.0),  # Compressor fan speed (%)
-    # Priority times
+    ),
+    "fan_speed_reduced": (69, "uint16", 1.0),
+    "fan_speed_normal": (70, "uint16", 1.0),
+    "fan_speed_extra": (71, "uint16", 1.0),
+    "compressor_fan_speed": (72, "uint16", 1.0),
     "heating_priority_time": (
         73,
         "uint16",
         1.0,
-    ),  # Heating priority time (min, 0=No priority)
+    ),
     "cooling_priority_time": (
         74,
         "uint16",
         1.0,
-    ),  # Cooling priority time (min, 0=No priority)
-    "dhw_priority_time": (75, "uint16", 1.0),  # DHW priority time (min, 0=No priority)
-    # System configuration
-    "bt12_mounted": (83, "uint16", 1.0),  # BT12 Mounted (0=No, 1=Yes)
-    "qs_unit_connected": (84, "uint16", 1.0),  # QS unit connected (0=No, 1=Yes)
-    "sg_enabled": (88, "uint16", 1.0),  # SG enabled (0=No, 1=Yes)
-    "outdoor_air_mixed": (89, "uint16", 1.0),  # Outdoor Air Mixed (0=No, 1=Yes)
-    "reset_alarms": (99, "uint16", 1.0),  # Reset Alarms (1=Resets alarms)
+    ),
+    "dhw_priority_time": (75, "uint16", 1.0),
+    "bt12_mounted": (83, "uint16", 1.0),
+    "qs_unit_connected": (84, "uint16", 1.0),
+    "sg_enabled": (88, "uint16", 1.0),
+    "outdoor_air_mixed": (89, "uint16", 1.0),
+    "reset_alarms": (99, "uint16", 1.0),
 }
 
 RELAY_BIT_MAP = {
-    "picpin_relay_heat_l1": 0,  # L1
-    "picpin_relay_heat_l2": 1,  # L2
-    "picpin_relay_heat_l3": 2,  # L3
-    "picpin_relay_gp10": 3,  # GP10
-    "picpin_relay_qm10": 4,  # QM10
-    "picpin_relay_qn8_1": 5,  # QN8_1
-    "picpin_relay_qn8_2": 6,  # QN8_2
-    "picpin_relay_gp3": 7,  # GP3
-    "picpin_relay_pump": 8,  # Pump
-    "picpin_relay_ha12": 9,  # HA12
+    "picpin_relay_heat_l1": 0,
+    "picpin_relay_heat_l2": 1,
+    "picpin_relay_heat_l3": 2,
+    "picpin_relay_gp10": 3,
+    "picpin_relay_qm10": 4,
+    "picpin_relay_qn8_1": 5,
+    "picpin_relay_qn8_2": 6,
+    "picpin_relay_gp3": 7,
+    "picpin_relay_pump": 8,
+    "picpin_relay_ha12": 9,
 }
 
 MODBUS_SPEC_TO_INTERNAL_MAP = {
@@ -418,7 +408,6 @@ MODBUS_SPEC_TO_INTERNAL_MAP = {
     "bt21 - liquid line": "bt21",
     "bt22 - evaporator inlet": "bt22",
     "bt23 - suction line": "bt23",
-    "bt24 - crank case": "bt24",
     "bt30 - dhw tank": "bt30",
     "bt31 - dhw inlet": "bt31",
     "bt33 - dhw secondary inlet": "bt33",
@@ -448,63 +437,6 @@ MODBUS_SPEC_TO_INTERNAL_MAP = {
     "smart dhw control status (0=unavailable, 1=standby, 2=raising, 3=lowering, 4=lowering long term, 5=paused)": "smart_dhw_control_status",
     "enable smart price for the user (dhw) (0=off, 1=on)": "enable_sc_dhw",
     "enable smart price for the user (space heating) (0=off, 1=on)": "enable_sc_sh",
-    "dhw start temperature normal (°c)": "dhw_normal_start",
-    "dhw stop temperature normal (°c)": "dhw_normal_stop",
-    # Holding registers
-    "unit on/off": "unit_on_off",
-    "operation mode": "operation_mode",
-    "operation manual mode - allow heating": "allow_heating",
-    "operation manual mode - allow cooling": "allow_cooling",
-    "operation manual mode - allow addition": "allow_addition",
-    "operation manual mode - allow dhw": "allow_dhw",
-    "time between heating and cooling": "time_between_modes",
-    "allow addition temperature": "allow_addition_temp",
-    "filtertime outdoor sensor": "filtertime_outdoor",
-    "use operation mode sensor": "use_operation_sensor",
-    "desired indoor temperature": "desired_indoor_temp",
-    "room compensation factor": "room_compensation",
-    "room temp external": "room_temp_external",
-    "heating curve parallel offset": "heating_offset",
-    "outdoor temperature stop heating": "outdoor_stop_heating",
-    "maximum heating supply temperature": "max_heating_supply",
-    "minimum heating supply temperature": "min_heating_supply",
-    "curve type heating": "curve_type_heating",
-    "temperature compensation curve heating": "temp_compensation_curve",
-    "user defined heating curve @ -30c": "heating_curve_neg30",
-    "user defined heating curve @ -20c": "heating_curve_neg20",
-    "user defined heating curve @ -10c": "heating_curve_neg10",
-    "user defined heating curve @ 0c": "heating_curve_0",
-    "user defined heating curve @ 10c": "heating_curve_10",
-    "user defined heating curve @ 20c": "heating_curve_20",
-    "user defined heating curve @ 30c": "heating_curve_30",
-    "cooling curve parallel offset": "cooling_offset",
-    "start cooling temperature": "start_cooling_temp",
-    "dew point protection (cooling)": "dew_point_protection",
-    "minimum cooling supply temperature": "min_cooling_supply",
-    "dhw mode": "dhw_mode",
-    "dhw start temperature normal": "dhw_start_normal",
-    "dhw stop temperature normal": "dhw_stop_normal",
-    "dhw start temperature extra": "dhw_start_extra",
-    "dhw stop temperature extra": "dhw_stop_extra",
-    "dwh outlet temperature": "dhw_outlet_temp",
-    "dhw uninterrupted cooling": "dhw_uninterrupted_cooling",
-    "distribution circulation pump speed heating": "pump_speed_heating",
-    "distribution circulation pump speed cooling": "pump_speed_cooling",
-    "dhw circulation pump speed": "pump_speed_dhw",
-    "distribution circulation pump idle speed": "pump_idle_speed",
-    "ventilation state": "ventilation_state",
-    "reduced ventilation fan speed": "fan_speed_reduced",
-    "normal ventilation fan speed": "fan_speed_normal",
-    "extra ventilation fan speed": "fan_speed_extra",
-    "compressor fan speed": "compressor_fan_speed",
-    "heating priority time": "heating_priority_time",
-    "cooling priority time": "cooling_priority_time",
-    "dhw priority time": "dhw_priority_time",
-    "bt12 mounted": "bt12_mounted",
-    "qs unit connected": "qs_unit_connected",
-    "sg enabled": "sg_enabled",
-    "outdoor air mixed": "outdoor_air_mixed",
-    "reset alarms": "reset_alarms",
 }
 
 MODBUS_INTERNAL_TO_SPEC_MAP = {v: k for k, v in MODBUS_SPEC_TO_INTERNAL_MAP.items()}

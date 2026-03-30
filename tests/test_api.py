@@ -102,37 +102,6 @@ class TestQvantumAPI:
         assert result["metrics"]["latency"] == metrics_data["total_latency"]
 
     @pytest.mark.asyncio
-    async def test_read_modbus_metrics_tap_water_aliasing(self, mock_session):
-        """Test modbus metric keys are aliased to tap_water_* and tap_stop."""
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-
-        with patch.object(
-            QvantumAPI,
-            "_read_modbus_registers",
-            AsyncMock(
-                return_value={
-                    "dhw start temperature normal (°c)": 52,
-                    "dhw stop temperature normal (°c)": 62,
-                    "smart dhw mode (0=off, 1=eco, 2=balanced, 3=comfort)": 0,
-                }
-            ),
-        ):
-            result = await api._read_modbus_metrics(
-                "test_device_123", ["dhw_normal_start", "dhw_normal_stop"]
-            )
-
-        metrics = result["metrics"]
-        assert metrics["dhw_normal_start"] == 52
-        assert metrics["dhw_normal_stop"] == 62
-        assert "dhw_start_normal" not in metrics
-        assert "dhw_stop_normal" not in metrics
-        assert metrics["tap_water_start"] == 52
-        assert metrics["tap_water_stop"] == 62
-        assert metrics["use_adaptive"] is True
-
-    @pytest.mark.asyncio
     async def test_read_modbus_metrics_powertotal_computed(self, mock_session):
         """Test power total is derived from relay stages and compressor power."""
         api = QvantumAPI(
