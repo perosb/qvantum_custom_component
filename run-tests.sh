@@ -24,7 +24,7 @@ else
     # Ensure pymodbus is installed
     if ! python3 -c "import pymodbus" 2>/dev/null; then
         echo "Installing pymodbus..."
-        pip install pymodbus>=3.0.0
+        pip install "pymodbus>=3.0.0"
     fi
 fi
 
