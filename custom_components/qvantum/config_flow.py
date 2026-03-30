@@ -217,7 +217,7 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                     CONF_MODBUS_TCP,
                     default=self.options.get(CONF_MODBUS_TCP, False),
                 ): bool,
-                vol.Required(
+                vol.Optional(
                     CONF_MODBUS_HOST,
                     default=self.options.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
                 ): str,
