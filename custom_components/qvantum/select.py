@@ -69,8 +69,8 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
         _LOGGER.warning(
             "%s for %s (hpid=%s): smart_sh_mode=%s, smart_dhw_mode=%s. %s.",
             condition_desc,
-            self._hpid,
             self._metric_key,
+            self._hpid,
             smart_sh_mode,
             smart_dhw_mode,
             fallback_desc,
