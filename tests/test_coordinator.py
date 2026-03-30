@@ -13,6 +13,7 @@ from custom_components.qvantum.const import (
     DOMAIN,
     REQUIRED_METRICS,
 )
+from homeassistant.const import CONF_SCAN_INTERVAL
 
 
 class TestHandleSettingUpdateResponse:
@@ -215,7 +216,8 @@ class TestQvantumDataUpdateCoordinator:
         # Create coordinator with mocked __init__
         mock_super_init.return_value = None
         config_entry = MagicMock()
-        config_entry.options.get.return_value = 30  # Mock scan interval
+        config_entry.options.get.side_effect = lambda key, default=None: 30 if key == CONF_SCAN_INTERVAL else default
+        config_entry.data.get.return_value = False  # Mock data.get to return False for modbus
         config_entry.unique_id = "test_device"
         coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
         coordinator.hass = mock_hass
@@ -258,7 +260,8 @@ class TestQvantumDataUpdateCoordinator:
         # Create coordinator with mocked __init__
         mock_super_init.return_value = None
         config_entry = MagicMock()
-        config_entry.options.get.return_value = 30  # Mock scan interval
+        config_entry.options.get.side_effect = lambda key, default=None: 30 if key == CONF_SCAN_INTERVAL else default
+        config_entry.data.get.return_value = False  # Mock data.get to return False for modbus
         config_entry.unique_id = "test_device"
         coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
         coordinator.hass = mock_hass
