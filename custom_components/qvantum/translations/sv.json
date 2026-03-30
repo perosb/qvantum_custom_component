@@ -97,19 +97,70 @@
       "picpin_relay_heat_l3": {
         "name": "Eltillsats L3"
       },
+      "picpin_relay_gp10": {
+        "name": "Cirkulationspump (GP10)"
+      },
       "picpin_relay_qm10": {
         "name": "Växelventil, Varmvatten/Uppvärmning (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Shuntventil tillsats (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Shuntventil tillsats (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Cirkulationspump (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Cirkulationspump"
+      },
+      "picpin_relay_ha12": {
+        "name": "Värmekrets pump (HA12)"
       }
     },
     "sensor": {
-      "dhwpower": {
-        "name": "DHW Effekt"
+      "compressor_state": {
+        "name": "Kompressorstatus",
+        "state": {
+          "0": "Av",
+          "1": "Tomgång",
+          "2": "Förbereder för uppvärmning",
+          "3": "Förbereder för kyla",
+          "4": "Förbereder 1 för DHW",
+          "5": "Förbereder 2 för DHW",
+          "6": "Uppvärmning",
+          "7": "Kylning",
+          "8": "DHW",
+          "9": "Avfrostning DHW passiv",
+          "10": "Avfrostning uppvärmning passiv",
+          "11": "Förbereder pool",
+          "12": "Pool",
+          "13": "Avfrostning pool passiv"
+        }
       },
-      "heatingpower": {
-        "name": "Värmeeffekt"
+      "smart_dhw_control_status": {
+        "name": "Smart DHW-kontrollstatus",
+        "state": {
+          "0": "Inte tillgänglig",
+          "1": "Standby",
+          "2": "Ökar",
+          "3": "Minskar",
+          "4": "Långsiktigt minskande",
+          "5": "Pausad"
+        }
       },
       "powertotal": {
         "name": "Total effekt"
+      },
+      "compressor_power": {
+        "name": "Kompressoreffekt"
+      },
+      "heatingenergy": {
+        "name": "Värmeenergi"
+      },
+      "dhwenergy": {
+        "name": "Varmvattenenergi"
       },
       "inputcurrent1": {
         "name": "Ingångsström L1"
@@ -266,10 +317,10 @@
       "bt30": {
         "name": "Varmvattentemperatur (BT30)"
       },
-      "dhw_normal_start": {
+      "tap_water_start": {
         "name": "Varmvattentemperatur start"
       },
-      "dhw_normal_stop": {
+      "tap_water_stop": {
         "name": "Varmvattentemperatur stopp"
       },
       "tap_water_cap": {
@@ -451,12 +502,15 @@
     },
     "step": {
       "user": {
+        "description": "Modbus ger nästan realtidsmetrik genom att läsa direkt från enheten.\nModbus måste vara aktiverat i installatörsinställningarna i pumpens app/display innan det kan aktiveras här. Observera att det bara läser via Modbus, skrivning/kontroller sker fortfarande via HTTP API",
         "data": {
           "password": "Lösenord",
-          "username": "Användarnamn"
+          "username": "Användarnamn",
+          "modbus_tcp": "Använd Modbus TCP istället för HTTP-förfrågning"
         }
       },
       "reconfigure": {
+        "description": "Modbus ger nästan realtidsmetrik genom att läsa direkt från enheten.\nModbus måste vara aktiverat i installatörsinställningarna i pumpens app/display innan det kan aktiveras här. Observera att det bara läser via Modbus, skrivning/kontroller sker fortfarande via HTTP API",
         "data": {
           "password": "Lösenord",
           "username": "Användarnamn"
@@ -468,7 +522,9 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Uppdateringsfrekvens (sekunder)"
+          "scan_interval": "HTTP-skanningsintervall (sekunder)",
+          "modbus_tcp": "Använd Modbus TCP istället för HTTP-förfrågning",
+          "modbus_host": "Qvantum Host/IP"
         },
         "description": "Ändra alternativ.",
         "title": "Alternativ"

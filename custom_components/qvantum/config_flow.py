@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any
 
@@ -29,12 +30,19 @@ from .const import (
     MIN_SCAN_INTERVAL,
     VERSION,
     CONFIG_VERSION,
+    CONF_MODBUS_TCP,
+    CONF_MODBUS_HOST,
+    DEFAULT_MODBUS_HOST,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
-    {vol.Required("username"): str, vol.Required("password"): str}
+    {
+        vol.Required("username"): str,
+        vol.Required("password"): str,
+        vol.Optional(CONF_MODBUS_TCP, default=False): bool,
+    }
 )
 
 
@@ -55,6 +63,17 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         raise InvalidAuth from err
     except APIConnectionError as err:
         raise CannotConnect from err
+    finally:
+        if hasattr(api, "close"):
+            try:
+                close_result = api.close()
+                if inspect.isawaitable(close_result):
+                    await close_result
+            except Exception:
+                _LOGGER.debug(
+                    "Failed to close Qvantum API session in config flow validation",
+                    exc_info=True,
+                )
 
 
 class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -95,11 +114,24 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 # and create the config entry.
                 await self.async_set_unique_id(info.get("title"))
                 self._abort_if_unique_id_configured()
-                return self.async_create_entry(title=info["title"], data=user_input)
+                modbus_enabled = user_input.get(CONF_MODBUS_TCP, False)
+                return self.async_create_entry(
+                    title=info["title"],
+                    data={
+                        "username": user_input["username"],
+                        "password": user_input["password"],
+                        CONF_MODBUS_TCP: modbus_enabled,
+                    },
+                    options={
+                        CONF_MODBUS_TCP: modbus_enabled,
+                    },
+                )
 
         # Show initial form.
         return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+            step_id="user",
+            data_schema=STEP_USER_DATA_SCHEMA,
+            errors=errors,
         )
 
     async def async_step_reconfigure(
@@ -122,10 +154,22 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
+                modbus_enabled = user_input.get(CONF_MODBUS_TCP, False)
+                updated_data = {
+                    **config_entry.data,
+                    "username": user_input["username"],
+                    "password": user_input["password"],
+                    CONF_MODBUS_TCP: modbus_enabled,
+                }
+                updated_options = {
+                    **config_entry.options,
+                    CONF_MODBUS_TCP: modbus_enabled,
+                }
                 return self.async_update_reload_and_abort(
                     config_entry,
                     unique_id=config_entry.unique_id,
-                    data={**config_entry.data, **user_input},
+                    data=updated_data,
+                    options=updated_options,
                     reason="reconfigure_successful",
                 )
         return self.async_show_form(
@@ -136,6 +180,13 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_USERNAME, default=config_entry.data[CONF_USERNAME]
                     ): str,
                     vol.Required(CONF_PASSWORD): str,
+                    vol.Optional(
+                        CONF_MODBUS_TCP,
+                        default=config_entry.options.get(
+                            CONF_MODBUS_TCP,
+                            config_entry.data.get(CONF_MODBUS_TCP, False),
+                        ),
+                    ): bool,
                 }
             ),
             errors=errors,
@@ -162,6 +213,14 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                     CONF_SCAN_INTERVAL,
                     default=self.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                 ): (vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL))),
+                vol.Required(
+                    CONF_MODBUS_TCP,
+                    default=self.options.get(CONF_MODBUS_TCP, False),
+                ): bool,
+                vol.Optional(
+                    CONF_MODBUS_HOST,
+                    default=self.options.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
+                ): str,
             }
         )
 

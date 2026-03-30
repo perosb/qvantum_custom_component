@@ -7,6 +7,12 @@ template: |
   $CHANGES
 
 
+  > [!IMPORTANT]
+  > This integration's Modbus path is **read-only**. 
+  > No write operations are performed via Modbus.
+  > Any configuration/set commands still go through the existing HTTP API.
+
+
   > [!WARNING]
   >The Elevate access rights works by assigning "Remote Service" access to your user.
   >Essentially it gives you service tech access.

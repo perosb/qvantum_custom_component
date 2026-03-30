@@ -94,19 +94,70 @@
       "picpin_relay_heat_l3": {
         "name": "Extra vermogen L3"
       },
+      "picpin_relay_gp10": {
+        "name": "Circulatiepomp (GP10)"
+      },
       "picpin_relay_qm10": {
         "name": "Omloopklep, tapwater/verwarming (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Shuntklep extra (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Shuntklep extra (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Circulatiepomp (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Circulatiepomp"
+      },
+      "picpin_relay_ha12": {
+        "name": "Verwarmingscircuit pomp (HA12)"
       }
     },
     "sensor": {
-      "dhwpower": {
-        "name": "WTW-vermogen"
+      "compressor_state": {
+        "name": "Compressortoestand",
+        "state": {
+          "0": "Uit",
+          "1": "Leeglopen",
+          "2": "Voorbereiden op verwarming",
+          "3": "Voorbereiden op koeling",
+          "4": "Voorbereiden 1 voor DHW",
+          "5": "Voorbereiden 2 voor DHW",
+          "6": "Verwarmen",
+          "7": "Koelen",
+          "8": "DHW",
+          "9": "Ontdooien DHW passief",
+          "10": "Ontdooien verwarming passief",
+          "11": "Voorbereiden zwembad",
+          "12": "Zwembad",
+          "13": "Ontdooien zwembad passief"
+        }
       },
-      "heatingpower": {
-        "name": "Verwarmingsvermogen"
+      "smart_dhw_control_status": {
+        "name": "Smart DHW-controlestatus",
+        "state": {
+          "0": "Niet beschikbaar",
+          "1": "Standby",
+          "2": "Stijgen",
+          "3": "Dalen",
+          "4": "Lange termijn daling",
+          "5": "Gepauzeerd"
+        }
       },
       "powertotal": {
         "name": "Totaal (L1+L2+L3)"
+      },
+      "compressor_power": {
+        "name": "Compressorvermogen"
+      },
+      "heatingenergy": {
+        "name": "Verwarmingsenergie"
+      },
+      "dhwenergy": {
+        "name": "Warmwaterenergie"
       },
       "inputcurrent1": {
         "name": "Ingangsstroom L1"
@@ -255,10 +306,10 @@
       "bt30": {
         "name": "Warmwater tank (BT30)"
       },
-      "dhw_normal_start": {
+      "tap_water_start": {
         "name": "Warmwater tank onderste limiet"
       },
-      "dhw_normal_stop": {
+      "tap_water_stop": {
         "name": "Warmwater tank bovenste limiet"
       },
       "tap_water_cap": {
@@ -448,12 +499,15 @@
     },
     "step": {
       "user": {
+        "description": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest, schrijven/sturing gebeurt nog via de HTTP API",
         "data": {
           "password": "Wachtwoord",
-          "username": "Gebruikersnaam"
+          "username": "Gebruikersnaam",
+          "modbus_tcp": "Gebruik Modbus TCP in plaats van HTTP-polling"
         }
       },
       "reconfigure": {
+        "description": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest, schrijven/sturing gebeurt nog via de HTTP API",
         "data": {
           "password": "Wachtwoord",
           "username": "Gebruikersnaam"
@@ -465,7 +519,9 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Scan interval (seconden)"
+          "scan_interval": "HTTP-scaninterval (seconden)",
+          "modbus_tcp": "Gebruik Modbus TCP in plaats van HTTP-polling",
+          "modbus_host": "Qvantum Host/IP"
         },
         "description": "Wijzig uw opties.",
         "title": "Opties"

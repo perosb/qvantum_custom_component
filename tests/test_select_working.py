@@ -43,11 +43,15 @@ def mock_coordinator():
     coordinator = MagicMock()
     coordinator.data = {
         "device": {"id": "test_device_123"},
-        "metrics": {
+        "values": {
             "hpid": "test_device_123",
             "use_adaptive": True,  # Default to enabled
-            "smart_sh_mode": 0,  # Default to Eco
-            "smart_dhw_mode": 0,  # Default to Eco
+            "smart_sh_mode": 0,
+            "smart_dhw_mode": 0,
+        },
+        "metrics": {
+            "hpid": "test_device_123",
+            "smart_dhw_mode": 0,  # legacy - not used in values mode
         },
     }
     coordinator.api = MagicMock()
@@ -95,44 +99,45 @@ class TestQvantumSelectEntity:
         entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
 
         # Test Off (use_adaptive = False)
-        mock_coordinator.data["metrics"]["use_adaptive"] = False
+        mock_coordinator.data["values"]["use_adaptive"] = False
         assert entity.current_option == "off"
 
-        # Test Eco (use_adaptive = True, smart_sh_mode = 0)
-        mock_coordinator.data["metrics"]["use_adaptive"] = True
-        mock_coordinator.data["metrics"]["smart_sh_mode"] = 0
-        mock_coordinator.data["metrics"]["smart_dhw_mode"] = 0
+        # Test Eco (use_adaptive = True, smart_dhw_mode = 0)
+        mock_coordinator.data["values"]["use_adaptive"] = True
+        mock_coordinator.data["values"]["smart_sh_mode"] = 0
+        mock_coordinator.data["values"]["smart_dhw_mode"] = 0
         assert entity.current_option == "0"
 
-        # Test Balanced (use_adaptive = True, smart_sh_mode = 1)
-        mock_coordinator.data["metrics"]["smart_sh_mode"] = 1
-        mock_coordinator.data["metrics"]["smart_dhw_mode"] = 1
+        # Test Eco when smart_sh_mode is missing (use_adaptive = True, smart_dhw_mode = 0)
+        if "smart_sh_mode" in mock_coordinator.data["values"]:
+            del mock_coordinator.data["values"]["smart_sh_mode"]
+        assert entity.current_option == "0"
+        # Restore smart_sh_mode for subsequent tests
+        mock_coordinator.data["values"]["smart_sh_mode"] = 0
+        # Test Balanced (use_adaptive = True, smart_dhw_mode = 1)
+        mock_coordinator.data["values"]["smart_sh_mode"] = 1
+        mock_coordinator.data["values"]["smart_dhw_mode"] = 1
         assert entity.current_option == "1"
 
-        # Test Comfort (use_adaptive = True, smart_sh_mode = 2)
-        mock_coordinator.data["metrics"]["smart_sh_mode"] = 2
-        mock_coordinator.data["metrics"]["smart_dhw_mode"] = 2
+        # Test Comfort (use_adaptive = True, smart_dhw_mode = 2)
+        mock_coordinator.data["values"]["smart_sh_mode"] = 2
+        mock_coordinator.data["values"]["smart_dhw_mode"] = 2
         assert entity.current_option == "2"
 
-        # Test default case (use_adaptive = True, smart_sh_mode = unknown)
-        mock_coordinator.data["metrics"]["smart_sh_mode"] = 99
-        mock_coordinator.data["metrics"]["smart_dhw_mode"] = 99
+        # Test default case (use_adaptive = True, smart_dhw_mode = unknown)
+        mock_coordinator.data["values"]["smart_sh_mode"] = 99
+        mock_coordinator.data["values"]["smart_dhw_mode"] = 99
         assert entity.current_option == "off"
 
-        # Test mismatched modes case (use_adaptive = True, sh_mode=0, dhw_mode=1)
-        mock_coordinator.data["metrics"]["smart_sh_mode"] = 0
-        mock_coordinator.data["metrics"]["smart_dhw_mode"] = 1
-        assert entity.current_option == "0"  # Should fall back to smart_sh_mode
+        # Test mismatched modes case (use_adaptive = True, sh_mode=0, dhw_mode=2)
+        mock_coordinator.data["values"]["smart_sh_mode"] = 0
+        mock_coordinator.data["values"]["smart_dhw_mode"] = 2
+        assert entity.current_option == "0"
 
-        # Test valid sh_mode with invalid dhw_mode (sh_mode=1, dhw_mode=99)
-        mock_coordinator.data["metrics"]["smart_sh_mode"] = 1
-        mock_coordinator.data["metrics"]["smart_dhw_mode"] = 99
-        assert entity.current_option == "1"  # Should fall back to smart_sh_mode
-
-        # Test invalid sh_mode with valid dhw_mode (sh_mode=99, dhw_mode=2)
-        mock_coordinator.data["metrics"]["smart_sh_mode"] = 99
-        mock_coordinator.data["metrics"]["smart_dhw_mode"] = 2
-        assert entity.current_option == "2"  # Should fall back to smart_dhw_mode
+        # Test matching modes case (use_adaptive = True, both mode 0)
+        mock_coordinator.data["values"]["smart_sh_mode"] = 0
+        mock_coordinator.data["values"]["smart_dhw_mode"] = 0
+        assert entity.current_option == "0"
 
     @pytest.mark.asyncio
     async def test_async_select_option(self, mock_coordinator, mock_device):
@@ -175,16 +180,14 @@ class TestQvantumSelectEntity:
         # Test selecting Eco (option "0")
         await entity.async_select_option("0")
 
-        # Verify both modes are updated in coordinator data
-        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == 0
-        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == 0
+        # Verify mode is updated in coordinator data
+        assert mock_coordinator.data["values"]["smart_dhw_mode"] == 0
 
         # Test selecting Balanced (option "1")
         await entity.async_select_option("1")
 
-        # Verify both modes are updated
-        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == 1
-        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == 1
+        # Verify mode is updated
+        assert mock_coordinator.data["values"]["smart_dhw_mode"] == 1
 
     @pytest.mark.asyncio
     async def test_async_select_option_mode_synchronization_heatpump_status(
@@ -201,9 +204,8 @@ class TestQvantumSelectEntity:
         # Test selecting Comfort (option "2")
         await entity.async_select_option("2")
 
-        # Verify both modes are updated
-        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == 2
-        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == 2
+        # Verify mode is updated
+        assert mock_coordinator.data["values"]["smart_dhw_mode"] == 2
 
     @pytest.mark.asyncio
     async def test_async_select_option_mode_synchronization_failure(
@@ -212,9 +214,8 @@ class TestQvantumSelectEntity:
         """Test that modes are not updated when API response indicates failure."""
         entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
 
-        # Set initial mode values
-        initial_sh_mode = mock_coordinator.data["metrics"]["smart_sh_mode"]
-        initial_dhw_mode = mock_coordinator.data["metrics"]["smart_dhw_mode"]
+        # Set initial mode value
+        initial_dhw_mode = mock_coordinator.data["values"]["smart_dhw_mode"]
 
         # Mock failed API response
         mock_coordinator.api.set_smartcontrol = AsyncMock(
@@ -224,9 +225,8 @@ class TestQvantumSelectEntity:
         # Test selecting Eco (option "0")
         await entity.async_select_option("0")
 
-        # Verify modes are NOT updated
-        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == initial_sh_mode
-        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == initial_dhw_mode
+        # Verify mode is NOT updated
+        assert mock_coordinator.data["values"]["smart_dhw_mode"] == initial_dhw_mode
 
     @pytest.mark.asyncio
     async def test_async_select_option_mode_synchronization_off_option(
@@ -235,9 +235,8 @@ class TestQvantumSelectEntity:
         """Test that modes are not updated when selecting 'off' option."""
         entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
 
-        # Set initial mode values
-        initial_sh_mode = mock_coordinator.data["metrics"]["smart_sh_mode"]
-        initial_dhw_mode = mock_coordinator.data["metrics"]["smart_dhw_mode"]
+        # Set initial mode value
+        initial_dhw_mode = mock_coordinator.data["values"]["smart_dhw_mode"]
 
         # Mock successful API response
         mock_coordinator.api.set_smartcontrol = AsyncMock(
@@ -247,9 +246,8 @@ class TestQvantumSelectEntity:
         # Test selecting Off
         await entity.async_select_option("off")
 
-        # Verify modes are NOT updated (use_adaptive_value is False for "off")
-        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == initial_sh_mode
-        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == initial_dhw_mode
+        # Verify mode is NOT updated (use_adaptive_value is False for "off")
+        assert mock_coordinator.data["values"]["smart_dhw_mode"] == initial_dhw_mode
 
     @pytest.mark.asyncio
     async def test_async_select_option_mode_synchronization_no_response(
@@ -258,9 +256,8 @@ class TestQvantumSelectEntity:
         """Test that modes are not updated when API returns no response."""
         entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
 
-        # Set initial mode values
-        initial_sh_mode = mock_coordinator.data["metrics"]["smart_sh_mode"]
-        initial_dhw_mode = mock_coordinator.data["metrics"]["smart_dhw_mode"]
+        # Set initial mode value
+        initial_dhw_mode = mock_coordinator.data["values"]["smart_dhw_mode"]
 
         # Mock None response
         mock_coordinator.api.set_smartcontrol = AsyncMock(return_value=None)
@@ -268,9 +265,8 @@ class TestQvantumSelectEntity:
         # Test selecting Balanced (option "1")
         await entity.async_select_option("1")
 
-        # Verify modes are NOT updated
-        assert mock_coordinator.data["metrics"]["smart_sh_mode"] == initial_sh_mode
-        assert mock_coordinator.data["metrics"]["smart_dhw_mode"] == initial_dhw_mode
+        # Verify mode is NOT updated
+        assert mock_coordinator.data["values"]["smart_dhw_mode"] == initial_dhw_mode
 
     def test_available(self, mock_coordinator, mock_device):
         """Test availability check."""
@@ -280,7 +276,7 @@ class TestQvantumSelectEntity:
         assert entity.available is True
 
         # Should still be available when use_adaptive is False
-        mock_coordinator.data["metrics"]["use_adaptive"] = False
+        mock_coordinator.data["values"]["use_adaptive"] = False
         assert entity.available is True
 
         # Should not be available when coordinator data is None
@@ -288,7 +284,7 @@ class TestQvantumSelectEntity:
         assert entity.available is False
 
         # Reset and test when metric is missing
-        mock_coordinator.data = {"metrics": {}}
+        mock_coordinator.data = {"values": {}}
         assert entity.available is False
 
     def test_is_valid_mode(self, mock_coordinator, mock_device):

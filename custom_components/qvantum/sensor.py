@@ -25,13 +25,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     DEFAULT_ENABLED_METRICS,
-    DEFAULT_DISABLED_METRICS,
+    DEFAULT_DISABLED_HTTP_METRICS,
     EXCLUDED_METRIC_PATTERNS,
     TEMPERATURE_METRICS,
     ENERGY_METRICS,
     POWER_METRICS,
     CURRENT_METRICS,
-    PRESSURE_METRICS
+    PRESSURE_METRICS,
 )
 from .entity import QvantumEntity
 from . import MyConfigEntry
@@ -51,13 +51,20 @@ async def async_setup_entry(
     device: DeviceInfo | dict = config_entry.runtime_data.device
 
     sensors = []
-    metrics = DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_METRICS
+
+    if coordinator.modbus_enabled:
+        # In Modbus mode, only include the core supported default metrics.
+        metrics = DEFAULT_ENABLED_METRICS
+    else:
+        # In HTTP mode we also expose the optional HTTP-only metrics (disabled by default).
+        metrics = DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_HTTP_METRICS
 
     for metric in metrics:
         if _should_exclude_metric(metric):
             continue
 
-        enabled_by_default = metric not in DEFAULT_DISABLED_METRICS
+        enabled_by_default = metric not in DEFAULT_DISABLED_HTTP_METRICS
+
         sensor_class = _get_sensor_type(metric)
 
         sensors.append(
@@ -149,13 +156,15 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
     @property
     def state(self):
         """Get metric from API data."""
-        return self.coordinator.data.get("metrics").get(self._metric_key)
+        value = self.coordinator.data.get("values", {}).get(self._metric_key)
+        return value
 
     @property
     def available(self):
         """Check if data is available."""
-        metrics = self.coordinator.data.get("metrics", {})
-        return metrics.get(self._metric_key) is not None
+        values = self.coordinator.data.get("values", {})
+        available = values.get(self._metric_key) is not None
+        return available
 
 class QvantumTemperatureEntity(QvantumBaseSensorEntity):
     """Sensor for temperature measurements."""
@@ -193,7 +202,7 @@ class QvantumEnergyEntity(QvantumBaseSensorEntity):
         """Check if data is available."""
         return (
             super().available
-            and self.coordinator.data.get("metrics").get(self._metric_key) > 0
+            and self.coordinator.data.get("values", {}).get(self._metric_key) > 0
         )
 
 
@@ -210,11 +219,7 @@ class QvantumPowerEntity(QvantumBaseSensorEntity):
         super().__init__(coordinator, metric_key, device, enabled_by_default)
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        if metric_key in ["heatingpower", "dhwpower"]:
-            self._attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
-            self._attr_suggested_display_precision = 2
-        else:
-            self._attr_native_unit_of_measurement = UnitOfPower.WATT
+        self._attr_native_unit_of_measurement = UnitOfPower.WATT
 
 
 class QvantumCurrentEntity(QvantumBaseSensorEntity):
@@ -253,7 +258,7 @@ class QvantumPressureEntity(QvantumBaseSensorEntity):
         """Check if data is available."""
         return (
             super().available
-            and self.coordinator.data.get("metrics").get(self._metric_key) > 0
+            and self.coordinator.data.get("values", {}).get(self._metric_key) > 0
         )
 
 
@@ -272,17 +277,18 @@ class QvantumTotalEnergyEntity(QvantumEnergyEntity):
     @property
     def state(self):
         """Get metric from API data."""
-        total = self.coordinator.data.get("metrics").get(
+        total = self.coordinator.data.get("values", {}).get(
             "compressorenergy"
-        ) + self.coordinator.data.get("metrics").get("additionalenergy")
+        ) + self.coordinator.data.get("values", {}).get("additionalenergy")
         return total
 
     @property
     def available(self):
         """Check if data is available."""
         return (
-            "compressorenergy" in self.coordinator.data.get("metrics")
-            and self.coordinator.data.get("metrics").get("compressorenergy") is not None
+            "compressorenergy" in self.coordinator.data.get("values", {})
+            and self.coordinator.data.get("values", {}).get("compressorenergy")
+            is not None
         )
 
 
@@ -304,7 +310,7 @@ class QvantumDiagnosticEntity(QvantumBaseSensorEntity):
 
 
 class QvantumTimerEntity(QvantumBaseSensorEntity):
-    """Sensor for connectivity."""
+    """Sensor for tap water timer."""
 
     def __init__(
         self,
@@ -320,16 +326,17 @@ class QvantumTimerEntity(QvantumBaseSensorEntity):
     @property
     def state(self):
         """Get metric from API data."""
-        epoch = self.coordinator.data.get("metrics").get(self._metric_key)
+        epoch = self.coordinator.data.get("values", {}).get(self._metric_key)
         return dt_utils.utc_from_timestamp(epoch)
 
     @property
     def available(self):
         """Check if data is available."""
         return (
-            self._metric_key in self.coordinator.data.get("metrics")
-            and self.coordinator.data.get("metrics").get(self._metric_key) is not None
-            and self.coordinator.data.get("metrics").get(self._metric_key) > 0
+            self._metric_key in self.coordinator.data.get("values", {})
+            and self.coordinator.data.get("values", {}).get(self._metric_key)
+            is not None
+            and self.coordinator.data.get("values", {}).get(self._metric_key) > 0
         )
 
 

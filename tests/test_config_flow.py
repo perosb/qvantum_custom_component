@@ -28,6 +28,7 @@ class TestValidateInput:
             mock_api.get_primary_device = AsyncMock(
                 return_value={"vendor": "Qvantum", "model": "QE-6", "serial": "12345"}
             )
+            mock_api.close = AsyncMock()
 
             result = await validate_input(
                 hass, {"username": "test@example.com", "password": "testpass"}
@@ -36,6 +37,7 @@ class TestValidateInput:
             assert result == {"title": "Qvantum QE-6 (12345)"}
             mock_api.authenticate.assert_called_once()
             mock_api.get_primary_device.assert_called_once()
+            mock_api.close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_validate_input_auth_error(self, hass):
@@ -50,11 +52,14 @@ class TestValidateInput:
             mock_api.authenticate = AsyncMock(
                 side_effect=APIAuthError(None, "Auth failed")
             )
+            mock_api.close = AsyncMock()
 
             with pytest.raises(InvalidAuth):
                 await validate_input(
                     hass, {"username": "test@example.com", "password": "testpass"}
                 )
+
+            mock_api.close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_validate_input_connection_error(self, hass):
@@ -70,11 +75,14 @@ class TestValidateInput:
             mock_api.get_primary_device = AsyncMock(
                 side_effect=APIConnectionError(None, "Connection failed")
             )
+            mock_api.close = AsyncMock()
 
             with pytest.raises(CannotConnect):
                 await validate_input(
                     hass, {"username": "test@example.com", "password": "testpass"}
                 )
+
+            mock_api.close.assert_called_once()
 
 
 class TestQvantumConfigFlow:
@@ -149,19 +157,35 @@ class TestQvantumConfigFlow:
             mock_create_entry.return_value = {"type": "create_entry"}
 
             result = await config_flow.async_step_user(
-                {"username": "test@example.com", "password": "testpass"}
+                {
+                    "username": "test@example.com",
+                    "password": "testpass",
+                    "modbus_tcp": True,
+                }
             )
 
             assert result == {"type": "create_entry"}
 
             mock_validate.assert_called_once_with(
-                hass, {"username": "test@example.com", "password": "testpass"}
+                hass,
+                {
+                    "username": "test@example.com",
+                    "password": "testpass",
+                    "modbus_tcp": True,
+                },
             )
             mock_set_unique_id.assert_called_once_with("Test Device")
             mock_abort.assert_called_once()
             mock_create_entry.assert_called_once_with(
                 title="Test Device",
-                data={"username": "test@example.com", "password": "testpass"},
+                data={
+                    "username": "test@example.com",
+                    "password": "testpass",
+                    "modbus_tcp": True,
+                },
+                options={
+                    "modbus_tcp": True,
+                },
             )
 
     @pytest.mark.asyncio
@@ -237,7 +261,9 @@ class TestQvantumConfigFlow:
                 data={
                     "username": "new@example.com",
                     "password": "newpass",
+                    "modbus_tcp": False,
                 },
+                options={"modbus_tcp": False},
                 reason="reconfigure_successful",
             )
 
@@ -282,6 +308,41 @@ class TestQvantumConfigFlow:
         assert result["type"] == "form"
         assert result["step_id"] == "reconfigure"
         assert "data_schema" in result
+
+    @pytest.mark.asyncio
+    async def test_step_reconfigure_sets_modbus_tcp(self, hass, config_flow):
+        """Test reconfigure updates modbus_tcp in config data and triggers reload."""
+        config_entry = MagicMock()
+        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
+        config_entry.options = {"modbus_tcp": False}
+
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_get_entry.return_value = config_entry
+
+        config_flow.context = {"entry_id": "test_entry_id"}
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_input"
+            ) as mock_validate,
+            patch.object(
+                config_flow, "async_update_reload_and_abort"
+            ) as mock_update_reload,
+        ):
+            user_input = {
+                "username": "new@example.com",
+                "password": "newpass",
+                "modbus_tcp": True,
+            }
+            mock_validate.return_value = None
+            mock_update_reload.return_value = {"type": "abort"}
+
+            result = await config_flow.async_step_reconfigure(user_input)
+
+            assert result == {"type": "abort"}
+            mock_update_reload.assert_called_once()
+            assert mock_update_reload.call_args.kwargs["data"]["modbus_tcp"] is True
+            assert mock_update_reload.call_args.kwargs["options"]["modbus_tcp"] is True
 
     @pytest.mark.asyncio
     async def test_options_flow_init_success(self, hass):

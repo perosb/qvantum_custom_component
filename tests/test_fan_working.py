@@ -62,10 +62,8 @@ def mock_coordinator():
     coordinator = MagicMock()
     coordinator.data = {
         "device": {"id": "test_device_123"},
-        "metrics": {
+        "values": {
             "hpid": "test_device_123",
-        },
-        "settings": {
             "fanspeedselector": FAN_SPEED_STATE_NORMAL,
         },
     }
@@ -121,13 +119,13 @@ class TestQvantumFanEntity:
 
     def test_is_on_extra(self, mock_coordinator, mock_device):
         """Test is_on when fan is on extra speed."""
-        mock_coordinator.data["settings"]["fanspeedselector"] = FAN_SPEED_STATE_EXTRA
+        mock_coordinator.data["values"]["fanspeedselector"] = FAN_SPEED_STATE_EXTRA
         entity = QvantumFanEntity(mock_coordinator, "fanspeedselector", mock_device)
         assert entity.is_on is True
 
     def test_is_on_off(self, mock_coordinator, mock_device):
         """Test is_on when fan is off."""
-        mock_coordinator.data["settings"]["fanspeedselector"] = FAN_SPEED_STATE_OFF
+        mock_coordinator.data["values"]["fanspeedselector"] = FAN_SPEED_STATE_OFF
         entity = QvantumFanEntity(mock_coordinator, "fanspeedselector", mock_device)
         assert entity.is_on is False
 
@@ -143,7 +141,7 @@ class TestQvantumFanEntity:
 
     def test_available_false_none_value(self, mock_coordinator, mock_device):
         """Test entity availability when value is None."""
-        mock_coordinator.data["settings"]["fanspeedselector"] = None
+        mock_coordinator.data["values"]["fanspeedselector"] = None
         entity = QvantumFanEntity(mock_coordinator, "fanspeedselector", mock_device)
         assert entity.available is False
 
@@ -162,7 +160,9 @@ class TestQvantumFanEntity:
         mock_coordinator.api.set_fanspeedselector.assert_called_once_with(
             "test_device_123", FAN_SPEED_STATE_EXTRA
         )
-        assert mock_coordinator.data["settings"]["fanspeedselector"] == FAN_SPEED_STATE_EXTRA
+        assert (
+            mock_coordinator.data["values"]["fanspeedselector"] == FAN_SPEED_STATE_EXTRA
+        )
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
@@ -182,7 +182,9 @@ class TestQvantumFanEntity:
         mock_coordinator.api.set_fanspeedselector.assert_called_once_with(
             "test_device_123", FAN_SPEED_STATE_EXTRA
         )
-        assert mock_coordinator.data["settings"]["fanspeedselector"] == FAN_SPEED_STATE_EXTRA
+        assert (
+            mock_coordinator.data["values"]["fanspeedselector"] == FAN_SPEED_STATE_EXTRA
+        )
 
     @pytest.mark.asyncio
     async def test_async_turn_on_default(self, mock_coordinator, mock_device):
@@ -199,7 +201,10 @@ class TestQvantumFanEntity:
         mock_coordinator.api.set_fanspeedselector.assert_called_once_with(
             "test_device_123", FAN_SPEED_STATE_NORMAL
         )
-        assert mock_coordinator.data["settings"]["fanspeedselector"] == FAN_SPEED_STATE_NORMAL
+        assert (
+            mock_coordinator.data["values"]["fanspeedselector"]
+            == FAN_SPEED_STATE_NORMAL
+        )
 
     @pytest.mark.asyncio
     async def test_async_turn_off(self, mock_coordinator, mock_device):
@@ -216,7 +221,9 @@ class TestQvantumFanEntity:
         mock_coordinator.api.set_fanspeedselector.assert_called_once_with(
             "test_device_123", FAN_SPEED_STATE_OFF
         )
-        assert mock_coordinator.data["settings"]["fanspeedselector"] == FAN_SPEED_STATE_OFF
+        assert (
+            mock_coordinator.data["values"]["fanspeedselector"] == FAN_SPEED_STATE_OFF
+        )
 
     @pytest.mark.asyncio
     async def test_set_fanspeedselector_api_failure(self, mock_coordinator, mock_device):
@@ -231,7 +238,10 @@ class TestQvantumFanEntity:
         await entity.async_set_preset_mode(FAN_SPEED_STATE_EXTRA)
 
         # Data should not be updated
-        assert mock_coordinator.data["settings"]["fanspeedselector"] == FAN_SPEED_STATE_NORMAL
+        assert (
+            mock_coordinator.data["values"]["fanspeedselector"]
+            == FAN_SPEED_STATE_NORMAL
+        )
         mock_coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
@@ -260,8 +270,8 @@ class TestQvantumFanEntity:
         self, hass, mock_config_entry, mock_coordinator, mock_device
     ):
         """Test setting up fan entities when device does not support fan control."""
-        # Remove fanspeedselector from settings
-        mock_coordinator.data["settings"].pop("fanspeedselector", None)
+        # Remove fanspeedselector from values
+        mock_coordinator.data["values"].pop("fanspeedselector", None)
 
         mock_config_entry.runtime_data = RuntimeData(
             coordinator=mock_coordinator,

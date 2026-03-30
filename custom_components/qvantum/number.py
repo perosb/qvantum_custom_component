@@ -106,7 +106,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         await handle_setting_update_response(
             response,
             self.coordinator,
-            "settings",
+            "values",
             self._metric_key,
             int(value),
         )
@@ -116,14 +116,12 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         """Get metric from API data."""
         if self._metric_key == "tap_water_capacity_target":
             # Map (stop, start) pairs to capacity values using TAP_WATER_CAPACITY_MAPPINGS
-            stop = self.coordinator.data.get("settings", {}).get("tap_water_stop")
-            start = self.coordinator.data.get("settings", {}).get("tap_water_start")
+            stop = self.coordinator.data.get("values", {}).get("tap_water_stop")
+            start = self.coordinator.data.get("values", {}).get("tap_water_start")
             if (stop, start) in TAP_WATER_CAPACITY_MAPPINGS:
                 return TAP_WATER_CAPACITY_MAPPINGS[(stop, start)]
 
-        value = self.coordinator.data.get("settings", {}).get(self._metric_key)
-        if value is None:
-            value = self.coordinator.data.get("metrics", {}).get(self._metric_key)
+        value = self.coordinator.data.get("values", {}).get(self._metric_key)
         return value
 
     @property
@@ -131,14 +129,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         """Check if data is available."""
 
         avail = (
-            self._metric_key in self.coordinator.data.get("settings")
-            and self.coordinator.data.get("settings").get(self._metric_key) is not None
+            self.coordinator.data.get("values", {}).get(self._metric_key) is not None
         )
-        if not avail:
-            avail = (
-                self._metric_key in self.coordinator.data.get("metrics")
-                and self.coordinator.data.get("metrics").get(self._metric_key)
-                is not None
-            )
 
         return avail and self._has_write_access

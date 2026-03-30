@@ -71,7 +71,7 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
                     self._hpid, 60
                 )
                 await handle_setting_update_response(
-                    response, self.coordinator, "settings", "extra_tap_water", "on"
+                    response, self.coordinator, "values", "extra_tap_water", "on"
                 )
                 _LOGGER.info(
                     "Extra tap water activated for 60 minutes via button press"

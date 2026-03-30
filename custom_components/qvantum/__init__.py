@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import inspect
 import logging
 import json
 
@@ -23,7 +24,17 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from .api import QvantumAPI
-from .const import DOMAIN, VERSION, CONFIG_VERSION, FIRMWARE_KEYS
+from .const import (
+    DOMAIN,
+    VERSION,
+    CONFIG_VERSION,
+    FIRMWARE_KEYS,
+    CONF_MODBUS_TCP,
+    CONF_MODBUS_HOST,
+    DEFAULT_MODBUS_HOST,
+    DEFAULT_MODBUS_PORT,
+    DEFAULT_MODBUS_UNIT_ID,
+)
 from .coordinator import QvantumDataUpdateCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
@@ -60,8 +71,23 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     password = config_entry.data[CONF_PASSWORD]
     user_agent = f"Home Assistant/{MAJOR_VERSION}.{MINOR_VERSION}.{PATCH_VERSION} Qvantum/{VERSION}"
 
+    modbus_enabled = config_entry.options.get(
+        CONF_MODBUS_TCP,
+        config_entry.data.get(CONF_MODBUS_TCP, False),
+    )
+    modbus_host = config_entry.options.get(
+        CONF_MODBUS_HOST,
+        config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
+    )
+
     hass.data[DOMAIN] = QvantumAPI(
-        username=username, password=password, user_agent=user_agent
+        username=username,
+        password=password,
+        user_agent=user_agent,
+        modbus_tcp=modbus_enabled,
+        modbus_host=modbus_host,
+        modbus_port=DEFAULT_MODBUS_PORT,
+        modbus_unit_id=DEFAULT_MODBUS_UNIT_ID,
     )
     hass.data[DOMAIN].hass = hass
 
@@ -106,6 +132,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         hass, config_entry, coordinator
     )
     await maintenance_coordinator.async_config_entry_first_refresh()
+
+    remove_listener = config_entry.add_update_listener(_async_update_listener)
+    config_entry.async_on_unload(remove_listener)
 
     config_entry.runtime_data = RuntimeData(
         coordinator, maintenance_coordinator, device
@@ -152,9 +181,9 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
             new_unique_id = new_unique_id.replace("_heating_flow_temperature_target_", "_cal_heat_temp_")
             new_unique_id = new_unique_id.replace("_heating_flow_temperature_", "_bt11_")
             new_unique_id = new_unique_id.replace("_tap_water_tank_temperature_", "_bt30_")
-            new_unique_id = new_unique_id.replace("_tap_water_capacity", "_tap_water_cap")
-            new_unique_id = new_unique_id.replace("_tap_water_start_", "_dhw_normal_start_")
-            new_unique_id = new_unique_id.replace("_tap_water_stop_", "_dhw_normal_stop_")
+            new_unique_id = new_unique_id.replace(
+                "_tap_water_capacity", "_tap_water_cap"
+            )
 
             if old_unique_id == new_unique_id:
                 return None
@@ -183,6 +212,13 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
         config_entry, PLATFORMS
     )
 
+    if hass.data.get(DOMAIN) is not None:
+        try:
+            await hass.data[DOMAIN].close()
+        except Exception as err:
+            _LOGGER.debug("Failed closing Qvantum API session on unload: %s", err)
+        hass.data.pop(DOMAIN, None)
+
     if (
         unload_ok
         and config_entry.runtime_data
@@ -205,7 +241,9 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
                 for fw_key in FIRMWARE_KEYS:
                     notification_id = f"qvantum_firmware_update_{device_id}_{fw_key}"
                     try:
-                        await async_dismiss(hass, notification_id)
+                        result = async_dismiss(hass, notification_id)
+                        if inspect.isawaitable(result):
+                            await result
                         _LOGGER.debug(
                             "Cleared firmware notification %s", notification_id
                         )

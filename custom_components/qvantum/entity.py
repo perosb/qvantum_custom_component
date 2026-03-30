@@ -81,8 +81,8 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
                         return device_id
 
         # Falls back to coordinator data if device ID not found in device info
-        metrics_data = self.coordinator.data.get("metrics", {})
-        heatpump_id = metrics_data.get("hpid")
+        values_data = self.coordinator.data.get("values", {})
+        heatpump_id = values_data.get("hpid")
         if heatpump_id is not None:
             return str(heatpump_id)
 

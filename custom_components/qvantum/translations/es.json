@@ -94,19 +94,70 @@
       "picpin_relay_heat_l3": {
         "name": "Potencia adicional L3"
       },
+      "picpin_relay_gp10": {
+        "name": "Bomba circulación (GP10)"
+      },
       "picpin_relay_qm10": {
         "name": "Válvula desviadora, ACS/calefacción (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Válvula shunt adicional (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Válvula shunt adicional (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Bomba circulación (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Bomba circulación"
+      },
+      "picpin_relay_ha12": {
+        "name": "Bomba circuito calefacción (HA12)"
       }
     },
     "sensor": {
-      "dhwpower": {
-        "name": "Potencia ACS"
+      "compressor_state": {
+        "name": "Estado del compresor",
+        "state": {
+          "0": "Apagado",
+          "1": "Inactivo",
+          "2": "Preparando calefacción",
+          "3": "Preparando refrigeración",
+          "4": "Preparando 1 DHW",
+          "5": "Preparando 2 DHW",
+          "6": "Calefacción",
+          "7": "Refrigeración",
+          "8": "DHW",
+          "9": "Desescarche DHW pasivo",
+          "10": "Desescarche calefacción pasivo",
+          "11": "Preparando piscina",
+          "12": "Piscina",
+          "13": "Desescarche piscina pasivo"
+        }
       },
-      "heatingpower": {
-        "name": "Potencia calefacción"
+      "smart_dhw_control_status": {
+        "name": "Estado control DHW inteligente",
+        "state": {
+          "0": "No disponible",
+          "1": "En espera",
+          "2": "Elevando",
+          "3": "Descendiendo",
+          "4": "Descenso a largo plazo",
+          "5": "Pausado"
+        }
       },
       "powertotal": {
         "name": "Potencia total"
+      },
+      "compressor_power": {
+        "name": "Potencia del compresor"
+      },
+      "heatingenergy": {
+        "name": "Energía de calefacción"
+      },
+      "dhwenergy": {
+        "name": "Energía de ACS"
       },
       "inputcurrent1": {
         "name": "Corriente de entrada L1"
@@ -255,10 +306,10 @@
       "bt30": {
         "name": "Depósito de agua caliente (BT30)"
       },
-      "dhw_normal_start": {
+      "tap_water_start": {
         "name": "Límite inferior depósito ACS"
       },
-      "dhw_normal_stop": {
+      "tap_water_stop": {
         "name": "Límite superior depósito ACS"
       },
       "tap_water_cap": {
@@ -448,12 +499,15 @@
     },
     "step": {
       "user": {
+        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus, la escritura/control sigue siendo vía API HTTP",
         "data": {
           "password": "Contraseña",
-          "username": "Nombre de usuario"
+          "username": "Nombre de usuario",
+          "modbus_tcp": "Usar Modbus TCP en lugar de sondeo HTTP"
         }
       },
       "reconfigure": {
+        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus, la escritura/control sigue siendo vía API HTTP",
         "data": {
           "password": "Contraseña",
           "username": "Nombre de usuario"
@@ -465,7 +519,9 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Intervalo de exploración (segundos)"
+          "scan_interval": "Intervalo de exploración HTTP (segundos)",
+          "modbus_tcp": "Usar Modbus TCP en lugar de sondeo HTTP",
+          "modbus_host": "Qvantum Host/IP"
         },
         "description": "Modifique sus opciones.",
         "title": "Opciones"
