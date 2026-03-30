@@ -121,7 +121,7 @@ DEFAULT_DISABLED_HTTP_METRICS = [
     "picpin_mask",
 ]
 
-# Metrics that must always be fetched regardless of entity enablement
+# Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus)
 REQUIRED_METRICS = [
     "bt2",  # Required by climate component for current temperature
     "man_mode",  # Required by switch component
@@ -138,7 +138,19 @@ REQUIRED_METRICS = [
     "fan_speed_2",  # Required by number component
     "enable_sc_dhw",
     "enable_sc_sh",
-    "compressor_power",  # Required for power sensor and modbus mapping
+    "compressorenergy",
+    "additionalenergy",
+    "heatingenergy",
+    "dhwenergy",
+    "powertotal",
+]
+
+# Modbus-only intermediate metrics required to compute derived values (e.g. energy totals,
+# powertotal). These are NOT available via the HTTP API and must only be included in the
+# fetch list when Modbus is enabled to avoid noisy "missing metric" warnings and a larger
+# HTTP query string.
+REQUIRED_MODBUS_METRICS = [
+    "compressor_power",  # Used to compute powertotal
     "compressor_mwh",
     "compressor_kwh",
     "additional_mwh",
@@ -149,11 +161,6 @@ REQUIRED_METRICS = [
     "cooling_kwh",
     "dhw_mwh",
     "dhw_kwh",
-    "compressorenergy",
-    "additionalenergy",
-    "heatingenergy",
-    "dhwenergy",
-    "powertotal",
 ]
 
 # Sensor filtering patterns

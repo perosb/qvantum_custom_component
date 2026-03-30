@@ -21,6 +21,7 @@ from .const import (
     SETTING_UPDATE_APPLIED,
     DEFAULT_ENABLED_METRICS,
     REQUIRED_METRICS,
+    REQUIRED_MODBUS_METRICS,
     CONF_MODBUS_TCP,
 )
 
@@ -113,8 +114,11 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                 "Enabled metrics for device %s: %s", device_id, sorted(enabled_metrics)
             )
 
-            # Always include required metrics
+            # Always include required metrics; Modbus-only intermediate metrics are
+            # only needed when Modbus is enabled (they don't exist in the HTTP API).
             final_metrics = set(REQUIRED_METRICS)
+            if self.modbus_enabled:
+                final_metrics.update(REQUIRED_MODBUS_METRICS)
 
             if not known_metrics:
                 # First setup: no registry entries yet - include all default metrics
@@ -131,9 +135,12 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             "No device registry entry found for device %s, returning all DEFAULT_ENABLED_METRICS",
             device_id,
         )
-        # Always include required metrics
+        # Always include required metrics; Modbus-only intermediate metrics are
+        # only needed when Modbus is enabled (they don't exist in the HTTP API).
         final_metrics = set(DEFAULT_ENABLED_METRICS)
         final_metrics.update(REQUIRED_METRICS)
+        if self.modbus_enabled:
+            final_metrics.update(REQUIRED_MODBUS_METRICS)
         return sorted(final_metrics)
 
     def _process_settings_data(self, settings_data: dict) -> dict[str, Any]:
