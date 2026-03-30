@@ -130,7 +130,7 @@ def mock_coordinator():
     runtime_data.maintenance_coordinator = maintenance_coordinator
     config_entry.runtime_data = runtime_data
     coordinator.config_entry = config_entry
-    
+
     return coordinator
 
 
