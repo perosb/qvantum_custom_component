@@ -133,7 +133,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     )
     await maintenance_coordinator.async_config_entry_first_refresh()
 
-    config_entry.add_update_listener(_async_update_listener)
+    remove_listener = config_entry.add_update_listener(_async_update_listener)
+    config_entry.async_on_unload(remove_listener)
 
     config_entry.runtime_data = RuntimeData(
         coordinator, maintenance_coordinator, device
