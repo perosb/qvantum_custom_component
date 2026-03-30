@@ -32,7 +32,7 @@ async def async_setup_entry(
 
     fans = []
     # Only create fan entity if the device supports fan speed control
-    if "fanspeedselector" in coordinator.data.get("settings", {}):
+    if "fanspeedselector" in coordinator.data.get("values", {}):
         fans.append(QvantumFanEntity(coordinator, "fanspeedselector", device))
 
     async_add_entities(fans)
@@ -64,13 +64,13 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
     @property
     def preset_mode(self):
         """Get metric from API data."""
-        return self.coordinator.data.get("settings").get(self._metric_key)
+        return self.coordinator.data.get("values", {}).get(self._metric_key)
 
     @property
     def is_on(self):
         """Return true if the fan is on."""
         return (
-            self.coordinator.data.get("settings").get(self._metric_key)
+            self.coordinator.data.get("values", {}).get(self._metric_key)
             != FAN_SPEED_STATE_OFF
         )
 
@@ -78,8 +78,9 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
     def available(self):
         """Return true if entity is available."""
         return (
-            self._metric_key in self.coordinator.data.get("settings")
-            and self.coordinator.data.get("settings").get(self._metric_key) is not None
+            self._metric_key in self.coordinator.data.get("values", {})
+            and self.coordinator.data.get("values", {}).get(self._metric_key)
+            is not None
             and self._has_write_access
         )
 
@@ -106,7 +107,7 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
         await handle_setting_update_response(
             response,
             self.coordinator,
-            "settings",
+            "values",
             self._metric_key,
             preset,
         )

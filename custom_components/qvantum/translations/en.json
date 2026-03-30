@@ -94,19 +94,70 @@
       "picpin_relay_heat_l3": {
         "name": "Additional power L3"
       },
+      "picpin_relay_gp10": {
+        "name": "Circulation pump (GP10)"
+      },
       "picpin_relay_qm10": {
         "name": "Divertingvalve, DHW/heating (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Shunt valve addition (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Shunt valve addition (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Circulation pump (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Circulation pump"
+      },
+      "picpin_relay_ha12": {
+        "name": "Heating circuit pump (HA12)"
       }
     },
     "sensor": {
-      "dhwpower": {
-        "name": "DHW Power"
+      "compressor_state": {
+        "name": "Compressor state",
+        "state": {
+          "0": "Off",
+          "1": "Idle",
+          "2": "Prepare for heating",
+          "3": "Prepare for cooling",
+          "4": "Prepare 1 for DHW",
+          "5": "Prepare 2 for DHW",
+          "6": "Heating",
+          "7": "Cooling",
+          "8": "DHW",
+          "9": "Defrost DHW passive",
+          "10": "Defrost heating passive",
+          "11": "Prepare for pool",
+          "12": "Pool",
+          "13": "Defrost pool passive"
+        }
       },
-      "heatingpower": {
-        "name": "Heating Power"
+      "smart_dhw_control_status": {
+        "name": "Smart DHW control status",
+        "state": {
+          "0": "Unavailable",
+          "1": "Standby",
+          "2": "Raising",
+          "3": "Lowering",
+          "4": "Lowering long term",
+          "5": "Paused"
+        }
       },
       "powertotal": {
         "name": "Total Power"
+      },
+      "compressor_power": {
+        "name": "Compressor Power"
+      },
+      "heatingenergy": {
+        "name": "Heating Energy"
+      },
+      "dhwenergy": {
+        "name": "DHW Energy"
       },
       "inputcurrent1": {
         "name": "Input current L1"
@@ -255,10 +306,10 @@
       "bt30": {
         "name": "Hot water tank (BT30)"
       },
-      "dhw_normal_start": {
+      "tap_water_start": {
         "name": "Hot water tank lower limit"
       },
-      "dhw_normal_stop": {
+      "tap_water_stop": {
         "name": "Hot water tank upper limit"
       },
       "tap_water_cap": {
@@ -448,12 +499,15 @@
     },
     "step": {
       "user": {
+        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus, write/controls are still via HTTP API",
         "data": {
           "password": "Password",
-          "username": "Username"
+          "username": "Username",
+          "modbus_tcp": "Use Modbus TCP instead of HTTP polling"
         }
       },
       "reconfigure": {
+        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus, write/controls are still via HTTP API",
         "data": {
           "password": "Password",
           "username": "Username"
@@ -465,7 +519,9 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Scan Interval (seconds)"
+          "scan_interval": "HTTP Scan Interval (seconds)",
+          "modbus_tcp": "Use Modbus TCP instead of HTTP polling",
+          "modbus_host": "Qvantum Host/IP"
         },
         "description": "Amend your options.",
         "title": "Options"

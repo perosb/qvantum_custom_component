@@ -9,13 +9,11 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 from homeassistant.const import EntityCategory
 
 
 from . import MyConfigEntry
-from .const import DOMAIN, DEFAULT_ENABLED_METRICS, DEFAULT_DISABLED_METRICS
 from .coordinator import QvantumDataUpdateCoordinator
 from .entity import QvantumEntity
 
@@ -47,14 +45,12 @@ async def async_setup_entry(
     ]
 
     for sensor_name in sensor_names:
-        enabled_by_default = sensor_name not in DEFAULT_DISABLED_METRICS
         sensors.append(
             QvantumBaseBinaryEntity(
                 coordinator,
                 sensor_name,
                 sensor_name,
                 device,
-                enabled_by_default,
             )
         )
 
@@ -89,7 +85,7 @@ class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
         enabled_by_default: bool = True,
     ) -> None:
         super().__init__(coordinator, metric_key, device, enabled_by_default)
-        self._data_bearer = "metrics"
+        self._data_bearer = "values"
 
     @property
     def is_on(self):

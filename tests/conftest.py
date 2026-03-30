@@ -108,14 +108,29 @@ def mock_coordinator():
     """Mock QvantumDataUpdateCoordinator instance."""
     coordinator = Mock()
     coordinator.data = {
-        "settings": {
+        "values": {
+            "hpid": "test_device_123",
             "tap_water_capacity_target": 4,
             "tap_water_stop": 60,
             "tap_water_start": 50,
-        },
-        "metrics": {"hpid": "test_device_123"},
+            "use_adaptive": True,
+            "smart_price_dhw_enabled": True,
+            "smart_price_heating_enabled": True,
+            "smart_sh_mode": 0,
+            "smart_dhw_mode": 0,
+        }
     }
     coordinator.async_config_entry_first_refresh = AsyncMock()
+
+    # Mock the maintenance coordinator for access level checking
+    config_entry = Mock()
+    runtime_data = Mock()
+    maintenance_coordinator = Mock()
+    maintenance_coordinator.data = {"access_level": {"writeAccessLevel": 30}}
+    runtime_data.maintenance_coordinator = maintenance_coordinator
+    config_entry.runtime_data = runtime_data
+    coordinator.config_entry = config_entry
+    
     return coordinator
 
 

@@ -77,7 +77,7 @@ def mock_coordinator():
             },
         },
         "latency": 45,  # Latency at top level for QvantumLatencyEntity
-        "metrics": {
+        "values": {
             "hpid": "test_device_123",
             "bt1": 20.5,  # Temperature
             "compressorenergy": 100.0,  # Energy
@@ -90,8 +90,6 @@ def mock_coordinator():
             "compressormeasuredspeed": 3000,  # RPM
             "bf1_l_min": 25.5,  # Flow rate
             "qn8position": 1,  # Position sensor
-        },
-        "settings": {
             "tap_water_start": 3600,
             "tap_water_stop": 7200,
         },
@@ -218,7 +216,7 @@ class TestQvantumEnergyEntity:
 
     def test_available_with_zero_value(self, mock_coordinator, mock_device):
         """Test availability when energy value is zero."""
-        mock_coordinator.data["metrics"]["compressorenergy"] = 0
+        mock_coordinator.data["values"]["compressorenergy"] = 0
         entity = QvantumEnergyEntity(
             mock_coordinator, "compressorenergy", mock_device, True
         )
@@ -261,7 +259,7 @@ class TestQvantumPressureEntity:
 
     def test_available_with_zero_value(self, mock_coordinator, mock_device):
         """Test availability when pressure value is zero."""
-        mock_coordinator.data["metrics"]["bp1_pressure"] = 0
+        mock_coordinator.data["values"]["bp1_pressure"] = 0
         entity = QvantumPressureEntity(
             mock_coordinator, "bp1_pressure", mock_device, True
         )
@@ -301,7 +299,7 @@ class TestQvantumTotalEnergyEntity:
 
     def test_available_without_data(self, mock_coordinator, mock_device):
         """Test availability when compressor energy data is missing."""
-        del mock_coordinator.data["metrics"]["compressorenergy"]
+        del mock_coordinator.data["values"]["compressorenergy"]
         entity = QvantumTotalEnergyEntity(
             mock_coordinator, "totalenergy", mock_device, True
         )

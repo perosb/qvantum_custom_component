@@ -94,19 +94,70 @@
       "picpin_relay_heat_l3": {
         "name": "Zusätzliche Wärme L3"
       },
+      "picpin_relay_gp10": {
+        "name": "Umwälzpumpe (GP10)"
+      },
       "picpin_relay_qm10": {
         "name": "Drei-Wege-Ventil, Brauchwasser/Heizung (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Shuntventil Zusatz (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Shuntventil Zusatz (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Umwälzpumpe (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Umwälzpumpe"
+      },
+      "picpin_relay_ha12": {
+        "name": "Heizkreispumpe (HA12)"
       }
     },
     "sensor": {
-      "dhwpower": {
-        "name": "Brauchwasser-Leistung"
+      "compressor_state": {
+        "name": "Kompressorstatus",
+        "state": {
+          "0": "Aus",
+          "1": "Leerlauf",
+          "2": "Vorbereitung Heizen",
+          "3": "Vorbereitung Kühlen",
+          "4": "Vorbereitung 1 DHW",
+          "5": "Vorbereitung 2 DHW",
+          "6": "Heizen",
+          "7": "Kühlen",
+          "8": "DHW",
+          "9": "Abtauung DHW passiv",
+          "10": "Abtauung Heizung passiv",
+          "11": "Vorbereitung Pool",
+          "12": "Pool",
+          "13": "Abtauung Pool passiv"
+        }
       },
-      "heatingpower": {
-        "name": "Heizleistung"
+      "smart_dhw_control_status": {
+        "name": "Smart DHW-Steuerstatus",
+        "state": {
+          "0": "Nicht verfügbar",
+          "1": "Bereitschaft",
+          "2": "Steigend",
+          "3": "Sinkend",
+          "4": "Längerfristig sinkend",
+          "5": "Pausiert"
+        }
       },
       "powertotal": {
         "name": "Gesamt (L1+L2+L3)"
+      },
+      "compressor_power": {
+        "name": "Kompressorleistung"
+      },
+      "heatingenergy": {
+        "name": "Heizenergie"
+      },
+      "dhwenergy": {
+        "name": "Warmwasserenergie"
       },
       "inputcurrent1": {
         "name": "Eingangsstrom L1"
@@ -255,10 +306,10 @@
       "bt30": {
         "name": "Trinkwassererwärmer, Steuersensor (BT30)"
       },
-      "dhw_normal_start": {
-        "name": "Brauchwasserbehälter Untergrenze"
+      "tap_water_start": {
+        "name": "Warmwasser-Behälter Untergrenze"
       },
-      "dhw_normal_stop": {
+      "tap_water_stop": {
         "name": "Brauchwasserbehälter Obergrenze"
       },
       "tap_water_cap": {
@@ -448,12 +499,15 @@
     },
     "step": {
       "user": {
+        "description": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest, Schreiben/Steuerung erfolgt weiterhin über HTTP-API",
         "data": {
           "password": "Passwort",
-          "username": "Benutzername"
+          "username": "Benutzername",
+          "modbus_tcp": "Modbus TCP statt HTTP-Abfragen verwenden"
         }
       },
       "reconfigure": {
+        "description": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest, Schreiben/Steuerung erfolgt weiterhin über HTTP-API",
         "data": {
           "password": "Passwort",
           "username": "Benutzername"
@@ -465,7 +519,9 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Scan-Intervall (Sekunden)"
+          "scan_interval": "HTTP-Scan-Intervall (Sekunden)",
+          "modbus_tcp": "Modbus TCP statt HTTP-Abfragen verwenden",
+          "modbus_host": "Qvantum Host/IP"
         },
         "description": "Ändern Sie Ihre Optionen.",
         "title": "Optionen"

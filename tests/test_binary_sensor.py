@@ -35,10 +35,10 @@ def mock_coordinator():
     coordinator = MagicMock()
     coordinator.data = {
         "device": {"id": "test_device_123"},
-        "metrics": {
+        "values": {
             "hpid": "test_device_123",  # Add hpid for unique_id generation
             "op_man_addition": 1,  # Binary sensor value
-            "op_man_defrost": 0,   # Another binary sensor value
+            "op_man_defrost": 0,  # Another binary sensor value
         },
         "connectivity": {
             "connected": True,
@@ -71,10 +71,11 @@ class TestQvantumBaseBinaryEntity:
         assert entity._attr_device_info == mock_device
         assert entity._attr_has_entity_name is True
         assert entity._attr_entity_registry_enabled_default is True
-        assert entity._data_bearer == "metrics"
+        assert entity._data_bearer == "values"
 
     def test_is_on_true(self, mock_coordinator, mock_device):
         """Test binary entity state when on."""
+        mock_coordinator.data["values"]["op_man_addition"] = 1
         entity = QvantumBaseBinaryEntity(
             mock_coordinator, "op_man_addition", "Addition Mode", mock_device, True
         )
@@ -82,7 +83,7 @@ class TestQvantumBaseBinaryEntity:
 
     def test_is_on_false(self, mock_coordinator, mock_device):
         """Test binary entity state when off."""
-        mock_coordinator.data["metrics"]["op_man_addition"] = 0
+        mock_coordinator.data["values"]["op_man_addition"] = 0
         entity = QvantumBaseBinaryEntity(
             mock_coordinator, "op_man_addition", "Addition Mode", mock_device, True
         )
@@ -90,6 +91,7 @@ class TestQvantumBaseBinaryEntity:
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test binary entity availability when data exists."""
+        mock_coordinator.data["values"]["op_man_addition"] = 1
         entity = QvantumBaseBinaryEntity(
             mock_coordinator, "op_man_addition", "Addition Mode", mock_device, True
         )

@@ -55,7 +55,7 @@ def mock_coordinator():
     coordinator.data = {
         "device": {"id": "test_device_123"},
         "latency": 45,  # Latency at top level for QvantumLatencyEntity
-        "metrics": {
+        "values": {
             "hpid": "test_device_123",
             "bt1": 20.5,  # Temperature
             "compressorenergy": 100.0,  # Energy
@@ -70,8 +70,6 @@ def mock_coordinator():
             "compressormeasuredspeed": 3000,  # RPM
             "bf1_l_min": 25.5,  # Flow rate
             "qn8position": 1,  # Position sensor
-        },
-        "settings": {
             "tap_water_start": 3600,
             "tap_water_stop": 7200,
         },
@@ -182,7 +180,7 @@ class TestQvantumEnergyEntity:
 
     def test_available_with_zero_value(self, mock_coordinator, mock_device):
         """Test availability when energy value is zero."""
-        mock_coordinator.data["metrics"]["compressorenergy"] = 0
+        mock_coordinator.data["values"]["compressorenergy"] = 0
         entity = QvantumEnergyEntity(
             mock_coordinator, "compressorenergy", mock_device, True
         )
@@ -202,25 +200,7 @@ class TestQvantumPowerEntity:
         assert not hasattr(entity, "_attr_suggested_display_precision")
         assert entity.state == 1500.0
 
-    def test_heatingpower_init(self, mock_coordinator, mock_device):
-        """Test heating power entity initialization with kW unit and precision."""
-        entity = QvantumPowerEntity(mock_coordinator, "heatingpower", mock_device, True)
-
-        assert entity._attr_device_class == SensorDeviceClass.POWER
-        assert entity._attr_native_unit_of_measurement == UnitOfPower.KILO_WATT
-        assert entity._attr_state_class == SensorStateClass.MEASUREMENT
-        assert entity._attr_suggested_display_precision == 2
-        assert entity.state == 2.5
-
-    def test_dhwpower_init(self, mock_coordinator, mock_device):
-        """Test DHW power entity initialization with kW unit and precision."""
-        entity = QvantumPowerEntity(mock_coordinator, "dhwpower", mock_device, True)
-
-        assert entity._attr_device_class == SensorDeviceClass.POWER
-        assert entity._attr_native_unit_of_measurement == UnitOfPower.KILO_WATT
-        assert entity._attr_state_class == SensorStateClass.MEASUREMENT
-        assert entity._attr_suggested_display_precision == 2
-        assert entity.state == 1.8
+    # heatingpower and dhwpower metrics are removed; powertotal remains as main power metric.
 
 
 class TestQvantumPressureEntity:
@@ -246,7 +226,7 @@ class TestQvantumPressureEntity:
 
     def test_available_with_zero_value(self, mock_coordinator, mock_device):
         """Test availability when pressure value is zero."""
-        mock_coordinator.data["metrics"]["bp1_pressure"] = 0
+        mock_coordinator.data["values"]["bp1_pressure"] = 0
         entity = QvantumPressureEntity(
             mock_coordinator, "bp1_pressure", mock_device, True
         )
@@ -286,7 +266,7 @@ class TestQvantumTotalEnergyEntity:
 
     def test_available_without_data(self, mock_coordinator, mock_device):
         """Test availability when compressor energy data is missing."""
-        del mock_coordinator.data["metrics"]["compressorenergy"]
+        del mock_coordinator.data["values"]["compressorenergy"]
         entity = QvantumTotalEnergyEntity(
             mock_coordinator, "totalenergy", mock_device, True
         )
@@ -342,7 +322,8 @@ class TestGetSensorType:
         assert _get_sensor_type("bt1") == QvantumTemperatureEntity
         assert _get_sensor_type("bt2") == QvantumTemperatureEntity
         assert _get_sensor_type("bp1_temp") == QvantumTemperatureEntity
-        assert _get_sensor_type("dhw_normal_start") == QvantumTemperatureEntity
+        assert _get_sensor_type("tap_water_start") == QvantumTemperatureEntity
+        assert _get_sensor_type("tap_water_stop") == QvantumTemperatureEntity
 
     def test_energy_metrics(self):
         """Test energy metric classification."""
@@ -505,16 +486,10 @@ class TestSensorSetup:
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):
         """Test that entities disabled by integration can be updated on subsequent restarts."""
-        from custom_components.qvantum.const import DEFAULT_DISABLED_METRICS
-
-        # Define the exclusion patterns locally (same as in sensor.py)
-        EXCLUDED_METRIC_PATTERNS = [
-            "op_man_",
-            "enable",
-            "picpin_",
-            "qn8",
-            "use_",
-        ]
+        from custom_components.qvantum.const import (
+            DEFAULT_DISABLED_METRICS,
+            EXCLUDED_METRIC_PATTERNS,
+        )
 
         # Calculate expected calls dynamically to avoid relying on a magic number
         expected_calls = len(
@@ -561,12 +536,9 @@ class TestSensorSetup:
 
         await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
 
-        # Verify that async_update_entity was called for all disabled entities that are actually created
-        assert mock_entity_registry.async_update_entity.call_count == expected_calls
+        # Since this integration now only creates enabled-by-default sensors,
+        # no entities should be updated to disabled_by=INTEGRATION on restart.
+        assert mock_entity_registry.async_update_entity.call_count == 0
 
-        # Verify calls were made with correct parameters
-        calls = mock_entity_registry.async_update_entity.call_args_list
-        for call in calls:
-            args, kwargs = call
-            assert "disabled_by" in kwargs
-            assert kwargs["disabled_by"] == RegistryEntryDisabler.INTEGRATION
+        # Verify no integration-disabling calls were made
+        assert mock_entity_registry.async_update_entity.call_args_list == []

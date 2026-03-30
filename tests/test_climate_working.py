@@ -68,12 +68,10 @@ def mock_coordinator():
     coordinator = MagicMock()
     coordinator.data = {
         "device": {"id": "test_device_123"},
-        "metrics": {
+        "values": {
             "hpid": "test_device_123",
             "bt2": 22.5,  # Current temperature
             "hp_status": 3,  # Heating status
-        },
-        "settings": {
             "indoor_temperature_target": 21.0,
             "sensor_mode": "bt2",
         },
@@ -143,19 +141,19 @@ class TestQvantumIndoorClimateEntity:
 
     def test_hvac_action_idle(self, mock_coordinator, mock_device):
         """Test HVAC action when idle."""
-        mock_coordinator.data["metrics"]["hp_status"] = 0
+        mock_coordinator.data["values"]["hp_status"] = 0
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.hvac_action == "idle"
 
     def test_hvac_action_defrosting(self, mock_coordinator, mock_device):
         """Test HVAC action when defrosting."""
-        mock_coordinator.data["metrics"]["hp_status"] = 1
+        mock_coordinator.data["values"]["hp_status"] = 1
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.hvac_action == "defrosting"
 
     def test_hvac_action_unknown(self, mock_coordinator, mock_device):
         """Test HVAC action for unknown status."""
-        mock_coordinator.data["metrics"]["hp_status"] = 99
+        mock_coordinator.data["values"]["hp_status"] = 99
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.hvac_action == "idle"  # Default to idle
 
@@ -166,7 +164,7 @@ class TestQvantumIndoorClimateEntity:
 
     def test_supported_features_without_bt2(self, mock_coordinator, mock_device):
         """Test supported features when sensor_mode is not bt2."""
-        mock_coordinator.data["settings"]["sensor_mode"] = "other"
+        mock_coordinator.data["values"]["sensor_mode"] = "other"
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.supported_features == {}
 
@@ -177,13 +175,13 @@ class TestQvantumIndoorClimateEntity:
 
     def test_available_false_no_bt2(self, mock_coordinator, mock_device):
         """Test entity availability when bt2 key is missing."""
-        del mock_coordinator.data["metrics"]["bt2"]
+        del mock_coordinator.data["values"]["bt2"]
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.available is False
 
     def test_available_false_bt2_none(self, mock_coordinator, mock_device):
         """Test entity availability when bt2 is None."""
-        mock_coordinator.data["metrics"]["bt2"] = None
+        mock_coordinator.data["values"]["bt2"] = None
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.available is False
 
@@ -207,7 +205,7 @@ class TestQvantumIndoorClimateEntity:
             mock_coordinator.data
         )
         # The data should have been updated
-        assert mock_coordinator.data["settings"]["indoor_temperature_target"] == 23.5
+        assert mock_coordinator.data["values"]["indoor_temperature_target"] == 23.5
 
     @pytest.mark.asyncio
     async def test_async_set_hvac_mode(self, mock_coordinator, mock_device):

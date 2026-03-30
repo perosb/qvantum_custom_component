@@ -69,8 +69,8 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
         _LOGGER.warning(
             "%s for %s (hpid=%s): smart_sh_mode=%s, smart_dhw_mode=%s. %s.",
             condition_desc,
-            self._metric_key,
             self._hpid,
+            self._metric_key,
             smart_sh_mode,
             smart_dhw_mode,
             fallback_desc,
@@ -98,11 +98,11 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
                 response.get("status") == SETTING_UPDATE_APPLIED
                 or response.get("heatpump_status") == SETTING_UPDATE_APPLIED
             ):
-                self.coordinator.data.get("metrics")["smart_sh_mode"] = sh_mode
-                self.coordinator.data.get("metrics")["smart_dhw_mode"] = dhw_mode
+                self.coordinator.data.get("values", {})["smart_sh_mode"] = sh_mode
+                self.coordinator.data.get("values", {})["smart_dhw_mode"] = dhw_mode
 
         await handle_setting_update_response(
-            response, self.coordinator, "metrics", self._metric_key, use_adaptive_value
+            response, self.coordinator, "values", self._metric_key, use_adaptive_value
         )
 
     @property
@@ -111,13 +111,14 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
         if not self.coordinator.data:
             return None
 
-        metrics = self.coordinator.data.get("metrics", {})
-        use_adaptive = metrics.get(self._metric_key)
+        values = self.coordinator.data.get("values", {})
+        use_adaptive = values.get(self._metric_key)
+
         if use_adaptive is False:
             return "off"  # Off
 
-        smart_sh_mode = metrics.get("smart_sh_mode")
-        smart_dhw_mode = metrics.get("smart_dhw_mode")
+        smart_sh_mode = values.get("smart_sh_mode")
+        smart_dhw_mode = values.get("smart_dhw_mode")
 
         # Normal, consistent cases where both modes match
         if smart_sh_mode == 0 and smart_dhw_mode == 0:
@@ -179,5 +180,5 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
         if not self.coordinator.data:
             return False
 
-        metrics = self.coordinator.data.get("metrics") or {}
+        metrics = self.coordinator.data.get("values") or {}
         return self._metric_key in metrics and self._has_write_access

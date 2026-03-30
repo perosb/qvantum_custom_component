@@ -49,11 +49,18 @@ def mock_coordinator():
     coordinator = MagicMock()
     coordinator.data = {
         "device": {"id": "test_device_123"},
-        "metrics": {
+        "values": {
             "hpid": "test_device_123",
-        },
-        "settings": {
             "extra_tap_water": None,  # Will be set based on test
+            "use_adaptive": True,  # For enable_sc_* availability tests
+            "enable_sc_dhw": True,  # For enable_sc_dhw tests
+            "enable_sc_sh": True,  # For enable_sc_sh tests
+            "smart_price_dhw_enabled": True,
+            "smart_price_heating_enabled": True,
+        },
+        "metrics": {
+            "smart_price_dhw_enabled": True,
+            "smart_price_heating_enabled": True,
         },
     }
     coordinator.api = MagicMock()
@@ -119,37 +126,37 @@ class TestQvantumSwitchEntity:
 
     def test_is_on_extra_tap_water_off(self, mock_coordinator, mock_device):
         """Test is_on when extra_tap_water is 'off'."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = "off"
+        mock_coordinator.data["values"]["extra_tap_water"] = "off"
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is False
 
     def test_is_on_extra_tap_water_on(self, mock_coordinator, mock_device):
         """Test is_on when extra_tap_water is 'on'."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = "on"
+        mock_coordinator.data["values"]["extra_tap_water"] = "on"
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is True
 
     def test_is_on_extra_tap_water_none(self, mock_coordinator, mock_device):
         """Test is_on when extra_tap_water is None."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = None
+        mock_coordinator.data["values"]["extra_tap_water"] = None
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.is_on is False
 
     def test_is_on_other_metric_on(self, mock_coordinator, mock_device):
         """Test is_on for other metrics when set to 1."""
         entity = QvantumSwitchEntity(mock_coordinator, "other_switch", mock_device)
-        mock_coordinator.data["metrics"]["other_switch"] = 1
+        mock_coordinator.data["values"]["other_switch"] = 1
         assert entity.is_on is True
 
     def test_is_on_other_metric_off(self, mock_coordinator, mock_device):
         """Test is_on for other metrics when set to 0."""
         entity = QvantumSwitchEntity(mock_coordinator, "other_switch", mock_device)
-        mock_coordinator.data["metrics"]["other_switch"] = 0
+        mock_coordinator.data["values"]["other_switch"] = 0
         assert entity.is_on is False
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test entity availability when data exists."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = "on"
+        mock_coordinator.data["values"]["extra_tap_water"] = "on"
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is True
 
@@ -160,13 +167,13 @@ class TestQvantumSwitchEntity:
 
     def test_available_false_none_value(self, mock_coordinator, mock_device):
         """Test entity availability when value is None."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = None
+        mock_coordinator.data["values"]["extra_tap_water"] = None
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is False
 
     def test_available_extra_tap_water_with_data(self, mock_coordinator, mock_device):
         """Test availability for extra_tap_water when data exists."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = "on"
+        mock_coordinator.data["values"]["extra_tap_water"] = "on"
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is True
 
@@ -174,21 +181,21 @@ class TestQvantumSwitchEntity:
         self, mock_coordinator, mock_device
     ):
         """Test availability for extra_tap_water when stop data is missing."""
-        # Remove extra_tap_water from settings
-        if "extra_tap_water" in mock_coordinator.data["settings"]:
-            del mock_coordinator.data["settings"]["extra_tap_water"]
+        # Remove extra_tap_water from values
+        if "extra_tap_water" in mock_coordinator.data["values"]:
+            del mock_coordinator.data["values"]["extra_tap_water"]
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is False
 
     def test_available_extra_tap_water_none(self, mock_coordinator, mock_device):
         """Test availability for extra_tap_water when data is None."""
-        mock_coordinator.data["settings"]["extra_tap_water"] = None
+        mock_coordinator.data["values"]["extra_tap_water"] = None
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
         assert entity.available is False
 
     def test_available_other_switch_with_data(self, mock_coordinator, mock_device):
         """Test availability for other switches when data exists."""
-        mock_coordinator.data["metrics"]["op_mode"] = 1
+        mock_coordinator.data["values"]["op_mode"] = 1
         entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
         assert entity.available is True
 
@@ -199,14 +206,40 @@ class TestQvantumSwitchEntity:
 
     def test_available_other_switch_none_value(self, mock_coordinator, mock_device):
         """Test availability for other switches when value is None."""
-        mock_coordinator.data["settings"]["op_mode"] = None
+        mock_coordinator.data["values"]["op_mode"] = None
         entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
+        assert entity.available is False
+
+    def test_available_enable_sc_dhw_available(self, mock_coordinator, mock_device):
+        """Test availability for enable_sc_dhw when metric exists and use_adaptive is True."""
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_dhw", mock_device)
+        assert entity.available is True
+
+    def test_available_enable_sc_dhw_unavailable_use_adaptive_false(
+        self, mock_coordinator, mock_device
+    ):
+        """Test availability for enable_sc_dhw when use_adaptive is False."""
+        mock_coordinator.data["values"]["use_adaptive"] = False
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_dhw", mock_device)
+        assert entity.available is False
+
+    def test_available_enable_sc_sh_available(self, mock_coordinator, mock_device):
+        """Test availability for enable_sc_sh when metric exists and use_adaptive is True."""
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_sh", mock_device)
+        assert entity.available is True
+
+    def test_available_enable_sc_sh_unavailable_use_adaptive_false(
+        self, mock_coordinator, mock_device
+    ):
+        """Test availability for enable_sc_sh when use_adaptive is False."""
+        mock_coordinator.data["values"]["use_adaptive"] = False
+        entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_sh", mock_device)
         assert entity.available is False
 
     def test_available_op_man_addition_available(self, mock_coordinator, mock_device):
         """Test availability for op_man_addition when op_mode is 1."""
-        mock_coordinator.data["metrics"]["op_man_addition"] = 0
-        mock_coordinator.data["metrics"]["op_mode"] = 1
+        mock_coordinator.data["values"]["op_man_addition"] = 0
+        mock_coordinator.data["values"]["op_mode"] = 1
         entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
         assert entity.available is True
 
@@ -214,8 +247,8 @@ class TestQvantumSwitchEntity:
         self, mock_coordinator, mock_device
     ):
         """Test availability for op_man_addition when op_mode is not 1."""
-        mock_coordinator.data["metrics"]["op_man_addition"] = 0
-        mock_coordinator.data["metrics"]["op_mode"] = 0
+        mock_coordinator.data["values"]["op_man_addition"] = 0
+        mock_coordinator.data["values"]["op_mode"] = 0
         entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
         assert entity.available is False
 
@@ -223,14 +256,14 @@ class TestQvantumSwitchEntity:
         self, mock_coordinator, mock_device
     ):
         """Test availability for op_man_addition when metric is missing."""
-        mock_coordinator.data["metrics"]["op_mode"] = 1
+        mock_coordinator.data["values"]["op_mode"] = 1
         entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
         assert entity.available is False
 
     def test_available_op_man_dhw_available(self, mock_coordinator, mock_device):
         """Test availability for op_man_dhw when op_mode is 1."""
-        mock_coordinator.data["metrics"]["op_man_dhw"] = 0
-        mock_coordinator.data["metrics"]["op_mode"] = 1
+        mock_coordinator.data["values"]["op_man_dhw"] = 0
+        mock_coordinator.data["values"]["op_mode"] = 1
         entity = QvantumSwitchEntity(mock_coordinator, "op_man_dhw", mock_device)
         assert entity.available is True
 
@@ -238,8 +271,8 @@ class TestQvantumSwitchEntity:
         self, mock_coordinator, mock_device
     ):
         """Test availability for op_man_dhw when op_mode is not 1."""
-        mock_coordinator.data["metrics"]["op_man_dhw"] = 0
-        mock_coordinator.data["metrics"]["op_mode"] = 0
+        mock_coordinator.data["values"]["op_man_dhw"] = 0
+        mock_coordinator.data["values"]["op_mode"] = 0
         entity = QvantumSwitchEntity(mock_coordinator, "op_man_dhw", mock_device)
         assert entity.available is False
 
@@ -261,7 +294,7 @@ class TestQvantumSwitchEntity:
         # Data is updated after successful API response
         mock_coordinator.async_set_updated_data.assert_called_once()
         updated_data = mock_coordinator.async_set_updated_data.call_args[0][0]
-        assert updated_data["settings"]["extra_tap_water"] == "on"
+        assert updated_data["values"]["extra_tap_water"] == "on"
         # No immediate refresh to avoid overwriting the update
 
     @pytest.mark.asyncio
@@ -282,7 +315,7 @@ class TestQvantumSwitchEntity:
         # Data is updated after successful API response
         mock_coordinator.async_set_updated_data.assert_called_once()
         updated_data = mock_coordinator.async_set_updated_data.call_args[0][0]
-        assert updated_data["settings"]["extra_tap_water"] == "off"
+        assert updated_data["values"]["extra_tap_water"] == "off"
         # No immediate refresh to avoid overwriting the update
 
     @pytest.mark.asyncio
@@ -301,7 +334,7 @@ class TestQvantumSwitchEntity:
             "test_device_123", "other_switch", 1
         )
         # The method updates metrics
-        assert mock_coordinator.data["metrics"]["other_switch"] == 1
+        assert mock_coordinator.data["values"]["other_switch"] == 1
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
@@ -322,7 +355,7 @@ class TestQvantumSwitchEntity:
             "test_device_123", "other_switch", 0
         )
         # The method updates metrics
-        assert mock_coordinator.data["metrics"]["other_switch"] == 0
+        assert mock_coordinator.data["values"]["other_switch"] == 0
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
@@ -343,7 +376,7 @@ class TestQvantumSwitchEntity:
             "test_device_123", "enable_sc_dhw", True
         )
         # The method updates metrics
-        assert mock_coordinator.data["metrics"]["enable_sc_dhw"] is True
+        assert mock_coordinator.data["values"]["enable_sc_dhw"] is True
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
@@ -364,7 +397,7 @@ class TestQvantumSwitchEntity:
             "test_device_123", "enable_sc_dhw", False
         )
         # The method updates metrics
-        assert mock_coordinator.data["metrics"]["enable_sc_dhw"] is False
+        assert mock_coordinator.data["values"]["enable_sc_dhw"] is False
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
@@ -385,7 +418,7 @@ class TestQvantumSwitchEntity:
             "test_device_123", "enable_sc_sh", True
         )
         # The method updates metrics
-        assert mock_coordinator.data["metrics"]["enable_sc_sh"] is True
+        assert mock_coordinator.data["values"]["enable_sc_sh"] is True
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
@@ -406,7 +439,7 @@ class TestQvantumSwitchEntity:
             "test_device_123", "enable_sc_sh", False
         )
         # The method updates metrics
-        assert mock_coordinator.data["metrics"]["enable_sc_sh"] is False
+        assert mock_coordinator.data["values"]["enable_sc_sh"] is False
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+import asyncio
 import logging
+from datetime import timedelta
 from typing import Any, Optional
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -18,10 +19,9 @@ from .const import (
     DOMAIN,
     SETTING_UPDATE_APPLIED,
     DEFAULT_ENABLED_METRICS,
-    DEFAULT_DISABLED_METRICS,
     REQUIRED_METRICS,
+    CONF_MODBUS_TCP,
 )
-import traceback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +53,15 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
         )
 
+        # Modbus may be configured in options or in legacy config entry data.
+        modbus_enabled = config_entry.options.get(
+            CONF_MODBUS_TCP,
+            config_entry.data.get(CONF_MODBUS_TCP, False),
+        )
+
+        if modbus_enabled:
+            self.poll_interval = min(self.poll_interval, 15)  # Faster for Modbus
+
         self.api = hass.data[DOMAIN]
         self._device = None
 
@@ -75,29 +84,40 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         if device_reg_id:
             registry = self.hass.data["entity_registry"]
             enabled_metrics = set()
+            known_metrics = set()
             for entity in registry.entities.values():
                 if (
                     entity.device_id == device_reg_id
-                    and entity.disabled_by is None
                     and entity.unique_id.startswith("qvantum_")
                     and entity.unique_id.endswith(f"_{device_id}")
                 ):
                     metric_key = entity.unique_id[
                         len("qvantum_") : -len(f"_{device_id}")
                     ]
-                    if metric_key in DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_METRICS:
-                        enabled_metrics.add(metric_key)
+                    if metric_key in DEFAULT_ENABLED_METRICS:
+                        known_metrics.add(metric_key)
+                        if entity.disabled_by is None:
+                            enabled_metrics.add(metric_key)
             _LOGGER.debug(
-                "Enabled metrics for device %s: %s", device_id, list(enabled_metrics)
+                "Known metrics for device %s: %s", device_id, sorted(known_metrics)
             )
+            _LOGGER.debug(
+                "Enabled metrics for device %s: %s", device_id, sorted(enabled_metrics)
+            )
+
             # Always include required metrics
             final_metrics = set(REQUIRED_METRICS)
-            if enabled_metrics:
-                # If there are enabled entity metrics, include them
-                final_metrics.update(enabled_metrics)
-            else:
-                # If no entity metrics, include all default metrics
+
+            if not known_metrics:
+                # First setup: no registry entries yet - include all default metrics
                 final_metrics.update(DEFAULT_ENABLED_METRICS)
+            else:
+                # Include all currently enabled metrics plus any new defaults not in registry
+                final_metrics.update(enabled_metrics)
+                for metric in DEFAULT_ENABLED_METRICS:
+                    if metric not in known_metrics:
+                        final_metrics.add(metric)
+
             return sorted(final_metrics)
         _LOGGER.debug(
             "No device registry entry found for device %s, returning all DEFAULT_ENABLED_METRICS",
@@ -108,41 +128,133 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         final_metrics.update(REQUIRED_METRICS)
         return sorted(final_metrics)
 
+    def _process_settings_data(self, settings_data: dict) -> dict[str, Any]:
+        """Process raw settings data into a dictionary.
+
+        Args:
+            settings_data: Raw settings response from API
+
+        Returns:
+            Dictionary mapping setting names to values
+        """
+        settings_dict = {}
+        settings_list = settings_data.get("settings", [])
+
+        if not isinstance(settings_list, list):
+            _LOGGER.warning("Settings data is not a list: %s", type(settings_list))
+            return settings_dict
+
+        for setting in settings_list:
+            if not isinstance(setting, dict):
+                _LOGGER.warning(
+                    "Invalid setting format, expected dict: %s", type(setting)
+                )
+                continue
+
+            name = setting.get("name")
+            value = setting.get("value")
+
+            if name is None or value is None:
+                _LOGGER.warning("Setting missing name or value: %s", setting)
+                continue
+
+            settings_dict[name] = value
+
+        _LOGGER.debug("Processed %d settings", len(settings_dict))
+        return settings_dict
+
     async def async_update_data(self):
         """Fetch data from API endpoint."""
         try:
+            # Get device info if not cached
             if self._device is None:
+                _LOGGER.debug("Fetching primary device info")
                 self._device = await self.api.get_primary_device()
 
-            enabled_metrics = self._get_enabled_metrics(self._device.get("id"))
-            data = await self.api.get_metrics(
-                self._device.get("id"), enabled_metrics=enabled_metrics
+            device_id = self._device.get("id")
+            if not device_id:
+                raise UpdateFailed("Device ID not found in device data")
+
+            # Get enabled metrics for this device
+            enabled_metrics = self._get_enabled_metrics(device_id)
+            _LOGGER.debug(
+                "Fetching data for device %s with %d enabled metrics",
+                device_id,
+                len(enabled_metrics),
             )
-            settings = await self.api.get_settings(self._device.get("id"))
-            data.update({"device": self._device})
 
-            settings_dict = {}
-            settings_list = settings.get("settings", [])
-            if isinstance(settings_list, list):
-                for setting in settings_list:
-                    if (
-                        isinstance(setting, dict)
-                        and "name" in setting
-                        and "value" in setting
-                    ):
-                        settings_dict[setting.get("name")] = setting.get("value")
+            # Fetch metrics and settings concurrently for better performance
+            metrics_task = self.api.get_metrics(
+                device_id, enabled_metrics=enabled_metrics
+            )
+            settings_task = self.api.get_settings(device_id)
 
-            data.update({"settings": settings_dict})
+            data, settings = await asyncio.gather(metrics_task, settings_task)
 
-            _LOGGER.debug("Fetched data: %s", data)
+            # Validate response data
+            if not isinstance(data, dict):
+                raise UpdateFailed(f"Invalid metrics data type: {type(data)}")
+            if not isinstance(settings, dict):
+                raise UpdateFailed(f"Invalid settings data type: {type(settings)}")
 
-            return data
+            # Extract metrics from API response
+            metrics_dict = data.get("metrics", {})
+            _LOGGER.debug("Metrics data: %s", metrics_dict)
+
+            # Process settings data
+            settings_dict = self._process_settings_data(settings)
+            _LOGGER.debug("Settings data: %s", settings_dict)
+
+            # Detect and log conflicts where settings override metrics
+            overlapping_keys = metrics_dict.keys() & settings_dict.keys()
+            for conflict_key in overlapping_keys:
+                metrics_value = metrics_dict.get(conflict_key)
+                settings_value = settings_dict.get(conflict_key)
+                if metrics_value != settings_value:
+                    _LOGGER.debug(
+                        "Key conflict for device %s on '%s': using settings value over metrics value",
+                        device_id,
+                        conflict_key,
+                    )
+            # Merge metrics and settings into unified values structure
+            # Settings take precedence over metrics in case of conflicts
+            values = {**metrics_dict, **settings_dict}
+
+            _LOGGER.debug("Final values: %s", values)
+
+            # Validate we have some data
+            if not values:
+                _LOGGER.warning("No data received from API for device %s", device_id)
+
+            result = {"device": self._device, "values": values}
+
+            _LOGGER.debug(
+                "Successfully fetched data for device %s: %d values",
+                device_id,
+                len(values),
+            )
+
+            return result
 
         except APIAuthError as err:
-            _LOGGER.error(err)
-            raise UpdateFailed(err) from err
+            _LOGGER.error(
+                "Authentication error for device %s: %s",
+                getattr(self, "_device", {}).get("id", "unknown"),
+                err,
+            )
+            raise UpdateFailed(f"Authentication failed: {err}") from err
+        except asyncio.TimeoutError as err:
+            _LOGGER.error(
+                "Timeout fetching data for device %s",
+                getattr(self, "_device", {}).get("id", "unknown"),
+            )
+            raise UpdateFailed("Request timeout") from err
         except Exception as err:
-            stack_trace = traceback.format_exc()
-            raise UpdateFailed(
-                f"Error communicating with API: {err}\nStack trace:\n{stack_trace}"
-            ) from err
+            device_id = getattr(self, "_device", {}).get("id", "unknown")
+            _LOGGER.error(
+                "Unexpected error fetching data for device %s: %s",
+                device_id,
+                err,
+                exc_info=True,
+            )
+            raise UpdateFailed(f"Error communicating with API: {err}") from err

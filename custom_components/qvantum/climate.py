@@ -45,7 +45,7 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         self, coordinator: QvantumDataUpdateCoordinator, device: DeviceInfo
     ) -> None:
         super().__init__(coordinator)
-        self._hpid = self.coordinator.data.get("metrics").get("hpid")
+        self._hpid = self.coordinator.data.get("values", {}).get("hpid")
         self._attr_unique_id = f"qvantum_indoor_climate_{self._hpid}"
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_device_info = device
@@ -61,7 +61,7 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         await handle_setting_update_response(
             response,
             self.coordinator,
-            "settings",
+            "values",
             "indoor_temperature_target",
             temperature,
         )
@@ -73,7 +73,7 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
     @property
     def supported_features(self):
         """Return the list of supported features."""
-        if self.coordinator.data.get("settings").get("sensor_mode") == "bt2":
+        if self.coordinator.data.get("values", {}).get("sensor_mode") == "bt2":
             return ClimateEntityFeature.TARGET_TEMPERATURE
 
         return {}
@@ -82,25 +82,25 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
     def available(self):
         """Check if data is available."""
         return (
-            "bt2" in self.coordinator.data.get("metrics")
-            and self.coordinator.data.get("metrics").get("bt2") is not None
+            "bt2" in self.coordinator.data.get("values", {})
+            and self.coordinator.data.get("values", {}).get("bt2") is not None
             and self._has_write_access
         )
 
     @property
     def current_temperature(self):
         """Return the temperature we try to reach."""
-        return self.coordinator.data.get("metrics").get("bt2")
+        return self.coordinator.data.get("values", {}).get("bt2")
 
     @property
     def target_temperature(self):
         """Return the temperature we try to reach."""
-        return self.coordinator.data.get("settings").get("indoor_temperature_target")
+        return self.coordinator.data.get("values", {}).get("indoor_temperature_target")
 
     @property
     def hvac_action(self):
         """Current HVAC action"""
-        status = self.coordinator.data.get("metrics").get("hp_status")
+        status = self.coordinator.data.get("values", {}).get("hp_status")
         if status == 3:
             return HVACAction.HEATING
         if status == 0:

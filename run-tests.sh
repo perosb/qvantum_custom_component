@@ -17,9 +17,15 @@ if [ ! -d ".venv" ] || ! python3 -c "import homeassistant" 2>/dev/null; then
     rm -rf .venv
     python3 -m venv .venv
     source .venv/bin/activate
+    pip install --upgrade pip
     pip install -r requirements-test.txt
 else
     source .venv/bin/activate
+    # Ensure pymodbus is installed
+    if ! python3 -c "import pymodbus" 2>/dev/null; then
+        echo "Installing pymodbus..."
+        pip install pymodbus>=3.0.0
+    fi
 fi
 
 # Run tests
@@ -28,6 +34,7 @@ PROJECT_ROOT=$(pwd)
 PYTHONPATH=${PROJECT_ROOT}:${PROJECT_ROOT}/custom_components \
     python -m pytest \
     tests/ \
-    -v --tb=short --cov=custom_components.qvantum --cov-report=xml
+    -v --tb=short --cov=custom_components.qvantum --cov-report=xml \
+    -W ignore::DeprecationWarning -W ignore::PendingDeprecationWarning
 
 echo "Tests completed!"

@@ -40,10 +40,8 @@ def mock_coordinator():
     coordinator = MagicMock()
     coordinator.data = {
         "device": {"id": "test_device_123"},
-        "metrics": {
+        "values": {
             "hpid": "test_device_123",
-        },
-        "settings": {
             "tap_water_capacity_target": 4,
             "room_comp_factor": 2.5,
             "indoor_temperature_offset": 2,
@@ -177,12 +175,12 @@ class TestQvantumNumberEntity:
 
         coordinator = Mock()
         coordinator.data = {
-            "settings": {
+            "values": {
                 "tap_water_capacity_target": 5,  # Different stored value
                 "tap_water_stop": 58,
                 "tap_water_start": 52,
+                "hpid": "test_device_123",
             },
-            "metrics": {"hpid": "test_device_123"},
         }
         coordinator.async_config_entry_first_refresh = AsyncMock()
 
@@ -198,12 +196,12 @@ class TestQvantumNumberEntity:
 
         coordinator = Mock()
         coordinator.data = {
-            "settings": {
+            "values": {
                 "tap_water_capacity_target": 2,  # Different stored value
                 "tap_water_stop": 74,
                 "tap_water_start": 55,
+                "hpid": "test_device_123",
             },
-            "metrics": {"hpid": "test_device_123"},
         }
         coordinator.async_config_entry_first_refresh = AsyncMock()
 
@@ -219,12 +217,12 @@ class TestQvantumNumberEntity:
 
         coordinator = Mock()
         coordinator.data = {
-            "settings": {
+            "values": {
                 "tap_water_capacity_target": 3,
                 "tap_water_stop": 61,
                 "tap_water_start": 50,
+                "hpid": "test_device_123",
             },
-            "metrics": {"hpid": "test_device_123"},
         }
         coordinator.async_config_entry_first_refresh = AsyncMock()
 
@@ -240,12 +238,12 @@ class TestQvantumNumberEntity:
 
         coordinator = Mock()
         coordinator.data = {
-            "settings": {
+            "values": {
                 "tap_water_capacity_target": 2,
                 "tap_water_stop": None,
                 "tap_water_start": 50,
+                "hpid": "test_device_123",
             },
-            "metrics": {"hpid": "test_device_123"},
         }
         coordinator.async_config_entry_first_refresh = AsyncMock()
 
@@ -261,12 +259,12 @@ class TestQvantumNumberEntity:
 
         coordinator = Mock()
         coordinator.data = {
-            "settings": {
+            "values": {
                 "tap_water_capacity_target": 2,
                 "tap_water_stop": 61,
                 "tap_water_start": None,
+                "hpid": "test_device_123",
             },
-            "metrics": {"hpid": "test_device_123"},
         }
         coordinator.async_config_entry_first_refresh = AsyncMock()
 

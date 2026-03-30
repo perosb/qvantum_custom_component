@@ -1,17 +1,34 @@
 """Qvantum API."""
 
 import aiohttp
+import asyncio
+import inspect
+import json
 from datetime import datetime, timedelta, timezone
 import logging
-import json
-from typing import Optional
+import struct
+from typing import Any, Optional
+
+from pymodbus.client.tcp import AsyncModbusTcpClient
+from pymodbus.pdu.register_message import (
+    ReadHoldingRegistersRequest,
+    ReadInputRegistersRequest,
+)
+from pymodbus.exceptions import ModbusException
 
 from .const import (
-    FAN_SPEED_VALUE_OFF,
-    FAN_SPEED_VALUE_NORMAL,
-    FAN_SPEED_VALUE_EXTRA,
+    FAN_SPEED_STATE_EXTRA,
+    FAN_SPEED_STATE_NORMAL,
+    FAN_SPEED_STATE_OFF,
     DEFAULT_ENABLED_METRICS,
     TAP_WATER_CAPACITY_MAPPINGS,
+    MODBUS_REGISTER_MAP,
+    MODBUS_HOLDING_REGISTER_MAP,
+    RELAY_BIT_MAP,
+    MODBUS_SPEC_TO_INTERNAL_MAP,
+    MODBUS_INTERNAL_TO_SPEC_MAP,
+    RELAY_STAGE_POWER_MAP,
+    BASE_SYSTEM_POWER_W,
 )
 
 
@@ -42,6 +59,10 @@ class QvantumAPI:
         password: str,
         user_agent: str,
         session: Optional[aiohttp.ClientSession] = None,
+        modbus_tcp: bool = False,
+        modbus_host: str = "qvantum-hp",
+        modbus_port: int = 502,
+        modbus_unit_id: int = 1,
     ) -> None:
         """Initialise."""
         self._auth_url = AUTH_URL
@@ -51,6 +72,12 @@ class QvantumAPI:
         self._password = password
         self._user_agent = user_agent
         self.hass = None
+        self._modbus_tcp = modbus_tcp
+        self._modbus_host = modbus_host
+        self._modbus_port = modbus_port
+        self._modbus_unit_id = modbus_unit_id
+        self._modbus_client = None
+        self._modbus_lock = asyncio.Lock()
         # Accept an optional aiohttp session for easier testing. If not provided,
         # create one and mark it as owned so we can close it when `close()` is called.
         if session is not None:
@@ -74,6 +101,27 @@ class QvantumAPI:
         self._device_metadata = {}
         self._device_metadata_etag = None
 
+    def _init_modbus_client(self):
+        """Initialize Modbus TCP client if not already done."""
+        if self._modbus_tcp and self._modbus_client is None:
+            self._modbus_client = AsyncModbusTcpClient(
+                host=self._modbus_host,
+                port=self._modbus_port,
+                timeout=10.0,  # Increased timeout
+                retries=3,
+            )
+
+    async def _reset_modbus_client(self):
+        """Close and clear Modbus client so reconnect starts from scratch."""
+        if self._modbus_client:
+            try:
+                close_result = self._modbus_client.close()
+                if inspect.isawaitable(close_result):
+                    await close_result
+            except Exception as exc:
+                _LOGGER.debug("Error closing modbus client during reset: %s", exc)
+            self._modbus_client = None
+
     async def close(self):
         """Close the session."""
         # Only close the session if we created it; externally-provided sessions
@@ -81,6 +129,313 @@ class QvantumAPI:
         if getattr(self, "_session_owner", False) and self._session:
             await self._session.close()
             self._session = None
+        if self._modbus_client:
+            close_result = self._modbus_client.close()
+            if inspect.isawaitable(close_result):
+                await close_result
+            self._modbus_client = None
+
+    def _normalize_modbus_value(self, value: float, scale: float) -> int | float:
+        """Normalize a Modbus register value to the correct type and precision."""
+        if scale == 1.0:
+            return int(value)
+        return round(value, 2)
+
+    async def _read_modbus_registers(
+        self,
+        device_id: str,
+        enabled_items: list[str],
+        register_map: dict,
+        use_input_registers: bool = True,
+        handle_relay_bits: bool = False,
+    ):
+        """Generic method to read Modbus registers (input or holding)."""
+        async with self._modbus_lock:
+            self._init_modbus_client()
+            if not self._modbus_client:
+                raise APIConnectionError(None, "Modbus client not initialized")
+
+            data = {}
+            data["hpid"] = device_id
+            if use_input_registers:
+                data["latency"] = 0  # Placeholder for metrics
+
+            try:
+                if not self._modbus_client.connected:
+                    await self._modbus_client.connect()
+                    if not self._modbus_client.connected:
+                        raise APIConnectionError(None, "Modbus client connection failed")
+
+                # Collect all registers we need to read
+                registers_to_read = {}
+                relay_items = [] if handle_relay_bits else None
+
+                for item_name in enabled_items:
+                    if handle_relay_bits and item_name in RELAY_BIT_MAP:
+                        relay_items.append(item_name)
+                    elif item_name in register_map:
+                        addr, data_type, scale = register_map[item_name]
+                        if data_type == "float32":
+                            # Float32 needs 2 registers
+                            registers_to_read[addr] = (item_name, data_type, scale, 2)
+                            registers_to_read[addr + 1] = (item_name, data_type, scale, 2)
+                        else:
+                            # Single register
+                            registers_to_read[addr] = (item_name, data_type, scale, 1)
+
+                # Group registers into contiguous blocks for efficient reading
+                if registers_to_read:
+                    sorted_addresses = sorted(registers_to_read.keys())
+                    blocks = []
+                    current_block_start = sorted_addresses[0]
+                    current_block_end = sorted_addresses[0]
+
+                    for addr in sorted_addresses[1:]:
+                        if addr == current_block_end + 1:
+                            current_block_end = addr
+                        else:
+                            blocks.append((current_block_start, current_block_end))
+                            current_block_start = addr
+                            current_block_end = addr
+                    blocks.append((current_block_start, current_block_end))
+
+                    # Read each block
+                    for block_start, block_end in blocks:
+                        count = block_end - block_start + 1
+                        if use_input_registers:
+                            request = ReadInputRegistersRequest(
+                                dev_id=self._modbus_unit_id,
+                                address=block_start,
+                                count=count,
+                            )
+                        else:
+                            request = ReadHoldingRegistersRequest(
+                                dev_id=self._modbus_unit_id,
+                                address=block_start,
+                                count=count,
+                            )
+                        result = await self._modbus_client.execute(False, request)
+                        if result is None:
+                            raise APIConnectionError(
+                                None,
+                                "Modbus operation failed: no response received from device",
+                            )
+                        if result.isError():
+                            register_type = "input" if use_input_registers else "holding"
+                            _LOGGER.warning(
+                                f"Failed to read {register_type} register block {block_start}-{block_end}"
+                            )
+                            continue
+
+                        # Parse the block results
+                        for i, addr in enumerate(range(block_start, block_end + 1)):
+                            if addr in registers_to_read:
+                                item_name, data_type, scale, reg_count = registers_to_read[
+                                    addr
+                                ]
+                                if item_name in data:
+                                    continue  # Already processed this item
+
+                                if data_type == "float32":
+                                    # Need both registers for float32
+                                    if addr + 1 in registers_to_read and addr + 1 in range(
+                                        block_start, block_end + 1
+                                    ):
+                                        reg1 = result.registers[i]
+                                        reg2 = result.registers[i + 1]
+                                        # Convert two 16-bit registers to 32-bit float (big-endian)
+                                        raw_bytes = struct.pack(">HH", reg1, reg2)
+                                        value = struct.unpack(">f", raw_bytes)[0] * scale
+
+                                        data[item_name] = self._normalize_modbus_value(
+                                            value, scale
+                                        )
+                                elif data_type in ("int16", "uint16"):
+                                    value = result.registers[i]
+                                    if data_type == "int16":
+                                        if value > 32767:
+                                            value -= 65536
+                                    value *= scale
+
+                                    data[item_name] = self._normalize_modbus_value(
+                                        value, scale
+                                    )
+
+                # Handle relay bit extraction from relays_bitmask
+                if handle_relay_bits and relay_items:
+                    bitmask_addr = register_map[
+                        "relays (l1, l2, l3, gp10, qm10, qn8_1, qn8_2, gp3, pump, ha12)"
+                    ][0]
+                    request = ReadInputRegistersRequest(
+                        dev_id=self._modbus_unit_id, address=bitmask_addr, count=1
+                    )
+                    result = await self._modbus_client.execute(False, request)
+                    if result is None:
+                        raise APIConnectionError(
+                            None,
+                            "Modbus operation failed: no response received from device",
+                        )
+                    if result.isError():
+                        _LOGGER.warning(
+                            f"Failed to read relays bitmask from register {bitmask_addr}"
+                        )
+                    else:
+                        bitmask = result.registers[0]
+                        for item_name in relay_items:
+                            bit = RELAY_BIT_MAP[item_name]
+                            value = (bitmask >> bit) & 1
+                            data[item_name] = value
+
+            except ModbusException as e:
+                error_msg = f"Modbus error reading {'input' if use_input_registers else 'holding'} registers: {e}"
+                _LOGGER.error(error_msg)
+                await self._reset_modbus_client()
+                raise APIConnectionError(None, f"Modbus communication failed: {e}")
+            except Exception as e:
+                # Catch non-Modbus exceptions (e.g. NoneType on execute) and recover gracefully.
+                _LOGGER.error(
+                    "Unexpected error reading %s registers: %s",
+                    'input' if use_input_registers else 'holding',
+                    e,
+                    exc_info=True,
+                )
+                await self._reset_modbus_client()
+                raise APIConnectionError(None, f"Modbus communication failed: {e}")
+
+            # Keep Modbus client open for subsequent reads to reuse the connection.
+            return data
+
+    async def _read_modbus_metrics(self, device_id: str, enabled_metrics: list[str]):
+        """Read metrics from Modbus TCP."""
+        # Convert enabled metrics to original Modbus names
+        enabled_metrics_original = [
+            MODBUS_INTERNAL_TO_SPEC_MAP.get(m, m) for m in enabled_metrics
+        ]
+
+        metrics = await self._read_modbus_registers(
+            device_id=device_id,
+            enabled_items=enabled_metrics_original,
+            register_map=MODBUS_REGISTER_MAP,
+            use_input_registers=True,
+            handle_relay_bits=True,
+        )
+
+        # Map keys back to our internal names
+        metrics = {MODBUS_SPEC_TO_INTERNAL_MAP.get(k, k): v for k, v in metrics.items()}
+
+        _LOGGER.debug("Raw Modbus metrics read: %s", metrics)
+
+        # Derive use_adaptive from smart control modes if both are available
+        if "smart_dhw_mode" in metrics:
+            _LOGGER.debug(
+                "Deriving smart_sh_mode and use_adaptive from smart_dhw_mode: %s",
+                metrics["smart_dhw_mode"],
+            )
+            # Both HTTP and Modbus use -1 to represent "smart control disabled".
+            # Any non-negative value indicates a specific smart/adaptive mode.
+            # Modbus specification is inconsistent here, so we standardize on -1 for disabled and 0/1/2 for modes.
+            # Mirror smart_dhw_mode into smart_sh_mode and derive use_adaptive from it.
+            metrics["smart_sh_mode"] = metrics["smart_dhw_mode"]
+            metrics["use_adaptive"] = metrics["smart_dhw_mode"] != -1
+
+        # Provide a combined power metric using compressor power and the three relay heat stages.
+        # Relay stage values are boolean (0/1), with each stage representing fixed wattage.
+        # power values are configured in const.py for maintainability and future model-specific changes.
+        stage_power_map = RELAY_STAGE_POWER_MAP
+        relay_sum = 0.0
+        for key, wattage in stage_power_map.items():
+            value = metrics.get(key, 0)
+            try:
+                relay_sum += float(value) * wattage
+            except (TypeError, ValueError):
+                continue
+
+        compressor_power = float(metrics.get("compressor_power", 0.0))
+        metrics.pop("compressor_power", None)
+
+        # Add fixed base power overhead from system baseline consumption.
+        # This includes circulation pumps, controls and other auxiliary constant loads.
+        metrics["powertotal"] = round(
+            BASE_SYSTEM_POWER_W + relay_sum + compressor_power, 2
+        )
+
+        # Compute energy from mwh/kwh components (preferred modbus format: kwh entry scaled x10).
+        for prefix in ["compressor", "additional", "heating", "cooling", "dhw"]:
+            mwh = metrics.get(f"{prefix}_mwh")
+            kwh = metrics.get(f"{prefix}_kwh")
+            mwh = float(mwh) if mwh is not None else 0.0
+            kwh = float(kwh) if kwh is not None else 0.0
+
+            # NOTE: kwh values in `metrics` are already normalized by the Modbus register map
+            # (e.g. raw x10 register values have been de-scaled), so we can add them directly
+            # to mwh * 1000.0 here without applying any additional scaling factor.
+            metrics[f"{prefix}energy"] = round(mwh * 1000.0 + kwh, 2)
+            metrics.pop(f"{prefix}_mwh", None)
+            metrics.pop(f"{prefix}_kwh", None)
+
+            _LOGGER.debug(
+                "Computed energy for %s: mwh=%s, kwh=%s, total energy=%s",
+                prefix,
+                mwh,
+                kwh,
+                metrics.get(f"{prefix}energy"),
+            )
+
+        # Convert internal metric names to HTTP alias names using canonical mapping.
+        from .const import MODBUS_INPUT_TO_HTTP_MAP
+
+        normalized_metrics = dict(metrics)
+        for internal_key, value in metrics.items():
+            if value is None:
+                continue
+            http_key = MODBUS_INPUT_TO_HTTP_MAP.get(internal_key)
+            if http_key and normalized_metrics.get(http_key) is None:
+                normalized_metrics[http_key] = value
+
+        return {"metrics": normalized_metrics}
+
+    async def _read_modbus_settings(self, device_id: str, enabled_settings: list[str]):
+        """Read settings from Modbus TCP holding registers."""
+        settings = await self._read_modbus_registers(
+            device_id=device_id,
+            enabled_items=enabled_settings,
+            register_map=MODBUS_HOLDING_REGISTER_MAP,
+            use_input_registers=False,
+            handle_relay_bits=False,
+        )
+
+        # Convert to the same format as HTTP API and include original modbus keys for compatibility.
+        from .const import MODBUS_HOLDING_TO_HTTP_MAP
+
+        settings_dict: dict[str, Any] = {}
+        for k, v in settings.items():
+            if k == "hpid":
+                continue
+            settings_dict[k] = v
+            http_key = MODBUS_HOLDING_TO_HTTP_MAP.get(k)
+            if http_key and http_key != k:
+                settings_dict[http_key] = v
+
+        if "extra_tap_water" in settings_dict:
+            settings_dict["extra_tap_water"] = (
+                # If the value is 2, it means "on" (max tap water), otherwise "off" (normal tap water)
+                "on" if settings_dict["extra_tap_water"] == 2 else "off"
+            )
+
+        if "fanspeedselector" in settings_dict:
+            match settings_dict["fanspeedselector"]:
+                case 0:
+                    settings_dict["fanspeedselector"] = FAN_SPEED_STATE_OFF
+                case 1:
+                    settings_dict["fanspeedselector"] = FAN_SPEED_STATE_NORMAL
+                case 2:
+                    settings_dict["fanspeedselector"] = FAN_SPEED_STATE_EXTRA
+
+        # hide internal dhw_* keys from public settings output
+        for hide_key in ["dhw_start_normal", "dhw_stop_normal"]:
+            settings_dict.pop(hide_key, None)
+
+        return {"settings": [{"name": n, "value": v} for n, v in settings_dict.items()]}
 
     async def _handle_response(self, response: aiohttp.ClientResponse):
         """Handle API response, raising exceptions for errors."""
@@ -533,7 +888,6 @@ class QvantumAPI:
                     _LOGGER.debug("Device metadata not modified, using cached data.")
                 case 500:
                     _LOGGER.error("Internal server error, clearing data...")
-                    # await self.unauthenticate()
                     raise APIConnectionError(response)
                 case _:
                     _LOGGER.error(
@@ -547,8 +901,24 @@ class QvantumAPI:
     async def get_metrics(
         self, device_id: str, method="now", enabled_metrics: Optional[list[str]] = None
     ):
-        """Fetch data from the API with authentication."""
+        """Fetch data from the API or Modbus with authentication."""
 
+        names = (
+            enabled_metrics if enabled_metrics is not None else DEFAULT_ENABLED_METRICS
+        )
+
+        if self._modbus_tcp:
+            # Try Modbus first, then fall back to HTTP if Modbus is unavailable.
+            try:
+                self._metrics_data = await self._read_modbus_metrics(device_id, names)
+                return self._metrics_data
+            except Exception as e:
+                _LOGGER.warning(
+                    "Failed to read metrics via Modbus, falling back to HTTP: %s",
+                    e,
+                )
+
+        # Fall back to HTTP API if Modbus is not available or fails.
         await self._ensure_valid_token()
         headers = self._request_headers()
         if self._metrics_etag:
@@ -569,7 +939,7 @@ class QvantumAPI:
                 case 200:
                     data = await response.json()
 
-                    _LOGGER.debug("Metrics fetched: %s", data)
+                    _LOGGER.debug("HTTP Metrics fetched: %s", data)
 
                     metrics = {}
                     metrics["hpid"] = device_id
@@ -601,23 +971,43 @@ class QvantumAPI:
                     await self.unauthenticate()
                     raise APIAuthError(response)
                 case 304:
-                    _LOGGER.debug("Metrics not modified, using cached data.")
+                    _LOGGER.debug("HTTP Metrics not modified, using cached data.")
                 case 500:
                     _LOGGER.error(
                         "Internal server error, clearing data: %s", response.status
                     )
                     _LOGGER.debug("Internal server error, clearing data: %s", response)
-                    # await self.unauthenticate()
                     raise APIConnectionError(response)
                 case _:
                     _LOGGER.error("Failed to fetch data, status: %s", response.status)
                     _LOGGER.debug("Failed to fetch data, status: %s", response)
 
+        _LOGGER.debug("HTTP metrics read: %s", self._metrics_data)
         return self._metrics_data
 
     async def get_settings(self, device_id: str):
-        """Fetch settings from the API with authentication."""
+        """Fetch settings from the API or Modbus."""
 
+        if self._modbus_tcp:
+            # Read settings from Modbus holding registers
+            try:
+                from .const import MODBUS_HOLDING_TO_HTTP_MAP
+
+                # Internal modbus setting names that we can read directly
+                settings_to_read = [
+                    s
+                    for s in MODBUS_HOLDING_TO_HTTP_MAP.keys()
+                    if s in MODBUS_HOLDING_REGISTER_MAP
+                ]
+                result = await self._read_modbus_settings(device_id, settings_to_read)
+                return result
+            except Exception as e:
+                _LOGGER.warning(
+                    "Failed to read settings via Modbus, falling back to HTTP: %s", e
+                )
+                # Fall through to HTTP logic below
+
+        # Original HTTP logic
         await self._ensure_valid_token()
         headers = self._request_headers()
         if self._settings_etag:
@@ -631,22 +1021,22 @@ class QvantumAPI:
                 case 200:
                     self._settings_data = await response.json()
                     self._settings_etag = response.headers.get("ETag")
-                    _LOGGER.debug("Settings fetched: %s", self._settings_data)
+                    _LOGGER.debug("HTTP Settings fetched: %s", self._settings_data)
                 case 403:
                     await self.unauthenticate()
                     raise APIAuthError(response)
                 case 304:
-                    _LOGGER.debug("Settings not modified, using cached data.")
+                    _LOGGER.debug("HTTP Settings not modified, using cached data.")
                 case 500:
                     _LOGGER.error("Internal server error, clearing data...")
-                    # await self.unauthenticate()
                     raise APIConnectionError(response)
                 case _:
                     _LOGGER.error(
-                        "Failed to fetch settings, status: %s", response.status
+                        "Failed to fetch HTTP settings, status: %s", response.status
                     )
                     self._settings_data = {}
 
+        _LOGGER.debug("HTTP Settings read: %s", self._settings_data)
         return self._settings_data
 
     async def get_primary_device(self):

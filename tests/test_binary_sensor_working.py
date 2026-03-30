@@ -53,7 +53,7 @@ def mock_coordinator():
     coordinator = MagicMock()
     coordinator.data = {
         "device": {"id": "test_device_123"},
-        "metrics": {
+        "values": {
             "hpid": "test_device_123",
             "op_man_addition": 1,  # Binary sensor values
             "op_man_cooling": 0,
@@ -98,7 +98,7 @@ class TestQvantumBaseBinaryEntity:
         assert entity._attr_device_info == mock_device
         assert entity._attr_has_entity_name is True
         assert entity._attr_entity_registry_enabled_default is True
-        assert entity._data_bearer == "metrics"
+        assert entity._data_bearer == "values"
 
     def test_is_on_true(self, mock_coordinator, mock_device):
         """Test binary entity state when on."""

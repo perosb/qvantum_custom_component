@@ -1,0 +1,2 @@
+# Runtime dependencies for Qvantum Heat Pump custom component
+pymodbus>=3.0.0,<4.0.0

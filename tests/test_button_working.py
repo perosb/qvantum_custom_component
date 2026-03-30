@@ -15,8 +15,8 @@ def mock_coordinator():
     coordinator = MagicMock()
     coordinator.data = {
         "device": {"id": "test_device_123"},
-        "metrics": {"hpid": "test_device_123"},
-        "settings": {
+        "values": {
+            "hpid": "test_device_123",
             "extra_tap_water": None,  # Will be set based on test
         },
     }
@@ -105,7 +105,7 @@ class TestQvantumButtonEntity:
         )
         # Data is updated when response comes back
         mock_coordinator.async_set_updated_data.assert_called_once()
-        assert mock_coordinator.data["settings"]["extra_tap_water"] == "on"
+        assert mock_coordinator.data["values"]["extra_tap_water"] == "on"
 
     @pytest.mark.asyncio
     async def test_async_press_elevate_access(
