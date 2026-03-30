@@ -162,6 +162,46 @@ class TestQvantumDataUpdateCoordinator:
             assert metric in result
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_get_enabled_metrics_respects_disabled_http_metric(self, mock_super_init):
+        """Test _get_enabled_metrics does not re-enable disabled HTTP metrics."""
+        mock_hass = MagicMock()
+        mock_device_registry = MagicMock()
+        mock_entity_registry = MagicMock()
+        mock_api = MagicMock()
+
+        mock_device = MagicMock()
+        mock_device.id = "device_id_123"
+        mock_device.identifiers = {(DOMAIN, "qvantum-test_device")}
+        mock_device_registry.devices.values.return_value = [mock_device]
+
+        # Disabled HTTP metric in entity registry already; should stay out of final metrics
+        mock_entity_disabled = MagicMock()
+        mock_entity_disabled.device_id = "device_id_123"
+        mock_entity_disabled.disabled_by = "user"
+        mock_entity_disabled.unique_id = "qvantum_calc_suppy_cpr_test_device"
+
+        mock_entity_registry.entities.values.return_value = [mock_entity_disabled]
+
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": mock_device_registry,
+            "entity_registry": mock_entity_registry,
+        }
+
+        mock_super_init.return_value = None
+        config_entry = MagicMock()
+        config_entry.options.get.side_effect = lambda key, default=None: False if key == CONF_MODBUS_TCP else 30
+        config_entry.unique_id = "test_device"
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
+        coordinator.hass = mock_hass
+
+        result = coordinator._get_enabled_metrics("test_device")
+
+        assert "calc_suppy_cpr" not in result
+        for metric in REQUIRED_METRICS:
+            assert metric in result
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_no_device_found(self, mock_super_init):
         """Test _get_enabled_metrics when no device is found in registry."""
         # Create mock hass with empty registries
@@ -361,3 +401,18 @@ class TestQvantumDataUpdateCoordinator:
         assert result["values"]["tap_stop"] == 62
         assert "dhw_normal_start" not in result["values"]
         assert "dhw_normal_stop" not in result["values"]
+
+    def test_process_settings_data_invalid_list(self):
+        data = {"settings": "not-a-list"}
+
+        result = QvantumDataUpdateCoordinator._process_settings_data(None, data)
+
+        assert result == {}
+
+    def test_process_settings_data_invalid_items(self):
+        data = {"settings": ["bad", {"name": "a"}, {"value": 1}, {"name": "a", "value": 1}]}
+
+        result = QvantumDataUpdateCoordinator._process_settings_data(None, data)
+
+        assert result == {"a": 1}
+

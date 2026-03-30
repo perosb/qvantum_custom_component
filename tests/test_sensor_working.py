@@ -359,6 +359,16 @@ class TestQvantumFirmwareSensorEntity:
         assert entity.firmware_key == "display_fw_version"
         assert entity._attr_translation_key == "firmware_display_fw_version"
 
+
+def test_should_exclude_metric_respects_excluded_patterns():
+    """Test that metrics matching excluded patterns are excluded."""
+    from custom_components.qvantum.sensor import _should_exclude_metric
+
+    assert _should_exclude_metric("op_man_dhw") is True
+    assert _should_exclude_metric("smart_dhw_mode") is True
+    assert _should_exclude_metric("picpin_relay_gp10") is True
+    assert _should_exclude_metric("some_other_metric") is False
+
     def test_state_from_firmware_coordinator(
         self, mock_firmware_coordinator, mock_device
     ):
