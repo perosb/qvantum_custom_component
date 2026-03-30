@@ -4,10 +4,10 @@
   "codeowners": ["@perosb"],
   "config_flow": true,
   "dependencies": [],
-  "requirements": ["pymodbus>=3.0.0,<4.0.0"],
   "documentation": "https://github.com/perosb/qvantum_custom_component",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/perosb/qvantum_custom_component/issues",
+  "requirements": ["pymodbus>=3.0.0,<4.0.0"],
   "single_config_entry": true,
   "version": "2026.3.1"
 }
