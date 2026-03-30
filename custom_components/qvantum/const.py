@@ -145,10 +145,10 @@ REQUIRED_METRICS = [
     "powertotal",
 ]
 
-# Modbus-only intermediate metrics required to compute derived values (e.g. energy totals,
-# powertotal). These are NOT available via the HTTP API and must only be included in the
-# fetch list when Modbus is enabled to avoid noisy "missing metric" warnings and a larger
-# HTTP query string.
+# Modbus-only intermediate metrics required to compute derived values (e.g. energy totals
+# like compressorenergy, and powertotal). These are NOT available via the HTTP API and must
+# only be included in the fetch list when Modbus is enabled to avoid noisy "missing metric"
+# warnings and a larger HTTP query string.
 REQUIRED_MODBUS_METRICS = [
     "compressor_power",  # Used to compute powertotal
     "compressor_mwh",
