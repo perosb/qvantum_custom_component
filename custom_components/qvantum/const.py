@@ -405,6 +405,7 @@ MODBUS_SPEC_TO_INTERNAL_MAP = {
     # Input registers
     "bt1 - fast filtered (1min) outdoor temp": "bt1",
     "bt2 - indoor temperature": "bt2",
+    "bt4 sensor value": "bt4",
     "bt10 - heating medium condenser outlet": "bt10",
     "bt11 - heating supply with addition": "bt11",
     "bt12 - heating supply external": "bt12",
@@ -419,6 +420,7 @@ MODBUS_SPEC_TO_INTERNAL_MAP = {
     "bt31 - dhw inlet": "bt31",
     "bt33 - dhw secondary inlet": "bt33",
     "bt34 - dhw secondary outlet": "bt34",
+    "btx sensor value": "btx",
     "bf1 - dhw flow": "bf1_l_min",
     "gp1 - distribution system circulation pump speed": "gp1_speed",
     "gp2 - dhw circulation pump speed": "gp2_speed",
