@@ -122,16 +122,16 @@
         "state": {
           "0": "Aus",
           "1": "Leerlauf",
-          "2": "Vorbereitung Heizen",
-          "3": "Vorbereitung Kühlen",
-          "4": "Vorbereitung 1 DHW",
-          "5": "Vorbereitung 2 DHW",
+          "2": "Heizen",
+          "3": "Kühlen",
+          "4": "Warmwasser",
+          "5": "Warmwasser",
           "6": "Heizen",
           "7": "Kühlen",
-          "8": "DHW",
+          "8": "Warmwasser",
           "9": "Abtauung DHW passiv",
           "10": "Abtauung Heizung passiv",
-          "11": "Vorbereitung Pool",
+          "11": "Pool",
           "12": "Pool",
           "13": "Abtauung Pool passiv"
         }

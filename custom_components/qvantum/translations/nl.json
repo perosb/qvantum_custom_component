@@ -122,16 +122,16 @@
         "state": {
           "0": "Uit",
           "1": "Leeglopen",
-          "2": "Voorbereiden op verwarming",
-          "3": "Voorbereiden op koeling",
-          "4": "Voorbereiden 1 voor DHW",
-          "5": "Voorbereiden 2 voor DHW",
+          "2": "Verwarmen",
+          "3": "Koelen",
+          "4": "Warm water",
+          "5": "Warm water",
           "6": "Verwarmen",
           "7": "Koelen",
-          "8": "DHW",
+          "8": "Warm water",
           "9": "Ontdooien DHW passief",
           "10": "Ontdooien verwarming passief",
-          "11": "Voorbereiden zwembad",
+          "11": "Zwembad",
           "12": "Zwembad",
           "13": "Ontdooien zwembad passief"
         }

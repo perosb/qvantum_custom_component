@@ -202,6 +202,11 @@ class QvantumAPI:
                     # Read each block
                     for block_start, block_end in blocks:
                         count = block_end - block_start + 1
+
+                        _LOGGER.debug(
+                            f"Reading Modbus register block {block_start}-{block_end} (count: {count})"
+                        )
+
                         if use_input_registers:
                             request = ReadInputRegistersRequest(
                                 dev_id=self._modbus_unit_id,
