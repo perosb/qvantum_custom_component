@@ -204,7 +204,10 @@ class QvantumAPI:
                         count = block_end - block_start + 1
 
                         _LOGGER.debug(
-                            f"Reading Modbus register block {block_start}-{block_end} (count: {count})"
+                            "Reading Modbus register block %s-%s (count: %s)",
+                            block_start,
+                            block_end,
+                            count,
                         )
 
                         if use_input_registers:
