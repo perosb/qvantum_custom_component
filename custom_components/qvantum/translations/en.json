@@ -122,16 +122,16 @@
         "state": {
           "0": "Off",
           "1": "Idle",
-          "2": "Prepare for heating",
-          "3": "Prepare for cooling",
-          "4": "Prepare 1 for DHW",
-          "5": "Prepare 2 for DHW",
+          "2": "Heating",
+          "3": "Cooling",
+          "4": "Hot water",
+          "5": "Hot water",
           "6": "Heating",
           "7": "Cooling",
-          "8": "DHW",
+          "8": "Hot water",
           "9": "Defrost DHW passive",
           "10": "Defrost heating passive",
-          "11": "Prepare for pool",
+          "11": "Pool",
           "12": "Pool",
           "13": "Defrost pool passive"
         }
