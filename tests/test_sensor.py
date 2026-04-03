@@ -555,9 +555,10 @@ class TestSensorSetup:
             EXCLUDED_METRIC_PATTERNS,
         )
 
-        # Calculate expected calls: all disabled HTTP metrics that are not excluded by patterns.
-        # Entities are now created for all possible metrics (not just those present in values),
-        # so disabled-by-default metrics always get registry entries even on first install.
+        # Calculate expected calls for disabled-by-default HTTP metrics that are not
+        # excluded by patterns. Setup is hybrid: enabled-by-default metrics are only
+        # created when present in values, while disabled-by-default metrics still get
+        # registry entries even on first install.
         expected_calls = len(
             [
                 metric
