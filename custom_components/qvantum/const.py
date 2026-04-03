@@ -36,9 +36,7 @@ DEFAULT_ENABLED_METRICS = [
     "bt30",
     "bt33",
     "bt34",
-    "bt4",
     "bt10",
-    "bt12",
     "bt13",
     "bt20",
     "bt21",
@@ -76,6 +74,8 @@ DEFAULT_ENABLED_METRICS = [
 DEFAULT_DISABLED_HTTP_METRICS = [
     "calc_suppy_cpr",  # Note: Typo is in the original data
     "btx",
+    "bt12",
+    "bt4",
     "cooling_enabled",
     "dhw_outl_temp_15",
     "dhw_outl_temp_5",
@@ -113,6 +113,8 @@ DEFAULT_DISABLED_HTTP_METRICS = [
 
 DEFAULT_DISABLED_MODBUS_METRICS = [
     "bf1_rpm",
+    "bt12",
+    "bt4",
 ]
 
 # Number metrics configuration
