@@ -258,5 +258,3 @@ class TestIntegrationSetup:
                 _, second_entry_id, second_migration_fn = second_call_args
                 assert second_entry_id == config_entry.entry_id
                 assert callable(second_migration_fn)
-                assert second_entry_id == config_entry.entry_id
-                assert callable(second_migration_fn)
