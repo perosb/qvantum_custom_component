@@ -52,9 +52,6 @@ async def async_setup_entry(
 
     sensors = []
 
-    # Only create sensors for metrics that exist in the coordinator's data,
-    # as the coordinator has already validated their availability for the current mode
-    values = coordinator.data.get("values", {})
     disabled_metrics = (
         DEFAULT_DISABLED_MODBUS_METRICS
         if coordinator.modbus_enabled
@@ -72,9 +69,11 @@ async def async_setup_entry(
     # Special metrics that have dedicated sensor classes
     special_metrics = {"latency", "hpid"}
 
+    # Create entities for all possible metrics so they appear in the entity registry
+    # even when disabled by default, allowing users to enable them from the UI.
+    # Entities for metrics not yet fetched will be unavailable until the coordinator
+    # fetches the metric (i.e., once the user enables the entity).
     for metric in sorted(possible_metrics):
-        if metric not in values:
-            continue
         if _should_exclude_metric(metric) or metric in special_metrics:
             continue
 

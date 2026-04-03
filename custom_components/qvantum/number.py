@@ -39,19 +39,16 @@ async def async_setup_entry(
         "fan_speed_2": (0, 100, 5),
     }
 
-    # Numbers are created only for metrics that exist in the coordinator's data,
-    # as the coordinator has already validated their availability for the current mode
-    number_metrics = list(NUMBER_CONFIG.keys())
-
+    # Create number entities for all configured metrics so they appear in the entity
+    # registry even if the metric is not yet fetched. Entities will be unavailable
+    # until the coordinator fetches the metric.
     sensors = []
-    for metric in number_metrics:
-        if metric in coordinator.data.get("values", {}):
-            min_val, max_val, step_val = NUMBER_CONFIG[metric]
-            sensors.append(
-                QvantumNumberEntity(
-                    coordinator, metric, min_val, max_val, step_val, device
-                )
+    for metric, (min_val, max_val, step_val) in NUMBER_CONFIG.items():
+        sensors.append(
+            QvantumNumberEntity(
+                coordinator, metric, min_val, max_val, step_val, device
             )
+        )
 
     async_add_entities(sensors)
 

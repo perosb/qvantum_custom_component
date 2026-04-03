@@ -555,13 +555,14 @@ class TestSensorSetup:
             EXCLUDED_METRIC_PATTERNS,
         )
 
-        # Calculate expected calls: number of disabled HTTP metrics that are actually present in the mock data and not excluded by patterns
+        # Calculate expected calls: all disabled HTTP metrics that are not excluded by patterns.
+        # Entities are now created for all possible metrics (not just those present in values),
+        # so disabled-by-default metrics always get registry entries even on first install.
         expected_calls = len(
             [
                 metric
                 for metric in DEFAULT_DISABLED_HTTP_METRICS
-                if metric in mock_coordinator.data["values"]
-                and not any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
+                if not any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
             ]
         )
 
