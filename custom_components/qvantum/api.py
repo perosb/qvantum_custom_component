@@ -331,7 +331,7 @@ class QvantumAPI:
         # Map keys back to our internal names
         metrics = {MODBUS_SPEC_TO_INTERNAL_MAP.get(k, k): v for k, v in metrics.items()}
 
-        _LOGGER.debug("Raw Modbus metrics read: %s", sorted(metrics))
+        _LOGGER.debug("Raw Modbus metrics read: %s", sorted(metrics.items()))
 
         # Derive use_adaptive from smart control modes if both are available
         if "smart_dhw_mode" in metrics:
