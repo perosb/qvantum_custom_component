@@ -52,6 +52,10 @@ def mock_coordinator():
         "values": {
             "hpid": "test_device_123",
             "extra_tap_water": None,  # Will be set based on test
+            "op_mode": 1,
+            "op_man_dhw": 1,
+            "op_man_addition": 0,
+            "man_mode": 0,
             "use_adaptive": True,  # For enable_sc_* availability tests
             "enable_sc_dhw": True,  # For enable_sc_dhw tests
             "enable_sc_sh": True,  # For enable_sc_sh tests
@@ -201,6 +205,8 @@ class TestQvantumSwitchEntity:
 
     def test_available_other_switch_without_data(self, mock_coordinator, mock_device):
         """Test availability for other switches when data is missing."""
+        # Remove op_mode from data to test availability
+        mock_coordinator.data["values"].pop("op_mode", None)
         entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
         assert entity.available is False
 
@@ -257,6 +263,8 @@ class TestQvantumSwitchEntity:
     ):
         """Test availability for op_man_addition when metric is missing."""
         mock_coordinator.data["values"]["op_mode"] = 1
+        # Remove op_man_addition from data
+        mock_coordinator.data["values"].pop("op_man_addition", None)
         entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
         assert entity.available is False
 

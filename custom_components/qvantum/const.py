@@ -11,7 +11,7 @@ FAN_SPEED_VALUE_OFF = 0
 FAN_SPEED_VALUE_NORMAL = 1
 FAN_SPEED_VALUE_EXTRA = 2
 VERSION = "2026.4.1"
-CONFIG_VERSION = 4
+CONFIG_VERSION = 5
 
 # Modbus TCP configuration
 CONF_MODBUS_TCP = "modbus_tcp"
@@ -53,6 +53,7 @@ DEFAULT_ENABLED_METRICS = [
     "tap_water_start",
     "fan0_10v",
     "gp1_speed",
+    "gp2_speed",
     "hp_status",
     "picpin_relay_heat_l1",
     "picpin_relay_heat_l2",
@@ -83,7 +84,6 @@ DEFAULT_ENABLED_METRICS = [
 ]
 
 DEFAULT_DISABLED_HTTP_METRICS = [
-    "gp2_speed",
     "calc_suppy_cpr",  # Note: Typo is in the original data
     "btx",
     "cooling_enabled",
@@ -120,6 +120,24 @@ DEFAULT_DISABLED_HTTP_METRICS = [
     "inputcurrent3",
     "picpin_mask",
 ]
+
+DEFAULT_DISABLED_MODBUS_METRICS = [
+    "bf1_rpm",
+]
+
+# Number metrics configuration
+DEFAULT_ENABLED_NUMBER_METRICS = [
+    "tap_water_capacity_target",
+    "room_comp_factor",
+    "indoor_temperature_offset",
+    "tap_water_stop",
+    "tap_water_start",
+    "fan_normal",
+    "fan_speed_2",
+]
+
+DEFAULT_DISABLED_HTTP_NUMBER_METRICS = []
+DEFAULT_DISABLED_MODBUS_NUMBER_METRICS = []
 
 # Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus)
 REQUIRED_METRICS = [
@@ -233,6 +251,7 @@ MODBUS_INPUT_REGISTER_MAP = {
     "bt34 - dhw secondary outlet": (19, "int16", 0.1),
     "btx sensor value": (21, "int16", 0.1),
     "bf1 - dhw flow": (26, "uint16", 0.01),
+    "bf1 rpm": (27, "uint16", 0.1),
     "gp1 - distribution system circulation pump speed": (28, "uint16", 0.1),
     "gp2 - dhw circulation pump speed": (29, "uint16", 1.0),
     "fan speed [rpm]": (30, "uint16", 1.0),
@@ -422,6 +441,7 @@ MODBUS_SPEC_TO_INTERNAL_MAP = {
     "bt34 - dhw secondary outlet": "bt34",
     "btx sensor value": "btx",
     "bf1 - dhw flow": "bf1_l_min",
+    "bf1 rpm": "bf1_rpm",
     "gp1 - distribution system circulation pump speed": "gp1_speed",
     "gp2 - dhw circulation pump speed": "gp2_speed",
     "fan speed [rpm]": "fanrpm",

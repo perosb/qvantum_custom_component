@@ -10,7 +10,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
-from .const import TAP_WATER_CAPACITY_MAPPINGS
+from .const import (
+    TAP_WATER_CAPACITY_MAPPINGS,
+    DEFAULT_ENABLED_NUMBER_METRICS,
+    DEFAULT_DISABLED_HTTP_NUMBER_METRICS,
+    DEFAULT_DISABLED_MODBUS_NUMBER_METRICS,
+)
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity
 
@@ -26,26 +31,30 @@ async def async_setup_entry(
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo = config_entry.runtime_data.device
 
+    # Configuration for number entities: metric_key -> (min, max, step)
+    NUMBER_CONFIG = {
+        "tap_water_capacity_target": (1, 7, 1),
+        "room_comp_factor": (0, 10, 0.5),
+        "indoor_temperature_offset": (-10, 10, 1),
+        "tap_water_stop": (60, 90, 1),
+        "tap_water_start": (50, 65, 1),
+        "fan_normal": (0, 100, 5),
+        "fan_speed_2": (0, 100, 5),
+    }
+
+    # Numbers are created only for metrics that exist in the coordinator's data,
+    # as the coordinator has already validated their availability for the current mode
+    number_metrics = list(NUMBER_CONFIG.keys())
+
     sensors = []
-    sensors.append(
-        QvantumNumberEntity(coordinator, "tap_water_capacity_target", 1, 7, 1, device)
-    )
-    sensors.append(
-        QvantumNumberEntity(coordinator, "room_comp_factor", 0, 10, 0.5, device)
-    )
-    sensors.append(
-        QvantumNumberEntity(
-            coordinator, "indoor_temperature_offset", -10, 10, 1, device
-        )
-    )
-    sensors.append(
-        QvantumNumberEntity(coordinator, "tap_water_stop", 60, 90, 1, device)
-    )
-    sensors.append(
-        QvantumNumberEntity(coordinator, "tap_water_start", 50, 65, 1, device)
-    )
-    sensors.append(QvantumNumberEntity(coordinator, "fan_normal", 0, 100, 5, device))
-    sensors.append(QvantumNumberEntity(coordinator, "fan_speed_2", 0, 100, 5, device))
+    for metric in number_metrics:
+        if metric in coordinator.data.get("values", {}):
+            min_val, max_val, step_val = NUMBER_CONFIG[metric]
+            sensors.append(
+                QvantumNumberEntity(
+                    coordinator, metric, min_val, max_val, step_val, device
+                )
+            )
 
     async_add_entities(sensors)
 

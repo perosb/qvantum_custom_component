@@ -325,7 +325,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_entity_registry = MagicMock()
         mock_entity = MagicMock()
         mock_entity.device_id = "device_id_123"
-        mock_entity.unique_id = "qvantum_gp2_speed_test_device"
+        mock_entity.unique_id = "qvantum_inputcurrent1_test_device"
         mock_entity.disabled_by = None
         mock_entity_registry.entities.values.return_value = [mock_entity]
 
@@ -348,7 +348,7 @@ class TestQvantumDataUpdateCoordinator:
 
         result = coordinator._get_enabled_metrics("test_device")
 
-        assert "gp2_speed" not in result
+        assert "inputcurrent1" not in result
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_poll_interval_modbus_enabled_in_data(self, mock_super_init):

@@ -59,6 +59,7 @@ def mock_coordinator():
             "op_man_cooling": 0,
             "op_man_dhw": 1,
             "enable_sc_dhw": 0,
+            "enable_sc_sh": 1,
             "cooling_enabled": 1,
             "use_adaptive": 0,
             "picpin_relay_heat_l1": 1,
@@ -182,6 +183,10 @@ async def test_async_setup_entry(
     # Mock the entity registry
     mock_entity_registry = MagicMock()
     hass.data["entity_registry"] = mock_entity_registry
+
+    # Mock the device registry
+    mock_device_registry = MagicMock()
+    hass.data["device_registry"] = mock_device_registry
 
     mock_config_entry.runtime_data = RuntimeData(
         coordinator=mock_coordinator,

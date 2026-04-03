@@ -161,13 +161,13 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
     """Migrate old entry."""
     _LOGGER.debug("Migrating configuration from version %s.%s", config_entry.version, config_entry.minor_version)
 
-    if config_entry.version > 1:
+    if config_entry.version > CONFIG_VERSION:
         return False
 
     if config_entry.version == 1:
 
         @callback
-        def update_unique_id(entity_entry):
+        def migrate_v1_unique_ids(entity_entry):
             """Update unique ID of entity entry."""
 
             if entity_entry.domain in ["switch", "climate", "fan", "number"]:
@@ -197,11 +197,44 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
                 )
             }
 
-        await async_migrate_entries(hass, config_entry.entry_id, update_unique_id)
+        await async_migrate_entries(hass, config_entry.entry_id, migrate_v1_unique_ids)
 
-        hass.config_entries.async_update_entry(config_entry, version=CONFIG_VERSION)
+    if config_entry.version < 5:
 
-        _LOGGER.debug("Migration to configuration version %s.%s successful", config_entry.version, config_entry.minor_version)
+        @callback
+        def migrate_to_v5_unique_ids(entity_entry):
+            """Rename dhw_normal_start/stop entities to tap_water_start/stop."""
+            old_unique_id = entity_entry.unique_id
+            new_unique_id = old_unique_id
+            new_unique_id = new_unique_id.replace(
+                "_dhw_normal_start_", "_tap_water_start_"
+            )
+            new_unique_id = new_unique_id.replace(
+                "_dhw_normal_stop_", "_tap_water_stop_"
+            )
+
+            if old_unique_id == new_unique_id:
+                return None
+
+            _LOGGER.debug(
+                "Updating unique ID for entity %s from %s to %s",
+                entity_entry.entity_id,
+                old_unique_id,
+                new_unique_id,
+            )
+            return {"new_unique_id": new_unique_id}
+
+        await async_migrate_entries(
+            hass, config_entry.entry_id, migrate_to_v5_unique_ids
+        )
+
+    hass.config_entries.async_update_entry(config_entry, version=CONFIG_VERSION)
+
+    _LOGGER.debug(
+        "Migration to configuration version %s.%s successful",
+        config_entry.version,
+        config_entry.minor_version,
+    )
 
     return True
 

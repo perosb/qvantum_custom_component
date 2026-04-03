@@ -27,7 +27,8 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
 
     entities = []
-    entities.append(QvantumSelectEntity(coordinator, "use_adaptive", device))
+    if "use_adaptive" in coordinator.data.get("values", {}):
+        entities.append(QvantumSelectEntity(coordinator, "use_adaptive", device))
 
     async_add_entities(entities)
 

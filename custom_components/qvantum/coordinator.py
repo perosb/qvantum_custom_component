@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .api import APIAuthError
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
+    DEFAULT_DISABLED_MODBUS_METRICS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     SETTING_UPDATE_APPLIED,
@@ -75,6 +76,13 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=self.poll_interval),
         )
 
+    @property
+    def device_id(self) -> str | None:
+        """Return the device ID."""
+        if self._device:
+            return self._device.get("id")
+        return None
+
     def _get_enabled_metrics(self, device_id: str) -> list[str]:
         """Get list of enabled metrics for a device based on entity registry."""
         device_registry = self.hass.data["device_registry"]
@@ -93,14 +101,17 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                     and entity.unique_id.startswith("qvantum_")
                     and entity.unique_id.endswith(f"_{device_id}")
                 ):
-                    metric_key = entity.unique_id[
-                        len("qvantum_") : -len(f"_{device_id}")
-                    ]
+                    from .entity import extract_metric_key
+
+                    metric_key = extract_metric_key(entity.unique_id, device_id)
 
                     # Known metrics include the default metrics always.
                     # HTTP-only disabled metrics are only known in HTTP mode.
+                    # Modbus disabled metrics are known in Modbus mode.
                     allowed_metrics = set(DEFAULT_ENABLED_METRICS)
-                    if not self.modbus_enabled:
+                    if self.modbus_enabled:
+                        allowed_metrics |= set(DEFAULT_DISABLED_MODBUS_METRICS)
+                    else:
                         allowed_metrics |= set(DEFAULT_DISABLED_HTTP_METRICS)
 
                     if metric_key in allowed_metrics:
