@@ -14,6 +14,7 @@ This document outlines the AI agents, assistants, and tools that contributed to 
   - Testing and validation assistance
   - GitHub repository management and branch protection configuration
   - Code review and quality improvements (fixing anti-patterns, optimizing entity creation, enhancing encapsulation, improving test coverage)
+  - Protocol-specific configuration updates (HTTP vs Modbus metrics handling)
 - **Tools Used**:
   - Code completion and suggestions
   - Multi-file editing capabilities
