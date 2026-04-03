@@ -117,20 +117,6 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
     "bt4",
 ]
 
-# Number metrics configuration
-DEFAULT_ENABLED_NUMBER_METRICS = [
-    "tap_water_capacity_target",
-    "room_comp_factor",
-    "indoor_temperature_offset",
-    "tap_water_stop",
-    "tap_water_start",
-    "fan_normal",
-    "fan_speed_2",
-]
-
-DEFAULT_DISABLED_HTTP_NUMBER_METRICS = []
-DEFAULT_DISABLED_MODBUS_NUMBER_METRICS = []
-
 # Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus)
 REQUIRED_METRICS = [
     "bt2",  # Required by climate component for current temperature
