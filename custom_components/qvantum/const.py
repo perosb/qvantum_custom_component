@@ -65,16 +65,6 @@ DEFAULT_ENABLED_METRICS = [
     "picpin_relay_gp3",
     "picpin_relay_pump",
     "picpin_relay_ha12",
-    "tap_water_cap",
-    "op_man_addition",
-    "op_man_dhw",
-    "op_mode",
-    "man_mode",
-    "enable_sc_dhw",
-    "enable_sc_sh",
-    "use_adaptive",
-    "smart_dhw_mode",
-    "smart_dhw_control_status",
     "qn8position",
     "compressorenergy",
     "additionalenergy",
@@ -161,6 +151,8 @@ REQUIRED_METRICS = [
     "heatingenergy",
     "dhwenergy",
     "powertotal",
+    "fanspeedselector",
+    "tap_water_cap",
 ]
 
 # Modbus-only intermediate metrics required to compute derived values (e.g. energy totals
@@ -169,6 +161,7 @@ REQUIRED_METRICS = [
 # warnings and a larger HTTP query string.
 REQUIRED_MODBUS_METRICS = [
     "compressor_power",  # Used to compute powertotal
+    "smart_dhw_control_status",
     "compressor_mwh",
     "compressor_kwh",
     "additional_mwh",
@@ -476,18 +469,6 @@ MODBUS_INPUT_TO_HTTP_MAP = {
     "dhw_normal_start": "tap_water_start",
     "dhw_normal_stop": "tap_water_stop",
     "tap_stop": "tap_stop",
-    "desired_indoor_temp": "indoor_temperature_target",
-    "heating_offset": "indoor_temperature_offset",
-    "use_operation_sensor": "sensor_mode",
-    "dhw_mode": "extra_tap_water",
-    "room_compensation": "room_comp_factor",
-    "fan_speed_normal": "fan_normal",
-    "fan_speed_reduced": "fan_speed_2",
-    "operation_mode": "op_mode",
-    "allow_dhw": "op_man_dhw",
-    "allow_addition": "op_man_addition",
-    "allow_heating": "man_mode",
-    "ventilation_state": "fanspeedselector",
     "smart_price_dhw_enabled": "enable_sc_dhw",
     "smart_price_heating_enabled": "enable_sc_sh",
 }

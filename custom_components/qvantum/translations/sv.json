@@ -175,6 +175,9 @@
       "bf1_l_min": {
         "name": "Flödesgivare för Varmvatten"
       },
+      "bf1_rpm": {
+        "name": "Flödesgivare pumpvarvtal (BF1)"
+      },
       "bp1_pressure": {
         "name": "Lågtryck bar (BP1)"
       },

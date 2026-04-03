@@ -153,7 +153,6 @@ def cleanup_disabled_entities(
     """Clean up disabled entities that are no longer supported in the current mode."""
     from homeassistant.helpers import entity_registry as er
     from homeassistant.helpers import device_registry as dr
-    from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
     entity_registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
@@ -170,8 +169,6 @@ def cleanup_disabled_entities(
                 and entity_entry.domain == domain
                 and entity_entry.unique_id.startswith("qvantum_")
                 and entity_entry.unique_id.endswith(f"_{coordinator.device_id}")
-                and entity_entry.disabled_by
-                == RegistryEntryDisabler.INTEGRATION  # Only integration-disabled entities
             ):
                 metric_key = extract_metric_key(
                     entity_entry.unique_id, coordinator.device_id

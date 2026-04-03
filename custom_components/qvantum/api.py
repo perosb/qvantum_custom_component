@@ -331,7 +331,7 @@ class QvantumAPI:
         # Map keys back to our internal names
         metrics = {MODBUS_SPEC_TO_INTERNAL_MAP.get(k, k): v for k, v in metrics.items()}
 
-        _LOGGER.debug("Raw Modbus metrics read: %s", metrics)
+        _LOGGER.debug("Raw Modbus metrics read: %s", sorted(metrics))
 
         # Derive use_adaptive from smart control modes if both are available
         if "smart_dhw_mode" in metrics:
@@ -399,6 +399,7 @@ class QvantumAPI:
             http_key = MODBUS_INPUT_TO_HTTP_MAP.get(internal_key)
             if http_key and normalized_metrics.get(http_key) is None:
                 normalized_metrics[http_key] = value
+                normalized_metrics.pop(internal_key, None)
 
         return {"metrics": normalized_metrics}
 

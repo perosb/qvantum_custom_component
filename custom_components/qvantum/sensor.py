@@ -82,6 +82,10 @@ async def async_setup_entry(
 
         enabled_by_default = metric not in disabled_metrics
         if enabled_by_default and metric not in values:
+            _LOGGER.debug(
+                "Skipping creation of enabled-by-default sensor for metric '%s' because it's not in current values. It will be created when the metric appears in the data.",
+                metric,
+            )
             continue
 
         sensor_class = _get_sensor_type(metric)
@@ -155,7 +159,7 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
 
     def _set_units_from_metric(self, metric_key: str) -> None:
         """Set appropriate units based on metric key patterns."""
-        if metric_key in ["compressormeasuredspeed", "fanrpm"]:
+        if "rpm" in metric_key or metric_key in ["compressormeasuredspeed"]:
             self._attr_native_unit_of_measurement = "rpm"
         elif (
             "fan" in metric_key
