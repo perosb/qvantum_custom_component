@@ -186,6 +186,7 @@ async def test_async_setup_entry(
 
     # Mock the device registry
     mock_device_registry = MagicMock()
+    mock_device_registry.devices.values.return_value = []
     hass.data["device_registry"] = mock_device_registry
 
     mock_config_entry.runtime_data = RuntimeData(
