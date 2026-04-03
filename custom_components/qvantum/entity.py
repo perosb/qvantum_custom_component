@@ -114,9 +114,10 @@ def disable_entities_by_default(
     hass: HomeAssistant, entities: List["QvantumEntity"]
 ) -> None:
     """Disable entities that should be disabled by default."""
+    from homeassistant.helpers import entity_registry as er
     from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
-    entity_registry = hass.data["entity_registry"]
+    entity_registry = er.async_get(hass)
     for entity in entities:
         if not entity._attr_entity_registry_enabled_default:
             entity_entry = entity_registry.async_get(entity.entity_id)
@@ -147,12 +148,15 @@ def cleanup_disabled_entities(
     hass: HomeAssistant,
     coordinator: QvantumDataUpdateCoordinator,
     possible_metrics: set[str],
+    domain: str,
 ) -> None:
     """Clean up disabled entities that are no longer supported in the current mode."""
-    from .const import DOMAIN
+    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers import device_registry as dr
+    from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
-    entity_registry = hass.data["entity_registry"]
-    device_registry = hass.data["device_registry"]
+    entity_registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
     device_reg_id = None
     for dev in device_registry.devices.values():
         if (DOMAIN, f"qvantum-{coordinator.device_id}") in dev.identifiers:
@@ -163,9 +167,11 @@ def cleanup_disabled_entities(
         for entity_entry in entity_registry.entities.values():
             if (
                 entity_entry.device_id == device_reg_id
+                and entity_entry.domain == domain
                 and entity_entry.unique_id.startswith("qvantum_")
                 and entity_entry.unique_id.endswith(f"_{coordinator.device_id}")
-                and entity_entry.disabled_by is not None  # Only disabled entities
+                and entity_entry.disabled_by
+                == RegistryEntryDisabler.INTEGRATION  # Only integration-disabled entities
             ):
                 metric_key = extract_metric_key(
                     entity_entry.unique_id, coordinator.device_id

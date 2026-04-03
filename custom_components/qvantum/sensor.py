@@ -131,7 +131,7 @@ async def async_setup_entry(
     # Clean up disabled entities that are no longer supported in the current mode
     from .entity import cleanup_disabled_entities
 
-    cleanup_disabled_entities(hass, coordinator, possible_metrics)
+    cleanup_disabled_entities(hass, coordinator, possible_metrics, "sensor")
 
 
 class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
