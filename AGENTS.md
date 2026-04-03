@@ -13,6 +13,7 @@ This document outlines the AI agents, assistants, and tools that contributed to 
   - Documentation writing and README improvements
   - Testing and validation assistance
   - GitHub repository management and branch protection configuration
+  - Code review and quality improvements (fixing anti-patterns, optimizing entity creation, enhancing encapsulation, improving test coverage)
 - **Tools Used**:
   - Code completion and suggestions
   - Multi-file editing capabilities
@@ -51,6 +52,7 @@ This document outlines the AI agents, assistants, and tools that contributed to 
 - Unit test execution assistance
 - Test coverage analysis
 - Error diagnosis and debugging support
+- Code review assistance and coverage analysis
 
 ## Repository Management
 
