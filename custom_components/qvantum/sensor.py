@@ -136,10 +136,16 @@ async def async_setup_entry(
 
     disable_entities_by_default(hass, sensors)
 
-    # Clean up disabled entities that are no longer supported in the current mode
+    # Clean up disabled entities that are no longer supported in the current mode.
+    # Include special sensor keys so they are never removed by cleanup.
+    special_sensor_keys = {
+        "totalenergy", "latency", "hpid", "tap_stop",
+        "expiresAt", "display_fw_version", "cc_fw_version",
+        "inv_fw_version", "firmware_last_check",
+    }
     from .entity import cleanup_disabled_entities
 
-    cleanup_disabled_entities(hass, coordinator, possible_metrics, "sensor")
+    cleanup_disabled_entities(hass, coordinator, possible_metrics | special_sensor_keys, "sensor")
 
 
 class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
