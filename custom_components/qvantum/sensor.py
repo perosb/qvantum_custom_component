@@ -52,6 +52,7 @@ async def async_setup_entry(
 
     sensors = []
 
+    values = coordinator.data.get("values", {})
     disabled_metrics = (
         DEFAULT_DISABLED_MODBUS_METRICS
         if coordinator.modbus_enabled
@@ -69,15 +70,19 @@ async def async_setup_entry(
     # Special metrics that have dedicated sensor classes
     special_metrics = {"latency", "hpid"}
 
-    # Create entities for all possible metrics so they appear in the entity registry
-    # even when disabled by default, allowing users to enable them from the UI.
-    # Entities for metrics not yet fetched will be unavailable until the coordinator
-    # fetches the metric (i.e., once the user enables the entity).
+    # Create entities using a hybrid approach:
+    # - Disabled-by-default metrics: always create so they appear in the entity registry
+    #   and users can enable them from the UI. They show as unavailable until fetched.
+    # - Enabled-by-default metrics: only create if present in current values to avoid
+    #   permanently unavailable entities for mode-specific metrics (e.g., HTTP-only
+    #   metrics like fan0_10v and tap_water_cap that don't exist in Modbus mode).
     for metric in sorted(possible_metrics):
         if _should_exclude_metric(metric) or metric in special_metrics:
             continue
 
         enabled_by_default = metric not in disabled_metrics
+        if enabled_by_default and metric not in values:
+            continue
 
         sensor_class = _get_sensor_type(metric)
 

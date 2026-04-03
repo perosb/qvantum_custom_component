@@ -39,16 +39,17 @@ async def async_setup_entry(
         "fan_speed_2": (0, 100, 5),
     }
 
-    # Create number entities for all configured metrics so they appear in the entity
-    # registry even if the metric is not yet fetched. Entities will be unavailable
-    # until the coordinator fetches the metric.
+    # Only create number entities for metrics present in the coordinator's current data.
+    # This ensures HTTP-only number metrics (e.g., tap_water_capacity_target) are not
+    # created as permanently unavailable entities when in Modbus mode.
     sensors = []
     for metric, (min_val, max_val, step_val) in NUMBER_CONFIG.items():
-        sensors.append(
-            QvantumNumberEntity(
-                coordinator, metric, min_val, max_val, step_val, device
+        if metric in coordinator.data.get("values", {}):
+            sensors.append(
+                QvantumNumberEntity(
+                    coordinator, metric, min_val, max_val, step_val, device
+                )
             )
-        )
 
     async_add_entities(sensors)
 
