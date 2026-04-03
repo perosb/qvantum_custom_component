@@ -85,14 +85,17 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
 
     def _get_enabled_metrics(self, device_id: str) -> list[str]:
         """Get list of enabled metrics for a device based on entity registry."""
-        device_registry = self.hass.data["device_registry"]
+        from homeassistant.helpers import device_registry as dr
+        from homeassistant.helpers import entity_registry as er
+
+        device_registry = dr.async_get(self.hass)
         device_reg_id = None
         for device in device_registry.devices.values():
             if (DOMAIN, f"qvantum-{device_id}") in device.identifiers:
                 device_reg_id = device.id
                 break
         if device_reg_id:
-            registry = self.hass.data["entity_registry"]
+            registry = er.async_get(self.hass)
             enabled_metrics = set()
             known_metrics = set()
             for entity in registry.entities.values():

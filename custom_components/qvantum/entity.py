@@ -20,7 +20,7 @@ def resolve_device_id(device: DeviceInfo | dict[str, object]) -> str | None:
     """
     # Check if it's a dict with direct "id" key
     if isinstance(device, dict) and "id" in device:
-        return device["id"]
+        return str(device["id"])
 
     # Check if it's DeviceInfo with identifiers
     if isinstance(device, dict) and "identifiers" in device:
@@ -30,7 +30,7 @@ def resolve_device_id(device: DeviceInfo | dict[str, object]) -> str | None:
             if domain == DOMAIN and identifier.startswith(f"{DOMAIN}-"):
                 device_id = identifier.removeprefix(f"{DOMAIN}-")
                 if device_id:
-                    return device_id
+                    return str(device_id)
 
     return None
 

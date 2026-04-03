@@ -72,7 +72,7 @@ async def async_setup_entry(
     # Special metrics that have dedicated sensor classes
     special_metrics = {"latency", "hpid"}
 
-    for metric in possible_metrics:
+    for metric in sorted(possible_metrics):
         if metric not in values:
             continue
         if _should_exclude_metric(metric) or metric in special_metrics:
