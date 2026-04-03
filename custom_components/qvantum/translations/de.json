@@ -172,6 +172,9 @@
       "bf1_l_min": {
         "name": "Durchflusssensor für Brauchwasser (BF1)"
       },
+      "bf1_rpm": {
+        "name": "Durchflusssensor Pumpendrehzahl (BF1)"
+      },
       "bp1_pressure": {
         "name": "Niedriger Druckbalken (BP1)"
       },

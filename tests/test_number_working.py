@@ -445,6 +445,9 @@ class TestNumberSetup:
         """Test setting up number entities."""
         from custom_components.qvantum import RuntimeData
 
+        # Set modbus_enabled to False to enable HTTP numbers
+        mock_coordinator.modbus_enabled = False
+
         mock_config_entry.runtime_data = RuntimeData(
             coordinator=mock_coordinator, device=mock_device
         )

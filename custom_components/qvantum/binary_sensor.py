@@ -9,7 +9,6 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 from homeassistant.const import EntityCategory
 
 
@@ -45,32 +44,32 @@ async def async_setup_entry(
     ]
 
     for sensor_name in sensor_names:
-        sensors.append(
-            QvantumBaseBinaryEntity(
-                coordinator,
-                sensor_name,
-                sensor_name,
-                device,
+        if sensor_name in coordinator.data.get("values", {}):
+            sensors.append(
+                QvantumBaseBinaryEntity(
+                    coordinator,
+                    sensor_name,
+                    sensor_name,
+                    device,
+                )
             )
-        )
 
     async_add_entities(sensors)
 
     # Disable entities that should be disabled by default
-    entity_registry = hass.data["entity_registry"]
-    for sensor in sensors:
-        if not sensor._attr_entity_registry_enabled_default:
-            entity_entry = entity_registry.async_get(sensor.entity_id)
-            if entity_entry and entity_entry.disabled_by is None:
-                # Entity is currently enabled, respect user's choice
-                continue
-            if (
-                entity_entry is None
-                or entity_entry.disabled_by != RegistryEntryDisabler.USER
-            ):
-                entity_registry.async_update_entity(
-                    sensor.entity_id, disabled_by=RegistryEntryDisabler.INTEGRATION
-                )
+    from .entity import disable_entities_by_default
+
+    disable_entities_by_default(hass, sensors)
+
+    # Clean up disabled entities that are no longer supported in the current mode
+    from .entity import cleanup_disabled_entities
+
+    possible_binary_metrics = set(
+        name for name in sensor_names if name in coordinator.data.get("values", {})
+    )
+    cleanup_disabled_entities(
+        hass, coordinator, possible_binary_metrics, "binary_sensor"
+    )
 
 
 class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):

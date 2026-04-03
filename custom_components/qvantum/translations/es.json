@@ -172,6 +172,9 @@
       "bf1_l_min": {
         "name": "Sensor de caudal ACS (BF1)"
       },
+      "bf1_rpm": {
+        "name": "Velocidad de bomba sensor de caudal (BF1)"
+      },
       "bp1_pressure": {
         "name": "Presión baja en bar (BP1)"
       },

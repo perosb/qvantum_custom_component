@@ -210,11 +210,26 @@ class TestIntegrationSetup:
 
     @pytest.mark.asyncio
     async def test_async_migrate_entry_non_legacy(self, hass, mock_config_entry):
-        config_entry = MagicMock(version=2, minor_version=0)
+        config_entry = MagicMock(version=6, minor_version=0)
 
         result = await async_migrate_entry(hass, config_entry)
 
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_async_migrate_entry_from_v4_to_v5(self, hass, mock_config_entry):
+        config_entry = MagicMock(version=4, minor_version=0, entry_id="test")
+
+        with patch(
+            "custom_components.qvantum.async_migrate_entries",
+            new_callable=AsyncMock,
+        ) as mock_migrate:
+            with patch.object(hass.config_entries, "async_update_entry") as mock_update:
+                result = await async_migrate_entry(hass, config_entry)
+
+                assert result is True
+                mock_migrate.assert_called_once()
+                mock_update.assert_called_once_with(config_entry, version=5)
 
     @pytest.mark.asyncio
     async def test_async_migrate_entry_legacy(self, hass, mock_config_entry):
@@ -228,6 +243,18 @@ class TestIntegrationSetup:
                 result = await async_migrate_entry(hass, config_entry)
 
                 assert result is True
-                mock_migrate.assert_called_once()
-                mock_update.assert_called_once_with(config_entry, version=4)
+                assert mock_migrate.call_count == 2
+                mock_update.assert_called_once_with(config_entry, version=5)
 
+                # Verify both migration calls were made with correct arguments
+                assert len(mock_migrate.call_args_list) == 2
+
+                first_call_args = mock_migrate.call_args_list[0].args
+                _, first_entry_id, first_migration_fn = first_call_args
+                assert first_entry_id == config_entry.entry_id
+                assert callable(first_migration_fn)
+
+                second_call_args = mock_migrate.call_args_list[1].args
+                _, second_entry_id, second_migration_fn = second_call_args
+                assert second_entry_id == config_entry.entry_id
+                assert callable(second_migration_fn)

@@ -11,7 +11,7 @@ FAN_SPEED_VALUE_OFF = 0
 FAN_SPEED_VALUE_NORMAL = 1
 FAN_SPEED_VALUE_EXTRA = 2
 VERSION = "2026.4.1"
-CONFIG_VERSION = 4
+CONFIG_VERSION = 5
 
 # Modbus TCP configuration
 CONF_MODBUS_TCP = "modbus_tcp"
@@ -36,9 +36,7 @@ DEFAULT_ENABLED_METRICS = [
     "bt30",
     "bt33",
     "bt34",
-    "bt4",
     "bt10",
-    "bt12",
     "bt13",
     "bt20",
     "bt21",
@@ -53,6 +51,7 @@ DEFAULT_ENABLED_METRICS = [
     "tap_water_start",
     "fan0_10v",
     "gp1_speed",
+    "gp2_speed",
     "hp_status",
     "picpin_relay_heat_l1",
     "picpin_relay_heat_l2",
@@ -64,16 +63,6 @@ DEFAULT_ENABLED_METRICS = [
     "picpin_relay_gp3",
     "picpin_relay_pump",
     "picpin_relay_ha12",
-    "tap_water_cap",
-    "op_man_addition",
-    "op_man_dhw",
-    "op_mode",
-    "man_mode",
-    "enable_sc_dhw",
-    "enable_sc_sh",
-    "use_adaptive",
-    "smart_dhw_mode",
-    "smart_dhw_control_status",
     "qn8position",
     "compressorenergy",
     "additionalenergy",
@@ -83,9 +72,10 @@ DEFAULT_ENABLED_METRICS = [
 ]
 
 DEFAULT_DISABLED_HTTP_METRICS = [
-    "gp2_speed",
     "calc_suppy_cpr",  # Note: Typo is in the original data
     "btx",
+    "bt12",
+    "bt4",
     "cooling_enabled",
     "dhw_outl_temp_15",
     "dhw_outl_temp_5",
@@ -121,6 +111,12 @@ DEFAULT_DISABLED_HTTP_METRICS = [
     "picpin_mask",
 ]
 
+DEFAULT_DISABLED_MODBUS_METRICS = [
+    "bf1_rpm",
+    "bt12",
+    "bt4",
+]
+
 # Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus)
 REQUIRED_METRICS = [
     "bt2",  # Required by climate component for current temperature
@@ -143,6 +139,8 @@ REQUIRED_METRICS = [
     "heatingenergy",
     "dhwenergy",
     "powertotal",
+    "fanspeedselector",
+    "tap_water_cap",
 ]
 
 # Modbus-only intermediate metrics required to compute derived values (e.g. energy totals
@@ -151,6 +149,7 @@ REQUIRED_METRICS = [
 # warnings and a larger HTTP query string.
 REQUIRED_MODBUS_METRICS = [
     "compressor_power",  # Used to compute powertotal
+    "smart_dhw_control_status",
     "compressor_mwh",
     "compressor_kwh",
     "additional_mwh",
@@ -233,6 +232,7 @@ MODBUS_INPUT_REGISTER_MAP = {
     "bt34 - dhw secondary outlet": (19, "int16", 0.1),
     "btx sensor value": (21, "int16", 0.1),
     "bf1 - dhw flow": (26, "uint16", 0.01),
+    "bf1 rpm": (27, "uint16", 0.1),
     "gp1 - distribution system circulation pump speed": (28, "uint16", 0.1),
     "gp2 - dhw circulation pump speed": (29, "uint16", 1.0),
     "fan speed [rpm]": (30, "uint16", 1.0),
@@ -422,6 +422,7 @@ MODBUS_SPEC_TO_INTERNAL_MAP = {
     "bt34 - dhw secondary outlet": "bt34",
     "btx sensor value": "btx",
     "bf1 - dhw flow": "bf1_l_min",
+    "bf1 rpm": "bf1_rpm",
     "gp1 - distribution system circulation pump speed": "gp1_speed",
     "gp2 - dhw circulation pump speed": "gp2_speed",
     "fan speed [rpm]": "fanrpm",
@@ -456,18 +457,6 @@ MODBUS_INPUT_TO_HTTP_MAP = {
     "dhw_normal_start": "tap_water_start",
     "dhw_normal_stop": "tap_water_stop",
     "tap_stop": "tap_stop",
-    "desired_indoor_temp": "indoor_temperature_target",
-    "heating_offset": "indoor_temperature_offset",
-    "use_operation_sensor": "sensor_mode",
-    "dhw_mode": "extra_tap_water",
-    "room_compensation": "room_comp_factor",
-    "fan_speed_normal": "fan_normal",
-    "fan_speed_reduced": "fan_speed_2",
-    "operation_mode": "op_mode",
-    "allow_dhw": "op_man_dhw",
-    "allow_addition": "op_man_addition",
-    "allow_heating": "man_mode",
-    "ventilation_state": "fanspeedselector",
     "smart_price_dhw_enabled": "enable_sc_dhw",
     "smart_price_heating_enabled": "enable_sc_sh",
 }

@@ -375,10 +375,20 @@ class TestSensorSetup:
         return registry
 
     @pytest.fixture
-    def mock_hass(self, mock_entity_registry):
-        """Mock Home Assistant instance with entity registry."""
+    def mock_device_registry(self):
+        """Mock device registry."""
+        registry = MagicMock()
+        registry.devices.values.return_value = []
+        return registry
+
+    @pytest.fixture
+    def mock_hass(self, mock_entity_registry, mock_device_registry):
+        """Mock Home Assistant instance with registries."""
         hass = MagicMock()
-        hass.data = {"entity_registry": mock_entity_registry}
+        hass.data = {
+            "entity_registry": mock_entity_registry,
+            "device_registry": mock_device_registry,
+        }
         return hass
 
     @pytest.mark.asyncio
@@ -429,15 +439,25 @@ class TestSensorSetup:
     async def test_async_setup_entry_modbus_excludes_http_disabled_metrics(
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):
-        """Test that in Modbus mode HTTP-only disabled metrics are not created."""
+        """Test that in Modbus mode HTTP-only disabled metrics are not created, and Modbus disabled metrics are disabled."""
         from custom_components.qvantum.const import (
             CONF_MODBUS_TCP,
             DEFAULT_DISABLED_HTTP_METRICS,
+            DEFAULT_DISABLED_MODBUS_METRICS,
         )
 
         # Mark config entry as Modbus mode
         mock_config_entry.options = {CONF_MODBUS_TCP: True}
         mock_coordinator.modbus_enabled = True
+
+        # Remove HTTP disabled metrics from mock data to simulate they are not available in Modbus
+        for metric in DEFAULT_DISABLED_HTTP_METRICS:
+            mock_coordinator.data["values"].pop(metric, None)
+
+        # Add Modbus disabled metrics to mock data if they should be created
+        for metric in DEFAULT_DISABLED_MODBUS_METRICS:
+            if metric not in mock_coordinator.data["values"]:
+                mock_coordinator.data["values"][metric] = 0  # Dummy value
 
         # Mock async_add_entities to assign entity_ids
         def mock_async_add_entities(entities):
@@ -457,10 +477,22 @@ class TestSensorSetup:
             if entity._metric_key in DEFAULT_DISABLED_HTTP_METRICS
         ]
 
+        # Only metrics that are exclusively HTTP-disabled (not also Modbus-disabled)
+        # should be absent in Modbus mode. Metrics in both lists (e.g. bt4, bt12)
+        # are valid Modbus sensors and must be created (disabled by default).
+        http_only_disabled = set(DEFAULT_DISABLED_HTTP_METRICS) - set(
+            DEFAULT_DISABLED_MODBUS_METRICS
+        )
+        disabled_entities = [
+            entity for entity in entities if entity._metric_key in http_only_disabled
+        ]
+
         assert disabled_entities == []
 
         mock_entity_registry = mock_hass.data["entity_registry"]
-        assert mock_entity_registry.async_update_entity.call_count == 0
+        assert mock_entity_registry.async_update_entity.call_count == len(
+            DEFAULT_DISABLED_MODBUS_METRICS
+        )
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_respects_user_enabled_entities(
@@ -489,6 +521,11 @@ class TestSensorSetup:
         # Verify that async_update_entity was NOT called for the enabled entity
         # (since we respect user's choice to enable it)
         mock_entity_registry.async_update_entity.assert_not_called()
+
+        # Additional verification: ensure the entity's enabled state is preserved
+        # The mock entity should still be disabled=False (enabled)
+        assert mock_entity.disabled is False
+        assert mock_entity.disabled_by is None
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_respects_user_disabled_entities(
@@ -528,7 +565,10 @@ class TestSensorSetup:
             EXCLUDED_METRIC_PATTERNS,
         )
 
-        # Calculate expected calls dynamically to avoid relying on a magic number
+        # Calculate expected calls for disabled-by-default HTTP metrics that are not
+        # excluded by patterns. Setup is hybrid: enabled-by-default metrics are only
+        # created when present in values, while disabled-by-default metrics still get
+        # registry entries even on first install.
         expected_calls = len(
             [
                 metric

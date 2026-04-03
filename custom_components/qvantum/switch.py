@@ -24,18 +24,20 @@ async def async_setup_entry(
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo = config_entry.runtime_data.device
 
+    switch_names = [
+        "extra_tap_water",
+        "op_mode",
+        "op_man_dhw",
+        "op_man_addition",
+        "man_mode",
+        "enable_sc_sh",
+        "enable_sc_dhw",
+    ]
+
     sensors = []
-    sensors.append(QvantumSwitchEntity(coordinator, "extra_tap_water", device))
-
-    # Manual operation mode related switches
-    sensors.append(QvantumSwitchEntity(coordinator, "op_mode", device))
-    sensors.append(QvantumSwitchEntity(coordinator, "op_man_dhw", device))
-    sensors.append(QvantumSwitchEntity(coordinator, "op_man_addition", device))
-    sensors.append(QvantumSwitchEntity(coordinator, "man_mode", device))
-
-    # SmartControl related switches
-    sensors.append(QvantumSwitchEntity(coordinator, "enable_sc_sh", device))
-    sensors.append(QvantumSwitchEntity(coordinator, "enable_sc_dhw", device))
+    for switch_name in switch_names:
+        if switch_name in coordinator.data.get("values", {}):
+            sensors.append(QvantumSwitchEntity(coordinator, switch_name, device))
 
     async_add_entities(sensors)
 

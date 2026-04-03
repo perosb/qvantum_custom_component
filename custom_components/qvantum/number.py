@@ -10,7 +10,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
-from .const import TAP_WATER_CAPACITY_MAPPINGS
+from .const import (
+    TAP_WATER_CAPACITY_MAPPINGS,
+)
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity
 
@@ -26,26 +28,28 @@ async def async_setup_entry(
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo = config_entry.runtime_data.device
 
+    # Configuration for number entities: metric_key -> (min, max, step)
+    NUMBER_CONFIG = {
+        "tap_water_capacity_target": (1, 7, 1),
+        "room_comp_factor": (0, 10, 0.5),
+        "indoor_temperature_offset": (-10, 10, 1),
+        "tap_water_stop": (60, 90, 1),
+        "tap_water_start": (50, 65, 1),
+        "fan_normal": (0, 100, 5),
+        "fan_speed_2": (0, 100, 5),
+    }
+
+    # Only create number entities for metrics present in the coordinator's current data.
+    # This ensures HTTP-only number metrics (e.g., tap_water_capacity_target) are not
+    # created as permanently unavailable entities when in Modbus mode.
     sensors = []
-    sensors.append(
-        QvantumNumberEntity(coordinator, "tap_water_capacity_target", 1, 7, 1, device)
-    )
-    sensors.append(
-        QvantumNumberEntity(coordinator, "room_comp_factor", 0, 10, 0.5, device)
-    )
-    sensors.append(
-        QvantumNumberEntity(
-            coordinator, "indoor_temperature_offset", -10, 10, 1, device
-        )
-    )
-    sensors.append(
-        QvantumNumberEntity(coordinator, "tap_water_stop", 60, 90, 1, device)
-    )
-    sensors.append(
-        QvantumNumberEntity(coordinator, "tap_water_start", 50, 65, 1, device)
-    )
-    sensors.append(QvantumNumberEntity(coordinator, "fan_normal", 0, 100, 5, device))
-    sensors.append(QvantumNumberEntity(coordinator, "fan_speed_2", 0, 100, 5, device))
+    for metric, (min_val, max_val, step_val) in NUMBER_CONFIG.items():
+        if metric in coordinator.data.get("values", {}):
+            sensors.append(
+                QvantumNumberEntity(
+                    coordinator, metric, min_val, max_val, step_val, device
+                )
+            )
 
     async_add_entities(sensors)
 

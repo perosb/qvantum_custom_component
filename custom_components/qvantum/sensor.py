@@ -20,12 +20,12 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_utils
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     DEFAULT_ENABLED_METRICS,
     DEFAULT_DISABLED_HTTP_METRICS,
+    DEFAULT_DISABLED_MODBUS_METRICS,
     EXCLUDED_METRIC_PATTERNS,
     TEMPERATURE_METRICS,
     ENERGY_METRICS,
@@ -52,18 +52,41 @@ async def async_setup_entry(
 
     sensors = []
 
-    if coordinator.modbus_enabled:
-        # In Modbus mode, only include the core supported default metrics.
-        metrics = DEFAULT_ENABLED_METRICS
-    else:
-        # In HTTP mode we also expose the optional HTTP-only metrics (disabled by default).
-        metrics = DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_HTTP_METRICS
+    values = coordinator.data.get("values", {})
+    disabled_metrics = (
+        DEFAULT_DISABLED_MODBUS_METRICS
+        if coordinator.modbus_enabled
+        else DEFAULT_DISABLED_HTTP_METRICS
+    )
 
-    for metric in metrics:
-        if _should_exclude_metric(metric):
+    # Define possible metrics for the current mode
+    if coordinator.modbus_enabled:
+        possible_metrics = set(
+            DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_MODBUS_METRICS
+        )
+    else:
+        possible_metrics = set(DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_HTTP_METRICS)
+
+    # Special metrics that have dedicated sensor classes
+    special_metrics = {"latency", "hpid"}
+
+    # Create entities using a hybrid approach:
+    # - Disabled-by-default metrics: always create so they appear in the entity registry
+    #   and users can enable them from the UI. They show as unavailable until fetched.
+    # - Enabled-by-default metrics: only create if present in current values to avoid
+    #   permanently unavailable entities for mode-specific metrics (e.g., HTTP-only
+    #   metrics like fan0_10v and tap_water_cap that don't exist in Modbus mode).
+    for metric in sorted(possible_metrics):
+        if _should_exclude_metric(metric) or metric in special_metrics:
             continue
 
-        enabled_by_default = metric not in DEFAULT_DISABLED_HTTP_METRICS
+        enabled_by_default = metric not in disabled_metrics
+        if enabled_by_default and metric not in values:
+            _LOGGER.debug(
+                "Skipping creation of enabled-by-default sensor for metric '%s' because it's not in current values. It will be created when the metric appears in the data.",
+                metric,
+            )
+            continue
 
         sensor_class = _get_sensor_type(metric)
 
@@ -109,20 +132,14 @@ async def async_setup_entry(
     async_add_entities(sensors)
 
     # Disable entities that should be disabled by default
-    entity_registry = hass.data["entity_registry"]
-    for sensor in sensors:
-        if not sensor._attr_entity_registry_enabled_default:
-            entity_entry = entity_registry.async_get(sensor.entity_id)
-            if entity_entry and entity_entry.disabled_by is None:
-                # Entity is currently enabled, respect user's choice
-                continue
-            if (
-                entity_entry is None
-                or entity_entry.disabled_by != RegistryEntryDisabler.USER
-            ):
-                entity_registry.async_update_entity(
-                    sensor.entity_id, disabled_by=RegistryEntryDisabler.INTEGRATION
-                )
+    from .entity import disable_entities_by_default
+
+    disable_entities_by_default(hass, sensors)
+
+    # Clean up disabled entities that are no longer supported in the current mode
+    from .entity import cleanup_disabled_entities
+
+    cleanup_disabled_entities(hass, coordinator, possible_metrics, "sensor")
 
 
 class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
@@ -142,7 +159,7 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
 
     def _set_units_from_metric(self, metric_key: str) -> None:
         """Set appropriate units based on metric key patterns."""
-        if metric_key in ["compressormeasuredspeed", "fanrpm"]:
+        if "rpm" in metric_key or metric_key in ["compressormeasuredspeed"]:
             self._attr_native_unit_of_measurement = "rpm"
         elif (
             "fan" in metric_key
