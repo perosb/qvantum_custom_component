@@ -477,6 +477,16 @@ class TestSensorSetup:
             if entity._metric_key in DEFAULT_DISABLED_HTTP_METRICS
         ]
 
+        # Only metrics that are exclusively HTTP-disabled (not also Modbus-disabled)
+        # should be absent in Modbus mode. Metrics in both lists (e.g. bt4, bt12)
+        # are valid Modbus sensors and must be created (disabled by default).
+        http_only_disabled = set(DEFAULT_DISABLED_HTTP_METRICS) - set(
+            DEFAULT_DISABLED_MODBUS_METRICS
+        )
+        disabled_entities = [
+            entity for entity in entities if entity._metric_key in http_only_disabled
+        ]
+
         assert disabled_entities == []
 
         mock_entity_registry = mock_hass.data["entity_registry"]
