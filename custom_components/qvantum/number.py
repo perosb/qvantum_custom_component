@@ -12,9 +12,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import MyConfigEntry
 from .const import (
     TAP_WATER_CAPACITY_MAPPINGS,
-    DEFAULT_ENABLED_NUMBER_METRICS,
-    DEFAULT_DISABLED_HTTP_NUMBER_METRICS,
-    DEFAULT_DISABLED_MODBUS_NUMBER_METRICS,
 )
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity
