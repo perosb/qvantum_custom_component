@@ -149,7 +149,6 @@ REQUIRED_METRICS = [
 # warnings and a larger HTTP query string.
 REQUIRED_MODBUS_METRICS = [
     "compressor_power",  # Used to compute powertotal
-    "dhw_stop_extra",
     "smart_dhw_control_status",
     "compressor_mwh",
     "compressor_kwh",
