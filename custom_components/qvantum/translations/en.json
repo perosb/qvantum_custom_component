@@ -306,6 +306,9 @@
       "cal_heat_temp": {
         "name": "Heating medium, flow line, target."
       },
+      "start_cooling_temp": {
+        "name": "Cooling start temperature"
+      },
       "bt30": {
         "name": "Hot water tank (BT30)"
       },

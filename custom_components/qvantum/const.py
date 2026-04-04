@@ -22,34 +22,28 @@ DEFAULT_MODBUS_HOST = "Qvantum-HP"
 DEFAULT_MODBUS_PORT = 502
 DEFAULT_MODBUS_UNIT_ID = 1
 
+# Metrics available in both HTTP and Modbus modes
 DEFAULT_ENABLED_METRICS = [
     "bf1_l_min",
-    "bp1_pressure",
-    "bp1_temp",
-    "bp2_pressure",
-    "bp2_temp",
     "bt1",
+    "bt10",
     "bt11",
+    "bt13",
     "bt14",
     "bt15",
     "bt2",
-    "bt30",
-    "bt33",
-    "bt34",
-    "bt10",
-    "bt13",
     "bt20",
     "bt21",
     "bt22",
     "bt23",
+    "bt30",
     "bt31",
+    "bt33",
+    "bt34",
     "cal_heat_temp",
     "compressormeasuredspeed",
     "compressor_state",
     "fanrpm",
-    "tap_water_stop",
-    "tap_water_start",
-    "fan0_10v",
     "gp1_speed",
     "gp2_speed",
     "hp_status",
@@ -70,6 +64,34 @@ DEFAULT_ENABLED_METRICS = [
     "dhwenergy",
     "powertotal",
 ]
+
+# Additional metrics only available via Modbus input registers (not the HTTP API)
+DEFAULT_ENABLED_MODBUS_ONLY_METRICS: list[str] = []
+
+# Holding register keys that should be exposed as sensor entities in Modbus mode
+DEFAULT_ENABLED_MODBUS_HOLDING_METRICS = [
+    "start_cooling_temp",
+]
+
+# Additional metrics only available via the HTTP API (not Modbus input registers)
+DEFAULT_ENABLED_HTTP_ONLY_METRICS = [
+    "bp1_pressure",
+    "bp1_temp",
+    "bp2_pressure",
+    "bp2_temp",
+    "fan0_10v",
+    "tap_water_stop",
+    "tap_water_start",
+]
+
+DEFAULT_ENABLED_MODBUS_METRICS = (
+    DEFAULT_ENABLED_METRICS
+    + DEFAULT_ENABLED_MODBUS_ONLY_METRICS
+    + DEFAULT_ENABLED_MODBUS_HOLDING_METRICS
+)
+DEFAULT_ENABLED_HTTP_METRICS = (
+    DEFAULT_ENABLED_METRICS + DEFAULT_ENABLED_HTTP_ONLY_METRICS
+)
 
 DEFAULT_DISABLED_HTTP_METRICS = [
     "calc_suppy_cpr",  # Note: Typo is in the original data
@@ -465,6 +487,7 @@ MODBUS_INPUT_TO_HTTP_MAP = {
 # One-way map from Modbus holding register keys to the canonical settings names
 # used by the API/settings layer. This does not imply reverse lookup support.
 MODBUS_HOLDING_TO_SETTINGS_MAP = {
+    "start_cooling_temp": "start_cooling_temp",
     "dhw_start_normal": "tap_water_start",
     "dhw_stop_normal": "tap_water_stop",
     # "dhw_stop_extra": "dhw_stop_extra", # No update_setting found for this metric, so it's handled separately in number.py

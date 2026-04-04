@@ -306,6 +306,9 @@
       "cal_heat_temp": {
         "name": "Verwarmingsmedium, aanvoerleiding, doel."
       },
+      "start_cooling_temp": {
+        "name": "Starttemperatuur koeling"
+      },
       "bt30": {
         "name": "Warmwater tank (BT30)"
       },
