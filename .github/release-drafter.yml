@@ -38,9 +38,17 @@ autolabeler:
   - label: 'chore'
     files:
       - '*.md'
+    title:
+      - '/^(chore|docs|refactor|test|ci)\b/i'
+    branch:
+      - '/^(chore|docs|refactor|test|ci)[_\/]/i'
   - label: 'bug'
     title:
-      - '/fix/i'
+      - '/^fix\b/i'
+    branch:
+      - '/^fix[_\/]/i'
   - label: 'enhancement'
     title:
-      - '/feat/i'
+      - '/^feat\b/i'
+    branch:
+      - '/^feat[_\/]/i'
