@@ -38,7 +38,6 @@ jobs:
           tag: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
           include-pre-releases: true
-          disable-autolabeler: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -46,6 +45,6 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: release-drafter/release-drafter@v7.1.1
         with:
-          disable-releaser: true
+          dry-run: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
