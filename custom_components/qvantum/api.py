@@ -966,7 +966,8 @@ class QvantumAPI:
     ) -> tuple[dict | None, str | None, int | None]:
         """Perform a raw HTTP values fetch and return (values_dict, etag, total_latency).
 
-        Returns (None, None, None) on 304 Not Modified.
+        Returns (None, None, None) on 304 Not Modified and on any other
+        unhandled non-200 response status.
         Raises APIAuthError on 403, APIConnectionError on 500.
         """
         await self._ensure_valid_token()
