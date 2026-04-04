@@ -928,71 +928,82 @@ class QvantumAPI:
                 )
 
         # Fall back to HTTP API if Modbus is not available or fails.
+        http_values, etag, total_latency = await self._get_http_values(
+            device_id, names, etag_header=self._metrics_etag
+        )
+
+        if http_values is not None:
+            metrics: dict = {"hpid": device_id}
+            metrics["latency"] = total_latency
+            for metric_name in names:
+                if metric_name in http_values:
+                    metrics[metric_name] = http_values[metric_name]
+                    if metric_name == "fan0_10v":
+                        metrics[metric_name] = int(float(metrics[metric_name]) * 10)
+                else:
+                    _LOGGER.warning(f"Metric {metric_name} not found in response data.")
+            self._metrics_data = {"metrics": metrics}
+            self._metrics_etag = etag
+
+        _LOGGER.debug("HTTP metrics read: %s", self._metrics_data)
+        return self._metrics_data
+
+    async def get_http_metrics(self, device_id: str, metric_names: list[str]) -> dict:
+        """Fetch specific metrics from the HTTP API, bypassing Modbus."""
+        http_values, _, _ = await self._get_http_values(device_id, metric_names)
+        if not http_values:
+            return {"metrics": {}}
+        metrics = {
+            name: http_values[name] for name in metric_names if name in http_values
+        }
+        return {"metrics": metrics}
+
+    async def _get_http_values(
+        self,
+        device_id: str,
+        metric_names: list[str],
+        etag_header: Optional[str] = None,
+    ) -> tuple[dict | None, str | None, int | None]:
+        """Perform a raw HTTP values fetch and return (values_dict, etag, total_latency).
+
+        Returns (None, None, None) on 304 Not Modified.
+        Raises APIAuthError on 403, APIConnectionError on 500.
+        """
         await self._ensure_valid_token()
         headers = self._request_headers()
-        if self._metrics_etag:
-            headers["If-None-Match"] = self._metrics_etag
+        if etag_header:
+            headers["If-None-Match"] = etag_header
 
-        names = (
-            enabled_metrics if enabled_metrics is not None else DEFAULT_ENABLED_METRICS
-        )
-        names_list = ""
-        for metric_name in names:
-            names_list += f"&names[]={metric_name}"
-
+        names_list = "".join(f"&names[]={name}" for name in metric_names)
         async with self._session.get(
-            f"{API_INTERNAL_URL}/api/internal/v1/devices/{device_id}/values?use_internal_names=true&timeout={METRICS_TIMEOUT_SECONDS}{names_list}",
+            f"{API_INTERNAL_URL}/api/internal/v1/devices/{device_id}/values"
+            f"?use_internal_names=true&timeout={METRICS_TIMEOUT_SECONDS}{names_list}",
             headers=headers,
         ) as response:
             match response.status:
                 case 200:
                     data = await response.json()
-
-                    _LOGGER.debug("HTTP Metrics fetched: %s", data)
-
-                    metrics = {}
-                    metrics["hpid"] = device_id
-
-                    metrics_data = data.get("values", {})
-                    metrics["latency"] = (
-                        data["total_latency"] if "total_latency" in data else None
+                    _LOGGER.debug("HTTP values fetched: %s", data)
+                    return (
+                        data.get("values", {}),
+                        response.headers.get("ETag"),
+                        data.get("total_latency"),
                     )
-
-                    for metric_name in names:
-                        if metric_name in metrics_data:
-                            metrics[metric_name] = metrics_data[metric_name]
-
-                            if metric_name == "fan0_10v":
-                                metrics[metric_name] = int(
-                                    float(metrics[metric_name]) * 10
-                                )
-                        else:
-                            _LOGGER.warning(
-                                f"Metric {metric_name} not found in response data."
-                            )
-
-                    self._metrics_data = {"metrics": metrics}
-                    self._metrics_etag = response.headers.get("ETag")
-
                 case 403:
                     _LOGGER.error("Authentication failure: %s", response.status)
-                    _LOGGER.debug("Authentication failure: %s", response)
                     await self.unauthenticate()
                     raise APIAuthError(response)
                 case 304:
-                    _LOGGER.debug("HTTP Metrics not modified, using cached data.")
+                    _LOGGER.debug("HTTP values not modified, using cached data.")
+                    return None, None, None
                 case 500:
-                    _LOGGER.error(
-                        "Internal server error, clearing data: %s", response.status
-                    )
-                    _LOGGER.debug("Internal server error, clearing data: %s", response)
+                    _LOGGER.error("Internal server error: %s", response.status)
                     raise APIConnectionError(response)
                 case _:
-                    _LOGGER.error("Failed to fetch data, status: %s", response.status)
-                    _LOGGER.debug("Failed to fetch data, status: %s", response)
-
-        _LOGGER.debug("HTTP metrics read: %s", self._metrics_data)
-        return self._metrics_data
+                    _LOGGER.error(
+                        "Failed to fetch HTTP values, status: %s", response.status
+                    )
+                    return None, None, None
 
     async def get_settings(self, device_id: str):
         """Fetch settings from the API or Modbus."""

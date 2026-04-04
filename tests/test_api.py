@@ -1995,3 +1995,62 @@ class TestQvantumAPI:
 
         assert result is False
         authenticated_api._session.post.assert_called_once()
+
+    # --- get_http_metrics tests ---
+
+    @pytest.mark.asyncio
+    async def test_get_http_metrics_returns_requested_metrics(self, authenticated_api):
+        """Test that get_http_metrics returns only the requested metric names."""
+        cm, _ = authenticated_api._session.make_cm_response(
+            status=200,
+            json_data={"values": {"tap_stop": 65, "bt1": 5.2, "extra_field": 99}},
+            headers={"ETag": "abc123"},
+        )
+        authenticated_api._session.get.return_value = cm
+
+        result = await authenticated_api.get_http_metrics("dev1", ["tap_stop", "bt1"])
+
+        assert result == {"metrics": {"tap_stop": 65, "bt1": 5.2}}
+
+    @pytest.mark.asyncio
+    async def test_get_http_metrics_missing_metric_omitted(self, authenticated_api):
+        """Test that metrics absent from the response are silently omitted."""
+        cm, _ = authenticated_api._session.make_cm_response(
+            status=200,
+            json_data={"values": {"tap_stop": 70}},
+            headers={"ETag": "abc123"},
+        )
+        authenticated_api._session.get.return_value = cm
+
+        result = await authenticated_api.get_http_metrics(
+            "dev1", ["tap_stop", "missing_metric"]
+        )
+
+        assert result == {"metrics": {"tap_stop": 70}}
+        assert "missing_metric" not in result["metrics"]
+
+    @pytest.mark.asyncio
+    async def test_get_http_metrics_returns_empty_on_304(self, authenticated_api):
+        """Test that get_http_metrics returns empty metrics dict on 304 Not Modified."""
+        cm, _ = authenticated_api._session.make_cm_response(status=304)
+        authenticated_api._session.get.return_value = cm
+
+        result = await authenticated_api.get_http_metrics("dev1", ["tap_stop"])
+
+        assert result == {"metrics": {}}
+
+    @pytest.mark.asyncio
+    async def test_get_http_metrics_returns_empty_on_empty_values(
+        self, authenticated_api
+    ):
+        """Test that get_http_metrics returns empty metrics dict when values dict is empty."""
+        cm, _ = authenticated_api._session.make_cm_response(
+            status=200,
+            json_data={"values": {}},
+            headers={"ETag": "xyz"},
+        )
+        authenticated_api._session.get.return_value = cm
+
+        result = await authenticated_api.get_http_metrics("dev1", ["tap_stop"])
+
+        assert result == {"metrics": {}}

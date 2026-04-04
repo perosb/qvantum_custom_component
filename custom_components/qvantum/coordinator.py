@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Optional
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_SCAN_INTERVAL,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import APIAuthError
@@ -67,6 +68,8 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
 
         self.api = hass.data[DOMAIN]
         self._device = None
+        self._last_tap_stop_fetch: datetime | None = None
+        self._cached_tap_stop: Any = None
 
         super().__init__(
             hass,
@@ -253,6 +256,34 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             # Merge metrics and settings into unified values structure
             # Settings take precedence over metrics in case of conflicts
             values = {**metrics_dict, **settings_dict}
+
+            # In Modbus mode, tap_stop is HTTP-only. Poll it at the configured HTTP
+            # scan interval whenever extra_tap_water is active.
+            if self.modbus_enabled and values.get("extra_tap_water") == "on":
+                now = dt_util.utcnow()
+                elapsed = (
+                    (now - self._last_tap_stop_fetch).total_seconds()
+                    if self._last_tap_stop_fetch is not None
+                    else float("inf")
+                )
+                if elapsed > DEFAULT_SCAN_INTERVAL:
+                    try:
+                        http_data = await self.api.get_http_metrics(
+                            device_id, ["tap_stop"]
+                        )
+                        tap_stop = http_data.get("metrics", {}).get("tap_stop")
+                        if tap_stop is not None:
+                            self._cached_tap_stop = tap_stop
+                            values["tap_stop"] = tap_stop
+                        self._last_tap_stop_fetch = now
+                    except Exception as exc:
+                        _LOGGER.warning(
+                            "Failed to fetch tap_stop via HTTP in Modbus mode for device %s: %s",
+                            device_id,
+                            exc,
+                        )
+                elif self._cached_tap_stop is not None:
+                    values["tap_stop"] = self._cached_tap_stop
 
             _LOGGER.debug("Final values: %s", values)
 
