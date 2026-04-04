@@ -38,14 +38,11 @@ jobs:
           tag: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
           include-pre-releases: true
-          disable-autolabeler: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Apply autolabels
-        if: github.event_name == 'pull_request'
-        uses: release-drafter/release-drafter@v7.1.1
-        with:
-          disable-releaser: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Apply autolabels
+      #   if: github.event_name == 'pull_request'
+      #   uses: release-drafter/release-drafter/autolabeler@latest
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

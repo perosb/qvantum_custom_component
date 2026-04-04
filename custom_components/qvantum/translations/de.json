@@ -122,16 +122,16 @@
         "state": {
           "0": "Aus",
           "1": "Leerlauf",
-          "2": "Heizen",
-          "3": "Kühlen",
-          "4": "Warmwasser",
-          "5": "Warmwasser",
+          "2": "Vorbereitung Heizung",
+          "3": "Vorbereitung Kühlung",
+          "4": "Vorbereitung Warmwasser 1",
+          "5": "Vorbereitung Warmwasser 2",
           "6": "Heizen",
           "7": "Kühlen",
           "8": "Warmwasser",
-          "9": "Abtauung DHW passiv",
+          "9": "Abtauung Warmwasser passiv",
           "10": "Abtauung Heizung passiv",
-          "11": "Pool",
+          "11": "Vorbereitung Pool",
           "12": "Pool",
           "13": "Abtauung Pool passiv"
         }
@@ -341,7 +341,8 @@
           "0": "Leerlauf",
           "1": "Abtauen",
           "2": "Heißes Wasser",
-          "3": "Heizung"
+          "3": "Heizung",
+          "4": "Kühlung"
         }
       },
       "smart_dhw_status": {

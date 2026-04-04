@@ -122,16 +122,16 @@
         "state": {
           "0": "Off",
           "1": "Idle",
-          "2": "Heating",
-          "3": "Cooling",
-          "4": "Hot water",
-          "5": "Hot water",
+          "2": "Prepare for heating",
+          "3": "Prepare for cooling",
+          "4": "Prepare 1 for hot water",
+          "5": "Prepare 2 for hot water",
           "6": "Heating",
           "7": "Cooling",
           "8": "Hot water",
-          "9": "Defrost DHW passive",
+          "9": "Defrost hot water passive",
           "10": "Defrost heating passive",
-          "11": "Pool",
+          "11": "Prepare for pool",
           "12": "Pool",
           "13": "Defrost pool passive"
         }
@@ -341,7 +341,8 @@
           "0": "Idle",
           "1": "Defrosting",
           "2": "Hot water",
-          "3": "Heating"
+          "3": "Heating",
+          "4": "Cooling"
         }
       },
       "smart_dhw_status": {

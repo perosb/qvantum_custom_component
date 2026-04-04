@@ -125,16 +125,16 @@
         "state": {
           "0": "Av",
           "1": "Inaktiv",
-          "2": "Uppvärmning",
-          "3": "Kylning",
-          "4": "Varmvatten",
-          "5": "Varmvatten",
+          "2": "Förbereder uppvärmning",
+          "3": "Förbereder kylning",
+          "4": "Förbereder varmvatten 1",
+          "5": "Förbereder varmvatten 2",
           "6": "Uppvärmning",
           "7": "Kylning",
           "8": "Varmvatten",
           "9": "Avfrostning varmvatten passiv",
           "10": "Avfrostning uppvärmning passiv",
-          "11": "Pool",
+          "11": "Förbereder pool",
           "12": "Pool",
           "13": "Avfrostning pool passiv"
         }
@@ -419,7 +419,8 @@
           "0": "Inaktiv",
           "1": "Avfrostar",
           "2": "Varmvatten",
-          "3": "Värmer"
+          "3": "Värmer",
+          "4": "Kyler"
         }
       },
       "smart_dhw_status": {

@@ -30,6 +30,21 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+_COMPRESSOR_TO_HP_STATUS_MAP = {
+    2: 3,  # Heating → Heating
+    3: 4,  # Cooling → Cooling
+    4: 2,  # Hot water → Hot water
+    5: 2,  # Hot water (alias) → Hot water
+    6: 3,  # Heating (alias) → Heating
+    7: 4,  # Cooling (alias) → Cooling
+    8: 2,  # Hot water (alias) → Hot water
+    9: 1,  # Defrost DHW passive → Defrosting
+    10: 1,  # Defrost heating passive → Defrosting
+    11: 2,  # Pool → Hot water
+    12: 2,  # Pool (alias) → Hot water
+    13: 1,  # Defrost pool passive → Defrosting
+}
+
 
 async def handle_setting_update_response(
     api_response: Optional[dict[str, Any]],
@@ -256,6 +271,17 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             # Extract metrics from API response
             metrics_dict = data.get("metrics", {})
             _LOGGER.debug("Metrics data: %s", metrics_dict)
+
+            # Post process metrics for UI
+            # When hp_status reports 0 (idle), derive a more specific value from
+            # compressor_state using the same 5-state hp_status schema:
+            #   0=Idle, 1=Defrosting, 2=Hot water, 3=Heating, 4=Cooling
+            if (
+                metrics_dict.get("hp_status") == 0
+                and "compressor_state" in metrics_dict
+            ):
+                comp = metrics_dict["compressor_state"]
+                metrics_dict["hp_status"] = _COMPRESSOR_TO_HP_STATUS_MAP.get(comp, 0)
 
             # Process settings data
             settings_dict = self._process_settings_data(settings)
