@@ -453,8 +453,9 @@ class QvantumFirmwareSensorEntity(QvantumEntity, SensorEntity):
         # Check if firmware coordinator has data
         firmware_available = (
             super().available
-            and "firmware_versions" in self.coordinator.data
-            and self.firmware_key in self.coordinator.data.get("firmware_versions", {})
+            and "firmware_versions" in (self.coordinator.data or {})
+            and self.firmware_key
+            in (self.coordinator.data or {}).get("firmware_versions", {})
         )
 
         # Check if main coordinator has device metadata
