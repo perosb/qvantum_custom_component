@@ -275,13 +275,14 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                         if tap_stop is not None:
                             self._cached_tap_stop = tap_stop
                             values["tap_stop"] = tap_stop
-                        self._last_tap_stop_fetch = now
                     except Exception as exc:
                         _LOGGER.warning(
                             "Failed to fetch tap_stop via HTTP in Modbus mode for device %s: %s",
                             device_id,
                             exc,
                         )
+                    finally:
+                        self._last_tap_stop_fetch = now
                 elif self._cached_tap_stop is not None:
                     values["tap_stop"] = self._cached_tap_stop
 
