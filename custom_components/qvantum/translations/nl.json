@@ -121,17 +121,17 @@
         "name": "Compressortoestand",
         "state": {
           "0": "Uit",
-          "1": "Leeglopen",
-          "2": "Verwarmen",
-          "3": "Koelen",
-          "4": "Warm water",
-          "5": "Warm water",
+          "1": "Inactief",
+          "2": "Voorbereiding verwarming",
+          "3": "Voorbereiding koeling",
+          "4": "Voorbereiding warm water 1",
+          "5": "Voorbereiding warm water 2",
           "6": "Verwarmen",
           "7": "Koelen",
           "8": "Warm water",
-          "9": "Ontdooien DHW passief",
+          "9": "Ontdooien warm water passief",
           "10": "Ontdooien verwarming passief",
-          "11": "Zwembad",
+          "11": "Voorbereiding zwembad",
           "12": "Zwembad",
           "13": "Ontdooien zwembad passief"
         }
@@ -341,7 +341,8 @@
           "0": "Inactief",
           "1": "Ontdooien",
           "2": "Warm water",
-          "3": "Verwarming"
+          "3": "Verwarming",
+          "4": "Koeling"
         }
       },
       "smart_dhw_status": {

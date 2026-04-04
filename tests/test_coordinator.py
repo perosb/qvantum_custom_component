@@ -649,3 +649,103 @@ class TestQvantumDataUpdateCoordinator:
         await coordinator.async_update_data()
 
         mock_api.get_http_metrics.assert_not_called()
+
+
+class TestHpStatusPostProcessing:
+    """Tests for hp_status post-processing via compressor_state."""
+
+    def _make_coordinator(self, mock_super_init, metrics, modbus=True):
+        mock_super_init.return_value = None
+
+        mock_api = MagicMock()
+        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": metrics})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+
+        mock_config_entry = MagicMock()
+        if modbus:
+            mock_config_entry.options.get.side_effect = _modbus_options_get
+        else:
+            mock_config_entry.options.get.return_value = None
+        mock_config_entry.data = {}
+        mock_config_entry.unique_id = "test_device_123"
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+        coordinator.api = mock_api
+        coordinator.hass = mock_hass
+        return coordinator
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_hp_status_derived_hot_water(self, mock_super_init):
+        """compressor_state=4 (Hot water) maps to hp_status=2."""
+        coordinator = self._make_coordinator(
+            mock_super_init, {"hp_status": 0, "compressor_state": 4}
+        )
+        result = await coordinator.async_update_data()
+        assert result["values"]["hp_status"] == 2
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_hp_status_derived_heating(self, mock_super_init):
+        """compressor_state=2 (Heating) maps to hp_status=3."""
+        coordinator = self._make_coordinator(
+            mock_super_init, {"hp_status": 0, "compressor_state": 2}
+        )
+        result = await coordinator.async_update_data()
+        assert result["values"]["hp_status"] == 3
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_hp_status_derived_defrost(self, mock_super_init):
+        """compressor_state=9 (Defrost DHW passive) maps to hp_status=1."""
+        coordinator = self._make_coordinator(
+            mock_super_init, {"hp_status": 0, "compressor_state": 9}
+        )
+        result = await coordinator.async_update_data()
+        assert result["values"]["hp_status"] == 1
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_hp_status_not_overridden_when_nonzero(self, mock_super_init):
+        """hp_status is not changed when it is already nonzero."""
+        coordinator = self._make_coordinator(
+            mock_super_init, {"hp_status": 3, "compressor_state": 4}
+        )
+        result = await coordinator.async_update_data()
+        assert result["values"]["hp_status"] == 3
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_hp_status_derived_cooling(self, mock_super_init):
+        """compressor_state=3 (Cooling) maps to hp_status=4."""
+        coordinator = self._make_coordinator(
+            mock_super_init, {"hp_status": 0, "compressor_state": 3}
+        )
+        result = await coordinator.async_update_data()
+        assert result["values"]["hp_status"] == 4
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_hp_status_derived_cooling_alias(self, mock_super_init):
+        """compressor_state=7 (Cooling alias) maps to hp_status=4."""
+        coordinator = self._make_coordinator(
+            mock_super_init, {"hp_status": 0, "compressor_state": 7}
+        )
+        result = await coordinator.async_update_data()
+        assert result["values"]["hp_status"] == 4
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_hp_status_stays_zero_without_compressor_state(self, mock_super_init):
+        """hp_status stays 0 when compressor_state is absent."""
+        coordinator = self._make_coordinator(mock_super_init, {"hp_status": 0})
+        result = await coordinator.async_update_data()
+        assert result["values"]["hp_status"] == 0

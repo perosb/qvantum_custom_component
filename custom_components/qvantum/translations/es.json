@@ -122,16 +122,16 @@
         "state": {
           "0": "Apagado",
           "1": "Inactivo",
-          "2": "Calefacción",
-          "3": "Refrigeración",
-          "4": "Agua caliente",
-          "5": "Agua caliente",
+          "2": "Preparando calefacción",
+          "3": "Preparando refrigeración",
+          "4": "Preparando agua caliente 1",
+          "5": "Preparando agua caliente 2",
           "6": "Calefacción",
           "7": "Refrigeración",
           "8": "Agua caliente",
           "9": "Desescarche agua caliente pasivo",
           "10": "Desescarche calefacción pasivo",
-          "11": "Piscina",
+          "11": "Preparando piscina",
           "12": "Piscina",
           "13": "Desescarche piscina pasivo"
         }
@@ -341,7 +341,8 @@
           "0": "Inactivo",
           "1": "Descongelando",
           "2": "Agua caliente",
-          "3": "Calefacción"
+          "3": "Calefacción",
+          "4": "Refrigeración"
         }
       },
       "smart_dhw_status": {
