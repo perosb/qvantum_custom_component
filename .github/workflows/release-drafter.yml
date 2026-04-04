@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - drafter
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
 
 permissions:
   contents: read
@@ -22,6 +24,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Get next version
+        if: github.event_name == 'push'
         uses: reecetech/version-increment@2024.10.1
         id: version
         with:
@@ -29,10 +32,20 @@ jobs:
           increment: patch
 
       - name: Run Release Drafter
+        if: github.event_name == 'push'
         uses: release-drafter/release-drafter@v7.1.1
         with:
           tag: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
           include-pre-releases: true
+          disable-autolabeler: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply autolabels
+        if: github.event_name == 'pull_request'
+        uses: release-drafter/release-drafter@v7.1.1
+        with:
+          disable-releaser: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
