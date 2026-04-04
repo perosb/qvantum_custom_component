@@ -467,6 +467,9 @@
       },
       "fan_speed_2": {
         "name": "Min Lüftergeschwindigkeit für Kompressor"
+      },
+      "dhw_stop_extra": {
+        "name": "Extra Brauchwasser Stopptemperatur"
       }
     },
     "climate": {

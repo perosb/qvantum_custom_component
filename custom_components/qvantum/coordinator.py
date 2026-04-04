@@ -146,8 +146,20 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                 for metric in DEFAULT_ENABLED_METRICS:
                     if metric not in known_metrics:
                         final_metrics.add(metric)
+                        _LOGGER.debug(
+                            "Adding new default metric '%s' for device %s since it's not in the registry",
+                            metric,
+                            device_id,
+                        )
+
+            _LOGGER.debug(
+                "Final enabled metrics for device %s: %s",
+                device_id,
+                sorted(final_metrics),
+            )
 
             return sorted(final_metrics)
+
         _LOGGER.debug(
             "No device registry entry found for device %s, returning all DEFAULT_ENABLED_METRICS",
             device_id,

@@ -443,6 +443,7 @@ MODBUS_SPEC_TO_INTERNAL_MAP = {
     "cooling kwh": "cooling_kwh",
     "dhw mwh": "dhw_mwh",
     "dhw kwh": "dhw_kwh",
+    "dhw_stop_extra": "dhw_stop_extra",
     "smart dhw mode (0=off, 1=eco, 2=balanced, 3=comfort)": "smart_dhw_mode",
     "smart dhw control status (0=unavailable, 1=standby, 2=raising, 3=lowering, 4=lowering long term, 5=paused)": "smart_dhw_control_status",
     "enable smart price for the user (dhw) (0=off, 1=on)": "enable_sc_dhw",
@@ -461,10 +462,12 @@ MODBUS_INPUT_TO_HTTP_MAP = {
     "smart_price_heating_enabled": "enable_sc_sh",
 }
 
-# Modbus holding register internal→HTTP key map (settings conversion path)
-MODBUS_HOLDING_TO_HTTP_MAP = {
+# One-way map from Modbus holding register keys to the canonical settings names
+# used by the API/settings layer. This does not imply reverse lookup support.
+MODBUS_HOLDING_TO_SETTINGS_MAP = {
     "dhw_start_normal": "tap_water_start",
     "dhw_stop_normal": "tap_water_stop",
+    # "dhw_stop_extra": "dhw_stop_extra", # No update_setting found for this metric, so it's handled separately in number.py
     "dhw_mode": "extra_tap_water",
     "room_compensation": "room_comp_factor",
     "desired_indoor_temp": "indoor_temperature_target",

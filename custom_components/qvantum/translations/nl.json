@@ -467,6 +467,9 @@
       },
       "fan_speed_2": {
         "name": "Min ventilatorsnelheid voor compressor"
+      },
+      "dhw_stop_extra": {
+        "name": "Extra warmwater stoptemperatuur"
       }
     },
     "climate": {
