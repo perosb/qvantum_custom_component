@@ -257,7 +257,7 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             # Settings take precedence over metrics in case of conflicts
             values = {**metrics_dict, **settings_dict}
 
-            # In Modbus mode, tap_stop is HTTP-only. Poll it at the configured HTTP
+            # In Modbus mode, tap_stop is HTTP-only. Poll it at the DEFAULT HTTP
             # scan interval whenever extra_tap_water is active.
             if self.modbus_enabled and values.get("extra_tap_water") == "on":
                 now = dt_util.utcnow()
@@ -268,6 +268,11 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                 )
                 if elapsed > DEFAULT_SCAN_INTERVAL:
                     try:
+                        _LOGGER.debug(
+                            "Fetching tap_stop via HTTP for device %s due to active extra_tap_water and elapsed time %.1f seconds",
+                            device_id,
+                            elapsed,
+                        )
                         http_data = await self.api.get_http_metrics(
                             device_id, ["tap_stop"]
                         )
