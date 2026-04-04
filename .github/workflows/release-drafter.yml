@@ -41,8 +41,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Apply autolabels
-        if: github.event_name == 'pull_request'
-        uses: release-drafter/release-drafter/autolabeler@latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Apply autolabels
+      #   if: github.event_name == 'pull_request'
+      #   uses: release-drafter/release-drafter/autolabeler@latest
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
