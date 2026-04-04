@@ -467,6 +467,9 @@
       },
       "fan_speed_2": {
         "name": "Minimum fan speed for compressor"
+      },
+      "dhw_stop_extra": {
+        "name": "Extra hot water stop temperature"
       }
     },
     "climate": {

@@ -467,6 +467,9 @@
       },
       "fan_speed_2": {
         "name": "Velocidad mínima del ventilador para el compresor"
+      },
+      "dhw_stop_extra": {
+        "name": "Temperatura de parada ACS extra"
       }
     },
     "climate": {

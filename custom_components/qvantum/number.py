@@ -33,8 +33,9 @@ async def async_setup_entry(
         "tap_water_capacity_target": (1, 7, 1),
         "room_comp_factor": (0, 10, 0.5),
         "indoor_temperature_offset": (-10, 10, 1),
-        "tap_water_stop": (60, 90, 1),
+        "tap_water_stop": (60, 80, 1),
         "tap_water_start": (50, 65, 1),
+        "dhw_stop_extra": (60, 80, 5),
         "fan_normal": (0, 100, 5),
         "fan_speed_2": (0, 100, 5),
     }
@@ -82,10 +83,6 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 response = await self.coordinator.api.set_tap_water_capacity_target(
                     self._hpid, int(value)
                 )
-            case "room_comp_factor":
-                response = await self.coordinator.api.update_setting(
-                    self._hpid, "room_comp_factor", int(value)
-                )
             case "indoor_temperature_offset":
                 response = await self.coordinator.api.set_indoor_temperature_offset(
                     self._hpid, int(value)
@@ -98,13 +95,9 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 response = await self.coordinator.api.set_tap_water_start(
                     self._hpid, int(value)
                 )
-            case "fan_normal":
+            case "room_comp_factor" | "fan_normal" | "fan_speed_2" | "dhw_stop_extra":
                 response = await self.coordinator.api.update_setting(
-                    self._hpid, "fan_normal", int(value)
-                )
-            case "fan_speed_2":
-                response = await self.coordinator.api.update_setting(
-                    self._hpid, "fan_speed_2", int(value)
+                    self._hpid, self._metric_key, int(value)
                 )
 
         await handle_setting_update_response(

@@ -414,14 +414,14 @@ class QvantumAPI:
         )
 
         # Convert to the same format as HTTP API and include original modbus keys for compatibility.
-        from .const import MODBUS_HOLDING_TO_HTTP_MAP
+        from .const import MODBUS_HOLDING_TO_SETTINGS_MAP
 
         settings_dict: dict[str, Any] = {}
         for k, v in settings.items():
             if k == "hpid":
                 continue
             settings_dict[k] = v
-            http_key = MODBUS_HOLDING_TO_HTTP_MAP.get(k)
+            http_key = MODBUS_HOLDING_TO_SETTINGS_MAP.get(k)
             if http_key and http_key != k:
                 settings_dict[http_key] = v
 
@@ -1000,13 +1000,13 @@ class QvantumAPI:
         if self._modbus_tcp:
             # Read settings from Modbus holding registers
             try:
-                from .const import MODBUS_HOLDING_TO_HTTP_MAP
+                from .const import MODBUS_HOLDING_TO_SETTINGS_MAP
 
-                # Internal modbus setting names that we can read directly
+                # Read all settings that have a corresponding holding register
                 settings_to_read = [
-                    s
-                    for s in MODBUS_HOLDING_TO_HTTP_MAP.keys()
-                    if s in MODBUS_HOLDING_REGISTER_MAP
+                    setting_key
+                    for setting_key in MODBUS_HOLDING_TO_SETTINGS_MAP.keys()
+                    if setting_key in MODBUS_HOLDING_REGISTER_MAP
                 ]
                 result = await self._read_modbus_settings(device_id, settings_to_read)
                 return result
