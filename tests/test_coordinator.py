@@ -10,7 +10,7 @@ from custom_components.qvantum.coordinator import (
 )
 from custom_components.qvantum.const import (
     CONF_MODBUS_TCP,
-    DEFAULT_ENABLED_METRICS,
+    DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     REQUIRED_METRICS,
@@ -235,8 +235,8 @@ class TestQvantumDataUpdateCoordinator:
 
         result = coordinator._get_enabled_metrics("test_device")
 
-        # Should return DEFAULT_ENABLED_METRICS plus REQUIRED_METRICS
-        expected_metrics = set(DEFAULT_ENABLED_METRICS) | set(REQUIRED_METRICS)
+        # Should return DEFAULT_ENABLED_HTTP_METRICS plus REQUIRED_METRICS
+        expected_metrics = set(DEFAULT_ENABLED_HTTP_METRICS) | set(REQUIRED_METRICS)
         assert set(result) == expected_metrics
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
@@ -279,8 +279,8 @@ class TestQvantumDataUpdateCoordinator:
 
         result = coordinator._get_enabled_metrics("test_device")
 
-        # Should return DEFAULT_ENABLED_METRICS plus REQUIRED_METRICS since no matching entities found
-        expected_metrics = set(DEFAULT_ENABLED_METRICS) | set(REQUIRED_METRICS)
+        # Should return DEFAULT_ENABLED_HTTP_METRICS plus REQUIRED_METRICS since no matching entities found
+        expected_metrics = set(DEFAULT_ENABLED_HTTP_METRICS) | set(REQUIRED_METRICS)
         assert set(result) == expected_metrics
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")

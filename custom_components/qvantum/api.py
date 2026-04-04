@@ -20,7 +20,8 @@ from .const import (
     FAN_SPEED_STATE_EXTRA,
     FAN_SPEED_STATE_NORMAL,
     FAN_SPEED_STATE_OFF,
-    DEFAULT_ENABLED_METRICS,
+    DEFAULT_ENABLED_HTTP_METRICS,
+    DEFAULT_ENABLED_MODBUS_METRICS,
     TAP_WATER_CAPACITY_MAPPINGS,
     MODBUS_INPUT_REGISTER_MAP,
     MODBUS_HOLDING_REGISTER_MAP,
@@ -913,7 +914,13 @@ class QvantumAPI:
         """Fetch data from the API or Modbus with authentication."""
 
         names = (
-            enabled_metrics if enabled_metrics is not None else DEFAULT_ENABLED_METRICS
+            enabled_metrics
+            if enabled_metrics is not None
+            else (
+                DEFAULT_ENABLED_MODBUS_METRICS
+                if self._modbus_tcp
+                else DEFAULT_ENABLED_HTTP_METRICS
+            )
         )
 
         if self._modbus_tcp:

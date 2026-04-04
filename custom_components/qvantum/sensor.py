@@ -23,7 +23,8 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
-    DEFAULT_ENABLED_METRICS,
+    DEFAULT_ENABLED_HTTP_METRICS,
+    DEFAULT_ENABLED_MODBUS_METRICS,
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
     EXCLUDED_METRIC_PATTERNS,
@@ -62,10 +63,12 @@ async def async_setup_entry(
     # Define possible metrics for the current mode
     if coordinator.modbus_enabled:
         possible_metrics = set(
-            DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_MODBUS_METRICS
+            DEFAULT_ENABLED_MODBUS_METRICS + DEFAULT_DISABLED_MODBUS_METRICS
         )
     else:
-        possible_metrics = set(DEFAULT_ENABLED_METRICS + DEFAULT_DISABLED_HTTP_METRICS)
+        possible_metrics = set(
+            DEFAULT_ENABLED_HTTP_METRICS + DEFAULT_DISABLED_HTTP_METRICS
+        )
 
     # Special metrics that have dedicated sensor classes
     special_metrics = {"latency", "hpid"}

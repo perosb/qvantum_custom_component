@@ -306,6 +306,9 @@
       "cal_heat_temp": {
         "name": "Medio calefactor, línea de flujo, objetivo."
       },
+      "start_cooling_temp": {
+        "name": "Temperatura de inicio de refrigeración"
+      },
       "bt30": {
         "name": "Depósito de agua caliente (BT30)"
       },

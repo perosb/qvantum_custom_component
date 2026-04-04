@@ -306,6 +306,9 @@
       "cal_heat_temp": {
         "name": "Heizmedium, Durchflussleitung, Sollwert."
       },
+      "start_cooling_temp": {
+        "name": "Kühlstarttemperatur"
+      },
       "bt30": {
         "name": "Trinkwassererwärmer, Steuersensor (BT30)"
       },

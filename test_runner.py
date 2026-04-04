@@ -27,6 +27,11 @@ def test_api():
         const_mock.FAN_SPEED_VALUE_NORMAL = 1
         const_mock.FAN_SPEED_VALUE_EXTRA = 2
         const_mock.DEFAULT_ENABLED_METRICS = ["bt1", "bt2"]
+        const_mock.DEFAULT_ENABLED_HTTP_METRICS = ["bt1", "bt2"]
+        const_mock.DEFAULT_ENABLED_MODBUS_METRICS = ["bt1", "bt2"]
+        const_mock.DEFAULT_ENABLED_MODBUS_ONLY_METRICS = []
+        const_mock.DEFAULT_ENABLED_MODBUS_HOLDING_METRICS = []
+        const_mock.DEFAULT_ENABLED_HTTP_ONLY_METRICS = []
         const_mock.DEFAULT_DISABLED_METRICS = ["bt3", "bt4"]
         original_const = sys.modules.get("custom_components.qvantum.const")
         sys.modules['custom_components.qvantum.const'] = const_mock

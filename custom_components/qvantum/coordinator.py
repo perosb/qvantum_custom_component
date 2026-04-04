@@ -21,7 +21,8 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     SETTING_UPDATE_APPLIED,
-    DEFAULT_ENABLED_METRICS,
+    DEFAULT_ENABLED_HTTP_METRICS,
+    DEFAULT_ENABLED_MODBUS_METRICS,
     REQUIRED_METRICS,
     REQUIRED_MODBUS_METRICS,
     CONF_MODBUS_TCP,
@@ -91,6 +92,12 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         from homeassistant.helpers import device_registry as dr
         from homeassistant.helpers import entity_registry as er
 
+        default_metrics = (
+            DEFAULT_ENABLED_MODBUS_METRICS
+            if self.modbus_enabled
+            else DEFAULT_ENABLED_HTTP_METRICS
+        )
+
         device_registry = dr.async_get(self.hass)
         device_reg_id = None
         for device in device_registry.devices.values():
@@ -114,7 +121,7 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                     # Known metrics include the default metrics always.
                     # HTTP-only disabled metrics are only known in HTTP mode.
                     # Modbus disabled metrics are known in Modbus mode.
-                    allowed_metrics = set(DEFAULT_ENABLED_METRICS)
+                    allowed_metrics = set(default_metrics)
                     if self.modbus_enabled:
                         allowed_metrics |= set(DEFAULT_DISABLED_MODBUS_METRICS)
                     else:
@@ -139,11 +146,11 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
 
             if not known_metrics:
                 # First setup: no registry entries yet - include all default metrics
-                final_metrics.update(DEFAULT_ENABLED_METRICS)
+                final_metrics.update(default_metrics)
             else:
                 # Include all currently enabled metrics plus any new defaults not in registry
                 final_metrics.update(enabled_metrics)
-                for metric in DEFAULT_ENABLED_METRICS:
+                for metric in default_metrics:
                     if metric not in known_metrics:
                         final_metrics.add(metric)
                         _LOGGER.debug(
@@ -161,12 +168,12 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             return sorted(final_metrics)
 
         _LOGGER.debug(
-            "No device registry entry found for device %s, returning all DEFAULT_ENABLED_METRICS",
+            "No device registry entry found for device %s, returning all default enabled metrics",
             device_id,
         )
         # Always include required metrics; Modbus-only intermediate metrics are
         # only needed when Modbus is enabled (they don't exist in the HTTP API).
-        final_metrics = set(DEFAULT_ENABLED_METRICS)
+        final_metrics = set(default_metrics)
         final_metrics.update(REQUIRED_METRICS)
         if self.modbus_enabled:
             final_metrics.update(REQUIRED_MODBUS_METRICS)

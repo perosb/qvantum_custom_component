@@ -317,6 +317,9 @@
       "cal_heat_temp": {
         "name": "Framledningstemperatur (mål)"
       },
+      "start_cooling_temp": {
+        "name": "Kylningens starttemperatur"
+      },
       "bt30": {
         "name": "Varmvattentemperatur (BT30)"
       },
