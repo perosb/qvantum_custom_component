@@ -64,14 +64,14 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         self,
         coordinator: QvantumDataUpdateCoordinator,
         metric_key: str,
-        min: int,
-        max: int,
+        min_value: int,
+        max_value: int,
         step: float,
         device: DeviceInfo,
     ) -> None:
         super().__init__(coordinator, metric_key, device)
-        self._attr_native_min_value = min
-        self._attr_native_max_value = max
+        self._attr_native_min_value = min_value
+        self._attr_native_max_value = max_value
         self._attr_native_step = step
 
     async def async_set_native_value(self, value: float) -> None:
@@ -113,20 +113,15 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         """Get metric from API data."""
         if self._metric_key == "tap_water_capacity_target":
             # Map (stop, start) pairs to capacity values using TAP_WATER_CAPACITY_MAPPINGS
-            stop = self.coordinator.data.get("values", {}).get("tap_water_stop")
-            start = self.coordinator.data.get("values", {}).get("tap_water_start")
+            stop = self._values.get("tap_water_stop")
+            start = self._values.get("tap_water_start")
             if (stop, start) in TAP_WATER_CAPACITY_MAPPINGS:
                 return TAP_WATER_CAPACITY_MAPPINGS[(stop, start)]
 
-        value = self.coordinator.data.get("values", {}).get(self._metric_key)
-        return value
+        return self._values.get(self._metric_key)
 
     @property
     def available(self):
         """Check if data is available."""
 
-        avail = (
-            self.coordinator.data.get("values", {}).get(self._metric_key) is not None
-        )
-
-        return avail and self._has_write_access
+        return self._values.get(self._metric_key) is not None and self._has_write_access

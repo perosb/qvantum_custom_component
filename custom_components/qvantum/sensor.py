@@ -182,15 +182,12 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
     @property
     def state(self):
         """Get metric from API data."""
-        value = self.coordinator.data.get("values", {}).get(self._metric_key)
-        return value
+        return self._values.get(self._metric_key)
 
     @property
     def available(self):
         """Check if data is available."""
-        values = self.coordinator.data.get("values", {})
-        available = values.get(self._metric_key) is not None
-        return available
+        return self._values.get(self._metric_key) is not None
 
 class QvantumTemperatureEntity(QvantumBaseSensorEntity):
     """Sensor for temperature measurements."""
@@ -222,14 +219,6 @@ class QvantumEnergyEntity(QvantumBaseSensorEntity):
         self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
         self._attr_device_class = SensorDeviceClass.ENERGY
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
-
-    @property
-    def available(self):
-        """Check if data is available."""
-        return (
-            super().available
-            and self.coordinator.data.get("values", {}).get(self._metric_key) > 0
-        )
 
 
 class QvantumPowerEntity(QvantumBaseSensorEntity):
@@ -279,14 +268,6 @@ class QvantumPressureEntity(QvantumBaseSensorEntity):
         self._attr_device_class = SensorDeviceClass.PRESSURE
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
-    @property
-    def available(self):
-        """Check if data is available."""
-        return (
-            super().available
-            and self.coordinator.data.get("values", {}).get(self._metric_key) > 0
-        )
-
 
 class QvantumTotalEnergyEntity(QvantumEnergyEntity):
     """Sensor for energy measurements."""
@@ -303,18 +284,18 @@ class QvantumTotalEnergyEntity(QvantumEnergyEntity):
     @property
     def state(self):
         """Get metric from API data."""
-        total = self.coordinator.data.get("values", {}).get(
-            "compressorenergy"
-        ) + self.coordinator.data.get("values", {}).get("additionalenergy")
-        return total
+        compressor = self._values.get("compressorenergy")
+        additional = self._values.get("additionalenergy")
+        if compressor is None or additional is None:
+            return None
+        return compressor + additional
 
     @property
     def available(self):
         """Check if data is available."""
         return (
-            "compressorenergy" in self.coordinator.data.get("values", {})
-            and self.coordinator.data.get("values", {}).get("compressorenergy")
-            is not None
+            self._values.get("compressorenergy") is not None
+            and self._values.get("additionalenergy") is not None
         )
 
 
@@ -352,18 +333,14 @@ class QvantumTimerEntity(QvantumBaseSensorEntity):
     @property
     def state(self):
         """Get metric from API data."""
-        epoch = self.coordinator.data.get("values", {}).get(self._metric_key)
+        epoch = self._values.get(self._metric_key)
         return dt_utils.utc_from_timestamp(epoch)
 
     @property
     def available(self):
         """Check if data is available."""
-        return (
-            self._metric_key in self.coordinator.data.get("values", {})
-            and self.coordinator.data.get("values", {}).get(self._metric_key)
-            is not None
-            and self.coordinator.data.get("values", {}).get(self._metric_key) > 0
-        )
+        val = self._values.get(self._metric_key)
+        return val is not None and val > 0
 
 
 class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
@@ -403,31 +380,6 @@ class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
             and self.coordinator.data.get("access_level", {}).get(self._metric_key)
             is not None
         )
-
-
-class QvantumLatencyEntity(QvantumBaseSensorEntity):
-    """Sensor for connectivity."""
-
-    def __init__(
-        self,
-        coordinator: QvantumDataUpdateCoordinator,
-        metric_key: str,
-        device: DeviceInfo | dict,
-        enabled_default: bool = True,
-    ) -> None:
-        super().__init__(coordinator, metric_key, device, enabled_default)
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    @property
-    def state(self):
-        """Get metric from API data."""
-        return self.coordinator.data.get(self._metric_key)
-
-    @property
-    def available(self):
-        """Check if data is available."""
-        latency = self.coordinator.data.get(self._metric_key)
-        return latency is not None
 
 
 def _should_exclude_metric(metric: str) -> bool:
@@ -499,7 +451,6 @@ class QvantumFirmwareSensorEntity(QvantumEntity, SensorEntity):
         # Check if firmware coordinator has data
         firmware_available = (
             super().available
-            and self.coordinator.data is not None
             and "firmware_versions" in self.coordinator.data
             and self.firmware_key in self.coordinator.data.get("firmware_versions", {})
         )

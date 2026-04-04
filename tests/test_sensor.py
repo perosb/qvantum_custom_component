@@ -41,7 +41,6 @@ with patch(
             QvantumCurrentEntity,
             QvantumDiagnosticEntity,
             QvantumTotalEnergyEntity,
-            QvantumLatencyEntity,
             _get_sensor_type,
             async_setup_entry,
         )
@@ -54,7 +53,6 @@ def mock_coordinator():
     coordinator = MagicMock()
     coordinator.data = {
         "device": {"id": "test_device_123"},
-        "latency": 45,  # Latency at top level for QvantumLatencyEntity
         "values": {
             "hpid": "test_device_123",
             "bt1": 20.5,  # Temperature
@@ -179,12 +177,13 @@ class TestQvantumEnergyEntity:
         assert entity.available is True
 
     def test_available_with_zero_value(self, mock_coordinator, mock_device):
-        """Test availability when energy value is zero."""
+        """Test availability when energy value is zero (zero is a valid value)."""
         mock_coordinator.data["values"]["compressorenergy"] = 0
         entity = QvantumEnergyEntity(
             mock_coordinator, "compressorenergy", mock_device, True
         )
-        assert entity.available is False
+        assert entity.state == 0
+        assert entity.available is True
 
 
 class TestQvantumPowerEntity:
@@ -225,14 +224,20 @@ class TestQvantumPressureEntity:
         assert entity.available is True
 
     def test_available_with_zero_value(self, mock_coordinator, mock_device):
-        """Test availability when pressure value is zero."""
+        """Test availability when pressure value is zero (zero is a valid value)."""
         mock_coordinator.data["values"]["bp1_pressure"] = 0
         entity = QvantumPressureEntity(
             mock_coordinator, "bp1_pressure", mock_device, True
         )
+        assert entity.available is True
+
+    def test_unavailable_with_none_value(self, mock_coordinator, mock_device):
+        """Test availability when pressure value is missing."""
+        mock_coordinator.data["values"]["bp1_pressure"] = None
+        entity = QvantumPressureEntity(
+            mock_coordinator, "bp1_pressure", mock_device, True
+        )
         assert entity.available is False
-
-
 class TestQvantumCurrentEntity:
     """Test the QvantumCurrentEntity class."""
 
@@ -293,24 +298,6 @@ class TestQvantumDiagnosticEntity:
             not hasattr(entity, "_attr_device_class")
             or entity._attr_device_class is None
         )
-
-
-class TestQvantumLatencyEntity:
-    """Test the QvantumLatencyEntity class."""
-
-    def test_init(self, mock_coordinator, mock_device):
-        """Test latency entity initialization."""
-        entity = QvantumLatencyEntity(mock_coordinator, "latency", mock_device, True)
-
-        assert entity._attr_entity_category.name == "DIAGNOSTIC"
-        assert entity.state == 45
-        assert entity.available is True
-
-    def test_available_false(self, mock_coordinator, mock_device):
-        """Test latency entity availability when data is missing."""
-        mock_coordinator.data["latency"] = None
-        entity = QvantumLatencyEntity(mock_coordinator, "latency", mock_device, True)
-        assert entity.available is False
 
 
 class TestGetSensorType:
