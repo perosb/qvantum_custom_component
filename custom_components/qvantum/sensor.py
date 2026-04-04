@@ -334,6 +334,8 @@ class QvantumTimerEntity(QvantumBaseSensorEntity):
     def state(self):
         """Get metric from API data."""
         epoch = self._values.get(self._metric_key)
+        if epoch is None or epoch <= 0:
+            return None
         return dt_utils.utc_from_timestamp(epoch)
 
     @property
