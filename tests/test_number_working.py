@@ -360,14 +360,14 @@ class TestQvantumNumberEntity:
         )
 
         # Mock the API response
-        mock_coordinator.api.set_tap_water_stop = AsyncMock(
+        mock_coordinator.api.set_tap_water = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(80.0)
 
-        mock_coordinator.api.set_tap_water_stop.assert_called_once_with(
-            "test_device_123", 80
+        mock_coordinator.api.set_tap_water.assert_called_once_with(
+            "test_device_123", stop=80
         )
         # Note: async_set_updated_data would be called if the API response status was correct
 
@@ -381,14 +381,14 @@ class TestQvantumNumberEntity:
         )
 
         # Mock the API response
-        mock_coordinator.api.set_tap_water_start = AsyncMock(
+        mock_coordinator.api.set_tap_water = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(58.0)
 
-        mock_coordinator.api.set_tap_water_start.assert_called_once_with(
-            "test_device_123", 58
+        mock_coordinator.api.set_tap_water.assert_called_once_with(
+            "test_device_123", start=58
         )
         # Note: async_set_updated_data would be called if the API response status was correct
 
