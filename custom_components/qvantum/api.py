@@ -823,15 +823,24 @@ class QvantumAPI:
     async def set_tap_water_capacity_target(self, device_id: str, capacity: int):
         """Update tap_water_capacity_target setting."""
 
-        # Create reverse mapping: capacity -> (stop, start)
-        capacity_to_stop_start = {v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()}
+        # Capacities 1, 6, and 7 are "custom" levels that the API does not accept
+        # directly — they must be set by writing the corresponding stop/start temperatures.
+        _CUSTOM_CAPACITIES = {1, 6, 7}
 
-        if capacity in capacity_to_stop_start:
-            stop, start = capacity_to_stop_start[capacity]
+        if capacity in _CUSTOM_CAPACITIES:
+            capacity_to_stop_start = {
+                v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()
+            }
+            start, stop = capacity_to_stop_start[capacity]
             _LOGGER.debug(
-                f"Setting tap water capacity {capacity} maps to stop {stop} and start {start}."
+                "Setting tap water capacity %s maps to stop %s and start %s.",
+                capacity,
+                stop,
+                start,
             )
-            return await self.set_tap_water(device_id, stop, start)
+            return await self.set_tap_water(
+                device_id, start=start, stop=stop
+            )
 
         payload = {
             "settings": [{"name": "tap_water_capacity_target", "value": capacity}]
@@ -840,8 +849,8 @@ class QvantumAPI:
         _LOGGER.debug("Setting tap water capacity target to %s.", capacity)
         return await self._update_settings(device_id, payload)
 
-    async def set_tap_water(self, device_id: str, stop: int = 0, start: int = 0):
-        """Update tap_water_start setting."""
+    async def set_tap_water(self, device_id: str, start: int = 0, stop: int = 0):
+        """Update tap_water_start and tap_water_stop settings."""
 
         if stop == 0 and start == 0:
             _LOGGER.debug("No tap water settings to update, both stop and start are 0.")
@@ -855,16 +864,6 @@ class QvantumAPI:
             payload["settings"].append({"name": "tap_water_start", "value": start})
 
         return await self._update_settings(device_id, payload)
-
-    async def set_tap_water_start(self, device_id: str, start: int):
-        """Update tap_water_start setting."""
-
-        return await self.set_tap_water(device_id, start=start)  # pragma: no cover
-
-    async def set_tap_water_stop(self, device_id: str, stop: int):
-        """Update tap_water_stop setting."""
-
-        return await self.set_tap_water(device_id, stop=stop)  # pragma: no cover
 
     async def set_indoor_temperature_target(self, device_id: str, temperature: float):
         """Update indoor_temperature_target setting."""

@@ -26,6 +26,7 @@ from .const import (
     REQUIRED_METRICS,
     REQUIRED_MODBUS_METRICS,
     CONF_MODBUS_TCP,
+    TAP_WATER_CAPACITY_MAPPINGS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -229,6 +230,63 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         _LOGGER.debug("Processed %d settings", len(settings_dict))
         return settings_dict
 
+    async def _fetch_tap_stop_modbus(self, device_id: str, values: dict) -> None:
+        """Poll tap_stop via HTTP in Modbus mode when extra_tap_water is active.
+
+        tap_stop is HTTP-only; it is fetched at the DEFAULT HTTP scan interval
+        and cached between fetches.
+        """
+        now = dt_util.utcnow()
+        elapsed = (
+            (now - self._last_tap_stop_fetch).total_seconds()
+            if self._last_tap_stop_fetch is not None
+            else float("inf")
+        )
+        if elapsed > DEFAULT_SCAN_INTERVAL:
+            try:
+                _LOGGER.debug(
+                    "Fetching tap_stop via HTTP for device %s due to active extra_tap_water and elapsed time %.1f seconds",
+                    device_id,
+                    elapsed,
+                )
+                http_data = await self.api.get_http_metrics(device_id, ["tap_stop"])
+                tap_stop = http_data.get("metrics", {}).get("tap_stop")
+                if tap_stop is not None:
+                    self._cached_tap_stop = tap_stop
+                    values["tap_stop"] = tap_stop
+            except Exception as exc:
+                _LOGGER.warning(
+                    "Failed to fetch tap_stop via HTTP in Modbus mode for device %s: %s",
+                    device_id,
+                    exc,
+                )
+            finally:
+                self._last_tap_stop_fetch = now
+        elif self._cached_tap_stop is not None:
+            values["tap_stop"] = self._cached_tap_stop
+
+    def _derive_tap_water_capacity(self, values: dict) -> None:
+        """Derive tap_water_capacity_target from tap_water_start/stop when absent.
+
+        Uses TAP_WATER_CAPACITY_MAPPINGS to convert the (start, stop) temperature
+        pair into a capacity level (1–7) and stores it back into values.
+        """
+        if values.get("tap_water_capacity_target") is not None:
+            return
+        tap_start = values.get("tap_water_start")
+        tap_stop = values.get("tap_water_stop")
+        if tap_start is None or tap_stop is None:
+            return
+        capacity = TAP_WATER_CAPACITY_MAPPINGS.get((tap_start, tap_stop))
+        if capacity is not None:
+            values["tap_water_capacity_target"] = capacity
+        else:
+            _LOGGER.warning(
+                "No tap water capacity mapping found for start=%s and stop=%s",
+                tap_start,
+                tap_stop,
+            )
+
     async def async_update_data(self):
         """Fetch data from API endpoint."""
         try:
@@ -305,36 +363,9 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             # In Modbus mode, tap_stop is HTTP-only. Poll it at the DEFAULT HTTP
             # scan interval whenever extra_tap_water is active.
             if self.modbus_enabled and values.get("extra_tap_water") == "on":
-                now = dt_util.utcnow()
-                elapsed = (
-                    (now - self._last_tap_stop_fetch).total_seconds()
-                    if self._last_tap_stop_fetch is not None
-                    else float("inf")
-                )
-                if elapsed > DEFAULT_SCAN_INTERVAL:
-                    try:
-                        _LOGGER.debug(
-                            "Fetching tap_stop via HTTP for device %s due to active extra_tap_water and elapsed time %.1f seconds",
-                            device_id,
-                            elapsed,
-                        )
-                        http_data = await self.api.get_http_metrics(
-                            device_id, ["tap_stop"]
-                        )
-                        tap_stop = http_data.get("metrics", {}).get("tap_stop")
-                        if tap_stop is not None:
-                            self._cached_tap_stop = tap_stop
-                            values["tap_stop"] = tap_stop
-                    except Exception as exc:
-                        _LOGGER.warning(
-                            "Failed to fetch tap_stop via HTTP in Modbus mode for device %s: %s",
-                            device_id,
-                            exc,
-                        )
-                    finally:
-                        self._last_tap_stop_fetch = now
-                elif self._cached_tap_stop is not None:
-                    values["tap_stop"] = self._cached_tap_stop
+                await self._fetch_tap_stop_modbus(device_id, values)
+
+            self._derive_tap_water_capacity(values)
 
             _LOGGER.debug("Final values: %s", values)
 
