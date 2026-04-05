@@ -838,7 +838,9 @@ class QvantumAPI:
                 stop,
                 start,
             )
-            return await self.set_tap_water(device_id, start, stop)
+            return await self.set_tap_water(
+                device_id, start=start, stop=stop
+            )
 
         payload = {
             "settings": [{"name": "tap_water_capacity_target", "value": capacity}]
