@@ -27,9 +27,13 @@ template: |
 include-labels:
   - "bug"
   - "enhancement"
+  - "chore"
 categories:
   - title: "New features"
     label: "enhancement"
 
   - title: "Bug fixes"
     label: "bug"
+
+  - title: "Chores"
+    label: "chore"
