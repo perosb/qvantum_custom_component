@@ -771,7 +771,7 @@ class TestDeriveTapWaterCapacity:
         return coordinator
 
     def test_known_mapping_sets_capacity(self):
-        """(stop=70, start=55) maps to capacity 4."""
+        """(start=55, stop=70) maps to capacity 4."""
         coordinator = self._make_coordinator()
         values = {
             "tap_water_capacity_target": None,
