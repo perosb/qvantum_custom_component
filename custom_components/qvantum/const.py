@@ -208,12 +208,15 @@ PRESSURE_METRICS = ["pressure"]
 # Firmware component keys
 FIRMWARE_KEYS = ["display_fw_version", "cc_fw_version", "inv_fw_version"]
 
-# Tap water capacity mappings (stop, start) -> capacity
+# Tap water capacity mappings (start, stop) -> capacity
 TAP_WATER_CAPACITY_MAPPINGS = {
-    (58, 52): 1,  # Capacity 1
-    (62, 52): 2,  # Capacity 2
-    (74, 55): 6,  # Capacity 6
-    (76, 55): 7,  # Capacity 7
+    (52, 58): 1,  # Capacity 1
+    (52, 62): 2,  # Capacity 2
+    (55, 69): 3,  # Capacity 3
+    (55, 70): 4,  # Capacity 4
+    (55, 71): 5,  # Capacity 5
+    (55, 74): 6,  # Capacity 6
+    (55, 76): 7,  # Capacity 7
 }
 
 # Relay power constants (watts) used to compute total power from relay stages.

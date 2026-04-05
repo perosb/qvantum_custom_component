@@ -749,3 +749,104 @@ class TestHpStatusPostProcessing:
         coordinator = self._make_coordinator(mock_super_init, {"hp_status": 0})
         result = await coordinator.async_update_data()
         assert result["values"]["hp_status"] == 0
+
+
+class TestDeriveTapWaterCapacity:
+    """Tests for _derive_tap_water_capacity."""
+
+    def _make_coordinator(self):
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            mock_hass = MagicMock()
+            mock_hass.data = {DOMAIN: MagicMock()}
+            mock_config_entry = MagicMock()
+            mock_config_entry.options.get.side_effect = lambda key, default=None: (
+                default
+            )
+            mock_config_entry.data = {}
+            mock_config_entry.unique_id = "test_device_123"
+            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+        return coordinator
+
+    def test_known_mapping_sets_capacity(self):
+        """(start=55, stop=70) maps to capacity 4."""
+        coordinator = self._make_coordinator()
+        values = {
+            "tap_water_capacity_target": None,
+            "tap_water_start": 55,
+            "tap_water_stop": 70,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        assert values["tap_water_capacity_target"] == 4
+
+    def test_all_known_mappings(self):
+        """Every entry in TAP_WATER_CAPACITY_MAPPINGS is derived correctly."""
+        from custom_components.qvantum.const import TAP_WATER_CAPACITY_MAPPINGS
+
+        coordinator = self._make_coordinator()
+        for (start, stop), expected in TAP_WATER_CAPACITY_MAPPINGS.items():
+            values = {
+                "tap_water_capacity_target": None,
+                "tap_water_start": start,
+                "tap_water_stop": stop,
+            }
+            coordinator._derive_tap_water_capacity(values)
+            assert values["tap_water_capacity_target"] == expected, (
+                f"Expected capacity {expected} for start={start} stop={stop}"
+            )
+
+    def test_no_override_when_already_set(self):
+        """Existing tap_water_capacity_target is not overwritten."""
+        coordinator = self._make_coordinator()
+        values = {
+            "tap_water_capacity_target": 7,
+            "tap_water_start": 55,
+            "tap_water_stop": 70,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        assert values["tap_water_capacity_target"] == 7
+
+    def test_missing_tap_start_leaves_none(self):
+        """Missing tap_water_start leaves capacity unchanged."""
+        coordinator = self._make_coordinator()
+        values = {"tap_water_capacity_target": None, "tap_water_stop": 70}
+        coordinator._derive_tap_water_capacity(values)
+        assert values["tap_water_capacity_target"] is None
+
+    def test_missing_tap_stop_leaves_none(self):
+        """Missing tap_water_stop leaves capacity unchanged."""
+        coordinator = self._make_coordinator()
+        values = {"tap_water_capacity_target": None, "tap_water_start": 55}
+        coordinator._derive_tap_water_capacity(values)
+        assert values["tap_water_capacity_target"] is None
+
+    def test_unknown_pair_leaves_none_and_warns(self):
+        """An unknown (start, stop) pair leaves capacity as None and logs a warning."""
+        coordinator = self._make_coordinator()
+        values = {
+            "tap_water_capacity_target": None,
+            "tap_water_start": 99,
+            "tap_water_stop": 99,
+        }
+        with patch("custom_components.qvantum.coordinator._LOGGER") as mock_logger:
+            coordinator._derive_tap_water_capacity(values)
+        assert values["tap_water_capacity_target"] is None
+        mock_logger.warning.assert_called_once()
+
+    def test_non_integer_values_leave_none_and_warn(self):
+        """String values for tap_water_start/stop cannot match integer mapping keys."""
+        coordinator = self._make_coordinator()
+        values = {"tap_water_capacity_target": None, "tap_water_start": "55", "tap_water_stop": "70"}
+        with patch("custom_components.qvantum.coordinator._LOGGER") as mock_logger:
+            coordinator._derive_tap_water_capacity(values)
+        assert values["tap_water_capacity_target"] is None
+        mock_logger.warning.assert_called_once()
+
+    def test_capacity_key_absent_treated_as_none(self):
+        """tap_water_capacity_target absent from dict is treated the same as None."""
+        coordinator = self._make_coordinator()
+        values = {"tap_water_start": 55, "tap_water_stop": 70}
+        coordinator._derive_tap_water_capacity(values)
+        assert values["tap_water_capacity_target"] == 4

@@ -88,12 +88,12 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                     self._hpid, int(value)
                 )
             case "tap_water_stop":
-                response = await self.coordinator.api.set_tap_water_stop(
-                    self._hpid, int(value)
+                response = await self.coordinator.api.set_tap_water(
+                    self._hpid, stop=int(value)
                 )
             case "tap_water_start":
-                response = await self.coordinator.api.set_tap_water_start(
-                    self._hpid, int(value)
+                response = await self.coordinator.api.set_tap_water(
+                    self._hpid, start=int(value)
                 )
             case "room_comp_factor" | "fan_normal" | "fan_speed_2" | "dhw_stop_extra":
                 response = await self.coordinator.api.update_setting(
@@ -112,11 +112,11 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
     def state(self):
         """Get metric from API data."""
         if self._metric_key == "tap_water_capacity_target":
-            # Map (stop, start) pairs to capacity values using TAP_WATER_CAPACITY_MAPPINGS
+            # Map (start, stop) pairs to capacity values using TAP_WATER_CAPACITY_MAPPINGS
             stop = self._values.get("tap_water_stop")
             start = self._values.get("tap_water_start")
-            if (stop, start) in TAP_WATER_CAPACITY_MAPPINGS:
-                return TAP_WATER_CAPACITY_MAPPINGS[(stop, start)]
+            if (start, stop) in TAP_WATER_CAPACITY_MAPPINGS:
+                return TAP_WATER_CAPACITY_MAPPINGS[(start, stop)]
 
         return self._values.get(self._metric_key)
 
