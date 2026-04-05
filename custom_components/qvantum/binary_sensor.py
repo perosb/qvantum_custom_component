@@ -49,7 +49,6 @@ async def async_setup_entry(
                 QvantumBaseBinaryEntity(
                     coordinator,
                     sensor_name,
-                    sensor_name,
                     device,
                 )
             )
@@ -79,7 +78,6 @@ class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
         self,
         coordinator: QvantumDataUpdateCoordinator,
         metric_key: str,
-        name: str,
         device: DeviceInfo,
         enabled_by_default: bool = True,
     ) -> None:
@@ -89,32 +87,15 @@ class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
     @property
     def is_on(self):
         """Get metric from API data."""
-        return self.coordinator.data.get(self._data_bearer).get(self._metric_key)
+        if not self.coordinator.data:
+            return None
+        return self.coordinator.data.get(self._data_bearer, {}).get(self._metric_key)
 
     @property
     def available(self):
         """Check if data is available."""
+        if not self.coordinator.data:
+            return False
         data = self.coordinator.data.get(self._data_bearer, {})
-        # if self._metric_key.startswith("op_man_"):
-        #     if self.coordinator.data.get(self._data_bearer).get("op_mode") != 1:
-        #         return False
-
         return data.get(self._metric_key) is not None
 
-
-class QvantumConnectedEntity(QvantumBaseBinaryEntity):
-    """Sensor for qvantum."""
-
-    def __init__(
-        self,
-        coordinator: QvantumDataUpdateCoordinator,
-        metric_key: str,
-        name: str,
-        device: DeviceInfo,
-        enabled_by_default: bool = True,
-    ) -> None:
-        super().__init__(coordinator, metric_key, name, device, enabled_by_default)
-
-        self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._data_bearer = "connectivity"

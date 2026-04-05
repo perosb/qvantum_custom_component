@@ -25,7 +25,6 @@ with patch(
 
         from custom_components.qvantum.binary_sensor import (
             QvantumBaseBinaryEntity,
-            QvantumConnectedEntity,
         )
 
 
@@ -63,7 +62,7 @@ class TestQvantumBaseBinaryEntity:
     def test_init(self, mock_coordinator, mock_device):
         """Test binary entity initialization."""
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "op_man_addition", "Addition Mode", mock_device, True
+            mock_coordinator, "op_man_addition", mock_device, True
         )
 
         assert entity._metric_key == "op_man_addition"
@@ -77,7 +76,7 @@ class TestQvantumBaseBinaryEntity:
         """Test binary entity state when on."""
         mock_coordinator.data["values"]["op_man_addition"] = 1
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "op_man_addition", "Addition Mode", mock_device, True
+            mock_coordinator, "op_man_addition", mock_device, True
         )
         assert entity.is_on
 
@@ -85,7 +84,7 @@ class TestQvantumBaseBinaryEntity:
         """Test binary entity state when off."""
         mock_coordinator.data["values"]["op_man_addition"] = 0
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "op_man_addition", "Addition Mode", mock_device, True
+            mock_coordinator, "op_man_addition", mock_device, True
         )
         assert not entity.is_on
 
@@ -93,57 +92,13 @@ class TestQvantumBaseBinaryEntity:
         """Test binary entity availability when data exists."""
         mock_coordinator.data["values"]["op_man_addition"] = 1
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "op_man_addition", "Addition Mode", mock_device, True
+            mock_coordinator, "op_man_addition", mock_device, True
         )
         assert entity.available is True
 
     def test_available_false(self, mock_coordinator, mock_device):
         """Test binary entity availability when data is missing."""
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "missing_metric", "Missing", mock_device, True
-        )
-        assert entity.available is False
-
-
-class TestQvantumConnectedEntity:
-    """Test the QvantumConnectedEntity class."""
-
-    def test_init(self, mock_coordinator, mock_device):
-        """Test connected entity initialization."""
-        entity = QvantumConnectedEntity(
-            mock_coordinator, "connected", "Connected", mock_device, True
-        )
-
-        assert entity._attr_device_class == BinarySensorDeviceClass.CONNECTIVITY
-        assert entity._attr_entity_category == EntityCategory.DIAGNOSTIC
-        assert entity._data_bearer == "connectivity"
-
-    def test_is_on_connected(self, mock_coordinator, mock_device):
-        """Test connected entity state when connected."""
-        entity = QvantumConnectedEntity(
-            mock_coordinator, "connected", "Connected", mock_device, True
-        )
-        assert entity.is_on is True
-
-    def test_is_on_disconnected(self, mock_coordinator, mock_device):
-        """Test connected entity state when disconnected."""
-        mock_coordinator.data["connectivity"]["connected"] = False
-        entity = QvantumConnectedEntity(
-            mock_coordinator, "connected", "Connected", mock_device, True
-        )
-        assert entity.is_on is False
-
-    def test_available_connected(self, mock_coordinator, mock_device):
-        """Test connected entity availability."""
-        entity = QvantumConnectedEntity(
-            mock_coordinator, "connected", "Connected", mock_device, True
-        )
-        assert entity.available is True
-
-    def test_available_missing_data(self, mock_coordinator, mock_device):
-        """Test connected entity availability when connectivity data is missing."""
-        mock_coordinator.data["connectivity"] = {}
-        entity = QvantumConnectedEntity(
-            mock_coordinator, "connected", "Connected", mock_device, True
+            mock_coordinator, "missing_metric", mock_device, True
         )
         assert entity.available is False

@@ -95,6 +95,11 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
         """Return the metric key for this entity."""
         return self._metric_key
 
+    @property
+    def _values(self) -> dict:
+        """Return current values from coordinator data, safe when data is None."""
+        return (self.coordinator.data or {}).get("values", {})
+
     def _resolve_device_id(self, device: DeviceInfo | dict[str, object]) -> str | None:
         """Resolve device ID from device info or coordinator data."""
         device_id = resolve_device_id(device)
@@ -102,7 +107,7 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
             return device_id
 
         # Falls back to coordinator data if device ID not found in device info
-        values_data = self.coordinator.data.get("values", {})
+        values_data = (self.coordinator.data or {}).get("values", {})
         heatpump_id = values_data.get("hpid")
         if heatpump_id is not None:
             return str(heatpump_id)

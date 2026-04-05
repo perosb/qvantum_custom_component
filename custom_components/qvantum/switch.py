@@ -127,7 +127,7 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
             return False
 
         # Handle both integer (== 1) and boolean (True) values
-        value = self.coordinator.data.get("values", {}).get(self._metric_key)
+        value = self._values.get(self._metric_key)
         return value == "on" or value == 1 or value is True
 
     @property
@@ -135,32 +135,28 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
         if not self.coordinator.data:
             return False
 
+        values = self._values
         match self._metric_key:
             case "extra_tap_water":
                 return (
-                    "extra_tap_water" in self.coordinator.data.get("values", {})
-                    and self.coordinator.data.get("values", {}).get("extra_tap_water")
-                    is not None
+                    values.get("extra_tap_water") is not None
                     and self._has_write_access
                 )
             case "op_man_addition" | "op_man_dhw" | "man_mode":
                 return (
-                    self._metric_key in self.coordinator.data.get("values", {})
-                    and self.coordinator.data.get("values", {}).get("op_mode") == 1
+                    self._metric_key in values
+                    and values.get("op_mode") == 1
                     and self._has_write_access
                 )
 
             case "enable_sc_dhw" | "enable_sc_sh":
                 return (
-                    self._metric_key in self.coordinator.data.get("values", {})
-                    and self.coordinator.data.get("values", {}).get("use_adaptive")
-                    is True
+                    self._metric_key in values
+                    and values.get("use_adaptive") is True
                     and self._has_write_access
                 )
             case _:
                 return (
-                    self._metric_key in self.coordinator.data.get("values", {})
-                    and self.coordinator.data.get("values", {}).get(self._metric_key)
-                    is not None
+                    values.get(self._metric_key) is not None
                     and self._has_write_access
                 )

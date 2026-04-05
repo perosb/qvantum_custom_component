@@ -64,23 +64,18 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
     @property
     def preset_mode(self):
         """Get metric from API data."""
-        return self.coordinator.data.get("values", {}).get(self._metric_key)
+        return self._values.get(self._metric_key)
 
     @property
     def is_on(self):
         """Return true if the fan is on."""
-        return (
-            self.coordinator.data.get("values", {}).get(self._metric_key)
-            != FAN_SPEED_STATE_OFF
-        )
+        return self._values.get(self._metric_key) != FAN_SPEED_STATE_OFF
 
     @property
     def available(self):
         """Return true if entity is available."""
         return (
-            self._metric_key in self.coordinator.data.get("values", {})
-            and self.coordinator.data.get("values", {}).get(self._metric_key)
-            is not None
+            self._values.get(self._metric_key) is not None
             and self._has_write_access
         )
 

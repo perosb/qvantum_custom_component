@@ -43,7 +43,6 @@ with patch(
 
                 from custom_components.qvantum.binary_sensor import (
                     QvantumBaseBinaryEntity,
-                    QvantumConnectedEntity,
                 )
 
 
@@ -91,7 +90,7 @@ class TestQvantumBaseBinaryEntity:
     def test_init(self, mock_coordinator, mock_device):
         """Test binary entity initialization."""
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "op_man_addition", "Addition Mode", mock_device, True
+            mock_coordinator, "op_man_addition", mock_device, True
         )
 
         assert entity._metric_key == "op_man_addition"
@@ -104,67 +103,28 @@ class TestQvantumBaseBinaryEntity:
     def test_is_on_true(self, mock_coordinator, mock_device):
         """Test binary entity state when on."""
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "op_man_addition", "Addition Mode", mock_device, True
+            mock_coordinator, "op_man_addition", mock_device, True
         )
         assert entity.is_on == 1  # op_man_addition is 1
 
     def test_is_on_false(self, mock_coordinator, mock_device):
         """Test binary entity state when off."""
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "op_man_cooling", "Cooling Mode", mock_device
+            mock_coordinator, "op_man_cooling", mock_device
         )
         assert entity.is_on == 0  # op_man_cooling is 0
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test binary entity availability when data exists."""
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "op_man_addition", "Addition Mode", mock_device, True
+            mock_coordinator, "op_man_addition", mock_device, True
         )
         assert entity.available is True
 
     def test_available_false(self, mock_coordinator, mock_device):
         """Test binary entity availability when data is missing."""
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "missing_metric", "Missing", mock_device, True
-        )
-        assert entity.available is False
-
-
-class TestQvantumConnectedEntity:
-    """Test the QvantumConnectedEntity class."""
-
-    def test_init(self, mock_coordinator, mock_device):
-        """Test connected entity initialization."""
-        entity = QvantumConnectedEntity(
-            mock_coordinator, "connected", "Connected", mock_device, True
-        )
-
-        assert entity._attr_device_class.name == "CONNECTIVITY"
-        assert entity._attr_entity_category.name == "DIAGNOSTIC"
-        assert entity._data_bearer == "connectivity"
-
-    def test_is_on_connected(self, mock_coordinator, mock_device):
-        """Test connected entity state."""
-        entity = QvantumConnectedEntity(
-            mock_coordinator, "connected", "Connected", mock_device, True
-        )
-        assert entity.is_on is True  # connected is True
-
-    def test_available_connected(self, mock_coordinator, mock_device):
-        """Test connected entity availability."""
-        entity = QvantumConnectedEntity(
-            mock_coordinator, "connected", "Connected", mock_device, True
-        )
-        assert entity.available is True
-
-    def test_available_connected_missing(self, mock_coordinator, mock_device):
-        """Test connected entity availability when data is missing."""
-        entity = QvantumConnectedEntity(
-            mock_coordinator,
-            "missing_connection",
-            "Missing Connection",
-            mock_device,
-            True,
+            mock_coordinator, "missing_metric", mock_device, True
         )
         assert entity.available is False
 
