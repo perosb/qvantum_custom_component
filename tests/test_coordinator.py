@@ -823,7 +823,7 @@ class TestDeriveTapWaterCapacity:
         assert values["tap_water_capacity_target"] is None
 
     def test_unknown_pair_leaves_none_and_warns(self):
-        """An unknown (stop, start) pair leaves capacity as None and logs a warning."""
+        """An unknown (start, stop) pair leaves capacity as None and logs a warning."""
         coordinator = self._make_coordinator()
         values = {
             "tap_water_capacity_target": None,
