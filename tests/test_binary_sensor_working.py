@@ -168,7 +168,7 @@ async def test_async_setup_entry(
         # Check that entities were added
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
-        assert len(entities) == 15  # 15 sensor names
+        assert len(entities) == 10  # 10 sensor names
 
         # Check that we have the expected sensor types
         sensor_names = [
@@ -176,13 +176,8 @@ async def test_async_setup_entry(
             "additiondhwdemand",
             "cooling_enabled",
             "coolingdemand",
-            "dhwdemand",
-            "enable_sc_dhw",
-            "enable_sc_sh",
             "heatingdemand",
-            "op_man_addition",
-            "op_man_cooling",
-            "op_man_dhw",
+            "dhwdemand",
             "picpin_relay_heat_l1",
             "picpin_relay_heat_l2",
             "picpin_relay_heat_l3",
