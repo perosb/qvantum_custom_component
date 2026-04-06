@@ -118,7 +118,6 @@ DEFAULT_DISABLED_HTTP_METRICS = [
     "additionreleased",
     "dhw_prioritytimeleft",
     "heating_prioritytimeleft",
-    "cooling_prioritytimeleft",
     "switch_state",
     "dhwstop_temp",
     "dhwstart_temp",
