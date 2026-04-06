@@ -96,20 +96,18 @@ class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
         enabled_by_default: bool = True,
     ) -> None:
         super().__init__(coordinator, metric_key, device, enabled_by_default)
-        self._data_bearer = "values"
 
     @property
     def is_on(self):
         """Get metric from API data."""
-        if not self.coordinator.data:
+        if not self._values:
             return None
-        return self.coordinator.data.get(self._data_bearer, {}).get(self._metric_key)
+        return self._values.get(self._metric_key)
 
     @property
     def available(self):
         """Check if data is available."""
-        if not self.coordinator.data:
+        if not self._values:
             return False
-        data = self.coordinator.data.get(self._data_bearer, {})
-        return data.get(self._metric_key) is not None
+        return self._values.get(self._metric_key) is not None
 
