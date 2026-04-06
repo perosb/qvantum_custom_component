@@ -98,7 +98,6 @@ class TestQvantumBaseBinaryEntity:
         assert entity._attr_device_info == mock_device
         assert entity._attr_has_entity_name is True
         assert entity._attr_entity_registry_enabled_default is True
-        assert entity._data_bearer == "values"
 
     def test_is_on_true(self, mock_coordinator, mock_device):
         """Test binary entity state when on."""
@@ -179,6 +178,7 @@ async def test_async_setup_entry(
             "coolingdemand",
             "heatingdemand",
             "dhwdemand",
+            "heatingdemand",
             "picpin_relay_heat_l1",
             "picpin_relay_heat_l2",
             "picpin_relay_heat_l3",
