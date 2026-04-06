@@ -44,7 +44,7 @@ jobs:
 
       - name: Apply labels from PR title
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const title = context.payload.pull_request.title;
