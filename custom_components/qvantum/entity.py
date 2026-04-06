@@ -67,6 +67,32 @@ class QvantumAccessMixin:
             return False
 
 
+# Centralized icon map for all Qvantum entities keyed by metric_key
+_ENTITY_ICONS: dict[str, str] = {
+    # Binary sensors / demand
+    "heatingdemand": "mdi:heat-wave",
+    "dhwdemand": "mdi:water-pump",
+    "coolingdemand": "mdi:snowflake",
+    "cooling_enabled": "mdi:snowflake",
+    "additiondemand": "mdi:lightning-bolt",
+    "additiondhwdemand": "mdi:lightning-bolt",
+    # Sensors
+    "tap_water_cap": "mdi:account-group",
+    "fanrpm": "mdi:fan",
+    "compressormeasuredspeed": "mdi:turbine",
+    # Switches
+    "op_mode": "mdi:auto-mode",
+    "man_mode": "mdi:radiator",
+    "op_man_dhw": "mdi:water-outline",
+    "op_man_addition": "mdi:transmission-tower-import",
+    "extra_tap_water": "mdi:water-boiler",
+    "enable_sc_sh": "mdi:radiator",
+    "enable_sc_dhw": "mdi:water-thermometer",
+    # Select
+    "use_adaptive": "mdi:leaf",
+}
+
+
 class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
     """Base class for all Qvantum entities with common initialization."""
 
@@ -89,6 +115,7 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
         self._attr_device_info = device
         self._attr_has_entity_name = True
         self._attr_entity_registry_enabled_default = enabled_by_default
+        self._attr_icon = _ENTITY_ICONS.get(metric_key)
 
     @property
     def metric_key(self) -> str:

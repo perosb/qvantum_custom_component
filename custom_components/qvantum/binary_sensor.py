@@ -81,24 +81,7 @@ async def async_setup_entry(
 
 
 class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
-    """Sensor for qvantum."""
-
-    def __init__(
-        self,
-        coordinator: QvantumDataUpdateCoordinator,
-        metric_key: str,
-        device: DeviceInfo,
-        enabled_by_default: bool = True,
-    ) -> None:
-        super().__init__(coordinator, metric_key, device, enabled_by_default)
-
-        match self._metric_key:
-            case "heatingdemand":
-                self._attr_icon = "mdi:heat-wave"
-            case "coolingdemand" | "cooling_enabled":
-                self._attr_icon = "mdi:snowflake"
-            case "additiondemand" | "additiondhwdemand":
-                self._attr_icon = "mdi:lightning-bolt"
+    """Base binary sensor entity for Qvantum devices."""
 
     @property
     def is_on(self):

@@ -134,6 +134,7 @@ DEFAULT_DISABLED_HTTP_METRICS = [
     "inputcurrent2",
     "inputcurrent3",
     "picpin_mask",
+    "tap_water_cap",
 ]
 
 DEFAULT_DISABLED_MODBUS_METRICS = [
@@ -173,7 +174,6 @@ REQUIRED_METRICS = [
     "dhwenergy",
     "powertotal",
     "fanspeedselector",
-    "tap_water_cap",
 ]
 
 # Modbus-only intermediate metrics required to compute derived values (e.g. energy totals

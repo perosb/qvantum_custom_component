@@ -57,18 +57,6 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
         self._attr_device_class = SwitchDeviceClass.SWITCH
         self._attr_is_on = False
 
-        match self._metric_key:
-            case "op_mode":
-                self._attr_icon = "mdi:auto-mode"
-            case "man_mode":
-                self._attr_icon = "mdi:radiator"
-            case "op_man_dhw":
-                self._attr_icon = "mdi:water-outline"
-            case "op_man_addition":
-                self._attr_icon = "mdi:transmission-tower-import"
-            case _:
-                self._attr_icon = "mdi:water-boiler"
-
     async def async_turn_off(self, **kwargs):
         """Update the current value."""
         match self._metric_key:
