@@ -168,6 +168,9 @@
       "heatingpower": {
         "name": "Potencia de calefacción"
       },
+      "dhwpower": {
+        "name": "Potencia ACS"
+      },
       "compressor_power": {
         "name": "Potencia del compresor"
       },

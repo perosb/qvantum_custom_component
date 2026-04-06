@@ -168,6 +168,9 @@
       "heatingpower": {
         "name": "Verwarmingsvermogen"
       },
+      "dhwpower": {
+        "name": "Warmwatervermogen"
+      },
       "compressor_power": {
         "name": "Compressorvermogen"
       },

@@ -171,6 +171,9 @@
       "heatingpower": {
         "name": "Värmeeffekt"
       },
+      "dhwpower": {
+        "name": "Varmvatteneffekt"
+      },
       "compressor_power": {
         "name": "Kompressoreffekt"
       },

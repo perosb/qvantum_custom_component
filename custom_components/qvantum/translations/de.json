@@ -168,6 +168,9 @@
       "heatingpower": {
         "name": "Heizleistung"
       },
+      "dhwpower": {
+        "name": "Warmwasser-Leistung"
+      },
       "compressor_power": {
         "name": "Kompressorleistung"
       },

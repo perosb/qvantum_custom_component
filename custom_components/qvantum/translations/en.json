@@ -168,6 +168,9 @@
       "heatingpower": {
         "name": "Heating Power"
       },
+      "dhwpower": {
+        "name": "DHW Power"
+      },
       "compressor_power": {
         "name": "Compressor Power"
       },
