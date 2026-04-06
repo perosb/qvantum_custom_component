@@ -432,9 +432,6 @@ class TestSensorSetup:
             DEFAULT_DISABLED_HTTP_METRICS,
             DEFAULT_DISABLED_MODBUS_METRICS,
         )
-        from custom_components.qvantum.binary_sensor import (
-            async_setup_entry as binary_setup_entry,
-        )
 
         # Metrics in DEFAULT_DISABLED_MODBUS_METRICS that are handled by binary_sensor, not sensor
         binary_sensor_metrics = {

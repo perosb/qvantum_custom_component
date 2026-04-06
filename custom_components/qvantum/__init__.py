@@ -161,8 +161,12 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
     """Migrate old entry."""
     _LOGGER.debug("Migrating configuration from version %s.%s", config_entry.version, config_entry.minor_version)
 
-    if config_entry.version >= CONFIG_VERSION:
+    if config_entry.version > CONFIG_VERSION:
+        # Entry is from a newer version of the integration (downgrade case)
         return False
+
+    if config_entry.version == CONFIG_VERSION:
+        return True
 
     if config_entry.version == 1:
 

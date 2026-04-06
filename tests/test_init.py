@@ -214,6 +214,14 @@ class TestIntegrationSetup:
 
         result = await async_migrate_entry(hass, config_entry)
 
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_async_migrate_entry_future_version(self, hass, mock_config_entry):
+        config_entry = MagicMock(version=99, minor_version=0)
+
+        result = await async_migrate_entry(hass, config_entry)
+
         assert result is False
 
     @pytest.mark.asyncio
