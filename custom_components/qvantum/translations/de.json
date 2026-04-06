@@ -190,6 +190,9 @@
         "name": "Eingangsstrom L3"
       },
 
+      "degree_minute": {
+        "name": "Gradminute"
+      },
       "bf1_l_min": {
         "name": "Durchflusssensor für Brauchwasser (BF1)"
       },

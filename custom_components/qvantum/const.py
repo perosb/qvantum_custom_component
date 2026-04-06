@@ -149,6 +149,7 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
     "dhw_prioritytimeleft",
     "heating_prioritytimeleft",
     "cooling_prioritytimeleft",
+    "degree_minute",
 ]
 
 # Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus)
@@ -272,6 +273,7 @@ MODBUS_INPUT_REGISTER_MAP = {
         "uint16",
         1.0,
     ),
+    "degree minute": (34, "int16", 0.1),
     "calculated supply temp heating (°c)": (35, "int16", 0.1),
     "heatpump state": (41, "uint16", 1.0),
     "heatingdemand": (50, "uint16", 1.0),
@@ -466,6 +468,7 @@ MODBUS_SPEC_TO_INTERNAL_MAP = {
     "fan speed [rpm]": "fanrpm",
     "compressor speed [rpm]": "compressormeasuredspeed",
     "relays (l1, l2, l3, gp10, qm10, qn8_1, qn8_2, gp3, pump, ha12)": "relays_bitmask",
+    "degree minute": "degree_minute",
     "calculated supply temp heating (°c)": "cal_heat_temp",
     "heatpump state": "hp_status",
     "compressor state": "compressor_state",

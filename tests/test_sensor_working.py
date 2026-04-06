@@ -177,6 +177,13 @@ class TestQvantumBaseSensorEntity:
         )
         assert entity._attr_native_unit_of_measurement == "l/m"
 
+    def test_degree_minute_unit_assignment(self, mock_coordinator, mock_device):
+        """Test degree minute unit assignment."""
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "degree_minute", mock_device, True
+        )
+        assert entity._attr_native_unit_of_measurement == "dm"
+
 
 class TestQvantumTemperatureEntity:
     """Test the QvantumTemperatureEntity class."""

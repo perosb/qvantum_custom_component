@@ -193,6 +193,9 @@
         "name": "Ingångsström L3"
       },
 
+      "degree_minute": {
+        "name": "Gradminut"
+      },
       "bf1_l_min": {
         "name": "Flödesgivare för Varmvatten"
       },

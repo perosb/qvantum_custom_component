@@ -190,6 +190,9 @@
         "name": "Input current L3"
       },
 
+      "degree_minute": {
+        "name": "Degree Minute"
+      },
       "bf1_l_min": {
         "name": "Flow sensor DHW (BF1)"
       },
