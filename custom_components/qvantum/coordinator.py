@@ -292,15 +292,32 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
     def _calculate_heating_power(self, values: dict) -> None:
         """Derive heatingpower (W) from the heatingenergy (kWh) delta between polls.
 
-        Stores the result in values["heatingpower"].
-        Negative deltas (counter resets) are clamped to 0 W.
+        Uses the elapsed time between actual counter increments as the denominator,
+        not the poll interval. This avoids large overestimates caused by the coarse
+        0.1 kWh counter resolution: a single 0.1 kWh tick measured over a 16 s poll
+        interval would yield 22 500 W, whereas measuring it over the ~51 s it took
+        to accumulate gives the correct ~7 000 W.
+
+        While hp_status == 3 (heating), the last computed value is held when the
+        counter has not yet ticked (no new delta). When heating stops, power resets
+        to 0. Negative deltas (counter resets) are clamped to 0 W.
         """
         now = dt_util.utcnow()
         current_energy = values.get("heatingenergy")
         if current_energy is None:
             return
 
-        values["heatingpower"] = 0  # Default to 0 W if we can't calculate a delta yet
+        # Read the previously emitted heatingpower from the last coordinator data update.
+        # self.data holds the prior poll's result, so this avoids a separate state field.
+        prev_power: float = (self.data or {}).get("values", {}).get("heatingpower", 0.0)
+
+        # When the heat pump is not actively heating, report 0 and reset the baseline
+        # so we start fresh when heating resumes.
+        if values.get("hp_status") != 3:
+            values["heatingpower"] = 0.0
+            self._last_heatingenergy = current_energy
+            self._last_heatingenergy_time = now
+            return
 
         _LOGGER.debug(
             "Calculating heating power: current_energy=%.6f kWh, last_energy=%s kWh, last_time=%s",
@@ -308,25 +325,34 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             self._last_heatingenergy,
             self._last_heatingenergy_time,
         )
+
         if (
             self._last_heatingenergy is not None
             and self._last_heatingenergy_time is not None
         ):
             delta_kwh = current_energy - self._last_heatingenergy
             delta_seconds = (now - self._last_heatingenergy_time).total_seconds()
-            if delta_seconds > 0:
+            if delta_kwh != 0 and delta_seconds > 0:
                 # kWh / s → W:  (kWh * 3 600 000 J/kWh) / s = J/s = W
                 power_w = (delta_kwh * 3_600_000) / delta_seconds
-                values["heatingpower"] = max(0.0, round(power_w, 1))
+                prev_power = max(0.0, round(power_w, 1))
                 _LOGGER.debug(
                     "Calculated heatingpower: %.1f W (delta=%.6f kWh over %.1f s)",
-                    values["heatingpower"],
+                    prev_power,
                     delta_kwh,
                     delta_seconds,
                 )
 
+        # Emit the last known value — held when counter hasn't ticked yet
+        values["heatingpower"] = prev_power
+
+        # Only advance the time reference when the energy counter actually increments.
+        # When the counter is unchanged (multiple polls with the same reading), keep the
+        # original timestamp so the next increment is measured over the full accumulation
+        # period rather than just one poll interval.
+        if current_energy != self._last_heatingenergy:
+            self._last_heatingenergy_time = now
         self._last_heatingenergy = current_energy
-        self._last_heatingenergy_time = now
 
     async def async_update_data(self):
         """Fetch data from API endpoint."""
