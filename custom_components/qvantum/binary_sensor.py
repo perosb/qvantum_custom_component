@@ -41,6 +41,11 @@ async def async_setup_entry(
         "picpin_relay_heat_l2",
         "picpin_relay_heat_l3",
         "picpin_relay_qm10",
+        "dhwdemand",
+        "heatingdemand",
+        "coolingdemand",
+        "additiondemand",
+        "additiondhwdemand",
     ]
 
     for sensor_name in sensor_names:

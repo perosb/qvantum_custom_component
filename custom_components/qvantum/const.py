@@ -11,7 +11,7 @@ FAN_SPEED_VALUE_OFF = 0
 FAN_SPEED_VALUE_NORMAL = 1
 FAN_SPEED_VALUE_EXTRA = 2
 VERSION = "2026.4.7"
-CONFIG_VERSION = 5
+CONFIG_VERSION = 6
 
 # Modbus TCP configuration
 CONF_MODBUS_TCP = "modbus_tcp"
@@ -118,7 +118,7 @@ DEFAULT_DISABLED_HTTP_METRICS = [
     "additionreleased",
     "dhw_prioritytimeleft",
     "heating_prioritytimeleft",
-    "cooling_priotitytimeleft",
+    "cooling_prioritytimeleft",
     "switch_state",
     "dhwstop_temp",
     "dhwstart_temp",
@@ -137,6 +137,14 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
     "bf1_rpm",
     "bt12",
     "bt4",
+    "dhwdemand",
+    "heatingdemand",
+    "coolingdemand",
+    "additiondemand",
+    "additiondhwdemand",
+    "dhw_prioritytimeleft",
+    "heating_prioritytimeleft",
+    "cooling_prioritytimeleft",
 ]
 
 # Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus)
@@ -185,13 +193,7 @@ REQUIRED_MODBUS_METRICS = [
 ]
 
 # Sensor filtering patterns
-EXCLUDED_METRIC_PATTERNS = [
-    "op_man_",
-    "enable",
-    "smart_",
-    "picpin_",
-    "use_",
-]
+EXCLUDED_METRIC_PATTERNS = ["op_man_", "enable", "smart_", "picpin_", "use_", "demand"]
 
 # Sensor type classification
 TEMPERATURE_METRICS = [
@@ -269,6 +271,14 @@ MODBUS_INPUT_REGISTER_MAP = {
     ),
     "calculated supply temp heating (°c)": (35, "int16", 0.1),
     "heatpump state": (41, "uint16", 1.0),
+    "heatingdemand": (50, "uint16", 1.0),
+    "coolingdemand": (51, "uint16", 1.0),
+    "additiondemand": (52, "uint16", 1.0),
+    "additiondhwdemand": (53, "uint16", 0.1),
+    "dhwdemand": (54, "uint16", 1.0),
+    "heating_prioritytimeleft": (63, "uint16", 1.0),
+    "cooling_prioritytimeleft": (64, "uint16", 1.0),
+    "dhw_prioritytimeleft": (65, "uint16", 1.0),
     "compressor state": (70, "uint16", 1.0),
     "qn8 position": (76, "int16", 1.0),
     "compressor power (w)": (93, "uint16", 1.0),

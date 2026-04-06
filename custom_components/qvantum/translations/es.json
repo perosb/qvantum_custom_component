@@ -114,6 +114,21 @@
       },
       "picpin_relay_ha12": {
         "name": "Bomba circuito calefacción (HA12)"
+      },
+      "dhwdemand": {
+        "name": "Demanda ACS"
+      },
+      "heatingdemand": {
+        "name": "Demanda de calefacción"
+      },
+      "coolingdemand": {
+        "name": "Demanda de refrigeración"
+      },
+      "additiondemand": {
+        "name": "Demanda adicional"
+      },
+      "additiondhwdemand": {
+        "name": "Demanda adicional ACS"
       }
     },
     "sensor": {
@@ -374,15 +389,7 @@
           "client-disconnect": "Cliente desconectado"
         }
       },
-      "dhwdemand": {
-        "name": "Demanda ACS"
-      },
-      "heatingdemand": {
-        "name": "Demanda calefacción"
-      },
-      "coolingdemand": {
-        "name": "Demanda refrigeración"
-      },
+
       "heatingreleased": {
         "name": "Calefacción liberada"
       },
@@ -401,7 +408,7 @@
       "heating_prioritytimeleft": {
         "name": "Tiempo de prioridad calefacción restante"
       },
-      "cooling_priotitytimeleft": {
+      "cooling_prioritytimeleft": {
         "name": "Tiempo de prioridad refrigeración restante"
       },
       "switch_state": {

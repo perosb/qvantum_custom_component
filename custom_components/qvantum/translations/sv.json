@@ -117,6 +117,21 @@
       },
       "picpin_relay_ha12": {
         "name": "Värmekrets pump (HA12)"
+      },
+      "dhwdemand": {
+        "name": "Varmvattenbehov"
+      },
+      "heatingdemand": {
+        "name": "Värmebehov"
+      },
+      "coolingdemand": {
+        "name": "Kylbehov"
+      },
+      "additiondemand": {
+        "name": "Tillsatsbehov"
+      },
+      "additiondhwdemand": {
+        "name": "Tillsatsbehov Varmvatten"
       }
     },
     "sensor": {
@@ -353,15 +368,6 @@
           "client-disconnect": "Kunden bortkopplad"
         }
       },
-      "dhwdemand": {
-        "name": "DHW Efterfrågan"
-      },
-      "heatingdemand": {
-        "name": "Värmeefterfrågan"
-      },
-      "coolingdemand": {
-        "name": "Kylningsefterfrågan"
-      },
       "heatingreleased": {
         "name": "Värme frigjord"
       },
@@ -375,12 +381,12 @@
         "name": "Tillsats frigjord"
       },
       "dhw_prioritytimeleft": {
-        "name": "DHW prioritetstid kvar"
+        "name": "Varmvattenprioritetstid kvar"
       },
       "heating_prioritytimeleft": {
         "name": "Värmeprioritetstid kvar"
       },
-      "cooling_priotitytimeleft": {
+      "cooling_prioritytimeleft": {
         "name": "Kylningsprioritetstid kvar"
       },
       "switch_state": {

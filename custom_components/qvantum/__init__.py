@@ -161,7 +161,7 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
     """Migrate old entry."""
     _LOGGER.debug("Migrating configuration from version %s.%s", config_entry.version, config_entry.minor_version)
 
-    if config_entry.version > CONFIG_VERSION:
+    if config_entry.version >= CONFIG_VERSION:
         return False
 
     if config_entry.version == 1:
@@ -226,6 +226,30 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
 
         await async_migrate_entries(
             hass, config_entry.entry_id, migrate_to_v5_unique_ids
+        )
+
+    if config_entry.version < 6:
+
+        @callback
+        def migrate_to_v6_entity_domains(entity_entry):
+            """Migrate demand sensors from sensor to binary_sensor domain."""
+            demand_keys = ["dhwdemand", "heatingdemand", "coolingdemand"]
+            if entity_entry.domain == "sensor":
+                for key in demand_keys:
+                    if entity_entry.unique_id.endswith(f"_{key}"):
+                        new_entity_id = (
+                            f"binary_sensor.{entity_entry.entity_id.split('.', 1)[1]}"
+                        )
+                        _LOGGER.debug(
+                            "Migrating entity %s from sensor to binary_sensor: %s",
+                            entity_entry.entity_id,
+                            new_entity_id,
+                        )
+                        return {"new_entity_id": new_entity_id}
+            return None
+
+        await async_migrate_entries(
+            hass, config_entry.entry_id, migrate_to_v6_entity_domains
         )
 
     hass.config_entries.async_update_entry(config_entry, version=CONFIG_VERSION)

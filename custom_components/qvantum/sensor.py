@@ -176,6 +176,9 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             or metric_key.startswith("qn8")
         ):
             self._attr_native_unit_of_measurement = "%"
+        elif "timeleft" in metric_key:
+            self._attr_native_unit_of_measurement = "s"
+            self._attr_device_class = SensorDeviceClass.DURATION
         elif "bf1_l_min" == metric_key:
             self._attr_native_unit_of_measurement = "l/m"
 

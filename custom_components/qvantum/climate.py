@@ -74,7 +74,7 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
     def supported_features(self):
         """Return the list of supported features."""
         values = (self.coordinator.data or {}).get("values", {})
-        if values.get("sensor_mode") == "bt2":
+        if values.get("sensor_mode") in ("bt2", 1):
             return ClimateEntityFeature.TARGET_TEMPERATURE
 
         return {}
