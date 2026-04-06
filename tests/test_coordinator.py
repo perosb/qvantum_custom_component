@@ -867,12 +867,13 @@ class TestCalculateHeatingPower:
             mock_config_entry.data = {}
             mock_config_entry.unique_id = "test_device_123"
             coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+            coordinator.data = None  # simulate no prior poll
         return coordinator
 
     def test_no_previous_sample_writes_zero_power(self):
-        """First call records baseline and writes 0 W (no delta available yet)."""
+        """First call (heating active) records baseline and writes 0 W — no prior delta."""
         coordinator = self._make_coordinator()
-        values = {"heatingenergy": 100.0}
+        values = {"heatingenergy": 100.0, "hp_status": 3}
 
         with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
             mock_now.return_value = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
@@ -889,10 +890,10 @@ class TestCalculateHeatingPower:
 
         with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
-            coordinator._calculate_heating_power({"heatingenergy": 100.0})
+            coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
 
             mock_now.return_value = t1
-            values = {"heatingenergy": 100.001}  # +0.001 kWh in 15 s
+            values = {"heatingenergy": 100.001, "hp_status": 3}  # +0.001 kWh in 15 s
             coordinator._calculate_heating_power(values)
 
         # 0.001 kWh / 15 s * 3_600_000 = 240.0 W
@@ -906,10 +907,33 @@ class TestCalculateHeatingPower:
 
         with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
-            coordinator._calculate_heating_power({"heatingenergy": 100.0})
+            coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
 
             mock_now.return_value = t1
-            values = {"heatingenergy": 90.0}  # counter reset
+            values = {"heatingenergy": 90.0, "hp_status": 3}  # counter reset
+            coordinator._calculate_heating_power(values)
+
+        assert values["heatingpower"] == 0.0
+
+    def test_not_heating_resets_power_to_zero(self):
+        """When hp_status != 3, heatingpower is always 0 regardless of energy."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            # Establish a prior computed power
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
+            mock_now.return_value = t1
+            v1 = {"heatingenergy": 100.001, "hp_status": 3}
+            coordinator._calculate_heating_power(v1)
+            assert v1["heatingpower"] == 240.0
+            coordinator.data = {"values": v1}
+
+            # Heat pump switches to DHW (hp_status=2) — power must reset
+            mock_now.return_value = t1
+            values = {"heatingenergy": 100.001, "hp_status": 2}
             coordinator._calculate_heating_power(values)
 
         assert values["heatingpower"] == 0.0
@@ -922,21 +946,31 @@ class TestCalculateHeatingPower:
         assert "heatingpower" not in values
         assert coordinator._last_heatingenergy is None
 
-    def test_zero_delta_produces_zero_power(self):
-        """No change in energy over a poll interval produces 0 W."""
+    def test_zero_delta_holds_last_power_while_heating(self):
+        """When hp_status==3 and counter has not ticked, last computed power is held."""
         coordinator = self._make_coordinator()
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
 
         with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
-            coordinator._calculate_heating_power({"heatingenergy": 100.0})
+            coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
 
             mock_now.return_value = t1
-            values = {"heatingenergy": 100.0}
+            v1 = {"heatingenergy": 100.001, "hp_status": 3}
+            coordinator._calculate_heating_power(v1)  # computes 240 W
+            assert v1["heatingpower"] == 240.0
+
+            # Simulate coordinator.data updated with the previous poll result
+            coordinator.data = {"values": v1}
+
+            # Counter unchanged — should hold 240 W, not reset to 0
+            mock_now.return_value = t2
+            values = {"heatingenergy": 100.001, "hp_status": 3}
             coordinator._calculate_heating_power(values)
 
-        assert values["heatingpower"] == 0.0
+        assert values["heatingpower"] == 240.0
 
     def test_updates_tracking_state_after_each_call(self):
         """_last_heatingenergy and _last_heatingenergy_time are updated each call."""
@@ -946,11 +980,47 @@ class TestCalculateHeatingPower:
 
         with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
-            coordinator._calculate_heating_power({"heatingenergy": 50.0})
+            coordinator._calculate_heating_power({"heatingenergy": 50.0, "hp_status": 3})
             assert coordinator._last_heatingenergy == 50.0
             assert coordinator._last_heatingenergy_time == t0
 
             mock_now.return_value = t1
-            coordinator._calculate_heating_power({"heatingenergy": 51.0})
+            coordinator._calculate_heating_power({"heatingenergy": 51.0, "hp_status": 3})
             assert coordinator._last_heatingenergy == 51.0
             assert coordinator._last_heatingenergy_time == t1
+
+    def test_time_reference_only_advances_on_energy_change(self):
+        """Time denominator is the gap between counter increments, not poll intervals.
+
+        With 0.1 kWh counter resolution polled at 16 s intervals, the naive
+        calculation gives 0.1 * 3 600 000 / 16 ≈ 22 500 W.  The correct value
+        uses the full ~48 s accumulation period to produce ≈ 7 500 W.
+        """
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            # Poll 1: establish baseline
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
+
+            # Poll 2 (16 s): counter unchanged — time reference must NOT advance
+            mock_now.return_value = t0 + timedelta(seconds=16)
+            values = {"heatingenergy": 100.0, "hp_status": 3}
+            coordinator._calculate_heating_power(values)
+            assert values["heatingpower"] == 0.0
+            assert coordinator._last_heatingenergy_time == t0  # not advanced
+
+            # Poll 3 (32 s): counter unchanged
+            mock_now.return_value = t0 + timedelta(seconds=32)
+            values = {"heatingenergy": 100.0, "hp_status": 3}
+            coordinator._calculate_heating_power(values)
+            assert coordinator._last_heatingenergy_time == t0  # still not advanced
+
+            # Poll 4 (48 s): 0.1 kWh increment — measured over full 48 s window
+            mock_now.return_value = t0 + timedelta(seconds=48)
+            values = {"heatingenergy": 100.1, "hp_status": 3}
+            coordinator._calculate_heating_power(values)
+
+        # 0.1 kWh / 48 s * 3 600 000 = 7 500 W  (not 22 500 W from 0.1 / 16 s)
+        assert values["heatingpower"] == 7500.0
