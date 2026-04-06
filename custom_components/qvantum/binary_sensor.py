@@ -11,10 +11,16 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.const import EntityCategory
 
+from custom_components.qvantum.const import (
+    DEFAULT_DISABLED_HTTP_METRICS,
+    DEFAULT_DISABLED_MODBUS_METRICS,
+)
+
 
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
 from .entity import QvantumEntity
+from custom_components.qvantum import coordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,15 +54,26 @@ async def async_setup_entry(
         "additiondhwdemand",
     ]
 
-    for sensor_name in sensor_names:
-        if sensor_name in coordinator.data.get("values", {}):
-            sensors.append(
-                QvantumBaseBinaryEntity(
-                    coordinator,
-                    sensor_name,
-                    device,
-                )
+    values = coordinator.data.get("values", {})
+    disabled_metrics = (
+        DEFAULT_DISABLED_MODBUS_METRICS
+        if coordinator.modbus_enabled
+        else DEFAULT_DISABLED_HTTP_METRICS
+    )
+
+    for metric in sorted(sensor_names):
+        enabled_by_default = metric not in disabled_metrics
+        if enabled_by_default and metric not in values:
+            continue
+
+        sensors.append(
+            QvantumBaseBinaryEntity(
+                coordinator,
+                metric,
+                device,
+                enabled_by_default=enabled_by_default,
             )
+        )
 
     async_add_entities(sensors)
 
@@ -68,12 +85,7 @@ async def async_setup_entry(
     # Clean up disabled entities that are no longer supported in the current mode
     from .entity import cleanup_disabled_entities
 
-    possible_binary_metrics = set(
-        name for name in sensor_names if name in coordinator.data.get("values", {})
-    )
-    cleanup_disabled_entities(
-        hass, coordinator, possible_binary_metrics, "binary_sensor"
-    )
+    cleanup_disabled_entities(hass, coordinator, sensor_names, "binary_sensor")
 
 
 class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):

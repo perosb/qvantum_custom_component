@@ -169,25 +169,29 @@ async def test_async_setup_entry(
         # Check that entities were added
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
-        assert len(entities) == 10  # 10 sensor names
+        assert len(entities) == 15  # 15 sensor names
 
         # Check that we have the expected sensor types
         sensor_names = [
+            "additiondemand",
+            "additiondhwdemand",
+            "cooling_enabled",
+            "coolingdemand",
+            "enable_sc_dhw",
+            "enable_sc_sh",
+            "heatingdemand",
+            "dhwdemand",
             "op_man_addition",
             "op_man_cooling",
             "op_man_dhw",
-            "enable_sc_dhw",
-            "enable_sc_sh",
-            "cooling_enabled",
             "picpin_relay_heat_l1",
             "picpin_relay_heat_l2",
             "picpin_relay_heat_l3",
             "picpin_relay_qm10",
         ]
 
-        for i, sensor_name in enumerate(sensor_names):
-            assert entities[i]._metric_key == sensor_name
-            assert entities[i]._attr_translation_key == sensor_name
+        entity_metric_keys = sorted([e._metric_key for e in entities])
+        assert entity_metric_keys == sorted(sensor_names)
     finally:
         # Clean up
         if hasattr(QvantumBaseBinaryEntity, "entity_id"):
