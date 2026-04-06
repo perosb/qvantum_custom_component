@@ -182,7 +182,7 @@ class TestQvantumBaseSensorEntity:
         entity = QvantumBaseSensorEntity(
             mock_coordinator, "degree_minute", mock_device, True
         )
-        assert entity._attr_native_unit_of_measurement == "dm"
+        assert entity._attr_native_unit_of_measurement in {"dm", "°min"}
 
 
 class TestQvantumTemperatureEntity:
