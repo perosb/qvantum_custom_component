@@ -87,6 +87,8 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         self._device = None
         self._last_tap_stop_fetch: datetime | None = None
         self._cached_tap_stop: Any = None
+        self._last_heatingenergy: float | None = None
+        self._last_heatingenergy_time: datetime | None = None
 
         super().__init__(
             hass,
@@ -287,6 +289,45 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                 tap_stop,
             )
 
+    def _calculate_heating_power(self, values: dict) -> None:
+        """Derive heatingpower (W) from the heatingenergy (kWh) delta between polls.
+
+        Stores the result in values["heatingpower"].
+        Negative deltas (counter resets) are clamped to 0 W.
+        """
+        now = dt_util.utcnow()
+        current_energy = values.get("heatingenergy")
+        if current_energy is None:
+            return
+
+        values["heatingpower"] = 0  # Default to 0 W if we can't calculate a delta yet
+
+        _LOGGER.debug(
+            "Calculating heating power: current_energy=%.6f kWh, last_energy=%s kWh, last_time=%s",
+            current_energy,
+            self._last_heatingenergy,
+            self._last_heatingenergy_time,
+        )
+        if (
+            self._last_heatingenergy is not None
+            and self._last_heatingenergy_time is not None
+        ):
+            delta_kwh = current_energy - self._last_heatingenergy
+            delta_seconds = (now - self._last_heatingenergy_time).total_seconds()
+            if delta_seconds > 0:
+                # kWh / s → W:  (kWh * 3 600 000 J/kWh) / s = J/s = W
+                power_w = (delta_kwh * 3_600_000) / delta_seconds
+                values["heatingpower"] = max(0.0, round(power_w, 1))
+                _LOGGER.debug(
+                    "Calculated heatingpower: %.1f W (delta=%.6f kWh over %.1f s)",
+                    values["heatingpower"],
+                    delta_kwh,
+                    delta_seconds,
+                )
+
+        self._last_heatingenergy = current_energy
+        self._last_heatingenergy_time = now
+
     async def async_update_data(self):
         """Fetch data from API endpoint."""
         try:
@@ -366,6 +407,9 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                 await self._fetch_tap_stop_modbus(device_id, values)
 
             self._derive_tap_water_capacity(values)
+
+            if self.modbus_enabled:
+                self._calculate_heating_power(values)
 
             _LOGGER.debug("Final values: %s", values)
 

@@ -165,6 +165,12 @@
       "powertotal": {
         "name": "Totaal (L1+L2+L3)"
       },
+      "heatingpower": {
+        "name": "Verwarmingsvermogen"
+      },
+      "dhwpower": {
+        "name": "Warmwatervermogen"
+      },
       "compressor_power": {
         "name": "Compressorvermogen"
       },

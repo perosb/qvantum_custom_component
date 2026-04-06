@@ -850,3 +850,107 @@ class TestDeriveTapWaterCapacity:
         values = {"tap_water_start": 55, "tap_water_stop": 70}
         coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] == 4
+
+
+class TestCalculateHeatingPower:
+    """Tests for _calculate_heating_power."""
+
+    def _make_coordinator(self):
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            mock_hass = MagicMock()
+            mock_hass.data = {DOMAIN: MagicMock()}
+            mock_config_entry = MagicMock()
+            mock_config_entry.options.get.side_effect = lambda key, default=None: default
+            mock_config_entry.data = {}
+            mock_config_entry.unique_id = "test_device_123"
+            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+        return coordinator
+
+    def test_no_previous_sample_writes_zero_power(self):
+        """First call records baseline and writes 0 W (no delta available yet)."""
+        coordinator = self._make_coordinator()
+        values = {"heatingenergy": 100.0}
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            mock_now.return_value = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+            coordinator._calculate_heating_power(values)
+
+        assert values["heatingpower"] == 0
+        assert coordinator._last_heatingenergy == 100.0
+
+    def test_calculates_power_from_delta(self):
+        """After two calls, heatingpower = delta_kWh / delta_s * 3_600_000."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)  # 15 s later
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power({"heatingenergy": 100.0})
+
+            mock_now.return_value = t1
+            values = {"heatingenergy": 100.001}  # +0.001 kWh in 15 s
+            coordinator._calculate_heating_power(values)
+
+        # 0.001 kWh / 15 s * 3_600_000 = 240.0 W
+        assert values["heatingpower"] == 240.0
+
+    def test_negative_delta_clamped_to_zero(self):
+        """A negative delta (counter reset) produces 0 W, not a negative value."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power({"heatingenergy": 100.0})
+
+            mock_now.return_value = t1
+            values = {"heatingenergy": 90.0}  # counter reset
+            coordinator._calculate_heating_power(values)
+
+        assert values["heatingpower"] == 0.0
+
+    def test_missing_heatingenergy_skipped(self):
+        """If heatingenergy is absent, the method does nothing."""
+        coordinator = self._make_coordinator()
+        values = {}
+        coordinator._calculate_heating_power(values)
+        assert "heatingpower" not in values
+        assert coordinator._last_heatingenergy is None
+
+    def test_zero_delta_produces_zero_power(self):
+        """No change in energy over a poll interval produces 0 W."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power({"heatingenergy": 100.0})
+
+            mock_now.return_value = t1
+            values = {"heatingenergy": 100.0}
+            coordinator._calculate_heating_power(values)
+
+        assert values["heatingpower"] == 0.0
+
+    def test_updates_tracking_state_after_each_call(self):
+        """_last_heatingenergy and _last_heatingenergy_time are updated each call."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power({"heatingenergy": 50.0})
+            assert coordinator._last_heatingenergy == 50.0
+            assert coordinator._last_heatingenergy_time == t0
+
+            mock_now.return_value = t1
+            coordinator._calculate_heating_power({"heatingenergy": 51.0})
+            assert coordinator._last_heatingenergy == 51.0
+            assert coordinator._last_heatingenergy_time == t1
