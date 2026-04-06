@@ -92,6 +92,14 @@ class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
     ) -> None:
         super().__init__(coordinator, metric_key, device, enabled_by_default)
 
+        match self._metric_key:
+            case "heatingdemand":
+                self._attr_icon = "mdi:heat-wave"
+            case "coolingdemand" | "cooling_enabled":
+                self._attr_icon = "mdi:snowflake"
+            case "additiondemand" | "additiondhwdemand":
+                self._attr_icon = "mdi:lightning-bolt"
+
     @property
     def is_on(self):
         """Get metric from API data."""
