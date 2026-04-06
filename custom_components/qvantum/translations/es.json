@@ -165,6 +165,9 @@
       "powertotal": {
         "name": "Potencia total"
       },
+      "heatingpower": {
+        "name": "Potencia de calefacción"
+      },
       "compressor_power": {
         "name": "Potencia del compresor"
       },

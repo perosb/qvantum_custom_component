@@ -66,7 +66,9 @@ DEFAULT_ENABLED_METRICS = [
 ]
 
 # Additional metrics only available via Modbus input registers (not the HTTP API)
-DEFAULT_ENABLED_MODBUS_ONLY_METRICS: list[str] = []
+DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
+    "heatingpower",  # Derived from heatingenergy delta; only meaningful with fast Modbus polling
+]
 
 # Holding register keys that should be exposed as sensor entities in Modbus mode
 DEFAULT_ENABLED_MODBUS_HOLDING_METRICS = [
@@ -112,6 +114,8 @@ DEFAULT_DISABLED_HTTP_METRICS = [
     "dhwdemand",
     "heatingdemand",
     "coolingdemand",
+    "heatingpower",
+    "dhwpower",
     "heatingreleased",
     "coolingreleased",
     "compressorreleased",
@@ -202,7 +206,7 @@ TEMPERATURE_METRICS = [
     "tap_water_stop",
 ]
 ENERGY_METRICS = ["energy"]
-POWER_METRICS = ["powertotal"]
+POWER_METRICS = ["powertotal", "heatingpower"]
 CURRENT_METRICS = ["current"]
 PRESSURE_METRICS = ["pressure"]
 

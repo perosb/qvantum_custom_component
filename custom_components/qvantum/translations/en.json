@@ -165,6 +165,9 @@
       "powertotal": {
         "name": "Total Power"
       },
+      "heatingpower": {
+        "name": "Heating Power"
+      },
       "compressor_power": {
         "name": "Compressor Power"
       },

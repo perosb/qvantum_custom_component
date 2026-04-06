@@ -168,6 +168,9 @@
       "powertotal": {
         "name": "Total effekt"
       },
+      "heatingpower": {
+        "name": "Värmeeffekt"
+      },
       "compressor_power": {
         "name": "Kompressoreffekt"
       },

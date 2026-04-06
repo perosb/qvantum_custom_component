@@ -165,6 +165,9 @@
       "powertotal": {
         "name": "Gesamt (L1+L2+L3)"
       },
+      "heatingpower": {
+        "name": "Heizleistung"
+      },
       "compressor_power": {
         "name": "Kompressorleistung"
       },
