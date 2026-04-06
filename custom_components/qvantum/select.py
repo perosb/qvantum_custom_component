@@ -54,7 +54,6 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
                     "1",
                     "2",
                 ]  # Translation keys that will be translated by HA
-                self._attr_icon = "mdi:leaf"
 
     def _is_valid_mode(self, mode, valid_modes: set) -> bool:
         """Check if a mode value is valid."""

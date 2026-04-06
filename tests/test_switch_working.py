@@ -124,9 +124,9 @@ class TestQvantumSwitchEntity:
         assert entity._attr_icon == "mdi:transmission-tower-import"
 
     def test_init_default_icon(self, mock_coordinator, mock_device):
-        """Test switch entity initialization with default icon."""
+        """Test switch entity initialization with unknown metric has no icon."""
         entity = QvantumSwitchEntity(mock_coordinator, "unknown_metric", mock_device)
-        assert entity._attr_icon == "mdi:water-boiler"
+        assert entity._attr_icon is None
 
     def test_is_on_extra_tap_water_off(self, mock_coordinator, mock_device):
         """Test is_on when extra_tap_water is 'off'."""
