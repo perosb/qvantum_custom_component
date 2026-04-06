@@ -178,7 +178,6 @@ async def test_async_setup_entry(
             "coolingdemand",
             "heatingdemand",
             "dhwdemand",
-            "heatingdemand",
             "picpin_relay_heat_l1",
             "picpin_relay_heat_l2",
             "picpin_relay_heat_l3",
