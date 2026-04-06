@@ -190,6 +190,9 @@
         "name": "Corriente de entrada L3"
       },
 
+      "degree_minute": {
+        "name": "Grado minuto"
+      },
       "bf1_l_min": {
         "name": "Sensor de caudal ACS (BF1)"
       },

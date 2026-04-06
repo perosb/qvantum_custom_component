@@ -80,6 +80,7 @@ _ENTITY_ICONS: dict[str, str] = {
     "tap_water_cap": "mdi:account-group",
     "fanrpm": "mdi:fan",
     "compressormeasuredspeed": "mdi:turbine",
+    "degree_minute": "mdi:metronome",
     # Switches
     "op_mode": "mdi:auto-mode",
     "man_mode": "mdi:radiator",

@@ -181,6 +181,8 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             self._attr_device_class = SensorDeviceClass.DURATION
         elif "bf1_l_min" == metric_key:
             self._attr_native_unit_of_measurement = "l/m"
+        elif "degree_minute" == metric_key:
+            self._attr_native_unit_of_measurement = "°min"
 
     @property
     def state(self):

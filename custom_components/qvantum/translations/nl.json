@@ -190,6 +190,9 @@
         "name": "Ingangsstroom L3"
       },
 
+      "degree_minute": {
+        "name": "Graadminuut"
+      },
       "bf1_l_min": {
         "name": "Flowsensor tapwater (BF1)"
       },
