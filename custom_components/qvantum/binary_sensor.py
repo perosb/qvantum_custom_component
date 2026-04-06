@@ -3,13 +3,11 @@
 import logging
 
 from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
     BinarySensorEntity,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.const import EntityCategory
 
 from custom_components.qvantum.const import (
     DEFAULT_DISABLED_HTTP_METRICS,
@@ -20,7 +18,6 @@ from custom_components.qvantum.const import (
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
 from .entity import QvantumEntity
-from custom_components.qvantum import coordinator
 
 _LOGGER = logging.getLogger(__name__)
 
