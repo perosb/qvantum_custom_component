@@ -295,8 +295,8 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         Uses the elapsed time between actual counter increments as the denominator,
         not the poll interval. This avoids large overestimates caused by the coarse
         0.1 kWh counter resolution: a single 0.1 kWh tick measured over a 16 s poll
-        interval would yield 22 500 W, whereas measuring it over the ~51 s it took
-        to accumulate gives the correct ~7 000 W.
+        interval would yield 22 500 W, whereas measuring it over the 48 s it took
+        to accumulate gives the correct 7 500 W.
 
         While hp_status == 3 (heating), the last computed value is held when the
         counter has not yet ticked (no new delta). When heating stops, power resets
