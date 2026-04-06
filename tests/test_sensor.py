@@ -433,6 +433,15 @@ class TestSensorSetup:
             DEFAULT_DISABLED_MODBUS_METRICS,
         )
 
+        # Metrics in DEFAULT_DISABLED_MODBUS_METRICS that are handled by binary_sensor, not sensor
+        binary_sensor_metrics = {
+            "dhwdemand",
+            "heatingdemand",
+            "coolingdemand",
+            "additiondemand",
+            "additiondhwdemand",
+        }
+
         # Mark config entry as Modbus mode
         mock_config_entry.options = {CONF_MODBUS_TCP: True}
         mock_coordinator.modbus_enabled = True
@@ -476,9 +485,18 @@ class TestSensorSetup:
 
         assert disabled_entities == []
 
+        # Demand metrics in DEFAULT_DISABLED_MODBUS_METRICS are binary sensors, not sensor entities,
+        # so they won't be disabled via the entity registry in sensor setup.
+        expected_call_count = len(
+            [
+                m
+                for m in DEFAULT_DISABLED_MODBUS_METRICS
+                if m not in binary_sensor_metrics
+            ]
+        )
         mock_entity_registry = mock_hass.data["entity_registry"]
-        assert mock_entity_registry.async_update_entity.call_count == len(
-            DEFAULT_DISABLED_MODBUS_METRICS
+        assert (
+            mock_entity_registry.async_update_entity.call_count == expected_call_count
         )
 
     @pytest.mark.asyncio

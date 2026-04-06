@@ -114,6 +114,21 @@
       },
       "picpin_relay_ha12": {
         "name": "Heizkreispumpe (HA12)"
+      },
+      "dhwdemand": {
+        "name": "DHW Bedarf"
+      },
+      "heatingdemand": {
+        "name": "Heizbedarf"
+      },
+      "coolingdemand": {
+        "name": "Kühlbedarf"
+      },
+      "additiondemand": {
+        "name": "Zusatzbedarf"
+      },
+      "additiondhwdemand": {
+        "name": "Zusatzbedarf DHW"
       }
     },
     "sensor": {
@@ -374,15 +389,6 @@
           "client-disconnect": "Client getrennt"
         }
       },
-      "dhwdemand": {
-        "name": "Brauchwasser-Nachfrage"
-      },
-      "heatingdemand": {
-        "name": "Heiznachfrage"
-      },
-      "coolingdemand": {
-        "name": "Kühlungsnachfrage"
-      },
       "heatingreleased": {
         "name": "Heizung freigegeben"
       },
@@ -401,7 +407,7 @@
       "heating_prioritytimeleft": {
         "name": "Heiz-Prioritätszeit verbleibend"
       },
-      "cooling_priotitytimeleft": {
+      "cooling_prioritytimeleft": {
         "name": "Kühl-Prioritätszeit verbleibend"
       },
       "switch_state": {
