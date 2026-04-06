@@ -78,6 +78,8 @@ _ENTITY_ICONS: dict[str, str] = {
     "additiondhwdemand": "mdi:lightning-bolt",
     # Sensors
     "tap_water_cap": "mdi:account-group",
+    "fanrpm": "mdi:fan",
+    "compressormeasuredspeed": "mdi:turbine",
     # Switches
     "op_mode": "mdi:auto-mode",
     "man_mode": "mdi:radiator",
