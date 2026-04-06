@@ -34,11 +34,6 @@ async def async_setup_entry(
     sensors = []
 
     sensor_names = [
-        "op_man_addition",
-        "op_man_cooling",
-        "op_man_dhw",
-        "enable_sc_dhw",
-        "enable_sc_sh",
         "cooling_enabled",
         "picpin_relay_heat_l1",
         "picpin_relay_heat_l2",
