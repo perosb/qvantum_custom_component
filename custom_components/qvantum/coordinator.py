@@ -292,9 +292,8 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
     def _calculate_heating_power(self, values: dict) -> None:
         """Derive heatingpower (W) from the heatingenergy (kWh) delta between polls.
 
-        Stores the result in values["heatingpower"]. On the first call there is no
-        previous sample, so only the timestamp/value are recorded without writing
-        a power value.  Negative deltas (counter resets) are clamped to 0 W.
+        Stores the result in values["heatingpower"].
+        Negative deltas (counter resets) are clamped to 0 W.
         """
         now = dt_util.utcnow()
         current_energy = values.get("heatingenergy")
