@@ -8,13 +8,17 @@ This document outlines the AI agents, assistants, and tools that contributed to 
 - **Role**: Primary coding assistant and development partner
 - **Contributions**:
   - Code generation and refactoring
-  - Translation file management (German and Dutch HVAC terminology)
+  - Translation file management (German, Dutch, Swedish, Spanish, and English HVAC terminology)
   - Workflow automation setup (GitHub Actions release workflow)
   - Documentation writing and README improvements
   - Testing and validation assistance
   - GitHub repository management and branch protection configuration
   - Code review and quality improvements (fixing anti-patterns, optimizing entity creation, enhancing encapsulation, improving test coverage)
   - Protocol-specific configuration updates (HTTP vs Modbus metrics handling)
+  - Modbus demand binary sensors (heating, cooling, DHW, addition) with register mappings and config entry migration
+  - Derived metric implementation: `heatingpower` calculated from `heatingenergy` counter delta with accurate time-window measurement and hold-last-value while heating
+  - Centralized icon mapping in `QvantumEntity` base class
+  - Bug fixes for heating power overestimation caused by coarse counter resolution vs. fast poll intervals
 - **Tools Used**:
   - Code completion and suggestions
   - Multi-file editing capabilities
