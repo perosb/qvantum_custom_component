@@ -1559,6 +1559,62 @@ class TestQvantumAPI:
         with pytest.raises(APIAuthError):
             await api.get_device_metadata("test_device")
 
+    @pytest.mark.asyncio
+    async def test_get_device_metadata_uses_device_metadata_etag(self, mock_session):
+        """Metadata requests should use _device_metadata_etag, not _metrics_etag."""
+        cm, _ = mock_session.make_cm_response(status=304)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._metrics_etag = "metrics-etag"
+        api._device_metadata_etag = "metadata-etag"
+
+        await api.get_device_metadata("test_device")
+
+        call_args = mock_session.get.call_args
+        assert call_args[1]["headers"]["If-None-Match"] == "metadata-etag"
+
+    @pytest.mark.asyncio
+    async def test_request_json_omits_json_when_payload_not_provided(
+        self, mock_session
+    ):
+        """_request_json should not send a json body when no payload is provided."""
+        cm, _ = mock_session.make_cm_response(status=200, json_data={"ok": True})
+        mock_session.post.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        result = await api._request_json("post", "https://example.test/endpoint")
+
+        assert result == {"ok": True}
+        call_args = mock_session.post.call_args
+        assert "json" not in call_args[1]
+        assert call_args[1]["headers"]["Authorization"] == "Bearer test_token"
+
+    @pytest.mark.asyncio
+    async def test_send_command_wraps_payload_in_command(self, mock_session):
+        """_send_command should wrap payload in a top-level command object."""
+        cm, _ = mock_session.make_cm_response(status=200, json_data={"ok": True})
+        mock_session.post.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        await api._send_command("test_device", {"set_fan_mode": {"mode": 0}})
+
+        call_args = mock_session.post.call_args
+        assert call_args[1]["json"] == {"command": {"set_fan_mode": {"mode": 0}}}
 
     @pytest.mark.asyncio
     async def test_update_settings_non_200_response(self, mock_session):
