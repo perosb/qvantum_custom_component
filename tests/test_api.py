@@ -230,6 +230,51 @@ class TestQvantumAPI:
         assert mock_session.get.called
 
     @pytest.mark.asyncio
+    async def test_get_metrics_modbus_sets_latency_ms(self, mock_session):
+        """When Modbus succeeds, latency should be an integer millisecond measurement."""
+        api = QvantumAPI(
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
+        )
+
+        fake_metrics = {"metrics": {"bt1": 21, "powertotal": 100}}
+
+        with patch.object(
+            QvantumAPI,
+            "_read_modbus_metrics",
+            AsyncMock(return_value=fake_metrics),
+        ):
+            result = await api.get_metrics("test_device_123", enabled_metrics=["bt1"])
+
+        assert "metrics" in result
+        latency = result["metrics"]["latency"]
+        assert isinstance(latency, int)
+        assert latency >= 0
+        assert latency < 10000
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_modbus_no_latency_placeholder_in_registers(
+        self, mock_session
+    ):
+        """_read_modbus_registers must not inject a latency key; latency is set in get_metrics."""
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+
+        with patch.object(
+            QvantumAPI,
+            "_read_modbus_registers",
+            AsyncMock(return_value={"hpid": "dev", "bt1": 20}),
+        ):
+            raw = await api._read_modbus_metrics("dev", ["bt1"])
+
+        # latency must not be present unless explicitly measured and injected
+        assert "latency" not in raw.get("metrics", {})
+
+    @pytest.mark.asyncio
     async def test_read_modbus_settings_aliasing(self, mock_session):
         """Test that Modbus settings values are mapped to HTTP and modbus alias keys."""
         api = QvantumAPI(
