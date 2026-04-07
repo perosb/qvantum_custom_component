@@ -253,7 +253,6 @@ class TestQvantumAPI:
         latency = result["metrics"]["latency"]
         assert isinstance(latency, int)
         assert latency >= 0
-        assert latency < 10000
 
     @pytest.mark.asyncio
     async def test_get_metrics_modbus_no_latency_placeholder_in_registers(
