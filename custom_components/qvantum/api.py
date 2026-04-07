@@ -28,6 +28,8 @@ from .const import (
     RELAY_BIT_MAP,
     MODBUS_SPEC_TO_INTERNAL_MAP,
     MODBUS_INTERNAL_TO_SPEC_MAP,
+    MODBUS_INPUT_TO_HTTP_MAP,
+    MODBUS_HOLDING_TO_SETTINGS_MAP,
     RELAY_STAGE_POWER_MAP,
     BASE_SYSTEM_POWER_W,
 )
@@ -92,6 +94,10 @@ class QvantumAPI:
                 }
             )
             self._session_owner = True
+        self._reset_state()
+
+    def _reset_state(self):
+        """Reset authentication and cached API data."""
         self._token = None
         self._refreshtoken = None
         self._token_expiry = None
@@ -381,8 +387,6 @@ class QvantumAPI:
             )
 
         # Convert internal metric names to HTTP alias names using canonical mapping.
-        from .const import MODBUS_INPUT_TO_HTTP_MAP
-
         normalized_metrics = dict(metrics)
         for internal_key, value in metrics.items():
             if value is None:
@@ -405,8 +409,6 @@ class QvantumAPI:
         )
 
         # Convert to the same format as HTTP API and include original modbus keys for compatibility.
-        from .const import MODBUS_HOLDING_TO_SETTINGS_MAP
-
         settings_dict: dict[str, Any] = {}
         for k, v in settings.items():
             if k == "hpid":
@@ -449,15 +451,33 @@ class QvantumAPI:
 
     async def unauthenticate(self):
         """Unauthenticate from the API."""
-        self._token = None
-        self._refreshtoken = None
-        self._token_expiry = None
-        self._settings_data = {}
-        self._settings_etag = None
-        self._metrics_data = {}
-        self._metrics_etag = None
-        self._device_metadata = {}
-        self._device_metadata_etag = None
+        self._reset_state()
+
+    async def _request_json(
+        self,
+        method: str,
+        url: str,
+        payload: Optional[dict] = None,
+        validate_status: bool = False,
+    ) -> dict[str, Any]:
+        """Send an authenticated request and return parsed JSON response.
+
+        By default, this helper does not validate HTTP status codes and will try
+        to parse JSON regardless of response status. Set ``validate_status=True``
+        to enforce ``_handle_response`` before reading the response body.
+        """
+        await self._ensure_valid_token()
+        request = getattr(self._session, method)
+        kwargs: dict[str, Any] = {"headers": self._request_headers()}
+        if payload is not None:
+            kwargs["json"] = payload
+
+        async with request(url, **kwargs) as response:
+            if validate_status:
+                await self._handle_response(response)
+            data = await response.json()
+            _LOGGER.debug("Response received %s: %s", response.status, data)
+            return data
 
     async def authenticate(self):
         """Authenticate with the API using username and password to retrieve a token."""
@@ -560,34 +580,22 @@ class QvantumAPI:
         """Update one or several settings."""
 
         _LOGGER.debug(json.dumps(payload))
-
-        await self._ensure_valid_token()
-
-        async with self._session.patch(
+        return await self._request_json(
+            "patch",
             f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings?dispatch=false",
-            json=payload,
-            headers=self._request_headers(),
-        ) as response:
-            data = await response.json()
-            _LOGGER.debug("Response received %s: %s", response.status, data)
-            return data
+            payload,
+        )
 
     async def _send_command(self, device_id: str, payload: dict):
         """Send a command to a device."""
 
         wrapped_payload = {"command": payload}
         _LOGGER.debug(json.dumps(wrapped_payload))
-
-        await self._ensure_valid_token()
-
-        async with self._session.post(
+        return await self._request_json(
+            "post",
             f"{self._api_url}/api/commands/v1/devices/{device_id}/commands?wait=true&use_internal_names=true",
-            json=wrapped_payload,
-            headers=self._request_headers(),
-        ) as response:
-            data = await response.json()
-            _LOGGER.debug("Response received %s: %s", response.status, data)
-            return data
+            wrapped_payload,
+        )
 
     async def elevate_access(self, device_id: str):
         """Elevate access for a device."""
@@ -828,9 +836,7 @@ class QvantumAPI:
                 stop,
                 start,
             )
-            return await self.set_tap_water(
-                device_id, start=start, stop=stop
-            )
+            return await self.set_tap_water(device_id, start=start, stop=stop)
 
         payload = {
             "settings": [{"name": "tap_water_capacity_target", "value": capacity}]
@@ -869,8 +875,8 @@ class QvantumAPI:
 
         await self._ensure_valid_token()
         headers = self._request_headers()
-        if self._metrics_etag:
-            headers["If-None-Match"] = self._metrics_etag
+        if self._device_metadata_etag:
+            headers["If-None-Match"] = self._device_metadata_etag
 
         async with self._session.get(
             f"{self._api_url}/api/device-info/v1/devices/{device_id}/status",
@@ -1017,8 +1023,6 @@ class QvantumAPI:
         if self._modbus_tcp:
             # Read settings from Modbus holding registers
             try:
-                from .const import MODBUS_HOLDING_TO_SETTINGS_MAP
-
                 # Read all settings that have a corresponding holding register
                 settings_to_read = [
                     setting_key
