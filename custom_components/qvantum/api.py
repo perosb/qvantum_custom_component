@@ -454,9 +454,18 @@ class QvantumAPI:
         self._reset_state()
 
     async def _request_json(
-        self, method: str, url: str, payload: Optional[dict] = None
+        self,
+        method: str,
+        url: str,
+        payload: Optional[dict] = None,
+        validate_status: bool = False,
     ) -> dict[str, Any]:
-        """Send an authenticated request and return response JSON."""
+        """Send an authenticated request and return parsed JSON response.
+
+        By default, this helper does not validate HTTP status codes and will try
+        to parse JSON regardless of response status. Set ``validate_status=True``
+        to enforce ``_handle_response`` before reading the response body.
+        """
         await self._ensure_valid_token()
         request = getattr(self._session, method)
         kwargs: dict[str, Any] = {"headers": self._request_headers()}
@@ -464,6 +473,8 @@ class QvantumAPI:
             kwargs["json"] = payload
 
         async with request(url, **kwargs) as response:
+            if validate_status:
+                await self._handle_response(response)
             data = await response.json()
             _LOGGER.debug("Response received %s: %s", response.status, data)
             return data

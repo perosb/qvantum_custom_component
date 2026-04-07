@@ -1600,6 +1600,25 @@ class TestQvantumAPI:
         assert call_args[1]["headers"]["Authorization"] == "Bearer test_token"
 
     @pytest.mark.asyncio
+    async def test_request_json_validate_status_raises_on_non_2xx(self, mock_session):
+        """_request_json should raise when validate_status is enabled for non-2xx."""
+        from custom_components.qvantum.api import APIConnectionError
+
+        cm, _ = mock_session.make_cm_response(status=400, json_data={"error": "bad"})
+        mock_session.post.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        with pytest.raises(APIConnectionError):
+            await api._request_json(
+                "post", "https://example.test/endpoint", validate_status=True
+            )
+
+    @pytest.mark.asyncio
     async def test_send_command_wraps_payload_in_command(self, mock_session):
         """_send_command should wrap payload in a top-level command object."""
         cm, _ = mock_session.make_cm_response(status=200, json_data={"ok": True})
