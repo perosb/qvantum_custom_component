@@ -76,6 +76,9 @@ _ENTITY_ICONS: dict[str, str] = {
     "cooling_enabled": "mdi:snowflake",
     "additiondemand": "mdi:lightning-bolt",
     "additiondhwdemand": "mdi:lightning-bolt",
+    "picpin_relay_heat_l1": "mdi:transmission-tower-import",
+    "picpin_relay_heat_l2": "mdi:transmission-tower-import",
+    "picpin_relay_heat_l3": "mdi:transmission-tower-import",
     # Sensors
     "tap_water_cap": "mdi:account-group",
     "fanrpm": "mdi:fan",
