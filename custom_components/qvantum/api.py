@@ -158,8 +158,6 @@ class QvantumAPI:
 
             data = {}
             data["hpid"] = device_id
-            if use_input_registers:
-                data["latency"] = 0  # Placeholder for metrics
 
             try:
                 if not self._modbus_client.connected:
@@ -917,7 +915,16 @@ class QvantumAPI:
         if self._modbus_tcp:
             # Try Modbus first, then fall back to HTTP if Modbus is unavailable.
             try:
+                modbus_start = asyncio.get_running_loop().time()
                 self._metrics_data = await self._read_modbus_metrics(device_id, names)
+                modbus_latency = int(
+                    (asyncio.get_running_loop().time() - modbus_start) * 1000
+                )
+                if (
+                    isinstance(self._metrics_data, dict)
+                    and "metrics" in self._metrics_data
+                ):
+                    self._metrics_data["metrics"]["latency"] = modbus_latency
                 return self._metrics_data
             except Exception as e:
                 _LOGGER.warning(
