@@ -915,10 +915,10 @@ class QvantumAPI:
         if self._modbus_tcp:
             # Try Modbus first, then fall back to HTTP if Modbus is unavailable.
             try:
-                modbus_start = datetime.now()
+                modbus_start = asyncio.get_running_loop().time()
                 self._metrics_data = await self._read_modbus_metrics(device_id, names)
                 modbus_latency = int(
-                    (datetime.now() - modbus_start).total_seconds() * 1000
+                    (asyncio.get_running_loop().time() - modbus_start) * 1000
                 )
                 if (
                     isinstance(self._metrics_data, dict)
