@@ -1024,3 +1024,106 @@ class TestCalculateHeatingPower:
 
         # 0.1 kWh / 48 s * 3 600 000 = 7 500 W  (not 22 500 W from 0.1 / 16 s)
         assert values["heatingpower"] == 7500.0
+
+
+class TestCalculateDhwPower:
+    """Tests for _calculate_dhw_power."""
+
+    def _make_coordinator(self):
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            mock_hass = MagicMock()
+            mock_hass.data = {DOMAIN: MagicMock()}
+            mock_config_entry = MagicMock()
+            mock_config_entry.options.get.side_effect = lambda key, default=None: (
+                default
+            )
+            mock_config_entry.data = {}
+            mock_config_entry.unique_id = "test_device_123"
+            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+            coordinator.data = None  # simulate no prior poll
+        return coordinator
+
+    def test_no_previous_sample_writes_zero_power(self):
+        """First call (DHW active) records baseline and writes 0 W."""
+        coordinator = self._make_coordinator()
+        values = {"dhwenergy": 100.0, "hp_status": 2}
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            mock_now.return_value = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+            coordinator._calculate_dhw_power(values)
+
+        assert values["dhwpower"] == 0
+        assert coordinator._last_dhwenergy == 100.0
+
+    def test_calculates_power_from_delta(self):
+        """After two calls, dhwpower = delta_kWh / delta_s * 3_600_000."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_dhw_power({"dhwenergy": 100.0, "hp_status": 2})
+
+            mock_now.return_value = t1
+            values = {"dhwenergy": 100.001, "hp_status": 2}
+            coordinator._calculate_dhw_power(values)
+
+        assert values["dhwpower"] == 240.0
+
+    def test_not_dhw_resets_power_to_zero(self):
+        """When hp_status != 2, dhwpower is always 0 regardless of energy."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t1_same = t1  # intentionally same timestamp: this assertion is mode-switch, not time-delta based
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_dhw_power({"dhwenergy": 100.0, "hp_status": 2})
+            mock_now.return_value = t1
+            v1 = {"dhwenergy": 100.001, "hp_status": 2}
+            coordinator._calculate_dhw_power(v1)
+            assert v1["dhwpower"] == 240.0
+            coordinator.data = {"values": v1}
+
+            mock_now.return_value = t1_same
+            values = {"dhwenergy": 100.001, "hp_status": 3}
+            coordinator._calculate_dhw_power(values)
+
+        assert values["dhwpower"] == 0.0
+
+    def test_missing_dhwenergy_skipped(self):
+        """If dhwenergy is absent, the method does nothing."""
+        coordinator = self._make_coordinator()
+        values = {}
+        coordinator._calculate_dhw_power(values)
+        assert "dhwpower" not in values
+        assert coordinator._last_dhwenergy is None
+
+    def test_zero_delta_holds_last_power_while_dhw(self):
+        """When hp_status==2 and counter has not ticked, last computed power is held."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_dhw_power({"dhwenergy": 100.0, "hp_status": 2})
+
+            mock_now.return_value = t1
+            v1 = {"dhwenergy": 100.001, "hp_status": 2}
+            coordinator._calculate_dhw_power(v1)
+            assert v1["dhwpower"] == 240.0
+
+            coordinator.data = {"values": v1}
+
+            mock_now.return_value = t2
+            values = {"dhwenergy": 100.001, "hp_status": 2}
+            coordinator._calculate_dhw_power(values)
+
+        assert values["dhwpower"] == 240.0

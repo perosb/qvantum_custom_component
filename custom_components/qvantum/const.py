@@ -68,6 +68,8 @@ DEFAULT_ENABLED_METRICS = [
 # Additional metrics only available via Modbus input registers (not the HTTP API)
 DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "heatingpower",  # Derived from heatingenergy delta; only meaningful with fast Modbus polling
+    "dhwpower",  # Derived from dhwenergy delta; only meaningful with fast Modbus polling
+    "smart_dhw_control_status",
 ]
 
 # Holding register keys that should be exposed as sensor entities in Modbus mode
@@ -197,7 +199,15 @@ REQUIRED_MODBUS_METRICS = [
 ]
 
 # Sensor filtering patterns
-EXCLUDED_METRIC_PATTERNS = ["op_man_", "enable", "smart_", "picpin_", "use_", "demand"]
+EXCLUDED_METRIC_PATTERNS = [
+    "op_man_",
+    "enable",
+    "smart_sh_mode",
+    "smart_dhw_mode",
+    "picpin_",
+    "use_",
+    "demand",
+]
 
 # Sensor type classification
 TEMPERATURE_METRICS = [
@@ -207,7 +217,7 @@ TEMPERATURE_METRICS = [
     "tap_water_stop",
 ]
 ENERGY_METRICS = ["energy"]
-POWER_METRICS = ["powertotal", "heatingpower"]
+POWER_METRICS = ["powertotal", "heatingpower", "dhwpower"]
 CURRENT_METRICS = ["current"]
 PRESSURE_METRICS = ["pressure"]
 
