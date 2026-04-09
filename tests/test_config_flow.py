@@ -97,7 +97,7 @@ class TestQvantumConfigFlow:
 
     def test_config_flow_version(self, config_flow):
         """Test that config flow has correct version."""
-        assert config_flow.VERSION == 6  # From const.py CONFIG_VERSION
+        assert config_flow.VERSION == 7  # From const.py CONFIG_VERSION
 
     @pytest.mark.asyncio
     async def test_user_step_cannot_connect(self, hass, config_flow):

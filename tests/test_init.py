@@ -210,7 +210,7 @@ class TestIntegrationSetup:
 
     @pytest.mark.asyncio
     async def test_async_migrate_entry_non_legacy(self, hass, mock_config_entry):
-        config_entry = MagicMock(version=6, minor_version=0)
+        config_entry = MagicMock(version=7, minor_version=0)
 
         result = await async_migrate_entry(hass, config_entry)
 
@@ -236,8 +236,8 @@ class TestIntegrationSetup:
                 result = await async_migrate_entry(hass, config_entry)
 
                 assert result is True
-                assert mock_migrate.call_count == 2  # v5 and v6 migrations
-                mock_update.assert_called_once_with(config_entry, version=6)
+                assert mock_migrate.call_count == 3  # v5, v6, and v7 migrations
+                mock_update.assert_called_once_with(config_entry, version=7)
 
     @pytest.mark.asyncio
     async def test_async_migrate_entry_legacy(self, hass, mock_config_entry):
@@ -251,11 +251,11 @@ class TestIntegrationSetup:
                 result = await async_migrate_entry(hass, config_entry)
 
                 assert result is True
-                assert mock_migrate.call_count == 3  # v1, v5, and v6 migrations
-                mock_update.assert_called_once_with(config_entry, version=6)
+                assert mock_migrate.call_count == 4  # v1, v5, v6, and v7 migrations
+                mock_update.assert_called_once_with(config_entry, version=7)
 
-                # Verify both migration calls were made with correct arguments
-                assert len(mock_migrate.call_args_list) == 3
+                # Verify migration calls were made with correct arguments
+                assert len(mock_migrate.call_args_list) == 4
 
                 first_call_args = mock_migrate.call_args_list[0].args
                 _, first_entry_id, first_migration_fn = first_call_args
