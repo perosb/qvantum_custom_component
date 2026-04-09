@@ -157,7 +157,7 @@
       "smart_dhw_control_status": {
         "name": "Smart DHW-kontrollstatus",
         "state": {
-          "0": "Inte tillgänglig",
+          "0": "Väntar på elpriser",
           "1": "Standby",
           "2": "Ökar",
           "3": "Minskar",

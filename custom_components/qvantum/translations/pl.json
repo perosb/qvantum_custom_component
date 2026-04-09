@@ -1,0 +1,571 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Extra ciepła woda"
+      },
+      "op_man_addition": {
+        "name": "Ręczny tryb pracy: Dogrzewanie"
+      },
+      "op_man_dhw": {
+        "name": "Ręczny tryb pracy: Ciepła woda"
+      },
+      "op_mode": {
+        "name": "Ręczny tryb pracy"
+      },
+      "man_mode": {
+        "name": "Ręczny tryb pracy: Ogrzewanie"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: DHW"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Ogrzewanie"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "SmartControl",
+        "state": {
+          "off": "Wył.",
+          "0": "Eco",
+          "1": "Zrównoważony",
+          "2": "Komfort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Smart tryb SH",
+        "state": {
+          "0": "Eco",
+          "1": "Zrównoważony",
+          "2": "Komfort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Smart tryb DHW",
+        "state": {
+          "0": "Eco",
+          "1": "Zrównoważony",
+          "2": "Komfort"
+        }
+      }
+    },
+    "button": {
+      "extra_tap_water_60min": {
+        "name": "Extra ciepła woda 60 min"
+      },
+      "elevate_access": {
+        "name": "Podnieś dostęp"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Ręczny tryb pracy: Dogrzewanie"
+      },
+      "op_man_cooling": {
+        "name": "Ręczny tryb pracy: Chłodzenie"
+      },
+      "op_man_dhw": {
+        "name": "Ręczny tryb pracy: Ciepła woda"
+      },
+      "cooling_enabled": {
+        "name": "Chłodzenie włączone"
+      },
+      "use_adaptive": {
+        "name": "SmartControl"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: DHW"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Ogrzewanie"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Moc dodatkowa L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Moc dodatkowa L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Moc dodatkowa L3"
+      },
+      "picpin_relay_gp10": {
+        "name": "Pompa cyrkulacyjna (GP10)"
+      },
+      "picpin_relay_qm10": {
+        "name": "Zawór przełączający, DHW/ogrzewanie (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Zawór mieszający dogrzewanie (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Zawór mieszający dogrzewanie (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Pompa cyrkulacyjna (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Pompa cyrkulacyjna"
+      },
+      "picpin_relay_ha12": {
+        "name": "Pompa obiegu grzewczego (HA12)"
+      },
+      "dhwdemand": {
+        "name": "Zapotrzebowanie na ciepłą wodę"
+      },
+      "heatingdemand": {
+        "name": "Zapotrzebowanie na ogrzewanie"
+      },
+      "coolingdemand": {
+        "name": "Zapotrzebowanie na chłodzenie"
+      },
+      "additiondemand": {
+        "name": "Zapotrzebowanie na dogrzewanie"
+      },
+      "additiondhwdemand": {
+        "name": "Zapotrzebowanie na dogrzewanie ciepłej wody"
+      }
+    },
+    "sensor": {
+      "compressor_state": {
+        "name": "Stan sprężarki",
+        "state": {
+          "0": "Wył.",
+          "1": "Bezczynność",
+          "2": "Przygotowanie do ogrzewania",
+          "3": "Przygotowanie do chłodzenia",
+          "4": "Przygotowanie 1 do ciepłej wody",
+          "5": "Przygotowanie 2 do ciepłej wody",
+          "6": "Ogrzewanie",
+          "7": "Chłodzenie",
+          "8": "Ciepła woda",
+          "9": "Odszranianie ciepłej wody pasywne",
+          "10": "Odszranianie ogrzewania pasywne",
+          "11": "Przygotowanie do basenu",
+          "12": "Basen",
+          "13": "Odszranianie basenu pasywne"
+        }
+      },
+      "smart_dhw_control_status": {
+        "name": "Status sterowania Smart DHW",
+        "state": {
+          "0": "Oczekiwanie na ceny energii",
+          "1": "Tryb gotowości",
+          "2": "Podnoszenie",
+          "3": "Obniżanie",
+          "4": "Obniżanie długoterminowe",
+          "5": "Wstrzymane"
+        }
+      },
+      "powertotal": {
+        "name": "Całkowita moc"
+      },
+      "heatingpower": {
+        "name": "Moc ogrzewania"
+      },
+      "dhwpower": {
+        "name": "Moc DHW"
+      },
+      "compressor_power": {
+        "name": "Moc sprężarki"
+      },
+      "heatingenergy": {
+        "name": "Energia ogrzewania"
+      },
+      "dhwenergy": {
+        "name": "Energia DHW"
+      },
+      "inputcurrent1": {
+        "name": "Prąd wejściowy L1"
+      },
+      "inputcurrent2": {
+        "name": "Prąd wejściowy L2"
+      },
+      "inputcurrent3": {
+        "name": "Prąd wejściowy L3"
+      },
+      "degree_minute": {
+        "name": "Stopień minutowy"
+      },
+      "bf1_l_min": {
+        "name": "Czujnik przepływu DHW (BF1)"
+      },
+      "bf1_rpm": {
+        "name": "Prędkość pompy czujnika przepływu DHW (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Niskie ciśnienie bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Temperatura niskiego ciśnienia (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "Wysokie ciśnienie bar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "Temperatura wysokiego ciśnienia (BP2)"
+      },
+      "bt10": {
+        "name": "Temperatura wyjścia skraplacza (BT10)"
+      },
+      "bt12": {
+        "name": "Czynnik grzewczy, zewnętrzna linia zasilająca (BT12)"
+      },
+      "bt13": {
+        "name": "Temperatura wejścia skraplacza (BT13)"
+      },
+      "bt14": {
+        "name": "Temperatura powietrza wylotowego (BT14)"
+      },
+      "bt15": {
+        "name": "Temperatura powietrza wywiewanego (BT15)"
+      },
+      "bt20": {
+        "name": "Linia tłoczna (BT20)"
+      },
+      "bt21": {
+        "name": "Linia cieczowa (BT21)"
+      },
+      "bt22": {
+        "name": "Temperatura wejścia parownika (BT22)"
+      },
+      "bt23": {
+        "name": "Linia ssania (BT23)"
+      },
+      "bt31": {
+        "name": "DHW pierwotny, temperatura ładowania wejście (BT31)"
+      },
+      "bt33": {
+        "name": "DHW wtórny, zimna woda wejście (BT33)"
+      },
+      "bt34": {
+        "name": "DHW wtórny, ciepła woda wyjście (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Prędkość sprężarki"
+      },
+      "dhw_outl_temp_15": {
+        "name": "Temperatura wyjścia DHW 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "Temperatura wyjścia DHW 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "Temperatura wyjścia DHW max"
+      },
+      "dhw_prioritytime": {
+        "name": "Czas priorytetu DHW"
+      },
+      "fan0_10v": {
+        "name": "Prędkość wentylatora"
+      },
+      "fanrpm": {
+        "name": "Prędkość wentylatora"
+      },
+      "qn8position": {
+        "name": "Zawór mieszający, dogrzewanie (QN8)"
+      },
+      "gp1_speed": {
+        "name": "Pompa cyrkulacyjna (GP1)"
+      },
+      "gp2_speed": {
+        "name": "Pompa ładowania DHW (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Temperatura docelowa sterownika"
+      },
+      "guide_he": {
+        "name": "Ogrzewanie sterownika"
+      },
+      "man_mode": {
+        "name": "Tryb ręczny"
+      },
+      "op_mode": {
+        "name": "Tryb pracy",
+        "state": {
+          "0": "Automatyczny",
+          "1": "Ręczny",
+          "2": "Dogrzewanie"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Czujnik trybu pracy"
+      },
+      "price_region": {
+        "name": "Region cenowy"
+      },
+      "room_temp_ext": {
+        "name": "Zewnętrzna temperatura pokojowa"
+      },
+      "compressorenergy": {
+        "name": "Energia sprężarki"
+      },
+      "totalenergy": {
+        "name": "Całkowita energia"
+      },
+      "bt1": {
+        "name": "Zewnętrzna (BT1)"
+      },
+      "bt2": {
+        "name": "Wewnętrzna (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Status Smart dla ogrzewania"
+      },
+      "bt11": {
+        "name": "Czynnik grzewczy, linia zasilająca (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "Czynnik grzewczy, linia zasilająca, docelowa."
+      },
+      "start_cooling_temp": {
+        "name": "Temperatura startu chłodzenia"
+      },
+      "bt30": {
+        "name": "Zbiornik ciepłej wody (BT30)"
+      },
+      "tap_water_start": {
+        "name": "Dolna granica zbiornika ciepłej wody"
+      },
+      "tap_water_stop": {
+        "name": "Górna granica zbiornika ciepłej wody"
+      },
+      "tap_water_cap": {
+        "name": "Pojemność ciepłej wody"
+      },
+      "additionalenergy": {
+        "name": "Energia dogrzewania"
+      },
+      "hpid": {
+        "name": "Id"
+      },
+      "smart_sh_mode": {
+        "name": "Smart tryb SH",
+        "state": {
+          "0": "Eco",
+          "1": "Zrównoważony",
+          "2": "Komfort"
+        }
+      },
+      "hp_status": {
+        "name": "Status pompy ciepła",
+        "state": {
+          "0": "Bezczynność",
+          "1": "Odszranianie",
+          "2": "Ciepła woda",
+          "3": "Ogrzewanie",
+          "4": "Chłodzenie"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Status Smart dla ciepłej wody"
+      },
+      "smart_dhw_mode": {
+        "name": "Smart tryb DHW",
+        "state": {
+          "0": "Eco",
+          "1": "Zrównoważony",
+          "2": "Komfort"
+        }
+      },
+      "tap_stop": {
+        "name": "Stop extra ciepłej wody"
+      },
+      "ventilation_boost_stop": {
+        "name": "Stop wentylacji boost"
+      },
+      "timestamp": {
+        "name": "Ostatnia aktualizacja"
+      },
+      "latency": {
+        "name": "Opóźnienie"
+      },
+      "disconnect_reason": {
+        "name": "Powód rozłączenia",
+        "state": {
+          "client-disconnect": "Klient rozłączony"
+        }
+      },
+      "heatingreleased": {
+        "name": "Ogrzewanie zwolnione"
+      },
+      "coolingreleased": {
+        "name": "Chłodzenie zwolnione"
+      },
+      "compressorreleased": {
+        "name": "Sprężarka zwolniona"
+      },
+      "additionreleased": {
+        "name": "Dogrzewanie zwolnione"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "Pozostały czas priorytetu DHW"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Pozostały czas priorytetu ogrzewania"
+      },
+      "cooling_prioritytimeleft": {
+        "name": "Pozostały czas priorytetu chłodzenia"
+      },
+      "switch_state": {
+        "name": "Stan przełącznika"
+      },
+      "dhwstop_temp": {
+        "name": "Temperatura zatrzymania DHW"
+      },
+      "dhwstart_temp": {
+        "name": "Temperatura startu DHW"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Filtrowana temperatura zewnętrzna (60s)"
+      },
+      "max_freq_env": {
+        "name": "Maks. częstotliwość środowiska"
+      },
+      "calc_suppy_cpr": {
+        "name": "Wyliczone zasilanie CPR"
+      },
+      "dhw_set": {
+        "name": "Ustawienie DHW"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "Filtr temperatury BP1 20 min"
+      },
+      "max_bp2_env": {
+        "name": "Maks. BP2 środowisko"
+      },
+      "picpin_mask": {
+        "name": "Maska PIC Pin"
+      },
+      "firmware_display_fw_version": {
+        "name": "Wersja firmware wyświetlacza"
+      },
+      "firmware_cc_fw_version": {
+        "name": "Wersja firmware CC"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Wersja firmware inwertera"
+      },
+      "firmware_last_check": {
+        "name": "Ostatnie sprawdzenie firmware"
+      },
+      "expires_at": {
+        "name": "Wygaśnięcie podwyższonego dostępu"
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Krzywa równoległa, przesunięcie"
+      },
+      "tap_water_capacity_target": {
+        "name": "Docelowa pojemność ciepłej wody"
+      },
+      "room_comp_factor": {
+        "name": "Współczynnik kompensacji pokojowej"
+      },
+      "tap_water_stop": {
+        "name": "Górna granica temperatury zbiornika ciepłej wody"
+      },
+      "tap_water_start": {
+        "name": "Dolna granica temperatury zbiornika ciepłej wody"
+      },
+      "fan_normal": {
+        "name": "Normalna prędkość wentylatora"
+      },
+      "fan_speed_2": {
+        "name": "Minimalna prędkość wentylatora dla sprężarki"
+      },
+      "dhw_stop_extra": {
+        "name": "Extra temperatura zatrzymania ciepłej wody"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Klimat wewnętrzny"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Prędkość wentylatora",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Wył.",
+              "normal": "Normalny",
+              "extra": "Extra"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Pompa ciepła Qvantum",
+    "abort": {
+      "already_configured": "Urządzenie jest już skonfigurowane",
+      "reconfigure_successful": "Rekonfiguracja powiodła się"
+    },
+    "error": {
+      "cannot_connect": "Nie udało się połączyć",
+      "invalid_auth": "Nieprawidłowe uwierzytelnienie",
+      "unknown": "Nieoczekiwany błąd"
+    },
+    "step": {
+      "user": {
+        "description": "Modbus zapewnia dane w czasie niemal rzeczywistym, czytając bezpośrednio z urządzenia.\nModbus musi być włączony w ustawieniach instalatora w aplikacji/wyświetlaczu pompy przed włączeniem tutaj. Uwaga: odczytuje tylko przez Modbus, zapis/sterowanie nadal odbywa się przez HTTP API",
+        "data": {
+          "password": "Hasło",
+          "username": "Nazwa użytkownika",
+          "modbus_tcp": "Użyj Modbus TCP zamiast odpytywania HTTP"
+        }
+      },
+      "reconfigure": {
+        "description": "Modbus zapewnia dane w czasie niemal rzeczywistym, czytając bezpośrednio z urządzenia.\nModbus musi być włączony w ustawieniach instalatora w aplikacji/wyświetlaczu pompy przed włączeniem tutaj. Uwaga: odczytuje tylko przez Modbus, zapis/sterowanie nadal odbywa się przez HTTP API",
+        "data": {
+          "password": "Hasło",
+          "username": "Nazwa użytkownika"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Interwał skanowania HTTP (sekundy)",
+          "modbus_tcp": "Użyj Modbus TCP zamiast odpytywania HTTP",
+          "modbus_host": "Host/IP Qvantum"
+        },
+        "description": "Zmień swoje opcje.",
+        "title": "Opcje"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Extra ciepła woda",
+      "description": "Aktywuj extra ciepłą wodę na okres",
+      "fields": {
+        "device_id": {
+          "name": "Id urządzenia",
+          "description": "Identyfikator urządzenia Qvantum"
+        },
+        "minutes": {
+          "name": "Minuty",
+          "description": "Minuty produkcji extra ciepłej wody (0 minut wyłącza)"
+        }
+      }
+    }
+  }
+}

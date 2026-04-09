@@ -154,7 +154,7 @@
       "smart_dhw_control_status": {
         "name": "Smart DHW-Steuerstatus",
         "state": {
-          "0": "Nicht verfügbar",
+          "0": "Warten auf Energiepreise",
           "1": "Bereitschaft",
           "2": "Steigend",
           "3": "Sinkend",

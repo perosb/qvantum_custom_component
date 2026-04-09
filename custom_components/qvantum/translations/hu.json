@@ -1,0 +1,571 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Extra melegvíz"
+      },
+      "op_man_addition": {
+        "name": "Kézi üzemmód: rásegítés"
+      },
+      "op_man_dhw": {
+        "name": "Kézi üzemmód: melegvíz"
+      },
+      "op_mode": {
+        "name": "Kézi üzemmód"
+      },
+      "man_mode": {
+        "name": "Kézi üzemmód: fűtés"
+      },
+      "enable_sc_dhw": {
+        "name": "Intelligens vezérlés: DHW"
+      },
+      "enable_sc_sh": {
+        "name": "Intelligens vezérlés: fűtés"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "Intelligens vezérlés",
+        "state": {
+          "off": "Ki",
+          "0": "Takarékos",
+          "1": "Kiegyensúlyozott",
+          "2": "Komfort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Intelligens SH mód",
+        "state": {
+          "0": "Takarékos",
+          "1": "Kiegyensúlyozott",
+          "2": "Komfort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Intelligens DHW mód",
+        "state": {
+          "0": "Takarékos",
+          "1": "Kiegyensúlyozott",
+          "2": "Komfort"
+        }
+      }
+    },
+    "button": {
+      "extra_tap_water_60min": {
+        "name": "Extra melegvíz 60 perc"
+      },
+      "elevate_access": {
+        "name": "Emelt hozzáférés"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Kézi üzemmód: rásegítés"
+      },
+      "op_man_cooling": {
+        "name": "Kézi üzemmód: hűtés"
+      },
+      "op_man_dhw": {
+        "name": "Kézi üzemmód: melegvíz"
+      },
+      "cooling_enabled": {
+        "name": "Hűtés engedélyezve"
+      },
+      "use_adaptive": {
+        "name": "Intelligens vezérlés"
+      },
+      "enable_sc_dhw": {
+        "name": "Intelligens vezérlés: DHW"
+      },
+      "enable_sc_sh": {
+        "name": "Intelligens vezérlés: fűtés"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Kiegészítő teljesítmény L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Kiegészítő teljesítmény L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Kiegészítő teljesítmény L3"
+      },
+      "picpin_relay_gp10": {
+        "name": "Keringető szivattyú (GP10)"
+      },
+      "picpin_relay_qm10": {
+        "name": "Váltószelep, DHW/fűtés (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Keverőszelep rásegítés (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Keverőszelep rásegítés (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Keringető szivattyú (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Keringető szivattyú"
+      },
+      "picpin_relay_ha12": {
+        "name": "Fűtőkör szivattyú (HA12)"
+      },
+      "dhwdemand": {
+        "name": "Melegvíz igény"
+      },
+      "heatingdemand": {
+        "name": "Fűtési igény"
+      },
+      "coolingdemand": {
+        "name": "Hűtési igény"
+      },
+      "additiondemand": {
+        "name": "Rásegítési igény"
+      },
+      "additiondhwdemand": {
+        "name": "Rásegítési használati melegvíz igény"
+      }
+    },
+    "sensor": {
+      "compressor_state": {
+        "name": "Kompresszor állapot",
+        "state": {
+          "0": "Ki",
+          "1": "Készenlét",
+          "2": "Előkészítés fűtéshez",
+          "3": "Előkészítés hűtéshez",
+          "4": "1. előkészítés melegvízhez",
+          "5": "2. előkészítés melegvízhez",
+          "6": "Fűtés",
+          "7": "Hűtés",
+          "8": "Használati melegvíz",
+          "9": "Passzív leolvasztás melegvíznél",
+          "10": "Passzív leolvasztás fűtésnél",
+          "11": "Előkészítés medencéhez",
+          "12": "Medence",
+          "13": "Passzív leolvasztás medencénél"
+        }
+      },
+      "smart_dhw_control_status": {
+        "name": "Intelligens DHW vezérlési állapot",
+        "state": {
+          "0": "Energiaárakra vár",
+          "1": "Készenlét",
+          "2": "Emelés",
+          "3": "Csökkentés",
+          "4": "Hosszú távú csökkentés",
+          "5": "Szüneteltetve"
+        }
+      },
+      "powertotal": {
+        "name": "Összes teljesítmény"
+      },
+      "heatingpower": {
+        "name": "Fűtési teljesítmény"
+      },
+      "dhwpower": {
+        "name": "HMV teljesítmény"
+      },
+      "compressor_power": {
+        "name": "Kompresszor teljesítmény"
+      },
+      "heatingenergy": {
+        "name": "Fűtési energia"
+      },
+      "dhwenergy": {
+        "name": "HMV energia"
+      },
+      "inputcurrent1": {
+        "name": "Bemeneti áram L1"
+      },
+      "inputcurrent2": {
+        "name": "Bemeneti áram L2"
+      },
+      "inputcurrent3": {
+        "name": "Bemeneti áram L3"
+      },
+      "degree_minute": {
+        "name": "Fokperc"
+      },
+      "bf1_l_min": {
+        "name": "DHW átfolyásérzékelő (BF1)"
+      },
+      "bf1_rpm": {
+        "name": "DHW szivattyú fordulatszám érzékelő (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Alacsony nyomás bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Alacsony nyomás hőmérséklet (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "Magasnyomás bar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "Magasnyomás hőmérséklet (BP2)"
+      },
+      "bt10": {
+        "name": "Kondenzátor kilépő hőmérséklet (BT10)"
+      },
+      "bt12": {
+        "name": "Fűtőközeg, külső előremenő ág (BT12)"
+      },
+      "bt13": {
+        "name": "Kondenzátor belépő hőmérséklet (BT13)"
+      },
+      "bt14": {
+        "name": "Elhasznált levegő hőmérséklet (BT14)"
+      },
+      "bt15": {
+        "name": "Elszívott levegő hőmérséklet (BT15)"
+      },
+      "bt20": {
+        "name": "Nyomóvezeték (BT20)"
+      },
+      "bt21": {
+        "name": "Folyadékvezeték (BT21)"
+      },
+      "bt22": {
+        "name": "Elpárologtató belépő hőmérséklet (BT22)"
+      },
+      "bt23": {
+        "name": "Szívóvezeték (BT23)"
+      },
+      "bt31": {
+        "name": "HMV primer, töltési hőmérséklet be (BT31)"
+      },
+      "bt33": {
+        "name": "HMV szekunder, hidegvíz be (BT33)"
+      },
+      "bt34": {
+        "name": "HMV szekunder, melegvíz ki (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Kompresszor fordulatszám"
+      },
+      "dhw_outl_temp_15": {
+        "name": "HMV kilépő hőmérséklet 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "HMV kilépő hőmérséklet 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "HMV kilépő hőmérséklet max"
+      },
+      "dhw_prioritytime": {
+        "name": "HMV prioritási idő"
+      },
+      "fan0_10v": {
+        "name": "Ventilátor fordulatszám"
+      },
+      "fanrpm": {
+        "name": "Ventilátor fordulatszám"
+      },
+      "qn8position": {
+        "name": "Keverőszelep, rásegítés (QN8)"
+      },
+      "gp1_speed": {
+        "name": "Keringető szivattyú (GP1)"
+      },
+      "gp2_speed": {
+        "name": "HMV töltőszivattyú (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Irányított kívánt hőmérséklet"
+      },
+      "guide_he": {
+        "name": "Irányított fűtés"
+      },
+      "man_mode": {
+        "name": "Kézi mód"
+      },
+      "op_mode": {
+        "name": "Üzemmód",
+        "state": {
+          "0": "Automatikus",
+          "1": "Kézi",
+          "2": "Rásegítés"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Üzemmód érzékelő"
+      },
+      "price_region": {
+        "name": "Ár régió"
+      },
+      "room_temp_ext": {
+        "name": "Külső szobahőmérséklet"
+      },
+      "compressorenergy": {
+        "name": "Kompresszor energia"
+      },
+      "totalenergy": {
+        "name": "Összes energia"
+      },
+      "bt1": {
+        "name": "Kültéri (BT1)"
+      },
+      "bt2": {
+        "name": "Beltéri (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Intelligens állapot fűtéshez"
+      },
+      "bt11": {
+        "name": "Fűtőközeg, előremenő ág (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "Fűtőközeg, előremenő ág célérték."
+      },
+      "start_cooling_temp": {
+        "name": "Hűtés indítási hőmérséklet"
+      },
+      "bt30": {
+        "name": "Melegvíz tartály (BT30)"
+      },
+      "tap_water_start": {
+        "name": "Melegvíz tartály alsó határ"
+      },
+      "tap_water_stop": {
+        "name": "Melegvíz tartály felső határ"
+      },
+      "tap_water_cap": {
+        "name": "Melegvíz kapacitás"
+      },
+      "additionalenergy": {
+        "name": "Rásegítési energia"
+      },
+      "hpid": {
+        "name": "Azonosító"
+      },
+      "smart_sh_mode": {
+        "name": "Intelligens SH mód",
+        "state": {
+          "0": "Takarékos",
+          "1": "Kiegyensúlyozott",
+          "2": "Komfort"
+        }
+      },
+      "hp_status": {
+        "name": "Hőszivattyú állapot",
+        "state": {
+          "0": "Készenlét",
+          "1": "Leolvasztás",
+          "2": "Használati melegvíz",
+          "3": "Fűtés",
+          "4": "Hűtés"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Intelligens állapot melegvízhez"
+      },
+      "smart_dhw_mode": {
+        "name": "Intelligens DHW mód",
+        "state": {
+          "0": "Takarékos",
+          "1": "Kiegyensúlyozott",
+          "2": "Komfort"
+        }
+      },
+      "tap_stop": {
+        "name": "Extra melegvíz leállítás"
+      },
+      "ventilation_boost_stop": {
+        "name": "Szellőztetés ráerősítés leállítása"
+      },
+      "timestamp": {
+        "name": "Utolsó frissítés"
+      },
+      "latency": {
+        "name": "Késleltetés"
+      },
+      "disconnect_reason": {
+        "name": "Lecsatlakozás oka",
+        "state": {
+          "client-disconnect": "Kliens lecsatlakozott"
+        }
+      },
+      "heatingreleased": {
+        "name": "Fűtés engedélyezve"
+      },
+      "coolingreleased": {
+        "name": "Hűtés engedélyezve"
+      },
+      "compressorreleased": {
+        "name": "Kompresszor engedélyezve"
+      },
+      "additionreleased": {
+        "name": "Rásegítés engedélyezve"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "HMV prioritás hátralévő ideje"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Fűtési prioritás hátralévő ideje"
+      },
+      "cooling_prioritytimeleft": {
+        "name": "Hűtési prioritás hátralévő ideje"
+      },
+      "switch_state": {
+        "name": "Kapcsoló állapot"
+      },
+      "dhwstop_temp": {
+        "name": "HMV leállítási hőmérséklet"
+      },
+      "dhwstart_temp": {
+        "name": "HMV indítási hőmérséklet"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Szűrt külső hőmérséklet (60 mp)"
+      },
+      "max_freq_env": {
+        "name": "Max frekvencia környezet"
+      },
+      "calc_suppy_cpr": {
+        "name": "Számított előremenő CPR"
+      },
+      "dhw_set": {
+        "name": "HMV beállítás"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "BP1 hőmérséklet 20 perces szűrő"
+      },
+      "max_bp2_env": {
+        "name": "Max BP2 környezet"
+      },
+      "picpin_mask": {
+        "name": "PIC láb maszk"
+      },
+      "firmware_display_fw_version": {
+        "name": "Kijelző firmware verzió"
+      },
+      "firmware_cc_fw_version": {
+        "name": "CC firmware verzió"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Inverter firmware verzió"
+      },
+      "firmware_last_check": {
+        "name": "Firmware utolsó ellenőrzése"
+      },
+      "expires_at": {
+        "name": "Emelt hozzáférés lejárata"
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Párhuzamos görbe eltolás"
+      },
+      "tap_water_capacity_target": {
+        "name": "Melegvíz kapacitás célérték"
+      },
+      "room_comp_factor": {
+        "name": "Szobahőmérséklet kompenzációs tényező"
+      },
+      "tap_water_stop": {
+        "name": "Melegvíz tartály felső hőmérséklet-határ"
+      },
+      "tap_water_start": {
+        "name": "Melegvíz tartály alsó hőmérséklet-határ"
+      },
+      "fan_normal": {
+        "name": "Normál ventilátor fordulatszám"
+      },
+      "fan_speed_2": {
+        "name": "Kompresszor minimális ventilátor fordulatszám"
+      },
+      "dhw_stop_extra": {
+        "name": "Extra melegvíz leállítási hőmérséklet"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Beltéri klíma"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Ventilátor fordulatszám",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Ki",
+              "normal": "Normál",
+              "extra": "Extra fokozat"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Qvantum hőszivattyú",
+    "abort": {
+      "already_configured": "Az eszköz már konfigurálva van",
+      "reconfigure_successful": "Újrakonfigurálás sikeres"
+    },
+    "error": {
+      "cannot_connect": "Sikertelen csatlakozás",
+      "invalid_auth": "Érvénytelen hitelesítés",
+      "unknown": "Váratlan hiba"
+    },
+    "step": {
+      "user": {
+        "description": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: a Modbus csak olvas, az írás/vezérlés továbbra is HTTP API-n keresztül történik.",
+        "data": {
+          "password": "Jelszó",
+          "username": "Felhasználónév",
+          "modbus_tcp": "Modbus TCP használata HTTP lekérdezés helyett"
+        }
+      },
+      "reconfigure": {
+        "description": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: a Modbus csak olvas, az írás/vezérlés továbbra is HTTP API-n keresztül történik.",
+        "data": {
+          "password": "Jelszó",
+          "username": "Felhasználónév"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "HTTP lekérdezési időköz (másodperc)",
+          "modbus_tcp": "Modbus TCP használata HTTP lekérdezés helyett",
+          "modbus_host": "Qvantum Hoszt/IP"
+        },
+        "description": "Módosítsa a beállításait.",
+        "title": "Beállítások"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Extra melegvíz",
+      "description": "Extra használati melegvíz aktiválása egy időszakra",
+      "fields": {
+        "device_id": {
+          "name": "Eszközazonosító",
+          "description": "A Qvantum eszköz azonosítója"
+        },
+        "minutes": {
+          "name": "Percek",
+          "description": "Percek száma extra melegvíz előállításához (0 perc kikapcsol)"
+        }
+      }
+    }
+  }
+}

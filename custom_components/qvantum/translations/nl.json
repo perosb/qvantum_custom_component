@@ -154,7 +154,7 @@
       "smart_dhw_control_status": {
         "name": "Smart DHW-controlestatus",
         "state": {
-          "0": "Niet beschikbaar",
+          "0": "Wachten op energieprijzen",
           "1": "Standby",
           "2": "Stijgen",
           "3": "Dalen",

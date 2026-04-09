@@ -1,0 +1,571 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Extra eau chaude"
+      },
+      "op_man_addition": {
+        "name": "Mode manuel de fonctionnement : appoint"
+      },
+      "op_man_dhw": {
+        "name": "Mode manuel de fonctionnement : eau chaude"
+      },
+      "op_mode": {
+        "name": "Mode manuel de fonctionnement"
+      },
+      "man_mode": {
+        "name": "Mode manuel de fonctionnement : chauffage"
+      },
+      "enable_sc_dhw": {
+        "name": "Smart Control : ECS"
+      },
+      "enable_sc_sh": {
+        "name": "Smart Control : chauffage"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "Smart Control",
+        "state": {
+          "off": "Arrêt",
+          "0": "Éco",
+          "1": "Équilibré",
+          "2": "Confort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Mode Smart SH",
+        "state": {
+          "0": "Éco",
+          "1": "Équilibré",
+          "2": "Confort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Mode Smart ECS",
+        "state": {
+          "0": "Éco",
+          "1": "Équilibré",
+          "2": "Confort"
+        }
+      }
+    },
+    "button": {
+      "extra_tap_water_60min": {
+        "name": "Extra eau chaude 60 min"
+      },
+      "elevate_access": {
+        "name": "Élever l'accès"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Mode manuel de fonctionnement : appoint"
+      },
+      "op_man_cooling": {
+        "name": "Mode manuel de fonctionnement : refroidissement"
+      },
+      "op_man_dhw": {
+        "name": "Mode manuel de fonctionnement : eau chaude"
+      },
+      "cooling_enabled": {
+        "name": "Refroidissement activé"
+      },
+      "use_adaptive": {
+        "name": "Smart Control"
+      },
+      "enable_sc_dhw": {
+        "name": "Smart Control : ECS"
+      },
+      "enable_sc_sh": {
+        "name": "Smart Control : chauffage"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Puissance d'appoint L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Puissance d'appoint L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Puissance d'appoint L3"
+      },
+      "picpin_relay_gp10": {
+        "name": "Pompe de circulation (GP10)"
+      },
+      "picpin_relay_qm10": {
+        "name": "Vanne de diversion, ECS/chauffage (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Vanne de dérivation appoint (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Vanne de dérivation appoint (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Pompe de circulation (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Pompe de circulation"
+      },
+      "picpin_relay_ha12": {
+        "name": "Pompe de circuit de chauffage (HA12)"
+      },
+      "dhwdemand": {
+        "name": "Demande eau chaude"
+      },
+      "heatingdemand": {
+        "name": "Demande de chauffage"
+      },
+      "coolingdemand": {
+        "name": "Demande de refroidissement"
+      },
+      "additiondemand": {
+        "name": "Demande d'appoint"
+      },
+      "additiondhwdemand": {
+        "name": "Demande d'appoint eau chaude"
+      }
+    },
+    "sensor": {
+      "compressor_state": {
+        "name": "État du compresseur",
+        "state": {
+          "0": "Arrêt",
+          "1": "Inactif",
+          "2": "Préparation pour chauffage",
+          "3": "Préparation pour refroidissement",
+          "4": "Préparation 1 pour eau chaude",
+          "5": "Préparation 2 pour eau chaude",
+          "6": "Chauffage",
+          "7": "Refroidissement",
+          "8": "Eau chaude",
+          "9": "Dégivrage eau chaude passif",
+          "10": "Dégivrage chauffage passif",
+          "11": "Préparation pour piscine",
+          "12": "Piscine",
+          "13": "Dégivrage piscine passif"
+        }
+      },
+      "smart_dhw_control_status": {
+        "name": "Statut contrôle Smart ECS",
+        "state": {
+          "0": "En attente des prix de l'énergie",
+          "1": "Veille",
+          "2": "Augmentation",
+          "3": "Réduction",
+          "4": "Réduction à long terme",
+          "5": "En pause"
+        }
+      },
+      "powertotal": {
+        "name": "Puissance totale"
+      },
+      "heatingpower": {
+        "name": "Puissance de chauffage"
+      },
+      "dhwpower": {
+        "name": "Puissance ECS"
+      },
+      "compressor_power": {
+        "name": "Puissance compresseur"
+      },
+      "heatingenergy": {
+        "name": "Énergie de chauffage"
+      },
+      "dhwenergy": {
+        "name": "Énergie ECS"
+      },
+      "inputcurrent1": {
+        "name": "Courant d'entrée L1"
+      },
+      "inputcurrent2": {
+        "name": "Courant d'entrée L2"
+      },
+      "inputcurrent3": {
+        "name": "Courant d'entrée L3"
+      },
+      "degree_minute": {
+        "name": "Degré Minute"
+      },
+      "bf1_l_min": {
+        "name": "Capteur de débit ECS (BF1)"
+      },
+      "bf1_rpm": {
+        "name": "Vitesse pompe capteur débit ECS (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Basse pression bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Température basse pression (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "Haute pression bar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "Température haute pression (BP2)"
+      },
+      "bt10": {
+        "name": "Température sortie condenseur (BT10)"
+      },
+      "bt12": {
+        "name": "Fluide chauffage, ligne d'alimentation externe (BT12)"
+      },
+      "bt13": {
+        "name": "Température entrée condenseur (BT13)"
+      },
+      "bt14": {
+        "name": "Température air soufflé (BT14)"
+      },
+      "bt15": {
+        "name": "Température air extrait (BT15)"
+      },
+      "bt20": {
+        "name": "Ligne de refoulement (BT20)"
+      },
+      "bt21": {
+        "name": "Ligne liquide (BT21)"
+      },
+      "bt22": {
+        "name": "Température entrée évaporateur (BT22)"
+      },
+      "bt23": {
+        "name": "Ligne d'aspiration (BT23)"
+      },
+      "bt31": {
+        "name": "ECS primaire, température de charge entrée (BT31)"
+      },
+      "bt33": {
+        "name": "ECS secondaire, eau froide entrée (BT33)"
+      },
+      "bt34": {
+        "name": "ECS secondaire, eau chaude sortie (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Vitesse compresseur"
+      },
+      "dhw_outl_temp_15": {
+        "name": "Température sortie ECS 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "Température sortie ECS 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "Température sortie ECS max"
+      },
+      "dhw_prioritytime": {
+        "name": "Temps de priorité ECS"
+      },
+      "fan0_10v": {
+        "name": "Vitesse ventilateur"
+      },
+      "fanrpm": {
+        "name": "Vitesse ventilateur"
+      },
+      "qn8position": {
+        "name": "Vanne de dérivation, appoint (QN8)"
+      },
+      "gp1_speed": {
+        "name": "Pompe de circulation (GP1)"
+      },
+      "gp2_speed": {
+        "name": "Pompe de charge ECS (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Température désirée guide"
+      },
+      "guide_he": {
+        "name": "Guide chauffage"
+      },
+      "man_mode": {
+        "name": "Mode manuel"
+      },
+      "op_mode": {
+        "name": "Mode de fonctionnement",
+        "state": {
+          "0": "Automatique",
+          "1": "Manuel",
+          "2": "Appoint"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Capteur mode de fonctionnement"
+      },
+      "price_region": {
+        "name": "Région tarifaire"
+      },
+      "room_temp_ext": {
+        "name": "Température extérieure pièce"
+      },
+      "compressorenergy": {
+        "name": "Énergie compresseur"
+      },
+      "totalenergy": {
+        "name": "Énergie totale"
+      },
+      "bt1": {
+        "name": "Extérieur (BT1)"
+      },
+      "bt2": {
+        "name": "Intérieur (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Statut Smart pour chauffage"
+      },
+      "bt11": {
+        "name": "Fluide chauffage, ligne d'alimentation (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "Fluide chauffage, ligne d'alimentation, cible."
+      },
+      "start_cooling_temp": {
+        "name": "Température de démarrage refroidissement"
+      },
+      "bt30": {
+        "name": "Ballon eau chaude (BT30)"
+      },
+      "tap_water_start": {
+        "name": "Limite inférieure ballon eau chaude"
+      },
+      "tap_water_stop": {
+        "name": "Limite supérieure ballon eau chaude"
+      },
+      "tap_water_cap": {
+        "name": "Capacité eau chaude"
+      },
+      "additionalenergy": {
+        "name": "Énergie d'appoint"
+      },
+      "hpid": {
+        "name": "Id"
+      },
+      "smart_sh_mode": {
+        "name": "Mode Smart SH",
+        "state": {
+          "0": "Éco",
+          "1": "Équilibré",
+          "2": "Confort"
+        }
+      },
+      "hp_status": {
+        "name": "Statut pompe à chaleur",
+        "state": {
+          "0": "Inactif",
+          "1": "Dégivrage",
+          "2": "Eau chaude",
+          "3": "Chauffage",
+          "4": "Refroidissement"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Statut Smart pour eau chaude"
+      },
+      "smart_dhw_mode": {
+        "name": "Mode Smart ECS",
+        "state": {
+          "0": "Éco",
+          "1": "Équilibré",
+          "2": "Confort"
+        }
+      },
+      "tap_stop": {
+        "name": "Arrêt extra eau chaude"
+      },
+      "ventilation_boost_stop": {
+        "name": "Arrêt ventilation boostée"
+      },
+      "timestamp": {
+        "name": "Dernière mise à jour"
+      },
+      "latency": {
+        "name": "Latence"
+      },
+      "disconnect_reason": {
+        "name": "Raison de déconnexion",
+        "state": {
+          "client-disconnect": "Client déconnecté"
+        }
+      },
+      "heatingreleased": {
+        "name": "Chauffage autorisé"
+      },
+      "coolingreleased": {
+        "name": "Refroidissement autorisé"
+      },
+      "compressorreleased": {
+        "name": "Compresseur autorisé"
+      },
+      "additionreleased": {
+        "name": "Appoint autorisé"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "Temps restant priorité ECS"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Temps restant priorité chauffage"
+      },
+      "cooling_prioritytimeleft": {
+        "name": "Temps restant priorité refroidissement"
+      },
+      "switch_state": {
+        "name": "État commutateur"
+      },
+      "dhwstop_temp": {
+        "name": "Température d'arrêt ECS"
+      },
+      "dhwstart_temp": {
+        "name": "Température de démarrage ECS"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Température extérieure filtrée (60s)"
+      },
+      "max_freq_env": {
+        "name": "Fréquence max environnement"
+      },
+      "calc_suppy_cpr": {
+        "name": "Alimentation calculée CPR"
+      },
+      "dhw_set": {
+        "name": "Réglage ECS"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "Filtre température BP1 20min"
+      },
+      "max_bp2_env": {
+        "name": "Max BP2 environnement"
+      },
+      "picpin_mask": {
+        "name": "Masque PIC Pin"
+      },
+      "firmware_display_fw_version": {
+        "name": "Version firmware affichage"
+      },
+      "firmware_cc_fw_version": {
+        "name": "Version firmware CC"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Version firmware onduleur"
+      },
+      "firmware_last_check": {
+        "name": "Dernière vérification firmware"
+      },
+      "expires_at": {
+        "name": "Expiration accès élevé"
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Décalage courbe parallèle"
+      },
+      "tap_water_capacity_target": {
+        "name": "Capacité cible eau chaude"
+      },
+      "room_comp_factor": {
+        "name": "Facteur de compensation pièce"
+      },
+      "tap_water_stop": {
+        "name": "Limite supérieure température ballon eau chaude"
+      },
+      "tap_water_start": {
+        "name": "Limite inférieure température ballon eau chaude"
+      },
+      "fan_normal": {
+        "name": "Vitesse ventilateur normale"
+      },
+      "fan_speed_2": {
+        "name": "Vitesse ventilateur minimale pour compresseur"
+      },
+      "dhw_stop_extra": {
+        "name": "Température d'arrêt extra eau chaude"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Climat intérieur"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Vitesse ventilateur",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Arrêt",
+              "normal": "Normal",
+              "extra": "Extra"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Pompe à chaleur Qvantum",
+    "abort": {
+      "already_configured": "L'appareil est déjà configuré",
+      "reconfigure_successful": "Reconfiguration réussie"
+    },
+    "error": {
+      "cannot_connect": "Échec de connexion",
+      "invalid_auth": "Authentification invalide",
+      "unknown": "Erreur inattendue"
+    },
+    "step": {
+      "user": {
+        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il ne fait que lire via Modbus, les écritures/contrôles se font toujours via l'API HTTP",
+        "data": {
+          "password": "Mot de passe",
+          "username": "Nom d'utilisateur",
+          "modbus_tcp": "Utiliser Modbus TCP au lieu du polling HTTP"
+        }
+      },
+      "reconfigure": {
+        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il ne fait que lire via Modbus, les écritures/contrôles se font toujours via l'API HTTP",
+        "data": {
+          "password": "Mot de passe",
+          "username": "Nom d'utilisateur"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Intervalle de scan HTTP (secondes)",
+          "modbus_tcp": "Utiliser Modbus TCP au lieu du polling HTTP",
+          "modbus_host": "Hôte/IP Qvantum"
+        },
+        "description": "Modifiez vos options.",
+        "title": "Options"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Extra eau chaude",
+      "description": "Active l'eau chaude extra pour une période",
+      "fields": {
+        "device_id": {
+          "name": "Id appareil",
+          "description": "L'identifiant de l'appareil Qvantum"
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "Minutes de production d'eau chaude extra (0 minutes arrête)"
+        }
+      }
+    }
+  }
+}
