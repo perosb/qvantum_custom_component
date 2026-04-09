@@ -1,0 +1,571 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Extra eau chaude"
+      },
+      "op_man_addition": {
+        "name": "Manual mode de fmarchectimarchenement: Additimarche"
+      },
+      "op_man_dhw": {
+        "name": "Manual mode de fmarchectimarchenement: eau chaude"
+      },
+      "op_mode": {
+        "name": "Manual mode de fmarchectimarchenement"
+      },
+      "man_mode": {
+        "name": "Manual mode de fmarchectimarchenement: chauffage"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartCmarchetrol: DHW"
+      },
+      "enable_sc_sh": {
+        "name": "SmartCmarchetrol: chauffage"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "SmartCmarchetrol",
+        "state": {
+          "off": "arret",
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH mode",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW mode",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      }
+    },
+    "button": {
+      "extra_tap_water_60min": {
+        "name": "Extra eau chaude 60 min"
+      },
+      "elevate_access": {
+        "name": "Elevate access"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Manual mode de fmarchectimarchenement: Additimarche"
+      },
+      "op_man_cooling": {
+        "name": "Manual mode de fmarchectimarchenement: refroidissement"
+      },
+      "op_man_dhw": {
+        "name": "Manual mode de fmarchectimarchenement: eau chaude"
+      },
+      "cooling_enabled": {
+        "name": "refroidissement active"
+      },
+      "use_adaptive": {
+        "name": "SmartCmarchetrol"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartCmarchetrol: DHW"
+      },
+      "enable_sc_sh": {
+        "name": "SmartCmarchetrol: chauffage"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Additimarcheal power L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Additimarcheal power L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Additimarcheal power L3"
+      },
+      "picpin_relay_gp10": {
+        "name": "Circulatimarche pompe (GP10)"
+      },
+      "picpin_relay_qm10": {
+        "name": "Divertingvalve, DHW/chauffage (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Shunt valve additimarche (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Shunt valve additimarche (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Circulatimarche pompe (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Circulatimarche pompe"
+      },
+      "picpin_relay_ha12": {
+        "name": "chauffage circuit pompe (HA12)"
+      },
+      "dhwdemand": {
+        "name": "eau chaude demand"
+      },
+      "heatingdemand": {
+        "name": "chauffage demand"
+      },
+      "coolingdemand": {
+        "name": "refroidissement demand"
+      },
+      "additiondemand": {
+        "name": "Additimarche demand"
+      },
+      "additiondhwdemand": {
+        "name": "Additimarche eau chaude demand"
+      }
+    },
+    "sensor": {
+      "compressor_state": {
+        "name": "compresseur etat",
+        "state": {
+          "0": "arret",
+          "1": "Idle",
+          "2": "Prepare for chauffage",
+          "3": "Prepare for refroidissement",
+          "4": "Prepare 1 for eau chaude",
+          "5": "Prepare 2 for eau chaude",
+          "6": "chauffage",
+          "7": "refroidissement",
+          "8": "eau chaude",
+          "9": "degivrage eau chaude passive",
+          "10": "degivrage chauffage passive",
+          "11": "Prepare for pool",
+          "12": "Pool",
+          "13": "degivrage pool passive"
+        }
+      },
+      "smart_dhw_control_status": {
+        "name": "Smart DHW cmarchetrol etat",
+        "state": {
+          "0": "En attente des prix de l'energie",
+          "1": "Veille",
+          "2": "Augmentation",
+          "3": "Reduction",
+          "4": "Reduction a long terme",
+          "5": "En pause"
+        }
+      },
+      "powertotal": {
+        "name": "Total Power"
+      },
+      "heatingpower": {
+        "name": "chauffage Power"
+      },
+      "dhwpower": {
+        "name": "DHW Power"
+      },
+      "compressor_power": {
+        "name": "compresseur Power"
+      },
+      "heatingenergy": {
+        "name": "chauffage Energy"
+      },
+      "dhwenergy": {
+        "name": "DHW Energy"
+      },
+      "inputcurrent1": {
+        "name": "Input actuel L1"
+      },
+      "inputcurrent2": {
+        "name": "Input actuel L2"
+      },
+      "inputcurrent3": {
+        "name": "Input actuel L3"
+      },
+      "degree_minute": {
+        "name": "Degree Minute"
+      },
+      "bf1_l_min": {
+        "name": "debit capteur DHW (BF1)"
+      },
+      "bf1_rpm": {
+        "name": "debit capteur DHW pompe speed (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Low pressimarche bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Low pressimarche temp (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "High pressimarche bar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "High pressimarche temp (BP2)"
+      },
+      "bt10": {
+        "name": "Cmarchedenser temp out (BT10)"
+      },
+      "bt12": {
+        "name": "chauffage medium, external debit line (BT12)"
+      },
+      "bt13": {
+        "name": "Cmarchedenser temp in (BT13)"
+      },
+      "bt14": {
+        "name": "Exhaust temp air (BT14)"
+      },
+      "bt15": {
+        "name": "Extract temp air (BT15)"
+      },
+      "bt20": {
+        "name": "Discharge line (BT20)"
+      },
+      "bt21": {
+        "name": "Liquid line (BT21)"
+      },
+      "bt22": {
+        "name": "Evaporator inlet temp (BT22)"
+      },
+      "bt23": {
+        "name": "Suctimarche line (BT23)"
+      },
+      "bt31": {
+        "name": "DHW primary, chargetemp in (BT31)"
+      },
+      "bt33": {
+        "name": "DHW secmarchedary, Coldeau in (BT33)"
+      },
+      "bt34": {
+        "name": "DHW secmarchedary, Hoteau out (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "compresseur speed"
+      },
+      "dhw_outl_temp_15": {
+        "name": "DHW outlet temperature 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "DHW outlet temperature 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "DHW outlet temperature max"
+      },
+      "dhw_prioritytime": {
+        "name": "DHW priority time"
+      },
+      "fan0_10v": {
+        "name": "ventilateur speed"
+      },
+      "fanrpm": {
+        "name": "ventilateur speed"
+      },
+      "qn8position": {
+        "name": "Shuntvalve, additimarche (QN8)"
+      },
+      "gp1_speed": {
+        "name": "Circulatimarche pompe (GP1)"
+      },
+      "gp2_speed": {
+        "name": "DHW charge pompe (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Guide desired temperature"
+      },
+      "guide_he": {
+        "name": "Guide chauffage"
+      },
+      "man_mode": {
+        "name": "Manual mode"
+      },
+      "op_mode": {
+        "name": "mode de fmarchectimarchenement",
+        "state": {
+          "0": "Auto",
+          "1": "Manual",
+          "2": "Additimarche"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "mode de fmarchectimarchenement capteur"
+      },
+      "price_region": {
+        "name": "Price regimarche"
+      },
+      "room_temp_ext": {
+        "name": "piece temperature external"
+      },
+      "compressorenergy": {
+        "name": "compresseur energy"
+      },
+      "totalenergy": {
+        "name": "Total energy"
+      },
+      "bt1": {
+        "name": "Outdoor (BT1)"
+      },
+      "bt2": {
+        "name": "Indoor (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Smart etat for chauffage"
+      },
+      "bt11": {
+        "name": "chauffage medium, debit line (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "chauffage medium, debit line, cible."
+      },
+      "start_cooling_temp": {
+        "name": "refroidissement start temperature"
+      },
+      "bt30": {
+        "name": "eau chaude tank (BT30)"
+      },
+      "tap_water_start": {
+        "name": "eau chaude tank lower limit"
+      },
+      "tap_water_stop": {
+        "name": "eau chaude tank upper limit"
+      },
+      "tap_water_cap": {
+        "name": "eau chaude capacity"
+      },
+      "additionalenergy": {
+        "name": "Additimarcheal energy"
+      },
+      "hpid": {
+        "name": "Id"
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH mode",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      },
+      "hp_status": {
+        "name": "pompe a chaleur etat",
+        "state": {
+          "0": "Idle",
+          "1": "degivrageing",
+          "2": "eau chaude",
+          "3": "chauffage",
+          "4": "refroidissement"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Smart etat for eau chaude"
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW mode",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      },
+      "tap_stop": {
+        "name": "Extra eau chaude stop"
+      },
+      "ventilation_boost_stop": {
+        "name": "Augmentatimarche ventilatimarche stop"
+      },
+      "timestamp": {
+        "name": "Last update"
+      },
+      "latency": {
+        "name": "Latency"
+      },
+      "disconnect_reason": {
+        "name": "Discmarchenect reasmarche",
+        "state": {
+          "client-disconnect": "Client discmarchenected"
+        }
+      },
+      "heatingreleased": {
+        "name": "chauffage Released"
+      },
+      "coolingreleased": {
+        "name": "refroidissement Released"
+      },
+      "compressorreleased": {
+        "name": "compresseur Released"
+      },
+      "additionreleased": {
+        "name": "Additimarcheal Released"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "DHW Priority Time Left"
+      },
+      "heating_prioritytimeleft": {
+        "name": "chauffage Priority Time Left"
+      },
+      "cooling_prioritytimeleft": {
+        "name": "refroidissement Priority Time Left"
+      },
+      "switch_state": {
+        "name": "Switch etat"
+      },
+      "dhwstop_temp": {
+        "name": "DHW Stop temperature"
+      },
+      "dhwstart_temp": {
+        "name": "DHW Start temperature"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Filtered temperature exterieure (60s)"
+      },
+      "max_freq_env": {
+        "name": "Max frequence Envirmarchement"
+      },
+      "calc_suppy_cpr": {
+        "name": "Calculated Supply CPR"
+      },
+      "dhw_set": {
+        "name": "DHW Set"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "BP1 Temp 20min Filter"
+      },
+      "max_bp2_env": {
+        "name": "Max BP2 Envirmarchement"
+      },
+      "picpin_mask": {
+        "name": "PIC Pin Mask"
+      },
+      "firmware_display_fw_version": {
+        "name": "Display firmware versimarche"
+      },
+      "firmware_cc_fw_version": {
+        "name": "CC firmware versimarche"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Inverter firmware versimarche"
+      },
+      "firmware_last_check": {
+        "name": "Firmware last checked"
+      },
+      "expires_at": {
+        "name": "Elevated access expiratimarche"
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Parallel curve arretset"
+      },
+      "tap_water_capacity_target": {
+        "name": "eau chaude capacity cible"
+      },
+      "room_comp_factor": {
+        "name": "piece compensatimarche factor"
+      },
+      "tap_water_stop": {
+        "name": "eau chaude tank upper temperature limit"
+      },
+      "tap_water_start": {
+        "name": "eau chaude tank lower temperature limit"
+      },
+      "fan_normal": {
+        "name": "Normal ventilateur speed"
+      },
+      "fan_speed_2": {
+        "name": "Minimum ventilateur speed for compresseur"
+      },
+      "dhw_stop_extra": {
+        "name": "Extra eau chaude stop temperature"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Indoor climate"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "ventilateur speed",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "arret",
+              "normal": "Normal",
+              "extra": "Extra"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Qvantum pompe a chaleur",
+    "abort": {
+      "already_configured": "Device is already cmarchefigured",
+      "reconfigure_successful": "Recmarchefiguratimarche successful"
+    },
+    "error": {
+      "cannot_connect": "Failed to cmarchenect",
+      "invalid_auth": "Invalid authenticatimarche",
+      "unknown": "Unexpected erreur"
+    },
+    "step": {
+      "user": {
+        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be active in Installer settings marche the pompe app/display before enabling here. Note that it marchely reads via Modbus, write/cmarchetrols are still via HTTP API",
+        "data": {
+          "password": "Password",
+          "username": "Username",
+          "modbus_tcp": "Use Modbus TCP instead of HTTP polling"
+        }
+      },
+      "reconfigure": {
+        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be active in Installer settings marche the pompe app/display before enabling here. Note that it marchely reads via Modbus, write/cmarchetrols are still via HTTP API",
+        "data": {
+          "password": "Password",
+          "username": "Username"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "HTTP Scan Interval (secmarcheds)",
+          "modbus_tcp": "Use Modbus TCP instead of HTTP polling",
+          "modbus_host": "Qvantum Host/IP"
+        },
+        "description": "Amend your optimarches.",
+        "title": "Optimarches"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Extra eau chaude",
+      "description": "Active extra eau chaude for a period",
+      "fields": {
+        "device_id": {
+          "name": "Device Id",
+          "description": "The Qvantum device id"
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "Minutes to produce extra eau chaude (0 minutes turns arret)"
+        }
+      }
+    }
+  }
+}

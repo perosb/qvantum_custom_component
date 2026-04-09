@@ -1,0 +1,571 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Extra ciepla woda"
+      },
+      "op_man_addition": {
+        "name": "Manual tryb pracy: Additiwl."
+      },
+      "op_man_dhw": {
+        "name": "Manual tryb pracy: ciepla woda"
+      },
+      "op_mode": {
+        "name": "Manual tryb pracy"
+      },
+      "man_mode": {
+        "name": "Manual tryb pracy: ogrzewanie"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartCwl.trol: DHW"
+      },
+      "enable_sc_sh": {
+        "name": "SmartCwl.trol: ogrzewanie"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "SmartCwl.trol",
+        "state": {
+          "off": "wyl.",
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH tryb",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW tryb",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      }
+    },
+    "button": {
+      "extra_tap_water_60min": {
+        "name": "Extra ciepla woda 60 min"
+      },
+      "elevate_access": {
+        "name": "Elevate access"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Manual tryb pracy: Additiwl."
+      },
+      "op_man_cooling": {
+        "name": "Manual tryb pracy: chlodzenie"
+      },
+      "op_man_dhw": {
+        "name": "Manual tryb pracy: ciepla woda"
+      },
+      "cooling_enabled": {
+        "name": "chlodzenie wlaczwl.e"
+      },
+      "use_adaptive": {
+        "name": "SmartCwl.trol"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartCwl.trol: DHW"
+      },
+      "enable_sc_sh": {
+        "name": "SmartCwl.trol: ogrzewanie"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Additiwl.al power L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Additiwl.al power L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Additiwl.al power L3"
+      },
+      "picpin_relay_gp10": {
+        "name": "Circulatiwl. pompa (GP10)"
+      },
+      "picpin_relay_qm10": {
+        "name": "Divertingvalve, DHW/ogrzewanie (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Shunt valve additiwl. (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Shunt valve additiwl. (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Circulatiwl. pompa (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Circulatiwl. pompa"
+      },
+      "picpin_relay_ha12": {
+        "name": "ogrzewanie circuit pompa (HA12)"
+      },
+      "dhwdemand": {
+        "name": "ciepla woda demand"
+      },
+      "heatingdemand": {
+        "name": "ogrzewanie demand"
+      },
+      "coolingdemand": {
+        "name": "chlodzenie demand"
+      },
+      "additiondemand": {
+        "name": "Additiwl. demand"
+      },
+      "additiondhwdemand": {
+        "name": "Additiwl. ciepla woda demand"
+      }
+    },
+    "sensor": {
+      "compressor_state": {
+        "name": "sprezarka stan",
+        "state": {
+          "0": "wyl.",
+          "1": "Idle",
+          "2": "Prepare for ogrzewanie",
+          "3": "Prepare for chlodzenie",
+          "4": "Prepare 1 for ciepla woda",
+          "5": "Prepare 2 for ciepla woda",
+          "6": "ogrzewanie",
+          "7": "chlodzenie",
+          "8": "ciepla woda",
+          "9": "odszranianie ciepla woda passive",
+          "10": "odszranianie ogrzewanie passive",
+          "11": "Prepare for pool",
+          "12": "Pool",
+          "13": "odszranianie pool passive"
+        }
+      },
+      "smart_dhw_control_status": {
+        "name": "Smart DHW cwl.trol status",
+        "state": {
+          "0": "Oczekiwanie na ceny energii",
+          "1": "Tryb gotowosci",
+          "2": "Podnoszenie",
+          "3": "Obnizanie",
+          "4": "Obnizanie dlugoterminowe",
+          "5": "Wstrzymane"
+        }
+      },
+      "powertotal": {
+        "name": "Total Power"
+      },
+      "heatingpower": {
+        "name": "ogrzewanie Power"
+      },
+      "dhwpower": {
+        "name": "DHW Power"
+      },
+      "compressor_power": {
+        "name": "sprezarka Power"
+      },
+      "heatingenergy": {
+        "name": "ogrzewanie Energy"
+      },
+      "dhwenergy": {
+        "name": "DHW Energy"
+      },
+      "inputcurrent1": {
+        "name": "Input biezacy L1"
+      },
+      "inputcurrent2": {
+        "name": "Input biezacy L2"
+      },
+      "inputcurrent3": {
+        "name": "Input biezacy L3"
+      },
+      "degree_minute": {
+        "name": "Degree Minute"
+      },
+      "bf1_l_min": {
+        "name": "przeplyw czujnik DHW (BF1)"
+      },
+      "bf1_rpm": {
+        "name": "przeplyw czujnik DHW pompa speed (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Low cisnienie bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Low cisnienie temp (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "High cisnienie bar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "High cisnienie temp (BP2)"
+      },
+      "bt10": {
+        "name": "Cwl.denser temp out (BT10)"
+      },
+      "bt12": {
+        "name": "ogrzewanie medium, external przeplyw line (BT12)"
+      },
+      "bt13": {
+        "name": "Cwl.denser temp in (BT13)"
+      },
+      "bt14": {
+        "name": "Exhaust temp air (BT14)"
+      },
+      "bt15": {
+        "name": "Extract temp air (BT15)"
+      },
+      "bt20": {
+        "name": "Discharge line (BT20)"
+      },
+      "bt21": {
+        "name": "Liquid line (BT21)"
+      },
+      "bt22": {
+        "name": "Evaporator inlet temp (BT22)"
+      },
+      "bt23": {
+        "name": "Suctiwl. line (BT23)"
+      },
+      "bt31": {
+        "name": "DHW primary, chargetemp in (BT31)"
+      },
+      "bt33": {
+        "name": "DHW secwl.dary, Coldwoda in (BT33)"
+      },
+      "bt34": {
+        "name": "DHW secwl.dary, Hotwoda out (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "sprezarka speed"
+      },
+      "dhw_outl_temp_15": {
+        "name": "DHW outlet temperatura 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "DHW outlet temperatura 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "DHW outlet temperatura max"
+      },
+      "dhw_prioritytime": {
+        "name": "DHW priority time"
+      },
+      "fan0_10v": {
+        "name": "wentylator speed"
+      },
+      "fanrpm": {
+        "name": "wentylator speed"
+      },
+      "qn8position": {
+        "name": "Shuntvalve, additiwl. (QN8)"
+      },
+      "gp1_speed": {
+        "name": "Circulatiwl. pompa (GP1)"
+      },
+      "gp2_speed": {
+        "name": "DHW charge pompa (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Guide desired temperatura"
+      },
+      "guide_he": {
+        "name": "Guide ogrzewanie"
+      },
+      "man_mode": {
+        "name": "Manual tryb"
+      },
+      "op_mode": {
+        "name": "tryb pracy",
+        "state": {
+          "0": "Auto",
+          "1": "Manual",
+          "2": "Additiwl."
+        }
+      },
+      "op_mode_sensor": {
+        "name": "tryb pracy czujnik"
+      },
+      "price_region": {
+        "name": "Price regiwl."
+      },
+      "room_temp_ext": {
+        "name": "pomieszczenie temperatura external"
+      },
+      "compressorenergy": {
+        "name": "sprezarka energy"
+      },
+      "totalenergy": {
+        "name": "Total energy"
+      },
+      "bt1": {
+        "name": "Outdoor (BT1)"
+      },
+      "bt2": {
+        "name": "Indoor (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Smart status for ogrzewanie"
+      },
+      "bt11": {
+        "name": "ogrzewanie medium, przeplyw line (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "ogrzewanie medium, przeplyw line, docelowy."
+      },
+      "start_cooling_temp": {
+        "name": "chlodzenie start temperatura"
+      },
+      "bt30": {
+        "name": "ciepla woda tank (BT30)"
+      },
+      "tap_water_start": {
+        "name": "ciepla woda tank lower limit"
+      },
+      "tap_water_stop": {
+        "name": "ciepla woda tank upper limit"
+      },
+      "tap_water_cap": {
+        "name": "ciepla woda capacity"
+      },
+      "additionalenergy": {
+        "name": "Additiwl.al energy"
+      },
+      "hpid": {
+        "name": "Id"
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH tryb",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      },
+      "hp_status": {
+        "name": "pompa ciepla status",
+        "state": {
+          "0": "Idle",
+          "1": "odszranianieing",
+          "2": "ciepla woda",
+          "3": "ogrzewanie",
+          "4": "chlodzenie"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Smart status for ciepla woda"
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW tryb",
+        "state": {
+          "0": "Eco",
+          "1": "Balanced",
+          "2": "Comfort"
+        }
+      },
+      "tap_stop": {
+        "name": "Extra ciepla woda stop"
+      },
+      "ventilation_boost_stop": {
+        "name": "Podnoszenie ventilatiwl. stop"
+      },
+      "timestamp": {
+        "name": "Last update"
+      },
+      "latency": {
+        "name": "Latency"
+      },
+      "disconnect_reason": {
+        "name": "Discwl.nect reaswl.",
+        "state": {
+          "client-disconnect": "Client discwl.nected"
+        }
+      },
+      "heatingreleased": {
+        "name": "ogrzewanie Released"
+      },
+      "coolingreleased": {
+        "name": "chlodzenie Released"
+      },
+      "compressorreleased": {
+        "name": "sprezarka Released"
+      },
+      "additionreleased": {
+        "name": "Additiwl.al Released"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "DHW Priority Time Left"
+      },
+      "heating_prioritytimeleft": {
+        "name": "ogrzewanie Priority Time Left"
+      },
+      "cooling_prioritytimeleft": {
+        "name": "chlodzenie Priority Time Left"
+      },
+      "switch_state": {
+        "name": "Switch stan"
+      },
+      "dhwstop_temp": {
+        "name": "DHW Stop temperatura"
+      },
+      "dhwstart_temp": {
+        "name": "DHW Start temperatura"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Filtered temperatura zewnetrzna (60s)"
+      },
+      "max_freq_env": {
+        "name": "Max czestotliwosc Envirwl.ment"
+      },
+      "calc_suppy_cpr": {
+        "name": "Calculated Supply CPR"
+      },
+      "dhw_set": {
+        "name": "DHW Set"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "BP1 Temp 20min Filter"
+      },
+      "max_bp2_env": {
+        "name": "Max BP2 Envirwl.ment"
+      },
+      "picpin_mask": {
+        "name": "PIC Pin Mask"
+      },
+      "firmware_display_fw_version": {
+        "name": "Display firmware versiwl."
+      },
+      "firmware_cc_fw_version": {
+        "name": "CC firmware versiwl."
+      },
+      "firmware_inv_fw_version": {
+        "name": "Inverter firmware versiwl."
+      },
+      "firmware_last_check": {
+        "name": "Firmware last checked"
+      },
+      "expires_at": {
+        "name": "Elevated access expiratiwl."
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Parallel curve wyl.set"
+      },
+      "tap_water_capacity_target": {
+        "name": "ciepla woda capacity docelowy"
+      },
+      "room_comp_factor": {
+        "name": "pomieszczenie compensatiwl. factor"
+      },
+      "tap_water_stop": {
+        "name": "ciepla woda tank upper temperatura limit"
+      },
+      "tap_water_start": {
+        "name": "ciepla woda tank lower temperatura limit"
+      },
+      "fan_normal": {
+        "name": "Normal wentylator speed"
+      },
+      "fan_speed_2": {
+        "name": "Minimum wentylator speed for sprezarka"
+      },
+      "dhw_stop_extra": {
+        "name": "Extra ciepla woda stop temperatura"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Indoor climate"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "wentylator speed",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "wyl.",
+              "normal": "Normal",
+              "extra": "Extra"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Qvantum pompa ciepla",
+    "abort": {
+      "already_configured": "Device is already cwl.figured",
+      "reconfigure_successful": "Recwl.figuratiwl. successful"
+    },
+    "error": {
+      "cannot_connect": "Failed to cwl.nect",
+      "invalid_auth": "Invalid authenticatiwl.",
+      "unknown": "Unexpected blad"
+    },
+    "step": {
+      "user": {
+        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be wlaczwl.e in Installer settings wl. the pompa app/display before enabling here. Note that it wl.ly reads via Modbus, write/cwl.trols are still via HTTP API",
+        "data": {
+          "password": "Password",
+          "username": "Username",
+          "modbus_tcp": "Use Modbus TCP instead of HTTP polling"
+        }
+      },
+      "reconfigure": {
+        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be wlaczwl.e in Installer settings wl. the pompa app/display before enabling here. Note that it wl.ly reads via Modbus, write/cwl.trols are still via HTTP API",
+        "data": {
+          "password": "Password",
+          "username": "Username"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "HTTP Scan Interval (secwl.ds)",
+          "modbus_tcp": "Use Modbus TCP instead of HTTP polling",
+          "modbus_host": "Qvantum Host/IP"
+        },
+        "description": "Amend your optiwl.s.",
+        "title": "Optiwl.s"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Extra ciepla woda",
+      "description": "Active extra ciepla woda for a period",
+      "fields": {
+        "device_id": {
+          "name": "Device Id",
+          "description": "The Qvantum device id"
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "Minutes to produce extra ciepla woda (0 minutes turns wyl.)"
+        }
+      }
+    }
+  }
+}
