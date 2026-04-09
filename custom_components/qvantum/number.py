@@ -70,6 +70,9 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         device: DeviceInfo,
     ) -> None:
         super().__init__(coordinator, metric_key, device)
+        # Prefix unique_id with 'number_' to avoid conflicts with sensor entities
+        # that share the same metric key (e.g. tap_water_start, tap_water_stop).
+        self._attr_unique_id = f"qvantum_number_{metric_key}_{self._hpid}"
         self._attr_native_min_value = min_value
         self._attr_native_max_value = max_value
         self._attr_native_step = step

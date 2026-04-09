@@ -256,6 +256,32 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
             hass, config_entry.entry_id, migrate_to_v6_entity_domains
         )
 
+    if config_entry.version < 7:
+
+        @callback
+        def migrate_to_v7_number_unique_ids(entity_entry):
+            """Prefix number entity unique IDs with 'number_' to avoid conflicts with sensor entities."""
+            if entity_entry.domain != "number":
+                return None
+            old_unique_id = entity_entry.unique_id
+            # Skip entries already in the new format
+            if "_number_" in old_unique_id:
+                return None
+            # Old format: qvantum_{metric_key}_{device_id}
+            # New format: qvantum_number_{metric_key}_{device_id}
+            new_unique_id = old_unique_id.replace("qvantum_", "qvantum_number_", 1)
+            _LOGGER.debug(
+                "Updating unique ID for number entity %s from %s to %s",
+                entity_entry.entity_id,
+                old_unique_id,
+                new_unique_id,
+            )
+            return {"new_unique_id": new_unique_id}
+
+        await async_migrate_entries(
+            hass, config_entry.entry_id, migrate_to_v7_number_unique_ids
+        )
+
     hass.config_entries.async_update_entry(config_entry, version=CONFIG_VERSION)
 
     _LOGGER.debug(

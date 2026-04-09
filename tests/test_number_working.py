@@ -87,7 +87,7 @@ class TestQvantumNumberEntity:
         assert entity._metric_key == "tap_water_capacity_target"
         assert (
             entity._attr_unique_id
-            == "qvantum_tap_water_capacity_target_test_device_123"
+            == "qvantum_number_tap_water_capacity_target_test_device_123"
         )
         assert entity._attr_device_info == mock_device
         assert entity._attr_has_entity_name is True
