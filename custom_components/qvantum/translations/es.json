@@ -154,7 +154,7 @@
       "smart_dhw_control_status": {
         "name": "Estado control DHW inteligente",
         "state": {
-          "0": "No disponible",
+          "0": "Esperando precios de la energía",
           "1": "En espera",
           "2": "Elevando",
           "3": "Descendiendo",
