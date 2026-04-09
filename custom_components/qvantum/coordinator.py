@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_SCAN_INTERVAL,
@@ -20,6 +20,10 @@ from .const import (
     DEFAULT_DISABLED_MODBUS_METRICS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    HP_STATUS_COOLING,
+    HP_STATUS_DEFROSTING,
+    HP_STATUS_HEATING,
+    HP_STATUS_HOT_WATER,
     SETTING_UPDATE_APPLIED,
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
@@ -32,18 +36,18 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 _COMPRESSOR_TO_HP_STATUS_MAP = {
-    2: 3,  # Heating → Heating
-    3: 4,  # Cooling → Cooling
-    4: 2,  # Hot water → Hot water
-    5: 2,  # Hot water (alias) → Hot water
-    6: 3,  # Heating (alias) → Heating
-    7: 4,  # Cooling (alias) → Cooling
-    8: 2,  # Hot water (alias) → Hot water
-    9: 1,  # Defrost DHW passive → Defrosting
-    10: 1,  # Defrost heating passive → Defrosting
-    11: 2,  # Pool → Hot water
-    12: 2,  # Pool (alias) → Hot water
-    13: 1,  # Defrost pool passive → Defrosting
+    2: HP_STATUS_HEATING,   # Heating → Heating
+    3: HP_STATUS_COOLING,   # Cooling → Cooling
+    4: HP_STATUS_HOT_WATER, # Hot water → Hot water
+    5: HP_STATUS_HOT_WATER, # Hot water (alias) → Hot water
+    6: HP_STATUS_HEATING,   # Heating (alias) → Heating
+    7: HP_STATUS_COOLING,   # Cooling (alias) → Cooling
+    8: HP_STATUS_HOT_WATER, # Hot water (alias) → Hot water
+    9: HP_STATUS_DEFROSTING,  # Defrost DHW passive → Defrosting
+    10: HP_STATUS_DEFROSTING, # Defrost heating passive → Defrosting
+    11: HP_STATUS_HOT_WATER,  # Pool → Hot water
+    12: HP_STATUS_HOT_WATER,  # Pool (alias) → Hot water
+    13: HP_STATUS_DEFROSTING, # Defrost pool passive → Defrosting
 }
 
 
@@ -297,7 +301,7 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         *,
         energy_key: str,
         power_key: str,
-        active_hp_status: int,
+        is_active: Callable[[dict[str, Any]], bool],
         last_energy_attr: str,
         last_time_attr: str,
         mode_label: str,
@@ -318,7 +322,7 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         last_energy = getattr(self, last_energy_attr)
         last_time = getattr(self, last_time_attr)
 
-        if values.get("hp_status") != active_hp_status:
+        if not is_active(values):
             values[power_key] = 0.0
             setattr(self, last_energy_attr, current_energy)
             setattr(self, last_time_attr, now)
@@ -359,7 +363,7 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             values,
             energy_key="heatingenergy",
             power_key="heatingpower",
-            active_hp_status=3,
+            is_active=lambda v: v.get("hp_status") == HP_STATUS_HEATING,
             last_energy_attr="_last_heatingenergy",
             last_time_attr="_last_heatingenergy_time",
             mode_label="heating",
@@ -371,7 +375,10 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             values,
             energy_key="dhwenergy",
             power_key="dhwpower",
-            active_hp_status=2,
+            # DHW activity is determined by BF1 flow rate rather than hp_status,
+            # because active tap water production is most reliably indicated by
+            # water flow through the DHW circuit.
+            is_active=lambda v: v.get("bf1_l_min", 0) > 0,
             last_energy_attr="_last_dhwenergy",
             last_time_attr="_last_dhwenergy_time",
             mode_label="dhw",
