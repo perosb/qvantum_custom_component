@@ -15,7 +15,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_registry import async_migrate_entries
+from homeassistant.helpers.entity_registry import (
+    async_get as async_get_entity_registry,
+    async_migrate_entries,
+)
 from homeassistant.components.persistent_notification import async_dismiss
 
 
@@ -249,34 +252,49 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
             hass, config_entry.entry_id, migrate_to_v5_number_unique_ids
         )
 
-        @callback
-        def migrate_to_v5_unique_ids(entity_entry):
-            """Rename dhw_normal_start/stop sensor entities to tap_water_start/stop."""
+        # Rename dhw_normal_start/stop sensor entities to tap_water_start/stop.
+        # Use the entity registry directly so we can handle collisions gracefully:
+        # if the target unique_id is already in use by another entity (e.g. a
+        # "live" sensor that was already created with the new metric name) the
+        # entity being renamed is an orphaned stale entry and should be removed.
+        ent_reg = async_get_entity_registry(hass)
+        entry_entities = [
+            e
+            for e in ent_reg.entities.values()
+            if e.config_entry_id == config_entry.entry_id
+        ]
+        uid_map: dict[str, str] = {e.unique_id: e.entity_id for e in entry_entities}
+        for entity_entry in entry_entities:
             if entity_entry.domain == "number":
-                return None
-            old_unique_id = entity_entry.unique_id
-            new_unique_id = old_unique_id
-            new_unique_id = new_unique_id.replace(
-                "_dhw_normal_start_", "_tap_water_start_"
-            )
-            new_unique_id = new_unique_id.replace(
-                "_dhw_normal_stop_", "_tap_water_stop_"
-            )
-
-            if old_unique_id == new_unique_id:
-                return None
-
-            _LOGGER.debug(
-                "Updating unique ID for entity %s from %s to %s",
-                entity_entry.entity_id,
-                old_unique_id,
-                new_unique_id,
-            )
-            return {"new_unique_id": new_unique_id}
-
-        await async_migrate_entries(
-            hass, config_entry.entry_id, migrate_to_v5_unique_ids
-        )
+                continue
+            old_uid = entity_entry.unique_id
+            new_uid = old_uid.replace("_dhw_normal_start_", "_tap_water_start_")
+            new_uid = new_uid.replace("_dhw_normal_stop_", "_tap_water_stop_")
+            if old_uid == new_uid:
+                continue
+            if new_uid in uid_map and uid_map[new_uid] != entity_entry.entity_id:
+                _LOGGER.debug(
+                    "Removing orphaned entity %s (unique_id %s) because"
+                    " %s already holds unique_id %s",
+                    entity_entry.entity_id,
+                    old_uid,
+                    uid_map[new_uid],
+                    new_uid,
+                )
+                ent_reg.async_remove(entity_entry.entity_id)
+                uid_map.pop(old_uid, None)
+            else:
+                _LOGGER.debug(
+                    "Updating unique ID for entity %s from %s to %s",
+                    entity_entry.entity_id,
+                    old_uid,
+                    new_uid,
+                )
+                ent_reg.async_update_entity(
+                    entity_entry.entity_id, new_unique_id=new_uid
+                )
+                uid_map.pop(old_uid, None)
+                uid_map[new_uid] = entity_entry.entity_id
 
     if config_entry.version < 6:
 
