@@ -206,8 +206,54 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
     if config_entry.version < 5:
 
         @callback
+        def migrate_to_v5_number_unique_ids(entity_entry):
+            """Pre-migrate number entities to the qvantum_number_ format to free up unique IDs.
+
+            Number entities that share a metric key with sensor entities (e.g.
+            tap_water_start/stop) would collide when the sensor rename below runs,
+            because HA enforces unique_id uniqueness across all platforms within a
+            config entry.
+
+            This intentionally applies the same number-prefix normalization later
+            schema versions use, but it must happen here first so the old number
+            unique IDs are vacated before sensor entities are renamed in the same
+            migration path. In other words, this is a compatibility pre-step to
+            avoid cross-platform unique_id conflicts during upgrades from older
+            entries, not an accidental second migration.
+            """
+            if entity_entry.domain != "number":
+                return None
+            old_unique_id = entity_entry.unique_id
+            # Skip entries already in the new format
+            if old_unique_id.startswith("qvantum_number_"):
+                return None
+            new_unique_id = old_unique_id
+            new_unique_id = new_unique_id.replace(
+                "_dhw_normal_start_", "_tap_water_start_"
+            )
+            new_unique_id = new_unique_id.replace(
+                "_dhw_normal_stop_", "_tap_water_stop_"
+            )
+            new_unique_id = new_unique_id.replace("qvantum_", "qvantum_number_", 1)
+            if old_unique_id == new_unique_id:
+                return None
+            _LOGGER.debug(
+                "Updating unique ID for number entity %s from %s to %s",
+                entity_entry.entity_id,
+                old_unique_id,
+                new_unique_id,
+            )
+            return {"new_unique_id": new_unique_id}
+
+        await async_migrate_entries(
+            hass, config_entry.entry_id, migrate_to_v5_number_unique_ids
+        )
+
+        @callback
         def migrate_to_v5_unique_ids(entity_entry):
-            """Rename dhw_normal_start/stop entities to tap_water_start/stop."""
+            """Rename dhw_normal_start/stop sensor entities to tap_water_start/stop."""
+            if entity_entry.domain == "number":
+                return None
             old_unique_id = entity_entry.unique_id
             new_unique_id = old_unique_id
             new_unique_id = new_unique_id.replace(

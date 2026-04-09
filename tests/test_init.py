@@ -236,7 +236,7 @@ class TestIntegrationSetup:
                 result = await async_migrate_entry(hass, config_entry)
 
                 assert result is True
-                assert mock_migrate.call_count == 3  # v5, v6, and v7 migrations
+                assert mock_migrate.call_count == 4  # v5 numbers, v5 sensors, v6, v7
                 mock_update.assert_called_once_with(config_entry, version=7)
 
     @pytest.mark.asyncio
@@ -251,11 +251,11 @@ class TestIntegrationSetup:
                 result = await async_migrate_entry(hass, config_entry)
 
                 assert result is True
-                assert mock_migrate.call_count == 4  # v1, v5, v6, and v7 migrations
+                assert mock_migrate.call_count == 5  # v1, v5 numbers, v5 sensors, v6, v7
                 mock_update.assert_called_once_with(config_entry, version=7)
 
                 # Verify migration calls were made with correct arguments
-                assert len(mock_migrate.call_args_list) == 4
+                assert len(mock_migrate.call_args_list) == 5
 
                 first_call_args = mock_migrate.call_args_list[0].args
                 _, first_entry_id, first_migration_fn = first_call_args
@@ -266,3 +266,205 @@ class TestIntegrationSetup:
                 _, second_entry_id, second_migration_fn = second_call_args
                 assert second_entry_id == config_entry.entry_id
                 assert callable(second_migration_fn)
+
+
+class TestMigrateToV5Callbacks:
+    """Test the v5 migration callback functions directly by capturing them."""
+
+    def _make_entity_entry(self, domain, unique_id, entity_id=None):
+        """Build a minimal mock entity entry."""
+        entry = MagicMock()
+        entry.domain = domain
+        entry.unique_id = unique_id
+        entry.entity_id = entity_id or f"{domain}.qvantum_test"
+        return entry
+
+    async def _capture_v5_callbacks(self, hass, version=4):
+        """Run async_migrate_entry for a version-*version* entry and return the
+        list of callback functions passed to async_migrate_entries."""
+        config_entry = MagicMock(version=version, minor_version=0, entry_id="test")
+        captured = []
+
+        async def capture_migrate(h, entry_id, fn):
+            captured.append(fn)
+
+        with patch(
+            "custom_components.qvantum.async_migrate_entries",
+            side_effect=capture_migrate,
+        ):
+            with patch.object(hass.config_entries, "async_update_entry"):
+                await async_migrate_entry(hass, config_entry)
+
+        return captured
+
+    # ------------------------------------------------------------------
+    # migrate_to_v5_number_unique_ids  (first v5 pass, index 0 from v4)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_v5_number_cb_renames_dhw_normal_start(self, hass):
+        callbacks = await self._capture_v5_callbacks(hass, version=4)
+        cb = callbacks[0]  # first pass: numbers
+
+        entry = self._make_entity_entry(
+            "number", "qvantum_dhw_normal_start_1011074250800138"
+        )
+        result = cb(entry)
+
+        assert result == {
+            "new_unique_id": "qvantum_number_tap_water_start_1011074250800138"
+        }
+
+    @pytest.mark.asyncio
+    async def test_v5_number_cb_renames_dhw_normal_stop(self, hass):
+        callbacks = await self._capture_v5_callbacks(hass, version=4)
+        cb = callbacks[0]
+
+        entry = self._make_entity_entry(
+            "number", "qvantum_dhw_normal_stop_1011074250800138"
+        )
+        result = cb(entry)
+
+        assert result == {
+            "new_unique_id": "qvantum_number_tap_water_stop_1011074250800138"
+        }
+
+    @pytest.mark.asyncio
+    async def test_v5_number_cb_prefixes_plain_number_entity(self, hass):
+        """A number entity without a dhw rename still gets the qvantum_number_ prefix."""
+        callbacks = await self._capture_v5_callbacks(hass, version=4)
+        cb = callbacks[0]
+
+        entry = self._make_entity_entry(
+            "number", "qvantum_tap_water_cap_1011074250800138"
+        )
+        result = cb(entry)
+
+        assert result == {
+            "new_unique_id": "qvantum_number_tap_water_cap_1011074250800138"
+        }
+
+    @pytest.mark.asyncio
+    async def test_v5_number_cb_skips_already_prefixed(self, hass):
+        """Already-prefixed entries must not be modified."""
+        callbacks = await self._capture_v5_callbacks(hass, version=4)
+        cb = callbacks[0]
+
+        entry = self._make_entity_entry(
+            "number", "qvantum_number_tap_water_start_1011074250800138"
+        )
+        result = cb(entry)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_v5_number_cb_skips_non_number_domains(self, hass):
+        """Sensor entities must be ignored by the number pre-migration pass."""
+        callbacks = await self._capture_v5_callbacks(hass, version=4)
+        cb = callbacks[0]
+
+        entry = self._make_entity_entry(
+            "sensor", "qvantum_dhw_normal_start_1011074250800138"
+        )
+        result = cb(entry)
+
+        assert result is None
+
+    # ------------------------------------------------------------------
+    # migrate_to_v5_unique_ids  (second v5 pass, index 1 from v4)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_v5_sensor_cb_renames_dhw_normal_start(self, hass):
+        callbacks = await self._capture_v5_callbacks(hass, version=4)
+        cb = callbacks[1]  # second pass: non-numbers
+
+        entry = self._make_entity_entry(
+            "sensor",
+            "qvantum_dhw_normal_start_1011074250800138",
+            entity_id="sensor.qvantum_hot_water_tank_lower_limit",
+        )
+        result = cb(entry)
+
+        assert result == {
+            "new_unique_id": "qvantum_tap_water_start_1011074250800138"
+        }
+
+    @pytest.mark.asyncio
+    async def test_v5_sensor_cb_renames_dhw_normal_stop(self, hass):
+        callbacks = await self._capture_v5_callbacks(hass, version=4)
+        cb = callbacks[1]
+
+        entry = self._make_entity_entry(
+            "sensor",
+            "qvantum_dhw_normal_stop_1011074250800138",
+            entity_id="sensor.qvantum_hot_water_tank_upper_limit",
+        )
+        result = cb(entry)
+
+        assert result == {
+            "new_unique_id": "qvantum_tap_water_stop_1011074250800138"
+        }
+
+    @pytest.mark.asyncio
+    async def test_v5_sensor_cb_skips_number_domain(self, hass):
+        """Number entities must be skipped by the sensor rename pass."""
+        callbacks = await self._capture_v5_callbacks(hass, version=4)
+        cb = callbacks[1]
+
+        entry = self._make_entity_entry(
+            "number", "qvantum_dhw_normal_start_1011074250800138"
+        )
+        result = cb(entry)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_v5_sensor_cb_no_change_returns_none(self, hass):
+        """Sensors without dhw_normal keys must be left alone."""
+        callbacks = await self._capture_v5_callbacks(hass, version=4)
+        cb = callbacks[1]
+
+        entry = self._make_entity_entry(
+            "sensor", "qvantum_bt1_1011074250800138"
+        )
+        result = cb(entry)
+
+        assert result is None
+
+    # ------------------------------------------------------------------
+    # Collision scenario: verify the two-pass ordering prevents conflicts
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_v5_two_pass_avoids_unique_id_collision(self, hass):
+        """Simulate the real-world collision: number and sensor share the same
+        dhw_normal_start unique ID.  After pass 1 the number ID is freed and
+        pass 2 can safely claim it for the sensor."""
+        device_id = "1011074250800138"
+        shared_old_id = f"qvantum_dhw_normal_start_{device_id}"
+
+        number_entry = self._make_entity_entry("number", shared_old_id)
+        sensor_entry = self._make_entity_entry(
+            "sensor",
+            shared_old_id,
+            entity_id="sensor.qvantum_hot_water_tank_lower_limit",
+        )
+
+        callbacks = await self._capture_v5_callbacks(hass, version=4)
+        number_cb, sensor_cb = callbacks[0], callbacks[1]
+
+        # Pass 1: number entity gets prefixed → frees up the sensor's target ID
+        number_result = number_cb(number_entry)
+        assert number_result == {
+            "new_unique_id": f"qvantum_number_tap_water_start_{device_id}"
+        }
+
+        # Pass 2: sensor entity claims the now-free target ID
+        sensor_result = sensor_cb(sensor_entry)
+        assert sensor_result == {
+            "new_unique_id": f"qvantum_tap_water_start_{device_id}"
+        }
+
+        # The two resulting IDs must be distinct
+        assert number_result["new_unique_id"] != sensor_result["new_unique_id"]
