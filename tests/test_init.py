@@ -228,44 +228,64 @@ class TestIntegrationSetup:
     async def test_async_migrate_entry_from_v4_to_v5(self, hass, mock_config_entry):
         config_entry = MagicMock(version=4, minor_version=0, entry_id="test")
 
+        mock_ent_reg = MagicMock()
+        mock_ent_reg.entities.values.return_value = []
+
         with patch(
             "custom_components.qvantum.async_migrate_entries",
             new_callable=AsyncMock,
         ) as mock_migrate:
-            with patch.object(hass.config_entries, "async_update_entry") as mock_update:
-                result = await async_migrate_entry(hass, config_entry)
+            with patch(
+                "custom_components.qvantum.async_get_entity_registry",
+                return_value=mock_ent_reg,
+            ):
+                with patch.object(
+                    hass.config_entries, "async_update_entry"
+                ) as mock_update:
+                    result = await async_migrate_entry(hass, config_entry)
 
-                assert result is True
-                assert mock_migrate.call_count == 4  # v5 numbers, v5 sensors, v6, v7
-                mock_update.assert_called_once_with(config_entry, version=7)
+                    assert result is True
+                    # v5 numbers, v6, v7 (v5 sensors now uses entity registry directly)
+                    assert mock_migrate.call_count == 3
+                    mock_update.assert_called_once_with(config_entry, version=7)
 
     @pytest.mark.asyncio
     async def test_async_migrate_entry_legacy(self, hass, mock_config_entry):
         config_entry = MagicMock(version=1, minor_version=0, entry_id="test")
 
+        mock_ent_reg = MagicMock()
+        mock_ent_reg.entities.values.return_value = []
+
         with patch(
             "custom_components.qvantum.async_migrate_entries",
             new_callable=AsyncMock,
         ) as mock_migrate:
-            with patch.object(hass.config_entries, "async_update_entry") as mock_update:
-                result = await async_migrate_entry(hass, config_entry)
+            with patch(
+                "custom_components.qvantum.async_get_entity_registry",
+                return_value=mock_ent_reg,
+            ):
+                with patch.object(
+                    hass.config_entries, "async_update_entry"
+                ) as mock_update:
+                    result = await async_migrate_entry(hass, config_entry)
 
-                assert result is True
-                assert mock_migrate.call_count == 5  # v1, v5 numbers, v5 sensors, v6, v7
-                mock_update.assert_called_once_with(config_entry, version=7)
+                    assert result is True
+                    # v1, v5 numbers, v6, v7 (v5 sensors now uses entity registry directly)
+                    assert mock_migrate.call_count == 4
+                    mock_update.assert_called_once_with(config_entry, version=7)
 
-                # Verify migration calls were made with correct arguments
-                assert len(mock_migrate.call_args_list) == 5
+                    # Verify migration calls were made with correct arguments
+                    assert len(mock_migrate.call_args_list) == 4
 
-                first_call_args = mock_migrate.call_args_list[0].args
-                _, first_entry_id, first_migration_fn = first_call_args
-                assert first_entry_id == config_entry.entry_id
-                assert callable(first_migration_fn)
+                    first_call_args = mock_migrate.call_args_list[0].args
+                    _, first_entry_id, first_migration_fn = first_call_args
+                    assert first_entry_id == config_entry.entry_id
+                    assert callable(first_migration_fn)
 
-                second_call_args = mock_migrate.call_args_list[1].args
-                _, second_entry_id, second_migration_fn = second_call_args
-                assert second_entry_id == config_entry.entry_id
-                assert callable(second_migration_fn)
+                    second_call_args = mock_migrate.call_args_list[1].args
+                    _, second_entry_id, second_migration_fn = second_call_args
+                    assert second_entry_id == config_entry.entry_id
+                    assert callable(second_migration_fn)
 
 
 class TestMigrateToV5Callbacks:
@@ -288,12 +308,19 @@ class TestMigrateToV5Callbacks:
         async def capture_migrate(h, entry_id, fn):
             captured.append(fn)
 
+        mock_ent_reg = MagicMock()
+        mock_ent_reg.entities.values.return_value = []
+
         with patch(
             "custom_components.qvantum.async_migrate_entries",
             side_effect=capture_migrate,
         ):
-            with patch.object(hass.config_entries, "async_update_entry"):
-                await async_migrate_entry(hass, config_entry)
+            with patch(
+                "custom_components.qvantum.async_get_entity_registry",
+                return_value=mock_ent_reg,
+            ):
+                with patch.object(hass.config_entries, "async_update_entry"):
+                    await async_migrate_entry(hass, config_entry)
 
         return captured
 
@@ -371,100 +398,123 @@ class TestMigrateToV5Callbacks:
         assert result is None
 
     # ------------------------------------------------------------------
-    # migrate_to_v5_unique_ids  (second v5 pass, index 1 from v4)
+    # v5 sensor entity migration via entity registry (direct, not callback)
     # ------------------------------------------------------------------
 
-    @pytest.mark.asyncio
-    async def test_v5_sensor_cb_renames_dhw_normal_start(self, hass):
-        callbacks = await self._capture_v5_callbacks(hass, version=4)
-        cb = callbacks[1]  # second pass: non-numbers
+    def _make_ent_reg_entry(
+        self, domain, unique_id, entity_id=None, config_entry_id="test"
+    ):
+        """Create a minimal mock entity registry entry."""
+        entry = MagicMock()
+        entry.domain = domain
+        entry.unique_id = unique_id
+        entry.entity_id = entity_id or f"{domain}.qvantum_test"
+        entry.config_entry_id = config_entry_id
+        return entry
 
-        entry = self._make_entity_entry(
+    async def _run_v5_sensor_migration(self, hass, entities):
+        """Run async_migrate_entry for v4 with a mocked entity registry
+        and return the registry mock."""
+        mock_ent_reg = MagicMock()
+        mock_ent_reg.entities.values.return_value = entities
+
+        config_entry = MagicMock(version=4, minor_version=0, entry_id="test")
+        with patch(
+            "custom_components.qvantum.async_migrate_entries", new_callable=AsyncMock
+        ):
+            with patch(
+                "custom_components.qvantum.async_get_entity_registry",
+                return_value=mock_ent_reg,
+            ):
+                with patch.object(hass.config_entries, "async_update_entry"):
+                    await async_migrate_entry(hass, config_entry)
+        return mock_ent_reg
+
+    @pytest.mark.asyncio
+    async def test_v5_sensor_renames_dhw_normal_start(self, hass):
+        """Sensor with dhw_normal_start unique_id is renamed to tap_water_start."""
+        entity = self._make_ent_reg_entry(
             "sensor",
             "qvantum_dhw_normal_start_1011074250800138",
             entity_id="sensor.qvantum_hot_water_tank_lower_limit",
         )
-        result = cb(entry)
+        ent_reg = await self._run_v5_sensor_migration(hass, [entity])
 
-        assert result == {
-            "new_unique_id": "qvantum_tap_water_start_1011074250800138"
-        }
+        ent_reg.async_update_entity.assert_called_once_with(
+            "sensor.qvantum_hot_water_tank_lower_limit",
+            new_unique_id="qvantum_tap_water_start_1011074250800138",
+        )
+        ent_reg.async_remove.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_v5_sensor_cb_renames_dhw_normal_stop(self, hass):
-        callbacks = await self._capture_v5_callbacks(hass, version=4)
-        cb = callbacks[1]
-
-        entry = self._make_entity_entry(
+    async def test_v5_sensor_renames_dhw_normal_stop(self, hass):
+        """Sensor with dhw_normal_stop unique_id is renamed to tap_water_stop."""
+        entity = self._make_ent_reg_entry(
             "sensor",
             "qvantum_dhw_normal_stop_1011074250800138",
             entity_id="sensor.qvantum_hot_water_tank_upper_limit",
         )
-        result = cb(entry)
+        ent_reg = await self._run_v5_sensor_migration(hass, [entity])
 
-        assert result == {
-            "new_unique_id": "qvantum_tap_water_stop_1011074250800138"
-        }
+        ent_reg.async_update_entity.assert_called_once_with(
+            "sensor.qvantum_hot_water_tank_upper_limit",
+            new_unique_id="qvantum_tap_water_stop_1011074250800138",
+        )
+        ent_reg.async_remove.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_v5_sensor_cb_skips_number_domain(self, hass):
-        """Number entities must be skipped by the sensor rename pass."""
-        callbacks = await self._capture_v5_callbacks(hass, version=4)
-        cb = callbacks[1]
-
-        entry = self._make_entity_entry(
+    async def test_v5_sensor_skips_number_domain(self, hass):
+        """Number entities are skipped by the sensor rename pass."""
+        entity = self._make_ent_reg_entry(
             "number", "qvantum_dhw_normal_start_1011074250800138"
         )
-        result = cb(entry)
+        ent_reg = await self._run_v5_sensor_migration(hass, [entity])
 
-        assert result is None
+        ent_reg.async_update_entity.assert_not_called()
+        ent_reg.async_remove.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_v5_sensor_cb_no_change_returns_none(self, hass):
-        """Sensors without dhw_normal keys must be left alone."""
-        callbacks = await self._capture_v5_callbacks(hass, version=4)
-        cb = callbacks[1]
+    async def test_v5_sensor_no_change_when_no_dhw_key(self, hass):
+        """Sensors without dhw_normal keys are left untouched."""
+        entity = self._make_ent_reg_entry("sensor", "qvantum_bt1_1011074250800138")
+        ent_reg = await self._run_v5_sensor_migration(hass, [entity])
 
-        entry = self._make_entity_entry(
-            "sensor", "qvantum_bt1_1011074250800138"
-        )
-        result = cb(entry)
-
-        assert result is None
+        ent_reg.async_update_entity.assert_not_called()
+        ent_reg.async_remove.assert_not_called()
 
     # ------------------------------------------------------------------
-    # Collision scenario: verify the two-pass ordering prevents conflicts
+    # Collision scenario: stale sensor removed when target unique_id taken
     # ------------------------------------------------------------------
 
     @pytest.mark.asyncio
-    async def test_v5_two_pass_avoids_unique_id_collision(self, hass):
-        """Simulate the real-world collision: number and sensor share the same
-        dhw_normal_start unique ID.  After pass 1 the number ID is freed and
-        pass 2 can safely claim it for the sensor."""
+    async def test_v5_sensor_removes_orphan_when_target_uid_taken(self, hass):
+        """When both a stale entity (dhw_normal_start) and an active entity
+        already holding the target unique_id (tap_water_start) exist, the stale
+        entity is removed rather than causing a ValueError."""
         device_id = "1011074250800138"
-        shared_old_id = f"qvantum_dhw_normal_start_{device_id}"
 
-        number_entry = self._make_entity_entry("number", shared_old_id)
-        sensor_entry = self._make_entity_entry(
+        # Active sensor already has the target unique_id
+        active = self._make_ent_reg_entry(
             "sensor",
-            shared_old_id,
+            f"qvantum_tap_water_start_{device_id}",
+            entity_id="sensor.qvantum_hot_water_tank_lower_temperature_limit",
+        )
+        # Stale/orphaned sensor still has the old dhw unique_id
+        stale = self._make_ent_reg_entry(
+            "sensor",
+            f"qvantum_dhw_normal_start_{device_id}",
             entity_id="sensor.qvantum_hot_water_tank_lower_limit",
         )
 
-        callbacks = await self._capture_v5_callbacks(hass, version=4)
-        number_cb, sensor_cb = callbacks[0], callbacks[1]
+        ent_reg = await self._run_v5_sensor_migration(hass, [active, stale])
 
-        # Pass 1: number entity gets prefixed → frees up the sensor's target ID
-        number_result = number_cb(number_entry)
-        assert number_result == {
-            "new_unique_id": f"qvantum_number_tap_water_start_{device_id}"
-        }
-
-        # Pass 2: sensor entity claims the now-free target ID
-        sensor_result = sensor_cb(sensor_entry)
-        assert sensor_result == {
-            "new_unique_id": f"qvantum_tap_water_start_{device_id}"
-        }
-
-        # The two resulting IDs must be distinct
-        assert number_result["new_unique_id"] != sensor_result["new_unique_id"]
+        # The orphan must be removed, not renamed
+        ent_reg.async_remove.assert_called_once_with(
+            "sensor.qvantum_hot_water_tank_lower_limit"
+        )
+        # The active entity must remain in the registry and not be removed
+        assert active.entity_id not in [
+            call.args[0] for call in ent_reg.async_remove.call_args_list
+        ]
+        # The active entity must not be touched
+        ent_reg.async_update_entity.assert_not_called()
