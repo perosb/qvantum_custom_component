@@ -265,11 +265,13 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
                 return None
             old_unique_id = entity_entry.unique_id
             # Skip entries already in the new format
-            if "_number_" in old_unique_id:
+            if old_unique_id.startswith("qvantum_number_"):
                 return None
             # Old format: qvantum_{metric_key}_{device_id}
             # New format: qvantum_number_{metric_key}_{device_id}
             new_unique_id = old_unique_id.replace("qvantum_", "qvantum_number_", 1)
+            if new_unique_id == old_unique_id:
+                return None
             _LOGGER.debug(
                 "Updating unique ID for number entity %s from %s to %s",
                 entity_entry.entity_id,
