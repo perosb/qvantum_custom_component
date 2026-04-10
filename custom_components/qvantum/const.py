@@ -91,8 +91,6 @@ DEFAULT_ENABLED_HTTP_ONLY_METRICS = [
     "bp2_pressure",
     "bp2_temp",
     "fan0_10v",
-    "tap_water_stop",
-    "tap_water_start",
 ]
 
 DEFAULT_ENABLED_MODBUS_METRICS = (
