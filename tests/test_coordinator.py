@@ -833,7 +833,7 @@ class TestDeriveTapWaterCapacity:
         with patch("custom_components.qvantum.coordinator._LOGGER") as mock_logger:
             coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] == 7  # Nearest stop=76 -> capacity=7
-        mock_logger.warning.assert_called_once()
+        mock_logger.debug.assert_called_once()
 
     def test_unknown_pair_estimates_capacity_mid_range(self):
         """An unknown pair with stop=72 estimates capacity 5 (closest to stop=71)."""
@@ -853,7 +853,7 @@ class TestDeriveTapWaterCapacity:
         with patch("custom_components.qvantum.coordinator._LOGGER") as mock_logger:
             coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] is None
-        mock_logger.warning.assert_called_once()
+        mock_logger.debug.assert_called_once()
 
     def test_capacity_key_absent_treated_as_none(self):
         """tap_water_capacity_target absent from dict is treated the same as None."""

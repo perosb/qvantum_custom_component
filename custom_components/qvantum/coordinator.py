@@ -289,7 +289,7 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         if capacity is not None:
             values["tap_water_capacity_target"] = capacity
         else:
-            # use nearest tap_stop to estimate unmapped pairs
+            # use nearest tap_stop for unmapped pairs and log a debug message
             if isinstance(tap_stop, (int, float)):
                 nearest_pair = min(
                     TAP_WATER_CAPACITY_MAPPINGS.keys(), key=lambda pair: abs(pair[1] - tap_stop)
