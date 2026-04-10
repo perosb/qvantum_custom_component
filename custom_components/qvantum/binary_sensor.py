@@ -10,6 +10,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    BINARY_SENSOR_NAMES,
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
 )
@@ -33,19 +34,6 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
     sensors = []
 
-    sensor_names = [
-        "cooling_enabled",
-        "picpin_relay_heat_l1",
-        "picpin_relay_heat_l2",
-        "picpin_relay_heat_l3",
-        "picpin_relay_qm10",
-        "dhwdemand",
-        "heatingdemand",
-        "coolingdemand",
-        "additiondemand",
-        "additiondhwdemand",
-    ]
-
     values = coordinator.data.get("values", {})
     disabled_metrics = (
         DEFAULT_DISABLED_MODBUS_METRICS
@@ -53,7 +41,7 @@ async def async_setup_entry(
         else DEFAULT_DISABLED_HTTP_METRICS
     )
 
-    for metric in sorted(sensor_names):
+    for metric in sorted(BINARY_SENSOR_NAMES):
         enabled_by_default = metric not in disabled_metrics
         if enabled_by_default and metric not in values:
             continue
@@ -77,7 +65,7 @@ async def async_setup_entry(
     # Clean up disabled entities that are no longer supported in the current mode
     from .entity import cleanup_disabled_entities
 
-    cleanup_disabled_entities(hass, coordinator, sensor_names, "binary_sensor")
+    cleanup_disabled_entities(hass, coordinator, BINARY_SENSOR_NAMES, "binary_sensor")
 
 
 class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):

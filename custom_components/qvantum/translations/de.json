@@ -129,6 +129,9 @@
       },
       "additiondhwdemand": {
         "name": "Zusatzbedarf DHW"
+      },
+      "time_to_defrost": {
+        "name": "Zeit bis zum Abtauen"
       }
     },
     "sensor": {

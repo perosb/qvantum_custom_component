@@ -129,6 +129,9 @@
       },
       "additiondhwdemand": {
         "name": "Rásegítési használati melegvíz igény"
+      },
+      "time_to_defrost": {
+        "name": "Idő a leolvasztásig"
       }
     },
     "sensor": {

@@ -129,6 +129,9 @@
       },
       "additiondhwdemand": {
         "name": "Addition hot water demand"
+      },
+      "time_to_defrost": {
+        "name": "Time to defrost"
       }
     },
     "sensor": {

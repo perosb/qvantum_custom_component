@@ -6,7 +6,6 @@ import inspect
 import json
 from datetime import datetime, timedelta, timezone
 import logging
-import struct
 from typing import Any, Optional
 
 from pymodbus.client.tcp import AsyncModbusTcpClient
@@ -23,15 +22,14 @@ from .const import (
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
     TAP_WATER_CAPACITY_MAPPINGS,
+    RELAY_STAGE_POWER_MAP,
+    BASE_SYSTEM_POWER_W,
+)
+from .modbus import (
     MODBUS_INPUT_REGISTER_MAP,
     MODBUS_HOLDING_REGISTER_MAP,
     RELAY_BIT_MAP,
-    MODBUS_SPEC_TO_INTERNAL_MAP,
-    MODBUS_INTERNAL_TO_SPEC_MAP,
-    MODBUS_INPUT_TO_HTTP_MAP,
     MODBUS_HOLDING_TO_SETTINGS_MAP,
-    RELAY_STAGE_POWER_MAP,
-    BASE_SYSTEM_POWER_W,
 )
 
 
@@ -180,13 +178,7 @@ class QvantumAPI:
                         relay_items.append(item_name)
                     elif item_name in register_map:
                         addr, data_type, scale = register_map[item_name]
-                        if data_type == "float32":
-                            # Float32 needs 2 registers
-                            registers_to_read[addr] = (item_name, data_type, scale, 2)
-                            registers_to_read[addr + 1] = (item_name, data_type, scale, 2)
-                        else:
-                            # Single register
-                            registers_to_read[addr] = (item_name, data_type, scale, 1)
+                        registers_to_read[addr] = (item_name, data_type, scale, 1)
 
                 # Group registers into contiguous blocks for efficient reading
                 if registers_to_read:
@@ -241,21 +233,7 @@ class QvantumAPI:
                                 if item_name in data:
                                     continue  # Already processed this item
 
-                                if data_type == "float32":
-                                    # Need both registers for float32
-                                    if addr + 1 in registers_to_read and addr + 1 in range(
-                                        block_start, block_end + 1
-                                    ):
-                                        reg1 = result.registers[i]
-                                        reg2 = result.registers[i + 1]
-                                        # Convert two 16-bit registers to 32-bit float (big-endian)
-                                        raw_bytes = struct.pack(">HH", reg1, reg2)
-                                        value = struct.unpack(">f", raw_bytes)[0] * scale
-
-                                        data[item_name] = self._normalize_modbus_value(
-                                            value, scale
-                                        )
-                                elif data_type in ("int16", "uint16"):
+                                if data_type in ("int16", "uint16"):
                                     value = result.registers[i]
                                     if data_type == "int16":
                                         if value > 32767:
@@ -268,9 +246,7 @@ class QvantumAPI:
 
                 # Handle relay bit extraction from relays_bitmask
                 if handle_relay_bits and relay_items:
-                    bitmask_addr = register_map[
-                        "relays (l1, l2, l3, gp10, qm10, qn8_1, qn8_2, gp3, pump, ha12)"
-                    ][0]
+                    bitmask_addr = register_map["relays_bitmask"][0]
                     request = ReadInputRegistersRequest(
                         dev_id=self._modbus_unit_id, address=bitmask_addr, count=1
                     )
@@ -312,21 +288,13 @@ class QvantumAPI:
 
     async def _read_modbus_metrics(self, device_id: str, enabled_metrics: list[str]):
         """Read metrics from Modbus TCP."""
-        # Convert enabled metrics to original Modbus names
-        enabled_metrics_original = [
-            MODBUS_INTERNAL_TO_SPEC_MAP.get(m, m) for m in enabled_metrics
-        ]
-
         metrics = await self._read_modbus_registers(
             device_id=device_id,
-            enabled_items=enabled_metrics_original,
+            enabled_items=enabled_metrics,
             register_map=MODBUS_INPUT_REGISTER_MAP,
             use_input_registers=True,
             handle_relay_bits=True,
         )
-
-        # Map keys back to our internal names
-        metrics = {MODBUS_SPEC_TO_INTERNAL_MAP.get(k, k): v for k, v in metrics.items()}
 
         _LOGGER.debug("Raw Modbus metrics read: %s", sorted(metrics.items()))
 
@@ -386,17 +354,7 @@ class QvantumAPI:
                 metrics.get(f"{prefix}energy"),
             )
 
-        # Convert internal metric names to HTTP alias names using canonical mapping.
-        normalized_metrics = dict(metrics)
-        for internal_key, value in metrics.items():
-            if value is None:
-                continue
-            http_key = MODBUS_INPUT_TO_HTTP_MAP.get(internal_key)
-            if http_key and normalized_metrics.get(http_key) is None:
-                normalized_metrics[http_key] = value
-                normalized_metrics.pop(internal_key, None)
-
-        return {"metrics": normalized_metrics}
+        return {"metrics": metrics}
 
     async def _read_modbus_settings(self, device_id: str, enabled_settings: list[str]):
         """Read settings from Modbus TCP holding registers."""
