@@ -6,7 +6,6 @@ import inspect
 import json
 from datetime import datetime, timedelta, timezone
 import logging
-import struct
 from typing import Any, Optional
 
 from pymodbus.client.tcp import AsyncModbusTcpClient
