@@ -61,7 +61,6 @@ DEFAULT_ENABLED_METRICS = [
     "picpin_relay_qn8_1",
     "picpin_relay_qn8_2",
     "picpin_relay_gp3",
-    "picpin_relay_pump",
     "picpin_relay_ha12",
     "qn8position",
     "compressorenergy",
@@ -77,6 +76,7 @@ DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "dhwpower",  # Derived from dhwenergy delta; only meaningful with fast Modbus polling
     "smart_dhw_control_status",
     "compressor_state",
+    "picpin_relay_pump",
 ]
 
 # Holding register keys that should be exposed as sensor entities in Modbus mode
@@ -132,8 +132,6 @@ DEFAULT_DISABLED_HTTP_METRICS = [
     "dhw_prioritytimeleft",
     "heating_prioritytimeleft",
     "switch_state",
-    "dhwstop_temp",
-    "dhwstart_temp",
     "filtered60sec_outdoortemp",
     "max_freq_env",
     "dhw_set",
