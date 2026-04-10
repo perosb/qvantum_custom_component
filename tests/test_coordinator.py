@@ -822,8 +822,8 @@ class TestDeriveTapWaterCapacity:
         coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] is None
 
-    def test_unknown_pair_leaves_none_and_warns(self):
-        """An unknown (start, stop) pair leaves capacity as None and logs a warning."""
+    def test_unknown_pair_estimates_capacity_and_warns(self):
+        """An unknown (start, stop) pair estimates capacity based on nearest stop and logs a warning."""
         coordinator = self._make_coordinator()
         values = {
             "tap_water_capacity_target": None,
@@ -832,8 +832,19 @@ class TestDeriveTapWaterCapacity:
         }
         with patch("custom_components.qvantum.coordinator._LOGGER") as mock_logger:
             coordinator._derive_tap_water_capacity(values)
-        assert values["tap_water_capacity_target"] is None
-        mock_logger.warning.assert_called_once()
+        assert values["tap_water_capacity_target"] == 7  # Nearest stop=76 -> capacity=7
+        mock_logger.debug.assert_called_once()
+
+    def test_unknown_pair_estimates_capacity_mid_range(self):
+        """An unknown pair with stop=72 estimates capacity 5 (closest to stop=71)."""
+        coordinator = self._make_coordinator()
+        values = {
+            "tap_water_capacity_target": None,
+            "tap_water_start": 55,
+            "tap_water_stop": 72,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        assert values["tap_water_capacity_target"] == 5
 
     def test_non_integer_values_leave_none_and_warn(self):
         """String values for tap_water_start/stop cannot match integer mapping keys."""
@@ -842,7 +853,7 @@ class TestDeriveTapWaterCapacity:
         with patch("custom_components.qvantum.coordinator._LOGGER") as mock_logger:
             coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] is None
-        mock_logger.warning.assert_called_once()
+        mock_logger.debug.assert_called_once()
 
     def test_capacity_key_absent_treated_as_none(self):
         """tap_water_capacity_target absent from dict is treated the same as None."""

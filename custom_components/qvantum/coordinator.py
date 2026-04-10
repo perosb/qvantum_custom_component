@@ -289,10 +289,18 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         if capacity is not None:
             values["tap_water_capacity_target"] = capacity
         else:
-            _LOGGER.warning(
-                "No tap water capacity mapping found for start=%s and stop=%s",
+            # use nearest tap_stop for unmapped pairs and log a debug message
+            if isinstance(tap_stop, (int, float)):
+                nearest_pair = min(
+                    TAP_WATER_CAPACITY_MAPPINGS.keys(), key=lambda pair: abs(pair[1] - tap_stop)
+                )
+                nearest_capacity = TAP_WATER_CAPACITY_MAPPINGS[nearest_pair]
+                values["tap_water_capacity_target"] = nearest_capacity
+            _LOGGER.debug(
+                "No tap water capacity mapping found for start=%s and stop=%s, using nearest capacity=%s based on stop temperature",
                 tap_start,
                 tap_stop,
+                values.get("tap_water_capacity_target", "none"),
             )
 
     def _calculate_mode_power(
