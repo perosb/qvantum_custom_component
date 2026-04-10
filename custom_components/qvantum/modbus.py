@@ -120,15 +120,6 @@ RELAY_BIT_MAP = {
     "picpin_relay_ha12": 9,
 }
 
-# Modbus input register internal→HTTP key map (source data conversion path)
-MODBUS_INPUT_TO_HTTP_MAP = {
-    "dhw_normal_start": "tap_water_start",
-    "dhw_normal_stop": "tap_water_stop",
-    "tap_stop": "tap_stop",
-    "smart_price_dhw_enabled": "enable_sc_dhw",
-    "smart_price_heating_enabled": "enable_sc_sh",
-}
-
 # One-way map from Modbus holding register keys to the canonical settings names
 # used by the API/settings layer. This does not imply reverse lookup support.
 MODBUS_HOLDING_TO_SETTINGS_MAP = {
