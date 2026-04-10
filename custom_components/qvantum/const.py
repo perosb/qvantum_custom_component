@@ -157,7 +157,7 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
     "heating_prioritytimeleft",
     "cooling_prioritytimeleft",
     "degree_minute",
-    "time_to_defrost",  # should be interprted as binary (defrosting vs not) rather than a continuous time value
+    "time_to_defrost",  # should be interpreted as binary (defrosting vs not) rather than a continuous time value
 ]
 
 # Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus)
@@ -259,7 +259,7 @@ BINARY_SENSOR_NAMES = [
     "coolingdemand",
     "additiondemand",
     "additiondhwdemand",
-    "time_to_defrost",  # should be interprted as binary (defrosting vs not) rather than a continuous time value
+    "time_to_defrost",  # should be interpreted as binary (defrosting vs not) rather than a continuous time value
 ]
 
 # Sensor filtering patterns
