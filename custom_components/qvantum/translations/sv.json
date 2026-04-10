@@ -132,6 +132,9 @@
       },
       "additiondhwdemand": {
         "name": "Tillsatsbehov Varmvatten"
+      },
+      "time_to_defrost": {
+        "name": "Tid till avfrostning"
       }
     },
     "sensor": {

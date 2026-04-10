@@ -440,6 +440,7 @@ class TestSensorSetup:
             "coolingdemand",
             "additiondemand",
             "additiondhwdemand",
+            "time_to_defrost",
         }
 
         # Mark config entry as Modbus mode

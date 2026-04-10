@@ -168,7 +168,7 @@ async def test_async_setup_entry(
         # Check that entities were added
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
-        assert len(entities) == 10  # 10 sensor names
+        assert len(entities) == 11  # 11 sensor names
 
         # Check that we have the expected sensor types
         sensor_names = [
@@ -182,6 +182,7 @@ async def test_async_setup_entry(
             "picpin_relay_heat_l2",
             "picpin_relay_heat_l3",
             "picpin_relay_qm10",
+            "time_to_defrost",
         ]
 
         entity_metric_keys = sorted([e._metric_key for e in entities])

@@ -49,7 +49,6 @@ DEFAULT_ENABLED_METRICS = [
     "bt34",
     "cal_heat_temp",
     "compressormeasuredspeed",
-    "compressor_state",
     "fanrpm",
     "gp1_speed",
     "gp2_speed",
@@ -77,6 +76,7 @@ DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "heatingpower",  # Derived from heatingenergy delta; only meaningful with fast Modbus polling
     "dhwpower",  # Derived from dhwenergy delta; only meaningful with fast Modbus polling
     "smart_dhw_control_status",
+    "compressor_state",
 ]
 
 # Holding register keys that should be exposed as sensor entities in Modbus mode
@@ -159,6 +159,7 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
     "heating_prioritytimeleft",
     "cooling_prioritytimeleft",
     "degree_minute",
+    "time_to_defrost",
 ]
 
 # Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus)
@@ -203,17 +204,6 @@ REQUIRED_MODBUS_METRICS = [
     "cooling_kwh",
     "dhw_mwh",
     "dhw_kwh",
-]
-
-# Sensor filtering patterns
-EXCLUDED_METRIC_PATTERNS = [
-    "op_man_",
-    "enable",
-    "smart_sh_mode",
-    "smart_dhw_mode",
-    "picpin_",
-    "use_",
-    "demand",
 ]
 
 # Sensor type classification
@@ -273,3 +263,13 @@ BINARY_SENSOR_NAMES = [
     "additiondhwdemand",
     "time_to_defrost",
 ]
+
+# Sensor filtering patterns
+EXCLUDED_METRIC_PATTERNS = [
+    "op_man_",
+    "enable",
+    "smart_sh_mode",
+    "smart_dhw_mode",
+    "picpin_",
+    "use_",
+] + BINARY_SENSOR_NAMES
