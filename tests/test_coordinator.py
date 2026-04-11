@@ -1239,16 +1239,16 @@ class TestCalculateTapWaterCap:
     def test_ema_smooths_output(self):
         """Second poll blends toward new value rather than jumping immediately."""
         coordinator = self._make_coordinator()
-        # First poll: no prior EMA state → raw value used as-is
+        # First poll: no prior EMA state → raw value used as-is (about 5.8 with defaults)
         values1 = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values1)
-        first = values1["tap_water_cap"]  # ≈ 6.23
+        first = values1["tap_water_cap"]
 
         # Second poll: slightly lower tank temp
         values2 = {"bt30": 55.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values2)
         second = values2["tap_water_cap"]
-        # raw_second ≈ 5.57 (bt30=55, cold=8, flow=7)
-        # EMA: 0.2 * 5.57 + 0.8 * 6.23 ≈ 6.10
+        # raw_second is about 5.1 with bt30=55, cold=8, flow=7
+        # EMA should stay between the new raw value and the previous reading
         assert second < first  # moved in the right direction
         assert second > 5.57  # did not jump all the way to the raw value
