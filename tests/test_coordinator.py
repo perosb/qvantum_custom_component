@@ -1170,12 +1170,12 @@ class TestCalculateTapWaterCap:
         coordinator = self._make_coordinator()
         values = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values)
-        # hot_fraction = (38 - 8) / (60 - 8) = 30/52 ≈ 0.5769
-        # hot_per_min = 7 * 0.5769 ≈ 4.038
-        # minutes = (235 * 0.8 / 4.038) * 0.75 ≈ 34.9
-        # showers = 34.9 / 6 ≈ 5.82 -> rounded to 5.8
+        # hot_fraction = (36 - 8) / (60 - 8) = 28/52 ≈ 0.5385
+        # hot_per_min = 7 * 0.5385 ≈ 3.769
+        # minutes = (175 * 0.8 / 3.769) * 0.75 ≈ 27.9
+        # showers = 27.9 / 6 ≈ 4.64 -> rounded to 4.6
         assert "tap_water_cap" in values
-        assert values["tap_water_cap"] == pytest.approx(5.8, abs=0.1)
+        assert values["tap_water_cap"] == pytest.approx(4.6, abs=0.1)
 
     def test_updates_baseline_on_flow(self):
         """When bf1_l_min > 0.1, cold and flow snapshots are EMA-smoothed from their priors."""
@@ -1217,11 +1217,11 @@ class TestCalculateTapWaterCap:
         # Second poll: no flow — uses cold=8.4, flow=6.8, effective_hot=bt30=60 (tank_temp)
         values = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values)
-        # hot_fraction = (38 - 8.4) / (60 - 8.4) = 29.6/51.6 ≈ 0.574
-        # hot_per_min = 6.8 * 0.574 ≈ 3.901
-        # minutes = (235 * 0.8 / 3.901) * 0.75 ≈ 36.1
-        # showers = 36.1 / 6 ≈ 6.02 -> rounded to 6.0
-        assert values["tap_water_cap"] == pytest.approx(6.0, abs=0.1)
+        # hot_fraction = (36 - 8.4) / (60 - 8.4) = 27.6/51.6 ≈ 0.535
+        # hot_per_min = 6.8 * 0.535 ≈ 3.637
+        # minutes = (175 * 0.8 / 3.637) * 0.75 ≈ 28.9
+        # showers = 28.9 / 6 ≈ 4.81 -> rounded to 4.8
+        assert values["tap_water_cap"] == pytest.approx(4.8, abs=0.1)
 
     def test_low_tank_temp_returns_zero(self):
         """When tank_temp - cold_temp < 5, tap_water_cap is set to 0.0."""
@@ -1239,11 +1239,11 @@ class TestCalculateTapWaterCap:
         coordinator._calculate_tap_water_cap(values1)
         first = values1["tap_water_cap"]
 
-        # Second poll: slightly lower tank temp
-        values2 = {"bt30": 55.0, "bf1_l_min": 0.0}
+        # Second poll: lower tank temp
+        values2 = {"bt30": 50.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values2)
         second = values2["tap_water_cap"]
-        # raw_second is about 5.1 with bt30=55, cold=8, flow=7
+        # raw_second ≈ 3.75 with bt30=50, cold=8, flow=7
         # EMA should stay between the new raw value and the previous reading
         assert second < first  # moved in the right direction
-        assert second > 5.57  # did not jump all the way to the raw value
+        assert second > 3.9  # did not jump all the way to the raw value
