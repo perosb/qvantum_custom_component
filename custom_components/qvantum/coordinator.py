@@ -15,6 +15,7 @@ from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import APIAuthError
+from .calculations import QvantumCalculationsMixin
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
@@ -69,7 +70,7 @@ async def handle_setting_update_response(
             coordinator.async_set_updated_data(coordinator.data)
 
 
-class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
+class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinator):
     """Qvantum coordinator."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
@@ -95,6 +96,9 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
         self._last_heatingenergy_time: datetime | None = None
         self._last_dhwenergy: float | None = None
         self._last_dhwenergy_time: datetime | None = None
+        self._last_shower_cold_temp: float | None = None
+        self._last_shower_flow_lpm: float | None = None
+        self._last_tap_water_cap: float | None = None
 
         super().__init__(
             hass,
@@ -303,95 +307,6 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
                 values.get("tap_water_capacity_target", "none"),
             )
 
-    def _calculate_mode_power(
-        self,
-        values: dict,
-        *,
-        energy_key: str,
-        power_key: str,
-        is_active: Callable[[dict[str, Any]], bool],
-        last_energy_attr: str,
-        last_time_attr: str,
-        mode_label: str,
-    ) -> None:
-        """Derive a mode-specific power metric from an energy counter delta.
-
-        Uses elapsed real time between counter increments (not poll interval).
-        While active mode is on and the counter is unchanged, holds the previously
-        emitted power value. Outside active mode, writes 0 W and resets baseline.
-        Negative deltas (counter resets) are clamped to 0 W.
-        """
-        now = dt_util.utcnow()
-        current_energy = values.get(energy_key)
-        if current_energy is None:
-            return
-
-        prev_power: float = (self.data or {}).get("values", {}).get(power_key, 0.0)
-        last_energy = getattr(self, last_energy_attr)
-        last_time = getattr(self, last_time_attr)
-
-        if not is_active(values):
-            values[power_key] = 0.0
-            setattr(self, last_energy_attr, current_energy)
-            setattr(self, last_time_attr, now)
-            return
-
-        _LOGGER.debug(
-            "Calculating %s power: current_energy=%.6f kWh, last_energy=%s kWh, last_time=%s",
-            mode_label,
-            current_energy,
-            last_energy,
-            last_time,
-        )
-
-        if last_energy is not None and last_time is not None:
-            delta_kwh = current_energy - last_energy
-            delta_seconds = (now - last_time).total_seconds()
-            if delta_kwh != 0 and delta_seconds > 0:
-                # kWh / s -> W: (kWh * 3_600_000 J/kWh) / s = J/s = W
-                power_w = (delta_kwh * 3_600_000) / delta_seconds
-                prev_power = max(0.0, round(power_w, 1))
-                _LOGGER.debug(
-                    "Calculated %s: %.1f W (delta=%.6f kWh over %.1f s)",
-                    power_key,
-                    prev_power,
-                    delta_kwh,
-                    delta_seconds,
-                )
-
-        values[power_key] = prev_power
-
-        if current_energy != last_energy:
-            setattr(self, last_time_attr, now)
-        setattr(self, last_energy_attr, current_energy)
-
-    def _calculate_heating_power(self, values: dict) -> None:
-        """Derive heatingpower (W) from the heatingenergy (kWh) delta between polls."""
-        self._calculate_mode_power(
-            values,
-            energy_key="heatingenergy",
-            power_key="heatingpower",
-            is_active=lambda v: v.get("hp_status") == HP_STATUS_HEATING,
-            last_energy_attr="_last_heatingenergy",
-            last_time_attr="_last_heatingenergy_time",
-            mode_label="heating",
-        )
-
-    def _calculate_dhw_power(self, values: dict) -> None:
-        """Derive dhwpower (W) from the dhwenergy (kWh) delta between polls."""
-        self._calculate_mode_power(
-            values,
-            energy_key="dhwenergy",
-            power_key="dhwpower",
-            # DHW activity is determined by BF1 flow rate rather than hp_status,
-            # because active tap water production is most reliably indicated by
-            # water flow through the DHW circuit.
-            is_active=lambda v: v.get("bf1_l_min", 0) > 0,
-            last_energy_attr="_last_dhwenergy",
-            last_time_attr="_last_dhwenergy_time",
-            mode_label="dhw",
-        )
-
     async def async_update_data(self):
         """Fetch data from API endpoint."""
         try:
@@ -475,6 +390,7 @@ class QvantumDataUpdateCoordinator(DataUpdateCoordinator):
             if self.modbus_enabled:
                 self._calculate_heating_power(values)
                 self._calculate_dhw_power(values)
+                self._calculate_tap_water_cap(values)
 
             _LOGGER.debug("Final values: %s", values)
 

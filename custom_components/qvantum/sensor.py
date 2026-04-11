@@ -181,7 +181,7 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             self._attr_device_class = SensorDeviceClass.DURATION
             self._attr_suggested_display_precision = 0
         elif "tap_water_cap" == metric_key:
-            self._attr_suggested_display_precision = 2
+            self._attr_suggested_display_precision = 1
         elif "bf1_l_min" == metric_key:
             self._attr_native_unit_of_measurement = "l/m"
         elif "degree_minute" == metric_key:

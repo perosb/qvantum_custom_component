@@ -886,7 +886,7 @@ class TestCalculateHeatingPower:
         coordinator = self._make_coordinator()
         values = {"heatingenergy": 100.0, "hp_status": 3}
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
             coordinator._calculate_heating_power(values)
 
@@ -899,7 +899,7 @@ class TestCalculateHeatingPower:
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)  # 15 s later
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
 
@@ -916,7 +916,7 @@ class TestCalculateHeatingPower:
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
 
@@ -932,7 +932,7 @@ class TestCalculateHeatingPower:
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             # Establish a prior computed power
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
@@ -964,7 +964,7 @@ class TestCalculateHeatingPower:
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
         t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
 
@@ -989,7 +989,7 @@ class TestCalculateHeatingPower:
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 50.0, "hp_status": 3})
             assert coordinator._last_heatingenergy == 50.0
@@ -1010,7 +1010,7 @@ class TestCalculateHeatingPower:
         coordinator = self._make_coordinator()
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             # Poll 1: establish baseline
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
@@ -1062,7 +1062,7 @@ class TestCalculateDhwPower:
         coordinator = self._make_coordinator()
         values = {"dhwenergy": 100.0, "bf1_l_min": 5.0}
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
             coordinator._calculate_dhw_power(values)
 
@@ -1075,7 +1075,7 @@ class TestCalculateDhwPower:
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_dhw_power({"dhwenergy": 100.0, "bf1_l_min": 5.0})
 
@@ -1092,7 +1092,7 @@ class TestCalculateDhwPower:
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
         t1_same = t1  # intentionally same timestamp: this assertion is mode-switch, not time-delta based
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_dhw_power({"dhwenergy": 100.0, "bf1_l_min": 5.0})
             mock_now.return_value = t1
@@ -1122,7 +1122,7 @@ class TestCalculateDhwPower:
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
         t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_dhw_power({"dhwenergy": 100.0, "bf1_l_min": 5.0})
 
@@ -1138,3 +1138,112 @@ class TestCalculateDhwPower:
             coordinator._calculate_dhw_power(values)
 
         assert values["dhwpower"] == 240.0
+
+
+class TestCalculateTapWaterCap:
+    """Tests for _calculate_tap_water_cap."""
+
+    def _make_coordinator(self):
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            mock_hass = MagicMock()
+            mock_hass.data = {DOMAIN: MagicMock()}
+            mock_config_entry = MagicMock()
+            mock_config_entry.options.get.side_effect = lambda key, default=None: default
+            mock_config_entry.data = {}
+            mock_config_entry.unique_id = "test_device_123"
+            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+            coordinator.data = None
+        return coordinator
+
+    def test_missing_tank_temp_skips(self):
+        """When bt30 is absent, tap_water_cap is not written."""
+        coordinator = self._make_coordinator()
+        values = {"bt33": 8.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+        assert "tap_water_cap" not in values
+
+    def test_first_poll_uses_defaults(self):
+        """With no prior shower snapshot, defaults are used: bt30=60, cold=8, flow=7."""
+        coordinator = self._make_coordinator()
+        values = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+        # hot_fraction = (36 - 8) / (60 - 8) = 28/52 ≈ 0.5385
+        # hot_per_min = 7 * 0.5385 ≈ 3.769
+        # minutes = (175 * 0.8 / 3.769) * 0.75 ≈ 27.9
+        # showers = 27.9 / 6 ≈ 4.64 -> rounded to 4.6
+        assert "tap_water_cap" in values
+        assert values["tap_water_cap"] == pytest.approx(4.6, abs=0.1)
+
+    def test_updates_baseline_on_flow(self):
+        """When bf1_l_min > 0.1, cold and flow snapshots are EMA-smoothed from their priors."""
+        coordinator = self._make_coordinator()
+        values = {"bt30": 60.0, "bf1_l_min": 6.5, "bt33": 12.0}
+        coordinator._calculate_tap_water_cap(values)
+        # cold: 0.2 * 12.0 + 0.8 * 8.0 = 8.8 (EMA from DHW_DEFAULT_COLD_TEMP_C prior)
+        assert coordinator._last_shower_cold_temp == pytest.approx(8.8)
+        # flow: 0.2 * 6.5 + 0.8 * 7.0 = 6.9 (EMA from DHW_DEFAULT_FLOW_LPM prior)
+        assert coordinator._last_shower_flow_lpm == pytest.approx(6.9)
+
+    def test_capacity_decreases_as_tank_drains(self):
+        """Capacity decreases as tank_temp drops, reflecting actual hot water consumption."""
+        # Full tank: bt30=60°C
+        coordinator_full = self._make_coordinator()
+        values_full = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator_full._calculate_tap_water_cap(values_full)
+        cap_full = values_full["tap_water_cap"]
+
+        # Partially drained tank: bt30=45°C
+        coordinator_half = self._make_coordinator()
+        values_half = {"bt30": 45.0, "bf1_l_min": 0.0}
+        coordinator_half._calculate_tap_water_cap(values_half)
+        cap_half = values_half["tap_water_cap"]
+
+        # Capacity must decrease as tank drains — this was the key bug: bt34 rising
+        # during a shower caused capacity to appear to increase instead of decrease.
+        assert cap_full > cap_half
+
+    def test_uses_stored_cold_temp_when_no_flow(self):
+        """After flow has stopped, EMA-smoothed cold/flow values are used for the calculation."""
+        coordinator = self._make_coordinator()
+        # First poll: showering
+        # cold: 0.2*10 + 0.8*8 = 8.4 (EMA from DHW_DEFAULT_COLD_TEMP_C)
+        # flow: 0.2*6.0 + 0.8*7.0 = 6.8 (EMA from DHW_DEFAULT_FLOW_LPM)
+        coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0})
+        assert coordinator._last_shower_cold_temp == pytest.approx(8.4)
+        assert coordinator._last_shower_flow_lpm == pytest.approx(6.8)
+        # Second poll: no flow — uses cold=8.4, flow=6.8, effective_hot=bt30=60 (tank_temp)
+        values = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+        # hot_fraction = (36 - 8.4) / (60 - 8.4) = 27.6/51.6 ≈ 0.535
+        # hot_per_min = 6.8 * 0.535 ≈ 3.637
+        # minutes = (175 * 0.8 / 3.637) * 0.75 ≈ 28.9
+        # showers = 28.9 / 6 ≈ 4.81 -> rounded to 4.8
+        assert values["tap_water_cap"] == pytest.approx(4.8, abs=0.1)
+
+    def test_low_tank_temp_returns_zero(self):
+        """When tank_temp - cold_temp < 5, tap_water_cap is set to 0.0."""
+        coordinator = self._make_coordinator()
+        # default cold = 8, so tank = 12 gives delta = 4 < 5
+        values = {"bt30": 12.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+        assert values["tap_water_cap"] == 0.0
+
+    def test_ema_smooths_output(self):
+        """Second poll blends toward new value rather than jumping immediately."""
+        coordinator = self._make_coordinator()
+        # First poll: no prior EMA state → raw value used as-is (about 5.8 with defaults)
+        values1 = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values1)
+        first = values1["tap_water_cap"]
+
+        # Second poll: lower tank temp
+        values2 = {"bt30": 50.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values2)
+        second = values2["tap_water_cap"]
+        # raw_second ≈ 3.75 with bt30=50, cold=8, flow=7
+        # EMA should stay between the new raw value and the previous reading
+        assert second < first  # moved in the right direction
+        assert second > 3.9  # did not jump all the way to the raw value
