@@ -1178,37 +1178,32 @@ class TestCalculateTapWaterCap:
         assert values["tap_water_cap"] == pytest.approx(5.8, abs=0.1)
 
     def test_updates_baseline_on_flow(self):
-        """When bf1_l_min > 0.1, cold and hot snapshots are EMA-smoothed from their priors."""
+        """When bf1_l_min > 0.1, cold and flow snapshots are EMA-smoothed from their priors."""
         coordinator = self._make_coordinator()
-        values = {"bt30": 60.0, "bf1_l_min": 6.5, "bt33": 12.0, "bt34": 48.0}
+        values = {"bt30": 60.0, "bf1_l_min": 6.5, "bt33": 12.0}
         coordinator._calculate_tap_water_cap(values)
         # cold: 0.2 * 12.0 + 0.8 * 8.0 = 8.8 (EMA from DHW_DEFAULT_COLD_TEMP_C prior)
         assert coordinator._last_shower_cold_temp == pytest.approx(8.8)
-        # hot: 0.2 * 48.0 + 0.8 * 60.0 = 57.6 (EMA from bt30 prior, avoids cold pipe transient)
-        assert coordinator._last_shower_hot_temp == pytest.approx(57.6)
         # flow: 0.2 * 6.5 + 0.8 * 7.0 = 6.9 (EMA from DHW_DEFAULT_FLOW_LPM prior)
         assert coordinator._last_shower_flow_lpm == pytest.approx(6.9)
 
-    def test_uses_bt34_when_available(self):
-        """When bt34 is observed during flow, it is EMA-blended from bt30 prior and used as effective hot temp."""
-        coordinator = self._make_coordinator()
-        # First poll: showering — hot_out=48 EMA-seeded from bt30=60: 0.2*48 + 0.8*60 = 57.6
-        coordinator._calculate_tap_water_cap(
-            {"bt30": 60.0, "bf1_l_min": 7.0, "bt33": 10.0, "bt34": 48.0}
-        )
-        assert coordinator._last_shower_hot_temp == pytest.approx(57.6)
-        # Second poll: no flow — effective_hot=57.6 (lower than bt30=60, showing bt34 influence)
-        values = {"bt30": 60.0, "bf1_l_min": 0.0}
-        coordinator._calculate_tap_water_cap(values)
-        # effective_hot=57.6, cold=8.4 (0.2*10+0.8*8), flow=7.0 (EMA of 7.0 from 7.0 default = 7.0)
-        # hot_fraction = (38 - 8.4) / (57.6 - 8.4) = 29.6/49.2 ≈ 0.602
-        # hot_per_min = 7.0 * 0.602 ≈ 4.211
-        # minutes = (235 * 0.8 / 4.211) * 0.75 ≈ 33.5
-        # showers = 33.5 / 6 ≈ 5.58 -> rounded to 5.6
-        result_with_bt34 = values["tap_water_cap"]
-        assert result_with_bt34 == pytest.approx(5.6, abs=0.1)
-        # Verify bt34 lowered the estimate vs using bt30 alone (bt30 alone ≈ 5.9)
-        assert result_with_bt34 < 5.9
+    def test_capacity_decreases_as_tank_drains(self):
+        """Capacity decreases as tank_temp drops, reflecting actual hot water consumption."""
+        # Full tank: bt30=60°C
+        coordinator_full = self._make_coordinator()
+        values_full = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator_full._calculate_tap_water_cap(values_full)
+        cap_full = values_full["tap_water_cap"]
+
+        # Partially drained tank: bt30=45°C
+        coordinator_half = self._make_coordinator()
+        values_half = {"bt30": 45.0, "bf1_l_min": 0.0}
+        coordinator_half._calculate_tap_water_cap(values_half)
+        cap_half = values_half["tap_water_cap"]
+
+        # Capacity must decrease as tank drains — this was the key bug: bt34 rising
+        # during a shower caused capacity to appear to increase instead of decrease.
+        assert cap_full > cap_half
 
     def test_uses_stored_cold_temp_when_no_flow(self):
         """After flow has stopped, EMA-smoothed cold/flow values are used for the calculation."""
@@ -1219,7 +1214,7 @@ class TestCalculateTapWaterCap:
         coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0})
         assert coordinator._last_shower_cold_temp == pytest.approx(8.4)
         assert coordinator._last_shower_flow_lpm == pytest.approx(6.8)
-        # Second poll: no flow — uses cold=8.4, flow=6.8, effective_hot=bt30=60 (no bt34 snapshot)
+        # Second poll: no flow — uses cold=8.4, flow=6.8, effective_hot=bt30=60 (tank_temp)
         values = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values)
         # hot_fraction = (38 - 8.4) / (60 - 8.4) = 29.6/51.6 ≈ 0.574

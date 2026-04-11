@@ -117,12 +117,12 @@ class QvantumCalculationsMixin:
     def _calculate_tap_water_cap(self, values: dict) -> None:
         """Derive tap_water_cap (showers remaining) from tank and flow sensor data.
 
-        bt34 (DHW hot water outlet) is the temperature the thermostatic mixer
-        actually receives and is snapshotted during active flow alongside bt33
-        (cold water in) and bf1_l_min (flow), because all three drift when idle.
-        bt30 (tank temp) is used as fallback when no bt34 snapshot exists yet.
-        Formula: effective_hot = bt34_snapshot or bt30,
-                 hot_fraction = (shower_temp - cold) / (effective_hot - cold),
+        bt30 (tank temp) is used directly as the effective hot water temperature,
+        since it represents current stored energy and decreases as hot water is
+        drawn — making capacity correctly decrease during a shower.
+        bt33 (cold water in) and bf1_l_min (flow) are snapshotted during active
+        flow and EMA-smoothed to prevent brief transients from dominating.
+        Formula: hot_fraction = (shower_temp - cold) / (tank_temp - cold),
                  hot_per_min = flow * hot_fraction,
                  minutes = (volume * usable_fraction / hot_per_min) * drop_factor,
                  showers = minutes / shower_duration_min.
@@ -130,11 +130,10 @@ class QvantumCalculationsMixin:
         tank_temp = values.get("bt30")
         flow = values.get("bf1_l_min")
         cold = values.get("bt33")
-        hot_out = values.get("bt34")
 
         # Snapshot realistic shower-time values while water is actually flowing.
-        # EMA-smooth cold and hot_out to prevent a brief transient (e.g. warm pipe
-        # water at the start of a 15-second run) from dominating the estimate.
+        # EMA-smooth cold to prevent a brief transient (e.g. warm pipe water at
+        # the start of a 15-second run) from dominating the estimate.
         if flow is not None and flow > 0.1:
             if cold is not None:
                 prior_cold = (
@@ -144,15 +143,6 @@ class QvantumCalculationsMixin:
                 )
                 self._last_shower_cold_temp = (
                     DHW_EMA_ALPHA * cold + (1 - DHW_EMA_ALPHA) * prior_cold
-                )
-            if hot_out is not None:
-                prior_hot = (
-                    self._last_shower_hot_temp
-                    if self._last_shower_hot_temp is not None
-                    else tank_temp  # seed from bt30 to avoid cold pipe transient on first observation
-                )
-                self._last_shower_hot_temp = (
-                    DHW_EMA_ALPHA * hot_out + (1 - DHW_EMA_ALPHA) * prior_hot
                 )
             prior_flow = (
                 self._last_shower_flow_lpm
@@ -178,12 +168,11 @@ class QvantumCalculationsMixin:
         if tank_temp is None:
             return
 
-        # bt34 is the actual delivery temperature; fall back to bt30 when not yet observed
-        effective_hot_temp = (
-            self._last_shower_hot_temp
-            if self._last_shower_hot_temp is not None
-            else tank_temp
-        )
+        # Use tank_temp (bt30) directly as the hot water temperature.
+        # tank_temp decreases as hot water is drawn, so capacity correctly
+        # decreases during a shower — unlike bt34 outlet temp which rises as
+        # pipes warm up and would cause capacity to appear to increase.
+        effective_hot_temp = tank_temp
 
         if (
             effective_hot_temp <= DHW_SHOWER_TEMP_C
@@ -221,11 +210,10 @@ class QvantumCalculationsMixin:
         # the EMA state in full precision for subsequent calculations.
         values["tap_water_cap"] = round(smoothed, 1)
         _LOGGER.debug(
-            "Calculated tap_water_cap=%.2f showers (raw=%.2f, tank=%.1f°C, hot_out=%.1f°C, cold=%.1f°C, flow=%.1f L/min)",
+            "Calculated tap_water_cap=%.2f showers (raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min)",
             smoothed,
             raw_showers,
             tank_temp,
-            effective_hot_temp,
             cold_temp,
             flow_lpm,
         )

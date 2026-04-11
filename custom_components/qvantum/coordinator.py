@@ -97,7 +97,6 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._last_dhwenergy: float | None = None
         self._last_dhwenergy_time: datetime | None = None
         self._last_shower_cold_temp: float | None = None
-        self._last_shower_hot_temp: float | None = None
         self._last_shower_flow_lpm: float | None = None
         self._last_tap_water_cap: float | None = None
 
