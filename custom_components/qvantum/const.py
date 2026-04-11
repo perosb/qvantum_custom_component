@@ -204,7 +204,6 @@ REQUIRED_MODBUS_METRICS = [
     # Required by tap_water_cap derived metric calculation in Modbus mode
     "bt30",  # Tank temperature
     "bt33",  # Cold water inlet temperature
-    "bt34",  # Hot water outlet temperature
     "bf1_l_min",  # DHW flow rate
 ]
 
