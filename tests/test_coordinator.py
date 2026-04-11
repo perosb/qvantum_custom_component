@@ -886,7 +886,7 @@ class TestCalculateHeatingPower:
         coordinator = self._make_coordinator()
         values = {"heatingenergy": 100.0, "hp_status": 3}
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
             coordinator._calculate_heating_power(values)
 
@@ -899,7 +899,7 @@ class TestCalculateHeatingPower:
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)  # 15 s later
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
 
@@ -916,7 +916,7 @@ class TestCalculateHeatingPower:
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
 
@@ -932,7 +932,7 @@ class TestCalculateHeatingPower:
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             # Establish a prior computed power
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
@@ -964,7 +964,7 @@ class TestCalculateHeatingPower:
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
         t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
 
@@ -989,7 +989,7 @@ class TestCalculateHeatingPower:
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 50.0, "hp_status": 3})
             assert coordinator._last_heatingenergy == 50.0
@@ -1010,7 +1010,7 @@ class TestCalculateHeatingPower:
         coordinator = self._make_coordinator()
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             # Poll 1: establish baseline
             mock_now.return_value = t0
             coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
@@ -1062,7 +1062,7 @@ class TestCalculateDhwPower:
         coordinator = self._make_coordinator()
         values = {"dhwenergy": 100.0, "bf1_l_min": 5.0}
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
             coordinator._calculate_dhw_power(values)
 
@@ -1075,7 +1075,7 @@ class TestCalculateDhwPower:
         t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_dhw_power({"dhwenergy": 100.0, "bf1_l_min": 5.0})
 
@@ -1092,7 +1092,7 @@ class TestCalculateDhwPower:
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
         t1_same = t1  # intentionally same timestamp: this assertion is mode-switch, not time-delta based
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_dhw_power({"dhwenergy": 100.0, "bf1_l_min": 5.0})
             mock_now.return_value = t1
@@ -1122,7 +1122,7 @@ class TestCalculateDhwPower:
         t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
         t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
 
-        with patch("custom_components.qvantum.coordinator.dt_util.utcnow") as mock_now:
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
             coordinator._calculate_dhw_power({"dhwenergy": 100.0, "bf1_l_min": 5.0})
 
