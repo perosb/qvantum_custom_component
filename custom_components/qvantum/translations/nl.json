@@ -131,7 +131,7 @@
         "name": "Extra DHW vraag"
       },
       "time_to_defrost": {
-        "name": "Tijd tot ontdooien"
+        "name": "Tijd om te ontdooien"
       }
     },
     "sensor": {

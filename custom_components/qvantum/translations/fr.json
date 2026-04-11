@@ -131,7 +131,7 @@
         "name": "Demande d'appoint eau chaude"
       },
       "time_to_defrost": {
-        "name": "Temps jusqu'au dégivrage"
+        "name": "Temps de dégivrage"
       }
     },
     "sensor": {

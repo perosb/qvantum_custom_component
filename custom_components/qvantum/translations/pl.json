@@ -131,7 +131,7 @@
         "name": "Zapotrzebowanie na dogrzewanie ciepłej wody"
       },
       "time_to_defrost": {
-        "name": "Czas do odszraniania"
+        "name": "Czas rozmrażania"
       }
     },
     "sensor": {
