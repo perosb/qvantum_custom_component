@@ -74,6 +74,7 @@ DEFAULT_ENABLED_METRICS = [
 DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "heatingpower",  # Derived from heatingenergy delta; only meaningful with fast Modbus polling
     "dhwpower",  # Derived from dhwenergy delta; only meaningful with fast Modbus polling
+    "tap_water_cap",  # Derived from bt30/bt33/bf1_l_min; only computed in Modbus mode
     "smart_dhw_control_status",
     "compressor_state",
     "picpin_relay_pump",
@@ -216,6 +217,18 @@ PRESSURE_METRICS = ["pressure"]
 
 # Firmware component keys
 FIRMWARE_KEYS = ["display_fw_version", "cc_fw_version", "inv_fw_version"]
+
+# DHW capacity calculation defaults
+DHW_SHOWER_TEMP_C = 38.0        # Target shower temperature (°C)
+DHW_TANK_VOLUME_L = 235         # Hot water tank volume (L)
+DHW_USABLE_FRACTION = 0.8       # Usable fraction of tank
+DHW_DEFAULT_FLOW_LPM = 7.0      # Default shower flow rate when no recent observation (L/min)
+DHW_DEFAULT_COLD_TEMP_C = 8.0   # Default cold water temperature when no recent observation (°C)
+DHW_TEMP_DROP_FACTOR = 0.75     # Empirical compensation for tank temperature drop during shower
+DHW_SHOWER_DURATION_MIN = 6.0   # Duration of one shower in minutes
+DHW_EMA_ALPHA = (
+    0.2  # EMA smoothing factor for tap_water_cap (0=no change, 1=no smoothing)
+)
 
 # Tap water capacity mappings (start, stop) -> capacity
 TAP_WATER_CAPACITY_MAPPINGS = {

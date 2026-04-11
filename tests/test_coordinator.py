@@ -1138,3 +1138,117 @@ class TestCalculateDhwPower:
             coordinator._calculate_dhw_power(values)
 
         assert values["dhwpower"] == 240.0
+
+
+class TestCalculateTapWaterCap:
+    """Tests for _calculate_tap_water_cap."""
+
+    def _make_coordinator(self):
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            mock_hass = MagicMock()
+            mock_hass.data = {DOMAIN: MagicMock()}
+            mock_config_entry = MagicMock()
+            mock_config_entry.options.get.side_effect = lambda key, default=None: default
+            mock_config_entry.data = {}
+            mock_config_entry.unique_id = "test_device_123"
+            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+            coordinator.data = None
+        return coordinator
+
+    def test_missing_tank_temp_skips(self):
+        """When bt30 is absent, tap_water_cap is not written."""
+        coordinator = self._make_coordinator()
+        values = {"bt33": 8.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+        assert "tap_water_cap" not in values
+
+    def test_first_poll_uses_defaults(self):
+        """With no prior shower snapshot, defaults are used: bt30=60, cold=8, flow=7."""
+        coordinator = self._make_coordinator()
+        values = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+        # hot_fraction = (38 - 8) / (60 - 8) = 30/52 ≈ 0.5769
+        # hot_per_min = 7 * 0.5769 ≈ 4.038
+        # minutes = (235 * 0.8 / 4.038) * 0.75 ≈ 34.9
+        # showers = 34.9 / 6 ≈ 5.82 -> rounded to 5.8
+        assert "tap_water_cap" in values
+        assert values["tap_water_cap"] == pytest.approx(5.8, abs=0.1)
+
+    def test_updates_baseline_on_flow(self):
+        """When bf1_l_min > 0.1, cold and hot snapshots are EMA-smoothed from their priors."""
+        coordinator = self._make_coordinator()
+        values = {"bt30": 60.0, "bf1_l_min": 6.5, "bt33": 12.0, "bt34": 48.0}
+        coordinator._calculate_tap_water_cap(values)
+        # cold: 0.2 * 12.0 + 0.8 * 8.0 = 8.8 (EMA from DHW_DEFAULT_COLD_TEMP_C prior)
+        assert coordinator._last_shower_cold_temp == pytest.approx(8.8)
+        # hot: 0.2 * 48.0 + 0.8 * 60.0 = 57.6 (EMA from bt30 prior, avoids cold pipe transient)
+        assert coordinator._last_shower_hot_temp == pytest.approx(57.6)
+        # flow: 0.2 * 6.5 + 0.8 * 7.0 = 6.9 (EMA from DHW_DEFAULT_FLOW_LPM prior)
+        assert coordinator._last_shower_flow_lpm == pytest.approx(6.9)
+
+    def test_uses_bt34_when_available(self):
+        """When bt34 is observed during flow, it is EMA-blended from bt30 prior and used as effective hot temp."""
+        coordinator = self._make_coordinator()
+        # First poll: showering — hot_out=48 EMA-seeded from bt30=60: 0.2*48 + 0.8*60 = 57.6
+        coordinator._calculate_tap_water_cap(
+            {"bt30": 60.0, "bf1_l_min": 7.0, "bt33": 10.0, "bt34": 48.0}
+        )
+        assert coordinator._last_shower_hot_temp == pytest.approx(57.6)
+        # Second poll: no flow — effective_hot=57.6 (lower than bt30=60, showing bt34 influence)
+        values = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+        # effective_hot=57.6, cold=8.4 (0.2*10+0.8*8), flow=7.0 (EMA of 7.0 from 7.0 default = 7.0)
+        # hot_fraction = (38 - 8.4) / (57.6 - 8.4) = 29.6/49.2 ≈ 0.602
+        # hot_per_min = 7.0 * 0.602 ≈ 4.211
+        # minutes = (235 * 0.8 / 4.211) * 0.75 ≈ 33.5
+        # showers = 33.5 / 6 ≈ 5.58 -> rounded to 5.6
+        result_with_bt34 = values["tap_water_cap"]
+        assert result_with_bt34 == pytest.approx(5.6, abs=0.1)
+        # Verify bt34 lowered the estimate vs using bt30 alone (bt30 alone ≈ 5.9)
+        assert result_with_bt34 < 5.9
+
+    def test_uses_stored_cold_temp_when_no_flow(self):
+        """After flow has stopped, EMA-smoothed cold/flow values are used for the calculation."""
+        coordinator = self._make_coordinator()
+        # First poll: showering
+        # cold: 0.2*10 + 0.8*8 = 8.4 (EMA from DHW_DEFAULT_COLD_TEMP_C)
+        # flow: 0.2*6.0 + 0.8*7.0 = 6.8 (EMA from DHW_DEFAULT_FLOW_LPM)
+        coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0})
+        assert coordinator._last_shower_cold_temp == pytest.approx(8.4)
+        assert coordinator._last_shower_flow_lpm == pytest.approx(6.8)
+        # Second poll: no flow — uses cold=8.4, flow=6.8, effective_hot=bt30=60 (no bt34 snapshot)
+        values = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+        # hot_fraction = (38 - 8.4) / (60 - 8.4) = 29.6/51.6 ≈ 0.574
+        # hot_per_min = 6.8 * 0.574 ≈ 3.901
+        # minutes = (235 * 0.8 / 3.901) * 0.75 ≈ 36.1
+        # showers = 36.1 / 6 ≈ 6.02 -> rounded to 6.0
+        assert values["tap_water_cap"] == pytest.approx(6.0, abs=0.1)
+
+    def test_low_tank_temp_returns_zero(self):
+        """When tank_temp - cold_temp < 5, tap_water_cap is set to 0.0."""
+        coordinator = self._make_coordinator()
+        # default cold = 8, so tank = 12 gives delta = 4 < 5
+        values = {"bt30": 12.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+        assert values["tap_water_cap"] == 0.0
+
+    def test_ema_smooths_output(self):
+        """Second poll blends toward new value rather than jumping immediately."""
+        coordinator = self._make_coordinator()
+        # First poll: no prior EMA state → raw value used as-is
+        values1 = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values1)
+        first = values1["tap_water_cap"]  # ≈ 6.23
+
+        # Second poll: slightly lower tank temp
+        values2 = {"bt30": 55.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values2)
+        second = values2["tap_water_cap"]
+        # raw_second ≈ 5.57 (bt30=55, cold=8, flow=7)
+        # EMA: 0.2 * 5.57 + 0.8 * 6.23 ≈ 6.10
+        assert second < first  # moved in the right direction
+        assert second > 5.57  # did not jump all the way to the raw value
