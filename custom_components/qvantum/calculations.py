@@ -185,14 +185,23 @@ class QvantumCalculationsMixin:
             else tank_temp
         )
 
+        if (
+            effective_hot_temp <= DHW_SHOWER_TEMP_C
+            or cold_temp >= DHW_SHOWER_TEMP_C
+        ):
+            values["tap_water_cap"] = 0.0
+            return
+
         delta_available = effective_hot_temp - cold_temp
         if delta_available < 5:
             values["tap_water_cap"] = 0.0
             return
 
         hot_fraction = (DHW_SHOWER_TEMP_C - cold_temp) / delta_available
+        hot_fraction = min(1.0, max(0.0, hot_fraction))
         hot_per_min = flow_lpm * hot_fraction
         if hot_per_min <= 0:
+            values["tap_water_cap"] = 0.0
             return
 
         minutes = (
