@@ -11,6 +11,8 @@ from .const import (
     DHW_DEFAULT_COLD_TEMP_C,
     DHW_DEFAULT_FLOW_LPM,
     DHW_EMA_ALPHA,
+    DHW_FLOW_SNAPSHOT_THRESHOLD_LPM,
+    DHW_MIN_TEMPERATURE_DELTA_C,
     DHW_SHOWER_DURATION_MIN,
     DHW_SHOWER_TEMP_C,
     DHW_TANK_VOLUME_L,
@@ -134,7 +136,7 @@ class QvantumCalculationsMixin:
         # Snapshot realistic shower-time values while water is actually flowing.
         # EMA-smooth cold to prevent a brief transient (e.g. warm pipe water at
         # the start of a 15-second run) from dominating the estimate.
-        if flow is not None and flow > 0.1:
+        if flow is not None and flow > DHW_FLOW_SNAPSHOT_THRESHOLD_LPM:
             if cold is not None:
                 prior_cold = (
                     self._last_shower_cold_temp
@@ -182,7 +184,7 @@ class QvantumCalculationsMixin:
             return
 
         delta_available = effective_hot_temp - cold_temp
-        if delta_available < 5:
+        if delta_available < DHW_MIN_TEMPERATURE_DELTA_C:
             values["tap_water_cap"] = 0.0
             return
 

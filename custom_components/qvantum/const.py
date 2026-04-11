@@ -227,8 +227,10 @@ DHW_SHOWER_TEMP_C = 36.0  # Target shower temperature (°C) — per Qvantum app 
 DHW_TANK_VOLUME_L = 175  # Hot water tank volume (L) — buffer tank per installer spec
 DHW_USABLE_FRACTION = 0.8  # Usable fraction of tank
 DHW_DEFAULT_FLOW_LPM = 7.0  # Default shower flow rate when no recent observation (L/min)
+DHW_FLOW_SNAPSHOT_THRESHOLD_LPM = 0.1  # Minimum flow used to sample cold/flow values for tap_water_cap
 DHW_DEFAULT_COLD_TEMP_C = 8.0  # Default cold water temperature when no recent observation (°C)
 DHW_TEMP_DROP_FACTOR = 0.75  # Empirical compensation for tank temperature drop during shower
+DHW_MIN_TEMPERATURE_DELTA_C = 5.0  # Minimum spread between tank and cold water before a tap-water capacity estimate is valid
 DHW_SHOWER_DURATION_MIN = 6.0  # Duration of one shower in minutes
 DHW_EMA_ALPHA = (
     0.2  # EMA smoothing factor for tap_water_cap (0=no change, 1=no smoothing)
