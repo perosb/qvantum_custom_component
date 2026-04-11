@@ -131,7 +131,7 @@
         "name": "Demanda adicional ACS"
       },
       "time_to_defrost": {
-        "name": "Tiempo hasta descongelación"
+        "name": "Tiempo de descongelación"
       }
     },
     "sensor": {
