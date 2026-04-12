@@ -347,6 +347,9 @@
       "tap_water_cap": {
         "name": "Pojemność ciepłej wody"
       },
+      "tap_water_minutes": {
+        "name": "Pozostała ciepła woda"
+      },
       "additionalenergy": {
         "name": "Energia dogrzewania"
       },

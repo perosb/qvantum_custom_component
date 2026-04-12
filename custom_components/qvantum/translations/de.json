@@ -348,6 +348,9 @@
       "tap_water_cap": {
         "name": "Brauchwasserkapazität"
       },
+      "tap_water_minutes": {
+        "name": "Verbleibende Brauchwasserzeit"
+      },
       "additionalenergy": {
         "name": "Zusätzliche Energie"
       },

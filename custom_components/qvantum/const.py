@@ -75,6 +75,7 @@ DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "heatingpower",  # Derived from heatingenergy delta; only meaningful with fast Modbus polling
     "dhwpower",  # Derived from dhwenergy delta; only meaningful with fast Modbus polling
     "tap_water_cap",  # Derived from bt30/bt33/bf1_l_min; only computed in Modbus mode
+    "tap_water_minutes",  # Minutes of hot water remaining; companion to tap_water_cap
     "smart_dhw_control_status",
     "compressor_state",
     "picpin_relay_pump",

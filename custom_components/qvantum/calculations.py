@@ -181,11 +181,13 @@ class QvantumCalculationsMixin:
             or cold_temp >= DHW_SHOWER_TEMP_C
         ):
             values["tap_water_cap"] = 0.0
+            values["tap_water_minutes"] = 0.0
             return
 
         delta_available = effective_hot_temp - cold_temp
         if delta_available < DHW_MIN_TEMPERATURE_DELTA_C:
             values["tap_water_cap"] = 0.0
+            values["tap_water_minutes"] = 0.0
             return
 
         hot_fraction = (DHW_SHOWER_TEMP_C - cold_temp) / delta_available
@@ -193,6 +195,7 @@ class QvantumCalculationsMixin:
         hot_per_min = flow_lpm * hot_fraction
         if hot_per_min <= 0:
             values["tap_water_cap"] = 0.0
+            values["tap_water_minutes"] = 0.0
             return
 
         minutes = (
@@ -207,13 +210,15 @@ class QvantumCalculationsMixin:
         else:
             smoothed = raw_showers
         self._last_tap_water_cap = smoothed
-        # Publish the derived value rounded to the sensor's display precision
+        # Publish the derived values rounded to the sensor's display precision
         # so small fluctuations do not cause UI flicker between updates. Keep
         # the EMA state in full precision for subsequent calculations.
         values["tap_water_cap"] = round(smoothed, 1)
+        values["tap_water_minutes"] = round(minutes)
         _LOGGER.debug(
-            "Calculated tap_water_cap=%.2f showers (raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min)",
+            "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min)",
             smoothed,
+            round(minutes),
             raw_showers,
             tank_temp,
             cold_temp,

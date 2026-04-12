@@ -1164,6 +1164,7 @@ class TestCalculateTapWaterCap:
         values = {"bt33": 8.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values)
         assert "tap_water_cap" not in values
+        assert "tap_water_minutes" not in values
 
     def test_first_poll_uses_defaults(self):
         """With no prior shower snapshot, defaults are used: bt30=60, cold=8, flow=7."""
@@ -1176,6 +1177,7 @@ class TestCalculateTapWaterCap:
         # showers = 26.0 / 6 ≈ 4.33 -> rounded to 4.3
         assert "tap_water_cap" in values
         assert values["tap_water_cap"] == pytest.approx(4.3, abs=0.1)
+        assert values["tap_water_minutes"] == 26
 
     def test_updates_baseline_on_flow(self):
         """When bf1_l_min > 0.1, cold and flow snapshots are EMA-smoothed from their priors."""
@@ -1222,6 +1224,7 @@ class TestCalculateTapWaterCap:
         # minutes = (175 * 0.8 / 3.904) * 0.75 ≈ 26.9
         # showers = 26.9 / 6 ≈ 4.48 -> rounded to 4.5
         assert values["tap_water_cap"] == pytest.approx(4.5, abs=0.1)
+        assert values["tap_water_minutes"] == 27
 
     def test_low_tank_temp_returns_zero(self):
         """When tank_temp - cold_temp < 5, tap_water_cap is set to 0.0."""
@@ -1230,6 +1233,7 @@ class TestCalculateTapWaterCap:
         values = {"bt30": 12.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values)
         assert values["tap_water_cap"] == 0.0
+        assert values["tap_water_minutes"] == 0
 
     def test_ema_smooths_output(self):
         """Second poll blends toward new value rather than jumping immediately."""
