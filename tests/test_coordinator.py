@@ -1170,12 +1170,12 @@ class TestCalculateTapWaterCap:
         coordinator = self._make_coordinator()
         values = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values)
-        # hot_fraction = (36 - 8) / (60 - 8) = 28/52 ≈ 0.5385
-        # hot_per_min = 7 * 0.5385 ≈ 3.769
-        # minutes = (175 * 0.8 / 3.769) * 0.75 ≈ 27.9
-        # showers = 27.9 / 6 ≈ 4.64 -> rounded to 4.6
+        # hot_fraction = (38 - 8) / (60 - 8) = 30/52 ≈ 0.577
+        # hot_per_min = 7 * 0.577 ≈ 4.038
+        # minutes = (175 * 0.8 / 4.038) * 0.75 ≈ 26.0
+        # showers = 26.0 / 6 ≈ 4.33 -> rounded to 4.3
         assert "tap_water_cap" in values
-        assert values["tap_water_cap"] == pytest.approx(4.6, abs=0.1)
+        assert values["tap_water_cap"] == pytest.approx(4.3, abs=0.1)
 
     def test_updates_baseline_on_flow(self):
         """When bf1_l_min > 0.1, cold and flow snapshots are EMA-smoothed from their priors."""
@@ -1217,11 +1217,11 @@ class TestCalculateTapWaterCap:
         # Second poll: no flow — uses cold=8.4, flow=6.8, effective_hot=bt30=60 (tank_temp)
         values = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values)
-        # hot_fraction = (36 - 8.4) / (60 - 8.4) = 27.6/51.6 ≈ 0.535
-        # hot_per_min = 6.8 * 0.535 ≈ 3.637
-        # minutes = (175 * 0.8 / 3.637) * 0.75 ≈ 28.9
-        # showers = 28.9 / 6 ≈ 4.81 -> rounded to 4.8
-        assert values["tap_water_cap"] == pytest.approx(4.8, abs=0.1)
+        # hot_fraction = (38 - 8.4) / (60 - 8.4) = 29.6/51.6 ≈ 0.574
+        # hot_per_min = 6.8 * 0.574 ≈ 3.904
+        # minutes = (175 * 0.8 / 3.904) * 0.75 ≈ 26.9
+        # showers = 26.9 / 6 ≈ 4.48 -> rounded to 4.5
+        assert values["tap_water_cap"] == pytest.approx(4.5, abs=0.1)
 
     def test_low_tank_temp_returns_zero(self):
         """When tank_temp - cold_temp < 5, tap_water_cap is set to 0.0."""
