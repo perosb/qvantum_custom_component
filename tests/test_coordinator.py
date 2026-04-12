@@ -13,6 +13,7 @@ from custom_components.qvantum.const import (
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    DHW_SHOWER_DURATION_MIN,
     REQUIRED_METRICS,
 )
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -1225,6 +1226,18 @@ class TestCalculateTapWaterCap:
         # showers = 26.9 / 6 ≈ 4.48 -> rounded to 4.5
         assert values["tap_water_cap"] == pytest.approx(4.5, abs=0.1)
         assert values["tap_water_minutes"] == 27
+        assert values["tap_water_minutes"] == round(
+            values["tap_water_cap"] * DHW_SHOWER_DURATION_MIN
+        )
+
+    def test_tap_water_minutes_matches_smoothed_capacity(self):
+        """tap_water_minutes is derived from the same smoothed tap_water_cap estimate."""
+        coordinator = self._make_coordinator()
+        values = {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+        coordinator._calculate_tap_water_cap(values)
+        assert values["tap_water_minutes"] == round(
+            values["tap_water_cap"] * DHW_SHOWER_DURATION_MIN
+        )
 
     def test_low_tank_temp_returns_zero(self):
         """When tank_temp - cold_temp < 5, tap_water_cap is set to 0.0."""
