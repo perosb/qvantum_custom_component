@@ -348,6 +348,9 @@
       "tap_water_cap": {
         "name": "Capacidad agua caliente"
       },
+      "tap_water_minutes": {
+        "name": "Agua caliente restante"
+      },
       "additionalenergy": {
         "name": "Energía adicional"
       },

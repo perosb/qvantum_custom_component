@@ -348,6 +348,9 @@
       "tap_water_cap": {
         "name": "Hot water capacity"
       },
+      "tap_water_minutes": {
+        "name": "Hot water remaining"
+      },
       "additionalenergy": {
         "name": "Additional energy"
       },

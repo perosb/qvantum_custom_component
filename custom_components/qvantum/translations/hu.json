@@ -347,6 +347,9 @@
       "tap_water_cap": {
         "name": "Melegvíz kapacitás"
       },
+      "tap_water_minutes": {
+        "name": "Melegvíz hátralévő"
+      },
       "additionalenergy": {
         "name": "Rásegítési energia"
       },

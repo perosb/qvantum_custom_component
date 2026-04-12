@@ -348,6 +348,9 @@
       "tap_water_cap": {
         "name": "Warmwater capaciteit"
       },
+      "tap_water_minutes": {
+        "name": "Warmwater resterend"
+      },
       "additionalenergy": {
         "name": "Extra energie"
       },
