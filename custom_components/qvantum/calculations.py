@@ -195,7 +195,7 @@ class QvantumCalculationsMixin:
         hot_per_min = flow_lpm * hot_fraction
         if hot_per_min <= 0:
             values["tap_water_cap"] = 0.0
-            values["tap_water_minutes"] = 0.0
+            values["tap_water_minutes"] = 0
             return
 
         minutes = (
