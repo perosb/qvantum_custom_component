@@ -137,7 +137,6 @@ class QvantumCalculationsMixin:
         # EMA-smooth cold to prevent a brief transient (e.g. warm pipe water at
         # the start of a 15-second run) from dominating the estimate.
         flow_is_active = flow is not None and flow > DHW_FLOW_SNAPSHOT_THRESHOLD_LPM
-        self._tap_water_flow_was_active = flow_is_active
 
         if flow_is_active:
             if cold is not None:

@@ -13,6 +13,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.storage import Store
 
 from .api import APIAuthError
 from .calculations import QvantumCalculationsMixin
@@ -103,6 +104,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._last_published_tap_water_minutes: int | None = None
         self._tap_water_cap_start_time: datetime | None = None
         self._tap_water_flow_was_active: bool = False
+        self._dhw_store: Store = Store(
+            hass, 1, f"{DOMAIN}.dhw_ema.{config_entry.unique_id}"
+        )
 
         super().__init__(
             hass,
@@ -110,6 +114,34 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             name=f"{DOMAIN} ({config_entry.unique_id})",
             update_method=self.async_update_data,
             update_interval=timedelta(seconds=self.poll_interval),
+        )
+
+    async def async_restore_dhw_state(self) -> None:
+        """Restore DHW EMA snapshot from persistent storage after a restart."""
+        data = await self._dhw_store.async_load()
+        if data:
+            self._last_shower_cold_temp = data.get("cold_temp")
+            self._last_shower_flow_lpm = data.get("flow_lpm")
+            self._last_tap_water_cap = data.get("tap_water_cap")
+            self._last_published_tap_water_cap = data.get("published_cap")
+            self._last_published_tap_water_minutes = data.get("published_minutes")
+            _LOGGER.debug(
+                "Restored DHW EMA state: cold=%.1f°C, flow=%.1f L/min, cap=%.2f showers",
+                self._last_shower_cold_temp or 0.0,
+                self._last_shower_flow_lpm or 0.0,
+                self._last_tap_water_cap or 0.0,
+            )
+
+    async def _persist_dhw_state(self) -> None:
+        """Save DHW EMA snapshot to storage so it survives a restart."""
+        await self._dhw_store.async_save(
+            {
+                "cold_temp": self._last_shower_cold_temp,
+                "flow_lpm": self._last_shower_flow_lpm,
+                "tap_water_cap": self._last_tap_water_cap,
+                "published_cap": self._last_published_tap_water_cap,
+                "published_minutes": self._last_published_tap_water_minutes,
+            }
         )
 
     @property
@@ -395,6 +427,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._calculate_heating_power(values)
                 self._calculate_dhw_power(values)
                 self._calculate_tap_water_cap(values)
+                await self._persist_dhw_state()
 
             _LOGGER.debug("Final values: %s", values)
 

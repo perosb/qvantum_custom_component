@@ -1166,6 +1166,35 @@ class TestCalculateTapWaterCap:
         coordinator._tap_water_cap_start_time = dt_util.utcnow() - timedelta(seconds=61)
         return coordinator
 
+    @pytest.mark.asyncio
+    async def test_restore_dhw_state_populates_attributes(self):
+        """async_restore_dhw_state loads persisted EMA values into coordinator state."""
+        coordinator = self._make_coordinator()
+        stored = {
+            "cold_temp": 9.5,
+            "flow_lpm": 5.8,
+            "tap_water_cap": 4.2,
+            "published_cap": 4.2,
+            "published_minutes": 25,
+        }
+        with patch.object(coordinator._dhw_store, "async_load", return_value=stored):
+            await coordinator.async_restore_dhw_state()
+        assert coordinator._last_shower_cold_temp == 9.5
+        assert coordinator._last_shower_flow_lpm == 5.8
+        assert coordinator._last_tap_water_cap == 4.2
+        assert coordinator._last_published_tap_water_cap == 4.2
+        assert coordinator._last_published_tap_water_minutes == 25
+
+    @pytest.mark.asyncio
+    async def test_restore_dhw_state_empty_storage_leaves_none(self):
+        """With no stored data, EMA attributes remain None after restore."""
+        coordinator = self._make_coordinator()
+        with patch.object(coordinator._dhw_store, "async_load", return_value=None):
+            await coordinator.async_restore_dhw_state()
+        assert coordinator._last_shower_cold_temp is None
+        assert coordinator._last_shower_flow_lpm is None
+        assert coordinator._last_tap_water_cap is None
+
     def test_missing_tank_temp_skips(self):
         """When bt30 is absent, tap_water_cap is not written."""
         coordinator = self._make_coordinator()

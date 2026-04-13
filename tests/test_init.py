@@ -190,6 +190,7 @@ class TestIntegrationSetup:
         mock_coordinator = MagicMock()
         mock_coordinator.data = {"device": {}}
         mock_coordinator.async_config_entry_first_refresh = AsyncMock(side_effect=[None, None])
+        mock_coordinator.async_restore_dhw_state = AsyncMock()
 
         with patch("custom_components.qvantum.QvantumAPI", return_value=mock_api), \
             patch("custom_components.qvantum.QvantumDataUpdateCoordinator", return_value=mock_coordinator), \
