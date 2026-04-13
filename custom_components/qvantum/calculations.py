@@ -341,11 +341,17 @@ class QvantumCalculationsMixin:
         # pipes warm up and would cause capacity to appear to increase.
         effective_hot_temp = tank_temp
 
-        if effective_hot_temp <= calc_shower_temp or calc_cold >= calc_shower_temp:
+        hot_le_shower_temp = effective_hot_temp <= calc_shower_temp
+        cold_ge_shower_temp = calc_cold >= calc_shower_temp
+        if hot_le_shower_temp or cold_ge_shower_temp:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
+            reason = (
+                "hot_le_shower_temp" if hot_le_shower_temp else "cold_ge_shower_temp"
+            )
             _LOGGER.debug(
-                "Calculated tap_water_cap=0.00 showers (0 min, reason=insufficient_hot_temp, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min)",
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min)",
+                reason,
                 effective_hot_temp,
                 calc_cold,
                 calc_flow,
