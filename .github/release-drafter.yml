@@ -1,4 +1,4 @@
-include-pre-releases: true
+include-pre-releases: false
 change-template: "- #$NUMBER $TITLE @$AUTHOR"
 sort-direction: ascending
 template: |
