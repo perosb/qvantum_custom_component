@@ -8,6 +8,7 @@ from typing import Any, Callable
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    DHW_CAP_HYSTERESIS_C,
     DHW_DEFAULT_COLD_TEMP_C,
     DHW_DEFAULT_FLOW_LPM,
     DHW_EMA_ALPHA,
@@ -341,24 +342,45 @@ class QvantumCalculationsMixin:
         # pipes warm up and would cause capacity to appear to increase.
         effective_hot_temp = tank_temp
 
-        hot_le_shower_temp = effective_hot_temp <= calc_shower_temp
         cold_ge_shower_temp = calc_cold >= calc_shower_temp
-        if hot_le_shower_temp or cold_ge_shower_temp:
+
+        # Hysteresis around the hot-vs-shower threshold prevents rapid
+        # 0/non-zero toggling when temperatures hover within sensor noise.
+        in_zero_mode = getattr(self, "_tap_water_cap_zero_mode", False)
+        if in_zero_mode:
+            should_force_zero = (
+                effective_hot_temp < calc_shower_temp + DHW_CAP_HYSTERESIS_C
+                or cold_ge_shower_temp
+            )
+        else:
+            should_force_zero = (
+                effective_hot_temp <= calc_shower_temp - DHW_CAP_HYSTERESIS_C
+                or cold_ge_shower_temp
+            )
+
+        if should_force_zero:
+            self._tap_water_cap_zero_mode = True
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
-            reason = (
-                "hot_le_shower_temp" if hot_le_shower_temp else "cold_ge_shower_temp"
-            )
+            if cold_ge_shower_temp:
+                reason = "cold_ge_shower_temp"
+            elif in_zero_mode:
+                reason = "hot_below_hysteresis_exit"
+            else:
+                reason = "hot_below_hysteresis_entry"
             _LOGGER.debug(
-                "Calculated tap_water_cap=0.00 showers (0 min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min)",
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, hysteresis=%.1f°C, zero_mode=true)",
                 reason,
                 effective_hot_temp,
                 calc_cold,
                 calc_flow,
                 calc_shower_temp,
                 calc_shower_duration,
+                DHW_CAP_HYSTERESIS_C,
             )
             return
+
+        self._tap_water_cap_zero_mode = False
 
         delta_available = effective_hot_temp - calc_cold
         if delta_available < DHW_MIN_TEMPERATURE_DELTA_C:
