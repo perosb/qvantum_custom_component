@@ -13,6 +13,7 @@ from custom_components.qvantum.const import (
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    DHW_CAP_HYSTERESIS_C,
     DHW_EMA_ALPHA,
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_SHOWER_DURATION_MIN,
@@ -1659,3 +1660,89 @@ class TestCalculateTapWaterCap:
 
         # Additional guard: if raw near-cold bt34 had been used, cap would be huge.
         assert values["tap_water_cap"] < 20
+
+    # ------------------------------------------------------------------
+    # Hysteresis / hold-last-value (borderline tank-vs-shower-temp zone)
+    # ------------------------------------------------------------------
+
+    def test_hysteresis_entry_holds_last_published_not_zero(self):
+        """When tank drops just below shower_temp - hysteresis, the sensor holds
+        the last published value instead of jumping to 0."""
+        coordinator = self._make_warmed_up_coordinator()
+        # Warm tank: publish a baseline capacity first.
+        warm = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(warm)
+        assert warm["tap_water_cap"] > 0
+        last_published = warm["tap_water_cap"]
+        last_minutes = warm["tap_water_minutes"]
+
+        # Seed learned shower temp to a known value so we control the threshold.
+        coordinator._last_shower_temp_c = 45.0
+        # tank exactly at shower_temp - hysteresis: on the boundary *outside* the entry
+        # deadband (entry requires strictly <= shower_temp - hysteresis).
+        entry_threshold = 45.0 - DHW_CAP_HYSTERESIS_C
+        borderline = {"bt30": entry_threshold, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(borderline)
+
+        # Must hold the previous published value, not drop to 0.
+        assert borderline["tap_water_cap"] == last_published
+        assert borderline["tap_water_minutes"] == last_minutes
+        assert coordinator._tap_water_cap_zero_mode is True
+
+    def test_hysteresis_remains_in_hold_until_exit_threshold_cleared(self):
+        """While in zero_mode, the sensor continues to hold once it enters,
+        until tank clears shower_temp + hysteresis."""
+        coordinator = self._make_warmed_up_coordinator()
+        coordinator._last_shower_temp_c = 45.0
+        # Prime a published value.
+        prime = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(prime)
+        held = prime["tap_water_cap"]
+
+        # Drive into hold mode.
+        coordinator._last_shower_temp_c = 45.0
+        coordinator._calculate_tap_water_cap({"bt30": 44.5, "bf1_l_min": 0.0})
+        assert coordinator._tap_water_cap_zero_mode is True
+
+        # Tank rises to shower_temp but not yet above exit threshold:
+        # still inside deadband → must keep holding.
+        still_borderline = {"bt30": 45.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(still_borderline)
+        assert still_borderline["tap_water_cap"] == held
+        assert coordinator._tap_water_cap_zero_mode is True
+
+        # Tank clears exit threshold (shower_temp + hysteresis):
+        # zero_mode must be cleared and a fresh raw-seeded cap produced.
+        exit_temp = 45.0 + DHW_CAP_HYSTERESIS_C + 0.1
+        cleared = {"bt30": exit_temp, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(cleared)
+        assert coordinator._tap_water_cap_zero_mode is False
+        # First recovery poll seeds EMA from raw, so output should differ from held.
+        assert cleared["tap_water_cap"] != held
+
+    def test_hysteresis_entry_resets_ema_so_recovery_starts_from_raw(self):
+        """On the first poll entering hold mode, the EMA is reset to None so
+        the first valid recovery poll seeds from raw rather than blending with
+        the stale pre-hold value."""
+        coordinator = self._make_warmed_up_coordinator()
+        coordinator._last_shower_temp_c = 45.0
+        # Prime a high EMA value.
+        coordinator._last_tap_water_cap = 8.0
+        coordinator._last_published_tap_water_cap = 8.0
+        coordinator._last_published_tap_water_minutes = 48
+
+        # Enter hold mode.
+        coordinator._calculate_tap_water_cap({"bt30": 44.0, "bf1_l_min": 0.0})
+        assert coordinator._tap_water_cap_zero_mode is True
+        # EMA must be cleared on entry.
+        assert coordinator._last_tap_water_cap is None
+
+        # Exit hold mode: calculate with tank well above exit threshold.
+        coordinator._last_shower_temp_c = 45.0
+        exit_temp = 45.0 + DHW_CAP_HYSTERESIS_C + 1.0
+        values = {"bt30": exit_temp, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+        # First recovery poll has no prior EMA → raw value used directly.
+        # With default cold=8, flow=7 and tank=exit_temp the raw is modest;
+        # it must NOT be blended with the stale 8.0.
+        assert values["tap_water_cap"] < 6.0

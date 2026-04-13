@@ -8,6 +8,7 @@ from typing import Any, Callable
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    DHW_CAP_HYSTERESIS_C,
     DHW_DEFAULT_COLD_TEMP_C,
     DHW_DEFAULT_FLOW_LPM,
     DHW_EMA_ALPHA,
@@ -213,9 +214,10 @@ class QvantumCalculationsMixin:
                         DHW_EMA_ALPHA * duration_min + (1 - DHW_EMA_ALPHA) * prior_dur
                     )
                     _LOGGER.debug(
-                        "Shower ended: duration=%.1f min; EMA shower duration → %.1f min",
+                        "Shower ended: duration=%.1f min; EMA shower duration → %.1f min (tank=%s)",
                         duration_min,
                         self._last_shower_duration_min,
+                        f"{tank_temp:.1f}°C" if tank_temp is not None else "unknown",
                     )
 
                     # Phase 2: record completed shower event to history.
@@ -340,15 +342,70 @@ class QvantumCalculationsMixin:
         # pipes warm up and would cause capacity to appear to increase.
         effective_hot_temp = tank_temp
 
-        if effective_hot_temp <= calc_shower_temp or calc_cold >= calc_shower_temp:
-            values["tap_water_cap"] = 0.0
-            values["tap_water_minutes"] = 0
+        cold_ge_shower_temp = calc_cold >= calc_shower_temp
+
+        # Hysteresis around the hot-vs-shower threshold prevents rapid
+        # 0/non-zero toggling when temperatures hover within sensor noise.
+        in_zero_mode = getattr(self, "_tap_water_cap_zero_mode", False)
+        if in_zero_mode:
+            should_force_zero = (
+                effective_hot_temp < calc_shower_temp + DHW_CAP_HYSTERESIS_C
+                or cold_ge_shower_temp
+            )
+        else:
+            should_force_zero = (
+                effective_hot_temp <= calc_shower_temp - DHW_CAP_HYSTERESIS_C
+                or cold_ge_shower_temp
+            )
+
+        if should_force_zero:
+            if not in_zero_mode:
+                # First poll entering zero mode: reset EMA so the first recovery
+                # poll seeds from raw rather than blending with the stale high value.
+                self._last_tap_water_cap = None
+            self._tap_water_cap_zero_mode = True
+            # Hold the last published value (or 0 if nothing published yet) so the
+            # sensor does not suddenly drop to 0 while the tank is borderline.
+            if cold_ge_shower_temp:
+                reason = "cold_ge_shower_temp"
+            elif in_zero_mode:
+                reason = "hot_below_hysteresis_hold"
+            else:
+                reason = "hot_below_hysteresis_entry"
+            held_cap = self._last_published_tap_water_cap or 0.0
+            held_minutes = self._last_published_tap_water_minutes or 0
+            values["tap_water_cap"] = held_cap
+            values["tap_water_minutes"] = held_minutes
+            _LOGGER.debug(
+                "Calculated tap_water_cap=%.2f showers (%d min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, hysteresis=%.1f°C, zero_mode=true)",
+                held_cap,
+                held_minutes,
+                reason,
+                effective_hot_temp,
+                calc_cold,
+                calc_flow,
+                calc_shower_temp,
+                calc_shower_duration,
+                DHW_CAP_HYSTERESIS_C,
+            )
             return
+
+        self._tap_water_cap_zero_mode = False
 
         delta_available = effective_hot_temp - calc_cold
         if delta_available < DHW_MIN_TEMPERATURE_DELTA_C:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
+            _LOGGER.debug(
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=delta_below_min, tank=%.1f°C, cold=%.1f°C, delta=%.1f°C, min_delta=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min)",
+                effective_hot_temp,
+                calc_cold,
+                delta_available,
+                DHW_MIN_TEMPERATURE_DELTA_C,
+                calc_flow,
+                calc_shower_temp,
+                calc_shower_duration,
+            )
             return
 
         hot_fraction = (calc_shower_temp - calc_cold) / delta_available
@@ -357,6 +414,14 @@ class QvantumCalculationsMixin:
         if hot_per_min <= 0:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
+            _LOGGER.debug(
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=non_positive_hot_per_min, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, hot_fraction=%.3f)",
+                effective_hot_temp,
+                calc_cold,
+                calc_flow,
+                calc_shower_temp,
+                hot_fraction,
+            )
             return
 
         minutes = (
@@ -391,6 +456,16 @@ class QvantumCalculationsMixin:
         published_minutes = round(smoothed_minutes)
 
         if is_warmup:
+            published_warmup_cap = (
+                self._last_published_tap_water_cap
+                if self._last_published_tap_water_cap is not None
+                else published_cap
+            )
+            published_warmup_minutes = (
+                self._last_published_tap_water_minutes
+                if self._last_published_tap_water_minutes is not None
+                else published_minutes
+            )
             if self._last_published_tap_water_cap is not None:
                 values["tap_water_cap"] = self._last_published_tap_water_cap
                 values["tap_water_minutes"] = (
@@ -403,6 +478,17 @@ class QvantumCalculationsMixin:
             else:
                 values["tap_water_cap"] = published_cap
                 values["tap_water_minutes"] = published_minutes
+            _LOGGER.debug(
+                "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, warmup=true)",
+                published_warmup_cap,
+                published_warmup_minutes,
+                raw_showers,
+                tank_temp,
+                calc_cold,
+                calc_flow,
+                calc_shower_temp,
+                calc_shower_duration,
+            )
             return
 
         # Publish the derived values rounded to the sensor's display precision
