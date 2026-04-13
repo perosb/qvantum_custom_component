@@ -359,17 +359,27 @@ class QvantumCalculationsMixin:
             )
 
         if should_force_zero:
+            if not in_zero_mode:
+                # First poll entering zero mode: reset EMA so the first recovery
+                # poll seeds from raw rather than blending with the stale high value.
+                self._last_tap_water_cap = None
             self._tap_water_cap_zero_mode = True
-            values["tap_water_cap"] = 0.0
-            values["tap_water_minutes"] = 0
+            # Hold the last published value (or 0 if nothing published yet) so the
+            # sensor does not suddenly drop to 0 while the tank is borderline.
             if cold_ge_shower_temp:
                 reason = "cold_ge_shower_temp"
             elif in_zero_mode:
-                reason = "hot_below_hysteresis_exit"
+                reason = "hot_below_hysteresis_hold"
             else:
                 reason = "hot_below_hysteresis_entry"
+            held_cap = self._last_published_tap_water_cap or 0.0
+            held_minutes = self._last_published_tap_water_minutes or 0
+            values["tap_water_cap"] = held_cap
+            values["tap_water_minutes"] = held_minutes
             _LOGGER.debug(
-                "Calculated tap_water_cap=0.00 showers (0 min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, hysteresis=%.1f°C, zero_mode=true)",
+                "Calculated tap_water_cap=%.2f showers (%d min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, hysteresis=%.1f°C, zero_mode=true)",
+                held_cap,
+                held_minutes,
                 reason,
                 effective_hot_temp,
                 calc_cold,
