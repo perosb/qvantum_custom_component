@@ -292,17 +292,20 @@ class QvantumCalculationsMixin:
                     else DHW_DEFAULT_COLD_TEMP_C
                 )
             )
-            # During flow use raw outlet temp as the shower temperature signal,
-            # falling back to the EMA or the default constant.
-            calc_shower_temp = (
-                values.get("bt34")
-                if values.get("bt34") is not None
-                else (
+            # During flow, only trust outlet temp once it is clearly above cold
+            # inlet (pipe-flush guard); otherwise use EMA/default shower temp.
+            outlet_for_calc = values.get("bt34")
+            if (
+                outlet_for_calc is not None
+                and outlet_for_calc > calc_cold + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
+            ):
+                calc_shower_temp = outlet_for_calc
+            else:
+                calc_shower_temp = (
                     self._last_shower_temp_c
                     if self._last_shower_temp_c is not None
                     else DHW_SHOWER_TEMP_C
                 )
-            )
         else:
             calc_cold = (
                 self._last_shower_cold_temp

@@ -13,6 +13,8 @@ from custom_components.qvantum.const import (
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    DHW_EMA_ALPHA,
+    DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_SHOWER_DURATION_MIN,
     REQUIRED_METRICS,
 )
@@ -1562,3 +1564,98 @@ class TestCalculateTapWaterCap:
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert len(coordinator._shower_event_history) == 1
         assert coordinator._shower_event_history[0]["avg_outlet_temp"] is None
+
+    # ------------------------------------------------------------------
+    # Outlet temperature EMA guard (pipe-flush phase filter)
+    # ------------------------------------------------------------------
+
+    def test_outlet_temp_at_threshold_does_not_update_shower_temp_ema(self):
+        """bt34 exactly at cold + threshold is treated as pipe-flush and ignored."""
+        coordinator = self._make_coordinator()
+        cold = 10.0
+        # Exactly at the boundary (not strictly above) — must be ignored
+        outlet_at_boundary = cold + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
+        coordinator._calculate_tap_water_cap(
+            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": cold, "bt34": outlet_at_boundary}
+        )
+        assert coordinator._last_shower_temp_c is None  # EMA not updated
+
+    def test_outlet_temp_clearly_warm_updates_shower_temp_ema(self):
+        """bt34 strictly above cold + threshold is accepted and the EMA is updated."""
+        coordinator = self._make_coordinator()
+        cold = 10.0
+        # Just above the boundary
+        outlet_warm = cold + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C + 0.1
+        coordinator._calculate_tap_water_cap(
+            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": cold, "bt34": outlet_warm}
+        )
+        # EMA should have been seeded from DHW_SHOWER_TEMP_C default toward outlet_warm
+        from custom_components.qvantum.const import DHW_EMA_ALPHA, DHW_SHOWER_TEMP_C
+
+        expected = DHW_EMA_ALPHA * outlet_warm + (1 - DHW_EMA_ALPHA) * DHW_SHOWER_TEMP_C
+        assert coordinator._last_shower_temp_c == pytest.approx(expected)
+
+    def test_learned_duration_used_in_subsequent_capacity_calculation(self):
+        """A >=1 min flow event updates duration EMA, which is then used by subsequent no-flow cap/minute calculations."""
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+
+        # Start a flow event to set _shower_start_time and collect a sample.
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+            )
+
+        # End event after 10 minutes (>= minimum): should update duration EMA.
+        end = start + timedelta(minutes=10)
+        with patch("homeassistant.util.dt.utcnow", return_value=end):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        expected_learned_duration = (
+            DHW_EMA_ALPHA * 10.0 + (1 - DHW_EMA_ALPHA) * DHW_SHOWER_DURATION_MIN
+        )
+        assert coordinator._last_shower_duration_min == pytest.approx(
+            expected_learned_duration
+        )
+
+        # Next no-flow poll must use learned duration for the minute conversion.
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=end + timedelta(seconds=1)
+        ):
+            values = {"bt30": 60.0, "bf1_l_min": 0.0}
+            coordinator._calculate_tap_water_cap(values)
+
+        # minutes are computed from full-precision smoothed state, while
+        # tap_water_cap is published rounded to 0.1; assert against internal state.
+        assert values["tap_water_minutes"] == round(
+            coordinator._last_tap_water_cap * coordinator._last_shower_duration_min
+        )
+        assert values["tap_water_minutes"] != round(
+            coordinator._last_tap_water_cap * DHW_SHOWER_DURATION_MIN
+        )
+
+    def test_active_flow_near_cold_outlet_temp_uses_fallback_shower_temp(self):
+        """During active flow, bt34 near cold inlet is ignored for cap math (pipe-flush guard)."""
+        coordinator = self._make_warmed_up_coordinator()
+        cold = 10.0
+        # At threshold boundary: should be ignored and fallback to default shower temp.
+        outlet_at_boundary = cold + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
+        values = {
+            "bt30": 60.0,
+            "bf1_l_min": 6.0,
+            "bt33": cold,
+            "bt34": outlet_at_boundary,
+        }
+
+        coordinator._calculate_tap_water_cap(values)
+
+        # Expected if fallback shower temp is used:
+        # hot_fraction=(38-10)/(60-10)=0.56, hot_per_min=6*0.56=3.36,
+        # minutes=(175*0.8/3.36)*0.75=31.25, showers=31.25/6=5.21 -> 5.2
+        assert values["tap_water_cap"] == pytest.approx(5.2, abs=0.2)
+        assert values["tap_water_minutes"] == round(
+            coordinator._last_tap_water_cap * DHW_SHOWER_DURATION_MIN
+        )
+
+        # Additional guard: if raw near-cold bt34 had been used, cap would be huge.
+        assert values["tap_water_cap"] < 20
