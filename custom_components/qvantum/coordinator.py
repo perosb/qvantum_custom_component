@@ -161,7 +161,6 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         )
         if current_state == self._last_persisted_dhw_state:
             return
-        self._last_persisted_dhw_state = current_state
         try:
             self._dhw_store.async_delay_save(
                 lambda: {
@@ -173,6 +172,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 },
                 delay=30,
             )
+            self._last_persisted_dhw_state = current_state
         except Exception:
             _LOGGER.warning("Failed to schedule DHW state persistence", exc_info=True)
 

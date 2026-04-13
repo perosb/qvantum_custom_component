@@ -1209,6 +1209,48 @@ class TestCalculateTapWaterCap:
         assert coordinator._last_shower_flow_lpm is None
         assert coordinator._last_tap_water_cap is None
 
+    def test_persist_dhw_state_updates_last_persisted_only_after_schedule_success(self):
+        """A successful schedule updates _last_persisted_dhw_state."""
+        coordinator = self._make_coordinator()
+        coordinator._last_shower_cold_temp = 8.4
+        coordinator._last_shower_flow_lpm = 6.8
+        coordinator._last_tap_water_cap = 5.0
+        coordinator._last_published_tap_water_cap = 5.0
+        coordinator._last_published_tap_water_minutes = 30
+
+        with patch.object(
+            coordinator._dhw_store, "async_delay_save"
+        ) as mock_delay_save:
+            coordinator._persist_dhw_state()
+
+        mock_delay_save.assert_called_once()
+        assert coordinator._last_persisted_dhw_state == (
+            8.4,
+            6.8,
+            5.0,
+            5.0,
+            30,
+        )
+
+    def test_persist_dhw_state_schedule_error_does_not_update_last_persisted(self):
+        """A scheduling failure must not poison _last_persisted_dhw_state."""
+        coordinator = self._make_coordinator()
+        coordinator._last_persisted_dhw_state = None
+        coordinator._last_shower_cold_temp = 8.4
+        coordinator._last_shower_flow_lpm = 6.8
+        coordinator._last_tap_water_cap = 5.0
+        coordinator._last_published_tap_water_cap = 5.0
+        coordinator._last_published_tap_water_minutes = 30
+
+        with patch.object(
+            coordinator._dhw_store,
+            "async_delay_save",
+            side_effect=Exception("schedule error"),
+        ):
+            coordinator._persist_dhw_state()
+
+        assert coordinator._last_persisted_dhw_state is None
+
     def test_missing_tank_temp_skips(self):
         """When bt30 is absent, tap_water_cap is not written."""
         coordinator = self._make_coordinator()
