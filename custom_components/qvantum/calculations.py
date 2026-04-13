@@ -259,7 +259,7 @@ class QvantumCalculationsMixin:
                             > DHW_MAX_SHOWER_HISTORY_SIZE
                         ):
                             self._shower_event_history.pop(0)
-                        _LOGGER.info(
+                        _LOGGER.debug(
                             "Shower event: duration=%.1f min, avg_flow=%.2f L/min, "
                             "avg_cold=%.1f\u00b0C, avg_outlet=%.1f\u00b0C, water_used=%.1f L",
                             duration_min,
