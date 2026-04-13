@@ -136,7 +136,10 @@ class QvantumCalculationsMixin:
         # Snapshot realistic shower-time values while water is actually flowing.
         # EMA-smooth cold to prevent a brief transient (e.g. warm pipe water at
         # the start of a 15-second run) from dominating the estimate.
-        if flow is not None and flow > DHW_FLOW_SNAPSHOT_THRESHOLD_LPM:
+        flow_is_active = flow is not None and flow > DHW_FLOW_SNAPSHOT_THRESHOLD_LPM
+        self._tap_water_flow_was_active = flow_is_active
+
+        if flow_is_active:
             if cold is not None:
                 prior_cold = (
                     self._last_shower_cold_temp
@@ -155,17 +158,32 @@ class QvantumCalculationsMixin:
                 DHW_EMA_ALPHA * flow + (1 - DHW_EMA_ALPHA) * prior_flow
             )
 
-        # Resolve effective values: use last observed or fall back to defaults
-        cold_temp = (
-            self._last_shower_cold_temp
-            if self._last_shower_cold_temp is not None
-            else DHW_DEFAULT_COLD_TEMP_C
-        )
-        flow_lpm = (
-            self._last_shower_flow_lpm
-            if self._last_shower_flow_lpm is not None
-            else DHW_DEFAULT_FLOW_LPM
-        )
+        # Resolve values for the capacity calculation:
+        # - During active flow: use raw current readings so the estimate reflects
+        #   real-time conditions without EMA lag from the default-seeded snapshot.
+        # - No active flow: fall back to EMA snapshot (or defaults if never seen).
+        if flow_is_active:
+            calc_cold = (
+                cold
+                if cold is not None
+                else (
+                    self._last_shower_cold_temp
+                    if self._last_shower_cold_temp is not None
+                    else DHW_DEFAULT_COLD_TEMP_C
+                )
+            )
+            calc_flow = flow
+        else:
+            calc_cold = (
+                self._last_shower_cold_temp
+                if self._last_shower_cold_temp is not None
+                else DHW_DEFAULT_COLD_TEMP_C
+            )
+            calc_flow = (
+                self._last_shower_flow_lpm
+                if self._last_shower_flow_lpm is not None
+                else DHW_DEFAULT_FLOW_LPM
+            )
 
         if tank_temp is None:
             return
@@ -176,23 +194,20 @@ class QvantumCalculationsMixin:
         # pipes warm up and would cause capacity to appear to increase.
         effective_hot_temp = tank_temp
 
-        if (
-            effective_hot_temp <= DHW_SHOWER_TEMP_C
-            or cold_temp >= DHW_SHOWER_TEMP_C
-        ):
+        if effective_hot_temp <= DHW_SHOWER_TEMP_C or calc_cold >= DHW_SHOWER_TEMP_C:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
             return
 
-        delta_available = effective_hot_temp - cold_temp
+        delta_available = effective_hot_temp - calc_cold
         if delta_available < DHW_MIN_TEMPERATURE_DELTA_C:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
             return
 
-        hot_fraction = (DHW_SHOWER_TEMP_C - cold_temp) / delta_available
+        hot_fraction = (DHW_SHOWER_TEMP_C - calc_cold) / delta_available
         hot_fraction = min(1.0, max(0.0, hot_fraction))
-        hot_per_min = flow_lpm * hot_fraction
+        hot_per_min = calc_flow * hot_fraction
         if hot_per_min <= 0:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
@@ -211,17 +226,53 @@ class QvantumCalculationsMixin:
             smoothed = raw_showers
         self._last_tap_water_cap = smoothed
         smoothed_minutes = smoothed * DHW_SHOWER_DURATION_MIN
+
+        # When flow is active, hold off publishing new values until the flow
+        # has been running for 60 s so the EMA can stabilise on real inlet
+        # conditions. If a value was previously published, keep it available
+        # during the warmup window instead of removing the metric entirely.
+        now = dt_util.utcnow()
+        is_warmup = False
+        if flow_is_active:
+            if self._tap_water_cap_start_time is None:
+                self._tap_water_cap_start_time = now
+            if (now - self._tap_water_cap_start_time).total_seconds() < 60:
+                is_warmup = True
+        else:
+            # Reset the window so the next flow onset triggers a fresh 60 s hold.
+            self._tap_water_cap_start_time = None
+
+        published_cap = round(smoothed, 1)
+        published_minutes = round(smoothed_minutes)
+
+        if is_warmup:
+            if self._last_published_tap_water_cap is not None:
+                values["tap_water_cap"] = self._last_published_tap_water_cap
+                values["tap_water_minutes"] = (
+                    self._last_published_tap_water_minutes
+                    if self._last_published_tap_water_minutes is not None
+                    else round(
+                        self._last_published_tap_water_cap * DHW_SHOWER_DURATION_MIN
+                    )
+                )
+            else:
+                values["tap_water_cap"] = published_cap
+                values["tap_water_minutes"] = published_minutes
+            return
+
         # Publish the derived values rounded to the sensor's display precision
         # so small fluctuations do not cause UI flicker between updates. Keep
         # the EMA state in full precision for subsequent calculations.
-        values["tap_water_cap"] = round(smoothed, 1)
-        values["tap_water_minutes"] = round(smoothed_minutes)
+        values["tap_water_cap"] = published_cap
+        values["tap_water_minutes"] = published_minutes
+        self._last_published_tap_water_cap = published_cap
+        self._last_published_tap_water_minutes = published_minutes
         _LOGGER.debug(
             "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min)",
             smoothed,
-            round(smoothed_minutes),
+            published_minutes,
             raw_showers,
             tank_temp,
-            cold_temp,
-            flow_lpm,
+            calc_cold,
+            calc_flow,
         )

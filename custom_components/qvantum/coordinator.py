@@ -99,6 +99,10 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._last_shower_cold_temp: float | None = None
         self._last_shower_flow_lpm: float | None = None
         self._last_tap_water_cap: float | None = None
+        self._last_published_tap_water_cap: float | None = None
+        self._last_published_tap_water_minutes: int | None = None
+        self._tap_water_cap_start_time: datetime | None = None
+        self._tap_water_flow_was_active: bool = False
 
         super().__init__(
             hass,
