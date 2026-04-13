@@ -231,8 +231,18 @@ DHW_DEFAULT_FLOW_LPM = 7.0  # Default shower flow rate when no recent observatio
 DHW_FLOW_SNAPSHOT_THRESHOLD_LPM = 0.1  # Minimum flow used to sample cold/flow values for tap_water_cap
 DHW_DEFAULT_COLD_TEMP_C = 8.0  # Default cold water temperature when no recent observation (°C)
 DHW_TEMP_DROP_FACTOR = 0.75  # Empirical compensation for tank temperature drop during shower
+DHW_OUTLET_TEMP_THRESHOLD_DELTA_C = (
+    5.0  # Minimum warm-water temperature rise above cold inlet before using outlet temp
+)
 DHW_MIN_TEMPERATURE_DELTA_C = 5.0  # Minimum spread between tank and cold water before a tap-water capacity estimate is valid
+DHW_ROLLING_BUFFER_WINDOW_SEC = (
+    60.0  # Rolling buffer window for cold/flow readings during active flow
+)
+DHW_MIN_SHOWER_DURATION_MIN = 1.0  # Minimum event duration to count as a shower
 DHW_SHOWER_DURATION_MIN = 6.0  # Duration of one shower in minutes
+DHW_MAX_SHOWER_HISTORY_SIZE = (
+    10  # Maximum number of completed shower events retained in history
+)
 DHW_EMA_ALPHA = (
     0.2  # EMA smoothing factor for tap_water_cap (0=no change, 1=no smoothing)
 )

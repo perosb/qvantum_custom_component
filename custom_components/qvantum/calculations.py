@@ -12,7 +12,11 @@ from .const import (
     DHW_DEFAULT_FLOW_LPM,
     DHW_EMA_ALPHA,
     DHW_FLOW_SNAPSHOT_THRESHOLD_LPM,
+    DHW_MIN_SHOWER_DURATION_MIN,
     DHW_MIN_TEMPERATURE_DELTA_C,
+    DHW_MAX_SHOWER_HISTORY_SIZE,
+    DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
+    DHW_ROLLING_BUFFER_WINDOW_SEC,
     DHW_SHOWER_DURATION_MIN,
     DHW_SHOWER_TEMP_C,
     DHW_TANK_VOLUME_L,
@@ -138,7 +142,22 @@ class QvantumCalculationsMixin:
         # the start of a 15-second run) from dominating the estimate.
         flow_is_active = flow is not None and flow > DHW_FLOW_SNAPSHOT_THRESHOLD_LPM
 
+        # Compute now early so start/end tracking can use it.
+        now = dt_util.utcnow()
+
         if flow_is_active:
+            # Record when this flow event started (used for duration learning).
+            if self._shower_start_time is None:
+                self._shower_start_time = now
+
+            # Phase 1: maintain a rolling 60-second buffer of flow/cold readings.
+            ts = now.timestamp()
+            self._flow_rolling_buffer.append((ts, flow, cold))
+            cutoff = ts - DHW_ROLLING_BUFFER_WINDOW_SEC
+            self._flow_rolling_buffer = [
+                s for s in self._flow_rolling_buffer if s[0] >= cutoff
+            ]
+
             if cold is not None:
                 prior_cold = (
                     self._last_shower_cold_temp
@@ -157,21 +176,136 @@ class QvantumCalculationsMixin:
                 DHW_EMA_ALPHA * flow + (1 - DHW_EMA_ALPHA) * prior_flow
             )
 
+            # Learn shower temperature from outlet sensor bt34.
+            # Only update when the outlet clearly carries warm water (> cold + threshold)
+            # to avoid polluting the EMA with the initial cold pipe-flush phase.
+            outlet_temp = values.get("bt34")
+            cold_for_guard = cold if cold is not None else DHW_DEFAULT_COLD_TEMP_C
+            if (
+                outlet_temp is not None
+                and outlet_temp > cold_for_guard + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
+            ):
+                prior_shower_temp = (
+                    self._last_shower_temp_c
+                    if self._last_shower_temp_c is not None
+                    else DHW_SHOWER_TEMP_C
+                )
+                self._last_shower_temp_c = (
+                    DHW_EMA_ALPHA * outlet_temp
+                    + (1 - DHW_EMA_ALPHA) * prior_shower_temp
+                )
+
+            # Phase 2: accumulate per-event samples for end-of-shower statistics.
+            self._shower_event_samples.append((ts, flow, cold, outlet_temp))
+        else:
+            # Flow just stopped — compute shower duration and update the EMA.
+            if self._shower_start_time is not None:
+                duration_min = (now - self._shower_start_time).total_seconds() / 60.0
+                if (
+                    duration_min >= DHW_MIN_SHOWER_DURATION_MIN
+                ):  # Ignore brief draws (tap, filling kettle, etc.)
+                    prior_dur = (
+                        self._last_shower_duration_min
+                        if self._last_shower_duration_min is not None
+                        else DHW_SHOWER_DURATION_MIN
+                    )
+                    self._last_shower_duration_min = (
+                        DHW_EMA_ALPHA * duration_min + (1 - DHW_EMA_ALPHA) * prior_dur
+                    )
+                    _LOGGER.debug(
+                        "Shower ended: duration=%.1f min; EMA shower duration → %.1f min",
+                        duration_min,
+                        self._last_shower_duration_min,
+                    )
+
+                    # Phase 2: record completed shower event to history.
+                    if self._shower_event_samples:
+                        avg_flow = sum(s[1] for s in self._shower_event_samples) / len(
+                            self._shower_event_samples
+                        )
+                        cold_samples = [
+                            s[2] for s in self._shower_event_samples if s[2] is not None
+                        ]
+                        avg_cold = (
+                            sum(cold_samples) / len(cold_samples)
+                            if cold_samples
+                            else DHW_DEFAULT_COLD_TEMP_C
+                        )
+                        outlet_samples = [
+                            s[3] for s in self._shower_event_samples if s[3] is not None
+                        ]
+                        avg_outlet_temp = (
+                            sum(outlet_samples) / len(outlet_samples)
+                            if outlet_samples
+                            else None
+                        )
+                        water_used_l = avg_flow * duration_min
+                        event = {
+                            "start": self._shower_start_time.isoformat(),
+                            "end": now.isoformat(),
+                            "duration_min": round(duration_min, 1),
+                            "avg_flow": round(avg_flow, 2),
+                            "avg_cold": round(avg_cold, 1),
+                            "avg_outlet_temp": (
+                                round(avg_outlet_temp, 1)
+                                if avg_outlet_temp is not None
+                                else None
+                            ),
+                            "water_used_l": round(water_used_l, 1),
+                        }
+                        self._shower_event_history.append(event)
+                        if (
+                            len(self._shower_event_history)
+                            > DHW_MAX_SHOWER_HISTORY_SIZE
+                        ):
+                            self._shower_event_history.pop(0)
+                        _LOGGER.info(
+                            "Shower event: duration=%.1f min, avg_flow=%.2f L/min, "
+                            "avg_cold=%.1f\u00b0C, avg_outlet=%.1f\u00b0C, water_used=%.1f L",
+                            duration_min,
+                            avg_flow,
+                            avg_cold,
+                            avg_outlet_temp if avg_outlet_temp is not None else 0.0,
+                            water_used_l,
+                        )
+                self._shower_start_time = None
+            self._flow_rolling_buffer.clear()
+            self._shower_event_samples.clear()
+
         # Resolve values for the capacity calculation:
         # - During active flow: use raw current readings so the estimate reflects
         #   real-time conditions without EMA lag from the default-seeded snapshot.
         # - No active flow: fall back to EMA snapshot (or defaults if never seen).
         if flow_is_active:
+            # Phase 1: use 60-second rolling buffer means for flow and cold so
+            # brief transients do not distort the capacity estimate.
+            calc_flow = sum(s[1] for s in self._flow_rolling_buffer) / len(
+                self._flow_rolling_buffer
+            )
+            cold_buf = [s[2] for s in self._flow_rolling_buffer if s[2] is not None]
             calc_cold = (
-                cold
-                if cold is not None
+                sum(cold_buf) / len(cold_buf)
+                if cold_buf
                 else (
                     self._last_shower_cold_temp
                     if self._last_shower_cold_temp is not None
                     else DHW_DEFAULT_COLD_TEMP_C
                 )
             )
-            calc_flow = flow
+            # During flow, only trust outlet temp once it is clearly above cold
+            # inlet (pipe-flush guard); otherwise use EMA/default shower temp.
+            outlet_for_calc = values.get("bt34")
+            if (
+                outlet_for_calc is not None
+                and outlet_for_calc > calc_cold + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
+            ):
+                calc_shower_temp = outlet_for_calc
+            else:
+                calc_shower_temp = (
+                    self._last_shower_temp_c
+                    if self._last_shower_temp_c is not None
+                    else DHW_SHOWER_TEMP_C
+                )
         else:
             calc_cold = (
                 self._last_shower_cold_temp
@@ -183,6 +317,19 @@ class QvantumCalculationsMixin:
                 if self._last_shower_flow_lpm is not None
                 else DHW_DEFAULT_FLOW_LPM
             )
+            # After flow use the EMA snapshot (learned preferred shower temperature).
+            calc_shower_temp = (
+                self._last_shower_temp_c
+                if self._last_shower_temp_c is not None
+                else DHW_SHOWER_TEMP_C
+            )
+
+        # Use the EMA-learned shower duration when available.
+        calc_shower_duration = (
+            self._last_shower_duration_min
+            if self._last_shower_duration_min is not None
+            else DHW_SHOWER_DURATION_MIN
+        )
 
         if tank_temp is None:
             return
@@ -193,7 +340,7 @@ class QvantumCalculationsMixin:
         # pipes warm up and would cause capacity to appear to increase.
         effective_hot_temp = tank_temp
 
-        if effective_hot_temp <= DHW_SHOWER_TEMP_C or calc_cold >= DHW_SHOWER_TEMP_C:
+        if effective_hot_temp <= calc_shower_temp or calc_cold >= calc_shower_temp:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
             return
@@ -204,7 +351,7 @@ class QvantumCalculationsMixin:
             values["tap_water_minutes"] = 0
             return
 
-        hot_fraction = (DHW_SHOWER_TEMP_C - calc_cold) / delta_available
+        hot_fraction = (calc_shower_temp - calc_cold) / delta_available
         hot_fraction = min(1.0, max(0.0, hot_fraction))
         hot_per_min = calc_flow * hot_fraction
         if hot_per_min <= 0:
@@ -215,7 +362,7 @@ class QvantumCalculationsMixin:
         minutes = (
             DHW_TANK_VOLUME_L * DHW_USABLE_FRACTION / hot_per_min
         ) * DHW_TEMP_DROP_FACTOR
-        raw_showers = minutes / DHW_SHOWER_DURATION_MIN
+        raw_showers = minutes / calc_shower_duration
         if self._last_tap_water_cap is not None:
             smoothed = (
                 DHW_EMA_ALPHA * raw_showers
@@ -224,13 +371,12 @@ class QvantumCalculationsMixin:
         else:
             smoothed = raw_showers
         self._last_tap_water_cap = smoothed
-        smoothed_minutes = smoothed * DHW_SHOWER_DURATION_MIN
+        smoothed_minutes = smoothed * calc_shower_duration
 
         # When flow is active, hold off publishing new values until the flow
         # has been running for 60 s so the EMA can stabilise on real inlet
         # conditions. If a value was previously published, keep it available
         # during the warmup window instead of removing the metric entirely.
-        now = dt_util.utcnow()
         is_warmup = False
         if flow_is_active:
             if self._tap_water_cap_start_time is None:
@@ -267,11 +413,13 @@ class QvantumCalculationsMixin:
         self._last_published_tap_water_cap = published_cap
         self._last_published_tap_water_minutes = published_minutes
         _LOGGER.debug(
-            "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min)",
+            "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min)",
             smoothed,
             published_minutes,
             raw_showers,
             tank_temp,
             calc_cold,
             calc_flow,
+            calc_shower_temp,
+            calc_shower_duration,
         )
