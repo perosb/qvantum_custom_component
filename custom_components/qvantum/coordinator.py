@@ -13,6 +13,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.storage import Store
 
 from .api import APIAuthError
 from .calculations import QvantumCalculationsMixin
@@ -99,6 +100,13 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._last_shower_cold_temp: float | None = None
         self._last_shower_flow_lpm: float | None = None
         self._last_tap_water_cap: float | None = None
+        self._last_published_tap_water_cap: float | None = None
+        self._last_published_tap_water_minutes: int | None = None
+        self._tap_water_cap_start_time: datetime | None = None
+        self._last_persisted_dhw_state: tuple | None = None
+        self._dhw_store: Store = Store(
+            hass, 1, f"{DOMAIN}.dhw_ema.{config_entry.entry_id}"
+        )
 
         super().__init__(
             hass,
@@ -107,6 +115,66 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             update_method=self.async_update_data,
             update_interval=timedelta(seconds=self.poll_interval),
         )
+
+    async def async_restore_dhw_state(self) -> None:
+        """Restore DHW EMA snapshot from persistent storage after a restart.
+
+        Errors (corrupted JSON, I/O failures) are caught and logged so that a
+        bad store file never prevents the integration from loading — the EMA
+        simply starts fresh from its defaults.
+        """
+        try:
+            data = await self._dhw_store.async_load()
+        except Exception:
+            _LOGGER.warning(
+                "Failed to load DHW EMA state from storage; starting with defaults",
+                exc_info=True,
+            )
+            return
+        if data:
+            self._last_shower_cold_temp = data.get("cold_temp")
+            self._last_shower_flow_lpm = data.get("flow_lpm")
+            self._last_tap_water_cap = data.get("tap_water_cap")
+            self._last_published_tap_water_cap = data.get("published_cap")
+            self._last_published_tap_water_minutes = data.get("published_minutes")
+            _LOGGER.debug(
+                "Restored DHW EMA state: cold=%.1f°C, flow=%.1f L/min, cap=%.2f showers",
+                self._last_shower_cold_temp or 0.0,
+                self._last_shower_flow_lpm or 0.0,
+                self._last_tap_water_cap or 0.0,
+            )
+
+    def _persist_dhw_state(self) -> None:
+        """Save DHW EMA snapshot via a debounced write so it survives a restart.
+
+        Uses async_delay_save (coalesces multiple calls within the delay window
+        into a single disk write). Only schedules a write when the state has
+        actually changed since the last save, and swallows storage errors so
+        they cannot propagate into the coordinator update cycle.
+        """
+        current_state = (
+            self._last_shower_cold_temp,
+            self._last_shower_flow_lpm,
+            self._last_tap_water_cap,
+            self._last_published_tap_water_cap,
+            self._last_published_tap_water_minutes,
+        )
+        if current_state == self._last_persisted_dhw_state:
+            return
+        try:
+            self._dhw_store.async_delay_save(
+                lambda: {
+                    "cold_temp": self._last_shower_cold_temp,
+                    "flow_lpm": self._last_shower_flow_lpm,
+                    "tap_water_cap": self._last_tap_water_cap,
+                    "published_cap": self._last_published_tap_water_cap,
+                    "published_minutes": self._last_published_tap_water_minutes,
+                },
+                delay=30,
+            )
+            self._last_persisted_dhw_state = current_state
+        except Exception:
+            _LOGGER.warning("Failed to schedule DHW state persistence", exc_info=True)
 
     @property
     def device_id(self) -> str | None:
@@ -391,6 +459,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._calculate_heating_power(values)
                 self._calculate_dhw_power(values)
                 self._calculate_tap_water_cap(values)
+                self._persist_dhw_state()
 
             _LOGGER.debug("Final values: %s", values)
 

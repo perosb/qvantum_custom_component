@@ -95,6 +95,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     hass.data[DOMAIN].hass = hass
 
     coordinator = QvantumDataUpdateCoordinator(hass, config_entry)
+    await coordinator.async_restore_dhw_state()
     await coordinator.async_config_entry_first_refresh()
 
     if not coordinator.data.get("device") or not coordinator.data.get("device").get(

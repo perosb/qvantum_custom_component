@@ -17,6 +17,7 @@ from custom_components.qvantum.const import (
     REQUIRED_METRICS,
 )
 from homeassistant.const import CONF_SCAN_INTERVAL
+from homeassistant.util import dt as dt_util
 
 
 def _modbus_options_get(key, default=None):
@@ -1159,6 +1160,97 @@ class TestCalculateTapWaterCap:
             coordinator.data = None
         return coordinator
 
+    def _make_warmed_up_coordinator(self):
+        """Return a coordinator whose warmup window has already elapsed."""
+        coordinator = self._make_coordinator()
+        coordinator._tap_water_cap_start_time = dt_util.utcnow() - timedelta(seconds=61)
+        return coordinator
+
+    @pytest.mark.asyncio
+    async def test_restore_dhw_state_populates_attributes(self):
+        """async_restore_dhw_state loads persisted EMA values into coordinator state."""
+        coordinator = self._make_coordinator()
+        stored = {
+            "cold_temp": 9.5,
+            "flow_lpm": 5.8,
+            "tap_water_cap": 4.2,
+            "published_cap": 4.2,
+            "published_minutes": 25,
+        }
+        with patch.object(coordinator._dhw_store, "async_load", return_value=stored):
+            await coordinator.async_restore_dhw_state()
+        assert coordinator._last_shower_cold_temp == 9.5
+        assert coordinator._last_shower_flow_lpm == 5.8
+        assert coordinator._last_tap_water_cap == 4.2
+        assert coordinator._last_published_tap_water_cap == 4.2
+        assert coordinator._last_published_tap_water_minutes == 25
+
+    @pytest.mark.asyncio
+    async def test_restore_dhw_state_empty_storage_leaves_none(self):
+        """With no stored data, EMA attributes remain None after restore."""
+        coordinator = self._make_coordinator()
+        with patch.object(coordinator._dhw_store, "async_load", return_value=None):
+            await coordinator.async_restore_dhw_state()
+        assert coordinator._last_shower_cold_temp is None
+        assert coordinator._last_shower_flow_lpm is None
+        assert coordinator._last_tap_water_cap is None
+
+    @pytest.mark.asyncio
+    async def test_restore_dhw_state_storage_error_leaves_none(self):
+        """A storage I/O error during restore is swallowed; attributes stay None."""
+        coordinator = self._make_coordinator()
+        with patch.object(
+            coordinator._dhw_store,
+            "async_load",
+            side_effect=Exception("disk error"),
+        ):
+            await coordinator.async_restore_dhw_state()
+        assert coordinator._last_shower_cold_temp is None
+        assert coordinator._last_shower_flow_lpm is None
+        assert coordinator._last_tap_water_cap is None
+
+    def test_persist_dhw_state_updates_last_persisted_only_after_schedule_success(self):
+        """A successful schedule updates _last_persisted_dhw_state."""
+        coordinator = self._make_coordinator()
+        coordinator._last_shower_cold_temp = 8.4
+        coordinator._last_shower_flow_lpm = 6.8
+        coordinator._last_tap_water_cap = 5.0
+        coordinator._last_published_tap_water_cap = 5.0
+        coordinator._last_published_tap_water_minutes = 30
+
+        with patch.object(
+            coordinator._dhw_store, "async_delay_save"
+        ) as mock_delay_save:
+            coordinator._persist_dhw_state()
+
+        mock_delay_save.assert_called_once()
+        assert coordinator._last_persisted_dhw_state == (
+            8.4,
+            6.8,
+            5.0,
+            5.0,
+            30,
+        )
+
+    def test_persist_dhw_state_schedule_error_does_not_update_last_persisted(self):
+        """A scheduling failure must not poison _last_persisted_dhw_state."""
+        coordinator = self._make_coordinator()
+        coordinator._last_persisted_dhw_state = None
+        coordinator._last_shower_cold_temp = 8.4
+        coordinator._last_shower_flow_lpm = 6.8
+        coordinator._last_tap_water_cap = 5.0
+        coordinator._last_published_tap_water_cap = 5.0
+        coordinator._last_published_tap_water_minutes = 30
+
+        with patch.object(
+            coordinator._dhw_store,
+            "async_delay_save",
+            side_effect=Exception("schedule error"),
+        ):
+            coordinator._persist_dhw_state()
+
+        assert coordinator._last_persisted_dhw_state is None
+
     def test_missing_tank_temp_skips(self):
         """When bt30 is absent, tap_water_cap is not written."""
         coordinator = self._make_coordinator()
@@ -1167,9 +1259,65 @@ class TestCalculateTapWaterCap:
         assert "tap_water_cap" not in values
         assert "tap_water_minutes" not in values
 
+    def test_warmup_suppresses_publication_during_flow(self):
+        """During active flow, publication holds the last published value."""
+        coordinator = self._make_coordinator()
+        # First call with no flow: publishes immediately
+        values_no_flow = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values_no_flow)
+        assert "tap_water_cap" in values_no_flow
+        baseline_cap = values_no_flow["tap_water_cap"]
+        baseline_minutes = values_no_flow["tap_water_minutes"]
+
+        # Flow starts: 60 s hold begins, first flow poll keeps the previous value
+        values_flow1 = {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+        coordinator._calculate_tap_water_cap(values_flow1)
+        assert values_flow1["tap_water_cap"] == baseline_cap
+        assert values_flow1["tap_water_minutes"] == baseline_minutes
+
+        # Subsequent flow poll within 60 s: still retains the previous value
+        values_flow2 = {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+        coordinator._calculate_tap_water_cap(values_flow2)
+        assert values_flow2["tap_water_cap"] == baseline_cap
+        assert values_flow2["tap_water_minutes"] == baseline_minutes
+        assert coordinator._last_tap_water_cap is not None
+
+    def test_no_flow_always_publishes(self):
+        """Without active flow, every poll publishes (no warmup suppression)."""
+        coordinator = self._make_coordinator()
+        for _ in range(3):
+            values = {"bt30": 60.0, "bf1_l_min": 0.0}
+            coordinator._calculate_tap_water_cap(values)
+            assert "tap_water_cap" in values
+
+    def test_flow_onset_resets_warmup(self):
+        """Each new flow onset starts a fresh 60 s hold before publishing."""
+        coordinator = self._make_coordinator()
+        # No-flow baseline: publishes
+        baseline = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(baseline)
+        baseline_cap = baseline["tap_water_cap"]
+
+        # Flow starts: retains the previous value while warmup is active
+        values = {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+        coordinator._calculate_tap_water_cap(values)
+        assert values["tap_water_cap"] == baseline_cap
+        assert coordinator._tap_water_cap_start_time is not None
+
+        # Flow stops: resets window; next no-flow poll publishes again
+        values_stopped = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values_stopped)
+        assert "tap_water_cap" in values_stopped
+        assert coordinator._tap_water_cap_start_time is None
+        # Flow starts again: new 60 s hold, retaining the last published value.
+        values2 = {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+        coordinator._calculate_tap_water_cap(values2)
+        assert values2["tap_water_cap"] == values_stopped["tap_water_cap"]
+        assert values2["tap_water_minutes"] == values_stopped["tap_water_minutes"]
+
     def test_first_poll_uses_defaults(self):
         """With no prior shower snapshot, defaults are used: bt30=60, cold=8, flow=7."""
-        coordinator = self._make_coordinator()
+        coordinator = self._make_warmed_up_coordinator()
         values = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values)
         # hot_fraction = (38 - 8) / (60 - 8) = 30/52 ≈ 0.577
@@ -1193,13 +1341,13 @@ class TestCalculateTapWaterCap:
     def test_capacity_decreases_as_tank_drains(self):
         """Capacity decreases as tank_temp drops, reflecting actual hot water consumption."""
         # Full tank: bt30=60°C
-        coordinator_full = self._make_coordinator()
+        coordinator_full = self._make_warmed_up_coordinator()
         values_full = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator_full._calculate_tap_water_cap(values_full)
         cap_full = values_full["tap_water_cap"]
 
         # Partially drained tank: bt30=45°C
-        coordinator_half = self._make_coordinator()
+        coordinator_half = self._make_warmed_up_coordinator()
         values_half = {"bt30": 45.0, "bf1_l_min": 0.0}
         coordinator_half._calculate_tap_water_cap(values_half)
         cap_half = values_half["tap_water_cap"]
@@ -1209,30 +1357,35 @@ class TestCalculateTapWaterCap:
         assert cap_full > cap_half
 
     def test_uses_stored_cold_temp_when_no_flow(self):
-        """After flow has stopped, EMA-smoothed cold/flow values are used for the calculation."""
-        coordinator = self._make_coordinator()
-        # First poll: showering
-        # cold: 0.2*10 + 0.8*8 = 8.4 (EMA from DHW_DEFAULT_COLD_TEMP_C)
-        # flow: 0.2*6.0 + 0.8*7.0 = 6.8 (EMA from DHW_DEFAULT_FLOW_LPM)
+        """After flow stops, the no-flow poll uses EMA snapshot values; the result is
+        EMA-blended with the preceding flow-active estimate."""
+        coordinator = self._make_warmed_up_coordinator()
+        # First poll: showering with raw readings (cold=10, flow=6.0)
+        # raw: hot_fraction=(38-10)/(60-10)=0.56, hot_per_min=6*0.56=3.36
+        #      minutes=(140/3.36)*0.75=31.25, showers=31.25/6=5.21 → _last_tap_water_cap=5.21
+        # EMA snapshot stored: cold=0.2*10+0.8*8=8.4, flow=0.2*6+0.8*7=6.8
         coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0})
         assert coordinator._last_shower_cold_temp == pytest.approx(8.4)
         assert coordinator._last_shower_flow_lpm == pytest.approx(6.8)
-        # Second poll: no flow — uses cold=8.4, flow=6.8, effective_hot=bt30=60 (tank_temp)
+        # Advance past the new warmup window
+        coordinator._tap_water_cap_start_time -= timedelta(seconds=61)
+        # Second poll: no flow — uses EMA snapshot (cold=8.4, flow=6.8)
+        # raw: hot_fraction=(38-8.4)/(60-8.4)=0.574, hot_per_min=6.8*0.574=3.90
+        #      minutes=(140/3.90)*0.75=26.9, showers=4.48
+        # EMA blend: 0.2*4.48 + 0.8*5.21 = 5.1
         values = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values)
-        # hot_fraction = (38 - 8.4) / (60 - 8.4) = 29.6/51.6 ≈ 0.574
-        # hot_per_min = 6.8 * 0.574 ≈ 3.904
-        # minutes = (175 * 0.8 / 3.904) * 0.75 ≈ 26.9
-        # showers = 26.9 / 6 ≈ 4.48 -> rounded to 4.5
-        assert values["tap_water_cap"] == pytest.approx(4.5, abs=0.1)
-        assert values["tap_water_minutes"] == 27
-        assert values["tap_water_minutes"] == round(
-            values["tap_water_cap"] * DHW_SHOWER_DURATION_MIN
-        )
+        assert values["tap_water_cap"] == pytest.approx(5.1, abs=0.1)
+        assert values["tap_water_minutes"] == 30
 
     def test_tap_water_minutes_matches_smoothed_capacity(self):
         """tap_water_minutes is derived from the same smoothed tap_water_cap estimate."""
-        coordinator = self._make_coordinator()
+        coordinator = self._make_warmed_up_coordinator()
+        # Flow onset resets warmup; advance past it so values are published
+        coordinator._calculate_tap_water_cap(
+            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+        )
+        coordinator._tap_water_cap_start_time -= timedelta(seconds=61)
         values = {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
         coordinator._calculate_tap_water_cap(values)
         assert values["tap_water_minutes"] == round(
@@ -1250,7 +1403,7 @@ class TestCalculateTapWaterCap:
 
     def test_ema_smooths_output(self):
         """Second poll blends toward new value rather than jumping immediately."""
-        coordinator = self._make_coordinator()
+        coordinator = self._make_warmed_up_coordinator()
         # First poll: no prior EMA state → raw value used as-is (about 5.8 with defaults)
         values1 = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values1)

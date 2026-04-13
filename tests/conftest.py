@@ -15,6 +15,23 @@ import pytest_asyncio
 pytest_plugins = ["pytest_homeassistant_custom_component"]
 
 
+@pytest.fixture(autouse=True)
+def mock_storage_save():
+    """Prevent Store disk I/O in unit tests."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            "homeassistant.helpers.storage.Store.async_save",
+            AsyncMock(return_value=None),
+            raising=False,
+        )
+        mp.setattr(
+            "homeassistant.helpers.storage.Store.async_delay_save",
+            Mock(return_value=None),
+            raising=False,
+        )
+        yield
+
+
 @pytest.fixture
 def hass():
     """Mock Home Assistant instance."""
@@ -121,6 +138,7 @@ def mock_coordinator():
         }
     }
     coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.async_restore_dhw_state = AsyncMock()
 
     # Mock the maintenance coordinator for access level checking
     config_entry = Mock()
