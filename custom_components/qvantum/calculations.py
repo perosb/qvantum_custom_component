@@ -214,10 +214,10 @@ class QvantumCalculationsMixin:
                         DHW_EMA_ALPHA * duration_min + (1 - DHW_EMA_ALPHA) * prior_dur
                     )
                     _LOGGER.debug(
-                        "Shower ended: duration=%.1f min; EMA shower duration → %.1f min (tank=%.1f°C)",
+                        "Shower ended: duration=%.1f min; EMA shower duration → %.1f min (tank=%s)",
                         duration_min,
                         self._last_shower_duration_min,
-                        tank_temp if tank_temp is not None else -1.0,
+                        f"{tank_temp:.1f}°C" if tank_temp is not None else "unknown",
                     )
 
                     # Phase 2: record completed shower event to history.
