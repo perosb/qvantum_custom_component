@@ -99,6 +99,18 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._last_dhwenergy_time: datetime | None = None
         self._last_shower_cold_temp: float | None = None
         self._last_shower_flow_lpm: float | None = None
+        self._last_shower_temp_c: float | None = (
+            None  # EMA of observed shower outlet temperature (bt34)
+        )
+        self._last_shower_duration_min: float | None = (
+            None  # EMA of observed shower duration
+        )
+        self._shower_start_time: datetime | None = (
+            None  # Timestamp when current flow event started
+        )
+        self._flow_rolling_buffer: list = []  # [(timestamp, flow, cold)] within 60-second window
+        self._shower_event_samples: list = []  # [(timestamp, flow, cold, outlet_temp)] for current event
+        self._shower_event_history: list = []  # Last 10 completed shower events
         self._last_tap_water_cap: float | None = None
         self._last_published_tap_water_cap: float | None = None
         self._last_published_tap_water_minutes: int | None = None
@@ -134,13 +146,17 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         if data:
             self._last_shower_cold_temp = data.get("cold_temp")
             self._last_shower_flow_lpm = data.get("flow_lpm")
+            self._last_shower_temp_c = data.get("shower_temp")
+            self._last_shower_duration_min = data.get("shower_duration")
             self._last_tap_water_cap = data.get("tap_water_cap")
             self._last_published_tap_water_cap = data.get("published_cap")
             self._last_published_tap_water_minutes = data.get("published_minutes")
             _LOGGER.debug(
-                "Restored DHW EMA state: cold=%.1f°C, flow=%.1f L/min, cap=%.2f showers",
+                "Restored DHW EMA state: cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, dur=%.1f min, cap=%.2f showers",
                 self._last_shower_cold_temp or 0.0,
                 self._last_shower_flow_lpm or 0.0,
+                self._last_shower_temp_c or 0.0,
+                self._last_shower_duration_min or 0.0,
                 self._last_tap_water_cap or 0.0,
             )
 
@@ -155,6 +171,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         current_state = (
             self._last_shower_cold_temp,
             self._last_shower_flow_lpm,
+            self._last_shower_temp_c,
+            self._last_shower_duration_min,
             self._last_tap_water_cap,
             self._last_published_tap_water_cap,
             self._last_published_tap_water_minutes,
@@ -166,6 +184,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 lambda: {
                     "cold_temp": self._last_shower_cold_temp,
                     "flow_lpm": self._last_shower_flow_lpm,
+                    "shower_temp": self._last_shower_temp_c,
+                    "shower_duration": self._last_shower_duration_min,
                     "tap_water_cap": self._last_tap_water_cap,
                     "published_cap": self._last_published_tap_water_cap,
                     "published_minutes": self._last_published_tap_water_minutes,

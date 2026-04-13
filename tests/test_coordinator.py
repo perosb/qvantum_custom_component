@@ -1227,6 +1227,8 @@ class TestCalculateTapWaterCap:
         assert coordinator._last_persisted_dhw_state == (
             8.4,
             6.8,
+            None,  # _last_shower_temp_c not set
+            None,  # _last_shower_duration_min not set
             5.0,
             5.0,
             30,
@@ -1417,3 +1419,146 @@ class TestCalculateTapWaterCap:
         # EMA should stay between the new raw value and the previous reading
         assert second < first  # moved in the right direction
         assert second > 3.9  # did not jump all the way to the raw value
+
+    # ------------------------------------------------------------------
+    # Rolling buffer (Phase 1)
+    # ------------------------------------------------------------------
+
+    def test_rolling_buffer_populated_during_flow(self):
+        """Buffer accumulates entries while flow is active."""
+        coordinator = self._make_coordinator()
+        coordinator._calculate_tap_water_cap(
+            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+        )
+        assert len(coordinator._flow_rolling_buffer) == 1
+        ts, flow, cold = coordinator._flow_rolling_buffer[0]
+        assert flow == 6.0
+        assert cold == 10.0
+
+    def test_rolling_buffer_cleared_on_flow_stop(self):
+        """Buffer is emptied when flow drops to zero."""
+        coordinator = self._make_coordinator()
+        coordinator._calculate_tap_water_cap(
+            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+        )
+        assert len(coordinator._flow_rolling_buffer) == 1
+        coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert coordinator._flow_rolling_buffer == []
+
+    def test_rolling_buffer_trims_entries_older_than_60s(self):
+        """Entries outside the 60-second window are pruned each poll."""
+        coordinator = self._make_coordinator()
+        now = dt_util.utcnow()
+        # Seed one old entry (65 s ago) that should be trimmed
+        old_ts = (now - timedelta(seconds=65)).timestamp()
+        coordinator._flow_rolling_buffer = [(old_ts, 5.0, 9.0)]
+        # A new poll appends a fresh entry then trims; only the new entry survives
+        with patch("homeassistant.util.dt.utcnow", return_value=now):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+            )
+        assert len(coordinator._flow_rolling_buffer) == 1
+        assert coordinator._flow_rolling_buffer[0][1] == 6.0
+
+    def test_rolling_buffer_mean_used_for_calc_flow(self):
+        """calc_flow during active flow is the mean of buffered readings, not just the last."""
+        coordinator = self._make_warmed_up_coordinator()
+        now = dt_util.utcnow()
+        # Pre-seed buffer with one entry from 10 s ago so the mean is (5.0+8.0)/2=6.5
+        ten_s_ago = (now - timedelta(seconds=10)).timestamp()
+        coordinator._flow_rolling_buffer = [(ten_s_ago, 5.0, 10.0)]
+        # Current poll: flow=8.0 → mean=(5.0+8.0)/2=6.5 is used for calc_flow
+        with patch("homeassistant.util.dt.utcnow", return_value=now):
+            # Advance past warmup window
+            coordinator._tap_water_cap_start_time = now - timedelta(seconds=61)
+            values = {"bt30": 60.0, "bf1_l_min": 8.0, "bt33": 10.0}
+            coordinator._calculate_tap_water_cap(values)
+        assert "tap_water_cap" in values
+        # Verify by computing what the result with mean flow=6.5 should be
+        # hot_fraction = (38-10)/(60-10) = 0.56; hot_per_min = 6.5*0.56 = 3.64
+        # minutes = (140/3.64)*0.75 = 28.8; showers = 28.8/6 = 4.8
+        assert values["tap_water_cap"] == pytest.approx(4.8, abs=0.2)
+
+    # ------------------------------------------------------------------
+    # Shower event history (Phase 2)
+    # ------------------------------------------------------------------
+
+    def test_event_samples_accumulate_during_flow(self):
+        """Samples are accumulated in _shower_event_samples while flow is active."""
+        coordinator = self._make_coordinator()
+        for _ in range(3):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 38.0}
+            )
+        assert len(coordinator._shower_event_samples) == 3
+
+    def test_event_samples_cleared_after_flow_stops(self):
+        """_shower_event_samples is always cleared when flow stops, even for short draws."""
+        coordinator = self._make_coordinator()
+        coordinator._calculate_tap_water_cap(
+            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+        )
+        assert len(coordinator._shower_event_samples) == 1
+        coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert coordinator._shower_event_samples == []
+
+    def test_long_shower_creates_event_history_entry(self):
+        """A shower lasting ≥1 min creates an entry in _shower_event_history."""
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        coordinator._shower_start_time = start - timedelta(minutes=5)
+        # Seed one sample so avg calculations have data
+        coordinator._shower_event_samples = [
+            ((start - timedelta(minutes=4)).timestamp(), 6.0, 10.0, 38.0)
+        ]
+        # Flow stops
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert len(coordinator._shower_event_history) == 1
+        event = coordinator._shower_event_history[0]
+        assert event["duration_min"] == pytest.approx(5.0, abs=0.1)
+        assert event["avg_flow"] == 6.0
+        assert event["avg_cold"] == 10.0
+        assert event["avg_outlet_temp"] == 38.0
+        assert event["water_used_l"] == pytest.approx(30.0, abs=0.5)
+
+    def test_short_draw_does_not_create_event_history_entry(self):
+        """A water draw shorter than 1 minute is NOT recorded in history."""
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        coordinator._shower_start_time = start - timedelta(seconds=30)
+        coordinator._shower_event_samples = [
+            ((start - timedelta(seconds=15)).timestamp(), 4.0, 10.0, None)
+        ]
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert coordinator._shower_event_history == []
+        assert coordinator._shower_event_samples == []  # samples still cleared
+
+    def test_event_history_capped_at_10_entries(self):
+        """_shower_event_history never exceeds 10 entries (oldest is evicted)."""
+        coordinator = self._make_coordinator()
+        now = dt_util.utcnow()
+        # Simulate 11 completed 2-minute showers
+        for i in range(11):
+            shower_start = now - timedelta(minutes=2)
+            coordinator._shower_start_time = shower_start
+            coordinator._shower_event_samples = [
+                (shower_start.timestamp(), 6.0, 10.0, 38.0)
+            ]
+            with patch("homeassistant.util.dt.utcnow", return_value=now):
+                coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert len(coordinator._shower_event_history) == 10
+
+    def test_event_history_no_outlet_temp_records_none(self):
+        """When bt34 is absent, avg_outlet_temp in the history entry is None."""
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        coordinator._shower_start_time = start - timedelta(minutes=3)
+        coordinator._shower_event_samples = [
+            ((start - timedelta(minutes=2)).timestamp(), 6.0, 10.0, None)
+        ]
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert len(coordinator._shower_event_history) == 1
+        assert coordinator._shower_event_history[0]["avg_outlet_temp"] is None
