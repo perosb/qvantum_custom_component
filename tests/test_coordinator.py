@@ -1195,6 +1195,20 @@ class TestCalculateTapWaterCap:
         assert coordinator._last_shower_flow_lpm is None
         assert coordinator._last_tap_water_cap is None
 
+    @pytest.mark.asyncio
+    async def test_restore_dhw_state_storage_error_leaves_none(self):
+        """A storage I/O error during restore is swallowed; attributes stay None."""
+        coordinator = self._make_coordinator()
+        with patch.object(
+            coordinator._dhw_store,
+            "async_load",
+            side_effect=Exception("disk error"),
+        ):
+            await coordinator.async_restore_dhw_state()
+        assert coordinator._last_shower_cold_temp is None
+        assert coordinator._last_shower_flow_lpm is None
+        assert coordinator._last_tap_water_cap is None
+
     def test_missing_tank_temp_skips(self):
         """When bt30 is absent, tap_water_cap is not written."""
         coordinator = self._make_coordinator()
