@@ -213,9 +213,10 @@ class QvantumCalculationsMixin:
                         DHW_EMA_ALPHA * duration_min + (1 - DHW_EMA_ALPHA) * prior_dur
                     )
                     _LOGGER.debug(
-                        "Shower ended: duration=%.1f min; EMA shower duration → %.1f min",
+                        "Shower ended: duration=%.1f min; EMA shower duration → %.1f min (tank=%.1f°C)",
                         duration_min,
                         self._last_shower_duration_min,
+                        tank_temp if tank_temp is not None else -1.0,
                     )
 
                     # Phase 2: record completed shower event to history.
@@ -343,12 +344,30 @@ class QvantumCalculationsMixin:
         if effective_hot_temp <= calc_shower_temp or calc_cold >= calc_shower_temp:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
+            _LOGGER.debug(
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=insufficient_hot_temp, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min)",
+                effective_hot_temp,
+                calc_cold,
+                calc_flow,
+                calc_shower_temp,
+                calc_shower_duration,
+            )
             return
 
         delta_available = effective_hot_temp - calc_cold
         if delta_available < DHW_MIN_TEMPERATURE_DELTA_C:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
+            _LOGGER.debug(
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=delta_below_min, tank=%.1f°C, cold=%.1f°C, delta=%.1f°C, min_delta=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min)",
+                effective_hot_temp,
+                calc_cold,
+                delta_available,
+                DHW_MIN_TEMPERATURE_DELTA_C,
+                calc_flow,
+                calc_shower_temp,
+                calc_shower_duration,
+            )
             return
 
         hot_fraction = (calc_shower_temp - calc_cold) / delta_available
@@ -357,6 +376,14 @@ class QvantumCalculationsMixin:
         if hot_per_min <= 0:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
+            _LOGGER.debug(
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=non_positive_hot_per_min, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, hot_fraction=%.3f)",
+                effective_hot_temp,
+                calc_cold,
+                calc_flow,
+                calc_shower_temp,
+                hot_fraction,
+            )
             return
 
         minutes = (
@@ -391,6 +418,16 @@ class QvantumCalculationsMixin:
         published_minutes = round(smoothed_minutes)
 
         if is_warmup:
+            published_warmup_cap = (
+                self._last_published_tap_water_cap
+                if self._last_published_tap_water_cap is not None
+                else published_cap
+            )
+            published_warmup_minutes = (
+                self._last_published_tap_water_minutes
+                if self._last_published_tap_water_minutes is not None
+                else published_minutes
+            )
             if self._last_published_tap_water_cap is not None:
                 values["tap_water_cap"] = self._last_published_tap_water_cap
                 values["tap_water_minutes"] = (
@@ -403,6 +440,17 @@ class QvantumCalculationsMixin:
             else:
                 values["tap_water_cap"] = published_cap
                 values["tap_water_minutes"] = published_minutes
+            _LOGGER.debug(
+                "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, warmup=true)",
+                published_warmup_cap,
+                published_warmup_minutes,
+                raw_showers,
+                tank_temp,
+                calc_cold,
+                calc_flow,
+                calc_shower_temp,
+                calc_shower_duration,
+            )
             return
 
         # Publish the derived values rounded to the sensor's display precision
