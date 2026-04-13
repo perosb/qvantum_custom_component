@@ -105,7 +105,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._tap_water_cap_start_time: datetime | None = None
         self._last_persisted_dhw_state: tuple | None = None
         self._dhw_store: Store = Store(
-            hass, 1, f"{DOMAIN}.dhw_ema.{config_entry.unique_id}"
+            hass, 1, f"{DOMAIN}.dhw_ema.{config_entry.entry_id}"
         )
 
         super().__init__(
