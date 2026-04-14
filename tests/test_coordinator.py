@@ -1321,6 +1321,21 @@ class TestCalculateTapWaterCap:
         assert values2["tap_water_cap"] == values_stopped["tap_water_cap"]
         assert values2["tap_water_minutes"] == values_stopped["tap_water_minutes"]
 
+    def test_warmup_fallback_minutes_use_current_duration(self):
+        """If published minutes are missing, fallback uses current learned duration."""
+        coordinator = self._make_coordinator()
+        coordinator._last_published_tap_water_cap = 2.0
+        coordinator._last_published_tap_water_minutes = None
+        coordinator._last_shower_duration_min = 4.9
+
+        values = {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 45.0}
+        coordinator._calculate_tap_water_cap(values)
+
+        # warmup_progress=0 on first active-flow poll, so minutes should be the
+        # fallback derived from cap * learned duration (2.0 * 4.9 -> 10), not
+        # cap * default duration (2.0 * 6.0 -> 12).
+        assert values["tap_water_minutes"] == 10
+
     def test_first_poll_uses_defaults(self):
         """With no prior shower snapshot, defaults are used: bt30=60, cold=8, flow=7."""
         coordinator = self._make_warmed_up_coordinator()
@@ -1678,6 +1693,21 @@ class TestCalculateTapWaterCap:
         assert borderline["tap_water_cap"] == 0.0
         assert borderline["tap_water_minutes"] == 0
         assert coordinator._tap_water_cap_zero_mode is True
+
+    def test_hysteresis_entry_resets_published_state_to_zero(self):
+        """Force-zero output also updates published state to avoid stale baselines."""
+        coordinator = self._make_warmed_up_coordinator()
+        coordinator._last_shower_temp_c = 45.0
+        coordinator._last_published_tap_water_cap = 2.8
+        coordinator._last_published_tap_water_minutes = 18
+
+        values = {"bt30": 44.7, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+
+        assert values["tap_water_cap"] == 0.0
+        assert values["tap_water_minutes"] == 0
+        assert coordinator._last_published_tap_water_cap == 0.0
+        assert coordinator._last_published_tap_water_minutes == 0
 
     def test_hysteresis_remains_in_zero_mode_until_exit_threshold_cleared(self):
         """While in zero_mode, output stays 0 until tank clears shower_temp + hysteresis."""

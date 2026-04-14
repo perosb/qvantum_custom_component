@@ -367,6 +367,10 @@ class QvantumCalculationsMixin:
                 reason = "hot_below_hysteresis_entry"
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
+            # Keep published state consistent with emitted zero values so
+            # persistence and warmup interpolation do not reuse stale baselines.
+            self._last_published_tap_water_cap = 0.0
+            self._last_published_tap_water_minutes = 0
             _LOGGER.debug(
                 "Calculated tap_water_cap=0.00 showers (0 min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, hysteresis=%.1f°C, zero_mode=true)",
                 reason,
@@ -458,7 +462,7 @@ class QvantumCalculationsMixin:
                     self._last_published_tap_water_minutes
                     if self._last_published_tap_water_minutes is not None
                     else round(
-                        self._last_published_tap_water_cap * DHW_SHOWER_DURATION_MIN
+                        self._last_published_tap_water_cap * calc_shower_duration
                     )
                 )
                 published_warmup_cap = round(
