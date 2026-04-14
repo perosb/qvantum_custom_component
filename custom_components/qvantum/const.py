@@ -238,7 +238,7 @@ DHW_MIN_TEMPERATURE_DELTA_C = 5.0  # Minimum spread between tank and cold water 
 DHW_CAP_HYSTERESIS_C = (
     0.3  # Deadband around tank-vs-shower temperature threshold to avoid rapid 0/non-zero toggling
 )
-DHW_HEADROOM_FULL_CAP_C = 10.0
+DHW_HEADROOM_FULL_CAP_C = 10.0  # Δ°C above shower temp required for tap-water capacity to scale to 100%
 DHW_ROLLING_BUFFER_WINDOW_SEC = (
     60.0  # Rolling buffer window for cold/flow readings during active flow
 )
