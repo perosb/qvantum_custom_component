@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, Callable
 
 from homeassistant.util import dt as dt_util
 
 from .const import (
     DHW_CAP_HYSTERESIS_C,
+    DHW_COMPRESSOR_STATE_HOT_WATER,
     DHW_DEFAULT_COLD_TEMP_C,
     DHW_DEFAULT_FLOW_LPM,
     DHW_EMA_ALPHA,
     DHW_FLOW_SNAPSHOT_THRESHOLD_LPM,
-    DHW_HEADROOM_FULL_CAP_C,
     DHW_MIN_SHOWER_DURATION_MIN,
     DHW_MIN_TEMPERATURE_DELTA_C,
     DHW_MAX_SHOWER_HISTORY_SIZE,
@@ -22,8 +23,6 @@ from .const import (
     DHW_SHOWER_DURATION_MIN,
     DHW_SHOWER_TEMP_C,
     DHW_TANK_VOLUME_L,
-    DHW_TEMP_DROP_FACTOR,
-    DHW_USABLE_FRACTION,
     HP_STATUS_HEATING,
 )
 
@@ -130,10 +129,11 @@ class QvantumCalculationsMixin:
         drawn — making capacity correctly decrease during a shower.
         bt33 (cold water in) and bf1_l_min (flow) are snapshotted during active
         flow and EMA-smoothed to prevent brief transients from dominating.
-        Formula: hot_fraction = (shower_temp - cold) / (tank_temp - cold),
-                 hot_per_min = flow * hot_fraction,
-                 minutes = (volume * usable_fraction / hot_per_min) * drop_factor,
+        Formula (integrated perfect-mixing tank model):
+                 minutes = (volume / flow) * ln((tank - cold) / (shower - cold)),
                  showers = minutes / shower_duration_min.
+        This is the analytic solution to T(t)=cold+(hot-cold)*exp(-flow/V*t)
+        for the time t* at which T drops to shower_temp.
         """
         tank_temp = values.get("bt30")
         flow = values.get("bf1_l_min")
@@ -401,30 +401,39 @@ class QvantumCalculationsMixin:
             )
             return
 
-        hot_fraction = (calc_shower_temp - calc_cold) / delta_available
-        hot_fraction = min(1.0, max(0.0, hot_fraction))
-        hot_per_min = calc_flow * hot_fraction
-        if hot_per_min <= 0:
+        if calc_flow <= 0:
             values["tap_water_cap"] = 0.0
             values["tap_water_minutes"] = 0
             _LOGGER.debug(
-                "Calculated tap_water_cap=0.00 showers (0 min, reason=non_positive_hot_per_min, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, hot_fraction=%.3f)",
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=non_positive_flow, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C)",
                 effective_hot_temp,
                 calc_cold,
                 calc_flow,
                 calc_shower_temp,
-                hot_fraction,
             )
             return
 
-        minutes = (
-            DHW_TANK_VOLUME_L * DHW_USABLE_FRACTION / hot_per_min
-        ) * DHW_TEMP_DROP_FACTOR
-        # Reduce optimistic estimates when tank temperature is only slightly
-        # above the target shower temperature.
-        headroom_c = max(effective_hot_temp - calc_shower_temp, 0.0)
-        headroom_factor = min(headroom_c / DHW_HEADROOM_FULL_CAP_C, 1.0)
-        minutes *= headroom_factor
+        # Integrated perfect-mixing tank model: time until outlet temperature
+        # drops from effective_hot_temp to calc_shower_temp under continuous
+        # flow of calc_flow. All guards above guarantee both log arguments > 0
+        # and the argument > 1 so the result is positive.
+        minutes = (DHW_TANK_VOLUME_L / calc_flow) * math.log(
+            (effective_hot_temp - calc_cold) / (calc_shower_temp - calc_cold)
+        )
+
+        # When the compressor is in DHW mode or electric heaters are active the
+        # tank is being replenished faster than cold dilution can drain it.  The
+        # log model returns a small (or even incorrect) estimate in this case,
+        # so floor the raw minutes at one full shower duration to indicate the
+        # shower can continue sustained.
+        dhw_reheating = (
+            values.get("compressor_state") == DHW_COMPRESSOR_STATE_HOT_WATER
+            or values.get("picpin_relay_heat_l1")
+            or values.get("picpin_relay_heat_l2")
+            or values.get("picpin_relay_heat_l3")
+        )
+        if dhw_reheating:
+            minutes = max(minutes, DHW_SHOWER_DURATION_MIN)
         raw_showers = minutes / calc_shower_duration
         if self._last_tap_water_cap is not None:
             smoothed = (
@@ -483,7 +492,7 @@ class QvantumCalculationsMixin:
                 values["tap_water_cap"] = published_warmup_cap
                 values["tap_water_minutes"] = published_warmup_minutes
             _LOGGER.debug(
-                "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, headroom=%.1f°C, headroom_factor=%.2f, warmup=true, warmup_progress=%.2f)",
+                "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, warmup=true, warmup_progress=%.2f, reheating=%s)",
                 published_warmup_cap,
                 published_warmup_minutes,
                 raw_showers,
@@ -492,9 +501,8 @@ class QvantumCalculationsMixin:
                 calc_flow,
                 calc_shower_temp,
                 calc_shower_duration,
-                headroom_c,
-                headroom_factor,
                 warmup_progress,
+                dhw_reheating,
             )
             return
 
@@ -506,7 +514,7 @@ class QvantumCalculationsMixin:
         self._last_published_tap_water_cap = published_cap
         self._last_published_tap_water_minutes = published_minutes
         _LOGGER.debug(
-            "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, headroom=%.1f°C, headroom_factor=%.2f)",
+            "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, reheating=%s)",
             smoothed,
             published_minutes,
             raw_showers,
@@ -515,6 +523,5 @@ class QvantumCalculationsMixin:
             calc_flow,
             calc_shower_temp,
             calc_shower_duration,
-            headroom_c,
-            headroom_factor,
+            dhw_reheating,
         )
