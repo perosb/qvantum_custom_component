@@ -432,10 +432,10 @@ class QvantumCalculationsMixin:
         self._last_tap_water_cap = smoothed
         smoothed_minutes = smoothed * calc_shower_duration
 
-        # When flow is active, hold off publishing new values until the flow
-        # has been running for 60 s so the EMA can stabilise on real inlet
-        # conditions. If a value was previously published, keep it available
-        # during the warmup window instead of removing the metric entirely.
+        # When flow is active, use a 60 s warmup window so the EMA can stabilise
+        # on real inlet conditions. During warmup, if a value was previously
+        # published, linearly ramp from the previous published value toward the
+        # newly calculated value instead of hard-switching between them.
         is_warmup = False
         warmup_progress = 1.0
         if flow_is_active:
