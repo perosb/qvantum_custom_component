@@ -15,6 +15,7 @@ from custom_components.qvantum.const import (
     DOMAIN,
     DHW_CAP_HYSTERESIS_C,
     DHW_EMA_ALPHA,
+    DHW_HEADROOM_FULL_CAP_C,
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_SHOWER_DURATION_MIN,
     REQUIRED_METRICS,
@@ -1665,50 +1666,33 @@ class TestCalculateTapWaterCap:
     # Hysteresis / hold-last-value (borderline tank-vs-shower-temp zone)
     # ------------------------------------------------------------------
 
-    def test_hysteresis_entry_holds_last_published_not_zero(self):
-        """When tank drops just below shower_temp - hysteresis, the sensor holds
-        the last published value instead of jumping to 0."""
+    def test_hysteresis_entry_outputs_zero(self):
+        """With no prior published estimate, hysteresis entry outputs 0."""
         coordinator = self._make_warmed_up_coordinator()
-        # Warm tank: publish a baseline capacity first.
-        warm = {"bt30": 60.0, "bf1_l_min": 0.0}
-        coordinator._calculate_tap_water_cap(warm)
-        assert warm["tap_water_cap"] > 0
-        last_published = warm["tap_water_cap"]
-        last_minutes = warm["tap_water_minutes"]
-
-        # Seed learned shower temp to a known value so we control the threshold.
         coordinator._last_shower_temp_c = 45.0
-        # tank exactly at shower_temp - hysteresis: on the boundary *outside* the entry
-        # deadband (entry requires strictly <= shower_temp - hysteresis).
+
         entry_threshold = 45.0 - DHW_CAP_HYSTERESIS_C
         borderline = {"bt30": entry_threshold, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(borderline)
 
-        # Must hold the previous published value, not drop to 0.
-        assert borderline["tap_water_cap"] == last_published
-        assert borderline["tap_water_minutes"] == last_minutes
+        assert borderline["tap_water_cap"] == 0.0
+        assert borderline["tap_water_minutes"] == 0
         assert coordinator._tap_water_cap_zero_mode is True
 
-    def test_hysteresis_remains_in_hold_until_exit_threshold_cleared(self):
-        """While in zero_mode, the sensor continues to hold once it enters,
-        until tank clears shower_temp + hysteresis."""
+    def test_hysteresis_remains_in_zero_mode_until_exit_threshold_cleared(self):
+        """While in zero_mode, output stays 0 until tank clears shower_temp + hysteresis."""
         coordinator = self._make_warmed_up_coordinator()
         coordinator._last_shower_temp_c = 45.0
-        # Prime a published value.
-        prime = {"bt30": 60.0, "bf1_l_min": 0.0}
-        coordinator._calculate_tap_water_cap(prime)
-        held = prime["tap_water_cap"]
 
-        # Drive into hold mode.
-        coordinator._last_shower_temp_c = 45.0
+        # Drive into zero mode.
         coordinator._calculate_tap_water_cap({"bt30": 44.5, "bf1_l_min": 0.0})
         assert coordinator._tap_water_cap_zero_mode is True
 
         # Tank rises to shower_temp but not yet above exit threshold:
-        # still inside deadband → must keep holding.
+        # still inside deadband → must remain 0.
         still_borderline = {"bt30": 45.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(still_borderline)
-        assert still_borderline["tap_water_cap"] == held
+        assert still_borderline["tap_water_cap"] == 0.0
         assert coordinator._tap_water_cap_zero_mode is True
 
         # Tank clears exit threshold (shower_temp + hysteresis):
@@ -1717,8 +1701,7 @@ class TestCalculateTapWaterCap:
         cleared = {"bt30": exit_temp, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(cleared)
         assert coordinator._tap_water_cap_zero_mode is False
-        # First recovery poll seeds EMA from raw, so output should differ from held.
-        assert cleared["tap_water_cap"] != held
+        assert cleared["tap_water_cap"] > 0.0
 
     def test_hysteresis_entry_resets_ema_so_recovery_starts_from_raw(self):
         """On the first poll entering hold mode, the EMA is reset to None so
@@ -1746,3 +1729,48 @@ class TestCalculateTapWaterCap:
         # With default cold=8, flow=7 and tank=exit_temp the raw is modest;
         # it must NOT be blended with the stale 8.0.
         assert values["tap_water_cap"] < 6.0
+
+    def test_near_shower_temp_headroom_reduces_minutes(self):
+        """When tank is only slightly above shower temp, minutes should be low."""
+        coordinator = self._make_warmed_up_coordinator()
+        coordinator._last_shower_temp_c = 47.4
+        coordinator._last_shower_cold_temp = 8.2
+        coordinator._last_shower_flow_lpm = 7.0
+        coordinator._last_shower_duration_min = 6.7
+        coordinator._last_tap_water_cap = None
+
+        values = {"bt30": 49.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+
+        headroom_c = values["bt30"] - coordinator._last_shower_temp_c
+        headroom_factor = headroom_c / DHW_HEADROOM_FULL_CAP_C
+
+        # Verify the intermediate headroom calculation that should drive the
+        # reduced estimate for a tank only slightly above shower temperature.
+        assert DHW_HEADROOM_FULL_CAP_C == 10.0
+        assert headroom_c == pytest.approx(1.6)
+        assert headroom_factor == pytest.approx(0.16)
+        assert 0.0 < headroom_factor < 1.0
+
+        # With only ~1.6°C headroom above shower temp, estimate should be
+        # strongly reduced from the previous optimistic ~15-18 minute range.
+        assert values["tap_water_minutes"] <= 5
+        assert values["tap_water_cap"] <= 0.8
+        assert values["tap_water_cap"] <= 0.8
+
+    def test_active_flow_uses_learned_shower_temp_not_raw_outlet(self):
+        """A temporary bt34 spike should not be used directly for capacity math."""
+        coordinator = self._make_warmed_up_coordinator()
+        coordinator._last_shower_temp_c = 45.0
+        coordinator._last_shower_cold_temp = 9.0
+        coordinator._last_shower_flow_lpm = 6.0
+        coordinator._last_shower_duration_min = 6.7
+        coordinator._last_tap_water_cap = None
+
+        # Active flow with very high outlet reading (spiky bt34).
+        values = {"bt30": 59.0, "bf1_l_min": 6.0, "bt33": 9.0, "bt34": 53.0}
+        coordinator._calculate_tap_water_cap(values)
+
+        # With learned shower temp around 45°C, estimate should stay around low-20s
+        # minutes instead of collapsing to very low values from the 53°C spike.
+        assert values["tap_water_minutes"] >= 18

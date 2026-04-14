@@ -13,6 +13,7 @@ from .const import (
     DHW_DEFAULT_FLOW_LPM,
     DHW_EMA_ALPHA,
     DHW_FLOW_SNAPSHOT_THRESHOLD_LPM,
+    DHW_HEADROOM_FULL_CAP_C,
     DHW_MIN_SHOWER_DURATION_MIN,
     DHW_MIN_TEMPERATURE_DELTA_C,
     DHW_MAX_SHOWER_HISTORY_SIZE,
@@ -294,20 +295,14 @@ class QvantumCalculationsMixin:
                     else DHW_DEFAULT_COLD_TEMP_C
                 )
             )
-            # During flow, only trust outlet temp once it is clearly above cold
-            # inlet (pipe-flush guard); otherwise use EMA/default shower temp.
-            outlet_for_calc = values.get("bt34")
-            if (
-                outlet_for_calc is not None
-                and outlet_for_calc > calc_cold + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
-            ):
-                calc_shower_temp = outlet_for_calc
-            else:
-                calc_shower_temp = (
-                    self._last_shower_temp_c
-                    if self._last_shower_temp_c is not None
-                    else DHW_SHOWER_TEMP_C
-                )
+            # During flow, calculate against the learned EMA shower temperature
+            # rather than the instantaneous outlet reading to avoid abrupt
+            # estimate swings from short-lived bt34 spikes.
+            calc_shower_temp = (
+                self._last_shower_temp_c
+                if self._last_shower_temp_c is not None
+                else DHW_SHOWER_TEMP_C
+            )
         else:
             calc_cold = (
                 self._last_shower_cold_temp
@@ -364,22 +359,16 @@ class QvantumCalculationsMixin:
                 # poll seeds from raw rather than blending with the stale high value.
                 self._last_tap_water_cap = None
             self._tap_water_cap_zero_mode = True
-            # Hold the last published value (or 0 if nothing published yet) so the
-            # sensor does not suddenly drop to 0 while the tank is borderline.
             if cold_ge_shower_temp:
                 reason = "cold_ge_shower_temp"
             elif in_zero_mode:
                 reason = "hot_below_hysteresis_hold"
             else:
                 reason = "hot_below_hysteresis_entry"
-            held_cap = self._last_published_tap_water_cap or 0.0
-            held_minutes = self._last_published_tap_water_minutes or 0
-            values["tap_water_cap"] = held_cap
-            values["tap_water_minutes"] = held_minutes
+            values["tap_water_cap"] = 0.0
+            values["tap_water_minutes"] = 0
             _LOGGER.debug(
-                "Calculated tap_water_cap=%.2f showers (%d min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, hysteresis=%.1f°C, zero_mode=true)",
-                held_cap,
-                held_minutes,
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, hysteresis=%.1f°C, zero_mode=true)",
                 reason,
                 effective_hot_temp,
                 calc_cold,
@@ -427,6 +416,11 @@ class QvantumCalculationsMixin:
         minutes = (
             DHW_TANK_VOLUME_L * DHW_USABLE_FRACTION / hot_per_min
         ) * DHW_TEMP_DROP_FACTOR
+        # Reduce optimistic estimates when tank temperature is only slightly
+        # above the target shower temperature.
+        headroom_c = max(effective_hot_temp - calc_shower_temp, 0.0)
+        headroom_factor = min(headroom_c / DHW_HEADROOM_FULL_CAP_C, 1.0)
+        minutes *= headroom_factor
         raw_showers = minutes / calc_shower_duration
         if self._last_tap_water_cap is not None:
             smoothed = (
@@ -443,11 +437,14 @@ class QvantumCalculationsMixin:
         # conditions. If a value was previously published, keep it available
         # during the warmup window instead of removing the metric entirely.
         is_warmup = False
+        warmup_progress = 1.0
         if flow_is_active:
             if self._tap_water_cap_start_time is None:
                 self._tap_water_cap_start_time = now
-            if (now - self._tap_water_cap_start_time).total_seconds() < 60:
+            elapsed_warmup_sec = (now - self._tap_water_cap_start_time).total_seconds()
+            if elapsed_warmup_sec < 60:
                 is_warmup = True
+                warmup_progress = max(0.0, min(1.0, elapsed_warmup_sec / 60.0))
         else:
             # Reset the window so the next flow onset triggers a fresh 60 s hold.
             self._tap_water_cap_start_time = None
@@ -456,30 +453,33 @@ class QvantumCalculationsMixin:
         published_minutes = round(smoothed_minutes)
 
         if is_warmup:
-            published_warmup_cap = (
-                self._last_published_tap_water_cap
-                if self._last_published_tap_water_cap is not None
-                else published_cap
-            )
-            published_warmup_minutes = (
-                self._last_published_tap_water_minutes
-                if self._last_published_tap_water_minutes is not None
-                else published_minutes
-            )
             if self._last_published_tap_water_cap is not None:
-                values["tap_water_cap"] = self._last_published_tap_water_cap
-                values["tap_water_minutes"] = (
+                previous_minutes = (
                     self._last_published_tap_water_minutes
                     if self._last_published_tap_water_minutes is not None
                     else round(
                         self._last_published_tap_water_cap * DHW_SHOWER_DURATION_MIN
                     )
                 )
+                published_warmup_cap = round(
+                    self._last_published_tap_water_cap
+                    + (published_cap - self._last_published_tap_water_cap)
+                    * warmup_progress,
+                    1,
+                )
+                published_warmup_minutes = round(
+                    previous_minutes
+                    + (published_minutes - previous_minutes) * warmup_progress
+                )
+                values["tap_water_cap"] = published_warmup_cap
+                values["tap_water_minutes"] = published_warmup_minutes
             else:
-                values["tap_water_cap"] = published_cap
-                values["tap_water_minutes"] = published_minutes
+                published_warmup_cap = published_cap
+                published_warmup_minutes = published_minutes
+                values["tap_water_cap"] = published_warmup_cap
+                values["tap_water_minutes"] = published_warmup_minutes
             _LOGGER.debug(
-                "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, warmup=true)",
+                "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, headroom=%.1f°C, headroom_factor=%.2f, warmup=true, warmup_progress=%.2f)",
                 published_warmup_cap,
                 published_warmup_minutes,
                 raw_showers,
@@ -488,6 +488,9 @@ class QvantumCalculationsMixin:
                 calc_flow,
                 calc_shower_temp,
                 calc_shower_duration,
+                headroom_c,
+                headroom_factor,
+                warmup_progress,
             )
             return
 
@@ -499,7 +502,7 @@ class QvantumCalculationsMixin:
         self._last_published_tap_water_cap = published_cap
         self._last_published_tap_water_minutes = published_minutes
         _LOGGER.debug(
-            "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min)",
+            "Calculated tap_water_cap=%.2f showers (%d min, raw=%.2f, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, headroom=%.1f°C, headroom_factor=%.2f)",
             smoothed,
             published_minutes,
             raw_showers,
@@ -508,4 +511,6 @@ class QvantumCalculationsMixin:
             calc_flow,
             calc_shower_temp,
             calc_shower_duration,
+            headroom_c,
+            headroom_factor,
         )
