@@ -1663,7 +1663,7 @@ class TestCalculateTapWaterCap:
         assert values["tap_water_cap"] < 20
 
     # ------------------------------------------------------------------
-    # Hysteresis / hold-last-value (borderline tank-vs-shower-temp zone)
+    # Hysteresis / zero-mode deadband (borderline tank-vs-shower-temp zone)
     # ------------------------------------------------------------------
 
     def test_hysteresis_entry_outputs_zero(self):
