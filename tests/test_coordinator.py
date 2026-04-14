@@ -1757,7 +1757,6 @@ class TestCalculateTapWaterCap:
         # strongly reduced from the previous optimistic ~15-18 minute range.
         assert values["tap_water_minutes"] <= 5
         assert values["tap_water_cap"] <= 0.8
-        assert values["tap_water_cap"] <= 0.8
 
     def test_active_flow_uses_learned_shower_temp_not_raw_outlet(self):
         """A temporary bt34 spike should not be used directly for capacity math."""
