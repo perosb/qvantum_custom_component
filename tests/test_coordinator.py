@@ -1336,6 +1336,53 @@ class TestCalculateTapWaterCap:
         # cap * default duration (2.0 * 6.0 -> 12).
         assert values["tap_water_minutes"] == 10
 
+    def test_warmup_mid_ramp_interpolates_published_values(self):
+        """At 30 s into a 60 s warmup window, published values are linearly
+        interpolated ≈ halfway between the last-published and newly-calculated values.
+
+        Setup:
+          last_published_cap = 2.0 showers, last_published_minutes = 11
+          bt30=60°C, cold=8°C, flow=7 L/min, shower_temp=45°C (via EMA)
+          → new computed: published_cap=3.5, published_minutes=21
+          warmup_progress=0.5 → expected output: 2.8 showers, 16 min
+        """
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=timezone.utc)
+
+        # Pre-seed the state that would exist before this shower event started.
+        coordinator._last_published_tap_water_cap = 2.0
+        coordinator._last_published_tap_water_minutes = 11
+        # Stable EMA shower temp so calc_shower_temp is predictable.
+        coordinator._last_shower_temp_c = 45.0
+        # Warmup window started 30 s ago → warmup_progress = 30/60 = 0.5.
+        coordinator._tap_water_cap_start_time = t0 - timedelta(seconds=30)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            values = {"bt30": 60.0, "bf1_l_min": 7.0, "bt33": 8.0, "bt34": 45.0}
+            coordinator._calculate_tap_water_cap(values)
+
+        # Arithmetic for the "newly calculated" values at full progress:
+        #   hot_fraction = (45-8)/(60-8) = 37/52 ≈ 0.7115
+        #   hot_per_min  = 7 × 0.7115 ≈ 4.981
+        #   minutes      = (175×0.8 / 4.981) × 0.75 ≈ 21.1 → published_minutes=21
+        #   showers      ≈ 3.51  → published_cap=3.5  (headroom=15°C → factor=1.0)
+        new_cap = 3.5
+        new_minutes = 21
+        last_cap = 2.0
+        last_minutes = 11
+
+        expected_cap = round(last_cap + (new_cap - last_cap) * 0.5, 1)  # 2.8
+        expected_minutes = round(last_minutes + (new_minutes - last_minutes) * 0.5)  # 16
+
+        assert values["tap_water_cap"] == pytest.approx(expected_cap, abs=0.05)
+        assert values["tap_water_minutes"] == expected_minutes
+        # Output must lie strictly between the two endpoints.
+        assert last_cap < values["tap_water_cap"] < new_cap
+        assert last_minutes < values["tap_water_minutes"] < new_minutes
+        # _last_published_tap_water_cap must NOT be updated during warmup.
+        assert coordinator._last_published_tap_water_cap == 2.0
+
     def test_first_poll_uses_defaults(self):
         """With no prior shower snapshot, defaults are used: bt30=60, cold=8, flow=7."""
         coordinator = self._make_warmed_up_coordinator()
