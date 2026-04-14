@@ -1774,13 +1774,9 @@ class TestCalculateTapWaterCap:
 
         headroom_c = values["bt30"] - coordinator._last_shower_temp_c
         headroom_factor = headroom_c / DHW_HEADROOM_FULL_CAP_C
-        expected_headroom_c = values["bt30"] - coordinator._last_shower_temp_c
-        expected_headroom_factor = expected_headroom_c / DHW_HEADROOM_FULL_CAP_C
 
-        # Verify the intermediate headroom calculation that should drive the
-        # reduced estimate for a tank only slightly above shower temperature.
-        assert headroom_c == pytest.approx(expected_headroom_c)
-        assert headroom_factor == pytest.approx(expected_headroom_factor)
+        # This setup provides only limited headroom above shower temperature,
+        # so the calculated capacity should be significantly reduced.
         assert 0.0 < headroom_factor < 1.0
 
         # With only slight headroom above shower temp, estimate should be
