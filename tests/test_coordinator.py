@@ -1387,6 +1387,95 @@ class TestCalculateTapWaterCap:
         # _last_published_tap_water_cap must NOT be updated during warmup.
         assert coordinator._last_published_tap_water_cap == 2.0
 
+    def test_no_flow_always_commits_ema_regardless_of_prior(self):
+        """Without active flow the EMA is always committed, even when the prior is inflated.
+
+        This verifies that the no-flow path does NOT freeze the EMA — only the
+        warmup (flow-active) path does.  An inflated _last_tap_water_cap (e.g.
+        left over from a transient) must decay toward the current raw value on
+        every no-flow poll.
+
+        Setup:
+          _last_tap_water_cap = 5.0  (inflated prior)
+          bt30=60°C, cold/flow/shower defaults
+          → raw_showers ≈ 2.27
+          → EMA candidate = 0.2*2.27 + 0.8*5.0 = 4.454  → published ≈ 4.5
+        """
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=timezone.utc)
+
+        coordinator._last_tap_water_cap = 5.0
+        # No shower-specific EMA values → defaults apply for cold/flow/shower_temp.
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            values = {"bt30": 60.0, "bf1_l_min": 0.0}
+            coordinator._calculate_tap_water_cap(values)
+
+        # EMA committed: output must be strictly between raw (≈2.27) and prior (5.0).
+        assert values["tap_water_cap"] < 5.0, (
+            "EMA must decay from the inflated prior on a no-flow poll"
+        )
+        assert values["tap_water_cap"] > 2.0, (
+            "EMA must not jump all the way to the raw value in one step"
+        )
+        assert pytest.approx(4.5, abs=0.1) == values["tap_water_cap"]
+        # State must have advanced.
+        assert coordinator._last_tap_water_cap < 5.0
+        # Warmup window must have been cleared (no flow).
+        assert coordinator._tap_water_cap_start_time is None
+
+    def test_warmup_ramp_converges_toward_ema_candidate_during_flow(self):
+        """During active flow warmup, successive polls ramp toward the EMA candidate.
+
+        The previously-broken path: with _last_tap_water_cap pre-seeded, warmup would
+        set smoothed=_last_tap_water_cap, making published_cap == _last_published_cap
+        and the interpolation a no-op.  Now smoothed is the true EMA candidate so the
+        ramp is meaningful.
+
+        Setup (flow active, warmup progress = 0.5):
+          _last_tap_water_cap           = 5.0
+          _last_published_tap_water_cap = 5.0
+          _last_published_tap_water_minutes = 30
+          bt30=60°C, cold=10°C (in buffer), flow=7 L/min (in buffer), shower_temp=38°C
+          → raw_showers ≈ (175/7)*ln(50/28)/6 ≈ 2.82
+          → EMA candidate = 0.2*2.82 + 0.8*5.0 = 4.564  → published_cap = 4.6
+          → warmup output = round(5.0 + (4.6 - 5.0) * 0.5, 1) = round(4.8, 1) = 4.8
+        Old broken output would have been 5.0 (no-op ramp).
+        """
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=timezone.utc)
+
+        coordinator._last_tap_water_cap = 5.0
+        coordinator._last_published_tap_water_cap = 5.0
+        coordinator._last_published_tap_water_minutes = 30
+        # Seed a single rolling-buffer entry so calc_flow/cold are predictable.
+        coordinator._flow_rolling_buffer = [(t0.timestamp(), 7.0, 10.0)]
+        coordinator._tap_water_cap_start_time = t0 - timedelta(seconds=30)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            values = {"bt30": 60.0, "bf1_l_min": 7.0, "bt33": 10.0}
+            coordinator._calculate_tap_water_cap(values)
+
+        # Arithmetic (log model):
+        #   minutes = (175/7) * ln((60-10)/(38-10)) = 25 * ln(50/28) ≈ 14.49
+        #   raw_showers = 14.49 / 6 ≈ 2.42
+        #   EMA candidate = 0.2*2.42 + 0.8*5.0 = 4.484  → published_cap = round(4.484,1) = 4.5
+        #   published_minutes = round(4.5 * 6) = 27
+        #   warmup output cap = round(5.0 + (4.5 - 5.0) * 0.5, 1) = round(4.75, 1) = 4.8
+        #   warmup output minutes = round(30 + (27 - 30) * 0.5) = round(28.5) = 28
+        # Old (broken) output: smoothed = _last_tap_water_cap = 5.0
+        #   → published_cap = 5.0 → interp: 5.0 + (5.0-5.0)*0.5 = 5.0  (no-op)
+        assert values["tap_water_cap"] == pytest.approx(4.8, abs=0.05), (
+            "Warmup ramp must interpolate toward the EMA candidate, not the frozen prior"
+        )
+        assert values["tap_water_minutes"] == 28
+        # EMA state must NOT advance during warmup.
+        assert coordinator._last_tap_water_cap == 5.0
+        # Published state must NOT be updated during warmup.
+        assert coordinator._last_published_tap_water_cap == 5.0
+
     def test_first_poll_uses_defaults(self):
         """With no prior shower snapshot, defaults are used: bt30=60, cold=8, flow=7."""
         coordinator = self._make_warmed_up_coordinator()

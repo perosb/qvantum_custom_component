@@ -450,20 +450,13 @@ class QvantumCalculationsMixin:
         if dhw_reheating:
             minutes = max(minutes, DHW_SHOWER_DURATION_MIN)
         raw_showers = minutes / calc_shower_duration
-        if self._last_tap_water_cap is not None:
-            smoothed = (
-                DHW_EMA_ALPHA * raw_showers
-                + (1 - DHW_EMA_ALPHA) * self._last_tap_water_cap
-            )
-        else:
-            smoothed = raw_showers
-        self._last_tap_water_cap = smoothed
-        smoothed_minutes = smoothed * calc_shower_duration
 
-        # When flow is active, use a 60 s warmup window so the EMA can stabilise
-        # on real inlet conditions. During warmup, if a value was previously
-        # published, linearly ramp from the previous published value toward the
-        # newly calculated value instead of hard-switching between them.
+        # Determine warmup state BEFORE applying EMA so that transient raw values
+        # during the initial 60 s flow-onset window (cold pipe flush, inlet temp
+        # spike, etc.) never contaminate the running average.  If the EMA were
+        # updated during warmup, an inflated raw value (e.g. raw=11.91) would
+        # bias _last_tap_water_cap upward and cause the published estimate to
+        # drift downward for many polls after warmup ends.
         is_warmup = False
         warmup_progress = 1.0
         if flow_is_active:
@@ -476,6 +469,27 @@ class QvantumCalculationsMixin:
         else:
             # Reset the window so the next flow onset triggers a fresh 60 s hold.
             self._tap_water_cap_start_time = None
+
+        # Compute the EMA candidate without mutating state yet.  Using the same
+        # formula in both warmup and post-warmup ensures the interpolation target
+        # during warmup is the value the EMA *would* converge to, so the ramp
+        # is meaningful rather than a no-op against the frozen baseline.
+        if self._last_tap_water_cap is not None:
+            smoothed = (
+                DHW_EMA_ALPHA * raw_showers
+                + (1 - DHW_EMA_ALPHA) * self._last_tap_water_cap
+            )
+        else:
+            smoothed = raw_showers
+
+        # Advance the EMA state only outside the warmup window so transient
+        # values (cold pipe flush, inlet temp spike) never contaminate the
+        # running average.  The first post-warmup poll blends cleanly from the
+        # same frozen baseline, producing an identical smoothed value and a
+        # seamless transition out of warmup.
+        if not is_warmup:
+            self._last_tap_water_cap = smoothed
+        smoothed_minutes = smoothed * calc_shower_duration
 
         published_cap = round(smoothed, 1)
         published_minutes = round(smoothed_minutes)
