@@ -413,13 +413,28 @@ class QvantumCalculationsMixin:
             )
             return
 
+        log_ratio = (effective_hot_temp - calc_cold) / (
+            calc_shower_temp - calc_cold
+        )
+        if effective_hot_temp <= calc_shower_temp or log_ratio <= 1.0:
+            values["tap_water_cap"] = 0.0
+            values["tap_water_minutes"] = 0
+            self._tap_water_cap_zero_mode = True
+            _LOGGER.debug(
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=log_ratio_not_gt_one, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, ratio=%.3f)",
+                effective_hot_temp,
+                calc_cold,
+                calc_flow,
+                calc_shower_temp,
+                log_ratio,
+            )
+            return
+
         # Integrated perfect-mixing tank model: time until outlet temperature
         # drops from effective_hot_temp to calc_shower_temp under continuous
-        # flow of calc_flow. All guards above guarantee both log arguments > 0
-        # and the argument > 1 so the result is positive.
-        minutes = (DHW_TANK_VOLUME_L / calc_flow) * math.log(
-            (effective_hot_temp - calc_cold) / (calc_shower_temp - calc_cold)
-        )
+        # flow of calc_flow. Guards above ensure the log arguments are valid
+        # and the ratio is strictly greater than 1, so the result is positive.
+        minutes = (DHW_TANK_VOLUME_L / calc_flow) * math.log(log_ratio)
 
         # When the compressor is in DHW mode or electric heaters are active the
         # tank is being replenished faster than cold dilution can drain it.  The
