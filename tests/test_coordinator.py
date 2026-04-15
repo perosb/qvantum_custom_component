@@ -1343,8 +1343,8 @@ class TestCalculateTapWaterCap:
         Setup:
           last_published_cap = 2.0 showers, last_published_minutes = 11
           bt30=60°C, cold=8°C, flow=7 L/min, shower_temp=45°C (via EMA)
-          → new computed: published_cap=3.5, published_minutes=21
-          warmup_progress=0.5 → expected output: 2.8 showers, 16 min
+          → new computed: published_cap=1.4, published_minutes=9
+          warmup_progress=0.5 → expected output: 1.7 showers, 10 min
         """
         coordinator = self._make_coordinator()
         t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=timezone.utc)
