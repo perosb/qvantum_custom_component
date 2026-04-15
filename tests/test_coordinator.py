@@ -1733,15 +1733,34 @@ class TestCalculateTapWaterCap:
         assert coordinator._last_shower_temp_c is None  # EMA not updated
 
     def test_outlet_temp_clearly_warm_updates_shower_temp_ema(self):
-        """bt34 strictly above cold + threshold is accepted and the EMA is updated."""
+        """bt34 in the 60–180 s early-stable window updates the EMA once at shower end."""
         coordinator = self._make_coordinator()
         cold = 10.0
-        # Just above the boundary
         outlet_warm = cold + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C + 0.1
-        coordinator._calculate_tap_water_cap(
-            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": cold, "bt34": outlet_warm}
-        )
-        # EMA should have been seeded from DHW_SHOWER_TEMP_C default toward outlet_warm
+        start = dt_util.utcnow()
+
+        # Poll at t=0: flow starts, warmup begins — EMA must NOT update yet.
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": cold, "bt34": outlet_warm}
+            )
+        assert coordinator._last_shower_temp_c is None
+
+        # Poll at t=90 s: inside the early-stable window (60–180 s) — still no update while flowing.
+        t90 = start + timedelta(seconds=90)
+        with patch("homeassistant.util.dt.utcnow", return_value=t90):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": cold, "bt34": outlet_warm}
+            )
+        assert coordinator._last_shower_temp_c is None  # updated only at shower end
+
+        # Poll at t=120 s: flow stops — shower ends, EMA updated from early-stable samples.
+        t120 = start + timedelta(seconds=120)
+        with patch("homeassistant.util.dt.utcnow", return_value=t120):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 0.0, "bt33": cold}
+            )
+
         from custom_components.qvantum.const import DHW_EMA_ALPHA, DHW_SHOWER_TEMP_C
 
         expected = DHW_EMA_ALPHA * outlet_warm + (1 - DHW_EMA_ALPHA) * DHW_SHOWER_TEMP_C

@@ -246,6 +246,7 @@ DHW_ROLLING_BUFFER_WINDOW_SEC = (
 )
 DHW_MIN_SHOWER_DURATION_MIN = 1.0  # Minimum event duration to count as a shower
 DHW_SHOWER_DURATION_MIN = 6.0  # Duration of one shower in minutes
+DHW_SHOWER_TEMP_STABLE_WINDOW_SEC = 180
 DHW_MAX_SHOWER_HISTORY_SIZE = (
     10  # Maximum number of completed shower events retained in history
 )

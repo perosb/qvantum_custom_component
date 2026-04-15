@@ -20,6 +20,7 @@ from .const import (
     DHW_MAX_SHOWER_HISTORY_SIZE,
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_ROLLING_BUFFER_WINDOW_SEC,
+    DHW_SHOWER_TEMP_STABLE_WINDOW_SEC,
     DHW_SHOWER_DURATION_MIN,
     DHW_SHOWER_TEMP_C,
     DHW_TANK_VOLUME_L,
@@ -178,24 +179,13 @@ class QvantumCalculationsMixin:
                 DHW_EMA_ALPHA * flow + (1 - DHW_EMA_ALPHA) * prior_flow
             )
 
-            # Learn shower temperature from outlet sensor bt34.
-            # Only update when the outlet clearly carries warm water (> cold + threshold)
-            # to avoid polluting the EMA with the initial cold pipe-flush phase.
+            # Collect outlet temp for end-of-shower statistics and temperature learning.
+            # The shower temperature EMA is NOT updated here; it is updated once at the
+            # end of flow using the early-stable window (60–180 s post-onset) to avoid
+            # the EMA being driven upward by the rising bt34 readings that occur during
+            # a long shower as the thermostatic valve opens wider to compensate for
+            # tank depletion.
             outlet_temp = values.get("bt34")
-            cold_for_guard = cold if cold is not None else DHW_DEFAULT_COLD_TEMP_C
-            if (
-                outlet_temp is not None
-                and outlet_temp > cold_for_guard + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
-            ):
-                prior_shower_temp = (
-                    self._last_shower_temp_c
-                    if self._last_shower_temp_c is not None
-                    else DHW_SHOWER_TEMP_C
-                )
-                self._last_shower_temp_c = (
-                    DHW_EMA_ALPHA * outlet_temp
-                    + (1 - DHW_EMA_ALPHA) * prior_shower_temp
-                )
 
             # Phase 2: accumulate per-event samples for end-of-shower statistics.
             self._shower_event_samples.append((ts, flow, cold, outlet_temp))
@@ -271,6 +261,56 @@ class QvantumCalculationsMixin:
                             avg_outlet_temp if avg_outlet_temp is not None else 0.0,
                             water_used_l,
                         )
+
+                        # Update shower temperature EMA once per shower using the
+                        # early-stable window (60–180 s after onset): past warmup
+                        # transients, before tank-depletion drives bt34 upward.
+                        shower_start_ts = self._shower_start_time.timestamp()
+                        stable_outlet_samples = [
+                            s[3]
+                            for s in self._shower_event_samples
+                            if s[3] is not None
+                            and 60
+                            <= (s[0] - shower_start_ts)
+                            <= DHW_SHOWER_TEMP_STABLE_WINDOW_SEC
+                            and s[3]
+                            > (s[2] if s[2] is not None else DHW_DEFAULT_COLD_TEMP_C)
+                            + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
+                        ]
+                        if not stable_outlet_samples:
+                            # Fallback: all post-warmup samples if the window was empty.
+                            stable_outlet_samples = [
+                                s[3]
+                                for s in self._shower_event_samples
+                                if s[3] is not None
+                                and (s[0] - shower_start_ts) >= 60
+                                and s[3]
+                                > (
+                                    s[2]
+                                    if s[2] is not None
+                                    else DHW_DEFAULT_COLD_TEMP_C
+                                )
+                                + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
+                            ]
+                        if stable_outlet_samples:
+                            stable_outlet_temp = sum(stable_outlet_samples) / len(
+                                stable_outlet_samples
+                            )
+                            prior_shower_temp = (
+                                self._last_shower_temp_c
+                                if self._last_shower_temp_c is not None
+                                else DHW_SHOWER_TEMP_C
+                            )
+                            self._last_shower_temp_c = (
+                                DHW_EMA_ALPHA * stable_outlet_temp
+                                + (1 - DHW_EMA_ALPHA) * prior_shower_temp
+                            )
+                            _LOGGER.debug(
+                                "Learned shower_temp from %d early-stable samples: avg=%.1f°C → EMA=%.1f°C",
+                                len(stable_outlet_samples),
+                                stable_outlet_temp,
+                                self._last_shower_temp_c,
+                            )
                 self._shower_start_time = None
             self._flow_rolling_buffer.clear()
             self._shower_event_samples.clear()
@@ -337,6 +377,15 @@ class QvantumCalculationsMixin:
         # pipes warm up and would cause capacity to appear to increase.
         effective_hot_temp = tank_temp
 
+        # Compute reheating state early so it can be included in all log messages,
+        # including those emitted from the zero_mode early-return path.
+        dhw_reheating = (
+            values.get("compressor_state") == DHW_COMPRESSOR_STATE_HOT_WATER
+            or values.get("picpin_relay_heat_l1")
+            or values.get("picpin_relay_heat_l2")
+            or values.get("picpin_relay_heat_l3")
+        )
+
         cold_ge_shower_temp = calc_cold >= calc_shower_temp
 
         # Hysteresis around the hot-vs-shower threshold prevents rapid
@@ -372,7 +421,7 @@ class QvantumCalculationsMixin:
             self._last_published_tap_water_cap = 0.0
             self._last_published_tap_water_minutes = 0
             _LOGGER.debug(
-                "Calculated tap_water_cap=0.00 showers (0 min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, hysteresis=%.1f°C, zero_mode=true)",
+                "Calculated tap_water_cap=0.00 showers (0 min, reason=%s, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, shower_dur=%.1f min, hysteresis=%.1f°C, zero_mode=true, reheating=%s)",
                 reason,
                 effective_hot_temp,
                 calc_cold,
@@ -380,6 +429,7 @@ class QvantumCalculationsMixin:
                 calc_shower_temp,
                 calc_shower_duration,
                 DHW_CAP_HYSTERESIS_C,
+                dhw_reheating,
             )
             return
 
@@ -441,12 +491,6 @@ class QvantumCalculationsMixin:
         # log model returns a small (or even incorrect) estimate in this case,
         # so floor the raw minutes at one full shower duration to indicate the
         # shower can continue sustained.
-        dhw_reheating = (
-            values.get("compressor_state") == DHW_COMPRESSOR_STATE_HOT_WATER
-            or values.get("picpin_relay_heat_l1")
-            or values.get("picpin_relay_heat_l2")
-            or values.get("picpin_relay_heat_l3")
-        )
         if dhw_reheating:
             minutes = max(minutes, DHW_SHOWER_DURATION_MIN)
         raw_showers = minutes / calc_shower_duration
