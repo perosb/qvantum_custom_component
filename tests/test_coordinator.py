@@ -1333,6 +1333,112 @@ class TestCalculateTapWaterCap:
         coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert coordinator._tap_water_cap_start_time is None
 
+    def test_dishwashing_pulses_keep_warmup_and_do_not_learn_flow_ema(self):
+        """Short on/off tap bursts (e.g. dish-washing) are one session within the gap.
+
+        Verifies three outcomes:
+        - warmup start time is preserved across within-gap pauses (no restart)
+        - shower flow EMA is not learned mid-session
+        - published cap remains stable across the pulse sequence
+        """
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 16, 17, 0, 0, tzinfo=timezone.utc)
+
+        # Establish a published baseline used by warmup interpolation.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 - timedelta(seconds=5)
+            baseline = {"bt30": 72.0, "bf1_l_min": 0.0}
+            coordinator._calculate_tap_water_cap(baseline)
+
+        pulse_caps = []
+
+        # Pulse 1 start (warmup progress = 0.0)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            values_1 = {"bt30": 72.0, "bf1_l_min": 3.8, "bt33": 15.5}
+            coordinator._calculate_tap_water_cap(values_1)
+            pulse_caps.append(values_1["tap_water_cap"])
+
+        assert coordinator._tap_water_cap_start_time == t0
+        assert coordinator._last_shower_flow_lpm is None
+
+        # Short pause (within session gap) should keep warmup timer.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 + timedelta(seconds=15)
+            coordinator._calculate_tap_water_cap({"bt30": 72.0, "bf1_l_min": 0.0})
+
+        assert coordinator._tap_water_cap_start_time == t0
+
+        # Pulse 2 resume after 30 s total elapsed: warmup continues (not restarted).
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 + timedelta(seconds=30)
+            values_2 = {"bt30": 72.0, "bf1_l_min": 3.8, "bt33": 16.1}
+            coordinator._calculate_tap_water_cap(values_2)
+            pulse_caps.append(values_2["tap_water_cap"])
+
+        assert coordinator._tap_water_cap_start_time == t0
+        assert coordinator._last_shower_flow_lpm is None
+        # Continuity guard: warmup start stayed at t0, not the resume instant.
+        assert coordinator._tap_water_cap_start_time != t0 + timedelta(seconds=30)
+
+        # Another short pause/resume still within gap.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 + timedelta(seconds=45)
+            coordinator._calculate_tap_water_cap({"bt30": 72.0, "bf1_l_min": 0.0})
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 + timedelta(seconds=55)
+            values_3 = {"bt30": 71.7, "bf1_l_min": 3.8, "bt33": 16.1}
+            coordinator._calculate_tap_water_cap(values_3)
+            pulse_caps.append(values_3["tap_water_cap"])
+
+        assert coordinator._tap_water_cap_start_time == t0
+        assert coordinator._last_shower_flow_lpm is None
+
+        # Stability guard: the pulse sequence should stay smooth (no large swings).
+        assert max(pulse_caps) - min(pulse_caps) <= 0.2
+
+    def test_warmup_restarts_after_gap_expiry_then_flow_resumes(self):
+        """If a pause exceeds the session gap, resumed flow starts a new warmup window."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 16, 18, 0, 0, tzinfo=timezone.utc)
+
+        # Baseline publish before any flow.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 - timedelta(seconds=5)
+            coordinator._calculate_tap_water_cap({"bt30": 72.0, "bf1_l_min": 0.0})
+
+        # Initial flow onset creates warmup start at t0.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 72.0, "bf1_l_min": 3.8, "bt33": 15.5}
+            )
+        assert coordinator._tap_water_cap_start_time == t0
+
+        # Flow stops and remains off past the session gap.
+        t_pause = t0 + timedelta(seconds=1)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_pause
+            coordinator._calculate_tap_water_cap({"bt30": 72.0, "bf1_l_min": 0.0})
+
+        t_after_gap = t_pause + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_after_gap
+            coordinator._calculate_tap_water_cap({"bt30": 72.0, "bf1_l_min": 0.0})
+
+        # Session finalised -> warmup cleared.
+        assert coordinator._tap_water_cap_start_time is None
+
+        # Flow resumes after finalization -> new warmup start at resume time.
+        t_resume = t_after_gap + timedelta(seconds=5)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_resume
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 72.0, "bf1_l_min": 3.8, "bt33": 15.8}
+            )
+
+        assert coordinator._tap_water_cap_start_time == t_resume
+
     def test_warmup_fallback_minutes_use_current_duration(self):
         """If published minutes are missing, fallback uses current learned duration."""
         coordinator = self._make_coordinator()
