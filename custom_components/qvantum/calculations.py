@@ -394,13 +394,13 @@ class QvantumCalculationsMixin:
         if in_zero_mode:
             should_force_zero = (
                 effective_hot_temp < calc_shower_temp + DHW_CAP_HYSTERESIS_C
-                or cold_ge_shower_temp
-            )
+                and not dhw_reheating
+            ) or cold_ge_shower_temp
         else:
             should_force_zero = (
                 effective_hot_temp <= calc_shower_temp - DHW_CAP_HYSTERESIS_C
-                or cold_ge_shower_temp
-            )
+                and not dhw_reheating
+            ) or cold_ge_shower_temp
 
         if should_force_zero:
             if not in_zero_mode:
@@ -467,32 +467,36 @@ class QvantumCalculationsMixin:
             calc_shower_temp - calc_cold
         )
         if effective_hot_temp <= calc_shower_temp or log_ratio <= 1.0:
-            values["tap_water_cap"] = 0.0
-            values["tap_water_minutes"] = 0
-            self._tap_water_cap_zero_mode = True
-            _LOGGER.debug(
-                "Calculated tap_water_cap=0.00 showers (0 min, reason=log_ratio_not_gt_one, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, ratio=%.3f)",
-                effective_hot_temp,
-                calc_cold,
-                calc_flow,
-                calc_shower_temp,
-                log_ratio,
-            )
-            return
-
-        # Integrated perfect-mixing tank model: time until outlet temperature
-        # drops from effective_hot_temp to calc_shower_temp under continuous
-        # flow of calc_flow. Guards above ensure the log arguments are valid
-        # and the ratio is strictly greater than 1, so the result is positive.
-        minutes = (DHW_TANK_VOLUME_L / calc_flow) * math.log(log_ratio)
+            if not dhw_reheating:
+                values["tap_water_cap"] = 0.0
+                values["tap_water_minutes"] = 0
+                self._tap_water_cap_zero_mode = True
+                _LOGGER.debug(
+                    "Calculated tap_water_cap=0.00 showers (0 min, reason=log_ratio_not_gt_one, tank=%.1f°C, cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, ratio=%.3f)",
+                    effective_hot_temp,
+                    calc_cold,
+                    calc_flow,
+                    calc_shower_temp,
+                    log_ratio,
+                )
+                return
+            # Reheating: tank temporarily depleted to/below shower temp.
+            # Bypass the log model and apply the floor directly.
+            minutes = calc_shower_duration
+        else:
+            # Integrated perfect-mixing tank model: time until outlet temperature
+            # drops from effective_hot_temp to calc_shower_temp under continuous
+            # flow of calc_flow. Guards above ensure the log arguments are valid
+            # and the ratio is strictly greater than 1, so the result is positive.
+            minutes = (DHW_TANK_VOLUME_L / calc_flow) * math.log(log_ratio)
 
         # When the compressor is in DHW mode or electric heaters are active the
         # tank is being replenished faster than cold dilution can drain it.  The
         # log model returns a small (or even incorrect) estimate in this case,
-        # so floor the raw minutes at one full shower duration to indicate the
-        # shower can continue sustained.
+        # so floor the raw minutes at one full shower duration to guarantee at
+        # least 1.0 shower is reported while reheating is active.
         if dhw_reheating:
-            minutes = max(minutes, DHW_SHOWER_DURATION_MIN)
+            minutes = max(minutes, calc_shower_duration)
         raw_showers = minutes / calc_shower_duration
 
         # Determine warmup state BEFORE applying EMA so that transient raw values

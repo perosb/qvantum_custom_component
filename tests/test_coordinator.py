@@ -1955,7 +1955,8 @@ class TestCalculateTapWaterCap:
     # ------------------------------------------------------------------
 
     def test_reheat_floor_compressor_state(self):
-        """When compressor_state==8 (DHW mode), minutes is floored at one shower duration."""
+        """When compressor_state==8 (DHW mode), minutes is floored at the learned shower duration,
+        guaranteeing at least 1.0 shower is reported."""
         coordinator = self._make_warmed_up_coordinator()
         # Tank almost depleted: log model would return <<1 min without floor.
         coordinator._last_shower_temp_c = 47.2
@@ -1971,10 +1972,12 @@ class TestCalculateTapWaterCap:
         }
         coordinator._calculate_tap_water_cap(values)
 
-        assert values["tap_water_minutes"] >= round(DHW_SHOWER_DURATION_MIN)
+        # Floor is calc_shower_duration (5.4 min learned), so minutes >= 5.4 → ≥1 shower.
+        assert values["tap_water_minutes"] >= round(5.4)
+        assert values["tap_water_cap"] >= 1.0
 
     def test_reheat_floor_relay_l1(self):
-        """When picpin_relay_heat_l1 is active, minutes is floored at one shower duration."""
+        """When picpin_relay_heat_l1 is active, minutes is floored at the learned shower duration."""
         coordinator = self._make_warmed_up_coordinator()
         coordinator._last_shower_temp_c = 47.2
         coordinator._last_shower_cold_temp = 9.4
@@ -1989,7 +1992,8 @@ class TestCalculateTapWaterCap:
         }
         coordinator._calculate_tap_water_cap(values)
 
-        assert values["tap_water_minutes"] >= round(DHW_SHOWER_DURATION_MIN)
+        assert values["tap_water_minutes"] >= round(5.4)
+        assert values["tap_water_cap"] >= 1.0
 
     def test_no_reheat_floor_without_signals(self):
         """Without reheating signals, log model returns its raw (low) estimate."""
@@ -2011,5 +2015,5 @@ class TestCalculateTapWaterCap:
         coordinator._calculate_tap_water_cap(values)
 
         # Without reheating, tank at 49°C vs shower at 47.2°C gives ≈ 1 min raw.
-        # EMA is None so raw is used directly; result must be below the floor.
-        assert values["tap_water_minutes"] < round(DHW_SHOWER_DURATION_MIN)
+        # EMA is None so raw is used directly; result must be below the learned duration floor.
+        assert values["tap_water_minutes"] < round(5.4)
