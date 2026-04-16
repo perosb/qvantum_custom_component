@@ -216,13 +216,18 @@ class QvantumCalculationsMixin:
                 self._shower_event_history.append(event)
                 if len(self._shower_event_history) > DHW_MAX_SHOWER_HISTORY_SIZE:
                     self._shower_event_history.pop(0)
+                avg_outlet_display = (
+                    f"{avg_outlet_temp:.1f}°C"
+                    if avg_outlet_temp is not None
+                    else "unknown"
+                )
                 _LOGGER.info(
                     "Shower event: duration=%.1f min, avg_flow=%.2f L/min, "
-                    "avg_cold=%.1f°C, avg_outlet=%.1f°C, water_used=%.1f L",
+                    "avg_cold=%.1f°C, avg_outlet=%s, water_used=%.1f L",
                     duration_min,
                     avg_flow,
                     avg_cold,
-                    avg_outlet_temp if avg_outlet_temp is not None else 0.0,
+                    avg_outlet_display,
                     water_used_l,
                 )
 
