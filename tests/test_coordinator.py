@@ -2200,8 +2200,8 @@ class TestCalculateTapWaterCap:
         }
         coordinator._calculate_tap_water_cap(values)
 
-        # Floor is calc_shower_duration (5.4 min learned), so minutes >= 5.4 → ≥1 shower.
-        assert values["tap_water_minutes"] >= round(5.4)
+        # Floor is calc_shower_duration (learned), so minutes >= learned duration → ≥1 shower.
+        assert values["tap_water_minutes"] >= round(coordinator._last_shower_duration_min)
         assert values["tap_water_cap"] >= 1.0
 
     def test_reheat_floor_relay_l1(self):
@@ -2220,7 +2220,7 @@ class TestCalculateTapWaterCap:
         }
         coordinator._calculate_tap_water_cap(values)
 
-        assert values["tap_water_minutes"] >= round(5.4)
+        assert values["tap_water_minutes"] >= round(coordinator._last_shower_duration_min)
         assert values["tap_water_cap"] >= 1.0
 
     def test_no_reheat_floor_without_signals(self):
@@ -2244,4 +2244,4 @@ class TestCalculateTapWaterCap:
 
         # Without reheating, tank at 49°C vs shower at 47.2°C gives ≈ 1 min raw.
         # EMA is None so raw is used directly; result must be below the learned duration floor.
-        assert values["tap_water_minutes"] < round(5.4)
+        assert values["tap_water_minutes"] < round(coordinator._last_shower_duration_min)
