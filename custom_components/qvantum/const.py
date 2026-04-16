@@ -249,7 +249,11 @@ DHW_SHOWER_DURATION_MIN = 6.0  # Duration of one shower in minutes
 DHW_SESSION_GAP_SEC = (
     300.0  # Max pause between flow bursts to still treat as one shower session (5 min)
 )
-DHW_SHOWER_TEMP_STABLE_WINDOW_SEC = 180
+DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC = (
+    180  # Maximum seconds since shower onset for the temperature-stability check (s)
+)
+# Backward-compatible alias for existing references; prefer DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC.
+DHW_SHOWER_TEMP_STABLE_WINDOW_SEC = DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC
 DHW_MAX_SHOWER_HISTORY_SIZE = (
     10  # Maximum number of completed shower events retained in history
 )
