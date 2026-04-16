@@ -195,15 +195,6 @@ class QvantumCalculationsMixin:
                 self._last_shower_cold_temp = (
                     DHW_EMA_ALPHA * cold + (1 - DHW_EMA_ALPHA) * prior_cold
                 )
-            prior_flow = (
-                self._last_shower_flow_lpm
-                if self._last_shower_flow_lpm is not None
-                else DHW_DEFAULT_FLOW_LPM
-            )
-            self._last_shower_flow_lpm = (
-                DHW_EMA_ALPHA * flow + (1 - DHW_EMA_ALPHA) * prior_flow
-            )
-
             # Collect outlet temp for end-of-shower statistics and temperature learning.
             # The shower temperature EMA is NOT updated here; it is updated once at the
             # end of flow using the early-stable window (60–180 s post-onset) to avoid
@@ -257,7 +248,7 @@ class QvantumCalculationsMixin:
                             )
 
                         # Phase 2: record completed shower event to history and update
-                        # shower temp EMA. Skip when reheating is active.
+                        # shower temp and flow EMAs. Skip when reheating is active.
                         if not dhw_reheating and self._shower_event_samples:
                             avg_flow = sum(
                                 s[1] for s in self._shower_event_samples
@@ -283,6 +274,24 @@ class QvantumCalculationsMixin:
                                 else None
                             )
                             water_used_l = avg_flow * duration_min
+                            # Update the shower flow EMA once per completed session
+                            # (same pattern as shower duration EMA) so that unrelated
+                            # tap events (e.g. dishes at low flow) cannot corrupt it
+                            # during an in-progress flow poll.
+                            prior_flow = (
+                                self._last_shower_flow_lpm
+                                if self._last_shower_flow_lpm is not None
+                                else DHW_DEFAULT_FLOW_LPM
+                            )
+                            self._last_shower_flow_lpm = (
+                                DHW_EMA_ALPHA * avg_flow
+                                + (1 - DHW_EMA_ALPHA) * prior_flow
+                            )
+                            _LOGGER.debug(
+                                "Shower ended: avg_flow=%.2f L/min; EMA shower flow → %.2f L/min",
+                                avg_flow,
+                                self._last_shower_flow_lpm,
+                            )
                             event = {
                                 "start": self._shower_start_time.isoformat(),
                                 "end": self._shower_pause_time.isoformat(),
@@ -377,16 +386,24 @@ class QvantumCalculationsMixin:
                 self._flow_rolling_buffer.clear()
                 self._shower_event_samples.clear()
 
-        # Resolve values for the capacity calculation:
-        # - During active flow: use raw current readings so the estimate reflects
-        #   real-time conditions without EMA lag from the default-seeded snapshot.
-        # - No active flow: fall back to EMA snapshot (or defaults if never seen).
+        # Resolve values for the capacity calculation.
+        # calc_flow always uses the EMA-learned shower flow rate rather than the
+        # current tap flow: the question is "how many showers at typical shower
+        # conditions", so an unrelated flow event (e.g. washing dishes at
+        # 4 L/min) must not inflate the estimate by lowering the assumed flow.
+        # calc_cold uses the rolling buffer mean during active flow to react to
+        # real-time cold-water conditions; otherwise falls back to the EMA snapshot.
+        calc_flow = (
+            self._last_shower_flow_lpm
+            if self._last_shower_flow_lpm is not None
+            else DHW_DEFAULT_FLOW_LPM
+        )
+        calc_shower_temp = (
+            self._last_shower_temp_c
+            if self._last_shower_temp_c is not None
+            else DHW_SHOWER_TEMP_C
+        )
         if flow_is_active:
-            # Phase 1: use 60-second rolling buffer means for flow and cold so
-            # brief transients do not distort the capacity estimate.
-            calc_flow = sum(s[1] for s in self._flow_rolling_buffer) / len(
-                self._flow_rolling_buffer
-            )
             cold_buf = [s[2] for s in self._flow_rolling_buffer if s[2] is not None]
             calc_cold = (
                 sum(cold_buf) / len(cold_buf)
@@ -397,30 +414,11 @@ class QvantumCalculationsMixin:
                     else DHW_DEFAULT_COLD_TEMP_C
                 )
             )
-            # During flow, calculate against the learned EMA shower temperature
-            # rather than the instantaneous outlet reading to avoid abrupt
-            # estimate swings from short-lived bt34 spikes.
-            calc_shower_temp = (
-                self._last_shower_temp_c
-                if self._last_shower_temp_c is not None
-                else DHW_SHOWER_TEMP_C
-            )
         else:
             calc_cold = (
                 self._last_shower_cold_temp
                 if self._last_shower_cold_temp is not None
                 else DHW_DEFAULT_COLD_TEMP_C
-            )
-            calc_flow = (
-                self._last_shower_flow_lpm
-                if self._last_shower_flow_lpm is not None
-                else DHW_DEFAULT_FLOW_LPM
-            )
-            # After flow use the EMA snapshot (learned preferred shower temperature).
-            calc_shower_temp = (
-                self._last_shower_temp_c
-                if self._last_shower_temp_c is not None
-                else DHW_SHOWER_TEMP_C
             )
 
         # Use the EMA-learned shower duration when available.
