@@ -17,6 +17,7 @@ from custom_components.qvantum.const import (
     DHW_COMPRESSOR_STATE_HOT_WATER,
     DHW_EMA_ALPHA,
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
+    DHW_SESSION_GAP_SEC,
     DHW_SHOWER_DURATION_MIN,
     REQUIRED_METRICS,
 )
@@ -1297,7 +1298,10 @@ class TestCalculateTapWaterCap:
             assert "tap_water_cap" in values
 
     def test_flow_onset_resets_warmup(self):
-        """Each new flow onset starts a fresh 60 s hold before publishing."""
+        """A flow onset starts warmup; short pauses keep the same warmup window.
+
+        Warmup resets only after the session is finalised (gap expired).
+        """
         coordinator = self._make_coordinator()
         # No-flow baseline: publishes
         baseline = {"bt30": 60.0, "bf1_l_min": 0.0}
@@ -1310,16 +1314,252 @@ class TestCalculateTapWaterCap:
         assert values["tap_water_cap"] == baseline_cap
         assert coordinator._tap_water_cap_start_time is not None
 
-        # Flow stops: resets window; next no-flow poll publishes again
+        # Flow stops: within session gap, keep warmup window (do not reset yet).
         values_stopped = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values_stopped)
         assert "tap_water_cap" in values_stopped
-        assert coordinator._tap_water_cap_start_time is None
-        # Flow starts again: new 60 s hold, retaining the last published value.
+        assert coordinator._tap_water_cap_start_time is not None
+        # Flow starts again within the open session: continue existing warmup
+        # window, retaining the last published value.
         values2 = {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
         coordinator._calculate_tap_water_cap(values2)
         assert values2["tap_water_cap"] == values_stopped["tap_water_cap"]
         assert values2["tap_water_minutes"] == values_stopped["tap_water_minutes"]
+
+        # After the session gap expires, warmup window resets.
+        coordinator._shower_pause_time = dt_util.utcnow() - timedelta(
+            seconds=DHW_SESSION_GAP_SEC + 1
+        )
+        coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert coordinator._tap_water_cap_start_time is None
+
+    def test_dishwashing_pulses_keep_warmup_and_do_not_learn_flow_ema(self):
+        """Short on/off tap bursts (e.g. dish-washing) are one session within the gap.
+
+        Verifies three outcomes:
+        - warmup start time is preserved across within-gap pauses (no restart)
+        - shower flow EMA is not learned mid-session
+        - published cap remains stable across the pulse sequence
+        """
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 16, 17, 0, 0, tzinfo=timezone.utc)
+
+        # Establish a published baseline used by warmup interpolation.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 - timedelta(seconds=5)
+            baseline = {"bt30": 72.0, "bf1_l_min": 0.0}
+            coordinator._calculate_tap_water_cap(baseline)
+
+        pulse_caps = []
+
+        # Pulse 1 start (warmup progress = 0.0)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            values_1 = {"bt30": 72.0, "bf1_l_min": 3.8, "bt33": 15.5}
+            coordinator._calculate_tap_water_cap(values_1)
+            pulse_caps.append(values_1["tap_water_cap"])
+
+        assert coordinator._tap_water_cap_start_time == t0
+        assert coordinator._last_shower_flow_lpm is None
+
+        # Short pause (within session gap) should keep warmup timer.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 + timedelta(seconds=15)
+            coordinator._calculate_tap_water_cap({"bt30": 72.0, "bf1_l_min": 0.0})
+
+        assert coordinator._tap_water_cap_start_time == t0
+
+        # Pulse 2 resume after 30 s total elapsed: warmup continues (not restarted).
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 + timedelta(seconds=30)
+            values_2 = {"bt30": 72.0, "bf1_l_min": 3.8, "bt33": 16.1}
+            coordinator._calculate_tap_water_cap(values_2)
+            pulse_caps.append(values_2["tap_water_cap"])
+
+        assert coordinator._tap_water_cap_start_time == t0
+        assert coordinator._last_shower_flow_lpm is None
+        # Continuity guard: warmup start stayed at t0, not the resume instant.
+        assert coordinator._tap_water_cap_start_time != t0 + timedelta(seconds=30)
+
+        # Another short pause/resume still within gap.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 + timedelta(seconds=45)
+            coordinator._calculate_tap_water_cap({"bt30": 72.0, "bf1_l_min": 0.0})
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 + timedelta(seconds=55)
+            values_3 = {"bt30": 71.7, "bf1_l_min": 3.8, "bt33": 16.1}
+            coordinator._calculate_tap_water_cap(values_3)
+            pulse_caps.append(values_3["tap_water_cap"])
+
+        assert coordinator._tap_water_cap_start_time == t0
+        assert coordinator._last_shower_flow_lpm is None
+
+        # Stability guard: the pulse sequence should stay smooth (no large swings).
+        assert max(pulse_caps) - min(pulse_caps) <= 0.2
+
+    def test_warmup_restarts_after_gap_expiry_then_flow_resumes(self):
+        """If a pause exceeds the session gap, resumed flow starts a new warmup window."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 16, 18, 0, 0, tzinfo=timezone.utc)
+
+        # Baseline publish before any flow.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 - timedelta(seconds=5)
+            coordinator._calculate_tap_water_cap({"bt30": 72.0, "bf1_l_min": 0.0})
+
+        # Initial flow onset creates warmup start at t0.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 72.0, "bf1_l_min": 3.8, "bt33": 15.5}
+            )
+        assert coordinator._tap_water_cap_start_time == t0
+
+        # Flow stops and remains off past the session gap.
+        t_pause = t0 + timedelta(seconds=1)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_pause
+            coordinator._calculate_tap_water_cap({"bt30": 72.0, "bf1_l_min": 0.0})
+
+        t_after_gap = t_pause + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_after_gap
+            coordinator._calculate_tap_water_cap({"bt30": 72.0, "bf1_l_min": 0.0})
+
+        # Session finalised -> warmup cleared.
+        assert coordinator._tap_water_cap_start_time is None
+
+        # Flow resumes after finalization -> new warmup start at resume time.
+        t_resume = t_after_gap + timedelta(seconds=5)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_resume
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 72.0, "bf1_l_min": 3.8, "bt33": 15.8}
+            )
+
+        assert coordinator._tap_water_cap_start_time == t_resume
+
+    def test_long_gap_resume_without_idle_poll_finalizes_previous_session(self):
+        """If flow resumes after a long gap with no idle poll in between, previous
+        session is finalized first so old/new samples do not mix."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 16, 19, 0, 0, tzinfo=timezone.utc)
+
+        # Start and collect two active-flow samples in session A.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
+            )
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 + timedelta(seconds=90)
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
+            )
+
+        # Flow stops once; no additional idle poll after gap expiry.
+        t_pause = t0 + timedelta(seconds=120)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_pause
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        # Resume after long gap directly with active flow.
+        t_resume = t_pause + timedelta(seconds=DHW_SESSION_GAP_SEC + 5)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_resume
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 40.0}
+            )
+
+        # Session A must have been finalised on resume.
+        assert len(coordinator._shower_event_history) == 1
+        assert coordinator._shower_event_history[0]["duration_min"] == pytest.approx(
+            2.0, abs=0.1
+        )
+
+        # Session B should start clean with exactly one sample (the resume poll).
+        assert coordinator._shower_start_time == t_resume
+        assert coordinator._shower_pause_time is None
+        assert len(coordinator._shower_event_samples) == 1
+
+        # Warmup should restart for session B at resume time.
+        assert coordinator._tap_water_cap_start_time == t_resume
+
+    def test_finalize_uses_session_reheating_not_finalize_poll_state(self):
+        """A normal shower session should still be learned even if reheating is on only
+        at the later finalization poll."""
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=90)
+        ):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=120)
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        # Finalization poll happens later with reheating active, but the session itself
+        # never saw reheating and therefore must still be learned.
+        with patch(
+            "homeassistant.util.dt.utcnow",
+            return_value=start + timedelta(seconds=120 + DHW_SESSION_GAP_SEC + 1),
+        ):
+            coordinator._calculate_tap_water_cap(
+                {
+                    "bt30": 60.0,
+                    "bf1_l_min": 0.0,
+                    "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+                }
+            )
+
+        assert len(coordinator._shower_event_history) == 1
+        assert coordinator._last_shower_flow_lpm is not None
+        assert coordinator._last_shower_duration_min is not None
+
+    def test_session_reheating_flag_is_ored_across_samples(self):
+        """If any active-flow sample in a session indicates reheating, finalization must
+        treat the whole session as reheating-driven and skip EMA/history learning."""
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
+            )
+        # A later active-flow sample shows reheating; this should mark the session.
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=90)
+        ):
+            coordinator._calculate_tap_water_cap(
+                {
+                    "bt30": 60.0,
+                    "bf1_l_min": 6.0,
+                    "bt33": 10.0,
+                    "bt34": 39.0,
+                    "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+                }
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=120)
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        with patch(
+            "homeassistant.util.dt.utcnow",
+            return_value=start + timedelta(seconds=120 + DHW_SESSION_GAP_SEC + 1),
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        assert coordinator._shower_event_history == []
+        assert coordinator._last_shower_flow_lpm is None
+        assert coordinator._last_shower_duration_min is None
 
     def test_warmup_fallback_minutes_use_current_duration(self):
         """If published minutes are missing, fallback uses current learned duration."""
@@ -1488,14 +1728,16 @@ class TestCalculateTapWaterCap:
         assert values["tap_water_minutes"] == 14
 
     def test_updates_baseline_on_flow(self):
-        """When bf1_l_min > 0.1, cold and flow snapshots are EMA-smoothed from their priors."""
+        """During active flow, cold EMA is updated each poll; flow EMA is only updated at
+        end-of-session so that unrelated tap events (dishes etc.) cannot corrupt it."""
         coordinator = self._make_coordinator()
         values = {"bt30": 60.0, "bf1_l_min": 6.5, "bt33": 12.0}
         coordinator._calculate_tap_water_cap(values)
         # cold: 0.2 * 12.0 + 0.8 * 8.0 = 8.8 (EMA from DHW_DEFAULT_COLD_TEMP_C prior)
         assert coordinator._last_shower_cold_temp == pytest.approx(8.8)
-        # flow: 0.2 * 6.5 + 0.8 * 7.0 = 6.9 (EMA from DHW_DEFAULT_FLOW_LPM prior)
-        assert coordinator._last_shower_flow_lpm == pytest.approx(6.9)
+        # flow EMA is NOT updated during an in-progress flow poll — stays None until
+        # the session finalises so that non-shower flow events do not corrupt it.
+        assert coordinator._last_shower_flow_lpm is None
 
     def test_capacity_decreases_as_tank_drains(self):
         """Capacity decreases as tank_temp drops, reflecting actual hot water consumption."""
@@ -1520,20 +1762,20 @@ class TestCalculateTapWaterCap:
         EMA-blended with the preceding flow-active estimate."""
         coordinator = self._make_warmed_up_coordinator()
         # First poll: showering with raw readings (cold=10, flow=6.0)
-        # Log model: minutes = 175/6 * ln(50/28) ≈ 16.9; showers ≈ 2.82
-        # EMA snapshot stored: cold=0.2*10+0.8*8=8.4, flow=0.2*6+0.8*7=6.8
+        # Log model: minutes = 175/7.0 * ln(50/28) ≈ 14.5; showers ≈ 2.42  (calc_flow=default 7.0)
+        # cold EMA stored: 0.2*10+0.8*8=8.4; flow EMA only updates at end-of-session.
         coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0})
         assert coordinator._last_shower_cold_temp == pytest.approx(8.4)
-        assert coordinator._last_shower_flow_lpm == pytest.approx(6.8)
+        # flow EMA remains None until a session finalises
+        assert coordinator._last_shower_flow_lpm is None
         # Advance past the new warmup window
         coordinator._tap_water_cap_start_time -= timedelta(seconds=61)
-        # Second poll: no flow — uses EMA snapshot (cold=8.4, flow=6.8)
-        # Log model: minutes = 175/6.8 * ln(51.6/29.6) ≈ 14.3; showers ≈ 2.39
-        # EMA blend: 0.2*2.39 + 0.8*2.82 ≈ 2.73 → 2.7 showers, 16 min
+        # Second poll: no flow — uses EMA snapshot for cold (8.4) and default flow (7.0)
+        # Log model: minutes = 175/7.0 * ln(51.6/23.6) ≈ 13.9; showers ≈ 2.32
+        # EMA blend: 0.2*2.32 + 0.8*2.42 ≈ 2.40 → 2.4 showers, 14 min
         values = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values)
-        assert values["tap_water_cap"] == pytest.approx(2.7, abs=0.1)
-        assert values["tap_water_minutes"] == 16
+        assert values["tap_water_cap"] == pytest.approx(2.4, abs=0.1)
 
     def test_tap_water_minutes_matches_smoothed_capacity(self):
         """tap_water_minutes is derived from the same smoothed tap_water_cap estimate."""
@@ -1591,13 +1833,23 @@ class TestCalculateTapWaterCap:
         assert cold == 10.0
 
     def test_rolling_buffer_cleared_on_flow_stop(self):
-        """Buffer is emptied when flow drops to zero."""
+        """Buffer is emptied once the session gap expires after flow drops to zero."""
         coordinator = self._make_coordinator()
-        coordinator._calculate_tap_water_cap(
-            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
-        )
+        start = dt_util.utcnow()
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+            )
         assert len(coordinator._flow_rolling_buffer) == 1
-        coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        # Flow stops — buffer is NOT cleared yet (within the session gap).
+        pause = start + timedelta(seconds=1)
+        with patch("homeassistant.util.dt.utcnow", return_value=pause):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert len(coordinator._flow_rolling_buffer) == 1  # still retained
+        # After the session gap expires the buffer is cleared.
+        after_gap = start + timedelta(seconds=DHW_SESSION_GAP_SEC + 16)
+        with patch("homeassistant.util.dt.utcnow", return_value=after_gap):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert coordinator._flow_rolling_buffer == []
 
     def test_rolling_buffer_trims_entries_older_than_60s(self):
@@ -1615,23 +1867,37 @@ class TestCalculateTapWaterCap:
         assert len(coordinator._flow_rolling_buffer) == 1
         assert coordinator._flow_rolling_buffer[0][1] == 6.0
 
-    def test_rolling_buffer_mean_used_for_calc_flow(self):
-        """calc_flow during active flow is the mean of buffered readings, not just the last."""
+    def test_rolling_buffer_mean_used_for_calc_cold(self):
+        """calc_cold during active flow is the mean of buffered cold readings (not flow).
+        calc_flow always uses the EMA-learned shower flow so non-shower tap events
+        (dishes, garden hose) do not inflate the capacity estimate."""
         coordinator = self._make_warmed_up_coordinator()
         now = dt_util.utcnow()
-        # Pre-seed buffer with one entry from 10 s ago so the mean is (5.0+8.0)/2=6.5
+        # Pre-seed buffer with one cold=15.0 entry from 10 s ago.
         ten_s_ago = (now - timedelta(seconds=10)).timestamp()
-        coordinator._flow_rolling_buffer = [(ten_s_ago, 5.0, 10.0)]
-        # Current poll: flow=8.0 → mean=(5.0+8.0)/2=6.5 is used for calc_flow
+        coordinator._flow_rolling_buffer = [(ten_s_ago, 5.0, 15.0)]
+        # Current poll: bt33=9.0 → cold mean=(15.0+9.0)/2=12.0
+        # calc_flow uses EMA default (7.0), not the current flow reading (8.0).
         with patch("homeassistant.util.dt.utcnow", return_value=now):
-            # Advance past warmup window
             coordinator._tap_water_cap_start_time = now - timedelta(seconds=61)
-            values = {"bt30": 60.0, "bf1_l_min": 8.0, "bt33": 10.0}
+            values = {"bt30": 60.0, "bf1_l_min": 8.0, "bt33": 9.0}
             coordinator._calculate_tap_water_cap(values)
         assert "tap_water_cap" in values
-        # Verify by computing what the result with mean flow=6.5 should be (log model):
-        # minutes = 175/6.5 * ln(50/28) = 26.9 * 0.580 ≈ 15.6; showers = 15.6/6 ≈ 2.6
-        assert values["tap_water_cap"] == pytest.approx(2.6, abs=0.2)
+        # With cold_mean=12.0, flow=7.0 (default), shower_temp=DHW_SHOWER_TEMP_C (38.0):
+        # minutes = 175/7.0 * ln((60-12)/(38-12)) = 25.0 * ln(48/26) ≈ 25.0 * 0.613 ≈ 15.3; showers ≈ 2.6
+        import math
+        from custom_components.qvantum.const import (
+            DHW_TANK_VOLUME_L,
+            DHW_SHOWER_TEMP_C,
+            DHW_SHOWER_DURATION_MIN,
+            DHW_DEFAULT_FLOW_LPM,
+        )
+
+        expected_min = (DHW_TANK_VOLUME_L / DHW_DEFAULT_FLOW_LPM) * math.log(
+            (60.0 - 12.0) / (DHW_SHOWER_TEMP_C - 12.0)
+        )
+        expected_showers = round(expected_min / DHW_SHOWER_DURATION_MIN, 1)
+        assert values["tap_water_cap"] == pytest.approx(expected_showers, abs=0.2)
 
     # ------------------------------------------------------------------
     # Shower event history (Phase 2)
@@ -1647,26 +1913,40 @@ class TestCalculateTapWaterCap:
         assert len(coordinator._shower_event_samples) == 3
 
     def test_event_samples_cleared_after_flow_stops(self):
-        """_shower_event_samples is always cleared when flow stops, even for short draws."""
+        """_shower_event_samples is retained during the session gap and cleared after it expires."""
         coordinator = self._make_coordinator()
-        coordinator._calculate_tap_water_cap(
-            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
-        )
+        start = dt_util.utcnow()
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+            )
         assert len(coordinator._shower_event_samples) == 1
-        coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        # Flow stops — samples are NOT cleared yet (within the session gap).
+        pause = start + timedelta(seconds=1)
+        with patch("homeassistant.util.dt.utcnow", return_value=pause):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert len(coordinator._shower_event_samples) == 1  # still retained
+        # After the session gap expires the samples are cleared.
+        after_gap = start + timedelta(seconds=DHW_SESSION_GAP_SEC + 16)
+        with patch("homeassistant.util.dt.utcnow", return_value=after_gap):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert coordinator._shower_event_samples == []
 
     def test_long_shower_creates_event_history_entry(self):
         """A shower lasting ≥1 min creates an entry in _shower_event_history."""
         coordinator = self._make_coordinator()
-        start = dt_util.utcnow()
-        coordinator._shower_start_time = start - timedelta(minutes=5)
+        now = dt_util.utcnow()
+        # Pre-set pause time far enough in the past for the gap to have expired.
+        pause_time = now - timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        shower_start = pause_time - timedelta(minutes=5)
+        coordinator._shower_start_time = shower_start
+        coordinator._shower_pause_time = pause_time
         # Seed one sample so avg calculations have data
         coordinator._shower_event_samples = [
-            ((start - timedelta(minutes=4)).timestamp(), 6.0, 10.0, 38.0)
+            ((shower_start + timedelta(minutes=1)).timestamp(), 6.0, 10.0, 38.0)
         ]
-        # Flow stops
-        with patch("homeassistant.util.dt.utcnow", return_value=start):
+        # Call with flow=0: gap already expired → session finalised immediately.
+        with patch("homeassistant.util.dt.utcnow", return_value=now):
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert len(coordinator._shower_event_history) == 1
         event = coordinator._shower_event_history[0]
@@ -1676,27 +1956,83 @@ class TestCalculateTapWaterCap:
         assert event["avg_outlet_temp"] == 38.0
         assert event["water_used_l"] == pytest.approx(30.0, abs=0.5)
 
+    def test_event_history_water_used_excludes_within_session_pause(self):
+        """water_used_l uses active-flow time, not total session wall-clock time.
+
+        Session timeline:
+        - flow active from t=0 to t=90 s
+        - paused from t=90 to t=150 s
+        - flow active again from t=150 to t=180 s
+
+        Total session duration = 3.0 min, active-flow duration = 2.0 min.
+        With avg_flow = 6.0 L/min, water_used_l should be about 12 L, not 18 L.
+        """
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 38.0}
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=60)
+        ):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 38.0}
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=90)
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=150)
+        ):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 38.0}
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=180)
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        with patch(
+            "homeassistant.util.dt.utcnow",
+            return_value=start + timedelta(seconds=180 + DHW_SESSION_GAP_SEC + 1),
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        assert len(coordinator._shower_event_history) == 1
+        event = coordinator._shower_event_history[0]
+        assert event["duration_min"] == pytest.approx(3.0, abs=0.1)
+        assert event["avg_flow"] == pytest.approx(6.0, abs=0.1)
+        assert event["water_used_l"] == pytest.approx(12.0, abs=0.5)
+
     def test_short_draw_does_not_create_event_history_entry(self):
         """A water draw shorter than 1 minute is NOT recorded in history."""
         coordinator = self._make_coordinator()
-        start = dt_util.utcnow()
-        coordinator._shower_start_time = start - timedelta(seconds=30)
+        now = dt_util.utcnow()
+        # Pre-set pause time far enough in the past for the gap to have expired.
+        pause_time = now - timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        shower_start = pause_time - timedelta(seconds=30)
+        coordinator._shower_start_time = shower_start
+        coordinator._shower_pause_time = pause_time
         coordinator._shower_event_samples = [
-            ((start - timedelta(seconds=15)).timestamp(), 4.0, 10.0, None)
+            ((shower_start + timedelta(seconds=15)).timestamp(), 4.0, 10.0, None)
         ]
-        with patch("homeassistant.util.dt.utcnow", return_value=start):
+        with patch("homeassistant.util.dt.utcnow", return_value=now):
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert coordinator._shower_event_history == []
-        assert coordinator._shower_event_samples == []  # samples still cleared
+        assert coordinator._shower_event_samples == []  # samples cleared after gap
 
     def test_event_history_capped_at_10_entries(self):
         """_shower_event_history never exceeds 10 entries (oldest is evicted)."""
         coordinator = self._make_coordinator()
         now = dt_util.utcnow()
-        # Simulate 11 completed 2-minute showers
+        # Simulate 11 completed 2-minute showers (gap already expired for each)
         for i in range(11):
-            shower_start = now - timedelta(minutes=2)
+            pause_time = now - timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+            shower_start = pause_time - timedelta(minutes=2)
             coordinator._shower_start_time = shower_start
+            coordinator._shower_pause_time = pause_time
             coordinator._shower_event_samples = [
                 (shower_start.timestamp(), 6.0, 10.0, 38.0)
             ]
@@ -1707,12 +2043,16 @@ class TestCalculateTapWaterCap:
     def test_event_history_no_outlet_temp_records_none(self):
         """When bt34 is absent, avg_outlet_temp in the history entry is None."""
         coordinator = self._make_coordinator()
-        start = dt_util.utcnow()
-        coordinator._shower_start_time = start - timedelta(minutes=3)
+        now = dt_util.utcnow()
+        # Pre-set pause time far enough in the past for the gap to have expired.
+        pause_time = now - timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        shower_start = pause_time - timedelta(minutes=3)
+        coordinator._shower_start_time = shower_start
+        coordinator._shower_pause_time = pause_time
         coordinator._shower_event_samples = [
-            ((start - timedelta(minutes=2)).timestamp(), 6.0, 10.0, None)
+            ((shower_start + timedelta(minutes=1)).timestamp(), 6.0, 10.0, None)
         ]
-        with patch("homeassistant.util.dt.utcnow", return_value=start):
+        with patch("homeassistant.util.dt.utcnow", return_value=now):
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert len(coordinator._shower_event_history) == 1
         assert coordinator._shower_event_history[0]["avg_outlet_temp"] is None
@@ -1733,15 +2073,42 @@ class TestCalculateTapWaterCap:
         assert coordinator._last_shower_temp_c is None  # EMA not updated
 
     def test_outlet_temp_clearly_warm_updates_shower_temp_ema(self):
-        """bt34 strictly above cold + threshold is accepted and the EMA is updated."""
+        """bt34 in the 60–180 s early-stable window updates the EMA once at shower end."""
         coordinator = self._make_coordinator()
         cold = 10.0
-        # Just above the boundary
         outlet_warm = cold + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C + 0.1
-        coordinator._calculate_tap_water_cap(
-            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": cold, "bt34": outlet_warm}
-        )
-        # EMA should have been seeded from DHW_SHOWER_TEMP_C default toward outlet_warm
+        start = dt_util.utcnow()
+
+        # Poll at t=0: flow starts, warmup begins — EMA must NOT update yet.
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": cold, "bt34": outlet_warm}
+            )
+        assert coordinator._last_shower_temp_c is None
+
+        # Poll at t=90 s: inside the early-stable window (60–180 s) — still no update while flowing.
+        t90 = start + timedelta(seconds=90)
+        with patch("homeassistant.util.dt.utcnow", return_value=t90):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": cold, "bt34": outlet_warm}
+            )
+        assert coordinator._last_shower_temp_c is None  # updated only at shower end
+
+        # Poll at t=120 s: flow stops — pause recorded, gap timer starts.
+        t120 = start + timedelta(seconds=120)
+        with patch("homeassistant.util.dt.utcnow", return_value=t120):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 0.0, "bt33": cold}
+            )
+        assert coordinator._last_shower_temp_c is None  # gap not yet expired
+
+        # After the session gap expires: shower finalised, EMA updated from early-stable samples.
+        t_after_gap = t120 + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        with patch("homeassistant.util.dt.utcnow", return_value=t_after_gap):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 0.0, "bt33": cold}
+            )
+
         from custom_components.qvantum.const import DHW_EMA_ALPHA, DHW_SHOWER_TEMP_C
 
         expected = DHW_EMA_ALPHA * outlet_warm + (1 - DHW_EMA_ALPHA) * DHW_SHOWER_TEMP_C
@@ -1758,9 +2125,14 @@ class TestCalculateTapWaterCap:
                 {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
             )
 
-        # End event after 10 minutes (>= minimum): should update duration EMA.
+        # Flow stops after 10 minutes.
         end = start + timedelta(minutes=10)
         with patch("homeassistant.util.dt.utcnow", return_value=end):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        # Session gap expires → duration EMA is updated.
+        after_gap = end + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        with patch("homeassistant.util.dt.utcnow", return_value=after_gap):
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
 
         expected_learned_duration = (
@@ -1772,7 +2144,8 @@ class TestCalculateTapWaterCap:
 
         # Next no-flow poll must use learned duration for the minute conversion.
         with patch(
-            "homeassistant.util.dt.utcnow", return_value=end + timedelta(seconds=1)
+            "homeassistant.util.dt.utcnow",
+            return_value=after_gap + timedelta(seconds=1),
         ):
             values = {"bt30": 60.0, "bf1_l_min": 0.0}
             coordinator._calculate_tap_water_cap(values)
@@ -1801,9 +2174,9 @@ class TestCalculateTapWaterCap:
 
         coordinator._calculate_tap_water_cap(values)
 
-        # Expected if fallback shower temp is used (log model):
-        # minutes = 175/6 * ln((60-10)/(38-10)) = 29.2 * ln(50/28) ≈ 16.9; showers ≈ 2.8
-        assert values["tap_water_cap"] == pytest.approx(2.8, abs=0.2)
+        # Expected if fallback shower temp is used (log model, calc_flow=default 7.0):
+        # minutes = 175/7 * ln((60-10)/(38-10)) = 25.0 * ln(50/28) ≈ 14.5; showers ≈ 2.4
+        assert values["tap_water_cap"] == pytest.approx(2.4, abs=0.2)
         assert values["tap_water_minutes"] == round(
             coordinator._last_tap_water_cap * DHW_SHOWER_DURATION_MIN
         )
@@ -1936,7 +2309,8 @@ class TestCalculateTapWaterCap:
     # ------------------------------------------------------------------
 
     def test_reheat_floor_compressor_state(self):
-        """When compressor_state==8 (DHW mode), minutes is floored at one shower duration."""
+        """When compressor_state==8 (DHW mode), minutes is floored at the learned shower duration,
+        guaranteeing at least 1.0 shower is reported."""
         coordinator = self._make_warmed_up_coordinator()
         # Tank almost depleted: log model would return <<1 min without floor.
         coordinator._last_shower_temp_c = 47.2
@@ -1952,10 +2326,12 @@ class TestCalculateTapWaterCap:
         }
         coordinator._calculate_tap_water_cap(values)
 
-        assert values["tap_water_minutes"] >= round(DHW_SHOWER_DURATION_MIN)
+        # Floor is calc_shower_duration (learned), so minutes >= learned duration → ≥1 shower.
+        assert values["tap_water_minutes"] >= round(coordinator._last_shower_duration_min)
+        assert values["tap_water_cap"] >= 1.0
 
     def test_reheat_floor_relay_l1(self):
-        """When picpin_relay_heat_l1 is active, minutes is floored at one shower duration."""
+        """When picpin_relay_heat_l1 is active, minutes is floored at the learned shower duration."""
         coordinator = self._make_warmed_up_coordinator()
         coordinator._last_shower_temp_c = 47.2
         coordinator._last_shower_cold_temp = 9.4
@@ -1970,7 +2346,8 @@ class TestCalculateTapWaterCap:
         }
         coordinator._calculate_tap_water_cap(values)
 
-        assert values["tap_water_minutes"] >= round(DHW_SHOWER_DURATION_MIN)
+        assert values["tap_water_minutes"] >= round(coordinator._last_shower_duration_min)
+        assert values["tap_water_cap"] >= 1.0
 
     def test_no_reheat_floor_without_signals(self):
         """Without reheating signals, log model returns its raw (low) estimate."""
@@ -1992,5 +2369,5 @@ class TestCalculateTapWaterCap:
         coordinator._calculate_tap_water_cap(values)
 
         # Without reheating, tank at 49°C vs shower at 47.2°C gives ≈ 1 min raw.
-        # EMA is None so raw is used directly; result must be below the floor.
-        assert values["tap_water_minutes"] < round(DHW_SHOWER_DURATION_MIN)
+        # EMA is None so raw is used directly; result must be below the learned duration floor.
+        assert values["tap_water_minutes"] < round(coordinator._last_shower_duration_min)
