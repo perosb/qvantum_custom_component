@@ -1439,6 +1439,52 @@ class TestCalculateTapWaterCap:
 
         assert coordinator._tap_water_cap_start_time == t_resume
 
+    def test_long_gap_resume_without_idle_poll_finalizes_previous_session(self):
+        """If flow resumes after a long gap with no idle poll in between, previous
+        session is finalized first so old/new samples do not mix."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 16, 19, 0, 0, tzinfo=timezone.utc)
+
+        # Start and collect two active-flow samples in session A.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
+            )
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0 + timedelta(seconds=90)
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
+            )
+
+        # Flow stops once; no additional idle poll after gap expiry.
+        t_pause = t0 + timedelta(seconds=120)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_pause
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        # Resume after long gap directly with active flow.
+        t_resume = t_pause + timedelta(seconds=DHW_SESSION_GAP_SEC + 5)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_resume
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 40.0}
+            )
+
+        # Session A must have been finalised on resume.
+        assert len(coordinator._shower_event_history) == 1
+        assert coordinator._shower_event_history[0]["duration_min"] == pytest.approx(
+            2.0, abs=0.1
+        )
+
+        # Session B should start clean with exactly one sample (the resume poll).
+        assert coordinator._shower_start_time == t_resume
+        assert coordinator._shower_pause_time is None
+        assert len(coordinator._shower_event_samples) == 1
+
+        # Warmup should restart for session B at resume time.
+        assert coordinator._tap_water_cap_start_time == t_resume
+
     def test_warmup_fallback_minutes_use_current_duration(self):
         """If published minutes are missing, fallback uses current learned duration."""
         coordinator = self._make_coordinator()
