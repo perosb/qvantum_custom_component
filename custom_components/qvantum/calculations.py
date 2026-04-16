@@ -21,6 +21,7 @@ from .const import (
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_ROLLING_BUFFER_WINDOW_SEC,
     DHW_SESSION_GAP_SEC,
+    DHW_SHOWER_TEMP_STABLE_MIN_OFFSET_SEC,
     DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC,
     DHW_SHOWER_DURATION_MIN,
     DHW_SHOWER_TEMP_C,
@@ -246,9 +247,9 @@ class QvantumCalculationsMixin:
                     s[3]
                     for s in self._shower_event_samples
                     if s[3] is not None
-                    and 60
+                    and DHW_SHOWER_TEMP_STABLE_MIN_OFFSET_SEC
                     <= (s[0] - shower_start_ts)
-                        <= DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC
+                    <= DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC
                     and s[3]
                     > (s[2] if s[2] is not None else DHW_DEFAULT_COLD_TEMP_C)
                     + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
@@ -259,7 +260,8 @@ class QvantumCalculationsMixin:
                         s[3]
                         for s in self._shower_event_samples
                         if s[3] is not None
-                        and (s[0] - shower_start_ts) >= 60
+                        and (s[0] - shower_start_ts)
+                        >= DHW_SHOWER_TEMP_STABLE_MIN_OFFSET_SEC
                         and s[3]
                         > (s[2] if s[2] is not None else DHW_DEFAULT_COLD_TEMP_C)
                         + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C

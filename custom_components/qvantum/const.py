@@ -252,6 +252,9 @@ DHW_SESSION_GAP_SEC = (
 DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC = (
     180  # Maximum seconds since shower onset for the temperature-stability check (s)
 )
+DHW_SHOWER_TEMP_STABLE_MIN_OFFSET_SEC = (
+    60  # Minimum seconds since shower onset for the temperature-stability check (s)
+)
 # Backward-compatible alias for existing references; prefer DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC.
 DHW_SHOWER_TEMP_STABLE_WINDOW_SEC = DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC
 DHW_MAX_SHOWER_HISTORY_SIZE = (

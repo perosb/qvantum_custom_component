@@ -1883,8 +1883,8 @@ class TestCalculateTapWaterCap:
             values = {"bt30": 60.0, "bf1_l_min": 8.0, "bt33": 9.0}
             coordinator._calculate_tap_water_cap(values)
         assert "tap_water_cap" in values
-        # With cold_mean=12.0, flow=7.0 (default):
-        # minutes = 175/7.0 * ln((60-12)/(32-12)) = 25.0 * ln(48/20) = 25.0 * 0.875 ≈ 21.9; showers ≈ 3.6
+        # With cold_mean=12.0, flow=7.0 (default), shower_temp=DHW_SHOWER_TEMP_C (38.0):
+        # minutes = 175/7.0 * ln((60-12)/(38-12)) = 25.0 * ln(48/26) ≈ 25.0 * 0.613 ≈ 15.3; showers ≈ 2.6
         import math
         from custom_components.qvantum.const import (
             DHW_TANK_VOLUME_L,
