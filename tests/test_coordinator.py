@@ -1485,6 +1485,82 @@ class TestCalculateTapWaterCap:
         # Warmup should restart for session B at resume time.
         assert coordinator._tap_water_cap_start_time == t_resume
 
+    def test_finalize_uses_session_reheating_not_finalize_poll_state(self):
+        """A normal shower session should still be learned even if reheating is on only
+        at the later finalization poll."""
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=90)
+        ):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=120)
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        # Finalization poll happens later with reheating active, but the session itself
+        # never saw reheating and therefore must still be learned.
+        with patch(
+            "homeassistant.util.dt.utcnow",
+            return_value=start + timedelta(seconds=120 + DHW_SESSION_GAP_SEC + 1),
+        ):
+            coordinator._calculate_tap_water_cap(
+                {
+                    "bt30": 60.0,
+                    "bf1_l_min": 0.0,
+                    "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+                }
+            )
+
+        assert len(coordinator._shower_event_history) == 1
+        assert coordinator._last_shower_flow_lpm is not None
+        assert coordinator._last_shower_duration_min is not None
+
+    def test_session_reheating_flag_is_ored_across_samples(self):
+        """If any active-flow sample in a session indicates reheating, finalization must
+        treat the whole session as reheating-driven and skip EMA/history learning."""
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
+            )
+        # A later active-flow sample shows reheating; this should mark the session.
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=90)
+        ):
+            coordinator._calculate_tap_water_cap(
+                {
+                    "bt30": 60.0,
+                    "bf1_l_min": 6.0,
+                    "bt33": 10.0,
+                    "bt34": 39.0,
+                    "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+                }
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=120)
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        with patch(
+            "homeassistant.util.dt.utcnow",
+            return_value=start + timedelta(seconds=120 + DHW_SESSION_GAP_SEC + 1),
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        assert coordinator._shower_event_history == []
+        assert coordinator._last_shower_flow_lpm is None
+        assert coordinator._last_shower_duration_min is None
+
     def test_warmup_fallback_minutes_use_current_duration(self):
         """If published minutes are missing, fallback uses current learned duration."""
         coordinator = self._make_coordinator()
@@ -1879,6 +1955,56 @@ class TestCalculateTapWaterCap:
         assert event["avg_cold"] == 10.0
         assert event["avg_outlet_temp"] == 38.0
         assert event["water_used_l"] == pytest.approx(30.0, abs=0.5)
+
+    def test_event_history_water_used_excludes_within_session_pause(self):
+        """water_used_l uses active-flow time, not total session wall-clock time.
+
+        Session timeline:
+        - flow active from t=0 to t=90 s
+        - paused from t=90 to t=150 s
+        - flow active again from t=150 to t=180 s
+
+        Total session duration = 3.0 min, active-flow duration = 2.0 min.
+        With avg_flow = 6.0 L/min, water_used_l should be about 12 L, not 18 L.
+        """
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 38.0}
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=60)
+        ):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 38.0}
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=90)
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=150)
+        ):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 38.0}
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=180)
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        with patch(
+            "homeassistant.util.dt.utcnow",
+            return_value=start + timedelta(seconds=180 + DHW_SESSION_GAP_SEC + 1),
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        assert len(coordinator._shower_event_history) == 1
+        event = coordinator._shower_event_history[0]
+        assert event["duration_min"] == pytest.approx(3.0, abs=0.1)
+        assert event["avg_flow"] == pytest.approx(6.0, abs=0.1)
+        assert event["water_used_l"] == pytest.approx(12.0, abs=0.5)
 
     def test_short_draw_does_not_create_event_history_entry(self):
         """A water draw shorter than 1 minute is NOT recorded in history."""
