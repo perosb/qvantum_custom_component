@@ -108,6 +108,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._shower_start_time: datetime | None = (
             None  # Timestamp when current flow event started
         )
+        self._shower_pause_time: datetime | None = (
+            None  # Timestamp when flow last stopped (used for session continuation gap)
+        )
         self._flow_rolling_buffer: list = []  # [(timestamp, flow, cold)] within 60-second window
         self._shower_event_samples: list = []  # [(timestamp, flow, cold, outlet_temp)] for current event
         self._shower_event_history: list = []  # Last 10 completed shower events

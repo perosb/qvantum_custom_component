@@ -20,6 +20,7 @@ from .const import (
     DHW_MAX_SHOWER_HISTORY_SIZE,
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_ROLLING_BUFFER_WINDOW_SEC,
+    DHW_SESSION_GAP_SEC,
     DHW_SHOWER_TEMP_STABLE_WINDOW_SEC,
     DHW_SHOWER_DURATION_MIN,
     DHW_SHOWER_TEMP_C,
@@ -148,10 +149,34 @@ class QvantumCalculationsMixin:
         # Compute now early so start/end tracking can use it.
         now = dt_util.utcnow()
 
+        # Compute reheating state early — needed both for skipping EMA learning
+        # during system recirculation pulses and for the capacity guard logic below.
+        dhw_reheating = (
+            values.get("compressor_state") == DHW_COMPRESSOR_STATE_HOT_WATER
+            or values.get("picpin_relay_heat_l1")
+            or values.get("picpin_relay_heat_l2")
+            or values.get("picpin_relay_heat_l3")
+        )
+
         if flow_is_active:
-            # Record when this flow event started (used for duration learning).
+            # If flow resumes within the session gap, continue the same session
+            # rather than starting a new one (e.g. shampoo pause mid-shower).
             if self._shower_start_time is None:
                 self._shower_start_time = now
+                self._shower_pause_time = None
+            elif self._shower_pause_time is not None:
+                gap_sec = (now - self._shower_pause_time).total_seconds()
+                if gap_sec <= DHW_SESSION_GAP_SEC:
+                    _LOGGER.debug(
+                        "Flow resumed after %.0f s pause — continuing shower session (gap ≤ %.0f s)",
+                        gap_sec,
+                        DHW_SESSION_GAP_SEC,
+                    )
+                else:
+                    # Gap too long: previous session was already finalised when
+                    # the gap expired; start fresh for this new flow event.
+                    self._shower_start_time = now
+                self._shower_pause_time = None
 
             # Phase 1: maintain a rolling 60-second buffer of flow/cold readings.
             ts = now.timestamp()
@@ -190,100 +215,114 @@ class QvantumCalculationsMixin:
             # Phase 2: accumulate per-event samples for end-of-shower statistics.
             self._shower_event_samples.append((ts, flow, cold, outlet_temp))
         else:
-            # Flow just stopped — compute shower duration and update the EMA.
+            # Flow is not active.
             if self._shower_start_time is not None:
-                duration_min = (now - self._shower_start_time).total_seconds() / 60.0
-                if (
-                    duration_min >= DHW_MIN_SHOWER_DURATION_MIN
-                ):  # Ignore brief draws (tap, filling kettle, etc.)
-                    prior_dur = (
-                        self._last_shower_duration_min
-                        if self._last_shower_duration_min is not None
-                        else DHW_SHOWER_DURATION_MIN
-                    )
-                    self._last_shower_duration_min = (
-                        DHW_EMA_ALPHA * duration_min + (1 - DHW_EMA_ALPHA) * prior_dur
-                    )
-                    _LOGGER.debug(
-                        "Shower ended: duration=%.1f min; EMA shower duration → %.1f min (tank=%s)",
-                        duration_min,
-                        self._last_shower_duration_min,
-                        f"{tank_temp:.1f}°C" if tank_temp is not None else "unknown",
-                    )
+                # First poll after flow stops: record the pause time.
+                if self._shower_pause_time is None:
+                    self._shower_pause_time = now
 
-                    # Phase 2: record completed shower event to history.
-                    if self._shower_event_samples:
-                        avg_flow = sum(s[1] for s in self._shower_event_samples) / len(
-                            self._shower_event_samples
-                        )
-                        cold_samples = [
-                            s[2] for s in self._shower_event_samples if s[2] is not None
-                        ]
-                        avg_cold = (
-                            sum(cold_samples) / len(cold_samples)
-                            if cold_samples
-                            else DHW_DEFAULT_COLD_TEMP_C
-                        )
-                        outlet_samples = [
-                            s[3] for s in self._shower_event_samples if s[3] is not None
-                        ]
-                        avg_outlet_temp = (
-                            sum(outlet_samples) / len(outlet_samples)
-                            if outlet_samples
-                            else None
-                        )
-                        water_used_l = avg_flow * duration_min
-                        event = {
-                            "start": self._shower_start_time.isoformat(),
-                            "end": now.isoformat(),
-                            "duration_min": round(duration_min, 1),
-                            "avg_flow": round(avg_flow, 2),
-                            "avg_cold": round(avg_cold, 1),
-                            "avg_outlet_temp": (
-                                round(avg_outlet_temp, 1)
-                                if avg_outlet_temp is not None
+                gap_sec = (now - self._shower_pause_time).total_seconds()
+                if gap_sec > DHW_SESSION_GAP_SEC:
+                    # Gap expired — finalise the session.
+                    # Use _shower_pause_time as the end of flow (not now, which
+                    # includes the idle wait time).
+                    duration_min = (
+                        self._shower_pause_time - self._shower_start_time
+                    ).total_seconds() / 60.0
+                    if duration_min >= DHW_MIN_SHOWER_DURATION_MIN:
+                        if dhw_reheating:
+                            # During active DHW reheating, flow events are likely
+                            # recirculation pulses — skip EMA learning.
+                            _LOGGER.debug(
+                                "Shower ended during reheating: duration=%.1f min — skipping EMA update (recirculation pulse)",
+                                duration_min,
+                            )
+                        else:
+                            prior_dur = (
+                                self._last_shower_duration_min
+                                if self._last_shower_duration_min is not None
+                                else DHW_SHOWER_DURATION_MIN
+                            )
+                            self._last_shower_duration_min = (
+                                DHW_EMA_ALPHA * duration_min
+                                + (1 - DHW_EMA_ALPHA) * prior_dur
+                            )
+                            _LOGGER.debug(
+                                "Shower ended: duration=%.1f min; EMA shower duration → %.1f min (tank=%s)",
+                                duration_min,
+                                self._last_shower_duration_min,
+                                f"{tank_temp:.1f}°C"
+                                if tank_temp is not None
+                                else "unknown",
+                            )
+
+                        # Phase 2: record completed shower event to history and update
+                        # shower temp EMA. Skip when reheating is active.
+                        if not dhw_reheating and self._shower_event_samples:
+                            avg_flow = sum(
+                                s[1] for s in self._shower_event_samples
+                            ) / len(self._shower_event_samples)
+                            cold_samples = [
+                                s[2]
+                                for s in self._shower_event_samples
+                                if s[2] is not None
+                            ]
+                            avg_cold = (
+                                sum(cold_samples) / len(cold_samples)
+                                if cold_samples
+                                else DHW_DEFAULT_COLD_TEMP_C
+                            )
+                            outlet_samples = [
+                                s[3]
+                                for s in self._shower_event_samples
+                                if s[3] is not None
+                            ]
+                            avg_outlet_temp = (
+                                sum(outlet_samples) / len(outlet_samples)
+                                if outlet_samples
                                 else None
-                            ),
-                            "water_used_l": round(water_used_l, 1),
-                        }
-                        self._shower_event_history.append(event)
-                        if (
-                            len(self._shower_event_history)
-                            > DHW_MAX_SHOWER_HISTORY_SIZE
-                        ):
-                            self._shower_event_history.pop(0)
-                        _LOGGER.info(
-                            "Shower event: duration=%.1f min, avg_flow=%.2f L/min, "
-                            "avg_cold=%.1f\u00b0C, avg_outlet=%.1f\u00b0C, water_used=%.1f L",
-                            duration_min,
-                            avg_flow,
-                            avg_cold,
-                            avg_outlet_temp if avg_outlet_temp is not None else 0.0,
-                            water_used_l,
-                        )
+                            )
+                            water_used_l = avg_flow * duration_min
+                            event = {
+                                "start": self._shower_start_time.isoformat(),
+                                "end": self._shower_pause_time.isoformat(),
+                                "duration_min": round(duration_min, 1),
+                                "avg_flow": round(avg_flow, 2),
+                                "avg_cold": round(avg_cold, 1),
+                                "avg_outlet_temp": (
+                                    round(avg_outlet_temp, 1)
+                                    if avg_outlet_temp is not None
+                                    else None
+                                ),
+                                "water_used_l": round(water_used_l, 1),
+                            }
+                            self._shower_event_history.append(event)
+                            if (
+                                len(self._shower_event_history)
+                                > DHW_MAX_SHOWER_HISTORY_SIZE
+                            ):
+                                self._shower_event_history.pop(0)
+                            _LOGGER.info(
+                                "Shower event: duration=%.1f min, avg_flow=%.2f L/min, "
+                                "avg_cold=%.1f\u00b0C, avg_outlet=%.1f\u00b0C, water_used=%.1f L",
+                                duration_min,
+                                avg_flow,
+                                avg_cold,
+                                avg_outlet_temp if avg_outlet_temp is not None else 0.0,
+                                water_used_l,
+                            )
 
-                        # Update shower temperature EMA once per shower using the
-                        # early-stable window (60–180 s after onset): past warmup
-                        # transients, before tank-depletion drives bt34 upward.
-                        shower_start_ts = self._shower_start_time.timestamp()
-                        stable_outlet_samples = [
-                            s[3]
-                            for s in self._shower_event_samples
-                            if s[3] is not None
-                            and 60
-                            <= (s[0] - shower_start_ts)
-                            <= DHW_SHOWER_TEMP_STABLE_WINDOW_SEC
-                            and s[3]
-                            > (s[2] if s[2] is not None else DHW_DEFAULT_COLD_TEMP_C)
-                            + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
-                        ]
-                        if not stable_outlet_samples:
-                            # Fallback: all post-warmup samples if the window was empty.
+                            # Update shower temperature EMA once per shower using the
+                            # early-stable window (60–180 s after onset): past warmup
+                            # transients, before tank-depletion drives bt34 upward.
+                            shower_start_ts = self._shower_start_time.timestamp()
                             stable_outlet_samples = [
                                 s[3]
                                 for s in self._shower_event_samples
                                 if s[3] is not None
-                                and (s[0] - shower_start_ts) >= 60
+                                and 60
+                                <= (s[0] - shower_start_ts)
+                                <= DHW_SHOWER_TEMP_STABLE_WINDOW_SEC
                                 and s[3]
                                 > (
                                     s[2]
@@ -292,28 +331,51 @@ class QvantumCalculationsMixin:
                                 )
                                 + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
                             ]
-                        if stable_outlet_samples:
-                            stable_outlet_temp = sum(stable_outlet_samples) / len(
-                                stable_outlet_samples
-                            )
-                            prior_shower_temp = (
-                                self._last_shower_temp_c
-                                if self._last_shower_temp_c is not None
-                                else DHW_SHOWER_TEMP_C
-                            )
-                            self._last_shower_temp_c = (
-                                DHW_EMA_ALPHA * stable_outlet_temp
-                                + (1 - DHW_EMA_ALPHA) * prior_shower_temp
-                            )
-                            _LOGGER.debug(
-                                "Learned shower_temp from %d early-stable samples: avg=%.1f°C → EMA=%.1f°C",
-                                len(stable_outlet_samples),
-                                stable_outlet_temp,
-                                self._last_shower_temp_c,
-                            )
-                self._shower_start_time = None
-            self._flow_rolling_buffer.clear()
-            self._shower_event_samples.clear()
+                            if not stable_outlet_samples:
+                                # Fallback: all post-warmup samples.
+                                stable_outlet_samples = [
+                                    s[3]
+                                    for s in self._shower_event_samples
+                                    if s[3] is not None
+                                    and (s[0] - shower_start_ts) >= 60
+                                    and s[3]
+                                    > (
+                                        s[2]
+                                        if s[2] is not None
+                                        else DHW_DEFAULT_COLD_TEMP_C
+                                    )
+                                    + DHW_OUTLET_TEMP_THRESHOLD_DELTA_C
+                                ]
+                            if stable_outlet_samples:
+                                stable_outlet_temp = sum(stable_outlet_samples) / len(
+                                    stable_outlet_samples
+                                )
+                                prior_shower_temp = (
+                                    self._last_shower_temp_c
+                                    if self._last_shower_temp_c is not None
+                                    else DHW_SHOWER_TEMP_C
+                                )
+                                self._last_shower_temp_c = (
+                                    DHW_EMA_ALPHA * stable_outlet_temp
+                                    + (1 - DHW_EMA_ALPHA) * prior_shower_temp
+                                )
+                                _LOGGER.debug(
+                                    "Learned shower_temp from %d early-stable samples: avg=%.1f°C → EMA=%.1f°C",
+                                    len(stable_outlet_samples),
+                                    stable_outlet_temp,
+                                    self._last_shower_temp_c,
+                                )
+
+                    self._shower_start_time = None
+                    self._shower_pause_time = None
+                    self._flow_rolling_buffer.clear()
+                    self._shower_event_samples.clear()
+                # else: gap not yet expired — keep session open and DO NOT clear
+                # buffers or state; samples are retained for when flow resumes.
+            else:
+                # No active session — ensure buffers are clean.
+                self._flow_rolling_buffer.clear()
+                self._shower_event_samples.clear()
 
         # Resolve values for the capacity calculation:
         # - During active flow: use raw current readings so the estimate reflects
@@ -376,15 +438,6 @@ class QvantumCalculationsMixin:
         # decreases during a shower — unlike bt34 outlet temp which rises as
         # pipes warm up and would cause capacity to appear to increase.
         effective_hot_temp = tank_temp
-
-        # Compute reheating state early so it can be included in all log messages,
-        # including those emitted from the zero_mode early-return path.
-        dhw_reheating = (
-            values.get("compressor_state") == DHW_COMPRESSOR_STATE_HOT_WATER
-            or values.get("picpin_relay_heat_l1")
-            or values.get("picpin_relay_heat_l2")
-            or values.get("picpin_relay_heat_l3")
-        )
 
         cold_ge_shower_temp = calc_cold >= calc_shower_temp
 

@@ -17,6 +17,7 @@ from custom_components.qvantum.const import (
     DHW_COMPRESSOR_STATE_HOT_WATER,
     DHW_EMA_ALPHA,
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
+    DHW_SESSION_GAP_SEC,
     DHW_SHOWER_DURATION_MIN,
     REQUIRED_METRICS,
 )
@@ -1591,13 +1592,23 @@ class TestCalculateTapWaterCap:
         assert cold == 10.0
 
     def test_rolling_buffer_cleared_on_flow_stop(self):
-        """Buffer is emptied when flow drops to zero."""
+        """Buffer is emptied once the session gap expires after flow drops to zero."""
         coordinator = self._make_coordinator()
-        coordinator._calculate_tap_water_cap(
-            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
-        )
+        start = dt_util.utcnow()
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+            )
         assert len(coordinator._flow_rolling_buffer) == 1
-        coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        # Flow stops — buffer is NOT cleared yet (within the session gap).
+        pause = start + timedelta(seconds=1)
+        with patch("homeassistant.util.dt.utcnow", return_value=pause):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert len(coordinator._flow_rolling_buffer) == 1  # still retained
+        # After the session gap expires the buffer is cleared.
+        after_gap = start + timedelta(seconds=DHW_SESSION_GAP_SEC + 16)
+        with patch("homeassistant.util.dt.utcnow", return_value=after_gap):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert coordinator._flow_rolling_buffer == []
 
     def test_rolling_buffer_trims_entries_older_than_60s(self):
@@ -1647,26 +1658,40 @@ class TestCalculateTapWaterCap:
         assert len(coordinator._shower_event_samples) == 3
 
     def test_event_samples_cleared_after_flow_stops(self):
-        """_shower_event_samples is always cleared when flow stops, even for short draws."""
+        """_shower_event_samples is retained during the session gap and cleared after it expires."""
         coordinator = self._make_coordinator()
-        coordinator._calculate_tap_water_cap(
-            {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
-        )
+        start = dt_util.utcnow()
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
+            )
         assert len(coordinator._shower_event_samples) == 1
-        coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        # Flow stops — samples are NOT cleared yet (within the session gap).
+        pause = start + timedelta(seconds=1)
+        with patch("homeassistant.util.dt.utcnow", return_value=pause):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert len(coordinator._shower_event_samples) == 1  # still retained
+        # After the session gap expires the samples are cleared.
+        after_gap = start + timedelta(seconds=DHW_SESSION_GAP_SEC + 16)
+        with patch("homeassistant.util.dt.utcnow", return_value=after_gap):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert coordinator._shower_event_samples == []
 
     def test_long_shower_creates_event_history_entry(self):
         """A shower lasting ≥1 min creates an entry in _shower_event_history."""
         coordinator = self._make_coordinator()
-        start = dt_util.utcnow()
-        coordinator._shower_start_time = start - timedelta(minutes=5)
+        now = dt_util.utcnow()
+        # Pre-set pause time far enough in the past for the gap to have expired.
+        pause_time = now - timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        shower_start = pause_time - timedelta(minutes=5)
+        coordinator._shower_start_time = shower_start
+        coordinator._shower_pause_time = pause_time
         # Seed one sample so avg calculations have data
         coordinator._shower_event_samples = [
-            ((start - timedelta(minutes=4)).timestamp(), 6.0, 10.0, 38.0)
+            ((shower_start + timedelta(minutes=1)).timestamp(), 6.0, 10.0, 38.0)
         ]
-        # Flow stops
-        with patch("homeassistant.util.dt.utcnow", return_value=start):
+        # Call with flow=0: gap already expired → session finalised immediately.
+        with patch("homeassistant.util.dt.utcnow", return_value=now):
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert len(coordinator._shower_event_history) == 1
         event = coordinator._shower_event_history[0]
@@ -1679,24 +1704,30 @@ class TestCalculateTapWaterCap:
     def test_short_draw_does_not_create_event_history_entry(self):
         """A water draw shorter than 1 minute is NOT recorded in history."""
         coordinator = self._make_coordinator()
-        start = dt_util.utcnow()
-        coordinator._shower_start_time = start - timedelta(seconds=30)
+        now = dt_util.utcnow()
+        # Pre-set pause time far enough in the past for the gap to have expired.
+        pause_time = now - timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        shower_start = pause_time - timedelta(seconds=30)
+        coordinator._shower_start_time = shower_start
+        coordinator._shower_pause_time = pause_time
         coordinator._shower_event_samples = [
-            ((start - timedelta(seconds=15)).timestamp(), 4.0, 10.0, None)
+            ((shower_start + timedelta(seconds=15)).timestamp(), 4.0, 10.0, None)
         ]
-        with patch("homeassistant.util.dt.utcnow", return_value=start):
+        with patch("homeassistant.util.dt.utcnow", return_value=now):
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert coordinator._shower_event_history == []
-        assert coordinator._shower_event_samples == []  # samples still cleared
+        assert coordinator._shower_event_samples == []  # samples cleared after gap
 
     def test_event_history_capped_at_10_entries(self):
         """_shower_event_history never exceeds 10 entries (oldest is evicted)."""
         coordinator = self._make_coordinator()
         now = dt_util.utcnow()
-        # Simulate 11 completed 2-minute showers
+        # Simulate 11 completed 2-minute showers (gap already expired for each)
         for i in range(11):
-            shower_start = now - timedelta(minutes=2)
+            pause_time = now - timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+            shower_start = pause_time - timedelta(minutes=2)
             coordinator._shower_start_time = shower_start
+            coordinator._shower_pause_time = pause_time
             coordinator._shower_event_samples = [
                 (shower_start.timestamp(), 6.0, 10.0, 38.0)
             ]
@@ -1707,12 +1738,16 @@ class TestCalculateTapWaterCap:
     def test_event_history_no_outlet_temp_records_none(self):
         """When bt34 is absent, avg_outlet_temp in the history entry is None."""
         coordinator = self._make_coordinator()
-        start = dt_util.utcnow()
-        coordinator._shower_start_time = start - timedelta(minutes=3)
+        now = dt_util.utcnow()
+        # Pre-set pause time far enough in the past for the gap to have expired.
+        pause_time = now - timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        shower_start = pause_time - timedelta(minutes=3)
+        coordinator._shower_start_time = shower_start
+        coordinator._shower_pause_time = pause_time
         coordinator._shower_event_samples = [
-            ((start - timedelta(minutes=2)).timestamp(), 6.0, 10.0, None)
+            ((shower_start + timedelta(minutes=1)).timestamp(), 6.0, 10.0, None)
         ]
-        with patch("homeassistant.util.dt.utcnow", return_value=start):
+        with patch("homeassistant.util.dt.utcnow", return_value=now):
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
         assert len(coordinator._shower_event_history) == 1
         assert coordinator._shower_event_history[0]["avg_outlet_temp"] is None
@@ -1754,9 +1789,17 @@ class TestCalculateTapWaterCap:
             )
         assert coordinator._last_shower_temp_c is None  # updated only at shower end
 
-        # Poll at t=120 s: flow stops — shower ends, EMA updated from early-stable samples.
+        # Poll at t=120 s: flow stops — pause recorded, gap timer starts.
         t120 = start + timedelta(seconds=120)
         with patch("homeassistant.util.dt.utcnow", return_value=t120):
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 0.0, "bt33": cold}
+            )
+        assert coordinator._last_shower_temp_c is None  # gap not yet expired
+
+        # After the session gap expires: shower finalised, EMA updated from early-stable samples.
+        t_after_gap = t120 + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        with patch("homeassistant.util.dt.utcnow", return_value=t_after_gap):
             coordinator._calculate_tap_water_cap(
                 {"bt30": 60.0, "bf1_l_min": 0.0, "bt33": cold}
             )
@@ -1777,9 +1820,14 @@ class TestCalculateTapWaterCap:
                 {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
             )
 
-        # End event after 10 minutes (>= minimum): should update duration EMA.
+        # Flow stops after 10 minutes.
         end = start + timedelta(minutes=10)
         with patch("homeassistant.util.dt.utcnow", return_value=end):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        # Session gap expires → duration EMA is updated.
+        after_gap = end + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        with patch("homeassistant.util.dt.utcnow", return_value=after_gap):
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
 
         expected_learned_duration = (
@@ -1791,7 +1839,8 @@ class TestCalculateTapWaterCap:
 
         # Next no-flow poll must use learned duration for the minute conversion.
         with patch(
-            "homeassistant.util.dt.utcnow", return_value=end + timedelta(seconds=1)
+            "homeassistant.util.dt.utcnow",
+            return_value=after_gap + timedelta(seconds=1),
         ):
             values = {"bt30": 60.0, "bf1_l_min": 0.0}
             coordinator._calculate_tap_water_cap(values)
