@@ -168,7 +168,7 @@ class QvantumCalculationsMixin:
                 gap_sec = (now - self._shower_pause_time).total_seconds()
                 if gap_sec <= DHW_SESSION_GAP_SEC:
                     _LOGGER.debug(
-                        "Flow resumed after %.0f s pause — continuing shower session (gap ≤ %.0f s)",
+                        "Flow resumed after %.0f s pause — continuing tap-water session (gap ≤ %.0f s)",
                         gap_sec,
                         DHW_SESSION_GAP_SEC,
                     )
@@ -566,8 +566,12 @@ class QvantumCalculationsMixin:
                 is_warmup = True
                 warmup_progress = max(0.0, min(1.0, elapsed_warmup_sec / 60.0))
         else:
-            # Reset the window so the next flow onset triggers a fresh 60 s hold.
-            self._tap_water_cap_start_time = None
+            # Keep the warmup start time during short within-gap pauses so
+            # intermittent tap usage (on/off while rinsing dishes) does not
+            # repeatedly restart warmup and cause estimate dips. Reset only
+            # when no active session remains (already finalised or never started).
+            if self._shower_start_time is None:
+                self._tap_water_cap_start_time = None
 
         # Compute the EMA candidate without mutating state yet.  Using the same
         # formula in both warmup and post-warmup ensures the interpolation target

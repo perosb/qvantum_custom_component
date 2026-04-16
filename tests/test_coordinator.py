@@ -1298,7 +1298,10 @@ class TestCalculateTapWaterCap:
             assert "tap_water_cap" in values
 
     def test_flow_onset_resets_warmup(self):
-        """Each new flow onset starts a fresh 60 s hold before publishing."""
+        """A flow onset starts warmup; short pauses keep the same warmup window.
+
+        Warmup resets only after the session is finalised (gap expired).
+        """
         coordinator = self._make_coordinator()
         # No-flow baseline: publishes
         baseline = {"bt30": 60.0, "bf1_l_min": 0.0}
@@ -1311,16 +1314,24 @@ class TestCalculateTapWaterCap:
         assert values["tap_water_cap"] == baseline_cap
         assert coordinator._tap_water_cap_start_time is not None
 
-        # Flow stops: resets window; next no-flow poll publishes again
+        # Flow stops: within session gap, keep warmup window (do not reset yet).
         values_stopped = {"bt30": 60.0, "bf1_l_min": 0.0}
         coordinator._calculate_tap_water_cap(values_stopped)
         assert "tap_water_cap" in values_stopped
-        assert coordinator._tap_water_cap_start_time is None
-        # Flow starts again: new 60 s hold, retaining the last published value.
+        assert coordinator._tap_water_cap_start_time is not None
+        # Flow starts again within the open session: continue existing warmup
+        # window, retaining the last published value.
         values2 = {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0}
         coordinator._calculate_tap_water_cap(values2)
         assert values2["tap_water_cap"] == values_stopped["tap_water_cap"]
         assert values2["tap_water_minutes"] == values_stopped["tap_water_minutes"]
+
+        # After the session gap expires, warmup window resets.
+        coordinator._shower_pause_time = dt_util.utcnow() - timedelta(
+            seconds=DHW_SESSION_GAP_SEC + 1
+        )
+        coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        assert coordinator._tap_water_cap_start_time is None
 
     def test_warmup_fallback_minutes_use_current_duration(self):
         """If published minutes are missing, fallback uses current learned duration."""
