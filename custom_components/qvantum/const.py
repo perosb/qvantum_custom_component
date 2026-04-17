@@ -234,7 +234,7 @@ DHW_TANK_VOLUME_L = 175  # Hot water tank volume (L) — buffer tank per install
 DHW_DEFAULT_FLOW_LPM = 7.0  # Default shower flow rate when no recent observation (L/min)
 DHW_FLOW_SNAPSHOT_THRESHOLD_LPM = 0.1  # Minimum flow used to sample cold/flow values for tap_water_cap
 DHW_MIN_SHOWER_FLOW_LPM = (
-    3.0  # Minimum average session flow to qualify as a shower for EMA learning
+    3.0  # Minimum flow threshold used to open/continue shower sessions and to qualify completed sessions for EMA learning
 )
 DHW_DEFAULT_COLD_TEMP_C = (
     8.0  # Default cold water temperature when no recent observation (°C)
