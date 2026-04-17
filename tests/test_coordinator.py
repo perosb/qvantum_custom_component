@@ -16,6 +16,7 @@ from custom_components.qvantum.const import (
     DHW_CAP_HYSTERESIS_C,
     DHW_COMPRESSOR_STATE_HOT_WATER,
     DHW_EMA_ALPHA,
+    DHW_MIN_SHOWER_FLOW_LPM,
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_SESSION_GAP_SEC,
     DHW_SHOWER_DURATION_MIN,
@@ -1396,6 +1397,46 @@ class TestCalculateTapWaterCap:
 
         # Stability guard: the pulse sequence should stay smooth (no large swings).
         assert max(pulse_caps) - min(pulse_caps) <= 0.2
+
+    def test_low_flow_session_does_not_corrupt_shower_emas(self):
+        """A completed session whose avg flow is below DHW_MIN_SHOWER_FLOW_LPM
+        (e.g. dishwasher fill, hand-wash tap) must not update the shower
+        duration, flow, or temperature EMAs, and must not add an event record."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 17, 4, 20, 0, tzinfo=timezone.utc)
+
+        # Pre-seed known EMA state to verify it is unchanged after the session.
+        coordinator._last_shower_duration_min = 3.4
+        coordinator._last_shower_flow_lpm = 4.0
+        coordinator._last_shower_temp_c = 42.7
+
+        # Simulate ~2 minutes of low flow (0.9 L/min — dishwasher / tap fill).
+        for i in range(8):
+            with patch(
+                "custom_components.qvantum.calculations.dt_util.utcnow"
+            ) as mock_now:
+                mock_now.return_value = t0 + timedelta(seconds=i * 15)
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": 60.6, "bf1_l_min": 0.9, "bt33": 16.3, "bt34": 47.9}
+                )
+
+        # Flow stops; record pause time.
+        t_stop = t0 + timedelta(seconds=8 * 15)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_stop
+            coordinator._calculate_tap_water_cap({"bt30": 60.6, "bf1_l_min": 0.0})
+
+        # Gap expires — session finalizes.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+            coordinator._calculate_tap_water_cap({"bt30": 60.6, "bf1_l_min": 0.0})
+
+        # All three EMAs must be unchanged (0.9 L/min < DHW_MIN_SHOWER_FLOW_LPM).
+        assert coordinator._last_shower_duration_min == pytest.approx(3.4)
+        assert coordinator._last_shower_flow_lpm == pytest.approx(4.0)
+        assert coordinator._last_shower_temp_c == pytest.approx(42.7)
+        # No event recorded.
+        assert coordinator._shower_event_history == []
 
     def test_warmup_restarts_after_gap_expiry_then_flow_resumes(self):
         """If a pause exceeds the session gap, resumed flow starts a new warmup window."""

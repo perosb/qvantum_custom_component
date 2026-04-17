@@ -15,6 +15,7 @@ from .const import (
     DHW_DEFAULT_FLOW_LPM,
     DHW_EMA_ALPHA,
     DHW_FLOW_SNAPSHOT_THRESHOLD_LPM,
+    DHW_MIN_SHOWER_FLOW_LPM,
     DHW_MIN_SHOWER_DURATION_MIN,
     DHW_MIN_TEMPERATURE_DELTA_C,
     DHW_MAX_SHOWER_HISTORY_SIZE,
@@ -142,12 +143,29 @@ class QvantumCalculationsMixin:
             self._shower_pause_time - self._shower_start_time
         ).total_seconds() / 60.0
         if duration_min >= DHW_MIN_SHOWER_DURATION_MIN:
+            # Compute avg_flow early so it can gate all EMA learning below.
+            if self._shower_event_samples:
+                avg_flow = sum(s[1] for s in self._shower_event_samples) / len(
+                    self._shower_event_samples
+                )
+            else:
+                avg_flow = 0.0
+            flow_qualifies = avg_flow >= DHW_MIN_SHOWER_FLOW_LPM
+
             if session_dhw_reheating:
                 # During active DHW reheating, flow events are likely
                 # recirculation pulses — skip EMA learning.
                 _LOGGER.debug(
                     "Shower ended during reheating: duration=%.1f min — skipping EMA update (recirculation pulse)",
                     duration_min,
+                )
+            elif not flow_qualifies:
+                # Low average flow (dishwasher, hand-washing, etc.) — do not
+                # corrupt the shower EMAs with non-shower behaviour.
+                _LOGGER.debug(
+                    "Tap water session ended: avg_flow=%.2f L/min < min=%.1f — skipping EMA update (not a shower)",
+                    avg_flow,
+                    DHW_MIN_SHOWER_FLOW_LPM,
                 )
             else:
                 prior_dur = (
@@ -166,10 +184,11 @@ class QvantumCalculationsMixin:
                 )
 
             # Record completed session and update shower temp/flow EMAs.
-            if not session_dhw_reheating and self._shower_event_samples:
-                avg_flow = sum(s[1] for s in self._shower_event_samples) / len(
-                    self._shower_event_samples
-                )
+            if (
+                not session_dhw_reheating
+                and flow_qualifies
+                and self._shower_event_samples
+            ):
                 cold_samples = [
                     s[2] for s in self._shower_event_samples if s[2] is not None
                 ]
