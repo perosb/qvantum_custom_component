@@ -2527,3 +2527,346 @@ class TestCalculateTapWaterCap:
         # not slowly blending up from a stale ~1.0 EMA.
         assert coordinator._tap_water_cap_reheating_floor_mode is False
         assert values_recovered["tap_water_cap"] > 4.0
+
+    # ------------------------------------------------------------------
+    # Household scenario: back-to-back showers
+    # ------------------------------------------------------------------
+
+    def test_back_to_back_showers_samples_do_not_mix(self):
+        """Session A finalizes cleanly; session B starts with empty sample buffers."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc)
+
+        def _poll(t, bf1, bt30=60.0, bt33=10.0, bt34=None):
+            v = {"bt30": bt30, "bf1_l_min": bf1, "bt33": bt33}
+            if bt34 is not None:
+                v["bt34"] = bt34
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t
+                coordinator._calculate_tap_water_cap(v)
+            return v
+
+        # Shower A: 16 polls at 4 L/min (approx 4 minutes).
+        for i in range(16):
+            _poll(t0 + timedelta(seconds=i * 15), bf1=4.0, bt34=44.0)
+        t_a_stop = t0 + timedelta(seconds=16 * 15)
+        _poll(t_a_stop, bf1=0.0)
+        assert coordinator._shower_start_time is not None
+
+        # Session A finalises via gap expiry.
+        _poll(t_a_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1), bf1=0.0)
+        assert coordinator._shower_start_time is None
+        assert coordinator._shower_event_samples == []
+
+        # Shower B starts 2 minutes after session A ended.
+        t_b = t_a_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 120)
+        for i in range(16):
+            _poll(t_b + timedelta(seconds=i * 15), bf1=4.0, bt34=44.0)
+
+        # Session B samples must only contain polls from shower B.
+        assert len(coordinator._shower_event_samples) == 16
+        assert all(s[0] >= t_b.timestamp() for s in coordinator._shower_event_samples)
+
+    def test_back_to_back_showers_ema_updates_incrementally(self):
+        """Each completed shower shifts duration and flow EMAs by exactly one step."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 17, 7, 30, 0, tzinfo=timezone.utc)
+
+        def _run_shower(start, duration_sec=300, flow=4.0):
+            for i in range(duration_sec // 15):
+                with patch(
+                    "custom_components.qvantum.calculations.dt_util.utcnow"
+                ) as m:
+                    m.return_value = start + timedelta(seconds=i * 15)
+                    coordinator._calculate_tap_water_cap(
+                        {"bt30": 60.0, "bf1_l_min": flow, "bt33": 10.0, "bt34": 44.0}
+                    )
+            t_stop = start + timedelta(seconds=duration_sec)
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t_stop
+                coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+                coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        # Shower 1: 5 minutes at 4 L/min.
+        _run_shower(t0)
+        after_1_dur = coordinator._last_shower_duration_min
+        after_1_flow = coordinator._last_shower_flow_lpm
+        assert after_1_dur is not None
+        assert after_1_flow is not None
+
+        # Shower 2: slightly different duration and flow.
+        _run_shower(t0 + timedelta(hours=1), duration_sec=240, flow=5.0)
+        after_2_dur = coordinator._last_shower_duration_min
+        after_2_flow = coordinator._last_shower_flow_lpm
+
+        # Both EMAs must have moved after shower 2.
+        assert abs(after_2_dur - after_1_dur) > 0
+        assert abs(after_2_flow - after_1_flow) > 0
+        # Exactly 2 independent history entries.
+        assert len(coordinator._shower_event_history) == 2
+
+    # ------------------------------------------------------------------
+    # Household scenario: second shower before tank fully recovers
+    # ------------------------------------------------------------------
+
+    def test_second_shower_after_partial_recovery_seeds_from_real_raw(self):
+        """Tank at ~52 C after partial reheating: capacity for second shower
+        must be calculated from the actual tank temp, not a stale pre-depletion EMA."""
+        coordinator = self._make_warmed_up_coordinator()
+        coordinator._last_shower_temp_c = 43.8
+        coordinator._last_shower_cold_temp = 10.0
+        coordinator._last_shower_flow_lpm = 4.0
+        coordinator._last_shower_duration_min = 5.0
+        # No prior cap EMA (simulates state just after clearing due to reheating).
+        coordinator._last_tap_water_cap = None
+        coordinator._tap_water_cap_reheating_floor_mode = False
+
+        # First no-flow poll with tank partially recovered to 52 C.
+        values = {"bt30": 52.0, "bf1_l_min": 0.0}
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = datetime(2026, 4, 17, 6, 0, 0, tzinfo=timezone.utc)
+            coordinator._calculate_tap_water_cap(values)
+
+        # (52-10)/(43.8-10) = 42/33.8 ≈ 1.243 → valid ratio > 1
+        # minutes ≈ (175/4)*ln(1.243) ≈ 9.5 min → ~1.6 showers
+        assert values["tap_water_cap"] > 1.0
+        assert values["tap_water_cap"] < 4.0  # definitely not the pre-depletion ~6+
+        # EMA baseline now set to the real raw value (no prior EMA to drag it).
+        assert coordinator._last_tap_water_cap is not None
+        assert coordinator._last_tap_water_cap == pytest.approx(
+            values["tap_water_cap"], abs=0.2
+        )
+
+    # ------------------------------------------------------------------
+    # Household scenario: cold-inlet spike at session start
+    # ------------------------------------------------------------------
+
+    def test_cold_inlet_spike_diluted_by_rolling_buffer(self):
+        """Warm water in the cold pipe at session start (bt33 reads 22 C initially)
+        must not produce a wildly different capacity estimate once the real cold
+        water arrives: the rolling buffer mean smooths the spike quickly."""
+        coordinator = self._make_coordinator()
+        coordinator._last_shower_temp_c = 43.8
+        coordinator._last_shower_flow_lpm = 4.0
+        coordinator._last_shower_duration_min = 5.0
+        coordinator._last_tap_water_cap = 6.0
+        coordinator._last_published_tap_water_cap = 6.0
+        coordinator._last_published_tap_water_minutes = 30
+        coordinator._tap_water_cap_start_time = datetime(
+            2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc
+        ) - timedelta(seconds=65)
+
+        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc)
+
+        def _poll(t, cold):
+            v = {"bt30": 60.0, "bf1_l_min": 4.0, "bt33": cold}
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t
+                coordinator._calculate_tap_water_cap(v)
+            return v
+
+        # First poll: warm pipe water in cold line.
+        v0 = _poll(t0, cold=22.0)
+        cap_at_spike = v0["tap_water_cap"]
+
+        # Polls 1–4: cold drops as real cold water arrives.
+        v_settled = None
+        for i, cold in enumerate([18.0, 14.0, 11.0, 10.0], start=1):
+            v_settled = _poll(t0 + timedelta(seconds=i * 15), cold=cold)
+        cap_after_settle = v_settled["tap_water_cap"]
+
+        # Higher bt33 means less headroom → lower raw capacity.  The spike must not
+        # have inflated the estimate by more than 1.5 showers above steady state.
+        assert abs(cap_at_spike - cap_after_settle) <= 1.5
+
+    # ------------------------------------------------------------------
+    # Household scenario: bt30 sensor absent for one poll mid-session
+    # ------------------------------------------------------------------
+
+    def test_missing_bt30_mid_session_preserves_state(self):
+        """If bt30 is absent for one poll the function must early-return but leave
+        all session state (start time, samples) intact."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc)
+
+        # Open a session with two good polls.
+        for i in range(2):
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t0 + timedelta(seconds=i * 15)
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": 60.0, "bf1_l_min": 4.0, "bt33": 10.0}
+                )
+
+        session_start = coordinator._shower_start_time
+        samples_before = len(coordinator._shower_event_samples)
+        assert session_start is not None
+
+        # Poll with bt30 missing — should not crash and must not clear the session.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t0 + timedelta(seconds=30)
+            coordinator._calculate_tap_water_cap({"bf1_l_min": 4.0, "bt33": 10.0})
+
+        assert coordinator._shower_start_time == session_start
+        # Samples either stayed the same (early-return) or grew if the flow
+        # was still accumulated; either way, not reset to 0.
+        assert len(coordinator._shower_event_samples) >= samples_before
+
+    # ------------------------------------------------------------------
+    # Household scenario: HA restart with persisted EMA state
+    # ------------------------------------------------------------------
+
+    def test_post_restart_idle_uses_persisted_emas(self):
+        """After HA restart the coordinator has no in-flight session but
+        persisted EMAs. The first idle poll must produce a valid capacity."""
+        coordinator = self._make_warmed_up_coordinator()
+        coordinator._last_shower_temp_c = 43.8
+        coordinator._last_shower_cold_temp = 10.0
+        coordinator._last_shower_flow_lpm = 4.0
+        coordinator._last_shower_duration_min = 5.0
+        coordinator._last_tap_water_cap = 5.5
+        assert coordinator._shower_start_time is None
+        assert coordinator._shower_event_samples == []
+
+        values = {"bt30": 60.0, "bf1_l_min": 0.0}
+        coordinator._calculate_tap_water_cap(values)
+
+        assert "tap_water_cap" in values
+        assert values["tap_water_cap"] > 0.0
+
+    def test_post_restart_flow_onset_opens_fresh_session(self):
+        """After restart the first qualifying flow onset must create a new session
+        without any state conflicts from a pre-restart session."""
+        coordinator = self._make_coordinator()
+        coordinator._last_shower_temp_c = 43.8
+        coordinator._last_shower_cold_temp = 10.0
+        coordinator._last_shower_flow_lpm = 4.0
+        coordinator._last_shower_duration_min = 5.0
+        assert coordinator._shower_start_time is None
+        assert coordinator._tap_water_cap_start_time is None
+
+        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t0
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 60.0, "bf1_l_min": 4.0, "bt33": 10.0}
+            )
+
+        assert coordinator._shower_start_time == t0
+        assert coordinator._tap_water_cap_start_time == t0
+        assert len(coordinator._shower_event_samples) == 1
+
+    # ------------------------------------------------------------------
+    # Household scenario: low-flow burst after gap expired
+    # ------------------------------------------------------------------
+
+    def test_low_flow_burst_after_finalized_session_keeps_session_closed(self):
+        """Once a session is finalized by gap expiry, a low-flow burst (0.8 L/min,
+        below DHW_MIN_SHOWER_FLOW_LPM) must not reopen a session."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc)
+
+        def _poll(t, bf1, bt30=60.0):
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": bt30, "bf1_l_min": bf1, "bt33": 10.0}
+                )
+
+        # Qualifying shower.
+        for i in range(8):
+            _poll(t0 + timedelta(seconds=i * 15), bf1=4.0)
+        t_stop = t0 + timedelta(seconds=8 * 15)
+        _poll(t_stop, bf1=0.0)
+        _poll(t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1), bf1=0.0)
+        assert coordinator._shower_start_time is None  # confirmed finalised
+
+        # Low-flow burst.
+        _poll(t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 30), bf1=0.8)
+        assert coordinator._shower_start_time is None
+
+    # ------------------------------------------------------------------
+    # Household scenario: seasonal cold-water temperature swing
+    # ------------------------------------------------------------------
+
+    def test_cold_ema_converges_toward_summer_temperature(self):
+        """When cold inlet rises from 8 C (winter) to 18 C (summer) the
+        cold-temperature EMA must converge monotonically toward 18 C."""
+        coordinator = self._make_coordinator()
+        coordinator._last_shower_cold_temp = 8.0
+        t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=timezone.utc)
+
+        cold_readings = []
+        for i in range(10):
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t0 + timedelta(seconds=i * 15)
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": 60.0, "bf1_l_min": 4.0, "bt33": 18.0}
+                )
+            cold_readings.append(coordinator._last_shower_cold_temp)
+
+        # EMA must be strictly increasing (each poll has fresh bt33=18.0 in window).
+        assert cold_readings[0] > 8.0
+        assert all(
+            cold_readings[i] <= cold_readings[i + 1]
+            for i in range(len(cold_readings) - 1)
+        )
+        assert cold_readings[-1] < 18.0  # asymptotic; not fully converged in 10 polls
+
+    # ------------------------------------------------------------------
+    # Household scenario: very short shower (minimum qualifying length)
+    # ------------------------------------------------------------------
+
+    def test_short_qualifying_shower_creates_history_entry(self):
+        """A 75-second rinse at 4 L/min (> DHW_MIN_SHOWER_DURATION_MIN=1.0 min)
+        must finalize and add exactly one entry to the history."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=timezone.utc)
+
+        # 5 polls × 15 s = 75 s active flow.
+        for i in range(5):
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t0 + timedelta(seconds=i * 15)
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": 60.0, "bf1_l_min": 4.0, "bt33": 10.0, "bt34": 44.0}
+                )
+        t_stop = t0 + timedelta(seconds=75)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_stop
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        # 75 s = 1.25 min ≥ DHW_MIN_SHOWER_DURATION_MIN → must be learned.
+        assert coordinator._last_shower_duration_min is not None
+        assert coordinator._last_shower_flow_lpm is not None
+        assert len(coordinator._shower_event_history) == 1
+        assert coordinator._shower_event_history[0]["duration_min"] == pytest.approx(
+            1.25, abs=0.1
+        )
+
+    def test_burst_just_below_min_duration_ignored(self):
+        """A 45-second burst (0.75 min < DHW_MIN_SHOWER_DURATION_MIN) at qualifying
+        flow must not create a history entry or update duration/flow EMAs."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=timezone.utc)
+
+        for i in range(3):
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t0 + timedelta(seconds=i * 15)
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": 60.0, "bf1_l_min": 4.0, "bt33": 10.0}
+                )
+        t_stop = t0 + timedelta(seconds=45)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_stop
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        assert coordinator._last_shower_duration_min is None
+        assert coordinator._last_shower_flow_lpm is None
+        assert coordinator._shower_event_history == []
