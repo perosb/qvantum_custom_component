@@ -1399,9 +1399,9 @@ class TestCalculateTapWaterCap:
         assert max(pulse_caps) - min(pulse_caps) <= 0.2
 
     def test_low_flow_session_does_not_corrupt_shower_emas(self):
-        """A completed session whose avg flow is below DHW_MIN_SHOWER_FLOW_LPM
-        (e.g. dishwasher fill, hand-wash tap) must not update the shower
-        duration, flow, or temperature EMAs, and must not add an event record."""
+        """Flow below DHW_MIN_SHOWER_FLOW_LPM (dishwasher, hand-wash, tooth brushing)
+        must not start a tracked session and must not update any shower EMA or add
+        an event record — even after the flow-snapshot gap expires."""
         coordinator = self._make_coordinator()
         t0 = datetime(2026, 4, 17, 4, 20, 0, tzinfo=timezone.utc)
 
@@ -1435,8 +1435,63 @@ class TestCalculateTapWaterCap:
         assert coordinator._last_shower_duration_min == pytest.approx(3.4)
         assert coordinator._last_shower_flow_lpm == pytest.approx(4.0)
         assert coordinator._last_shower_temp_c == pytest.approx(42.7)
-        # No event recorded.
+        # No event recorded — and crucially no session was ever opened.
         assert coordinator._shower_event_history == []
+        assert coordinator._shower_start_time is None
+
+    def test_low_flow_bursts_do_not_extend_session_gap(self):
+        """Repeated low-flow bursts (tooth brushing) after a shower must not
+        extend the session gap.  The session must finalize once DHW_SESSION_GAP_SEC
+        elapses since the last qualifying-flow stop, regardless of how many low-flow
+        bursts happen in between."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 17, 5, 0, 0, tzinfo=timezone.utc)
+
+        # Real shower: qualifying flow for 2 minutes.
+        for i in range(8):
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t0 + timedelta(seconds=i * 15)
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": 60.0, "bf1_l_min": 4.0, "bt33": 10.0}
+                )
+        # Shower stops.
+        t_stop = t0 + timedelta(seconds=8 * 15)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_stop
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        assert coordinator._shower_start_time is not None  # session open
+        assert coordinator._shower_pause_time == t_stop
+
+        # Three tooth-brushing bursts, each well within DHW_SESSION_GAP_SEC of
+        # each other, at 0.8 L/min (below DHW_MIN_SHOWER_FLOW_LPM=3.0).
+        for burst_start in [
+            t_stop + timedelta(seconds=60),
+            t_stop + timedelta(seconds=150),
+            t_stop + timedelta(seconds=240),
+        ]:
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = burst_start
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": 60.0, "bf1_l_min": 0.8, "bt33": 10.0}
+                )
+            # Pause time must still point to t_stop — burst must not extend it.
+            assert coordinator._shower_pause_time == t_stop, (
+                f"burst at +{(burst_start - t_stop).seconds}s extended _shower_pause_time"
+            )
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = burst_start + timedelta(seconds=5)
+                coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+            assert coordinator._shower_pause_time == t_stop
+
+        # Once DHW_SESSION_GAP_SEC elapses from t_stop the session must finalize.
+        t_finalize = t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_finalize
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        assert coordinator._shower_start_time is None
+        assert coordinator._shower_pause_time is None
 
     def test_warmup_restarts_after_gap_expiry_then_flow_resumes(self):
         """If a pause exceeds the session gap, resumed flow starts a new warmup window."""
@@ -2412,3 +2467,63 @@ class TestCalculateTapWaterCap:
         # Without reheating, tank at 49°C vs shower at 47.2°C gives ≈ 1 min raw.
         # EMA is None so raw is used directly; result must be below the learned duration floor.
         assert values["tap_water_minutes"] < round(coordinator._last_shower_duration_min)
+
+    def test_ema_frozen_during_reheating_floor(self):
+        """While the reheating floor clamps raw=1.0, _last_tap_water_cap must not be
+        updated so the EMA does not decay toward 1.0 and cause a slow recovery."""
+        coordinator = self._make_warmed_up_coordinator()
+        coordinator._last_shower_temp_c = 43.8
+        coordinator._last_shower_cold_temp = 8.4
+        coordinator._last_shower_flow_lpm = 3.4
+        coordinator._last_shower_duration_min = 3.7
+        # Seed a realistic mid-shower EMA baseline.
+        coordinator._last_tap_water_cap = 3.0
+
+        # Ten consecutive polls with tank below shower temp while reheating.
+        for _ in range(10):
+            values = {
+                "bt30": 42.0,
+                "bf1_l_min": 0.0,
+                "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+            }
+            coordinator._calculate_tap_water_cap(values)
+
+        # EMA baseline must remain None (reset on first floor-entry) rather than
+        # having decayed toward 1.0 over the 10 floored polls.
+        assert coordinator._last_tap_water_cap is None
+        assert coordinator._tap_water_cap_reheating_floor_mode is True
+
+    def test_ema_recovers_cleanly_after_reheating_floor(self):
+        """After the floor is no longer binding, the first non-floor poll must seed
+        the EMA from the real raw value (not blend from a stale ~1.0 baseline)."""
+        coordinator = self._make_warmed_up_coordinator()
+        coordinator._last_shower_temp_c = 43.8
+        coordinator._last_shower_cold_temp = 8.4
+        coordinator._last_shower_flow_lpm = 3.4
+        coordinator._last_shower_duration_min = 3.7
+        coordinator._last_tap_water_cap = 3.0
+
+        # Push through several floored polls (tank well below shower temp, reheating on).
+        for _ in range(5):
+            values = {
+                "bt30": 42.0,
+                "bf1_l_min": 0.0,
+                "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+            }
+            coordinator._calculate_tap_water_cap(values)
+
+        assert coordinator._tap_water_cap_reheating_floor_mode is True
+
+        # Tank recovers past shower temp; reheating still on but log model now
+        # returns > calc_shower_duration so floor is no longer binding.
+        values_recovered = {
+            "bt30": 60.0,
+            "bf1_l_min": 0.0,
+            "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+        }
+        coordinator._calculate_tap_water_cap(values_recovered)
+
+        # Floor mode must be cleared and the published cap must be well above 1.0,
+        # not slowly blending up from a stale ~1.0 EMA.
+        assert coordinator._tap_water_cap_reheating_floor_mode is False
+        assert values_recovered["tap_water_cap"] > 4.0
