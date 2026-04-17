@@ -399,10 +399,16 @@ class QvantumCalculationsMixin:
                         self._last_active_flow_sample_time = now
                     # _shower_pause_time is already None after finalization.
 
-            # Only accumulate active-flow time when a session is open and not
-            # paused. Low-flow bursts leave _shower_pause_time set (or never
-            # start a session) so they are excluded from active-duration tracking.
-            if self._shower_start_time is not None and self._shower_pause_time is None:
+            # Only accumulate session-scoped learning inputs when a session is
+            # open and not paused. Low-flow bursts leave _shower_pause_time set
+            # so they are excluded from gap extension and from learning inputs.
+            session_is_active_for_learning = (
+                self._shower_start_time is not None and self._shower_pause_time is None
+            )
+
+            # Active-flow duration should advance only while the session is
+            # actively flowing (not paused).
+            if session_is_active_for_learning:
                 if (
                     self._last_active_flow_sample_time is not None
                     and self._last_active_flow_sample_time != now
@@ -412,37 +418,40 @@ class QvantumCalculationsMixin:
                     ).total_seconds()
                 self._last_active_flow_sample_time = now
 
-            self._session_dhw_reheating = self._session_dhw_reheating or bool(
-                dhw_reheating
-            )
-
-            # Phase 1: maintain a rolling 60-second buffer of flow/cold readings.
-            ts = now.timestamp()
-            self._flow_rolling_buffer.append((ts, flow, cold))
-            cutoff = ts - DHW_ROLLING_BUFFER_WINDOW_SEC
-            self._flow_rolling_buffer = [
-                s for s in self._flow_rolling_buffer if s[0] >= cutoff
-            ]
-
-            if cold is not None:
-                prior_cold = (
-                    self._last_shower_cold_temp
-                    if self._last_shower_cold_temp is not None
-                    else DHW_DEFAULT_COLD_TEMP_C
+            if session_is_active_for_learning:
+                self._session_dhw_reheating = self._session_dhw_reheating or bool(
+                    dhw_reheating
                 )
-                self._last_shower_cold_temp = (
-                    DHW_EMA_ALPHA * cold + (1 - DHW_EMA_ALPHA) * prior_cold
-                )
-            # Collect outlet temp for end-of-shower statistics and temperature learning.
-            # The shower temperature EMA is NOT updated here; it is updated once at the
-            # end of flow using the early-stable window (60–180 s post-onset) to avoid
-            # the EMA being driven upward by the rising bt34 readings that occur during
-            # a long shower as the thermostatic valve opens wider to compensate for
-            # tank depletion.
-            outlet_temp = values.get("bt34")
 
-            # Phase 2: accumulate per-event samples for end-of-shower statistics.
-            self._shower_event_samples.append((ts, flow, cold, outlet_temp))
+                # Phase 1: maintain a rolling 60-second buffer of flow/cold
+                # readings for the active session.
+                ts = now.timestamp()
+                self._flow_rolling_buffer.append((ts, flow, cold))
+                cutoff = ts - DHW_ROLLING_BUFFER_WINDOW_SEC
+                self._flow_rolling_buffer = [
+                    s for s in self._flow_rolling_buffer if s[0] >= cutoff
+                ]
+
+                if cold is not None:
+                    prior_cold = (
+                        self._last_shower_cold_temp
+                        if self._last_shower_cold_temp is not None
+                        else DHW_DEFAULT_COLD_TEMP_C
+                    )
+                    self._last_shower_cold_temp = (
+                        DHW_EMA_ALPHA * cold + (1 - DHW_EMA_ALPHA) * prior_cold
+                    )
+                # Collect outlet temp for end-of-shower statistics and
+                # temperature learning.
+                # The shower temperature EMA is NOT updated here; it is updated
+                # once at the end of flow using the early-stable window (60–180
+                # s post-onset) to avoid the EMA being driven upward by rising
+                # bt34 readings that occur during a long shower.
+                outlet_temp = values.get("bt34")
+
+                # Phase 2: accumulate per-event samples for end-of-shower
+                # statistics.
+                self._shower_event_samples.append((ts, flow, cold, outlet_temp))
         else:
             # Flow is not active.
             if self._shower_start_time is not None:

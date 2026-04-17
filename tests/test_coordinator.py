@@ -1462,6 +1462,7 @@ class TestCalculateTapWaterCap:
 
         assert coordinator._shower_start_time is not None  # session open
         assert coordinator._shower_pause_time == t_stop
+        samples_before_bursts = len(coordinator._shower_event_samples)
 
         # Three tooth-brushing bursts, each well within DHW_SESSION_GAP_SEC of
         # each other, at 0.8 L/min (below DHW_MIN_SHOWER_FLOW_LPM=3.0).
@@ -1483,6 +1484,7 @@ class TestCalculateTapWaterCap:
                 m.return_value = burst_start + timedelta(seconds=5)
                 coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
             assert coordinator._shower_pause_time == t_stop
+            assert len(coordinator._shower_event_samples) == samples_before_bursts
 
         # Once DHW_SESSION_GAP_SEC elapses from t_stop the session must finalize.
         t_finalize = t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
@@ -1492,6 +1494,53 @@ class TestCalculateTapWaterCap:
 
         assert coordinator._shower_start_time is None
         assert coordinator._shower_pause_time is None
+
+    def test_paused_low_flow_bursts_do_not_pollute_finalized_event_metrics(self):
+        """Low-flow bursts while a session is paused must not change finalized
+        session metrics (avg_flow, avg_cold, avg_outlet_temp, water_used_l)."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 17, 5, 30, 0, tzinfo=timezone.utc)
+
+        # Qualifying shower: 8 polls over 2 minutes at 4.0 L/min.
+        for i in range(8):
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t0 + timedelta(seconds=i * 15)
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": 60.0, "bf1_l_min": 4.0, "bt33": 10.0, "bt34": 44.0}
+                )
+
+        # Pause starts here.
+        t_stop = t0 + timedelta(seconds=8 * 15)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_stop
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        samples_before_bursts = len(coordinator._shower_event_samples)
+
+        # Paused low-flow bursts with very different cold/outlet temps.
+        for burst_start in [
+            t_stop + timedelta(seconds=60),
+            t_stop + timedelta(seconds=150),
+        ]:
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = burst_start
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": 60.0, "bf1_l_min": 0.8, "bt33": 25.0, "bt34": 52.0}
+                )
+            assert len(coordinator._shower_event_samples) == samples_before_bursts
+            assert coordinator._shower_pause_time == t_stop
+
+        # Finalize after session gap.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        assert len(coordinator._shower_event_history) == 1
+        event = coordinator._shower_event_history[0]
+        assert event["avg_flow"] == pytest.approx(4.0, abs=0.01)
+        assert event["avg_cold"] == pytest.approx(10.0, abs=0.01)
+        assert event["avg_outlet_temp"] == pytest.approx(44.0, abs=0.01)
+        assert event["water_used_l"] == pytest.approx(8.0, abs=0.1)
 
     def test_warmup_restarts_after_gap_expiry_then_flow_resumes(self):
         """If a pause exceeds the session gap, resumed flow starts a new warmup window."""
