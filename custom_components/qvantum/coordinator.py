@@ -115,8 +115,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._session_started_with_reheating: bool = (
             False  # True if DHW reheating was already active when this session started
         )
-        self._session_active_flow_duration_sec: float = (
-            0.0  # cumulative active-flow time within current session
+        self._session_active_flow_duration_sec: float | None = (
+            None  # cumulative active-flow time within current session; None until first session starts
         )
         self._last_active_flow_sample_time: datetime | None = None
         self._flow_rolling_buffer: list = []  # [(timestamp, flow, cold)] within 60-second window
