@@ -139,13 +139,24 @@ class QvantumCalculationsMixin:
             self, "_session_started_with_reheating", False
         )
         active_flow_duration_sec = getattr(
-            self, "_session_active_flow_duration_sec", 0.0
+            self, "_session_active_flow_duration_sec", None
         )
 
         duration_min = (
             self._shower_pause_time - self._shower_start_time
         ).total_seconds() / 60.0
-        if duration_min >= DHW_MIN_SHOWER_DURATION_MIN:
+        # Use active-flow time (excludes mid-session pauses) so a short rinse
+        # followed by a long pause does not inflate the qualifying duration.
+        # None means the attribute was never set via polling (test state with manually
+        # seeded session fields); fall back to wall-clock only in that case.
+        # An explicit 0.0 means polling ran but no active-flow time accumulated,
+        # which correctly yields 0 min and fails the minimum duration check.
+        active_flow_min = (
+            active_flow_duration_sec / 60.0
+            if active_flow_duration_sec is not None
+            else duration_min
+        )
+        if active_flow_min >= DHW_MIN_SHOWER_DURATION_MIN:
             # Compute avg_flow early so it can gate all EMA learning below.
             if self._shower_event_samples:
                 avg_flow = sum(s[1] for s in self._shower_event_samples) / len(
@@ -213,10 +224,13 @@ class QvantumCalculationsMixin:
                     if outlet_samples
                     else None
                 )
-                active_flow_duration_min = active_flow_duration_sec / 60.0
-                if active_flow_duration_min <= 0:
-                    # Defensive fallback for manually seeded test state.
+                if active_flow_duration_sec is None or active_flow_duration_sec <= 0:
+                    # None = not tracked via polling (test state); 0 = no flow time
+                    # accumulated. Fall back to wall-clock duration in both cases so
+                    # water_used_l is at least a reasonable estimate.
                     active_flow_duration_min = duration_min
+                else:
+                    active_flow_duration_min = active_flow_duration_sec / 60.0
                 water_used_l = avg_flow * active_flow_duration_min
                 # Update the shower flow EMA once per completed session
                 # (same pattern as shower duration EMA) so that unrelated
@@ -317,7 +331,7 @@ class QvantumCalculationsMixin:
         self._shower_pause_time = None
         self._session_dhw_reheating = False
         self._session_started_with_reheating = False
-        self._session_active_flow_duration_sec = 0.0
+        self._session_active_flow_duration_sec = None
         self._last_active_flow_sample_time = None
         self._flow_rolling_buffer.clear()
         self._shower_event_samples.clear()

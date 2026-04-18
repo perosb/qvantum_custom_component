@@ -2911,7 +2911,7 @@ class TestCalculateTapWaterCap:
     # ------------------------------------------------------------------
 
     def test_short_qualifying_shower_creates_history_entry(self):
-        """A 75-second rinse at 4 L/min (> DHW_MIN_SHOWER_DURATION_MIN=1.0 min)
+        """A 75-second active-flow rinse at 4 L/min (> DHW_MIN_SHOWER_DURATION_MIN=1.0 min)
         must finalize and add exactly one entry to the history."""
         coordinator = self._make_coordinator()
         t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=timezone.utc)
@@ -2931,7 +2931,7 @@ class TestCalculateTapWaterCap:
             m.return_value = t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
 
-        # 75 s = 1.25 min ≥ DHW_MIN_SHOWER_DURATION_MIN → must be learned.
+        # 75 s active flow = 1.25 min ≥ DHW_MIN_SHOWER_DURATION_MIN → must be learned.
         assert coordinator._last_shower_duration_min is not None
         assert coordinator._last_shower_flow_lpm is not None
         assert len(coordinator._shower_event_history) == 1
@@ -2940,7 +2940,7 @@ class TestCalculateTapWaterCap:
         )
 
     def test_burst_just_below_min_duration_ignored(self):
-        """A 45-second burst (0.75 min < DHW_MIN_SHOWER_DURATION_MIN) at qualifying
+        """A 45-second active-flow burst (0.75 min < DHW_MIN_SHOWER_DURATION_MIN) at qualifying
         flow must not create a history entry or update duration/flow EMAs."""
         coordinator = self._make_coordinator()
         t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=timezone.utc)
@@ -2960,5 +2960,53 @@ class TestCalculateTapWaterCap:
             coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
 
         assert coordinator._last_shower_duration_min is None
+        assert coordinator._last_shower_flow_lpm is None
+        assert coordinator._shower_event_history == []
+
+    def test_short_burst_with_long_mid_session_pause_not_learned(self):
+        """A ~30 s rinse followed by a ~79 s pause (within gap) must NOT be learned.
+
+        Wall-clock duration (start → final flow-stop) can exceed the threshold
+        because of the pause, but active-flow duration is only ~30 s (0.5 min),
+        which is below DHW_MIN_SHOWER_DURATION_MIN=1.0 min.  This matches the
+        real-world scenario where someone turns the tap on briefly, waits, then
+        taps again — the session should not corrupt shower EMAs.
+        """
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 18, 7, 0, 0, tzinfo=timezone.utc)
+
+        # First burst: ~30 s of active flow (2 polls × 15 s).
+        for i in range(2):
+            with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+                m.return_value = t0 + timedelta(seconds=i * 15)
+                coordinator._calculate_tap_water_cap(
+                    {"bt30": 59.0, "bf1_l_min": 5.2, "bt33": 11.0, "bt34": 43.0}
+                )
+        t_pause = t0 + timedelta(seconds=30)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_pause
+            coordinator._calculate_tap_water_cap({"bt30": 59.0, "bf1_l_min": 0.0})
+
+        # 79 s pause — still within 90 s gap, session continues.
+        t_resume = t_pause + timedelta(seconds=79)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_resume
+            coordinator._calculate_tap_water_cap(
+                {"bt30": 59.0, "bf1_l_min": 5.2, "bt33": 11.0, "bt34": 43.0}
+            )
+        t_stop = t_resume + timedelta(seconds=15)
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_stop
+            coordinator._calculate_tap_water_cap({"bt30": 59.0, "bf1_l_min": 0.0})
+
+        # Expire gap to trigger finalization.
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
+            m.return_value = t_stop + timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
+            coordinator._calculate_tap_water_cap({"bt30": 59.0, "bf1_l_min": 0.0})
+
+        # Wall-clock duration > 1 min, but active-flow duration = 0.75 min < threshold.
+        assert coordinator._last_shower_duration_min is None, (
+            "Short active-flow session with long pause must not update duration EMA"
+        )
         assert coordinator._last_shower_flow_lpm is None
         assert coordinator._shower_event_history == []
