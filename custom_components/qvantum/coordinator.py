@@ -112,6 +112,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             None  # Timestamp when flow last stopped (used for session continuation gap)
         )
         self._session_dhw_reheating: bool = False
+        self._session_started_with_reheating: bool = (
+            False  # True if DHW reheating was already active when this session started
+        )
         self._session_active_flow_duration_sec: float = (
             0.0  # cumulative active-flow time within current session
         )

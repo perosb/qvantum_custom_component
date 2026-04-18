@@ -250,7 +250,7 @@ DHW_ROLLING_BUFFER_WINDOW_SEC = (
 DHW_MIN_SHOWER_DURATION_MIN = 1.0  # Minimum event duration to count as a shower
 DHW_SHOWER_DURATION_MIN = 6.0  # Duration of one shower in minutes
 DHW_SESSION_GAP_SEC = (
-    300.0  # Max pause between flow bursts to still treat as one shower session (5 min)
+    90.0  # Max pause between flow bursts to still treat as one shower session (90 s)
 )
 DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC = (
     180  # Maximum seconds since shower onset for the temperature-stability check (s)
@@ -264,7 +264,7 @@ DHW_MAX_SHOWER_HISTORY_SIZE = (
     10  # Maximum number of completed shower events retained in history
 )
 DHW_EMA_ALPHA = (
-    0.2  # EMA smoothing factor for tap_water_cap (0=no change, 1=no smoothing)
+    0.3  # EMA smoothing factor for tap_water_cap (0=no change, 1=no smoothing)
 )
 
 # Tap water capacity mappings (start, stop) -> capacity

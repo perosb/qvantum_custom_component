@@ -1395,7 +1395,7 @@ class TestCalculateTapWaterCap:
         assert coordinator._last_shower_flow_lpm is None
 
         # Stability guard: the pulse sequence should stay smooth (no large swings).
-        assert max(pulse_caps) - min(pulse_caps) <= 0.2
+        assert max(pulse_caps) - min(pulse_caps) <= 0.3
 
     def test_low_flow_session_does_not_corrupt_shower_emas(self):
         """Flow below DHW_MIN_SHOWER_FLOW_LPM (dishwasher, hand-wash, tooth brushing)
@@ -1466,9 +1466,9 @@ class TestCalculateTapWaterCap:
         # Three tooth-brushing bursts, each well within DHW_SESSION_GAP_SEC of
         # each other, at 0.8 L/min (below DHW_MIN_SHOWER_FLOW_LPM=3.0).
         for burst_start in [
+            t_stop + timedelta(seconds=20),
+            t_stop + timedelta(seconds=40),
             t_stop + timedelta(seconds=60),
-            t_stop + timedelta(seconds=150),
-            t_stop + timedelta(seconds=240),
         ]:
             with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
                 m.return_value = burst_start
@@ -1518,8 +1518,8 @@ class TestCalculateTapWaterCap:
 
         # Paused low-flow bursts with very different cold/outlet temps.
         for burst_start in [
-            t_stop + timedelta(seconds=60),
-            t_stop + timedelta(seconds=150),
+            t_stop + timedelta(seconds=20),
+            t_stop + timedelta(seconds=50),
         ]:
             with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
                 m.return_value = burst_start
@@ -1668,9 +1668,9 @@ class TestCalculateTapWaterCap:
         assert coordinator._last_shower_flow_lpm is not None
         assert coordinator._last_shower_duration_min is not None
 
-    def test_session_reheating_flag_is_ored_across_samples(self):
-        """If any active-flow sample in a session indicates reheating, finalization must
-        treat the whole session as reheating-driven and skip EMA/history learning."""
+    def test_session_reheating_mid_session_allows_ema_learning(self):
+        """Reheating that turns on MID-session (triggered by hot water draw) must NOT
+        suppress EMA learning — the session is a real shower, not a recirculation pulse."""
         coordinator = self._make_coordinator()
         start = dt_util.utcnow()
 
@@ -1678,7 +1678,51 @@ class TestCalculateTapWaterCap:
             coordinator._calculate_tap_water_cap(
                 {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
             )
-        # A later active-flow sample shows reheating; this should mark the session.
+        # Reheating kicks in mid-session as the tank depletes — still a real shower.
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=90)
+        ):
+            coordinator._calculate_tap_water_cap(
+                {
+                    "bt30": 60.0,
+                    "bf1_l_min": 6.0,
+                    "bt33": 10.0,
+                    "bt34": 39.0,
+                    "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+                }
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=120)
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        with patch(
+            "homeassistant.util.dt.utcnow",
+            return_value=start + timedelta(seconds=120 + DHW_SESSION_GAP_SEC + 1),
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        # EMA SHOULD be updated — reheating started mid-session, not at onset.
+        assert len(coordinator._shower_event_history) == 1
+        assert coordinator._last_shower_flow_lpm is not None
+        assert coordinator._last_shower_duration_min is not None
+
+    def test_session_reheating_at_start_skips_ema_learning(self):
+        """If DHW reheating is already active when flow starts, the session is a
+        recirculation pulse — EMA/history learning must be skipped."""
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+
+        # Reheating is active from the very first poll (before/at session start).
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {
+                    "bt30": 60.0,
+                    "bf1_l_min": 6.0,
+                    "bt33": 10.0,
+                    "bt34": 39.0,
+                    "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+                }
+            )
         with patch(
             "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=90)
         ):
@@ -1783,7 +1827,7 @@ class TestCalculateTapWaterCap:
           _last_tap_water_cap = 5.0  (inflated prior)
           bt30=60°C, cold/flow/shower defaults
           → raw_showers ≈ 2.27
-          → EMA candidate = 0.2*2.27 + 0.8*5.0 = 4.454  → published ≈ 4.5
+          → EMA candidate = 0.3*2.27 + 0.7*5.0 = 4.181  → published ≈ 4.2
         """
         coordinator = self._make_coordinator()
         t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=timezone.utc)
@@ -1803,7 +1847,7 @@ class TestCalculateTapWaterCap:
         assert values["tap_water_cap"] > 2.0, (
             "EMA must not jump all the way to the raw value in one step"
         )
-        assert pytest.approx(4.5, abs=0.1) == values["tap_water_cap"]
+        assert pytest.approx(4.2, abs=0.1) == values["tap_water_cap"]
         # State must have advanced.
         assert coordinator._last_tap_water_cap < 5.0
         # Warmup window must have been cleared (no flow).
@@ -1822,9 +1866,9 @@ class TestCalculateTapWaterCap:
           _last_published_tap_water_cap = 5.0
           _last_published_tap_water_minutes = 30
           bt30=60°C, cold=10°C (in buffer), flow=7 L/min (in buffer), shower_temp=38°C
-          → raw_showers ≈ (175/7)*ln(50/28)/6 ≈ 2.82
-          → EMA candidate = 0.2*2.82 + 0.8*5.0 = 4.564  → published_cap = 4.6
-          → warmup output = round(5.0 + (4.6 - 5.0) * 0.5, 1) = round(4.8, 1) = 4.8
+          → raw_showers ≈ (175/7)*ln(50/28)/6 ≈ 2.42
+          → EMA candidate = 0.3*2.42 + 0.7*5.0 = 4.226  → published_cap = 4.2
+          → warmup output = round(5.0 + (4.2 - 5.0) * 0.5, 1) = round(4.6, 1) = 4.6
         Old broken output would have been 5.0 (no-op ramp).
         """
         coordinator = self._make_coordinator()
@@ -1845,13 +1889,13 @@ class TestCalculateTapWaterCap:
         # Arithmetic (log model):
         #   minutes = (175/7) * ln((60-10)/(38-10)) = 25 * ln(50/28) ≈ 14.49
         #   raw_showers = 14.49 / 6 ≈ 2.42
-        #   EMA candidate = 0.2*2.42 + 0.8*5.0 = 4.484  → published_cap = round(4.484,1) = 4.5
-        #   published_minutes = round(4.5 * 6) = 27
-        #   warmup output cap = round(5.0 + (4.5 - 5.0) * 0.5, 1) = round(4.75, 1) = 4.8
-        #   warmup output minutes = round(30 + (27 - 30) * 0.5) = round(28.5) = 28
+        #   EMA candidate = 0.3*2.42 + 0.7*5.0 = 4.226  → published_cap = round(4.226,1) = 4.2
+        #   published_minutes = round(4.226 * 6) = round(25.4) = 25
+        #   warmup output cap = round(5.0 + (4.2 - 5.0) * 0.5, 1) = round(4.6, 1) = 4.6
+        #   warmup output minutes = round(30 + (25 - 30) * 0.5) = round(27.5) = 28
         # Old (broken) output: smoothed = _last_tap_water_cap = 5.0
         #   → published_cap = 5.0 → interp: 5.0 + (5.0-5.0)*0.5 = 5.0  (no-op)
-        assert values["tap_water_cap"] == pytest.approx(4.8, abs=0.05), (
+        assert values["tap_water_cap"] == pytest.approx(4.6, abs=0.05), (
             "Warmup ramp must interpolate toward the EMA candidate, not the frozen prior"
         )
         assert values["tap_water_minutes"] == 28
@@ -1877,8 +1921,8 @@ class TestCalculateTapWaterCap:
         coordinator = self._make_coordinator()
         values = {"bt30": 60.0, "bf1_l_min": 6.5, "bt33": 12.0}
         coordinator._calculate_tap_water_cap(values)
-        # cold: 0.2 * 12.0 + 0.8 * 8.0 = 8.8 (EMA from DHW_DEFAULT_COLD_TEMP_C prior)
-        assert coordinator._last_shower_cold_temp == pytest.approx(8.8)
+        # cold: 0.3 * 12.0 + 0.7 * 8.0 = 9.2 (EMA from DHW_DEFAULT_COLD_TEMP_C prior)
+        assert coordinator._last_shower_cold_temp == pytest.approx(9.2)
         # flow EMA is NOT updated during an in-progress flow poll — stays None until
         # the session finalises so that non-shower flow events do not corrupt it.
         assert coordinator._last_shower_flow_lpm is None
@@ -1907,9 +1951,9 @@ class TestCalculateTapWaterCap:
         coordinator = self._make_warmed_up_coordinator()
         # First poll: showering with raw readings (cold=10, flow=6.0)
         # Log model: minutes = 175/7.0 * ln(50/28) ≈ 14.5; showers ≈ 2.42  (calc_flow=default 7.0)
-        # cold EMA stored: 0.2*10+0.8*8=8.4; flow EMA only updates at end-of-session.
+        # cold EMA stored: 0.3*10+0.7*8=8.6; flow EMA only updates at end-of-session.
         coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0})
-        assert coordinator._last_shower_cold_temp == pytest.approx(8.4)
+        assert coordinator._last_shower_cold_temp == pytest.approx(8.6)
         # flow EMA remains None until a session finalises
         assert coordinator._last_shower_flow_lpm is None
         # Advance past the new warmup window

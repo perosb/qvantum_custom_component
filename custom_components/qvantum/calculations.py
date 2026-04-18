@@ -135,6 +135,9 @@ class QvantumCalculationsMixin:
             return
 
         session_dhw_reheating = getattr(self, "_session_dhw_reheating", False)
+        session_started_with_reheating = getattr(
+            self, "_session_started_with_reheating", False
+        )
         active_flow_duration_sec = getattr(
             self, "_session_active_flow_duration_sec", 0.0
         )
@@ -152,11 +155,11 @@ class QvantumCalculationsMixin:
                 avg_flow = 0.0
             flow_qualifies = avg_flow >= DHW_MIN_SHOWER_FLOW_LPM
 
-            if session_dhw_reheating:
-                # During active DHW reheating, flow events are likely
-                # recirculation pulses — skip EMA learning.
+            if session_dhw_reheating and session_started_with_reheating:
+                # DHW reheating was already active when flow started — this is
+                # likely a recirculation pulse, not a real shower. Skip EMA.
                 _LOGGER.debug(
-                    "Shower ended during reheating: duration=%.1f min — skipping EMA update (recirculation pulse)",
+                    "Tap water session started with reheating active: duration=%.1f min — skipping EMA update (recirculation pulse)",
                     duration_min,
                 )
             elif not flow_qualifies:
@@ -184,8 +187,13 @@ class QvantumCalculationsMixin:
                 )
 
             # Record completed session and update shower temp/flow EMAs.
+            # Skip only if reheating was active at session start (recirculation pulse).
+            # A real shower can trigger reheating mid-session; don't skip those.
+            is_recirculation_pulse = (
+                session_dhw_reheating and session_started_with_reheating
+            )
             if (
-                not session_dhw_reheating
+                not is_recirculation_pulse
                 and flow_qualifies
                 and self._shower_event_samples
             ):
@@ -308,6 +316,7 @@ class QvantumCalculationsMixin:
         self._shower_start_time = None
         self._shower_pause_time = None
         self._session_dhw_reheating = False
+        self._session_started_with_reheating = False
         self._session_active_flow_duration_sec = 0.0
         self._last_active_flow_sample_time = None
         self._flow_rolling_buffer.clear()
@@ -364,6 +373,7 @@ class QvantumCalculationsMixin:
                     self._shower_start_time = now
                     self._shower_pause_time = None
                     self._session_dhw_reheating = False
+                    self._session_started_with_reheating = bool(dhw_reheating)
                     self._session_active_flow_duration_sec = 0.0
                     self._last_active_flow_sample_time = now
             elif self._shower_pause_time is not None:
@@ -395,6 +405,7 @@ class QvantumCalculationsMixin:
                     if flow_qualifies_for_session:
                         self._shower_start_time = now
                         self._session_dhw_reheating = False
+                        self._session_started_with_reheating = bool(dhw_reheating)
                         self._session_active_flow_duration_sec = 0.0
                         self._last_active_flow_sample_time = now
                     # _shower_pause_time is already None after finalization.
