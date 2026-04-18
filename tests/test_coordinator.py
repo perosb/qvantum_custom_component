@@ -1668,9 +1668,9 @@ class TestCalculateTapWaterCap:
         assert coordinator._last_shower_flow_lpm is not None
         assert coordinator._last_shower_duration_min is not None
 
-    def test_session_reheating_flag_is_ored_across_samples(self):
-        """If any active-flow sample in a session indicates reheating, finalization must
-        treat the whole session as reheating-driven and skip EMA/history learning."""
+    def test_session_reheating_mid_session_allows_ema_learning(self):
+        """Reheating that turns on MID-session (triggered by hot water draw) must NOT
+        suppress EMA learning — the session is a real shower, not a recirculation pulse."""
         coordinator = self._make_coordinator()
         start = dt_util.utcnow()
 
@@ -1678,7 +1678,51 @@ class TestCalculateTapWaterCap:
             coordinator._calculate_tap_water_cap(
                 {"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0, "bt34": 39.0}
             )
-        # A later active-flow sample shows reheating; this should mark the session.
+        # Reheating kicks in mid-session as the tank depletes — still a real shower.
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=90)
+        ):
+            coordinator._calculate_tap_water_cap(
+                {
+                    "bt30": 60.0,
+                    "bf1_l_min": 6.0,
+                    "bt33": 10.0,
+                    "bt34": 39.0,
+                    "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+                }
+            )
+        with patch(
+            "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=120)
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+        with patch(
+            "homeassistant.util.dt.utcnow",
+            return_value=start + timedelta(seconds=120 + DHW_SESSION_GAP_SEC + 1),
+        ):
+            coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 0.0})
+
+        # EMA SHOULD be updated — reheating started mid-session, not at onset.
+        assert len(coordinator._shower_event_history) == 1
+        assert coordinator._last_shower_flow_lpm is not None
+        assert coordinator._last_shower_duration_min is not None
+
+    def test_session_reheating_at_start_skips_ema_learning(self):
+        """If DHW reheating is already active when flow starts, the session is a
+        recirculation pulse — EMA/history learning must be skipped."""
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+
+        # Reheating is active from the very first poll (before/at session start).
+        with patch("homeassistant.util.dt.utcnow", return_value=start):
+            coordinator._calculate_tap_water_cap(
+                {
+                    "bt30": 60.0,
+                    "bf1_l_min": 6.0,
+                    "bt33": 10.0,
+                    "bt34": 39.0,
+                    "compressor_state": DHW_COMPRESSOR_STATE_HOT_WATER,
+                }
+            )
         with patch(
             "homeassistant.util.dt.utcnow", return_value=start + timedelta(seconds=90)
         ):
