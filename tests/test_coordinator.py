@@ -2964,13 +2964,13 @@ class TestCalculateTapWaterCap:
         assert coordinator._shower_event_history == []
 
     def test_short_burst_with_long_mid_session_pause_not_learned(self):
-        """A ~30 s rinse followed by a ~79 s pause (within gap) must NOT be learned.
+        """A ~30 s rinse, ~79 s pause (within gap), then ~15 s more flow must NOT be learned.
 
         Wall-clock duration (start → final flow-stop) can exceed the threshold
-        because of the pause, but active-flow duration is only ~30 s (0.5 min),
-        which is below DHW_MIN_SHOWER_DURATION_MIN=1.0 min.  This matches the
-        real-world scenario where someone turns the tap on briefly, waits, then
-        taps again — the session should not corrupt shower EMAs.
+        because of the pause, but total active-flow duration is only ~45 s
+        (0.75 min), which is below DHW_MIN_SHOWER_DURATION_MIN=1.0 min. This
+        matches the real-world scenario where someone turns the tap on briefly,
+        waits, then taps again — the session should not corrupt shower EMAs.
         """
         coordinator = self._make_coordinator()
         t0 = datetime(2026, 4, 18, 7, 0, 0, tzinfo=timezone.utc)
