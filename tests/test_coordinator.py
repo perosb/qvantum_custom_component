@@ -1466,9 +1466,9 @@ class TestCalculateTapWaterCap:
         # Three tooth-brushing bursts, each well within DHW_SESSION_GAP_SEC of
         # each other, at 0.8 L/min (below DHW_MIN_SHOWER_FLOW_LPM=3.0).
         for burst_start in [
+            t_stop + timedelta(seconds=20),
+            t_stop + timedelta(seconds=40),
             t_stop + timedelta(seconds=60),
-            t_stop + timedelta(seconds=150),
-            t_stop + timedelta(seconds=240),
         ]:
             with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
                 m.return_value = burst_start
@@ -1518,8 +1518,8 @@ class TestCalculateTapWaterCap:
 
         # Paused low-flow bursts with very different cold/outlet temps.
         for burst_start in [
-            t_stop + timedelta(seconds=60),
-            t_stop + timedelta(seconds=150),
+            t_stop + timedelta(seconds=20),
+            t_stop + timedelta(seconds=50),
         ]:
             with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
                 m.return_value = burst_start
