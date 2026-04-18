@@ -159,7 +159,7 @@ class QvantumCalculationsMixin:
                 # DHW reheating was already active when flow started — this is
                 # likely a recirculation pulse, not a real shower. Skip EMA.
                 _LOGGER.debug(
-                    "Shower ended during reheating: duration=%.1f min — skipping EMA update (recirculation pulse, reheating was active at session start)",
+                    "Tap water session started with reheating active: duration=%.1f min — skipping EMA update (recirculation pulse)",
                     duration_min,
                 )
             elif not flow_qualifies:
