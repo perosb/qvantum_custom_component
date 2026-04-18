@@ -264,7 +264,7 @@ DHW_MAX_SHOWER_HISTORY_SIZE = (
     10  # Maximum number of completed shower events retained in history
 )
 DHW_EMA_ALPHA = (
-    0.2  # EMA smoothing factor for tap_water_cap (0=no change, 1=no smoothing)
+    0.3  # EMA smoothing factor for tap_water_cap (0=no change, 1=no smoothing)
 )
 
 # Tap water capacity mappings (start, stop) -> capacity

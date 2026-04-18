@@ -1395,7 +1395,7 @@ class TestCalculateTapWaterCap:
         assert coordinator._last_shower_flow_lpm is None
 
         # Stability guard: the pulse sequence should stay smooth (no large swings).
-        assert max(pulse_caps) - min(pulse_caps) <= 0.2
+        assert max(pulse_caps) - min(pulse_caps) <= 0.3
 
     def test_low_flow_session_does_not_corrupt_shower_emas(self):
         """Flow below DHW_MIN_SHOWER_FLOW_LPM (dishwasher, hand-wash, tooth brushing)
@@ -1827,7 +1827,7 @@ class TestCalculateTapWaterCap:
           _last_tap_water_cap = 5.0  (inflated prior)
           bt30=60°C, cold/flow/shower defaults
           → raw_showers ≈ 2.27
-          → EMA candidate = 0.2*2.27 + 0.8*5.0 = 4.454  → published ≈ 4.5
+          → EMA candidate = 0.3*2.27 + 0.7*5.0 = 4.181  → published ≈ 4.2
         """
         coordinator = self._make_coordinator()
         t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=timezone.utc)
@@ -1847,7 +1847,7 @@ class TestCalculateTapWaterCap:
         assert values["tap_water_cap"] > 2.0, (
             "EMA must not jump all the way to the raw value in one step"
         )
-        assert pytest.approx(4.5, abs=0.1) == values["tap_water_cap"]
+        assert pytest.approx(4.2, abs=0.1) == values["tap_water_cap"]
         # State must have advanced.
         assert coordinator._last_tap_water_cap < 5.0
         # Warmup window must have been cleared (no flow).
@@ -1866,9 +1866,9 @@ class TestCalculateTapWaterCap:
           _last_published_tap_water_cap = 5.0
           _last_published_tap_water_minutes = 30
           bt30=60°C, cold=10°C (in buffer), flow=7 L/min (in buffer), shower_temp=38°C
-          → raw_showers ≈ (175/7)*ln(50/28)/6 ≈ 2.82
-          → EMA candidate = 0.2*2.82 + 0.8*5.0 = 4.564  → published_cap = 4.6
-          → warmup output = round(5.0 + (4.6 - 5.0) * 0.5, 1) = round(4.8, 1) = 4.8
+          → raw_showers ≈ (175/7)*ln(50/28)/6 ≈ 2.42
+          → EMA candidate = 0.3*2.42 + 0.7*5.0 = 4.226  → published_cap = 4.2
+          → warmup output = round(5.0 + (4.2 - 5.0) * 0.5, 1) = round(4.6, 1) = 4.6
         Old broken output would have been 5.0 (no-op ramp).
         """
         coordinator = self._make_coordinator()
@@ -1889,13 +1889,13 @@ class TestCalculateTapWaterCap:
         # Arithmetic (log model):
         #   minutes = (175/7) * ln((60-10)/(38-10)) = 25 * ln(50/28) ≈ 14.49
         #   raw_showers = 14.49 / 6 ≈ 2.42
-        #   EMA candidate = 0.2*2.42 + 0.8*5.0 = 4.484  → published_cap = round(4.484,1) = 4.5
-        #   published_minutes = round(4.5 * 6) = 27
-        #   warmup output cap = round(5.0 + (4.5 - 5.0) * 0.5, 1) = round(4.75, 1) = 4.8
-        #   warmup output minutes = round(30 + (27 - 30) * 0.5) = round(28.5) = 28
+        #   EMA candidate = 0.3*2.42 + 0.7*5.0 = 4.226  → published_cap = round(4.226,1) = 4.2
+        #   published_minutes = round(4.226 * 6) = round(25.4) = 25
+        #   warmup output cap = round(5.0 + (4.2 - 5.0) * 0.5, 1) = round(4.6, 1) = 4.6
+        #   warmup output minutes = round(30 + (25 - 30) * 0.5) = round(27.5) = 28
         # Old (broken) output: smoothed = _last_tap_water_cap = 5.0
         #   → published_cap = 5.0 → interp: 5.0 + (5.0-5.0)*0.5 = 5.0  (no-op)
-        assert values["tap_water_cap"] == pytest.approx(4.8, abs=0.05), (
+        assert values["tap_water_cap"] == pytest.approx(4.6, abs=0.05), (
             "Warmup ramp must interpolate toward the EMA candidate, not the frozen prior"
         )
         assert values["tap_water_minutes"] == 28
@@ -1921,8 +1921,8 @@ class TestCalculateTapWaterCap:
         coordinator = self._make_coordinator()
         values = {"bt30": 60.0, "bf1_l_min": 6.5, "bt33": 12.0}
         coordinator._calculate_tap_water_cap(values)
-        # cold: 0.2 * 12.0 + 0.8 * 8.0 = 8.8 (EMA from DHW_DEFAULT_COLD_TEMP_C prior)
-        assert coordinator._last_shower_cold_temp == pytest.approx(8.8)
+        # cold: 0.3 * 12.0 + 0.7 * 8.0 = 9.2 (EMA from DHW_DEFAULT_COLD_TEMP_C prior)
+        assert coordinator._last_shower_cold_temp == pytest.approx(9.2)
         # flow EMA is NOT updated during an in-progress flow poll — stays None until
         # the session finalises so that non-shower flow events do not corrupt it.
         assert coordinator._last_shower_flow_lpm is None
@@ -1951,9 +1951,9 @@ class TestCalculateTapWaterCap:
         coordinator = self._make_warmed_up_coordinator()
         # First poll: showering with raw readings (cold=10, flow=6.0)
         # Log model: minutes = 175/7.0 * ln(50/28) ≈ 14.5; showers ≈ 2.42  (calc_flow=default 7.0)
-        # cold EMA stored: 0.2*10+0.8*8=8.4; flow EMA only updates at end-of-session.
+        # cold EMA stored: 0.3*10+0.7*8=8.6; flow EMA only updates at end-of-session.
         coordinator._calculate_tap_water_cap({"bt30": 60.0, "bf1_l_min": 6.0, "bt33": 10.0})
-        assert coordinator._last_shower_cold_temp == pytest.approx(8.4)
+        assert coordinator._last_shower_cold_temp == pytest.approx(8.6)
         # flow EMA remains None until a session finalises
         assert coordinator._last_shower_flow_lpm is None
         # Advance past the new warmup window
