@@ -434,6 +434,33 @@ class TestQvantumNumberEntity:
         )
         # Note: async_set_updated_data would be called if the API response status was correct
 
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_dhw_stop_extra(
+        self, mock_coordinator, mock_device
+    ):
+        """Test setting dhw_stop_extra writes via Modbus holding register, not update_setting."""
+        mock_coordinator.data["values"]["dhw_stop_extra"] = 65
+        entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
+        )
+
+        mock_coordinator.api.write_holding_register_for_metric = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_set_native_value(75.0)
+
+        mock_coordinator.api.write_holding_register_for_metric.assert_called_once_with(
+            "test_device_123", "dhw_stop_extra", 75
+        )
+        # update_setting must NOT be called for dhw_stop_extra
+        mock_coordinator.api.update_setting.assert_not_called()
+        # Coordinator cache should be updated with the new value
+        assert mock_coordinator.data["values"]["dhw_stop_extra"] == 75
+
 
 class TestNumberSetup:
     """Test number platform setup."""

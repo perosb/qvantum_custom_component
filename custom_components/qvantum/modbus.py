@@ -139,4 +139,5 @@ MODBUS_HOLDING_TO_SETTINGS_MAP = {
     "allow_addition": "op_man_addition",
     "allow_heating": "man_mode",
     "ventilation_state": "fanspeedselector",
+    "dhw_stop_extra": "dhw_stop_extra",
 }

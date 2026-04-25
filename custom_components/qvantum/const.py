@@ -206,6 +206,7 @@ REQUIRED_MODBUS_METRICS = [
     "bt30",  # Tank temperature
     "bt33",  # Cold water inlet temperature
     "bf1_l_min",  # DHW flow rate
+    "dhw_stop_extra",
 ]
 
 # Sensor type classification
@@ -214,6 +215,7 @@ TEMPERATURE_METRICS = [
     "bt",
     "tap_water_start",
     "tap_water_stop",
+    "dhw_stop_extra",
 ]
 ENERGY_METRICS = ["energy"]
 POWER_METRICS = ["powertotal", "heatingpower", "dhwpower"]

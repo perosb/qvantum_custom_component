@@ -12,6 +12,7 @@ from pymodbus.client.tcp import AsyncModbusTcpClient
 from pymodbus.pdu.register_message import (
     ReadHoldingRegistersRequest,
     ReadInputRegistersRequest,
+    WriteSingleRegisterRequest,
 )
 from pymodbus.exceptions import ModbusException
 
@@ -533,6 +534,79 @@ class QvantumAPI:
         payload = {"update_settings": settings}
 
         return await self._send_command(device_id, payload)
+
+    async def write_holding_register(
+        self, device_id: str, register_address: int, value: int
+    ) -> dict:
+        """Write a single Modbus holding register and return a status dict."""
+        async with self._modbus_lock:
+            self._init_modbus_client()
+            if not self._modbus_client:
+                raise APIConnectionError(None, "Modbus client not initialized")
+
+            try:
+                if not self._modbus_client.connected:
+                    await self._modbus_client.connect()
+                    if not self._modbus_client.connected:
+                        raise APIConnectionError(
+                            None, "Modbus client connection failed"
+                        )
+
+                request = WriteSingleRegisterRequest(
+                    dev_id=self._modbus_unit_id,
+                    address=register_address,
+                    # pymodbus 3.x uses a shared ModbusPDU base class where all register
+                    # values are stored as list[int]. For WriteSingleRegisterRequest the
+                    # value to write is accessed as registers[0] internally, so a
+                    # single-element list is the correct API.
+                    registers=[value],
+                )
+                result = await self._modbus_client.execute(False, request)
+                if result is None:
+                    raise APIConnectionError(
+                        None,
+                        "Modbus write failed: no response received from device",
+                    )
+                if result.isError():
+                    raise APIConnectionError(
+                        None,
+                        f"Modbus write error on register {register_address}: {result}",
+                    )
+            except ModbusException as e:
+                _LOGGER.error(
+                    "Modbus error writing holding register %d: %s", register_address, e
+                )
+                await self._reset_modbus_client()
+                raise APIConnectionError(None, f"Modbus write failed: {e}")
+            except APIConnectionError:
+                raise
+            except Exception as e:
+                _LOGGER.error(
+                    "Unexpected error writing holding register %d: %s",
+                    register_address,
+                    e,
+                    exc_info=True,
+                )
+                await self._reset_modbus_client()
+                raise APIConnectionError(None, f"Modbus write failed: {e}")
+
+        return {"status": "APPLIED"}
+
+    async def write_holding_register_for_metric(
+        self, device_id: str, metric_key: str, value: float
+    ) -> dict:
+        """Write a Modbus holding register looked up by metric key."""
+        holding_key = next(
+            (k for k, v in MODBUS_HOLDING_TO_SETTINGS_MAP.items() if v == metric_key),
+            None,
+        )
+        if holding_key is None or holding_key not in MODBUS_HOLDING_REGISTER_MAP:
+            raise ValueError(
+                f"No Modbus holding register mapping found for metric '{metric_key}'"
+            )
+        register_address, _data_type, scale = MODBUS_HOLDING_REGISTER_MAP[holding_key]
+        raw_value = int(round(value / scale)) if scale != 1.0 else int(value)
+        return await self.write_holding_register(device_id, register_address, raw_value)
 
     async def _update_settings(self, device_id: str, payload: dict):
         """Update one or several settings."""

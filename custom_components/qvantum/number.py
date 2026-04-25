@@ -35,7 +35,7 @@ async def async_setup_entry(
         "indoor_temperature_offset": (-10, 10, 1),
         "tap_water_stop": (60, 80, 1),
         "tap_water_start": (50, 65, 1),
-        "dhw_stop_extra": (60, 80, 5),
+        "dhw_stop_extra": (60, 85, 5),
         "fan_normal": (0, 100, 5),
         "fan_speed_2": (0, 100, 5),
     }
@@ -98,8 +98,14 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 response = await self.coordinator.api.set_tap_water(
                     self._hpid, start=int(value)
                 )
-            case "room_comp_factor" | "fan_normal" | "fan_speed_2" | "dhw_stop_extra":
+            case "room_comp_factor" | "fan_normal" | "fan_speed_2":
                 response = await self.coordinator.api.update_setting(
+                    self._hpid, self._metric_key, int(value)
+                )
+
+            case "dhw_stop_extra":
+                # dhw_stop_extra has no update_setting HTTP endpoint; write via Modbus holding register
+                response = await self.coordinator.api.write_holding_register_for_metric(
                     self._hpid, self._metric_key, int(value)
                 )
 

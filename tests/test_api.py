@@ -2173,3 +2173,177 @@ class TestQvantumAPI:
         result = await authenticated_api.get_http_metrics("dev1", ["tap_stop"])
 
         assert result == {"metrics": {}}
+
+
+class TestWriteHoldingRegister:
+    """Tests for write_holding_register and write_holding_register_for_metric."""
+
+    def _make_api(self, mock_session=None):
+        kwargs = {
+            "modbus_tcp": True,
+            "modbus_host": "192.168.1.100",
+            "modbus_port": 502,
+        }
+        if mock_session:
+            kwargs["session"] = mock_session
+        return QvantumAPI("test@example.com", "password", "test-agent", **kwargs)
+
+    def _make_fake_client(self, execute_result=None, connected=True):
+        client = MagicMock()
+        client.connected = connected
+        client.connect = AsyncMock(
+            side_effect=lambda: setattr(client, "connected", True)
+        )
+        if execute_result is None:
+            ok_result = MagicMock()
+            ok_result.isError.return_value = False
+            execute_result = ok_result
+        client.execute = AsyncMock(return_value=execute_result)
+        return client
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_success(self, mock_session):
+        """Successful write returns APPLIED status dict."""
+        api = self._make_api(mock_session)
+        client = self._make_fake_client()
+        api._modbus_client = client
+
+        result = await api.write_holding_register("dev1", 59, 75)
+
+        assert result == {"status": "APPLIED"}
+        client.execute.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_connects_if_disconnected(self, mock_session):
+        """Connects the client if not already connected."""
+        api = self._make_api(mock_session)
+        client = self._make_fake_client(connected=False)
+        api._modbus_client = client
+
+        result = await api.write_holding_register("dev1", 59, 75)
+
+        client.connect.assert_awaited_once()
+        assert result == {"status": "APPLIED"}
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_raises_when_no_client(self, mock_session):
+        """Raises APIConnectionError when Modbus is not enabled (no client)."""
+        from custom_components.qvantum.api import APIConnectionError
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        # modbus_tcp=False so _init_modbus_client leaves _modbus_client as None
+
+        with pytest.raises(APIConnectionError, match="Modbus client not initialized"):
+            await api.write_holding_register("dev1", 59, 75)
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_raises_on_error_result(self, mock_session):
+        """Raises APIConnectionError when device returns an error response."""
+        from custom_components.qvantum.api import APIConnectionError
+
+        api = self._make_api(mock_session)
+        error_result = MagicMock()
+        error_result.isError.return_value = True
+        client = self._make_fake_client(execute_result=error_result)
+        api._modbus_client = client
+
+        with pytest.raises(APIConnectionError):
+            await api.write_holding_register("dev1", 59, 75)
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_raises_on_none_response(self, mock_session):
+        """Raises APIConnectionError when execute returns None."""
+        from custom_components.qvantum.api import APIConnectionError
+
+        api = self._make_api(mock_session)
+        client = self._make_fake_client()
+        client.execute = AsyncMock(return_value=None)
+        api._modbus_client = client
+
+        with pytest.raises(APIConnectionError, match="no response received"):
+            await api.write_holding_register("dev1", 59, 75)
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_resets_client_on_modbus_exception(
+        self, mock_session
+    ):
+        """Resets the Modbus client and raises APIConnectionError on ModbusException."""
+        from custom_components.qvantum.api import APIConnectionError
+        from pymodbus.exceptions import ModbusException
+
+        api = self._make_api(mock_session)
+        client = self._make_fake_client()
+        client.execute = AsyncMock(side_effect=ModbusException("boom"))
+        api._modbus_client = client
+
+        with pytest.raises(APIConnectionError, match="Modbus write failed"):
+            await api.write_holding_register("dev1", 59, 75)
+
+        assert api._modbus_client is None
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_resets_client_on_generic_exception(
+        self, mock_session
+    ):
+        """Resets the Modbus client and raises APIConnectionError on unexpected errors."""
+        from custom_components.qvantum.api import APIConnectionError
+
+        api = self._make_api(mock_session)
+        client = self._make_fake_client()
+        client.execute = AsyncMock(side_effect=RuntimeError("unexpected"))
+        api._modbus_client = client
+
+        with pytest.raises(APIConnectionError, match="Modbus write failed"):
+            await api.write_holding_register("dev1", 59, 75)
+
+        assert api._modbus_client is None
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_for_metric_dhw_stop_extra(self, mock_session):
+        """write_holding_register_for_metric resolves dhw_stop_extra to register 59."""
+        api = self._make_api(mock_session)
+        client = self._make_fake_client()
+        api._modbus_client = client
+
+        result = await api.write_holding_register_for_metric(
+            "dev1", "dhw_stop_extra", 75
+        )
+
+        assert result == {"status": "APPLIED"}
+        # Verify the correct register address (59) was written
+        call_args = client.execute.call_args[0][
+            1
+        ]  # second positional arg is the request
+        assert call_args.address == 59
+        assert call_args.registers == [75]
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_for_metric_unknown_key_raises(
+        self, mock_session
+    ):
+        """write_holding_register_for_metric raises ValueError for unknown metric keys."""
+        api = self._make_api(mock_session)
+
+        with pytest.raises(
+            ValueError, match="No Modbus holding register mapping found"
+        ):
+            await api.write_holding_register_for_metric("dev1", "not_a_real_metric", 42)
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_for_metric_applies_scale(self, mock_session):
+        """write_holding_register_for_metric applies inverse scale when scale != 1.0."""
+        api = self._make_api(mock_session)
+        client = self._make_fake_client()
+        api._modbus_client = client
+
+        # room_comp_factor maps to holding key "room_compensation" (scale=0.1)
+        # value=2.5 -> raw = int(round(2.5 / 0.1)) = 25
+        result = await api.write_holding_register_for_metric(
+            "dev1", "room_comp_factor", 2.5
+        )
+
+        assert result == {"status": "APPLIED"}
+        call_args = client.execute.call_args[0][1]
+        assert call_args.registers == [25]
