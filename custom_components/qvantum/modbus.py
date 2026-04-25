@@ -120,13 +120,13 @@ RELAY_BIT_MAP = {
     "picpin_relay_ha12": 9,
 }
 
-# One-way map from Modbus holding register keys to the canonical settings names
-# used by the API/settings layer. This does not imply reverse lookup support.
+# Map from Modbus holding register keys to the canonical settings names used by
+# the API/settings layer. Also used in reverse (settings name -> holding key) by
+# write_holding_register_for_metric() to resolve a metric key to its register address.
 MODBUS_HOLDING_TO_SETTINGS_MAP = {
     "start_cooling_temp": "start_cooling_temp",
     "dhw_start_normal": "tap_water_start",
     "dhw_stop_normal": "tap_water_stop",
-    # "dhw_stop_extra": "dhw_stop_extra", # No update_setting found for this metric, so it's handled separately in number.py
     "dhw_mode": "extra_tap_water",
     "room_compensation": "room_comp_factor",
     "desired_indoor_temp": "indoor_temperature_target",

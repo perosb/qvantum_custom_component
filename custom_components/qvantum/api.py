@@ -542,14 +542,17 @@ class QvantumAPI:
         async with self._modbus_lock:
             self._init_modbus_client()
             if not self._modbus_client:
-                raise APIConnectionError(None, "Modbus client not initialized")
+                raise APIConnectionError(
+                    None, f"Modbus client not initialized for device {device_id}"
+                )
 
             try:
                 if not self._modbus_client.connected:
                     await self._modbus_client.connect()
                     if not self._modbus_client.connected:
                         raise APIConnectionError(
-                            None, "Modbus client connection failed"
+                            None,
+                            f"Modbus client connection failed for device {device_id}",
                         )
 
                 request = WriteSingleRegisterRequest(
@@ -565,16 +568,19 @@ class QvantumAPI:
                 if result is None:
                     raise APIConnectionError(
                         None,
-                        "Modbus write failed: no response received from device",
+                        f"Modbus write failed for device {device_id}: no response received from device",
                     )
                 if result.isError():
                     raise APIConnectionError(
                         None,
-                        f"Modbus write error on register {register_address}: {result}",
+                        f"Modbus write error on register {register_address} for device {device_id}: {result}",
                     )
             except ModbusException as e:
                 _LOGGER.error(
-                    "Modbus error writing holding register %d: %s", register_address, e
+                    "Modbus error writing holding register %d for device %s: %s",
+                    register_address,
+                    device_id,
+                    e,
                 )
                 await self._reset_modbus_client()
                 raise APIConnectionError(None, f"Modbus write failed: {e}")
@@ -582,8 +588,9 @@ class QvantumAPI:
                 raise
             except Exception as e:
                 _LOGGER.error(
-                    "Unexpected error writing holding register %d: %s",
+                    "Unexpected error writing holding register %d for device %s: %s",
                     register_address,
+                    device_id,
                     e,
                     exc_info=True,
                 )
