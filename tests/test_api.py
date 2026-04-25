@@ -2184,7 +2184,7 @@ class TestWriteHoldingRegister:
             "modbus_host": "192.168.1.100",
             "modbus_port": 502,
         }
-        if mock_session:
+        if mock_session is not None:
             kwargs["session"] = mock_session
         return QvantumAPI("test@example.com", "password", "test-agent", **kwargs)
 
