@@ -8,9 +8,9 @@ template: |
 
 
   > [!IMPORTANT]
-  > This integration's Modbus path is **read-only**. 
-  > No write operations are performed via Modbus.
-  > Any configuration/set commands still go through the existing HTTP API.
+  > By default, this integration uses Modbus for **reading only**.
+  > Modbus write support is disabled unless you explicitly enable it in the integration options,
+  > and only supported controls use that path. Other configuration/set commands continue to use the existing HTTP API.
 
 
   > [!WARNING]
