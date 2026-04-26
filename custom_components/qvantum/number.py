@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .const import (
+    CONF_MODBUS_TCP,
     CONF_MODBUS_WRITE,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
@@ -111,14 +112,9 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
 
             case "dhw_stop_extra":
                 # dhw_stop_extra has no update_setting HTTP endpoint; write via Modbus holding register
-                config_entry = self.coordinator.config_entry
-                modbus_write_enabled = config_entry.options.get(
-                    CONF_MODBUS_WRITE,
-                    config_entry.data.get(CONF_MODBUS_WRITE, False),
-                )
-                if not modbus_write_enabled:
+                if not self._is_modbus_write_allowed():
                     raise HomeAssistantError(
-                        "Modbus writing is disabled. Enable 'Enable writing via Modbus' in the integration options."
+                        "Modbus writing is disabled. Enable Modbus TCP and 'Enable writing via Modbus' in the integration options."
                     )
                 response = await self.coordinator.api.write_holding_register_for_metric(
                     self._hpid, self._metric_key, int(value)
@@ -147,13 +143,24 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
     @property
     def available(self):
         """Check if data is available."""
+        return (
+            (
+                self._metric_key not in MODBUS_WRITE_METRICS
+                or self._is_modbus_write_allowed()
+            )
+            and self._values.get(self._metric_key) is not None
+            and self._has_write_access
+        )
+
+    def _is_modbus_write_allowed(self) -> bool:
+        """Return True when Modbus write actions are explicitly enabled and available."""
         config_entry = self.coordinator.config_entry
         modbus_write_enabled = config_entry.options.get(
             CONF_MODBUS_WRITE,
             config_entry.data.get(CONF_MODBUS_WRITE, False),
         )
-        return (
-            (self._metric_key not in MODBUS_WRITE_METRICS or modbus_write_enabled)
-            and self._values.get(self._metric_key) is not None
-            and self._has_write_access
+        modbus_tcp_enabled = config_entry.options.get(
+            CONF_MODBUS_TCP,
+            config_entry.data.get(CONF_MODBUS_TCP, False),
         )
+        return modbus_write_enabled and modbus_tcp_enabled

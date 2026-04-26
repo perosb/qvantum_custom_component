@@ -440,7 +440,10 @@ class TestQvantumNumberEntity:
     ):
         """Test setting dhw_stop_extra writes via Modbus holding register, not update_setting."""
         mock_coordinator.data["values"]["dhw_stop_extra"] = 65
-        mock_coordinator.config_entry.options = {"modbus_write": True}
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
         entity = QvantumNumberEntity(
             mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
         )
@@ -482,6 +485,29 @@ class TestQvantumNumberEntity:
 
         mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_dhw_stop_extra_raises_when_modbus_tcp_disabled(
+        self, mock_coordinator, mock_device
+    ):
+        """Test that async_set_native_value raises when modbus_tcp is disabled."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        mock_coordinator.data["values"]["dhw_stop_extra"] = 65
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": False,
+        }
+        mock_coordinator.config_entry.data = {}
+        entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
+        )
+        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
+
+        with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
+            await entity.async_set_native_value(75.0)
+
+        mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
+
     def test_available_dhw_stop_extra_modbus_write_disabled(
         self, mock_coordinator, mock_device
     ):
@@ -499,11 +525,28 @@ class TestQvantumNumberEntity:
     ):
         """Test dhw_stop_extra entity is available when modbus_write is enabled."""
         mock_coordinator.data["values"]["dhw_stop_extra"] = 65
-        mock_coordinator.config_entry.options = {"modbus_write": True}
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
         entity = QvantumNumberEntity(
             mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
         )
         assert entity.available is True
+
+    def test_available_dhw_stop_extra_modbus_tcp_disabled(
+        self, mock_coordinator, mock_device
+    ):
+        """Test dhw_stop_extra entity is unavailable when modbus_tcp is disabled."""
+        mock_coordinator.data["values"]["dhw_stop_extra"] = 65
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": False,
+        }
+        entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
+        )
+        assert entity.available is False
 
 
 class TestNumberSetup:
