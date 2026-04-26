@@ -114,7 +114,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 # dhw_stop_extra has no update_setting HTTP endpoint; write via Modbus holding register
                 if not self._is_modbus_write_allowed():
                     raise HomeAssistantError(
-                        "Modbus writing is disabled. Enable Modbus TCP and 'Enable writing via Modbus' in the integration options."
+                        "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
                     )
                 response = await self.coordinator.api.write_holding_register_for_metric(
                     self._hpid, self._metric_key, int(value)
