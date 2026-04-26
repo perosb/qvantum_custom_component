@@ -534,10 +534,11 @@
         "data": {
           "password": "Password",
           "username": "Username",
-          "modbus_tcp": "Use Modbus TCP instead of HTTP polling",
+          "modbus_tcp": "Use Modbus reading instead of HTTP polling",
           "modbus_write": "Enable writing via Modbus"
         },
         "data_description": {
+          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus, write/controls are still via HTTP API unless write is also enabled, certain controls are written via Modbus.",
           "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
         }
       },
@@ -546,9 +547,11 @@
         "data": {
           "password": "Password",
           "username": "Username",
+          "modbus_tcp": "Use Modbus reading instead of HTTP polling",
           "modbus_write": "Enable writing via Modbus"
         },
         "data_description": {
+          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus, write/controls are still via HTTP API unless write is also enabled, certain controls are written via Modbus.",
           "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
         }
       }
@@ -559,11 +562,12 @@
       "init": {
         "data": {
           "scan_interval": "HTTP Scan Interval (seconds)",
-          "modbus_tcp": "Use Modbus TCP instead of HTTP polling",
+          "modbus_tcp": "Use Modbus reading instead of HTTP polling",
           "modbus_host": "Qvantum Host/IP",
           "modbus_write": "Enable writing via Modbus"
         },
         "data_description": {
+          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus, write/controls are still via HTTP API unless write is also enabled, certain controls are written via Modbus.",
           "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
         },
         "description": "Amend your options.",

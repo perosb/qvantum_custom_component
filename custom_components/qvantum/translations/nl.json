@@ -535,10 +535,11 @@
         "data": {
           "password": "Wachtwoord",
           "username": "Gebruikersnaam",
-          "modbus_tcp": "Gebruik Modbus TCP in plaats van HTTP-polling",
+          "modbus_tcp": "Gebruik Modbus-uitlezing in plaats van HTTP-polling",
           "modbus_write": "Schrijven via Modbus inschakelen"
         },
         "data_description": {
+          "modbus_tcp": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest; schrijven/sturing gebeurt nog via de HTTP API, tenzij schrijven ook is ingeschakeld. Bepaalde besturingen worden via Modbus geschreven.",
           "modbus_write": "Door het activeren van Modbus-schrijven aanvaardt u volledige verantwoordelijkheid voor alle waarden die via de interface worden geschreven. De fabrikant is niet aansprakelijk voor problemen veroorzaakt door onjuiste of buiten bereik vallende waarden, en dergelijke acties kunnen de garantie en/of de levensduur en prestaties van het product beïnvloeden."
         }
       },
@@ -547,9 +548,11 @@
         "data": {
           "password": "Wachtwoord",
           "username": "Gebruikersnaam",
+          "modbus_tcp": "Gebruik Modbus-uitlezing in plaats van HTTP-polling",
           "modbus_write": "Schrijven via Modbus inschakelen"
         },
         "data_description": {
+          "modbus_tcp": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest; schrijven/sturing gebeurt nog via de HTTP API, tenzij schrijven ook is ingeschakeld. Bepaalde besturingen worden via Modbus geschreven.",
           "modbus_write": "Door het activeren van Modbus-schrijven aanvaardt u volledige verantwoordelijkheid voor alle waarden die via de interface worden geschreven. De fabrikant is niet aansprakelijk voor problemen veroorzaakt door onjuiste of buiten bereik vallende waarden, en dergelijke acties kunnen de garantie en/of de levensduur en prestaties van het product beïnvloeden."
         }
       }
@@ -560,11 +563,12 @@
       "init": {
         "data": {
           "scan_interval": "HTTP-scaninterval (seconden)",
-          "modbus_tcp": "Gebruik Modbus TCP in plaats van HTTP-polling",
+          "modbus_tcp": "Gebruik Modbus-uitlezing in plaats van HTTP-polling",
           "modbus_host": "Qvantum Host/IP",
           "modbus_write": "Schrijven via Modbus inschakelen"
         },
         "data_description": {
+          "modbus_tcp": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest; schrijven/sturing gebeurt nog via de HTTP API, tenzij schrijven ook is ingeschakeld. Bepaalde besturingen worden via Modbus geschreven.",
           "modbus_write": "Door het activeren van Modbus-schrijven aanvaardt u volledige verantwoordelijkheid voor alle waarden die via de interface worden geschreven. De fabrikant is niet aansprakelijk voor problemen veroorzaakt door onjuiste of buiten bereik vallende waarden, en dergelijke acties kunnen de garantie en/of de levensduur en prestaties van het product beïnvloeden."
         },
         "description": "Wijzig uw opties.",
