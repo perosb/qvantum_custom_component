@@ -243,7 +243,8 @@ class QvantumOptionsFlowHandler(OptionsFlow):
             normalized_input = {**user_input}
             if CONF_MODBUS_TCP in user_input:
                 normalized_input[CONF_MODBUS_TCP] = modbus_enabled
-            if CONF_MODBUS_WRITE in user_input:
+                normalized_input[CONF_MODBUS_WRITE] = modbus_write_enabled
+            elif CONF_MODBUS_WRITE in user_input:
                 normalized_input[CONF_MODBUS_WRITE] = modbus_write_enabled
 
             options = self.options | normalized_input
