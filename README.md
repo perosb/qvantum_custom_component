@@ -57,15 +57,16 @@ The integration will automatically discover your Qvantum devices and create comp
 - **Smart Status**: Heat pump status, defrost cycles, priority modes
 - **Comprehensive Coverage**: Supports all major Qvantum heat pump parameters
 
-### Real time Modbus Support (Read-only)
+### Real time Modbus Support
 
 - **Efficient polling** of live data from the pump’s Modbus interface
 - **Highly granular metrics** for temperatures, flows, pressures, power, and energy
 - **Stable backup path** for metrics when REST data is unavailable
 - **Minimal network impact** with optimized modbus register reads
+- **Optional Modbus writes** for supported controls when explicitly enabled in the integration options
 
 > [!IMPORTANT]
-> This integration's Modbus path is **read-only**. No write operations are performed via Modbus. Any configuration/set commands still go through the existing HTTP API.
+> By default, this integration uses Modbus for **reading only**. Modbus write support is disabled unless you explicitly enable it in the integration options, and only supported controls use that path. Other configuration/set commands continue to use the existing HTTP API.
 
 ### Services
 
