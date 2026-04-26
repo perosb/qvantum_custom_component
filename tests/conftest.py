@@ -86,6 +86,7 @@ def mock_config_entry():
         "username": "test@example.com",
         "password": "test_password",
     }
+    entry.options = {}
     entry.title = "Test Qvantum"
     return entry
 

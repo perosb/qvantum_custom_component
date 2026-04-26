@@ -461,6 +461,29 @@ class TestQvantumNumberEntity:
         # Coordinator cache should be updated with the new value
         assert mock_coordinator.data["values"]["dhw_stop_extra"] == 75
 
+    def test_available_dhw_stop_extra_modbus_write_disabled(
+        self, mock_coordinator, mock_device
+    ):
+        """Test dhw_stop_extra entity is unavailable when modbus_write is disabled."""
+        mock_coordinator.data["values"]["dhw_stop_extra"] = 65
+        mock_coordinator.config_entry.options = {}
+        mock_coordinator.config_entry.data = {}
+        entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
+        )
+        assert entity.available is False
+
+    def test_available_dhw_stop_extra_modbus_write_enabled(
+        self, mock_coordinator, mock_device
+    ):
+        """Test dhw_stop_extra entity is available when modbus_write is enabled."""
+        mock_coordinator.data["values"]["dhw_stop_extra"] = 65
+        mock_coordinator.config_entry.options = {"modbus_write": True}
+        entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
+        )
+        assert entity.available is True
+
 
 class TestNumberSetup:
     """Test number platform setup."""

@@ -534,14 +534,22 @@
         "data": {
           "password": "Passwort",
           "username": "Benutzername",
-          "modbus_tcp": "Modbus TCP statt HTTP-Abfragen verwenden"
+          "modbus_tcp": "Modbus TCP statt HTTP-Abfragen verwenden",
+          "modbus_write": "Schreiben über Modbus aktivieren"
+        },
+        "data_description": {
+          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen."
         }
       },
       "reconfigure": {
         "description": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest, Schreiben/Steuerung erfolgt weiterhin über HTTP-API",
         "data": {
           "password": "Passwort",
-          "username": "Benutzername"
+          "username": "Benutzername",
+          "modbus_write": "Schreiben über Modbus aktivieren"
+        },
+        "data_description": {
+          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen."
         }
       }
     }
@@ -552,7 +560,11 @@
         "data": {
           "scan_interval": "HTTP-Scan-Intervall (Sekunden)",
           "modbus_tcp": "Modbus TCP statt HTTP-Abfragen verwenden",
-          "modbus_host": "Qvantum Host/IP"
+          "modbus_host": "Qvantum Host/IP",
+          "modbus_write": "Schreiben über Modbus aktivieren"
+        },
+        "data_description": {
+          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen."
         },
         "description": "Ändern Sie Ihre Optionen.",
         "title": "Optionen"

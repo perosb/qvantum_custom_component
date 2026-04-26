@@ -533,14 +533,22 @@
         "data": {
           "password": "Hasło",
           "username": "Nazwa użytkownika",
-          "modbus_tcp": "Użyj Modbus TCP zamiast odpytywania HTTP"
+          "modbus_tcp": "Użyj Modbus TCP zamiast odpytywania HTTP",
+          "modbus_write": "Włącz zapis przez Modbus"
+        },
+        "data_description": {
+          "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu."
         }
       },
       "reconfigure": {
         "description": "Modbus zapewnia dane w czasie niemal rzeczywistym, czytając bezpośrednio z urządzenia.\nModbus musi być włączony w ustawieniach instalatora w aplikacji/wyświetlaczu pompy przed włączeniem tutaj. Uwaga: odczytuje tylko przez Modbus, zapis/sterowanie nadal odbywa się przez HTTP API",
         "data": {
           "password": "Hasło",
-          "username": "Nazwa użytkownika"
+          "username": "Nazwa użytkownika",
+          "modbus_write": "Włącz zapis przez Modbus"
+        },
+        "data_description": {
+          "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu."
         }
       }
     }
@@ -551,7 +559,11 @@
         "data": {
           "scan_interval": "Interwał skanowania HTTP (sekundy)",
           "modbus_tcp": "Użyj Modbus TCP zamiast odpytywania HTTP",
-          "modbus_host": "Host/IP Qvantum"
+          "modbus_host": "Host/IP Qvantum",
+          "modbus_write": "Włącz zapis przez Modbus"
+        },
+        "data_description": {
+          "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu."
         },
         "description": "Zmień swoje opcje.",
         "title": "Opcje"

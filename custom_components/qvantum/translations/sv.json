@@ -537,14 +537,22 @@
         "data": {
           "password": "Lösenord",
           "username": "Användarnamn",
-          "modbus_tcp": "Använd Modbus TCP istället för HTTP-förfrågning"
+          "modbus_tcp": "Använd Modbus TCP istället för HTTP-förfrågning",
+          "modbus_write": "Aktivera skrivning via Modbus"
+        },
+        "data_description": {
+          "modbus_write": "Genom att aktivera Modbus-skrivning tar du fullt ansvar för alla värden som skrivs via gränssnittet. Tillverkaren ansvarar inte för problem orsakade av felaktiga eller utanför intervallet liggande värden, och sådana åtgärder kan ogiltigförklara garantin och/eller påverka produktens livslängd och prestanda."
         }
       },
       "reconfigure": {
         "description": "Modbus ger nästan realtidsmetrik genom att läsa direkt från enheten.\nModbus måste vara aktiverat i installatörsinställningarna i pumpens app/display innan det kan aktiveras här. Observera att det bara läser via Modbus, skrivning/kontroller sker fortfarande via HTTP API",
         "data": {
           "password": "Lösenord",
-          "username": "Användarnamn"
+          "username": "Användarnamn",
+          "modbus_write": "Aktivera skrivning via Modbus"
+        },
+        "data_description": {
+          "modbus_write": "Genom att aktivera Modbus-skrivning tar du fullt ansvar för alla värden som skrivs via gränssnittet. Tillverkaren ansvarar inte för problem orsakade av felaktiga eller utanför intervallet liggande värden, och sådana åtgärder kan ogiltigförklara garantin och/eller påverka produktens livslängd och prestanda."
         }
       }
     }
@@ -555,7 +563,11 @@
         "data": {
           "scan_interval": "HTTP-skanningsintervall (sekunder)",
           "modbus_tcp": "Använd Modbus TCP istället för HTTP-förfrågning",
-          "modbus_host": "Qvantum Host/IP"
+          "modbus_host": "Qvantum Host/IP",
+          "modbus_write": "Aktivera skrivning via Modbus"
+        },
+        "data_description": {
+          "modbus_write": "Genom att aktivera Modbus-skrivning tar du fullt ansvar för alla värden som skrivs via gränssnittet. Tillverkaren ansvarar inte för problem orsakade av felaktiga eller utanför intervallet liggande värden, och sådana åtgärder kan ogiltigförklara garantin och/eller påverka produktens livslängd och prestanda."
         },
         "description": "Ändra alternativ.",
         "title": "Alternativ"

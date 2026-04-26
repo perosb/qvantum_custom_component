@@ -182,9 +182,11 @@ class TestQvantumConfigFlow:
                     "username": "test@example.com",
                     "password": "testpass",
                     "modbus_tcp": True,
+                    "modbus_write": False,
                 },
                 options={
                     "modbus_tcp": True,
+                    "modbus_write": False,
                 },
             )
 
@@ -262,8 +264,9 @@ class TestQvantumConfigFlow:
                     "username": "new@example.com",
                     "password": "newpass",
                     "modbus_tcp": False,
+                    "modbus_write": False,
                 },
-                options={"modbus_tcp": False},
+                options={"modbus_tcp": False, "modbus_write": False},
                 reason="reconfigure_successful",
             )
 

@@ -22,6 +22,7 @@ CONFIG_VERSION = 7
 
 # Modbus TCP configuration
 CONF_MODBUS_TCP = "modbus_tcp"
+CONF_MODBUS_WRITE = "modbus_write"
 CONF_MODBUS_HOST = "modbus_host"
 CONF_MODBUS_PORT = "modbus_port"
 CONF_MODBUS_UNIT_ID = "modbus_unit_id"
