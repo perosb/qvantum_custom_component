@@ -48,6 +48,13 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
+def _normalize_modbus_settings(
+    modbus_enabled: bool, modbus_write_enabled: bool
+) -> tuple[bool, bool]:
+    """Ensure modbus_write cannot be enabled when modbus_tcp is disabled."""
+    return modbus_enabled, modbus_write_enabled and modbus_enabled
+
+
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect.
 
@@ -116,8 +123,10 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 # and create the config entry.
                 await self.async_set_unique_id(info.get("title"))
                 self._abort_if_unique_id_configured()
-                modbus_enabled = user_input.get(CONF_MODBUS_TCP, False)
-                modbus_write_enabled = user_input.get(CONF_MODBUS_WRITE, False)
+                modbus_enabled, modbus_write_enabled = _normalize_modbus_settings(
+                    user_input.get(CONF_MODBUS_TCP, False),
+                    user_input.get(CONF_MODBUS_WRITE, False),
+                )
                 return self.async_create_entry(
                     title=info["title"],
                     data={
@@ -159,8 +168,10 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
-                modbus_enabled = user_input.get(CONF_MODBUS_TCP, False)
-                modbus_write_enabled = user_input.get(CONF_MODBUS_WRITE, False)
+                modbus_enabled, modbus_write_enabled = _normalize_modbus_settings(
+                    user_input.get(CONF_MODBUS_TCP, False),
+                    user_input.get(CONF_MODBUS_WRITE, False),
+                )
                 updated_data = {
                     **config_entry.data,
                     "username": user_input["username"],
@@ -219,7 +230,23 @@ class QvantumOptionsFlowHandler(OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Handle options flow."""
         if user_input is not None:
-            options = self.options | user_input
+            modbus_enabled, modbus_write_enabled = _normalize_modbus_settings(
+                user_input.get(
+                    CONF_MODBUS_TCP,
+                    self.options.get(CONF_MODBUS_TCP, False),
+                ),
+                user_input.get(
+                    CONF_MODBUS_WRITE,
+                    self.options.get(CONF_MODBUS_WRITE, False),
+                ),
+            )
+            normalized_input = {**user_input}
+            if CONF_MODBUS_TCP in user_input:
+                normalized_input[CONF_MODBUS_TCP] = modbus_enabled
+            if CONF_MODBUS_WRITE in user_input:
+                normalized_input[CONF_MODBUS_WRITE] = modbus_write_enabled
+
+            options = self.options | normalized_input
             return self.async_create_entry(title="", data=options)
 
         data_schema = vol.Schema(

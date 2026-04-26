@@ -191,6 +191,52 @@ class TestQvantumConfigFlow:
             )
 
     @pytest.mark.asyncio
+    async def test_user_step_normalizes_modbus_write_without_tcp(
+        self, hass, config_flow
+    ):
+        """Test user step coerces modbus_write to false when modbus_tcp is disabled."""
+        hass.config_entries = MagicMock()
+        hass.config_entries.flow = MagicMock()
+        hass.config_entries.flow.async_progress_by_handler = AsyncMock(return_value=[])
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_input"
+            ) as mock_validate,
+            patch.object(config_flow, "async_set_unique_id") as mock_set_unique_id,
+            patch.object(config_flow, "_abort_if_unique_id_configured") as mock_abort,
+            patch.object(config_flow, "async_create_entry") as mock_create_entry,
+        ):
+            mock_validate.return_value = {"title": "Test Device"}
+            mock_create_entry.return_value = {"type": "create_entry"}
+
+            result = await config_flow.async_step_user(
+                {
+                    "username": "test@example.com",
+                    "password": "testpass",
+                    "modbus_tcp": False,
+                    "modbus_write": True,
+                }
+            )
+
+            assert result == {"type": "create_entry"}
+            mock_set_unique_id.assert_called_once_with("Test Device")
+            mock_abort.assert_called_once()
+            mock_create_entry.assert_called_once_with(
+                title="Test Device",
+                data={
+                    "username": "test@example.com",
+                    "password": "testpass",
+                    "modbus_tcp": False,
+                    "modbus_write": False,
+                },
+                options={
+                    "modbus_tcp": False,
+                    "modbus_write": False,
+                },
+            )
+
+    @pytest.mark.asyncio
     async def test_user_step_unknown_error(self, hass, config_flow):
         """Test user step with unknown error."""
         # Mock the hass.config_entries.flow property
@@ -348,6 +394,50 @@ class TestQvantumConfigFlow:
             assert mock_update_reload.call_args.kwargs["options"]["modbus_tcp"] is True
 
     @pytest.mark.asyncio
+    async def test_step_reconfigure_normalizes_modbus_write_without_tcp(
+        self, hass, config_flow
+    ):
+        """Test reconfigure coerces modbus_write to false when modbus_tcp is disabled."""
+        config_entry = MagicMock()
+        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
+        config_entry.options = {"modbus_tcp": True, "modbus_write": True}
+        config_entry.unique_id = "test_unique_id"
+
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_get_entry.return_value = config_entry
+
+        config_flow.context = {"entry_id": "test_entry_id"}
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_input"
+            ) as mock_validate,
+            patch.object(
+                config_flow, "async_update_reload_and_abort"
+            ) as mock_update_reload,
+        ):
+            mock_validate.return_value = None
+            mock_update_reload.return_value = {"type": "abort"}
+
+            result = await config_flow.async_step_reconfigure(
+                {
+                    "username": "new@example.com",
+                    "password": "newpass",
+                    "modbus_tcp": False,
+                    "modbus_write": True,
+                }
+            )
+
+            assert result == {"type": "abort"}
+            mock_update_reload.assert_called_once()
+            assert mock_update_reload.call_args.kwargs["data"]["modbus_tcp"] is False
+            assert mock_update_reload.call_args.kwargs["data"]["modbus_write"] is False
+            assert mock_update_reload.call_args.kwargs["options"]["modbus_tcp"] is False
+            assert (
+                mock_update_reload.call_args.kwargs["options"]["modbus_write"] is False
+            )
+
+    @pytest.mark.asyncio
     async def test_options_flow_init_success(self, hass):
         """Test options flow init step with successful update."""
         from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
@@ -405,3 +495,45 @@ class TestQvantumConfigFlow:
         assert result["type"] == "form"
         assert result["step_id"] == "init"
         assert "data_schema" in result
+
+    @pytest.mark.asyncio
+    async def test_options_flow_init_normalizes_modbus_write_without_tcp(self, hass):
+        """Test options flow coerces modbus_write to false when modbus_tcp is disabled."""
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+        from homeassistant.config_entries import ConfigEntry
+
+        config_entry = ConfigEntry(
+            version=1,
+            minor_version=1,
+            domain="qvantum",
+            title="Test",
+            data={},
+            options={"scan_interval": 120},
+            source="user",
+            unique_id="test_unique_id",
+            discovery_keys={},
+            subentries_data={},
+        )
+
+        flow = QvantumOptionsFlowHandler(config_entry)
+
+        with patch.object(flow, "async_create_entry") as mock_create_entry:
+            mock_create_entry.return_value = {"type": "create_entry"}
+
+            result = await flow.async_step_init(
+                {
+                    "scan_interval": 300,
+                    "modbus_tcp": False,
+                    "modbus_write": True,
+                }
+            )
+
+            assert result == {"type": "create_entry"}
+            mock_create_entry.assert_called_once_with(
+                title="",
+                data={
+                    "scan_interval": 300,
+                    "modbus_tcp": False,
+                    "modbus_write": False,
+                },
+            )

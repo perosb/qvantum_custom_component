@@ -529,7 +529,7 @@
     },
     "step": {
       "user": {
-        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il ne fait que lire via Modbus, les écritures/contrôles se font toujours via l'API HTTP",
+        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
         "data": {
           "password": "Mot de passe",
           "username": "Nom d'utilisateur",
@@ -542,7 +542,7 @@
         }
       },
       "reconfigure": {
-        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il ne fait que lire via Modbus, les écritures/contrôles se font toujours via l'API HTTP",
+        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
         "data": {
           "password": "Mot de passe",
           "username": "Nom d'utilisateur",

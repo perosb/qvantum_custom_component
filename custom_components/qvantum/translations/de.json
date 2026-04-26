@@ -530,7 +530,7 @@
     },
     "step": {
       "user": {
-        "description": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest, Schreiben/Steuerung erfolgt weiterhin über HTTP-API",
+        "description": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest; Schreiben/Steuerung erfolgt weiterhin über die HTTP-API, es sei denn, Schreiben ist ebenfalls aktiviert. Bestimmte Steuerungen werden über Modbus geschrieben.",
         "data": {
           "password": "Passwort",
           "username": "Benutzername",
@@ -543,7 +543,7 @@
         }
       },
       "reconfigure": {
-        "description": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest, Schreiben/Steuerung erfolgt weiterhin über HTTP-API",
+        "description": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest; Schreiben/Steuerung erfolgt weiterhin über die HTTP-API, es sei denn, Schreiben ist ebenfalls aktiviert. Bestimmte Steuerungen werden über Modbus geschrieben.",
         "data": {
           "password": "Passwort",
           "username": "Benutzername",

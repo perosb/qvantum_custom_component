@@ -533,7 +533,7 @@
     },
     "step": {
       "user": {
-        "description": "Modbus ger nästan realtidsmetrik genom att läsa direkt från enheten.\nModbus måste vara aktiverat i installatörsinställningarna i pumpens app/display innan det kan aktiveras här. Observera att det bara läser via Modbus, skrivning/kontroller sker fortfarande via HTTP API",
+        "description": "Modbus ger nästan realtidsmetrik genom att läsa direkt från enheten.\nModbus måste vara aktiverat i installatörsinställningarna i pumpens app/display innan det kan aktiveras här. Observera att det bara läser via Modbus; skrivning/kontroller sker fortfarande via HTTP API om inte skrivning också är aktiverad. Vissa kontroller skrivs via Modbus.",
         "data": {
           "password": "Lösenord",
           "username": "Användarnamn",
@@ -546,7 +546,7 @@
         }
       },
       "reconfigure": {
-        "description": "Modbus ger nästan realtidsmetrik genom att läsa direkt från enheten.\nModbus måste vara aktiverat i installatörsinställningarna i pumpens app/display innan det kan aktiveras här. Observera att det bara läser via Modbus, skrivning/kontroller sker fortfarande via HTTP API",
+        "description": "Modbus ger nästan realtidsmetrik genom att läsa direkt från enheten.\nModbus måste vara aktiverat i installatörsinställningarna i pumpens app/display innan det kan aktiveras här. Observera att det bara läser via Modbus; skrivning/kontroller sker fortfarande via HTTP API om inte skrivning också är aktiverad. Vissa kontroller skrivs via Modbus.",
         "data": {
           "password": "Lösenord",
           "username": "Användarnamn",

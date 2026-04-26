@@ -531,7 +531,7 @@
     },
     "step": {
       "user": {
-        "description": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest, schrijven/sturing gebeurt nog via de HTTP API",
+        "description": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest; schrijven/sturing gebeurt nog via de HTTP API, tenzij schrijven ook is ingeschakeld. Bepaalde besturingen worden via Modbus geschreven.",
         "data": {
           "password": "Wachtwoord",
           "username": "Gebruikersnaam",
@@ -544,7 +544,7 @@
         }
       },
       "reconfigure": {
-        "description": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest, schrijven/sturing gebeurt nog via de HTTP API",
+        "description": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest; schrijven/sturing gebeurt nog via de HTTP API, tenzij schrijven ook is ingeschakeld. Bepaalde besturingen worden via Modbus geschreven.",
         "data": {
           "password": "Wachtwoord",
           "username": "Gebruikersnaam",

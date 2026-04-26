@@ -531,7 +531,7 @@
     },
     "step": {
       "user": {
-        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus, la escritura/control sigue siendo vía API HTTP",
+        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
         "data": {
           "password": "Contraseña",
           "username": "Nombre de usuario",
@@ -544,7 +544,7 @@
         }
       },
       "reconfigure": {
-        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus, la escritura/control sigue siendo vía API HTTP",
+        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
         "data": {
           "password": "Contraseña",
           "username": "Nombre de usuario",
