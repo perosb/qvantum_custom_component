@@ -529,18 +529,29 @@
     },
     "step": {
       "user": {
-        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il ne fait que lire via Modbus, les écritures/contrôles se font toujours via l'API HTTP",
+        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
         "data": {
           "password": "Mot de passe",
           "username": "Nom d'utilisateur",
-          "modbus_tcp": "Utiliser Modbus TCP au lieu du polling HTTP"
+          "modbus_tcp": "Utiliser la lecture Modbus au lieu du polling HTTP",
+          "modbus_write": "Activer l'écriture via Modbus"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
+          "modbus_write": "En activant l'écriture Modbus, vous acceptez l'entière responsabilité de toutes les valeurs écrites via l'interface. Le fabricant n'est pas responsable des problèmes causés par des valeurs incorrectes ou hors limites, et de telles actions peuvent annuler la garantie et/ou affecter le cycle de vie et les performances du produit."
         }
       },
       "reconfigure": {
-        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il ne fait que lire via Modbus, les écritures/contrôles se font toujours via l'API HTTP",
+        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
         "data": {
           "password": "Mot de passe",
-          "username": "Nom d'utilisateur"
+          "username": "Nom d'utilisateur",
+          "modbus_tcp": "Utiliser la lecture Modbus au lieu du polling HTTP",
+          "modbus_write": "Activer l'écriture via Modbus"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
+          "modbus_write": "En activant l'écriture Modbus, vous acceptez l'entière responsabilité de toutes les valeurs écrites via l'interface. Le fabricant n'est pas responsable des problèmes causés par des valeurs incorrectes ou hors limites, et de telles actions peuvent annuler la garantie et/ou affecter le cycle de vie et les performances du produit."
         }
       }
     }
@@ -550,8 +561,13 @@
       "init": {
         "data": {
           "scan_interval": "Intervalle de scan HTTP (secondes)",
-          "modbus_tcp": "Utiliser Modbus TCP au lieu du polling HTTP",
-          "modbus_host": "Hôte/IP Qvantum"
+          "modbus_tcp": "Utiliser la lecture Modbus au lieu du polling HTTP",
+          "modbus_host": "Hôte/IP Qvantum",
+          "modbus_write": "Activer l'écriture via Modbus"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
+          "modbus_write": "En activant l'écriture Modbus, vous acceptez l'entière responsabilité de toutes les valeurs écrites via l'interface. Le fabricant n'est pas responsable des problèmes causés par des valeurs incorrectes ou hors limites, et de telles actions peuvent annuler la garantie et/ou affecter le cycle de vie et les performances du produit."
         },
         "description": "Modifiez vos options.",
         "title": "Options"

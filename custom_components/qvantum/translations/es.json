@@ -531,18 +531,29 @@
     },
     "step": {
       "user": {
-        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus, la escritura/control sigue siendo vía API HTTP",
+        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
         "data": {
           "password": "Contraseña",
           "username": "Nombre de usuario",
-          "modbus_tcp": "Usar Modbus TCP en lugar de sondeo HTTP"
+          "modbus_tcp": "Usar lectura Modbus en lugar de sondeo HTTP",
+          "modbus_write": "Activar escritura mediante Modbus"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
+          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto."
         }
       },
       "reconfigure": {
-        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus, la escritura/control sigue siendo vía API HTTP",
+        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
         "data": {
           "password": "Contraseña",
-          "username": "Nombre de usuario"
+          "username": "Nombre de usuario",
+          "modbus_tcp": "Usar lectura Modbus en lugar de sondeo HTTP",
+          "modbus_write": "Activar escritura mediante Modbus"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
+          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto."
         }
       }
     }
@@ -552,8 +563,13 @@
       "init": {
         "data": {
           "scan_interval": "Intervalo de exploración HTTP (segundos)",
-          "modbus_tcp": "Usar Modbus TCP en lugar de sondeo HTTP",
-          "modbus_host": "Qvantum Host/IP"
+          "modbus_tcp": "Usar lectura Modbus en lugar de sondeo HTTP",
+          "modbus_host": "Qvantum Host/IP",
+          "modbus_write": "Activar escritura mediante Modbus"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
+          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto."
         },
         "description": "Modifique sus opciones.",
         "title": "Opciones"

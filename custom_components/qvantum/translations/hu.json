@@ -529,18 +529,29 @@
     },
     "step": {
       "user": {
-        "description": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: a Modbus csak olvas, az írás/vezérlés továbbra is HTTP API-n keresztül történik.",
+        "description": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
         "data": {
           "password": "Jelszó",
           "username": "Felhasználónév",
-          "modbus_tcp": "Modbus TCP használata HTTP lekérdezés helyett"
+          "modbus_tcp": "Modbus-olvasás használata HTTP lekérdezés helyett",
+          "modbus_write": "Modbus alapú írás engedélyezése"
+        },
+        "data_description": {
+          "modbus_tcp": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
+          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét."
         }
       },
       "reconfigure": {
-        "description": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: a Modbus csak olvas, az írás/vezérlés továbbra is HTTP API-n keresztül történik.",
+        "description": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
         "data": {
           "password": "Jelszó",
-          "username": "Felhasználónév"
+          "username": "Felhasználónév",
+          "modbus_tcp": "Modbus-olvasás használata HTTP lekérdezés helyett",
+          "modbus_write": "Modbus alapú írás engedélyezése"
+        },
+        "data_description": {
+          "modbus_tcp": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
+          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét."
         }
       }
     }
@@ -550,8 +561,13 @@
       "init": {
         "data": {
           "scan_interval": "HTTP lekérdezési időköz (másodperc)",
-          "modbus_tcp": "Modbus TCP használata HTTP lekérdezés helyett",
-          "modbus_host": "Qvantum Hoszt/IP"
+          "modbus_tcp": "Modbus-olvasás használata HTTP lekérdezés helyett",
+          "modbus_host": "Qvantum Hoszt/IP",
+          "modbus_write": "Modbus alapú írás engedélyezése"
+        },
+        "data_description": {
+          "modbus_tcp": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
+          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét."
         },
         "description": "Módosítsa a beállításait.",
         "title": "Beállítások"
