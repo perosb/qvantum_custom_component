@@ -440,6 +440,7 @@ class TestQvantumNumberEntity:
     ):
         """Test setting dhw_stop_extra writes via Modbus holding register, not update_setting."""
         mock_coordinator.data["values"]["dhw_stop_extra"] = 65
+        mock_coordinator.config_entry.options = {"modbus_write": True}
         entity = QvantumNumberEntity(
             mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
         )
@@ -460,6 +461,26 @@ class TestQvantumNumberEntity:
         mock_coordinator.api.update_setting.assert_not_called()
         # Coordinator cache should be updated with the new value
         assert mock_coordinator.data["values"]["dhw_stop_extra"] == 75
+
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_dhw_stop_extra_raises_when_write_disabled(
+        self, mock_coordinator, mock_device
+    ):
+        """Test that async_set_native_value raises HomeAssistantError when modbus_write is disabled."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        mock_coordinator.data["values"]["dhw_stop_extra"] = 65
+        mock_coordinator.config_entry.options = {}
+        mock_coordinator.config_entry.data = {}
+        entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
+        )
+        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
+
+        with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
+            await entity.async_set_native_value(75.0)
+
+        mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
 
     def test_available_dhw_stop_extra_modbus_write_disabled(
         self, mock_coordinator, mock_device

@@ -5,6 +5,7 @@ import logging
 from homeassistant.components.number import NumberEntity
 from homeassistant.const import UnitOfEnergy, UnitOfTemperature, EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -110,6 +111,15 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
 
             case "dhw_stop_extra":
                 # dhw_stop_extra has no update_setting HTTP endpoint; write via Modbus holding register
+                config_entry = self.coordinator.config_entry
+                modbus_write_enabled = config_entry.options.get(
+                    CONF_MODBUS_WRITE,
+                    config_entry.data.get(CONF_MODBUS_WRITE, False),
+                )
+                if not modbus_write_enabled:
+                    raise HomeAssistantError(
+                        "Modbus writing is disabled. Enable 'Enable writing via Modbus' in the integration options."
+                    )
                 response = await self.coordinator.api.write_holding_register_for_metric(
                     self._hpid, self._metric_key, int(value)
                 )
