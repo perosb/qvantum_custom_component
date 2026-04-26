@@ -42,7 +42,7 @@ async def async_setup_entry(
         "indoor_temperature_offset": (-10, 10, 1),
         "tap_water_stop": (60, 80, 1),
         "tap_water_start": (50, 65, 1),
-        "dhw_stop_extra": (60, 85, 5),
+        "dhw_stop_extra": (60, 80, 5),
         "fan_normal": (0, 100, 5),
         "fan_speed_2": (0, 100, 5),
     }
