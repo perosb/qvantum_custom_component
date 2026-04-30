@@ -294,22 +294,35 @@ class QvantumTotalEnergyEntity(QvantumEnergyEntity):
     ) -> None:
         super().__init__(coordinator, metric_key, device, enabled_by_default)
 
+    def _is_data_valid(
+        self, compressor: float | int | None, additional: float | int | None
+    ) -> bool:
+        """Validate total-energy source values.
+
+        Values are considered invalid when either source is missing, or when both
+        are exactly zero (treated as a transient communication anomaly).
+        """
+        if compressor is None or additional is None:
+            return False
+        if compressor == 0 and additional == 0:
+            return False
+        return True
+
     @property
     def state(self):
         """Get metric from API data."""
         compressor = self._values.get("compressorenergy")
         additional = self._values.get("additionalenergy")
-        if compressor is None or additional is None:
+        if not self._is_data_valid(compressor, additional):
             return None
         return compressor + additional
 
     @property
     def available(self):
         """Check if data is available."""
-        return (
-            self._values.get("compressorenergy") is not None
-            and self._values.get("additionalenergy") is not None
-        )
+        compressor = self._values.get("compressorenergy")
+        additional = self._values.get("additionalenergy")
+        return self._is_data_valid(compressor, additional)
 
 
 class QvantumDiagnosticEntity(QvantumBaseSensorEntity):

@@ -334,16 +334,27 @@ class QvantumAPI:
         )
 
         # Compute energy from mwh/kwh components (preferred modbus format: kwh entry scaled x10).
+        # Only derive an energy counter when both components are present and numeric.
+        # This avoids synthesizing misleading 0 values during transient partial reads.
         for prefix in ["compressor", "additional", "heating", "cooling", "dhw"]:
             mwh = metrics.get(f"{prefix}_mwh")
             kwh = metrics.get(f"{prefix}_kwh")
-            mwh = float(mwh) if mwh is not None else 0.0
-            kwh = float(kwh) if kwh is not None else 0.0
-
-            # NOTE: kwh values in `metrics` are already normalized by the Modbus register map
-            # (e.g. raw x10 register values have been de-scaled), so we can add them directly
-            # to mwh * 1000.0 here without applying any additional scaling factor.
-            metrics[f"{prefix}energy"] = round(mwh * 1000.0 + kwh, 2)
+            if mwh is not None and kwh is not None:
+                try:
+                    mwh_val = float(mwh)
+                    kwh_val = float(kwh)
+                except (TypeError, ValueError):
+                    _LOGGER.debug(
+                        "Skipping energy derivation for %s due to non-numeric components: mwh=%s, kwh=%s",
+                        prefix,
+                        mwh,
+                        kwh,
+                    )
+                else:
+                    # NOTE: kwh values in `metrics` are already normalized by the Modbus register map
+                    # (e.g. raw x10 register values have been de-scaled), so we can add them directly
+                    # to mwh * 1000.0 here without applying any additional scaling factor.
+                    metrics[f"{prefix}energy"] = round(mwh_val * 1000.0 + kwh_val, 2)
             metrics.pop(f"{prefix}_mwh", None)
             metrics.pop(f"{prefix}_kwh", None)
 

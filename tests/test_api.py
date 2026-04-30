@@ -162,6 +162,58 @@ class TestQvantumAPI:
         assert metrics["compressorenergy"] == 4801.0
 
     @pytest.mark.asyncio
+    async def test_read_modbus_metrics_skips_energy_if_component_missing(
+        self, mock_session
+    ):
+        """Do not derive energy when mwh/kwh pair is incomplete."""
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+
+        with patch.object(
+            QvantumAPI,
+            "_read_modbus_registers",
+            AsyncMock(
+                return_value={
+                    "compressor_mwh": 4,
+                    # compressor_kwh intentionally missing to simulate transient partial read
+                }
+            ),
+        ):
+            result = await api._read_modbus_metrics(
+                "test_device_123", ["compressor_mwh", "compressor_kwh"]
+            )
+
+        metrics = result["metrics"]
+        assert "compressorenergy" not in metrics
+
+    @pytest.mark.asyncio
+    async def test_read_modbus_metrics_skips_energy_if_component_non_numeric(
+        self, mock_session
+    ):
+        """Do not derive energy when mwh/kwh values are malformed."""
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+
+        with patch.object(
+            QvantumAPI,
+            "_read_modbus_registers",
+            AsyncMock(
+                return_value={
+                    "compressor_mwh": "not-a-number",
+                    "compressor_kwh": 1,
+                }
+            ),
+        ):
+            result = await api._read_modbus_metrics(
+                "test_device_123", ["compressor_mwh", "compressor_kwh"]
+            )
+
+        metrics = result["metrics"]
+        assert "compressorenergy" not in metrics
+
+    @pytest.mark.asyncio
     async def test_read_modbus_metrics_rounds_to_two_decimals(self, mock_session):
         """Test numeric outputs from modbus are rounded to two decimals."""
         api = QvantumAPI(
