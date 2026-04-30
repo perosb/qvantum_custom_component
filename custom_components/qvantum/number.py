@@ -12,8 +12,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .const import (
-    CONF_MODBUS_TCP,
-    CONF_MODBUS_WRITE,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
@@ -23,7 +21,10 @@ _LOGGER = logging.getLogger(__name__)
 
 # Metrics that require writing via Modbus holding registers.
 # Entities for these metrics show as unavailable when "Enable writing via Modbus" is off.
-MODBUS_WRITE_METRICS = {"dhw_stop_extra"}
+MODBUS_WRITE_METRICS = {
+    "dhw_stop_extra",
+    "room_temp_external",  # Written via Modbus and only relevant when the external room sensor mode is enabled.
+}
 
 
 async def async_setup_entry(
@@ -45,6 +46,7 @@ async def async_setup_entry(
         "dhw_stop_extra": (60, 80, 5),
         "fan_normal": (0, 100, 5),
         "fan_speed_2": (0, 100, 5),
+        "room_temp_external": (-5, 40, 0.1),
     }
 
     # Only create number entities for metrics present in the coordinator's current data.
@@ -88,26 +90,32 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         """Update the current value."""
 
         response = {}
+        coordinator_update_value: int | float = value
         match self._metric_key:
             case "tap_water_capacity_target":
+                coordinator_update_value = int(value)
                 response = await self.coordinator.api.set_tap_water_capacity_target(
-                    self._hpid, int(value)
+                    self._hpid, coordinator_update_value
                 )
             case "indoor_temperature_offset":
+                coordinator_update_value = int(value)
                 response = await self.coordinator.api.set_indoor_temperature_offset(
-                    self._hpid, int(value)
+                    self._hpid, coordinator_update_value
                 )
             case "tap_water_stop":
+                coordinator_update_value = int(value)
                 response = await self.coordinator.api.set_tap_water(
-                    self._hpid, stop=int(value)
+                    self._hpid, stop=coordinator_update_value
                 )
             case "tap_water_start":
+                coordinator_update_value = int(value)
                 response = await self.coordinator.api.set_tap_water(
-                    self._hpid, start=int(value)
+                    self._hpid, start=coordinator_update_value
                 )
             case "room_comp_factor" | "fan_normal" | "fan_speed_2":
+                coordinator_update_value = int(value)
                 response = await self.coordinator.api.update_setting(
-                    self._hpid, self._metric_key, int(value)
+                    self._hpid, self._metric_key, coordinator_update_value
                 )
 
             case "dhw_stop_extra":
@@ -116,8 +124,24 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                     raise HomeAssistantError(
                         "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
                     )
+                coordinator_update_value = int(value)
                 response = await self.coordinator.api.write_holding_register_for_metric(
-                    self._hpid, self._metric_key, int(value)
+                    self._hpid, self._metric_key, coordinator_update_value
+                )
+
+            case "room_temp_external":
+                # room_temp_external writes to Modbus holding register 14 (scale 0.1)
+                if not self._is_modbus_write_allowed():
+                    raise HomeAssistantError(
+                        "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
+                    )
+                coordinator_update_value = value
+                response = await self.coordinator.api.write_holding_register_for_metric(
+                    self._hpid, self._metric_key, coordinator_update_value
+                )
+            case _:
+                raise HomeAssistantError(
+                    f"Unsupported metric key for number entity: {self._metric_key}"
                 )
 
         await handle_setting_update_response(
@@ -125,7 +149,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
             self.coordinator,
             "values",
             self._metric_key,
-            int(value),
+            coordinator_update_value,
         )
 
     @property
@@ -150,17 +174,13 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
             )
             and self._values.get(self._metric_key) is not None
             and self._has_write_access
+            and (
+                # `room_temp_external` is only meaningful when the heat pump is
+                # configured to use the external operation sensor; in the API,
+                # `use_operation_sensor == 4` represents the "External" sensor.
+                self._metric_key != "room_temp_external"
+                or self._values.get("use_operation_sensor") == 4
+            )
         )
 
-    def _is_modbus_write_allowed(self) -> bool:
-        """Return True when Modbus write actions are explicitly enabled and available."""
-        config_entry = self.coordinator.config_entry
-        modbus_write_enabled = config_entry.options.get(
-            CONF_MODBUS_WRITE,
-            config_entry.data.get(CONF_MODBUS_WRITE, False),
-        )
-        modbus_tcp_enabled = config_entry.options.get(
-            CONF_MODBUS_TCP,
-            config_entry.data.get(CONF_MODBUS_TCP, False),
-        )
-        return modbus_write_enabled and modbus_tcp_enabled
+

@@ -53,6 +53,16 @@
           "1": "Gebalanceerd",
           "2": "Comfort"
         }
+      },
+      "use_operation_sensor": {
+        "name": "Binnensensor",
+        "state": {
+          "0": "Nee",
+          "1": "Ja: BT2",
+          "2": "Ja: BT3",
+          "3": "Ja: AUX",
+          "4": "Extern"
+        }
       }
     },
     "button": {
@@ -496,6 +506,9 @@
       },
       "dhw_stop_extra": {
         "name": "Extra warmwater stoptemperatuur"
+      },
+      "room_temp_external": {
+        "name": "Externe binnentemperatuur"
       }
     },
     "climate": {

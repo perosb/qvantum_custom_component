@@ -53,6 +53,16 @@
           "1": "Equilibrado",
           "2": "Confort"
         }
+      },
+      "use_operation_sensor": {
+        "name": "Sensor de interior",
+        "state": {
+          "0": "No",
+          "1": "S\u00ed: BT2",
+          "2": "S\u00ed: BT3",
+          "3": "S\u00ed: AUX",
+          "4": "Externo"
+        }
       }
     },
     "button": {
@@ -496,6 +506,9 @@
       },
       "dhw_stop_extra": {
         "name": "Temperatura de parada ACS extra"
+      },
+      "room_temp_external": {
+        "name": "Temperatura interior externa"
       }
     },
     "climate": {

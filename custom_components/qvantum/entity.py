@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import DOMAIN
+from .const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE, DOMAIN
 from .coordinator import QvantumDataUpdateCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
@@ -94,6 +94,9 @@ _ENTITY_ICONS: dict[str, str] = {
     "enable_sc_dhw": "mdi:water-thermometer",
     # Select
     "use_adaptive": "mdi:leaf",
+    "use_operation_sensor": "mdi:motion-sensor",
+    # Number / writable temperature
+    "room_temp_external": "mdi:thermometer",
 }
 
 
@@ -130,6 +133,19 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
     def _values(self) -> dict:
         """Return current values from coordinator data, safe when data is None."""
         return (self.coordinator.data or {}).get("values", {})
+
+    def _is_modbus_write_allowed(self) -> bool:
+        """Return True when Modbus write actions are explicitly enabled and available."""
+        config_entry = self.coordinator.config_entry
+        modbus_write_enabled = config_entry.options.get(
+            CONF_MODBUS_WRITE,
+            config_entry.data.get(CONF_MODBUS_WRITE, False),
+        )
+        modbus_tcp_enabled = config_entry.options.get(
+            CONF_MODBUS_TCP,
+            config_entry.data.get(CONF_MODBUS_TCP, False),
+        )
+        return modbus_write_enabled and modbus_tcp_enabled
 
     def _resolve_device_id(self, device: DeviceInfo | dict[str, object]) -> str | None:
         """Resolve device ID from device info or coordinator data."""

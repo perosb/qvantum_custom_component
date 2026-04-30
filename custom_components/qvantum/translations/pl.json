@@ -53,6 +53,16 @@
           "1": "Zrównoważony",
           "2": "Komfort"
         }
+      },
+      "use_operation_sensor": {
+        "name": "Czujnik wewn\u0119trzny",
+        "state": {
+          "0": "Nie",
+          "1": "Tak: BT2",
+          "2": "Tak: BT3",
+          "3": "Tak: AUX",
+          "4": "Zewn\u0119trzny"
+        }
       }
     },
     "button": {
@@ -494,6 +504,9 @@
       },
       "dhw_stop_extra": {
         "name": "Extra temperatura zatrzymania ciepłej wody"
+      },
+      "room_temp_external": {
+        "name": "Zewnętrzna temperatura wewnętrzna"
       }
     },
     "climate": {

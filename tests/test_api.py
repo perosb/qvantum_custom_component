@@ -2399,3 +2399,23 @@ class TestWriteHoldingRegister:
         assert result == {"status": "APPLIED"}
         call_args = client.execute.call_args[0][1]
         assert call_args.registers == [25]
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_for_metric_room_temp_external_scaling(
+        self, mock_session
+    ):
+        """room_temp_external writes to register 14 and applies inverse 0.1 scale."""
+        api = self._make_api(mock_session)
+        client = self._make_fake_client()
+        api._modbus_client = client
+
+        # room_temp_external maps to holding register 14 with scale=0.1
+        # value=21.5 -> raw = int(round(21.5 / 0.1)) = 215
+        result = await api.write_holding_register_for_metric(
+            "dev1", "room_temp_external", 21.5
+        )
+
+        assert result == {"status": "APPLIED"}
+        request = client.execute.call_args[0][1]
+        assert request.address == 14
+        assert request.registers == [215]

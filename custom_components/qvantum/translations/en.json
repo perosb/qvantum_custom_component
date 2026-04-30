@@ -53,6 +53,16 @@
           "1": "Balanced",
           "2": "Comfort"
         }
+      },
+      "use_operation_sensor": {
+        "name": "Indoor sensor source",
+        "state": {
+          "0": "No",
+          "1": "Yes: BT2",
+          "2": "Yes: BT3",
+          "3": "Yes: AUX",
+          "4": "External"
+        }
       }
     },
     "button": {
@@ -495,6 +505,9 @@
       },
       "dhw_stop_extra": {
         "name": "Extra hot water stop temperature"
+      },
+      "room_temp_external": {
+        "name": "External indoor temperature"
       }
     },
     "climate": {

@@ -53,6 +53,16 @@
           "1": "Kiegyensúlyozott",
           "2": "Komfort"
         }
+      },
+      "use_operation_sensor": {
+        "name": "Bels\u0151 \u00e9rz\u00e9kel\u0151",
+        "state": {
+          "0": "Nem",
+          "1": "Igen: BT2",
+          "2": "Igen: BT3",
+          "3": "Igen: AUX",
+          "4": "K\u00fcls\u0151"
+        }
       }
     },
     "button": {
@@ -494,6 +504,9 @@
       },
       "dhw_stop_extra": {
         "name": "Extra melegvíz leállítási hőmérséklet"
+      },
+      "room_temp_external": {
+        "name": "Külső beltéri hőmérséklet"
       }
     },
     "climate": {

@@ -53,6 +53,16 @@
           "1": "Ausgewogen",
           "2": "Komfort"
         }
+      },
+      "use_operation_sensor": {
+        "name": "Innentemperatursensor",
+        "state": {
+          "0": "Nein",
+          "1": "Ja: BT2",
+          "2": "Ja: BT3",
+          "3": "Ja: AUX",
+          "4": "Extern"
+        }
       }
     },
     "button": {
@@ -495,6 +505,9 @@
       },
       "dhw_stop_extra": {
         "name": "Extra Brauchwasser Stopptemperatur"
+      },
+      "room_temp_external": {
+        "name": "Externe Innentemperatur"
       }
     },
     "climate": {
