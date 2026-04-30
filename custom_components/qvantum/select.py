@@ -83,12 +83,15 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Update the current value."""
         if self._metric_key == "use_operation_sensor":
+            option_value = int(option)
             response = await self.coordinator.api.write_holding_register_for_metric(
-                self._hpid, self._metric_key, int(option)
+                self._hpid, self._metric_key, option_value
             )
-            await handle_setting_update_response(
-                response, self.coordinator, "values", self._metric_key, int(option)
-            )
+            if await handle_setting_update_response(
+                response, self.coordinator, "values", self._metric_key, option_value
+            ):
+                values = self.coordinator.data.get("values", {})
+                values["sensor_mode"] = option_value
             return
 
         # Map option to smart control modes (use_adaptive)

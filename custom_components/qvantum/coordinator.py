@@ -59,16 +59,21 @@ async def handle_setting_update_response(
     data_section: Optional[str],
     key: Optional[str],
     value: Any,
-) -> None:
+) -> bool:
     """Handle API response for setting updates and update coordinator data if successful."""
-    if api_response and (
-        api_response.get("status") == SETTING_UPDATE_APPLIED
-        or api_response.get("heatpump_status") == SETTING_UPDATE_APPLIED
-    ):
-        if data_section and key is not None:
-            coordinator.data.get(data_section)[key] = value
-            # async_set_updated_data is a synchronous method despite the name
-            coordinator.async_set_updated_data(coordinator.data)
+    success = bool(
+        api_response
+        and (
+            api_response.get("status") == SETTING_UPDATE_APPLIED
+            or api_response.get("heatpump_status") == SETTING_UPDATE_APPLIED
+        )
+    )
+    if success and data_section and key is not None:
+        coordinator.data.get(data_section)[key] = value
+        # async_set_updated_data is a synchronous method despite the name
+        coordinator.async_set_updated_data(coordinator.data)
+        return True
+    return False
 
 
 class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinator):

@@ -357,6 +357,7 @@ class TestQvantumSelectEntityOperationSensor:
         mock_coordinator.api.write_holding_register_for_metric = AsyncMock(
             return_value={"status": "APPLIED"}
         )
+        mock_coordinator.data["values"]["sensor_mode"] = 0
 
         for opt in ["0", "1", "2", "3", "4"]:
             mock_coordinator.api.write_holding_register_for_metric.reset_mock()
@@ -364,6 +365,7 @@ class TestQvantumSelectEntityOperationSensor:
             mock_coordinator.api.write_holding_register_for_metric.assert_called_once_with(
                 "test_device_123", "use_operation_sensor", int(opt)
             )
+            assert mock_coordinator.data["values"]["sensor_mode"] == int(opt)
 
     def test_available_modbus_write_enabled(self, mock_coordinator, mock_device):
         """Test entity is available when Modbus write is enabled."""
