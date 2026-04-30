@@ -1,5 +1,6 @@
 """Tests for Qvantum select entities (working version that avoids metaclass issues)."""
 
+from homeassistant.exceptions import HomeAssistantError
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
@@ -354,16 +355,16 @@ class TestQvantumSelectEntityOperationSensor:
             mock_coordinator, "use_operation_sensor", mock_device
         )
 
-        mock_coordinator.api.write_holding_register_for_metric = AsyncMock(
+        mock_coordinator.api.write_holding_register = AsyncMock(
             return_value={"status": "APPLIED"}
         )
         mock_coordinator.data["values"]["sensor_mode"] = 0
 
         for opt in ["0", "1", "2", "3", "4"]:
-            mock_coordinator.api.write_holding_register_for_metric.reset_mock()
+            mock_coordinator.api.write_holding_register.reset_mock()
             await entity.async_select_option(opt)
-            mock_coordinator.api.write_holding_register_for_metric.assert_called_once_with(
-                "test_device_123", "use_operation_sensor", int(opt)
+            mock_coordinator.api.write_holding_register.assert_called_once_with(
+                "test_device_123", 9, int(opt)
             )
             assert mock_coordinator.data["values"]["sensor_mode"] == int(opt)
 
@@ -378,6 +379,39 @@ class TestQvantumSelectEntityOperationSensor:
             mock_coordinator, "use_operation_sensor", mock_device
         )
         assert entity.available is True
+
+    @pytest.mark.asyncio
+    async def test_async_select_option_raises_when_modbus_write_disabled(
+        self, mock_coordinator, mock_device
+    ):
+        """Test use_operation_sensor fails fast when Modbus writing is disabled."""
+        mock_coordinator.data["values"]["use_operation_sensor"] = 0
+        mock_coordinator.config_entry.options = {}
+        mock_coordinator.config_entry.data = {}
+        entity = QvantumSelectEntity(
+            mock_coordinator, "use_operation_sensor", mock_device
+        )
+
+        with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
+            await entity.async_select_option("1")
+
+    @pytest.mark.asyncio
+    async def test_async_select_option_raises_when_modbus_tcp_disabled(
+        self, mock_coordinator, mock_device
+    ):
+        """Test use_operation_sensor fails fast when Modbus TCP is disabled."""
+        mock_coordinator.data["values"]["use_operation_sensor"] = 0
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": False,
+        }
+        mock_coordinator.config_entry.data = {}
+        entity = QvantumSelectEntity(
+            mock_coordinator, "use_operation_sensor", mock_device
+        )
+
+        with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
+            await entity.async_select_option("1")
 
     def test_available_modbus_write_disabled(self, mock_coordinator, mock_device):
         """Test entity is unavailable when Modbus write is disabled."""

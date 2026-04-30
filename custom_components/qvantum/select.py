@@ -4,6 +4,7 @@ import logging
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -83,9 +84,13 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Update the current value."""
         if self._metric_key == "use_operation_sensor":
+            if not self._is_modbus_write_allowed():
+                raise HomeAssistantError(
+                    "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
+                )
             option_value = int(option)
-            response = await self.coordinator.api.write_holding_register_for_metric(
-                self._hpid, self._metric_key, option_value
+            response = await self.coordinator.api.write_holding_register(
+                self._hpid, 9, option_value
             )
             if await handle_setting_update_response(
                 response, self.coordinator, "values", self._metric_key, option_value
