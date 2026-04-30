@@ -68,6 +68,25 @@ The integration will automatically discover your Qvantum devices and create comp
 > [!IMPORTANT]
 > By default, this integration uses Modbus for **reading only**. Modbus write support is disabled unless you explicitly enable it in the integration options, and only supported controls use that path. Other configuration/set commands continue to use the existing HTTP API.
 
+### External room sensor support
+
+When the pump is configured to use an external room sensor (`use_operation_sensor == 4`), the integration exposes a `number` entity for `room_temp_external`.
+This allows you to mirror an external temperature sensor into the pump’s control setpoint via Modbus when Modbus writes are enabled.
+
+**Example automation:**
+```yaml
+alias: "Qvantum: Update external room temperature"
+trigger:
+  - platform: state
+    entity_id: sensor.some_external_room_temperature
+action:
+  - service: number.set_value
+    target:
+      entity_id: number.qvantum_room_temp_external_<device_id>
+    data:
+      value: "{{ states('sensor.some_external_room_temperature') | float }}"
+```
+
 ### Services
 
 The integration provides the following services for advanced control and testing:
