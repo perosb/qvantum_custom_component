@@ -277,6 +277,25 @@ class TestQvantumTotalEnergyEntity:
         )
         assert entity.available is False
 
+    def test_state_is_none_when_component_missing(self, mock_coordinator, mock_device):
+        """Total energy state should be unknown when one component is missing."""
+        del mock_coordinator.data["values"]["additionalenergy"]
+        entity = QvantumTotalEnergyEntity(
+            mock_coordinator, "totalenergy", mock_device, True
+        )
+        assert entity.state is None
+        assert entity.available is False
+
+    def test_unavailable_when_both_components_zero(self, mock_coordinator, mock_device):
+        """Total energy should be unavailable when both components are zero."""
+        mock_coordinator.data["values"]["compressorenergy"] = 0
+        mock_coordinator.data["values"]["additionalenergy"] = 0
+        entity = QvantumTotalEnergyEntity(
+            mock_coordinator, "totalenergy", mock_device, True
+        )
+        assert entity.state is None
+        assert entity.available is False
+
 
 class TestQvantumDiagnosticEntity:
     """Test the QvantumDiagnosticEntity class."""
