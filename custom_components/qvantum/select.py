@@ -92,11 +92,14 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
             response = await self.coordinator.api.write_holding_register(
                 self._hpid, 9, option_value
             )
-            if await handle_setting_update_response(
-                response, self.coordinator, "values", self._metric_key, option_value
+            if response and (
+                response.get("status") == SETTING_UPDATE_APPLIED
+                or response.get("heatpump_status") == SETTING_UPDATE_APPLIED
             ):
-                values = self.coordinator.data.get("values", {})
-                values["sensor_mode"] = option_value
+                self.coordinator.data.get("values", {})["sensor_mode"] = option_value
+            await handle_setting_update_response(
+                response, self.coordinator, "values", self._metric_key, option_value
+            )
             return
 
         # Map option to smart control modes (use_adaptive)
