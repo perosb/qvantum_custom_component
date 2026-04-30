@@ -46,7 +46,7 @@ async def async_setup_entry(
         "dhw_stop_extra": (60, 80, 5),
         "fan_normal": (0, 100, 5),
         "fan_speed_2": (0, 100, 5),
-        "room_temp_external": (-5, 40, 0.1),
+        "room_temp_external": (10, 40, 0.1),
     }
 
     # Only create number entities for metrics present in the coordinator's current data.

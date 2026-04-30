@@ -604,7 +604,7 @@ class TestRoomTempExternal:
             "modbus_tcp": True,
         }
         entity = QvantumNumberEntity(
-            mock_coordinator, "room_temp_external", -5, 40, 0.1, mock_device
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
 
         assert entity._metric_key == "room_temp_external"
@@ -627,7 +627,7 @@ class TestRoomTempExternal:
             "modbus_tcp": True,
         }
         entity = QvantumNumberEntity(
-            mock_coordinator, "room_temp_external", -5, 40, 0.1, mock_device
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
         assert entity.available is True
 
@@ -641,7 +641,7 @@ class TestRoomTempExternal:
             "modbus_tcp": True,
         }
         entity = QvantumNumberEntity(
-            mock_coordinator, "room_temp_external", -5, 40, 0.1, mock_device
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
         for val in [0, 1, 2, 3, None]:
             mock_coordinator.data["values"]["use_operation_sensor"] = val
@@ -656,7 +656,7 @@ class TestRoomTempExternal:
         mock_coordinator.config_entry.options = {}
         mock_coordinator.config_entry.data = {}
         entity = QvantumNumberEntity(
-            mock_coordinator, "room_temp_external", -5, 40, 0.1, mock_device
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
         assert entity.available is False
 
@@ -672,7 +672,7 @@ class TestRoomTempExternal:
             "modbus_tcp": True,
         }
         entity = QvantumNumberEntity(
-            mock_coordinator, "room_temp_external", -5, 40, 0.1, mock_device
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
 
         mock_coordinator.api.write_holding_register_for_metric = AsyncMock(
@@ -703,7 +703,7 @@ class TestRoomTempExternal:
         mock_coordinator.config_entry.options = {}
         mock_coordinator.config_entry.data = {}
         entity = QvantumNumberEntity(
-            mock_coordinator, "room_temp_external", -5, 40, 0.1, mock_device
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
         mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
 
