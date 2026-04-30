@@ -608,7 +608,7 @@ class TestRoomTempExternal:
         )
 
         assert entity._metric_key == "room_temp_external"
-        assert entity._attr_native_min_value == -5
+        assert entity._attr_native_min_value == 10
         assert entity._attr_native_max_value == 40
         assert entity._attr_native_step == 0.1
         assert (
