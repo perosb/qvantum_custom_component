@@ -53,6 +53,16 @@
           "1": "Équilibré",
           "2": "Confort"
         }
+      },
+      "use_operation_sensor": {
+        "name": "Source du capteur intérieur",
+        "state": {
+          "0": "Désactivé",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
+          "4": "Externe"
+        }
       }
     },
     "button": {
@@ -494,6 +504,9 @@
       },
       "dhw_stop_extra": {
         "name": "Température d'arrêt extra eau chaude"
+      },
+      "room_temp_external": {
+        "name": "Température intérieure externe"
       }
     },
     "climate": {

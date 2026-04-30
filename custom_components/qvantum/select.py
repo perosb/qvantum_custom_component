@@ -4,6 +4,7 @@ import logging
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -29,6 +30,8 @@ async def async_setup_entry(
     entities = []
     if "use_adaptive" in coordinator.data.get("values", {}):
         entities.append(QvantumSelectEntity(coordinator, "use_adaptive", device))
+    if "use_operation_sensor" in coordinator.data.get("values", {}):
+        entities.append(QvantumSelectEntity(coordinator, "use_operation_sensor", device))
 
     async_add_entities(entities)
 
@@ -54,6 +57,8 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
                     "1",
                     "2",
                 ]  # Translation keys that will be translated by HA
+            case "use_operation_sensor":
+                self._attr_options = ["0", "1", "2", "3", "4"]
 
     def _is_valid_mode(self, mode, valid_modes: set) -> bool:
         """Check if a mode value is valid."""
@@ -78,7 +83,26 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Update the current value."""
-        # Map option to smart control modes
+        if self._metric_key == "use_operation_sensor":
+            if not self._is_modbus_write_allowed():
+                raise HomeAssistantError(
+                    "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
+                )
+            option_value = int(option)
+            response = await self.coordinator.api.write_holding_register(
+                self._hpid, 9, option_value
+            )
+            if response and (
+                response.get("status") == SETTING_UPDATE_APPLIED
+                or response.get("heatpump_status") == SETTING_UPDATE_APPLIED
+            ):
+                self.coordinator.data.get("values", {})["sensor_mode"] = option_value
+            await handle_setting_update_response(
+                response, self.coordinator, "values", self._metric_key, option_value
+            )
+            return
+
+        # Map option to smart control modes (use_adaptive)
         if option == "off":
             mode_value = -1
         else:
@@ -112,6 +136,13 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
             return None
 
         values = self.coordinator.data.get("values", {})
+
+        if self._metric_key == "use_operation_sensor":
+            val = values.get(self._metric_key)
+            if val is None:
+                return None
+            return str(val)
+
         use_adaptive = values.get(self._metric_key)
 
         if use_adaptive is False:
@@ -181,4 +212,10 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
             return False
 
         metrics = self.coordinator.data.get("values") or {}
+        # `use_operation_sensor` is only available when Modbus writes are
+        # currently allowed, because selecting an option for this metric
+        # depends on Modbus write capability in addition to general write
+        # access. Other select entities only require write access.
+        if self._metric_key == "use_operation_sensor":
+            return self._metric_key in metrics and self._has_write_access and self._is_modbus_write_allowed()
         return self._metric_key in metrics and self._has_write_access

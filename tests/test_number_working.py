@@ -590,3 +590,124 @@ class TestNumberSetup:
             "fan_speed_2",
         ]
         assert entity_keys == expected_keys
+
+
+class TestRoomTempExternal:
+    """Tests for the room_temp_external number entity."""
+
+    def test_init_room_temp_external(self, mock_coordinator, mock_device):
+        """Test room_temp_external entity initialization."""
+        mock_coordinator.data["values"]["room_temp_external"] = 20.0
+        mock_coordinator.data["values"]["use_operation_sensor"] = 4
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        entity = QvantumNumberEntity(
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
+        )
+
+        assert entity._metric_key == "room_temp_external"
+        assert entity._attr_native_min_value == 10
+        assert entity._attr_native_max_value == 40
+        assert entity._attr_native_step == 0.1
+        assert (
+            entity._attr_unique_id
+            == "qvantum_number_room_temp_external_test_device_123"
+        )
+
+    def test_available_when_use_operation_sensor_4(
+        self, mock_coordinator, mock_device
+    ):
+        """Test entity is available when use_operation_sensor == 4 and Modbus write on."""
+        mock_coordinator.data["values"]["room_temp_external"] = 20.0
+        mock_coordinator.data["values"]["use_operation_sensor"] = 4
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        entity = QvantumNumberEntity(
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
+        )
+        assert entity.available is True
+
+    def test_unavailable_when_use_operation_sensor_not_4(
+        self, mock_coordinator, mock_device
+    ):
+        """Test entity is unavailable when use_operation_sensor != 4."""
+        mock_coordinator.data["values"]["room_temp_external"] = 20.0
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        entity = QvantumNumberEntity(
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
+        )
+        for val in [0, 1, 2, 3, None]:
+            mock_coordinator.data["values"]["use_operation_sensor"] = val
+            assert entity.available is False, f"Expected unavailable for sensor={val}"
+
+    def test_unavailable_when_modbus_write_disabled(
+        self, mock_coordinator, mock_device
+    ):
+        """Test entity is unavailable when Modbus write is disabled, even if sensor == 4."""
+        mock_coordinator.data["values"]["room_temp_external"] = 20.0
+        mock_coordinator.data["values"]["use_operation_sensor"] = 4
+        mock_coordinator.config_entry.options = {}
+        mock_coordinator.config_entry.data = {}
+        entity = QvantumNumberEntity(
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
+        )
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_room_temp_external(
+        self, mock_coordinator, mock_device
+    ):
+        """Test setting room_temp_external writes via Modbus holding register with float value."""
+        mock_coordinator.data["values"]["room_temp_external"] = 20.0
+        mock_coordinator.data["values"]["use_operation_sensor"] = 4
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        entity = QvantumNumberEntity(
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
+        )
+
+        mock_coordinator.api.write_holding_register_for_metric = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_set_native_value(21.5)
+
+        mock_coordinator.api.write_holding_register_for_metric.assert_called_once_with(
+            "test_device_123", "room_temp_external", 21.5
+        )
+        mock_coordinator.api.update_setting.assert_not_called()
+        assert mock_coordinator.data["values"]["room_temp_external"] == 21.5
+        assert isinstance(mock_coordinator.data["values"]["room_temp_external"], float)
+
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_room_temp_external_raises_when_write_disabled(
+        self, mock_coordinator, mock_device
+    ):
+        """Test that HomeAssistantError is raised when Modbus write is disabled."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        mock_coordinator.data["values"]["room_temp_external"] = 20.0
+        mock_coordinator.data["values"]["use_operation_sensor"] = 4
+        mock_coordinator.config_entry.options = {}
+        mock_coordinator.config_entry.data = {}
+        entity = QvantumNumberEntity(
+            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
+        )
+        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
+
+        with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
+            await entity.async_set_native_value(21.5)
+
+        mock_coordinator.api.write_holding_register_for_metric.assert_not_called()

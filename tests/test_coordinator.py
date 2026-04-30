@@ -47,10 +47,11 @@ class TestHandleSettingUpdateResponse:
 
         api_response = {"status": "APPLIED"}
 
-        await handle_setting_update_response(
+        result = await handle_setting_update_response(
             api_response, coordinator, "values", "new_key", "new_value"
         )
 
+        assert result is True
         assert coordinator.data["values"]["new_key"] == "new_value"
         coordinator.async_set_updated_data.assert_called_once_with(coordinator.data)
         # No immediate refresh to avoid overwriting the update
@@ -60,10 +61,11 @@ class TestHandleSettingUpdateResponse:
         """Test setting update with no response."""
         coordinator = MagicMock()
 
-        await handle_setting_update_response(
+        result = await handle_setting_update_response(
             None, coordinator, "values", "key", "value"
         )
 
+        assert result is False
         # Should not update data or refresh
         coordinator.async_set_updated_data.assert_not_called()
         coordinator.async_refresh.assert_not_called()
@@ -75,10 +77,11 @@ class TestHandleSettingUpdateResponse:
 
         api_response = {"status": "FAILED"}
 
-        await handle_setting_update_response(
+        result = await handle_setting_update_response(
             api_response, coordinator, "settings", "key", "value"
         )
 
+        assert result is False
         # Should not update data or refresh
         coordinator.async_set_updated_data.assert_not_called()
         coordinator.async_refresh.assert_not_called()
@@ -91,10 +94,11 @@ class TestHandleSettingUpdateResponse:
 
         api_response = {"status": "APPLIED"}
 
-        await handle_setting_update_response(
+        result = await handle_setting_update_response(
             api_response, coordinator, None, "key", "value"
         )
 
+        assert result is False
         # Should not update data or refresh
         coordinator.async_set_updated_data.assert_not_called()
         # No refresh called
@@ -107,10 +111,11 @@ class TestHandleSettingUpdateResponse:
 
         api_response = {"status": "APPLIED"}
 
-        await handle_setting_update_response(
+        result = await handle_setting_update_response(
             api_response, coordinator, "settings", None, "value"
         )
 
+        assert result is False
         # Should not update data or refresh
         coordinator.async_set_updated_data.assert_not_called()
         # No refresh called

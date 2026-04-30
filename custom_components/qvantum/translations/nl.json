@@ -53,6 +53,16 @@
           "1": "Gebalanceerd",
           "2": "Comfort"
         }
+      },
+      "use_operation_sensor": {
+        "name": "Bron binnensensor",
+        "state": {
+          "0": "Uitgeschakeld",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
+          "4": "Extern"
+        }
       }
     },
     "button": {
@@ -496,6 +506,9 @@
       },
       "dhw_stop_extra": {
         "name": "Extra warmwater stoptemperatuur"
+      },
+      "room_temp_external": {
+        "name": "Externe binnentemperatuur"
       }
     },
     "climate": {

@@ -30,6 +30,16 @@
           "1": "Balanserat",
           "2": "Komfort"
         }
+      },
+      "use_operation_sensor": {
+        "name": "Källa för inomhussensor",
+        "state": {
+          "0": "Inaktiverad",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
+          "4": "Extern"
+        }
       }
     },
     "switch": {
@@ -498,6 +508,9 @@
       },
       "dhw_stop_extra": {
         "name": "Extra varmvatten stopptemperatur"
+      },
+      "room_temp_external": {
+        "name": "Extern inomhustemperatur"
       }
     },
     "climate": {
