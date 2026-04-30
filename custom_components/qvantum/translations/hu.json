@@ -55,13 +55,13 @@
         }
       },
       "use_operation_sensor": {
-        "name": "Bels\u0151 \u00e9rz\u00e9kel\u0151",
+        "name": "Belső érzékelő forrása",
         "state": {
-          "0": "Nem",
-          "1": "Igen: BT2",
-          "2": "Igen: BT3",
-          "3": "Igen: AUX",
-          "4": "K\u00fcls\u0151"
+          "0": "Kikapcsolva",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
+          "4": "Külső"
         }
       }
     },

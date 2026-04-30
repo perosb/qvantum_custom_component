@@ -57,10 +57,10 @@
       "use_operation_sensor": {
         "name": "Indoor sensor source",
         "state": {
-          "0": "No",
-          "1": "Yes: BT2",
-          "2": "Yes: BT3",
-          "3": "Yes: AUX",
+          "0": "Disabled",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
           "4": "External"
         }
       }

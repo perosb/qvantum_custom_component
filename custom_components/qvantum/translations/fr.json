@@ -55,12 +55,12 @@
         }
       },
       "use_operation_sensor": {
-        "name": "Capteur intérieur",
+        "name": "Source du capteur intérieur",
         "state": {
-          "0": "Non",
-          "1": "Oui: BT2",
-          "2": "Oui: BT3",
-          "3": "Oui: AUX",
+          "0": "Désactivé",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
           "4": "Externe"
         }
       }

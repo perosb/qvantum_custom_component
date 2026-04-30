@@ -55,12 +55,12 @@
         }
       },
       "use_operation_sensor": {
-        "name": "Czujnik wewn\u0119trzny",
+        "name": "Źródło czujnika wewnętrznego",
         "state": {
-          "0": "Nie",
-          "1": "Tak: BT2",
-          "2": "Tak: BT3",
-          "3": "Tak: AUX",
+          "0": "Wyłączone",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
           "4": "Zewn\u0119trzny"
         }
       }

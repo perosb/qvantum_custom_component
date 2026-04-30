@@ -55,12 +55,12 @@
         }
       },
       "use_operation_sensor": {
-        "name": "Binnensensor",
+        "name": "Bron binnensensor",
         "state": {
-          "0": "Nee",
-          "1": "Ja: BT2",
-          "2": "Ja: BT3",
-          "3": "Ja: AUX",
+          "0": "Uitgeschakeld",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
           "4": "Extern"
         }
       }

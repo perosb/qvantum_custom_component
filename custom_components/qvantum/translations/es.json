@@ -55,12 +55,12 @@
         }
       },
       "use_operation_sensor": {
-        "name": "Sensor de interior",
+        "name": "Fuente del sensor interior",
         "state": {
-          "0": "No",
-          "1": "S\u00ed: BT2",
-          "2": "S\u00ed: BT3",
-          "3": "S\u00ed: AUX",
+          "0": "Desactivado",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
           "4": "Externo"
         }
       }
