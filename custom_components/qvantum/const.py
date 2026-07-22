@@ -94,6 +94,8 @@ DEFAULT_ENABLED_HTTP_ONLY_METRICS = [
     "bp2_pressure",
     "bp2_temp",
     "fan0_10v",
+    # Epoch timestamp for when extra hot water ends; powers QvantumTimerEntity
+    "tap_stop",
 ]
 
 DEFAULT_ENABLED_MODBUS_METRICS = (
