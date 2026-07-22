@@ -151,7 +151,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     maintenance_coordinator = QvantumMaintenanceCoordinator(
         hass, config_entry, coordinator, api
     )
-    await maintenance_coordinator.async_config_entry_first_refresh()
+    try:
+        await maintenance_coordinator.async_config_entry_first_refresh()
+    except Exception as err:
+        await api.close()
+        raise ConfigEntryNotReady(f"Maintenance data refresh failed: {err}") from err
 
     remove_listener = config_entry.add_update_listener(_async_update_listener)
     config_entry.async_on_unload(remove_listener)

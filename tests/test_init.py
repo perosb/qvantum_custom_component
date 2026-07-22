@@ -99,6 +99,52 @@ class TestIntegrationSetup:
             mock_api.close.assert_awaited()
 
     @pytest.mark.asyncio
+    async def test_async_setup_entry_maintenance_refresh_failure(
+        self, hass, mock_config_entry, mock_api, mock_coordinator
+    ):
+        """Maintenance first refresh failure should close API and raise ConfigEntryNotReady."""
+        mock_coordinator.data = {
+            "device": {
+                "id": "test_device",
+                "model": "QE-6",
+                "vendor": "Qvantum",
+                "serial": "SN123",
+                "device_metadata": {
+                    "display_fw_version": "1.0",
+                    "cc_fw_version": "1.0",
+                    "inv_fw_version": "1.0",
+                },
+            },
+            "metrics": {},
+            "settings": {},
+        }
+        mock_api.close = AsyncMock()
+
+        mock_maintenance_coordinator = MagicMock()
+        mock_maintenance_coordinator.async_config_entry_first_refresh = AsyncMock(
+            side_effect=Exception("maintenance API error")
+        )
+
+        with (
+            patch("custom_components.qvantum.async_get_clientsession"),
+            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch(
+                "custom_components.qvantum.QvantumDataUpdateCoordinator",
+                return_value=mock_coordinator,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
+                return_value=mock_maintenance_coordinator,
+            ),
+            patch("custom_components.qvantum.services.async_setup_services"),
+        ):
+            with pytest.raises(ConfigEntryNotReady, match="Maintenance data refresh"):
+                await async_setup_entry(hass, mock_config_entry)
+
+            mock_api.close.assert_awaited_once()
+            hass.config_entries.async_forward_entry_setups.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_async_unload_entry(self, hass, mock_config_entry):
         """Test unloading the integration."""
         # Setup mock platforms
