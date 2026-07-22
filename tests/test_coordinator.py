@@ -250,6 +250,8 @@ class TestQvantumDataUpdateCoordinator:
         # Should return DEFAULT_ENABLED_HTTP_METRICS plus REQUIRED_METRICS
         expected_metrics = set(DEFAULT_ENABLED_HTTP_METRICS) | set(REQUIRED_METRICS)
         assert set(result) == expected_metrics
+        # Extra hot water stop timestamp must be fetched in HTTP mode
+        assert "tap_stop" in result
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_no_matching_entities(self, mock_super_init):
@@ -386,6 +388,50 @@ class TestQvantumDataUpdateCoordinator:
         coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
 
         assert coordinator.poll_interval == 15
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_async_update_data_http_includes_tap_stop(self, mock_super_init):
+        """HTTP mode should request and surface tap_stop for the timer sensor."""
+        mock_super_init.return_value = None
+
+        mock_api = MagicMock()
+        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.get_metrics = AsyncMock(
+            return_value={
+                "metrics": {
+                    "hpid": "test_device_123",
+                    "tap_stop": 1712232000,
+                }
+            }
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+
+        mock_config_entry = MagicMock()
+        mock_config_entry.options.get.side_effect = lambda key, default=None: (
+            120 if key == CONF_SCAN_INTERVAL else default
+        )
+        mock_config_entry.data = {}
+        mock_config_entry.unique_id = "test_device_123"
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+        coordinator.api = mock_api
+        coordinator.hass = mock_hass
+        coordinator.modbus_enabled = False
+
+        result = await coordinator.async_update_data()
+
+        enabled_metrics = mock_api.get_metrics.await_args.kwargs["enabled_metrics"]
+        assert "tap_stop" in enabled_metrics
+        assert result["values"]["tap_stop"] == 1712232000
+        mock_api.get_http_metrics.assert_not_called()
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
