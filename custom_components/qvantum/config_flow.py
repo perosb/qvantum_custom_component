@@ -22,6 +22,7 @@ from homeassistant.const import (
 from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import QvantumAPI, APIAuthError, APIConnectionError
 from .const import (
@@ -61,7 +62,16 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
     user_agent = f"Home Assistant/{ha_version} Qvantum/{VERSION}"
-    api = QvantumAPI(data[CONF_USERNAME], data[CONF_PASSWORD], user_agent=user_agent)
+    # Prefer HA shared session so we do not open/close a private ClientSession
+    # during validation. Fall back to a private session when hass is unavailable
+    # (e.g. some unit tests).
+    session = async_get_clientsession(hass) if hass is not None else None
+    api = QvantumAPI(
+        data[CONF_USERNAME],
+        data[CONF_PASSWORD],
+        user_agent=user_agent,
+        session=session,
+    )
     try:
         await api.authenticate()
         device = await api.get_primary_device()

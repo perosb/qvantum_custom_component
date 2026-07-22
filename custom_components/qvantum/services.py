@@ -3,10 +3,10 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
-import homeassistant.helpers.config_validation as cv
+from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN
-from .api import APIAuthError, APIConnectionError, APIRateLimitError
+from .api import APIAuthError, APIConnectionError, APIRateLimitError, QvantumAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,12 +20,35 @@ EXTRA_TAP_WATER_SCHEMA = vol.Schema(
 )
 
 
+def _resolve_api(hass: HomeAssistant) -> QvantumAPI:
+    """Resolve the loaded Qvantum API from config entry runtime data.
+
+    Falls back to ``hass.data[DOMAIN]`` for unit tests that still inject the API
+    there. Production code always stores the API on ``config_entry.runtime_data``.
+    """
+    entries = hass.config_entries.async_entries(DOMAIN)
+    for entry in entries:
+        runtime_data = getattr(entry, "runtime_data", None)
+        if runtime_data is not None and getattr(runtime_data, "api", None) is not None:
+            return runtime_data.api
+
+    api = hass.data.get(DOMAIN)
+    if api is not None:
+        return api
+
+    raise HomeAssistantError("Qvantum integration is not loaded")
+
+
 async def async_setup_services(hass: HomeAssistant):
     _LOGGER.debug("Setting up services")
 
     async def extra_hot_water(service_call: ServiceCall) -> Any:
         data = service_call.data
-        api = service_call.hass.data[DOMAIN]
+        try:
+            api = _resolve_api(service_call.hass)
+        except HomeAssistantError as err:
+            _LOGGER.error("Cannot handle extra tap water request: %s", err)
+            return {"qvantum": {"exception": "not_loaded", "details": str(err)}}
 
         device_id = data["device_id"]
         minutes = data["minutes"]

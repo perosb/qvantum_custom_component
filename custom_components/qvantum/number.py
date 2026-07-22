@@ -153,7 +153,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         )
 
     @property
-    def state(self):
+    def native_value(self):
         """Get metric from API data."""
         if self._metric_key == "tap_water_capacity_target":
             # Map (start, stop) pairs to capacity values using TAP_WATER_CAPACITY_MAPPINGS

@@ -1,0 +1,26 @@
+# Ruff configuration for the Qvantum Home Assistant custom component
+target-version = "py313"
+line-length = 100
+src = ["custom_components", "tests"]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "LOG", # flake8-logging (lazy % formatting)
+]
+ignore = [
+    "E501",  # line length handled by formatter preference / existing style
+    "B008",  # function calls in argument defaults (common in HA schemas)
+]
+
+[lint.per-file-ignores]
+"tests/**" = ["B", "SIM"]
+
+[lint.isort]
+known-first-party = ["custom_components", "qvantum"]

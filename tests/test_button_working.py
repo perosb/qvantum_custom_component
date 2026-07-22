@@ -162,6 +162,7 @@ class TestQvantumButtonEntity:
     ):
         """Test setting up button entities."""
         mock_config_entry.runtime_data = RuntimeData(
+            api=MagicMock(),
             coordinator=mock_coordinator,
             device=mock_device,
             maintenance_coordinator=mock_maintenance_coordinator,

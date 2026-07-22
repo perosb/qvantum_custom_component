@@ -149,6 +149,7 @@ async def test_async_setup_entry(
     hass.data["device_registry"] = mock_device_registry
 
     mock_config_entry.runtime_data = RuntimeData(
+        api=MagicMock(),
         coordinator=mock_coordinator,
         device=mock_device,
     )

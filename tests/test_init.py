@@ -1,8 +1,8 @@
 """Tests for Qvantum integration setup."""
 
-import sys
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from homeassistant.exceptions import ConfigEntryNotReady
 
 # Import real functions before mocking
 from custom_components.qvantum import (
@@ -42,8 +42,11 @@ class TestIntegrationSetup:
         mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock()
 
         mock_config_entry.add_update_listener = MagicMock()
+        mock_config_entry.async_on_unload = MagicMock()
+        mock_api.close = AsyncMock()
 
         with (
+            patch("custom_components.qvantum.async_get_clientsession"),
             patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
@@ -65,13 +68,20 @@ class TestIntegrationSetup:
             mock_config_entry.add_update_listener.assert_called_once_with(
                 _async_update_listener
             )
+            # API lives on runtime_data, not hass.data
+            assert mock_config_entry.runtime_data.api is mock_api
+            assert "qvantum" not in hass.data
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_no_device_data(
         self, hass, mock_config_entry, mock_api, mock_coordinator
     ):
-        """Test setup failure when no device data is available."""
+        """Test setup raises ConfigEntryNotReady when no device data is available."""
+        mock_coordinator.data = {}
+        mock_api.close = AsyncMock()
+
         with (
+            patch("custom_components.qvantum.async_get_clientsession"),
             patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
@@ -83,22 +93,21 @@ class TestIntegrationSetup:
             ),
             patch("custom_components.qvantum.services.async_setup_services"),
         ):
-            # Mock missing device data
-            mock_api.get_primary_device = AsyncMock(return_value=None)
+            with pytest.raises(ConfigEntryNotReady):
+                await async_setup_entry(hass, mock_config_entry)
 
-            result = await async_setup_entry(hass, mock_config_entry)
-
-            assert result is False
+            mock_api.close.assert_awaited()
 
     @pytest.mark.asyncio
     async def test_async_unload_entry(self, hass, mock_config_entry):
         """Test unloading the integration."""
         # Setup mock platforms
         hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
-        # Setup hass.data as API object
         mock_api = MagicMock()
         mock_api.close = AsyncMock()
-        hass.data["qvantum"] = mock_api
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.api = mock_api
+        mock_config_entry.runtime_data.maintenance_coordinator = None
 
         result = await async_unload_entry(hass, mock_config_entry)
 
@@ -115,7 +124,6 @@ class TestIntegrationSetup:
         hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
         mock_api = MagicMock()
         mock_api.close = AsyncMock()
-        hass.data["qvantum"] = mock_api
 
         # Mock firmware coordinator with device data
         mock_firmware_coordinator = MagicMock()
@@ -125,6 +133,7 @@ class TestIntegrationSetup:
 
         # Add runtime_data to config entry
         mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.api = mock_api
         mock_config_entry.runtime_data.maintenance_coordinator = (
             mock_firmware_coordinator
         )
@@ -155,6 +164,8 @@ class TestIntegrationSetup:
     ):
         """Test unloading handles non-awaitable async_dismiss safely."""
         hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+        mock_api = MagicMock()
+        mock_api.close = AsyncMock()
 
         mock_firmware_coordinator = MagicMock()
         mock_main_coordinator = MagicMock()
@@ -162,6 +173,7 @@ class TestIntegrationSetup:
         mock_firmware_coordinator.main_coordinator = mock_main_coordinator
 
         mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.api = mock_api
         mock_config_entry.runtime_data.maintenance_coordinator = (
             mock_firmware_coordinator
         )
@@ -173,6 +185,7 @@ class TestIntegrationSetup:
 
             assert result is True
             hass.config_entries.async_unload_platforms.assert_called_once()
+            mock_api.close.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_async_update_listener(self, hass, mock_config_entry):
@@ -186,19 +199,30 @@ class TestIntegrationSetup:
     async def test_async_setup_entry_empty_device_metadata_fails(self, hass, mock_config_entry):
         mock_api = MagicMock()
         mock_api.get_primary_device = AsyncMock(return_value={"id": "device123"})
+        mock_api.close = AsyncMock()
 
         mock_coordinator = MagicMock()
         mock_coordinator.data = {"device": {}}
         mock_coordinator.async_config_entry_first_refresh = AsyncMock(side_effect=[None, None])
         mock_coordinator.async_restore_dhw_state = AsyncMock()
 
-        with patch("custom_components.qvantum.QvantumAPI", return_value=mock_api), \
-            patch("custom_components.qvantum.QvantumDataUpdateCoordinator", return_value=mock_coordinator), \
-            patch("custom_components.qvantum.QvantumMaintenanceCoordinator", return_value=MagicMock()), \
-            patch("custom_components.qvantum.services.async_setup_services"):
-            result = await async_setup_entry(hass, mock_config_entry)
+        with (
+            patch("custom_components.qvantum.async_get_clientsession"),
+            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch(
+                "custom_components.qvantum.QvantumDataUpdateCoordinator",
+                return_value=mock_coordinator,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
+                return_value=MagicMock(),
+            ),
+            patch("custom_components.qvantum.services.async_setup_services"),
+        ):
+            with pytest.raises(ConfigEntryNotReady):
+                await async_setup_entry(hass, mock_config_entry)
 
-        assert result is False
+        mock_api.close.assert_awaited()
 
 
     @pytest.mark.asyncio

@@ -5,15 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import inspect
 import logging
-import json
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import callback
 from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntry
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_registry import (
     async_get as async_get_entity_registry,
@@ -60,8 +60,9 @@ type MyConfigEntry = ConfigEntry[RuntimeData]
 
 @dataclass
 class RuntimeData:
-    """Class to hold your data."""
+    """Runtime objects for a config entry."""
 
+    api: QvantumAPI
     coordinator: QvantumDataUpdateCoordinator
     maintenance_coordinator: QvantumMaintenanceCoordinator | None = None
     device: DeviceInfo | None = None
@@ -83,36 +84,51 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
     )
 
-    hass.data[DOMAIN] = QvantumAPI(
+    # Use Home Assistant's shared session; the API must not close it.
+    session = async_get_clientsession(hass)
+    api = QvantumAPI(
         username=username,
         password=password,
         user_agent=user_agent,
+        session=session,
         modbus_tcp=modbus_enabled,
         modbus_host=modbus_host,
         modbus_port=DEFAULT_MODBUS_PORT,
         modbus_unit_id=DEFAULT_MODBUS_UNIT_ID,
     )
-    hass.data[DOMAIN].hass = hass
 
-    coordinator = QvantumDataUpdateCoordinator(hass, config_entry)
+    coordinator = QvantumDataUpdateCoordinator(hass, config_entry, api)
     await coordinator.async_restore_dhw_state()
-    await coordinator.async_config_entry_first_refresh()
 
-    if not coordinator.data.get("device") or not coordinator.data.get("device").get(
-        "device_metadata"
-    ):
-        _LOGGER.error(
-            "No device data found when setting up Qvantum integration, 2nd attempt"
-        )
+    try:
         await coordinator.async_config_entry_first_refresh()
+    except Exception as err:
+        await api.close()
+        raise ConfigEntryNotReady(
+            f"Initial data refresh failed: {err}"
+        ) from err
 
     if not coordinator.data.get("device") or not coordinator.data.get("device").get(
         "device_metadata"
     ):
-        _LOGGER.error(
-            "No device data found when setting up Qvantum integration, failure"
+        _LOGGER.warning(
+            "No device data found when setting up Qvantum integration, retrying once"
         )
-        return False
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as err:
+            await api.close()
+            raise ConfigEntryNotReady(
+                f"Device data refresh failed: {err}"
+            ) from err
+
+    if not coordinator.data.get("device") or not coordinator.data.get("device").get(
+        "device_metadata"
+    ):
+        await api.close()
+        raise ConfigEntryNotReady(
+            "No device data found when setting up Qvantum integration"
+        )
 
     device_metadata = coordinator.data.get("device").get("device_metadata")
     device = DeviceInfo(
@@ -133,7 +149,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     # Initialize maintenance coordinator (handles firmware updates and maintenance tasks)
     maintenance_coordinator = QvantumMaintenanceCoordinator(
-        hass, config_entry, coordinator
+        hass, config_entry, coordinator, api
     )
     await maintenance_coordinator.async_config_entry_first_refresh()
 
@@ -141,7 +157,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     config_entry.async_on_unload(remove_listener)
 
     config_entry.runtime_data = RuntimeData(
-        coordinator, maintenance_coordinator, device
+        api, coordinator, maintenance_coordinator, device
     )
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
@@ -366,24 +382,16 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
         config_entry, PLATFORMS
     )
 
-    if hass.data.get(DOMAIN) is not None:
-        try:
-            await hass.data[DOMAIN].close()
-        except Exception as err:
-            _LOGGER.debug("Failed closing Qvantum API session on unload: %s", err)
-        hass.data.pop(DOMAIN, None)
+    runtime_data = getattr(config_entry, "runtime_data", None)
 
-    if (
-        unload_ok
-        and config_entry.runtime_data
-        and config_entry.runtime_data.maintenance_coordinator
-    ):
+    if unload_ok and runtime_data is not None:
         # Clear any firmware update notifications when unloading
-        maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
+        maintenance_coordinator = runtime_data.maintenance_coordinator
 
         # Only attempt to clear notifications if we have a real coordinator with a main coordinator
         if (
-            hasattr(maintenance_coordinator, "main_coordinator")
+            maintenance_coordinator is not None
+            and hasattr(maintenance_coordinator, "main_coordinator")
             and maintenance_coordinator.main_coordinator
             and hasattr(maintenance_coordinator.main_coordinator, "_device")
             and maintenance_coordinator.main_coordinator._device
@@ -407,5 +415,11 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
                             notification_id,
                             err,
                         )
+
+        # Close Modbus client (shared HA aiohttp session is not owned by the API)
+        try:
+            await runtime_data.api.close()
+        except Exception as err:
+            _LOGGER.debug("Failed closing Qvantum API on unload: %s", err)
 
     return unload_ok

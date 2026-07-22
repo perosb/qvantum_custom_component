@@ -73,7 +73,6 @@ class QvantumAPI:
         self._username = username
         self._password = password
         self._user_agent = user_agent
-        self.hass = None
         self._modbus_tcp = modbus_tcp
         self._modbus_host = modbus_host
         self._modbus_port = modbus_port
@@ -221,7 +220,10 @@ class QvantumAPI:
                         if result.isError():
                             register_type = "input" if use_input_registers else "holding"
                             _LOGGER.warning(
-                                f"Failed to read {register_type} register block {block_start}-{block_end}"
+                                "Failed to read %s register block %s-%s",
+                                register_type,
+                                block_start,
+                                block_end,
                             )
                             continue
 
@@ -259,7 +261,8 @@ class QvantumAPI:
                         )
                     if result.isError():
                         _LOGGER.warning(
-                            f"Failed to read relays bitmask from register {bitmask_addr}"
+                            "Failed to read relays bitmask from register %s",
+                            bitmask_addr,
                         )
                     else:
                         bitmask = result.registers[0]
@@ -530,6 +533,8 @@ class QvantumAPI:
         """Get request headers for API calls."""
         return {
             "Authorization": f"Bearer {self._token}",
+            "User-Agent": self._user_agent,
+            "Content-Type": "application/json",
         }
 
     async def update_setting(self, device_id: str, name: str, value: any):

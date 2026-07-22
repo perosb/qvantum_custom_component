@@ -19,9 +19,12 @@ class TestValidateInput:
     @pytest.mark.asyncio
     async def test_validate_input_success(self, hass):
         """Test validate_input with successful authentication."""
-        with patch(
-            "custom_components.qvantum.config_flow.QvantumAPI"
-        ) as mock_api_class:
+        with (
+            patch("custom_components.qvantum.config_flow.async_get_clientsession"),
+            patch(
+                "custom_components.qvantum.config_flow.QvantumAPI"
+            ) as mock_api_class,
+        ):
             mock_api = MagicMock()
             mock_api_class.return_value = mock_api
             mock_api.authenticate = AsyncMock()
@@ -44,9 +47,12 @@ class TestValidateInput:
         """Test validate_input with authentication error."""
         from custom_components.qvantum.api import APIAuthError
 
-        with patch(
-            "custom_components.qvantum.config_flow.QvantumAPI"
-        ) as mock_api_class:
+        with (
+            patch("custom_components.qvantum.config_flow.async_get_clientsession"),
+            patch(
+                "custom_components.qvantum.config_flow.QvantumAPI"
+            ) as mock_api_class,
+        ):
             mock_api = MagicMock()
             mock_api_class.return_value = mock_api
             mock_api.authenticate = AsyncMock(
@@ -66,9 +72,12 @@ class TestValidateInput:
         """Test validate_input with connection error."""
         from custom_components.qvantum.api import APIConnectionError
 
-        with patch(
-            "custom_components.qvantum.config_flow.QvantumAPI"
-        ) as mock_api_class:
+        with (
+            patch("custom_components.qvantum.config_flow.async_get_clientsession"),
+            patch(
+                "custom_components.qvantum.config_flow.QvantumAPI"
+            ) as mock_api_class,
+        ):
             mock_api = MagicMock()
             mock_api_class.return_value = mock_api
             mock_api.authenticate = AsyncMock()

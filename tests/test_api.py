@@ -34,7 +34,7 @@ class TestQvantumAPI:
         assert api._password == "password"
         assert api._user_agent == "test-agent"
         assert api._session == mock_session
-        assert api.hass is None
+        assert api._session_owner is False
 
     @pytest.mark.asyncio
     async def test_authenticate_success(self, mock_session):

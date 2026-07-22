@@ -15,7 +15,7 @@ from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
 
-from .api import APIAuthError
+from .api import APIAuthError, QvantumAPI
 from .calculations import QvantumCalculationsMixin
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
@@ -79,8 +79,17 @@ async def handle_setting_update_response(
 class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinator):
     """Qvantum coordinator."""
 
-    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
-        """Initialize coordinator."""
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        api: QvantumAPI | None = None,
+    ) -> None:
+        """Initialize coordinator.
+
+        ``api`` should be provided by the integration setup. When omitted (e.g.
+        in unit tests), falls back to ``hass.data[DOMAIN]`` for compatibility.
+        """
         self.poll_interval = config_entry.options.get(
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
         )
@@ -94,7 +103,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         if self.modbus_enabled:
             self.poll_interval = min(self.poll_interval, 15)  # Faster for Modbus
 
-        self.api = hass.data[DOMAIN]
+        if api is None:
+            api = hass.data.get(DOMAIN)
+        if api is None:
+            raise ValueError("QvantumAPI instance is required")
+        self.api = api
         self._device = None
         self._last_tap_stop_fetch: datetime | None = None
         self._cached_tap_stop: Any = None

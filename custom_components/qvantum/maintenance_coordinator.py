@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from homeassistant.helpers.device_registry import async_get
 
-from .api import APIAuthError
+from .api import APIAuthError, QvantumAPI
 from .const import DOMAIN, FIRMWARE_KEYS
 import traceback
 
@@ -29,9 +29,18 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
         hass: HomeAssistant,
         config_entry: ConfigEntry,
         main_coordinator: "QvantumDataUpdateCoordinator",
+        api: QvantumAPI | None = None,
     ) -> None:
-        """Initialize firmware coordinator."""
-        self.api = hass.data[DOMAIN]
+        """Initialize firmware coordinator.
+
+        ``api`` should be provided by the integration setup. When omitted (e.g.
+        in unit tests), falls back to ``hass.data[DOMAIN]`` for compatibility.
+        """
+        if api is None:
+            api = hass.data.get(DOMAIN)
+        if api is None:
+            raise ValueError("QvantumAPI instance is required")
+        self.api = api
         self.main_coordinator = main_coordinator
         self._last_firmware_versions = {}
 

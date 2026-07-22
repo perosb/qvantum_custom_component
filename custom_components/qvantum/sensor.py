@@ -193,7 +193,7 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             self._attr_native_unit_of_measurement = "°min"
 
     @property
-    def state(self):
+    def native_value(self):
         """Get metric from API data."""
         return self._values.get(self._metric_key)
 
@@ -309,7 +309,7 @@ class QvantumTotalEnergyEntity(QvantumEnergyEntity):
         return True
 
     @property
-    def state(self):
+    def native_value(self):
         """Get metric from API data."""
         compressor = self._values.get("compressorenergy")
         additional = self._values.get("additionalenergy")
@@ -357,7 +357,7 @@ class QvantumTimerEntity(QvantumBaseSensorEntity):
         self._attr_device_class = "timestamp"
 
     @property
-    def state(self):
+    def native_value(self):
         """Get metric from API data."""
         epoch = self._values.get(self._metric_key)
         if epoch is None or epoch <= 0:
@@ -390,7 +390,7 @@ class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
         self._attr_translation_key = "expires_at"
 
     @property
-    def state(self) -> datetime | None:
+    def native_value(self) -> datetime | None:
         """Get expires_at from access_level data."""
         expire_at_str = (
             (self.coordinator.data or {}).get("access_level", {}).get(self._metric_key)
@@ -447,7 +447,7 @@ class QvantumFirmwareSensorEntity(QvantumEntity, SensorEntity):
         self._attr_translation_key = f"firmware_{firmware_key}"
 
     @property
-    def state(self) -> str | None:
+    def native_value(self) -> str | None:
         """Return the firmware version."""
         # First try to get from firmware coordinator data (updated every 60 minutes)
         if self.coordinator.data and "firmware_versions" in self.coordinator.data:
@@ -514,7 +514,7 @@ class QvantumFirmwareLastCheckSensorEntity(QvantumEntity, SensorEntity):
         self._attr_translation_key = sensor_key
 
     @property
-    def state(self) -> datetime | None:
+    def native_value(self) -> datetime | None:
         """Return the last firmware check timestamp."""
         if not self.coordinator.data:
             return None

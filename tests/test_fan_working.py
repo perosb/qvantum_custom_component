@@ -250,6 +250,7 @@ class TestQvantumFanEntity:
     ):
         """Test setting up fan entities when device supports fan control."""
         mock_config_entry.runtime_data = RuntimeData(
+            api=MagicMock(),
             coordinator=mock_coordinator,
             device=mock_device,
             maintenance_coordinator=None,
@@ -274,6 +275,7 @@ class TestQvantumFanEntity:
         mock_coordinator.data["values"].pop("fanspeedselector", None)
 
         mock_config_entry.runtime_data = RuntimeData(
+            api=MagicMock(),
             coordinator=mock_coordinator,
             device=mock_device,
             maintenance_coordinator=None,
