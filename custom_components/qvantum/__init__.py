@@ -103,7 +103,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     try:
         await coordinator.async_config_entry_first_refresh()
     except Exception as err:
-        await api.close()
+        try:
+            await api.close()
+        except Exception as close_err:
+            _LOGGER.debug(
+                "Failed closing Qvantum API after initial refresh failure: %s",
+                close_err,
+            )
         raise ConfigEntryNotReady(
             f"Initial data refresh failed: {err}"
         ) from err
@@ -117,7 +123,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         try:
             await coordinator.async_config_entry_first_refresh()
         except Exception as err:
-            await api.close()
+            try:
+                await api.close()
+            except Exception as close_err:
+                _LOGGER.debug(
+                    "Failed closing Qvantum API after device data refresh failure: %s",
+                    close_err,
+                )
             raise ConfigEntryNotReady(
                 f"Device data refresh failed: {err}"
             ) from err
@@ -125,7 +137,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     if not coordinator.data.get("device") or not coordinator.data.get("device").get(
         "device_metadata"
     ):
-        await api.close()
+        try:
+            await api.close()
+        except Exception as close_err:
+            _LOGGER.debug(
+                "Failed closing Qvantum API after missing device data: %s",
+                close_err,
+            )
         raise ConfigEntryNotReady(
             "No device data found when setting up Qvantum integration"
         )
@@ -154,7 +172,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     try:
         await maintenance_coordinator.async_config_entry_first_refresh()
     except Exception as err:
-        await api.close()
+        try:
+            await api.close()
+        except Exception as close_err:
+            _LOGGER.debug(
+                "Failed closing Qvantum API after maintenance refresh failure: %s",
+                close_err,
+            )
         raise ConfigEntryNotReady(f"Maintenance data refresh failed: {err}") from err
 
     remove_listener = config_entry.add_update_listener(_async_update_listener)

@@ -73,6 +73,35 @@ class TestIntegrationSetup:
             assert "qvantum" not in hass.data
 
     @pytest.mark.asyncio
+    async def test_async_setup_entry_initial_refresh_close_failure_still_raises_not_ready(
+        self, hass, mock_config_entry, mock_api, mock_coordinator
+    ):
+        """Setup should still raise ConfigEntryNotReady if API cleanup fails during initial refresh."""
+        mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock(
+            side_effect=Exception("initial refresh failed")
+        )
+        mock_api.close = AsyncMock(side_effect=RuntimeError("close failed"))
+
+        with (
+            patch("custom_components.qvantum.async_get_clientsession"),
+            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch(
+                "custom_components.qvantum.QvantumDataUpdateCoordinator",
+                return_value=mock_coordinator,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
+                return_value=MagicMock(),
+            ),
+            patch("custom_components.qvantum.services.async_setup_services"),
+        ):
+            with pytest.raises(ConfigEntryNotReady, match="Initial data refresh failed"):
+                await async_setup_entry(hass, mock_config_entry)
+
+            mock_api.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_async_setup_entry_no_device_data(
         self, hass, mock_config_entry, mock_api, mock_coordinator
     ):
