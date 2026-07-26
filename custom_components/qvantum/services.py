@@ -12,25 +12,39 @@ _LOGGER = logging.getLogger(__name__)
 
 EXTRA_TAP_WATER_SCHEMA = vol.Schema(
     {
-        vol.Required("device_id"): int,
-        vol.Required("minutes", default=120): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=480)
-        ),
+        vol.Required("device_id"): vol.All(vol.Coerce(str), vol.Length(min=1)),
+        vol.Required("minutes", default=120): vol.All(vol.Coerce(int), vol.Range(min=0, max=480)),
     }
 )
 
 
-def _resolve_api(hass: HomeAssistant) -> QvantumAPI:
-    """Resolve the loaded Qvantum API from config entry runtime data.
+def _resolve_api(hass: HomeAssistant, device_id: int | None = None) -> QvantumAPI:
+    """Resolve the API for the requested device id.
 
-    Falls back to ``hass.data[DOMAIN]`` for unit tests that still inject the API
-    there. Production code always stores the API on ``config_entry.runtime_data``.
+    When a service call includes a device id, prefer the config entry whose
+    coordinator device id matches that value. This avoids sending commands to the
+    wrong account or integration instance when multiple Qvantum entries are loaded.
+    Falls back to the legacy ``hass.data[DOMAIN]`` behavior for unit tests and
+    any setup that still exposes the API there.
     """
     entries = hass.config_entries.async_entries(DOMAIN)
+    if device_id is not None:
+        for entry in entries:
+            runtime_data = getattr(entry, "runtime_data", None)
+            coordinator = getattr(runtime_data, "coordinator", None)
+            if coordinator is None:
+                continue
+            coordinator_device_id = getattr(coordinator, "device_id", None)
+            if coordinator_device_id is not None and str(coordinator_device_id) == str(device_id):
+                api = getattr(runtime_data, "api", None)
+                if api is not None:
+                    return api
+
     for entry in entries:
         runtime_data = getattr(entry, "runtime_data", None)
-        if runtime_data is not None and getattr(runtime_data, "api", None) is not None:
-            return runtime_data.api
+        api = getattr(runtime_data, "api", None)
+        if api is not None:
+            return api
 
     api = hass.data.get(DOMAIN)
     if api is not None:
@@ -44,13 +58,13 @@ async def async_setup_services(hass: HomeAssistant):
 
     async def extra_hot_water(service_call: ServiceCall) -> Any:
         data = service_call.data
+        device_id = data["device_id"]
         try:
-            api = _resolve_api(service_call.hass)
+            api = _resolve_api(service_call.hass, device_id)
         except HomeAssistantError as err:
             _LOGGER.error("Cannot handle extra tap water request: %s", err)
             return {"qvantum": {"exception": "not_loaded", "details": str(err)}}
 
-        device_id = data["device_id"]
         minutes = data["minutes"]
         try:
             response = await api.set_extra_tap_water(device_id, minutes)

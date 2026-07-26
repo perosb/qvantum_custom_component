@@ -33,7 +33,7 @@ class MockSupportsResponse:
 
 # Patch the imports before importing the services module
 with patch("homeassistant.core.SupportsResponse", MockSupportsResponse):
-    from custom_components.qvantum.services import async_setup_services
+    from custom_components.qvantum.services import EXTRA_TAP_WATER_SCHEMA, async_setup_services
     from custom_components.qvantum.const import DOMAIN
 
 
@@ -73,6 +73,13 @@ class TestQvantumServices:
         assert first_call[1]["service"] == "extra_hot_water"
         assert "service_func" in first_call[1]
         assert "schema" in first_call[1]
+
+    def test_extra_hot_water_schema_coerces_device_id_to_string(self):
+        """The service schema should accept string device ids and coerce them to strings."""
+        data = EXTRA_TAP_WATER_SCHEMA({"device_id": "1234567890", "minutes": "60"})
+
+        assert data["device_id"] == "1234567890"
+        assert data["minutes"] == 60
 
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_success(self, mock_hass, mock_api):
@@ -158,6 +165,43 @@ class TestQvantumServices:
         mock_api.set_extra_tap_water.assert_called_once_with(456, 120)
 
         # Verify response
+        assert result == {"qvantum": [{"status": "success"}]}
+
+    @pytest.mark.asyncio
+    async def test_extra_hot_water_service_uses_matching_entry_for_device(self, mock_hass):
+        """The service should choose the API whose coordinator device id matches the requested device id."""
+        matching_api = MagicMock()
+        matching_api.set_extra_tap_water = AsyncMock(return_value={"status": "success"})
+        mismatched_api = MagicMock()
+        mismatched_api.set_extra_tap_water = AsyncMock(return_value={"status": "wrong"})
+
+        entry = MagicMock()
+        entry.runtime_data = MagicMock()
+        entry.runtime_data.api = matching_api
+        entry.runtime_data.coordinator = MagicMock(device_id="device-123")
+
+        other_entry = MagicMock()
+        other_entry.runtime_data = MagicMock()
+        other_entry.runtime_data.api = mismatched_api
+        other_entry.runtime_data.coordinator = MagicMock(device_id="device-999")
+
+        mock_hass.data = {DOMAIN: MagicMock()}
+        mock_hass.config_entries = MagicMock()
+        mock_hass.config_entries.async_entries.return_value = [other_entry, entry]
+
+        await async_setup_services(mock_hass)
+
+        first_call = mock_hass.services.async_register.call_args_list[0]
+        service_func = first_call[1]["service_func"]
+
+        service_call = MagicMock()
+        service_call.data = {"device_id": "device-123", "minutes": 60}
+        service_call.hass = mock_hass
+
+        result = await service_func(service_call)
+
+        matching_api.set_extra_tap_water.assert_called_once_with("device-123", 60)
+        mismatched_api.set_extra_tap_water.assert_not_called()
         assert result == {"qvantum": [{"status": "success"}]}
 
     @pytest.mark.asyncio
