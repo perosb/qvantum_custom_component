@@ -161,7 +161,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     config_entry.async_on_unload(remove_listener)
 
     config_entry.runtime_data = RuntimeData(
-        api, coordinator, maintenance_coordinator, device
+        api=api,
+        coordinator=coordinator,
+        maintenance_coordinator=maintenance_coordinator,
+        device=device,
     )
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
