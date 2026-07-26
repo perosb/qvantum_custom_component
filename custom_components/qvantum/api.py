@@ -537,7 +537,7 @@ class QvantumAPI:
             "Content-Type": "application/json",
         }
 
-    async def update_setting(self, device_id: str, name: str, value: any):
+    async def update_setting(self, device_id: str, name: str, value: Any):
         """Update one setting."""
 
         payload = {"update_settings": {name: value}}
