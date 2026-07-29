@@ -11,6 +11,10 @@ from custom_components.qvantum.config_flow import (
     InvalidAuth,
     validate_input,
 )
+from custom_components.qvantum.const import (
+    DEFAULT_MODBUS_SCAN_INTERVAL,
+    MIN_MODBUS_SCAN_INTERVAL,
+)
 
 
 class TestValidateInput:
@@ -276,6 +280,7 @@ class TestQvantumConfigFlow:
         # Mock config entry
         config_entry = MagicMock()
         config_entry.data = {"username": "old@example.com", "password": "oldpass"}
+        config_entry.options = {}
         config_entry.unique_id = "test_unique_id"
 
         hass.config_entries = MagicMock()
@@ -312,7 +317,11 @@ class TestQvantumConfigFlow:
                     "modbus_tcp": False,
                     "modbus_write": False,
                 },
-                options={"modbus_tcp": False, "modbus_write": False},
+                options={
+                    "modbus_tcp": False,
+                    "modbus_write": False,
+                    "modbus_scan_interval": DEFAULT_MODBUS_SCAN_INTERVAL,
+                },
                 reason="reconfigure_successful",
             )
 
@@ -438,6 +447,110 @@ class TestQvantumConfigFlow:
             )
 
     @pytest.mark.asyncio
+    async def test_step_reconfigure_sets_modbus_scan_interval(self, hass, config_flow):
+        """Test reconfigure stores a custom Modbus poll interval in options."""
+        config_entry = MagicMock()
+        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
+        config_entry.options = {"modbus_tcp": True, "modbus_scan_interval": 15}
+        config_entry.unique_id = "test_unique_id"
+
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_get_entry.return_value = config_entry
+
+        config_flow.context = {"entry_id": "test_entry_id"}
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_input"
+            ) as mock_validate,
+            patch.object(
+                config_flow, "async_update_reload_and_abort"
+            ) as mock_update_reload,
+        ):
+            mock_validate.return_value = None
+            mock_update_reload.return_value = {"type": "abort"}
+
+            result = await config_flow.async_step_reconfigure(
+                {
+                    "username": "new@example.com",
+                    "password": "newpass",
+                    "modbus_tcp": True,
+                    "modbus_write": False,
+                    "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
+                }
+            )
+
+            assert result == {"type": "abort"}
+            mock_update_reload.assert_called_once()
+            assert (
+                mock_update_reload.call_args.kwargs["options"]["modbus_scan_interval"]
+                == MIN_MODBUS_SCAN_INTERVAL
+            )
+            assert mock_update_reload.call_args.kwargs["options"]["modbus_tcp"] is True
+
+    @pytest.mark.asyncio
+    async def test_step_reconfigure_normalizes_invalid_modbus_scan_interval(
+        self, hass, config_flow
+    ):
+        """Test reconfigure coerces invalid Modbus intervals to a valid int."""
+        config_entry = MagicMock()
+        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
+        config_entry.options = {
+            "modbus_tcp": True,
+            "modbus_scan_interval": "not-a-number",
+        }
+        config_entry.unique_id = "test_unique_id"
+
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_get_entry.return_value = config_entry
+
+        config_flow.context = {"entry_id": "test_entry_id"}
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_input"
+            ) as mock_validate,
+            patch.object(
+                config_flow, "async_update_reload_and_abort"
+            ) as mock_update_reload,
+        ):
+            mock_validate.return_value = None
+            mock_update_reload.return_value = {"type": "abort"}
+
+            # Missing field falls back to stored invalid value, then normalizes.
+            result = await config_flow.async_step_reconfigure(
+                {
+                    "username": "new@example.com",
+                    "password": "newpass",
+                    "modbus_tcp": True,
+                    "modbus_write": False,
+                }
+            )
+
+            assert result == {"type": "abort"}
+            assert (
+                mock_update_reload.call_args.kwargs["options"]["modbus_scan_interval"]
+                == DEFAULT_MODBUS_SCAN_INTERVAL
+            )
+
+            mock_update_reload.reset_mock()
+            result = await config_flow.async_step_reconfigure(
+                {
+                    "username": "new@example.com",
+                    "password": "newpass",
+                    "modbus_tcp": True,
+                    "modbus_write": False,
+                    "modbus_scan_interval": "3",
+                }
+            )
+
+            assert result == {"type": "abort"}
+            assert (
+                mock_update_reload.call_args.kwargs["options"]["modbus_scan_interval"]
+                == MIN_MODBUS_SCAN_INTERVAL
+            )
+
+    @pytest.mark.asyncio
     async def test_options_flow_init_success(self, hass):
         """Test options flow init step with successful update."""
         from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
@@ -535,5 +648,93 @@ class TestQvantumConfigFlow:
                     "scan_interval": 300,
                     "modbus_tcp": False,
                     "modbus_write": False,
+                },
+            )
+
+    @pytest.mark.asyncio
+    async def test_options_flow_sets_modbus_scan_interval(self, hass):
+        """Test options flow stores a custom Modbus poll interval."""
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+        from homeassistant.config_entries import ConfigEntry
+
+        config_entry = ConfigEntry(
+            version=1,
+            minor_version=1,
+            domain="qvantum",
+            title="Test",
+            data={},
+            options={"scan_interval": 120, "modbus_tcp": True},
+            source="user",
+            unique_id="test_unique_id",
+            discovery_keys={},
+            subentries_data={},
+        )
+
+        flow = QvantumOptionsFlowHandler(config_entry)
+
+        with patch.object(flow, "async_create_entry") as mock_create_entry:
+            mock_create_entry.return_value = {"type": "create_entry"}
+
+            result = await flow.async_step_init(
+                {
+                    "scan_interval": 120,
+                    "modbus_tcp": True,
+                    "modbus_write": False,
+                    "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
+                }
+            )
+
+            assert result == {"type": "create_entry"}
+            mock_create_entry.assert_called_once_with(
+                title="",
+                data={
+                    "scan_interval": 120,
+                    "modbus_tcp": True,
+                    "modbus_write": False,
+                    "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
+                },
+            )
+
+    @pytest.mark.asyncio
+    async def test_options_flow_normalizes_invalid_modbus_scan_interval(self, hass):
+        """Test options flow coerces invalid Modbus intervals before persisting."""
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+        from homeassistant.config_entries import ConfigEntry
+
+        config_entry = ConfigEntry(
+            version=1,
+            minor_version=1,
+            domain="qvantum",
+            title="Test",
+            data={},
+            options={"scan_interval": 120, "modbus_tcp": True},
+            source="user",
+            unique_id="test_unique_id",
+            discovery_keys={},
+            subentries_data={},
+        )
+
+        flow = QvantumOptionsFlowHandler(config_entry)
+
+        with patch.object(flow, "async_create_entry") as mock_create_entry:
+            mock_create_entry.return_value = {"type": "create_entry"}
+
+            result = await flow.async_step_init(
+                {
+                    "scan_interval": 120,
+                    "modbus_tcp": True,
+                    "modbus_write": False,
+                    "modbus_scan_interval": "2",
+                }
+            )
+
+            assert result == {"type": "create_entry"}
+            mock_create_entry.assert_called_once_with(
+                title="",
+                data={
+                    "scan_interval": 120,
+                    "modbus_tcp": True,
+                    "modbus_write": False,
+                    "modbus_scan_interval": 5,
                 },
             )

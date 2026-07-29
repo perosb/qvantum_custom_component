@@ -25,11 +25,14 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .api import QvantumAPI, APIAuthError, APIConnectionError
 from .const import (
+    DEFAULT_MODBUS_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    MIN_MODBUS_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
     VERSION,
     CONFIG_VERSION,
+    CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     CONF_MODBUS_WRITE,
     CONF_MODBUS_HOST,
@@ -53,6 +56,15 @@ def _normalize_modbus_settings(
 ) -> tuple[bool, bool]:
     """Ensure modbus_write cannot be enabled when modbus_tcp is disabled."""
     return modbus_enabled, modbus_write_enabled and modbus_enabled
+
+
+def _normalize_modbus_scan_interval(value: Any) -> int:
+    """Coerce Modbus scan interval to int and enforce the configured minimum."""
+    try:
+        interval = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_MODBUS_SCAN_INTERVAL
+    return max(interval, MIN_MODBUS_SCAN_INTERVAL)
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -183,6 +195,15 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                     **config_entry.options,
                     CONF_MODBUS_TCP: modbus_enabled,
                     CONF_MODBUS_WRITE: modbus_write_enabled,
+                    CONF_MODBUS_SCAN_INTERVAL: _normalize_modbus_scan_interval(
+                        user_input.get(
+                            CONF_MODBUS_SCAN_INTERVAL,
+                            config_entry.options.get(
+                                CONF_MODBUS_SCAN_INTERVAL,
+                                DEFAULT_MODBUS_SCAN_INTERVAL,
+                            ),
+                        )
+                    ),
                 }
                 return self.async_update_reload_and_abort(
                     config_entry,
@@ -213,6 +234,17 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                             config_entry.data.get(CONF_MODBUS_WRITE, False),
                         ),
                     ): bool,
+                    vol.Optional(
+                        CONF_MODBUS_SCAN_INTERVAL,
+                        default=_normalize_modbus_scan_interval(
+                            config_entry.options.get(
+                                CONF_MODBUS_SCAN_INTERVAL,
+                                DEFAULT_MODBUS_SCAN_INTERVAL,
+                            )
+                        ),
+                    ): vol.All(
+                        vol.Coerce(int), vol.Clamp(min=MIN_MODBUS_SCAN_INTERVAL)
+                    ),
                 }
             ),
             errors=errors,
@@ -246,6 +278,12 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                 normalized_input[CONF_MODBUS_WRITE] = modbus_write_enabled
             elif CONF_MODBUS_WRITE in user_input:
                 normalized_input[CONF_MODBUS_WRITE] = modbus_write_enabled
+            if CONF_MODBUS_SCAN_INTERVAL in normalized_input:
+                normalized_input[CONF_MODBUS_SCAN_INTERVAL] = (
+                    _normalize_modbus_scan_interval(
+                        normalized_input[CONF_MODBUS_SCAN_INTERVAL]
+                    )
+                )
 
             options = self.options | normalized_input
             return self.async_create_entry(title="", data=options)
@@ -268,6 +306,14 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                     CONF_MODBUS_WRITE,
                     default=self.options.get(CONF_MODBUS_WRITE, False),
                 ): bool,
+                vol.Optional(
+                    CONF_MODBUS_SCAN_INTERVAL,
+                    default=_normalize_modbus_scan_interval(
+                        self.options.get(
+                            CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL
+                        )
+                    ),
+                ): vol.All(vol.Coerce(int), vol.Clamp(min=MIN_MODBUS_SCAN_INTERVAL)),
             }
         )
 

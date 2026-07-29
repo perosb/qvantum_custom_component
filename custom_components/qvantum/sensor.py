@@ -52,6 +52,8 @@ async def async_setup_entry(
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo | dict = config_entry.runtime_data.device
 
+    _LOGGER.debug("Setting up platform SENSOR")
+
     sensors = []
 
     values = coordinator.data.get("values", {})

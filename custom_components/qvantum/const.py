@@ -3,6 +3,9 @@
 DOMAIN = "qvantum"
 DEFAULT_SCAN_INTERVAL = 120
 MIN_SCAN_INTERVAL = 60
+# Modbus poll interval. Default matches the previous hard cap.
+DEFAULT_MODBUS_SCAN_INTERVAL = 15
+MIN_MODBUS_SCAN_INTERVAL = 5
 SETTING_UPDATE_APPLIED = "APPLIED"
 
 # Heat pump status values (hp_status metric)
@@ -26,6 +29,7 @@ CONF_MODBUS_WRITE = "modbus_write"
 CONF_MODBUS_HOST = "modbus_host"
 CONF_MODBUS_PORT = "modbus_port"
 CONF_MODBUS_UNIT_ID = "modbus_unit_id"
+CONF_MODBUS_SCAN_INTERVAL = "modbus_scan_interval"
 DEFAULT_MODBUS_HOST = "Qvantum-HP"
 DEFAULT_MODBUS_PORT = 502
 DEFAULT_MODBUS_UNIT_ID = 1

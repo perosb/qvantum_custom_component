@@ -202,7 +202,6 @@
       "inputcurrent3": {
         "name": "Eingangsstrom L3"
       },
-
       "degree_minute": {
         "name": "Gradminute"
       },
@@ -561,11 +560,13 @@
           "password": "Passwort",
           "username": "Benutzername",
           "modbus_tcp": "Modbus-Lesen statt HTTP-Abfragen verwenden",
-          "modbus_write": "Schreiben über Modbus aktivieren"
+          "modbus_write": "Schreiben über Modbus aktivieren",
+          "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)"
         },
         "data_description": {
           "modbus_tcp": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest; Schreiben/Steuerung erfolgt weiterhin über die HTTP-API, es sei denn, Schreiben ist ebenfalls aktiviert. Bestimmte Steuerungen werden über Modbus geschrieben.",
-          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen."
+          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen.",
+          "modbus_scan_interval": "Wie oft die Wärmepumpe über Modbus TCP abgefragt wird. Niedrigere Werte ermöglichen nahezu Echtzeit-Durchfluss- und Volumenmessung. Minimum sind 5 Sekunden. Standard sind 15 Sekunden."
         }
       }
     }
@@ -577,11 +578,13 @@
           "scan_interval": "HTTP-Scan-Intervall (Sekunden)",
           "modbus_tcp": "Modbus-Lesen statt HTTP-Abfragen verwenden",
           "modbus_host": "Qvantum Host/IP",
-          "modbus_write": "Schreiben über Modbus aktivieren"
+          "modbus_write": "Schreiben über Modbus aktivieren",
+          "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)"
         },
         "data_description": {
           "modbus_tcp": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest; Schreiben/Steuerung erfolgt weiterhin über die HTTP-API, es sei denn, Schreiben ist ebenfalls aktiviert. Bestimmte Steuerungen werden über Modbus geschrieben.",
-          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen."
+          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen.",
+          "modbus_scan_interval": "Wie oft die Wärmepumpe über Modbus TCP abgefragt wird. Niedrigere Werte ermöglichen nahezu Echtzeit-Durchfluss- und Volumenmessung. Minimum sind 5 Sekunden. Standard sind 15 Sekunden."
         },
         "description": "Ändern Sie Ihre Optionen.",
         "title": "Optionen"

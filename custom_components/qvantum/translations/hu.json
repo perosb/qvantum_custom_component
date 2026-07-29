@@ -560,11 +560,13 @@
           "password": "Jelszó",
           "username": "Felhasználónév",
           "modbus_tcp": "Modbus-olvasás használata HTTP lekérdezés helyett",
-          "modbus_write": "Modbus alapú írás engedélyezése"
+          "modbus_write": "Modbus alapú írás engedélyezése",
+          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)"
         },
         "data_description": {
           "modbus_tcp": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
-          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét."
+          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét.",
+          "modbus_scan_interval": "Milyen gyakran kérdezze le a hőszivattyút Modbus TCP-n. Az alacsonyabb értékek közel valós idejű áramlás- és térfogatpontosságot adnak. Minimum 5 másodperc. Alapértelmezett 15 másodperc."
         }
       }
     }
@@ -576,11 +578,13 @@
           "scan_interval": "HTTP lekérdezési időköz (másodperc)",
           "modbus_tcp": "Modbus-olvasás használata HTTP lekérdezés helyett",
           "modbus_host": "Qvantum Hoszt/IP",
-          "modbus_write": "Modbus alapú írás engedélyezése"
+          "modbus_write": "Modbus alapú írás engedélyezése",
+          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)"
         },
         "data_description": {
           "modbus_tcp": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
-          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét."
+          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét.",
+          "modbus_scan_interval": "Milyen gyakran kérdezze le a hőszivattyút Modbus TCP-n. Az alacsonyabb értékek közel valós idejű áramlás- és térfogatpontosságot adnak. Minimum 5 másodperc. Alapértelmezett 15 másodperc."
         },
         "description": "Módosítsa a beállításait.",
         "title": "Beállítások"

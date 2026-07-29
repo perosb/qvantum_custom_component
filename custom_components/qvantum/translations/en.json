@@ -202,7 +202,6 @@
       "inputcurrent3": {
         "name": "Input current L3"
       },
-
       "degree_minute": {
         "name": "Degree Minute"
       },
@@ -561,11 +560,13 @@
           "password": "Password",
           "username": "Username",
           "modbus_tcp": "Use Modbus reading instead of HTTP polling",
-          "modbus_write": "Enable writing via Modbus"
+          "modbus_write": "Enable writing via Modbus",
+          "modbus_scan_interval": "Modbus scan interval (seconds)"
         },
         "data_description": {
           "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
-          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
+          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
+          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Lower values give near real-time flow and volume accuracy. Minimum is 5 seconds. Default is 15 seconds."
         }
       }
     }
@@ -577,11 +578,13 @@
           "scan_interval": "HTTP Scan Interval (seconds)",
           "modbus_tcp": "Use Modbus reading instead of HTTP polling",
           "modbus_host": "Qvantum Host/IP",
-          "modbus_write": "Enable writing via Modbus"
+          "modbus_write": "Enable writing via Modbus",
+          "modbus_scan_interval": "Modbus scan interval (seconds)"
         },
         "data_description": {
           "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
-          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
+          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
+          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Lower values give near real-time flow and volume accuracy. Minimum is 5 seconds. Default is 15 seconds."
         },
         "description": "Amend your options.",
         "title": "Options"
