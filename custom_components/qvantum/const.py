@@ -3,7 +3,7 @@
 DOMAIN = "qvantum"
 DEFAULT_SCAN_INTERVAL = 120
 MIN_SCAN_INTERVAL = 60
-# Modbus poll interval (reconfigure-only). Default matches the previous hard cap.
+# Modbus poll interval. Default matches the previous hard cap.
 DEFAULT_MODBUS_SCAN_INTERVAL = 15
 MIN_MODBUS_SCAN_INTERVAL = 5
 SETTING_UPDATE_APPLIED = "APPLIED"

@@ -95,7 +95,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         )
 
         if self.modbus_enabled:
-            # Dedicated Modbus interval (reconfigure-only). Falls back to the
+            # Dedicated Modbus interval. Falls back to the
             # historical 15s default when unset. Enforce a sensible minimum.
             modbus_interval = config_entry.options.get(
                 CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL

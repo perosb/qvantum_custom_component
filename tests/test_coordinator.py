@@ -9,8 +9,10 @@ from custom_components.qvantum.coordinator import (
     QvantumDataUpdateCoordinator,
 )
 from custom_components.qvantum.const import (
+    CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     DEFAULT_ENABLED_HTTP_METRICS,
+    DEFAULT_MODBUS_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     DHW_CAP_HYSTERESIS_C,
@@ -19,6 +21,7 @@ from custom_components.qvantum.const import (
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_SESSION_GAP_SEC,
     DHW_SHOWER_DURATION_MIN,
+    MIN_MODBUS_SCAN_INTERVAL,
     REQUIRED_METRICS,
 )
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -389,13 +392,11 @@ class TestQvantumDataUpdateCoordinator:
         coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
 
         assert coordinator.modbus_enabled is True
-        assert coordinator.poll_interval == 15
+        assert coordinator.poll_interval == DEFAULT_MODBUS_SCAN_INTERVAL
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_poll_interval_modbus_uses_configured_interval(self, mock_super_init):
         """Test that a configured Modbus scan interval is used when Modbus is enabled."""
-        from custom_components.qvantum.const import CONF_MODBUS_SCAN_INTERVAL
-
         mock_super_init.return_value = None
 
         mock_hass = MagicMock()
@@ -405,7 +406,7 @@ class TestQvantumDataUpdateCoordinator:
             if key == CONF_MODBUS_TCP:
                 return True
             if key == CONF_MODBUS_SCAN_INTERVAL:
-                return 5
+                return MIN_MODBUS_SCAN_INTERVAL
             return default
 
         config_entry.options.get.side_effect = options_get
@@ -413,16 +414,11 @@ class TestQvantumDataUpdateCoordinator:
 
         coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
 
-        assert coordinator.poll_interval == 5
+        assert coordinator.poll_interval == MIN_MODBUS_SCAN_INTERVAL
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_poll_interval_modbus_enforces_minimum(self, mock_super_init):
         """Test that Modbus poll interval is clamped to the configured minimum."""
-        from custom_components.qvantum.const import (
-            CONF_MODBUS_SCAN_INTERVAL,
-            MIN_MODBUS_SCAN_INTERVAL,
-        )
-
         mock_super_init.return_value = None
 
         mock_hass = MagicMock()
@@ -432,7 +428,7 @@ class TestQvantumDataUpdateCoordinator:
             if key == CONF_MODBUS_TCP:
                 return True
             if key == CONF_MODBUS_SCAN_INTERVAL:
-                return 1
+                return MIN_MODBUS_SCAN_INTERVAL - 1
             return default
 
         config_entry.options.get.side_effect = options_get

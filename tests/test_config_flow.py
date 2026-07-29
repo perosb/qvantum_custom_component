@@ -11,6 +11,10 @@ from custom_components.qvantum.config_flow import (
     InvalidAuth,
     validate_input,
 )
+from custom_components.qvantum.const import (
+    DEFAULT_MODBUS_SCAN_INTERVAL,
+    MIN_MODBUS_SCAN_INTERVAL,
+)
 
 
 class TestValidateInput:
@@ -316,7 +320,7 @@ class TestQvantumConfigFlow:
                 options={
                     "modbus_tcp": False,
                     "modbus_write": False,
-                    "modbus_scan_interval": 15,
+                    "modbus_scan_interval": DEFAULT_MODBUS_SCAN_INTERVAL,
                 },
                 reason="reconfigure_successful",
             )
@@ -472,7 +476,7 @@ class TestQvantumConfigFlow:
                     "password": "newpass",
                     "modbus_tcp": True,
                     "modbus_write": False,
-                    "modbus_scan_interval": 5,
+                    "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
                 }
             )
 
@@ -480,7 +484,7 @@ class TestQvantumConfigFlow:
             mock_update_reload.assert_called_once()
             assert (
                 mock_update_reload.call_args.kwargs["options"]["modbus_scan_interval"]
-                == 5
+                == MIN_MODBUS_SCAN_INTERVAL
             )
             assert mock_update_reload.call_args.kwargs["options"]["modbus_tcp"] is True
 
@@ -526,7 +530,7 @@ class TestQvantumConfigFlow:
             assert result == {"type": "abort"}
             assert (
                 mock_update_reload.call_args.kwargs["options"]["modbus_scan_interval"]
-                == 15
+                == DEFAULT_MODBUS_SCAN_INTERVAL
             )
 
             mock_update_reload.reset_mock()
@@ -543,7 +547,7 @@ class TestQvantumConfigFlow:
             assert result == {"type": "abort"}
             assert (
                 mock_update_reload.call_args.kwargs["options"]["modbus_scan_interval"]
-                == 5
+                == MIN_MODBUS_SCAN_INTERVAL
             )
 
     @pytest.mark.asyncio
@@ -676,7 +680,7 @@ class TestQvantumConfigFlow:
                     "scan_interval": 120,
                     "modbus_tcp": True,
                     "modbus_write": False,
-                    "modbus_scan_interval": 5,
+                    "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
                 }
             )
 
@@ -687,7 +691,7 @@ class TestQvantumConfigFlow:
                     "scan_interval": 120,
                     "modbus_tcp": True,
                     "modbus_write": False,
-                    "modbus_scan_interval": 5,
+                    "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
                 },
             )
 
