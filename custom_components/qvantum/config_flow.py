@@ -285,6 +285,12 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                     CONF_MODBUS_WRITE,
                     default=self.options.get(CONF_MODBUS_WRITE, False),
                 ): bool,
+                vol.Optional(
+                    CONF_MODBUS_SCAN_INTERVAL,
+                    default=self.options.get(
+                        CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL
+                    ),
+                ): vol.All(vol.Coerce(int), vol.Clamp(min=MIN_MODBUS_SCAN_INTERVAL)),
             }
         )
 

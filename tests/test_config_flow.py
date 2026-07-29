@@ -584,3 +584,47 @@ class TestQvantumConfigFlow:
                     "modbus_write": False,
                 },
             )
+
+    @pytest.mark.asyncio
+    async def test_options_flow_sets_modbus_scan_interval(self, hass):
+        """Test options flow stores a custom Modbus poll interval."""
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+        from homeassistant.config_entries import ConfigEntry
+
+        config_entry = ConfigEntry(
+            version=1,
+            minor_version=1,
+            domain="qvantum",
+            title="Test",
+            data={},
+            options={"scan_interval": 120, "modbus_tcp": True},
+            source="user",
+            unique_id="test_unique_id",
+            discovery_keys={},
+            subentries_data={},
+        )
+
+        flow = QvantumOptionsFlowHandler(config_entry)
+
+        with patch.object(flow, "async_create_entry") as mock_create_entry:
+            mock_create_entry.return_value = {"type": "create_entry"}
+
+            result = await flow.async_step_init(
+                {
+                    "scan_interval": 120,
+                    "modbus_tcp": True,
+                    "modbus_write": False,
+                    "modbus_scan_interval": 5,
+                }
+            )
+
+            assert result == {"type": "create_entry"}
+            mock_create_entry.assert_called_once_with(
+                title="",
+                data={
+                    "scan_interval": 120,
+                    "modbus_tcp": True,
+                    "modbus_write": False,
+                    "modbus_scan_interval": 5,
+                },
+            )
