@@ -25,11 +25,14 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .api import QvantumAPI, APIAuthError, APIConnectionError
 from .const import (
+    DEFAULT_MODBUS_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    MIN_MODBUS_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
     VERSION,
     CONFIG_VERSION,
+    CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     CONF_MODBUS_WRITE,
     CONF_MODBUS_HOST,
@@ -183,6 +186,12 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                     **config_entry.options,
                     CONF_MODBUS_TCP: modbus_enabled,
                     CONF_MODBUS_WRITE: modbus_write_enabled,
+                    CONF_MODBUS_SCAN_INTERVAL: user_input.get(
+                        CONF_MODBUS_SCAN_INTERVAL,
+                        config_entry.options.get(
+                            CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL
+                        ),
+                    ),
                 }
                 return self.async_update_reload_and_abort(
                     config_entry,
@@ -213,6 +222,14 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                             config_entry.data.get(CONF_MODBUS_WRITE, False),
                         ),
                     ): bool,
+                    vol.Optional(
+                        CONF_MODBUS_SCAN_INTERVAL,
+                        default=config_entry.options.get(
+                            CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL
+                        ),
+                    ): vol.All(
+                        vol.Coerce(int), vol.Clamp(min=MIN_MODBUS_SCAN_INTERVAL)
+                    ),
                 }
             ),
             errors=errors,

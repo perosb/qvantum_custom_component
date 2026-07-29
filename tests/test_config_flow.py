@@ -276,6 +276,7 @@ class TestQvantumConfigFlow:
         # Mock config entry
         config_entry = MagicMock()
         config_entry.data = {"username": "old@example.com", "password": "oldpass"}
+        config_entry.options = {}
         config_entry.unique_id = "test_unique_id"
 
         hass.config_entries = MagicMock()
@@ -312,7 +313,11 @@ class TestQvantumConfigFlow:
                     "modbus_tcp": False,
                     "modbus_write": False,
                 },
-                options={"modbus_tcp": False, "modbus_write": False},
+                options={
+                    "modbus_tcp": False,
+                    "modbus_write": False,
+                    "modbus_scan_interval": 15,
+                },
                 reason="reconfigure_successful",
             )
 
@@ -436,6 +441,48 @@ class TestQvantumConfigFlow:
             assert (
                 mock_update_reload.call_args.kwargs["options"]["modbus_write"] is False
             )
+
+    @pytest.mark.asyncio
+    async def test_step_reconfigure_sets_modbus_scan_interval(self, hass, config_flow):
+        """Test reconfigure stores a custom Modbus poll interval in options."""
+        config_entry = MagicMock()
+        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
+        config_entry.options = {"modbus_tcp": True, "modbus_scan_interval": 15}
+        config_entry.unique_id = "test_unique_id"
+
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_get_entry.return_value = config_entry
+
+        config_flow.context = {"entry_id": "test_entry_id"}
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_input"
+            ) as mock_validate,
+            patch.object(
+                config_flow, "async_update_reload_and_abort"
+            ) as mock_update_reload,
+        ):
+            mock_validate.return_value = None
+            mock_update_reload.return_value = {"type": "abort"}
+
+            result = await config_flow.async_step_reconfigure(
+                {
+                    "username": "new@example.com",
+                    "password": "newpass",
+                    "modbus_tcp": True,
+                    "modbus_write": False,
+                    "modbus_scan_interval": 5,
+                }
+            )
+
+            assert result == {"type": "abort"}
+            mock_update_reload.assert_called_once()
+            assert (
+                mock_update_reload.call_args.kwargs["options"]["modbus_scan_interval"]
+                == 5
+            )
+            assert mock_update_reload.call_args.kwargs["options"]["modbus_tcp"] is True
 
     @pytest.mark.asyncio
     async def test_options_flow_init_success(self, hass):

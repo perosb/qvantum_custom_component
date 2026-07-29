@@ -20,17 +20,20 @@ from .calculations import QvantumCalculationsMixin
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
+    DEFAULT_MODBUS_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     HP_STATUS_COOLING,
     HP_STATUS_DEFROSTING,
     HP_STATUS_HEATING,
     HP_STATUS_HOT_WATER,
+    MIN_MODBUS_SCAN_INTERVAL,
     SETTING_UPDATE_APPLIED,
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
     REQUIRED_METRICS,
     REQUIRED_MODBUS_METRICS,
+    CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
@@ -92,7 +95,16 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         )
 
         if self.modbus_enabled:
-            self.poll_interval = min(self.poll_interval, 15)  # Faster for Modbus
+            # Dedicated Modbus interval (reconfigure-only). Falls back to the
+            # historical 15s default when unset. Enforce a sensible minimum.
+            modbus_interval = config_entry.options.get(
+                CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL
+            )
+            try:
+                modbus_interval = int(modbus_interval)
+            except (TypeError, ValueError):
+                modbus_interval = DEFAULT_MODBUS_SCAN_INTERVAL
+            self.poll_interval = max(modbus_interval, MIN_MODBUS_SCAN_INTERVAL)
 
         self.api = hass.data[DOMAIN]
         self._device = None
