@@ -80,6 +80,7 @@ class QvantumAPI:
         self._modbus_unit_id = modbus_unit_id
         self._modbus_client = None
         self._modbus_lock = asyncio.Lock()
+        self._closed = False
         # Accept an optional aiohttp session for easier testing. If not provided,
         # create one and mark it as owned so we can close it when `close()` is called.
         if session is not None:
@@ -107,8 +108,15 @@ class QvantumAPI:
         self._device_metadata = {}
         self._device_metadata_etag = None
 
+    def _ensure_open(self) -> None:
+        """Raise if the API client has been closed (e.g. during config reload)."""
+        if self._closed:
+            raise APIConnectionError(None, "API client is closed")
+
     def _init_modbus_client(self):
         """Initialize Modbus TCP client if not already done."""
+        if self._closed:
+            return
         if self._modbus_tcp and self._modbus_client is None:
             self._modbus_client = AsyncModbusTcpClient(
                 host=self._modbus_host,
@@ -118,7 +126,11 @@ class QvantumAPI:
             )
 
     async def _reset_modbus_client(self):
-        """Close and clear Modbus client so reconnect starts from scratch."""
+        """Close and clear Modbus client so reconnect starts from scratch.
+
+        Must only be called while holding ``_modbus_lock`` (or during final
+        teardown after no more Modbus work can start).
+        """
         if self._modbus_client:
             try:
                 close_result = self._modbus_client.close()
@@ -129,17 +141,32 @@ class QvantumAPI:
             self._modbus_client = None
 
     async def close(self):
-        """Close the session."""
+        """Close HTTP session and Modbus client; reject further API use.
+
+        Acquires the Modbus lock so an in-flight register read/write finishes
+        (or is cancelled by the coordinator) before the TCP client is torn down.
+        This avoids leaving a half-closed pymodbus client that blocks reconnects
+        after config option changes (e.g. poll interval reload).
+        """
+        if self._closed:
+            return
+        self._closed = True
+
+        # Wait for any in-flight Modbus operation, then dispose the client.
+        async with self._modbus_lock:
+            await self._reset_modbus_client()
+
         # Only close the session if we created it; externally-provided sessions
         # should be closed by their owner.
         if getattr(self, "_session_owner", False) and self._session:
-            await self._session.close()
+            try:
+                await self._session.close()
+            except asyncio.CancelledError:
+                self._session = None
+                raise
+            except Exception as exc:
+                _LOGGER.debug("Error closing HTTP session: %s", exc)
             self._session = None
-        if self._modbus_client:
-            close_result = self._modbus_client.close()
-            if inspect.isawaitable(close_result):
-                await close_result
-            self._modbus_client = None
 
     def _normalize_modbus_value(self, value: float, scale: float) -> int | float:
         """Normalize a Modbus register value to the correct type and precision."""
@@ -156,7 +183,9 @@ class QvantumAPI:
         handle_relay_bits: bool = False,
     ):
         """Generic method to read Modbus registers (input or holding)."""
+        self._ensure_open()
         async with self._modbus_lock:
+            self._ensure_open()
             self._init_modbus_client()
             if not self._modbus_client:
                 raise APIConnectionError(None, "Modbus client not initialized")
@@ -268,11 +297,19 @@ class QvantumAPI:
                             value = (bitmask >> bit) & 1
                             data[item_name] = value
 
+            except asyncio.CancelledError:
+                # Reload/unload cancels in-flight polls; reset the client so the
+                # next setup does not inherit a half-closed TCP session.
+                await self._reset_modbus_client()
+                raise
             except ModbusException as e:
                 error_msg = f"Modbus error reading {'input' if use_input_registers else 'holding'} registers: {e}"
                 _LOGGER.error(error_msg)
                 await self._reset_modbus_client()
                 raise APIConnectionError(None, f"Modbus communication failed: {e}")
+            except APIConnectionError:
+                await self._reset_modbus_client()
+                raise
             except Exception as e:
                 # Catch non-Modbus exceptions (e.g. NoneType on execute) and recover gracefully.
                 _LOGGER.error(
@@ -451,6 +488,7 @@ class QvantumAPI:
 
     async def authenticate(self):
         """Authenticate with the API using username and password to retrieve a token."""
+        self._ensure_open()
         payload = {
             "returnSecureToken": "true",
             "email": self._username,
@@ -481,6 +519,7 @@ class QvantumAPI:
 
     async def _refresh_authentication_token(self):
         """Refresh the authentication token."""
+        self._ensure_open()
 
         if not self._refreshtoken:
             return
@@ -511,6 +550,7 @@ class QvantumAPI:
 
     async def _ensure_valid_token(self):
         """Ensure a valid token is available, refreshing if expired."""
+        self._ensure_open()
         if not self._token or datetime.now() >= self._token_expiry:
             try:
                 await self._refresh_authentication_token()
@@ -550,7 +590,9 @@ class QvantumAPI:
         self, device_id: str, register_address: int, value: int
     ) -> dict:
         """Write a single Modbus holding register and return a status dict."""
+        self._ensure_open()
         async with self._modbus_lock:
+            self._ensure_open()
             self._init_modbus_client()
             if not self._modbus_client:
                 raise APIConnectionError(
@@ -586,6 +628,9 @@ class QvantumAPI:
                         None,
                         f"Modbus write error on register {register_address} for device {device_id}: {result}",
                     )
+            except asyncio.CancelledError:
+                await self._reset_modbus_client()
+                raise
             except ModbusException as e:
                 _LOGGER.error(
                     "Modbus error writing holding register %d for device %s: %s",
@@ -596,6 +641,7 @@ class QvantumAPI:
                 await self._reset_modbus_client()
                 raise APIConnectionError(None, f"Modbus write failed: {e}")
             except APIConnectionError:
+                await self._reset_modbus_client()
                 raise
             except Exception as e:
                 _LOGGER.error(
@@ -957,6 +1003,7 @@ class QvantumAPI:
         self, device_id: str, method="now", enabled_metrics: Optional[list[str]] = None
     ):
         """Fetch data from the API or Modbus with authentication."""
+        self._ensure_open()
 
         names = (
             enabled_metrics
@@ -982,6 +1029,18 @@ class QvantumAPI:
                 ):
                     self._metrics_data["metrics"]["latency"] = modbus_latency
                 return self._metrics_data
+            except (asyncio.CancelledError, APIConnectionError) as e:
+                # Do not HTTP-fallback when the client is closing/closed or the
+                # poll task was cancelled (config reload). Falling back would race
+                # unload and hit a None aiohttp session.
+                if isinstance(e, asyncio.CancelledError) or self._closed:
+                    raise
+                if "API client is closed" in str(e):
+                    raise
+                _LOGGER.warning(
+                    "Failed to read metrics via Modbus, falling back to HTTP: %s",
+                    e,
+                )
             except Exception as e:
                 _LOGGER.warning(
                     "Failed to read metrics via Modbus, falling back to HTTP: %s",
@@ -1031,6 +1090,7 @@ class QvantumAPI:
         unhandled non-200 response status.
         Raises APIAuthError on 403, APIConnectionError on 500.
         """
+        self._ensure_open()
         await self._ensure_valid_token()
         headers = self._request_headers()
         if etag_header:
@@ -1069,6 +1129,7 @@ class QvantumAPI:
 
     async def get_settings(self, device_id: str):
         """Fetch settings from the API or Modbus."""
+        self._ensure_open()
 
         if self._modbus_tcp:
             # Read settings from Modbus holding registers
@@ -1081,6 +1142,14 @@ class QvantumAPI:
                 ]
                 result = await self._read_modbus_settings(device_id, settings_to_read)
                 return result
+            except (asyncio.CancelledError, APIConnectionError) as e:
+                if isinstance(e, asyncio.CancelledError) or self._closed:
+                    raise
+                if "API client is closed" in str(e):
+                    raise
+                _LOGGER.warning(
+                    "Failed to read settings via Modbus, falling back to HTTP: %s", e
+                )
             except Exception as e:
                 _LOGGER.warning(
                     "Failed to read settings via Modbus, falling back to HTTP: %s", e
