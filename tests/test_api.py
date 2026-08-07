@@ -520,6 +520,161 @@ class TestQvantumAPI:
 
         # Since session was provided externally, the API shouldn't close it.
         mock_session.close.assert_not_called()
+        assert api._closed is True
+
+    @pytest.mark.asyncio
+    async def test_close_owned_session_and_modbus_client(self):
+        """Owned HTTP session and Modbus client are closed under the lock."""
+        api = QvantumAPI("test@example.com", "password", "test-agent", modbus_tcp=True)
+        mock_session = MagicMock()
+        mock_session.close = AsyncMock()
+        api._session = mock_session
+        api._session_owner = True
+
+        mock_client = MagicMock()
+        mock_client.close = AsyncMock()
+        api._modbus_client = mock_client
+
+        await api.close()
+
+        mock_session.close.assert_awaited_once()
+        mock_client.close.assert_awaited_once()
+        assert api._session is None
+        assert api._modbus_client is None
+        assert api._closed is True
+
+        # Second close is a no-op
+        await api.close()
+        mock_session.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_after_close_raises(self, mock_session):
+        """Closed API must not attempt HTTP after unload."""
+        from custom_components.qvantum.api import APIConnectionError
+
+        api = QvantumAPI(
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
+        )
+        await api.close()
+
+        with pytest.raises(APIConnectionError, match="API client is closed"):
+            await api.get_metrics("test_device", enabled_metrics=["bt1"])
+
+        mock_session.get.assert_not_called()
+        mock_session.post.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_modbus_cancel_does_not_http_fallback(self, mock_session):
+        """Cancelled Modbus polls must not fall back to HTTP (reload race)."""
+        api = QvantumAPI(
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        with patch.object(
+            QvantumAPI,
+            "_read_modbus_metrics",
+            AsyncMock(side_effect=asyncio.CancelledError()),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await api.get_metrics("test_device_123", enabled_metrics=["bt1"])
+
+        mock_session.get.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_modbus_closed_client_does_not_http_fallback(
+        self, mock_session
+    ):
+        """Closed-client errors during Modbus must not fall back to HTTP."""
+        from custom_components.qvantum.api import APIConnectionError
+
+        api = QvantumAPI(
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        with patch.object(
+            QvantumAPI,
+            "_read_modbus_metrics",
+            AsyncMock(side_effect=APIConnectionError(None, "API client is closed")),
+        ):
+            with pytest.raises(APIConnectionError, match="API client is closed"):
+                await api.get_metrics("test_device_123", enabled_metrics=["bt1"])
+
+        mock_session.get.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_close_waits_for_in_flight_modbus_lock(self):
+        """close() must not tear down Modbus while a read holds the lock."""
+        api = QvantumAPI("test@example.com", "password", "test-agent", modbus_tcp=True)
+        mock_client = MagicMock()
+        mock_client.close = AsyncMock()
+        api._modbus_client = mock_client
+
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def hold_lock():
+            async with api._modbus_lock:
+                entered.set()
+                await release.wait()
+
+        holder = asyncio.create_task(hold_lock())
+        await entered.wait()
+
+        closer = asyncio.create_task(api.close())
+        # close should block on the lock until the holder finishes
+        await asyncio.sleep(0.05)
+        assert not closer.done()
+        mock_client.close.assert_not_called()
+
+        release.set()
+        await closer
+        await holder
+
+        mock_client.close.assert_awaited_once()
+        assert api._modbus_client is None
+        assert api._closed is True
+
+    @pytest.mark.asyncio
+    async def test_read_modbus_cancelled_resets_client(self):
+        """Cancelled Modbus execute must reset the client before re-raising."""
+        api = QvantumAPI("test@example.com", "password", "test-agent", modbus_tcp=True)
+
+        client = MagicMock()
+        client.connected = True
+        client.close = AsyncMock()
+        client.execute = AsyncMock(side_effect=asyncio.CancelledError())
+        api._modbus_client = client
+
+        with patch(
+            "custom_components.qvantum.api.MODBUS_INPUT_REGISTER_MAP",
+            {"bt1": (0, "int16", 0.1)},
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await api._read_modbus_registers(
+                    "dev",
+                    ["bt1"],
+                    {"bt1": (0, "int16", 0.1)},
+                    use_input_registers=True,
+                )
+
+        client.close.assert_awaited_once()
+        assert api._modbus_client is None
 
     @pytest.mark.asyncio
     async def test_unauthenticate(self):

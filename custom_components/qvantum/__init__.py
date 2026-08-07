@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import inspect
 import logging
@@ -195,9 +196,71 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     return True
 
 
-async def _async_update_listener(hass: HomeAssistant, config_entry):
-    """Handle config options update."""
-    await hass.config_entries.async_reload(config_entry.entry_id)
+def _modbus_transport_changed(
+    config_entry: ConfigEntry, runtime: RuntimeData
+) -> bool:
+    """Return True when Modbus enablement or host requires a full reload."""
+    new_modbus_enabled = bool(
+        config_entry.options.get(
+            CONF_MODBUS_TCP,
+            config_entry.data.get(CONF_MODBUS_TCP, False),
+        )
+    )
+    new_modbus_host = str(
+        config_entry.options.get(
+            CONF_MODBUS_HOST,
+            config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
+        )
+    )
+
+    coordinator = getattr(runtime, "coordinator", None)
+    if coordinator is None:
+        return True
+
+    if new_modbus_enabled != bool(getattr(coordinator, "modbus_enabled", False)):
+        return True
+
+    api = getattr(coordinator, "api", None)
+    if api is not None:
+        current_host = str(getattr(api, "_modbus_host", DEFAULT_MODBUS_HOST))
+        if new_modbus_host != current_host:
+            return True
+        current_enabled = bool(
+            getattr(api, "_modbus_tcp", coordinator.modbus_enabled)
+        )
+        if new_modbus_enabled != current_enabled:
+            return True
+
+    return False
+
+
+async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry):
+    """Handle config options update.
+
+    Interval-only changes are applied in place on the running coordinator so
+    Modbus TCP is not torn down. Enabling/disabling Modbus or changing the
+    host still requires a full reload (different entity set / client).
+    """
+    runtime = getattr(config_entry, "runtime_data", None)
+    if runtime is None or getattr(runtime, "coordinator", None) is None:
+        await hass.config_entries.async_reload(config_entry.entry_id)
+        return
+
+    if _modbus_transport_changed(config_entry, runtime):
+        _LOGGER.debug(
+            "Reloading %s after Modbus transport option change",
+            config_entry.entry_id,
+        )
+        await hass.config_entries.async_reload(config_entry.entry_id)
+        return
+
+    changed = runtime.coordinator.apply_poll_interval(config_entry)
+    if changed:
+        _LOGGER.info(
+            "Applied new poll interval (%ss) without reload for %s",
+            runtime.coordinator.poll_interval,
+            config_entry.title or config_entry.entry_id,
+        )
 
 
 async def async_remove_config_entry_device(
@@ -408,7 +471,38 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
 
 
 async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
-    """Unload Qvantum Heat Pump Integration."""
+    """Unload Qvantum Heat Pump Integration.
+
+    Shut down coordinators before closing the shared API client so in-flight
+    Modbus/HTTP polls are cancelled cleanly. Otherwise a poll cancelled mid-
+    request can fall back to HTTP against a closed session, or leave pymodbus
+    half-open so the next setup cannot reconnect without a full HA restart.
+    """
+    runtime = getattr(config_entry, "runtime_data", None)
+
+    # Stop scheduled updates and cancel in-flight coordinator refreshes first.
+    if runtime is not None:
+        for coordinator in (
+            getattr(runtime, "maintenance_coordinator", None),
+            getattr(runtime, "coordinator", None),
+        ):
+            if coordinator is None:
+                continue
+            try:
+                await coordinator.async_shutdown()
+            except asyncio.CancelledError:
+                raise
+            except Exception as err:
+                _LOGGER.debug("Failed shutting down coordinator on unload: %s", err)
+
+    # Capture device id for notification cleanup before runtime_data is cleared.
+    device_id = None
+    if runtime is not None:
+        main_coordinator = getattr(runtime, "coordinator", None)
+        device = getattr(main_coordinator, "_device", None) if main_coordinator else None
+        if isinstance(device, dict):
+            device_id = device.get("id")
+
     unload_ok = await hass.config_entries.async_unload_platforms(
         config_entry, PLATFORMS
     )
@@ -416,41 +510,37 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
     runtime_data = getattr(config_entry, "runtime_data", None)
 
     if unload_ok and runtime_data is not None:
-        # Clear any firmware update notifications when unloading
-        maintenance_coordinator = runtime_data.maintenance_coordinator
+        # Clear any firmware update notifications when unloading.
+        if device_id:
+            for fw_key in FIRMWARE_KEYS:
+                notification_id = f"qvantum_firmware_update_{device_id}_{fw_key}"
+                try:
+                    result = async_dismiss(hass, notification_id)
+                    if inspect.isawaitable(result):
+                        await result
+                    _LOGGER.debug("Cleared firmware notification %s", notification_id)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as err:
+                    _LOGGER.debug(
+                        "Could not clear firmware notification %s: %s",
+                        notification_id,
+                        err,
+                    )
 
-        # Only attempt to clear notifications if we have a real coordinator with a main coordinator
-        if (
-            maintenance_coordinator is not None
-            and hasattr(maintenance_coordinator, "main_coordinator")
-            and maintenance_coordinator.main_coordinator
-            and hasattr(maintenance_coordinator.main_coordinator, "_device")
-            and maintenance_coordinator.main_coordinator._device
-        ):
-            device_id = maintenance_coordinator.main_coordinator._device.get("id")
+        # Close the API client without tearing down the shared Home Assistant session.
+        api = None
+        if runtime_data is not None:
+            runtime_attrs = getattr(runtime_data, "__dict__", None)
+            if isinstance(runtime_attrs, dict) and "api" in runtime_attrs:
+                api = runtime_attrs["api"]
+        if api is None:
+            api = hass.data.get(DOMAIN)
 
-            if device_id:
-                # Clear notifications for all firmware components
-                for fw_key in FIRMWARE_KEYS:
-                    notification_id = f"qvantum_firmware_update_{device_id}_{fw_key}"
-                    try:
-                        result = async_dismiss(hass, notification_id)
-                        if inspect.isawaitable(result):
-                            await result
-                        _LOGGER.debug(
-                            "Cleared firmware notification %s", notification_id
-                        )
-                    except Exception as err:
-                        _LOGGER.debug(
-                            "Could not clear firmware notification %s: %s",
-                            notification_id,
-                            err,
-                        )
-
-        # Close Modbus client (shared HA aiohttp session is not owned by the API)
-        try:
-            await runtime_data.api.close()
-        except Exception as err:
-            _LOGGER.debug("Failed closing Qvantum API on unload: %s", err)
+        if api is not None:
+            try:
+                await api.close()
+            except Exception as err:
+                _LOGGER.debug("Failed closing Qvantum API on unload: %s", err)
 
     return unload_ok

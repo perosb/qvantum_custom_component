@@ -52,6 +52,8 @@ async def async_setup_entry(
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo | dict = config_entry.runtime_data.device
 
+    _LOGGER.debug("Setting up platform SENSOR")
+
     sensors = []
 
     values = coordinator.data.get("values", {})
@@ -71,8 +73,8 @@ async def async_setup_entry(
             DEFAULT_ENABLED_HTTP_METRICS + DEFAULT_DISABLED_HTTP_METRICS
         )
 
-    # Special metrics that have dedicated sensor classes
-    special_metrics = {"latency", "hpid"}
+    # Special metrics that have dedicated sensor classes (created explicitly below)
+    special_metrics = {"latency", "hpid", "tap_stop"}
 
     # Create entities using a hybrid approach:
     # - Disabled-by-default metrics: always create so they appear in the entity registry

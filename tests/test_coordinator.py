@@ -9,8 +9,10 @@ from custom_components.qvantum.coordinator import (
     QvantumDataUpdateCoordinator,
 )
 from custom_components.qvantum.const import (
+    CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     DEFAULT_ENABLED_HTTP_METRICS,
+    DEFAULT_MODBUS_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     DHW_CAP_HYSTERESIS_C,
@@ -19,6 +21,7 @@ from custom_components.qvantum.const import (
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_SESSION_GAP_SEC,
     DHW_SHOWER_DURATION_MIN,
+    MIN_MODBUS_SCAN_INTERVAL,
     REQUIRED_METRICS,
 )
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -250,6 +253,8 @@ class TestQvantumDataUpdateCoordinator:
         # Should return DEFAULT_ENABLED_HTTP_METRICS plus REQUIRED_METRICS
         expected_metrics = set(DEFAULT_ENABLED_HTTP_METRICS) | set(REQUIRED_METRICS)
         assert set(result) == expected_metrics
+        # Extra hot water stop timestamp must be fetched in HTTP mode
+        assert "tap_stop" in result
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_no_matching_entities(self, mock_super_init):
@@ -375,17 +380,148 @@ class TestQvantumDataUpdateCoordinator:
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_poll_interval_modbus_enabled_in_data(self, mock_super_init):
-        """Test that modbus in config_entry.data sets fast poll interval."""
+        """Test that modbus in config_entry.data sets default Modbus poll interval."""
         mock_super_init.return_value = None
 
         mock_hass = MagicMock()
         config_entry = MagicMock()
-        config_entry.options.get.side_effect = lambda key, default=None: default
+        # Empty options so CONF_MODBUS_TCP falls back to config_entry.data.
+        config_entry.options = {}
         config_entry.data = {CONF_MODBUS_TCP: True}
 
         coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
 
+        assert coordinator.modbus_enabled is True
+        assert coordinator.poll_interval == DEFAULT_MODBUS_SCAN_INTERVAL
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_poll_interval_modbus_uses_configured_interval(self, mock_super_init):
+        """Test that a configured Modbus scan interval is used when Modbus is enabled."""
+        mock_super_init.return_value = None
+
+        mock_hass = MagicMock()
+        config_entry = MagicMock()
+
+        def options_get(key, default=None):
+            if key == CONF_MODBUS_TCP:
+                return True
+            if key == CONF_MODBUS_SCAN_INTERVAL:
+                return MIN_MODBUS_SCAN_INTERVAL
+            return default
+
+        config_entry.options.get.side_effect = options_get
+        config_entry.data = {}
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
+
+        assert coordinator.poll_interval == MIN_MODBUS_SCAN_INTERVAL
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_poll_interval_modbus_enforces_minimum(self, mock_super_init):
+        """Test that Modbus poll interval is clamped to the configured minimum."""
+        mock_super_init.return_value = None
+
+        mock_hass = MagicMock()
+        config_entry = MagicMock()
+
+        def options_get(key, default=None):
+            if key == CONF_MODBUS_TCP:
+                return True
+            if key == CONF_MODBUS_SCAN_INTERVAL:
+                return MIN_MODBUS_SCAN_INTERVAL - 1
+            return default
+
+        config_entry.options.get.side_effect = options_get
+        config_entry.data = {}
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
+
+        assert coordinator.poll_interval == MIN_MODBUS_SCAN_INTERVAL
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_apply_poll_interval_updates_coordinator_interval(self, mock_super_init):
+        """apply_poll_interval should reschedule without changing Modbus enablement."""
+        mock_super_init.return_value = None
+
+        mock_hass = MagicMock()
+        config_entry = MagicMock()
+
+        def options_get(key, default=None):
+            if key == CONF_MODBUS_TCP:
+                return True
+            if key == CONF_MODBUS_SCAN_INTERVAL:
+                return 15
+            return default
+
+        config_entry.options.get.side_effect = options_get
+        config_entry.data = {}
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
+        coordinator.name = "qvantum"
         assert coordinator.poll_interval == 15
+
+        def options_get_new(key, default=None):
+            if key == CONF_MODBUS_TCP:
+                return True
+            if key == CONF_MODBUS_SCAN_INTERVAL:
+                return 8
+            return default
+
+        config_entry.options.get.side_effect = options_get_new
+
+        changed = coordinator.apply_poll_interval(config_entry)
+
+        assert changed is True
+        assert coordinator.poll_interval == 8
+        assert coordinator.update_interval.total_seconds() == 8
+        assert coordinator.modbus_enabled is True
+
+        # No-op when interval is unchanged
+        assert coordinator.apply_poll_interval(config_entry) is False
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_async_update_data_http_includes_tap_stop(self, mock_super_init):
+        """HTTP mode should request and surface tap_stop for the timer sensor."""
+        mock_super_init.return_value = None
+
+        mock_api = MagicMock()
+        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.get_metrics = AsyncMock(
+            return_value={
+                "metrics": {
+                    "hpid": "test_device_123",
+                    "tap_stop": 1712232000,
+                }
+            }
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+
+        mock_config_entry = MagicMock()
+        mock_config_entry.options.get.side_effect = lambda key, default=None: (
+            120 if key == CONF_SCAN_INTERVAL else default
+        )
+        mock_config_entry.data = {}
+        mock_config_entry.unique_id = "test_device_123"
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+        coordinator.api = mock_api
+        coordinator.hass = mock_hass
+        coordinator.modbus_enabled = False
+
+        result = await coordinator.async_update_data()
+
+        enabled_metrics = mock_api.get_metrics.await_args.kwargs["enabled_metrics"]
+        assert "tap_stop" in enabled_metrics
+        assert result["values"]["tap_stop"] == 1712232000
+        mock_api.get_http_metrics.assert_not_called()
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio

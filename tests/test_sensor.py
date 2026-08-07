@@ -41,6 +41,7 @@ with patch(
             QvantumCurrentEntity,
             QvantumDiagnosticEntity,
             QvantumTotalEnergyEntity,
+            QvantumTimerEntity,
             _get_sensor_type,
             async_setup_entry,
         )
@@ -70,6 +71,7 @@ def mock_coordinator():
             "qn8position": 1,  # Position sensor
             "tap_water_start": 3600,
             "tap_water_stop": 7200,
+            "tap_stop": 1712232000,
         },
     }
     return coordinator
@@ -398,6 +400,31 @@ class TestSensorSetup:
             "device_registry": mock_device_registry,
         }
         return hass
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_creates_single_tap_stop_timer(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """tap_stop must only be created once as QvantumTimerEntity (not also as a base sensor)."""
+        mock_entity_registry = mock_hass.data["entity_registry"]
+        mock_entity_registry.async_get.return_value = None
+        mock_entity_registry.async_update_entity = MagicMock()
+
+        def mock_async_add_entities(entities):
+            for sensor in entities:
+                sensor.entity_id = f"sensor.qvantum_{sensor._metric_key}_{sensor._hpid}"
+
+        async_add_entities = MagicMock(side_effect=mock_async_add_entities)
+
+        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        tap_stop_entities = [e for e in entities if e._metric_key == "tap_stop"]
+        unique_ids = [e._attr_unique_id for e in entities]
+
+        assert len(tap_stop_entities) == 1
+        assert isinstance(tap_stop_entities[0], QvantumTimerEntity)
+        assert unique_ids.count("qvantum_tap_stop_test_device_123") == 1
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_disables_default_disabled_entities(

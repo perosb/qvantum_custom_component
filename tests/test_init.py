@@ -191,6 +191,48 @@ class TestIntegrationSetup:
         mock_api.close.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_async_unload_entry_shuts_down_coordinators_before_api_close(
+        self, hass, mock_config_entry
+    ):
+        """Coordinators must stop before API close to avoid Modbus/session races."""
+        hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+        mock_api = MagicMock()
+        mock_api.close = AsyncMock()
+        hass.data["qvantum"] = mock_api
+
+        call_order: list[str] = []
+
+        mock_main_coordinator = MagicMock()
+        mock_main_coordinator._device = {"id": "test_device_123"}
+
+        async def shutdown_main():
+            call_order.append("main_shutdown")
+
+        async def shutdown_maint():
+            call_order.append("maint_shutdown")
+
+        async def close_api():
+            call_order.append("api_close")
+
+        mock_main_coordinator.async_shutdown = AsyncMock(side_effect=shutdown_main)
+        mock_maint_coordinator = MagicMock()
+        mock_maint_coordinator.async_shutdown = AsyncMock(side_effect=shutdown_maint)
+        mock_api.close = AsyncMock(side_effect=close_api)
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = mock_main_coordinator
+        mock_config_entry.runtime_data.maintenance_coordinator = mock_maint_coordinator
+
+        with patch("custom_components.qvantum.async_dismiss", new_callable=AsyncMock):
+            result = await async_unload_entry(hass, mock_config_entry)
+
+        assert result is True
+        assert call_order == ["maint_shutdown", "main_shutdown", "api_close"]
+        mock_main_coordinator.async_shutdown.assert_awaited_once()
+        mock_maint_coordinator.async_shutdown.assert_awaited_once()
+        mock_api.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_async_unload_entry_with_firmware_notifications(
         self, hass, mock_config_entry
     ):
@@ -200,15 +242,17 @@ class TestIntegrationSetup:
         mock_api = MagicMock()
         mock_api.close = AsyncMock()
 
-        # Mock firmware coordinator with device data
-        mock_firmware_coordinator = MagicMock()
+        # Mock main coordinator with device data (used for notification cleanup)
         mock_main_coordinator = MagicMock()
         mock_main_coordinator._device = {"id": "test_device_123"}
-        mock_firmware_coordinator.main_coordinator = mock_main_coordinator
+        mock_main_coordinator.async_shutdown = AsyncMock()
+        mock_firmware_coordinator = MagicMock()
+        mock_firmware_coordinator.async_shutdown = AsyncMock()
 
         # Add runtime_data to config entry
         mock_config_entry.runtime_data = MagicMock()
         mock_config_entry.runtime_data.api = mock_api
+        mock_config_entry.runtime_data.coordinator = mock_main_coordinator
         mock_config_entry.runtime_data.maintenance_coordinator = (
             mock_firmware_coordinator
         )
@@ -221,6 +265,8 @@ class TestIntegrationSetup:
             assert result is True
             hass.config_entries.async_unload_platforms.assert_called_once()
             mock_api.close.assert_awaited_once()
+            mock_main_coordinator.async_shutdown.assert_awaited_once()
+            mock_firmware_coordinator.async_shutdown.assert_awaited_once()
 
             # Verify async_dismiss was called for each firmware component
             expected_calls = [
@@ -242,13 +288,15 @@ class TestIntegrationSetup:
         mock_api = MagicMock()
         mock_api.close = AsyncMock()
 
-        mock_firmware_coordinator = MagicMock()
         mock_main_coordinator = MagicMock()
         mock_main_coordinator._device = {"id": "test_device_123"}
-        mock_firmware_coordinator.main_coordinator = mock_main_coordinator
+        mock_main_coordinator.async_shutdown = AsyncMock()
+        mock_firmware_coordinator = MagicMock()
+        mock_firmware_coordinator.async_shutdown = AsyncMock()
 
         mock_config_entry.runtime_data = MagicMock()
         mock_config_entry.runtime_data.api = mock_api
+        mock_config_entry.runtime_data.coordinator = mock_main_coordinator
         mock_config_entry.runtime_data.maintenance_coordinator = (
             mock_firmware_coordinator
         )
@@ -263,12 +311,113 @@ class TestIntegrationSetup:
             mock_api.close.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_async_update_listener(self, hass, mock_config_entry):
+    async def test_async_update_listener_reloads_without_runtime(
+        self, hass, mock_config_entry
+    ):
+        """Missing runtime_data still forces a full reload."""
         hass.config_entries.async_reload = AsyncMock()
+        mock_config_entry.runtime_data = None
 
         await _async_update_listener(hass, mock_config_entry)
 
-        hass.config_entries.async_reload.assert_called_once_with(mock_config_entry.entry_id)
+        hass.config_entries.async_reload.assert_called_once_with(
+            mock_config_entry.entry_id
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_update_listener_applies_interval_without_reload(
+        self, hass, mock_config_entry
+    ):
+        """Interval-only option changes must not tear down Modbus."""
+        hass.config_entries.async_reload = AsyncMock()
+
+        mock_api = MagicMock()
+        mock_api._modbus_tcp = True
+        mock_api._modbus_host = "Qvantum-HP"
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.api = mock_api
+        mock_coordinator.poll_interval = 15
+        mock_coordinator.apply_poll_interval = MagicMock(return_value=True)
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = mock_coordinator
+        mock_config_entry.options = {
+            "modbus_tcp": True,
+            "modbus_host": "Qvantum-HP",
+            "modbus_scan_interval": 10,
+        }
+        mock_config_entry.data = {}
+        mock_config_entry.title = "Qvantum"
+
+        await _async_update_listener(hass, mock_config_entry)
+
+        hass.config_entries.async_reload.assert_not_called()
+        mock_coordinator.apply_poll_interval.assert_called_once_with(mock_config_entry)
+
+    @pytest.mark.asyncio
+    async def test_async_update_listener_reloads_on_modbus_host_change(
+        self, hass, mock_config_entry
+    ):
+        """Changing Modbus host still requires a full reload."""
+        hass.config_entries.async_reload = AsyncMock()
+
+        mock_api = MagicMock()
+        mock_api._modbus_tcp = True
+        mock_api._modbus_host = "old-host"
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.api = mock_api
+        mock_coordinator.apply_poll_interval = MagicMock()
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = mock_coordinator
+        mock_config_entry.options = {
+            "modbus_tcp": True,
+            "modbus_host": "new-host",
+            "modbus_scan_interval": 10,
+        }
+        mock_config_entry.data = {}
+
+        await _async_update_listener(hass, mock_config_entry)
+
+        hass.config_entries.async_reload.assert_called_once_with(
+            mock_config_entry.entry_id
+        )
+        mock_coordinator.apply_poll_interval.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_async_update_listener_reloads_on_modbus_toggle(
+        self, hass, mock_config_entry
+    ):
+        """Enabling/disabling Modbus still requires a full reload."""
+        hass.config_entries.async_reload = AsyncMock()
+
+        mock_api = MagicMock()
+        mock_api._modbus_tcp = False
+        mock_api._modbus_host = "Qvantum-HP"
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.modbus_enabled = False
+        mock_coordinator.api = mock_api
+        mock_coordinator.apply_poll_interval = MagicMock()
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = mock_coordinator
+        mock_config_entry.options = {
+            "modbus_tcp": True,
+            "modbus_host": "Qvantum-HP",
+        }
+        mock_config_entry.data = {}
+
+        await _async_update_listener(hass, mock_config_entry)
+
+        hass.config_entries.async_reload.assert_called_once_with(
+            mock_config_entry.entry_id
+        )
+        mock_coordinator.apply_poll_interval.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_empty_device_metadata_fails(self, hass, mock_config_entry):

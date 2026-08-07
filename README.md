@@ -1,11 +1,11 @@
 [![qvantum_custom_component](https://img.shields.io/github/release/perosb/qvantum_custom_component/all.svg?label=current%20release)](https://github.com/perosb/qvantum_custom_component) [![downloads](https://img.shields.io/github/downloads/perosb/qvantum_custom_component/total?label=downloads)](https://github.com/perosb/qvantum_custom_component) [![codecov](https://codecov.io/gh/perosb/qvantum_custom_component/graph/badge.svg)](https://codecov.io/gh/perosb/qvantum_custom_component)
 
-## Qvantum Exhaust Air Heat Pump Integration for Home Assistant
+## Qvantum Heat Pump Integration for Home Assistant
 
 
 > [!CAUTION]
 >This custom component uses the same internal API for all metrics that is also used by the app.  
->It pulls live metrics from FLVP.  
+>It pulls live metrics from the heat pump.  
 >Use at your own risk ;)  
 
 > [!WARNING]
@@ -15,7 +15,7 @@
 
 ### Transform Your Home's Energy Efficiency with Qvantum
 
-Discover the power of intelligent home climate control with the Qvantum Exhaust Air Heat Pump integration for Home Assistant. Seamlessly monitor and control your Qvantum heat pump directly from your smart home dashboard, giving you unprecedented insight into your energy usage and system performance.
+Discover the power of intelligent home climate control with the Qvantum Heat Pump integration for Home Assistant. Seamlessly monitor and control your Qvantum heat pump directly from your smart home dashboard, giving you unprecedented insight into your energy usage and system performance.
 
 **Why choose this integration?**
 - **Complete Control**: Monitor temperatures, energy consumption, and system status in real-time

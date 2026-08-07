@@ -20,17 +20,20 @@ from .calculations import QvantumCalculationsMixin
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
+    DEFAULT_MODBUS_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     HP_STATUS_COOLING,
     HP_STATUS_DEFROSTING,
     HP_STATUS_HEATING,
     HP_STATUS_HOT_WATER,
+    MIN_MODBUS_SCAN_INTERVAL,
     SETTING_UPDATE_APPLIED,
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
     REQUIRED_METRICS,
     REQUIRED_MODBUS_METRICS,
+    CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
@@ -79,6 +82,33 @@ async def handle_setting_update_response(
 class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinator):
     """Qvantum coordinator."""
 
+    @staticmethod
+    def resolve_poll_interval(config_entry: ConfigEntry) -> tuple[bool, int]:
+        """Return (modbus_enabled, poll_interval_seconds) from a config entry."""
+        modbus_enabled = config_entry.options.get(
+            CONF_MODBUS_TCP,
+            config_entry.data.get(CONF_MODBUS_TCP, False),
+        )
+        if not modbus_enabled:
+            poll_interval = config_entry.options.get(
+                CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+            )
+            try:
+                return False, int(poll_interval)
+            except (TypeError, ValueError):
+                return False, DEFAULT_SCAN_INTERVAL
+
+        # Dedicated Modbus interval. Falls back to the historical 15s default
+        # when unset. Enforce a sensible minimum.
+        modbus_interval = config_entry.options.get(
+            CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL
+        )
+        try:
+            modbus_interval = int(modbus_interval)
+        except (TypeError, ValueError):
+            modbus_interval = DEFAULT_MODBUS_SCAN_INTERVAL
+        return True, max(modbus_interval, MIN_MODBUS_SCAN_INTERVAL)
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -90,18 +120,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         ``api`` should be provided by the integration setup. When omitted (e.g.
         in unit tests), falls back to ``hass.data[DOMAIN]`` for compatibility.
         """
-        self.poll_interval = config_entry.options.get(
-            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+        self.modbus_enabled, self.poll_interval = self.resolve_poll_interval(
+            config_entry
         )
-
-        # Modbus may be configured in options or in legacy config entry data.
-        self.modbus_enabled = config_entry.options.get(
-            CONF_MODBUS_TCP,
-            config_entry.data.get(CONF_MODBUS_TCP, False),
-        )
-
-        if self.modbus_enabled:
-            self.poll_interval = min(self.poll_interval, 15)  # Faster for Modbus
 
         if api is None:
             api = hass.data.get(DOMAIN)
@@ -158,6 +179,26 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             update_method=self.async_update_data,
             update_interval=timedelta(seconds=self.poll_interval),
         )
+
+    def apply_poll_interval(self, config_entry: ConfigEntry) -> bool:
+        """Apply poll-interval options in place without tearing down the entry.
+
+        Returns True when the interval changed. Does not change Modbus
+        enablement; callers must reload when transport settings change.
+        """
+        _, poll_interval = self.resolve_poll_interval(config_entry)
+        if poll_interval == self.poll_interval:
+            return False
+
+        self.poll_interval = poll_interval
+        # DataUpdateCoordinator reschedules when update_interval is assigned.
+        self.update_interval = timedelta(seconds=poll_interval)
+        _LOGGER.debug(
+            "Updated poll interval to %ss for %s",
+            poll_interval,
+            self.name,
+        )
+        return True
 
     async def async_restore_dhw_state(self) -> None:
         """Restore DHW EMA snapshot from persistent storage after a restart.
