@@ -161,6 +161,9 @@ class QvantumAPI:
         if getattr(self, "_session_owner", False) and self._session:
             try:
                 await self._session.close()
+            except asyncio.CancelledError:
+                self._session = None
+                raise
             except Exception as exc:
                 _LOGGER.debug("Error closing HTTP session: %s", exc)
             self._session = None

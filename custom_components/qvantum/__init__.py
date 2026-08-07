@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import inspect
 import logging
@@ -442,6 +443,8 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
                 continue
             try:
                 await coordinator.async_shutdown()
+            except asyncio.CancelledError:
+                raise
             except Exception as err:
                 _LOGGER.debug("Failed shutting down coordinator on unload: %s", err)
 
@@ -460,6 +463,9 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
     if hass.data.get(DOMAIN) is not None:
         try:
             await hass.data[DOMAIN].close()
+        except asyncio.CancelledError:
+            hass.data.pop(DOMAIN, None)
+            raise
         except Exception as err:
             _LOGGER.debug("Failed closing Qvantum API session on unload: %s", err)
         hass.data.pop(DOMAIN, None)
@@ -473,6 +479,8 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
                 if inspect.isawaitable(result):
                     await result
                 _LOGGER.debug("Cleared firmware notification %s", notification_id)
+            except asyncio.CancelledError:
+                raise
             except Exception as err:
                 _LOGGER.debug(
                     "Could not clear firmware notification %s: %s",

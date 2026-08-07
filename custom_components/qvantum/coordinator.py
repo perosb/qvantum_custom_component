@@ -173,7 +173,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         Returns True when the interval changed. Does not change Modbus
         enablement; callers must reload when transport settings change.
         """
-        _modbus_enabled, poll_interval = self.resolve_poll_interval(config_entry)
+        _, poll_interval = self.resolve_poll_interval(config_entry)
         if poll_interval == self.poll_interval:
             return False
 
