@@ -439,6 +439,47 @@ class TestQvantumDataUpdateCoordinator:
         assert coordinator.poll_interval == MIN_MODBUS_SCAN_INTERVAL
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_apply_poll_interval_updates_coordinator_interval(self, mock_super_init):
+        """apply_poll_interval should reschedule without changing Modbus enablement."""
+        mock_super_init.return_value = None
+
+        mock_hass = MagicMock()
+        config_entry = MagicMock()
+
+        def options_get(key, default=None):
+            if key == CONF_MODBUS_TCP:
+                return True
+            if key == CONF_MODBUS_SCAN_INTERVAL:
+                return 15
+            return default
+
+        config_entry.options.get.side_effect = options_get
+        config_entry.data = {}
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
+        coordinator.name = "qvantum"
+        assert coordinator.poll_interval == 15
+
+        def options_get_new(key, default=None):
+            if key == CONF_MODBUS_TCP:
+                return True
+            if key == CONF_MODBUS_SCAN_INTERVAL:
+                return 8
+            return default
+
+        config_entry.options.get.side_effect = options_get_new
+
+        changed = coordinator.apply_poll_interval(config_entry)
+
+        assert changed is True
+        assert coordinator.poll_interval == 8
+        assert coordinator.update_interval.total_seconds() == 8
+        assert coordinator.modbus_enabled is True
+
+        # No-op when interval is unchanged
+        assert coordinator.apply_poll_interval(config_entry) is False
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
     async def test_async_update_data_http_includes_tap_stop(self, mock_super_init):
         """HTTP mode should request and surface tap_stop for the timer sensor."""

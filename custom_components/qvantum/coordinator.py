@@ -82,29 +82,38 @@ async def handle_setting_update_response(
 class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinator):
     """Qvantum coordinator."""
 
-    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
-        """Initialize coordinator."""
-        self.poll_interval = config_entry.options.get(
-            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-        )
-
-        # Modbus may be configured in options or in legacy config entry data.
-        self.modbus_enabled = config_entry.options.get(
+    @staticmethod
+    def resolve_poll_interval(config_entry: ConfigEntry) -> tuple[bool, int]:
+        """Return (modbus_enabled, poll_interval_seconds) from a config entry."""
+        modbus_enabled = config_entry.options.get(
             CONF_MODBUS_TCP,
             config_entry.data.get(CONF_MODBUS_TCP, False),
         )
-
-        if self.modbus_enabled:
-            # Dedicated Modbus interval. Falls back to the
-            # historical 15s default when unset. Enforce a sensible minimum.
-            modbus_interval = config_entry.options.get(
-                CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL
+        if not modbus_enabled:
+            poll_interval = config_entry.options.get(
+                CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
             )
             try:
-                modbus_interval = int(modbus_interval)
+                return False, int(poll_interval)
             except (TypeError, ValueError):
-                modbus_interval = DEFAULT_MODBUS_SCAN_INTERVAL
-            self.poll_interval = max(modbus_interval, MIN_MODBUS_SCAN_INTERVAL)
+                return False, DEFAULT_SCAN_INTERVAL
+
+        # Dedicated Modbus interval. Falls back to the historical 15s default
+        # when unset. Enforce a sensible minimum.
+        modbus_interval = config_entry.options.get(
+            CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL
+        )
+        try:
+            modbus_interval = int(modbus_interval)
+        except (TypeError, ValueError):
+            modbus_interval = DEFAULT_MODBUS_SCAN_INTERVAL
+        return True, max(modbus_interval, MIN_MODBUS_SCAN_INTERVAL)
+
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+        """Initialize coordinator."""
+        self.modbus_enabled, self.poll_interval = self.resolve_poll_interval(
+            config_entry
+        )
 
         self.api = hass.data[DOMAIN]
         self._device = None
@@ -157,6 +166,26 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             update_method=self.async_update_data,
             update_interval=timedelta(seconds=self.poll_interval),
         )
+
+    def apply_poll_interval(self, config_entry: ConfigEntry) -> bool:
+        """Apply poll-interval options in place without tearing down the entry.
+
+        Returns True when the interval changed. Does not change Modbus
+        enablement; callers must reload when transport settings change.
+        """
+        _modbus_enabled, poll_interval = self.resolve_poll_interval(config_entry)
+        if poll_interval == self.poll_interval:
+            return False
+
+        self.poll_interval = poll_interval
+        # DataUpdateCoordinator reschedules when update_interval is assigned.
+        self.update_interval = timedelta(seconds=poll_interval)
+        _LOGGER.debug(
+            "Updated poll interval to %ss for %s",
+            poll_interval,
+            self.name,
+        )
+        return True
 
     async def async_restore_dhw_state(self) -> None:
         """Restore DHW EMA snapshot from persistent storage after a restart.
