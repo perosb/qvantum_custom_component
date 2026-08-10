@@ -1,0 +1,610 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Ekstra varmt vand"
+      },
+      "op_man_addition": {
+        "name": "Manuel driftstilstand: Tilsætning"
+      },
+      "op_man_dhw": {
+        "name": "Manuel driftstilstand: Varmt vand"
+      },
+      "op_mode": {
+        "name": "Manuel driftstilstand"
+      },
+      "man_mode": {
+        "name": "Manuel driftstilstand: Opvarmning"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: Varmt vand"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Opvarmning"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "SmartControl",
+        "state": {
+          "off": "Fra",
+          "0": "Eco",
+          "1": "Balanceret",
+          "2": "Komfort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH-tilstand",
+        "state": {
+          "0": "Eco",
+          "1": "Balanceret",
+          "2": "Komfort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW-tilstand",
+        "state": {
+          "0": "Eco",
+          "1": "Balanceret",
+          "2": "Komfort"
+        }
+      },
+      "use_operation_sensor": {
+        "name": "Kilde for indendørs sensor",
+        "state": {
+          "0": "Deaktiveret",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
+          "4": "Ekstern"
+        }
+      }
+    },
+    "button": {
+      "extra_tap_water_60min": {
+        "name": "Ekstra varmt vand i 60 min"
+      },
+      "elevate_access": {
+        "name": "Forhøj adgang"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Manuel driftstilstand: Tilsætning"
+      },
+      "op_man_cooling": {
+        "name": "Manuel driftstilstand: Køling"
+      },
+      "op_man_dhw": {
+        "name": "Manuel driftstilstand: Varmt vand"
+      },
+      "cooling_enabled": {
+        "name": "Køling aktiveret"
+      },
+      "use_adaptive": {
+        "name": "SmartControl"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: Varmt vand"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Opvarmning"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Ekstra effekt L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Ekstra effekt L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Ekstra effekt L3"
+      },
+      "picpin_relay_gp10": {
+        "name": "Cirkulationspumpe (GP10)"
+      },
+      "picpin_relay_qm10": {
+        "name": "Vejskifteventil, varmtvand/opvarmning (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Shuntventil tilskud (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Shuntventil tilskud (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Cirkulationspumpe (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Cirkulationspumpe"
+      },
+      "picpin_relay_ha12": {
+        "name": "Varme kreds pumper (HA12)"
+      },
+      "dhwdemand": {
+        "name": "Efterspørgsel efter varmt vand"
+      },
+      "heatingdemand": {
+        "name": "Efterspørgsel efter opvarmning"
+      },
+      "coolingdemand": {
+        "name": "Efterspørgsel efter køling"
+      },
+      "additiondemand": {
+        "name": "Efterspørgsel efter tilskud"
+      },
+      "additiondhwdemand": {
+        "name": "Efterspørgsel efter varmtvandstilskud"
+      },
+      "time_to_defrost": {
+        "name": "Tid til afrimning"
+      }
+    },
+    "sensor": {
+      "compressor_state": {
+        "name": "Kompresorstatus",
+        "state": {
+          "0": "Fra",
+          "1": "Ledig",
+          "2": "Forbereder opvarmning",
+          "3": "Forbereder køling",
+          "4": "Forbereder 1 til varmt vand",
+          "5": "Forbereder 2 til varmt vand",
+          "6": "Opvarmning",
+          "7": "Køling",
+          "8": "Varmt vand",
+          "9": "Afrimning af varmt vand passiv",
+          "10": "Afrimning af opvarmning passiv",
+          "11": "Forbereder pool",
+          "12": "Pool",
+          "13": "Afrimning af pool passiv"
+        }
+      },
+      "smart_dhw_control_status": {
+        "name": "Smart DHW control status",
+        "state": {
+          "0": "Venter på energipriser",
+          "1": "Standby",
+          "2": "Øger",
+          "3": "Sænker",
+          "4": "Sænker på lang sigt",
+          "5": "Pauset"
+        }
+      },
+      "powertotal": {
+        "name": "Samlet effekt"
+      },
+      "heatingpower": {
+        "name": "Varmeeffekt"
+      },
+      "dhwpower": {
+        "name": "Varmt vand effekt"
+      },
+      "compressor_power": {
+        "name": "Kompresoreffekt"
+      },
+      "heatingenergy": {
+        "name": "Varmeenergi"
+      },
+      "dhwenergy": {
+        "name": "Varmtvandsenergi"
+      },
+      "inputcurrent1": {
+        "name": "Indgangsstrøm L1"
+      },
+      "inputcurrent2": {
+        "name": "Indgangsstrøm L2"
+      },
+      "inputcurrent3": {
+        "name": "Indgangsstrøm L3"
+      },
+      "degree_minute": {
+        "name": "Gradminut"
+      },
+      "bf1_l_min": {
+        "name": "Flowføler for varmtvand (BF1)"
+      },
+      "bf1_rpm": {
+        "name": "Flowføler for pumperpm (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Lavtryksbar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Lavtrykstemp (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "Højtryksbar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "Højtrykstemp (BP2)"
+      },
+      "bt10": {
+        "name": "Kondensator temperatur ud (BT10)"
+      },
+      "bt12": {
+        "name": "Varmebærer, ekstern fremløbsledning (BT12)"
+      },
+      "bt13": {
+        "name": "Kondensator temperatur ind (BT13)"
+      },
+      "bt14": {
+        "name": "Udblæst lufttemperatur (BT14)"
+      },
+      "bt15": {
+        "name": "Indtag lufttemperatur (BT15)"
+      },
+      "bt20": {
+        "name": "Afkastledning (BT20)"
+      },
+      "bt21": {
+        "name": "Væskeledning (BT21)"
+      },
+      "bt22": {
+        "name": "Fordamper indløbstemp (BT22)"
+      },
+      "bt23": {
+        "name": "Sugledning (BT23)"
+      },
+      "bt31": {
+        "name": "Varmtvands primær, ladetemp ind (BT31)"
+      },
+      "bt33": {
+        "name": "Varmtvands sekundær, koldt vand ind (BT33)"
+      },
+      "bt34": {
+        "name": "Varmtvands sekundær, varmt vand ud (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Kompresorhastighed"
+      },
+      "dhw_outl_temp_15": {
+        "name": "Varmtvandsudgangstemperatur 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "Varmtvandsudgangstemperatur 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "Varmtvandsudgangstemperatur maks."
+      },
+      "dhw_prioritytime": {
+        "name": "Prioritetstid for varmt vand"
+      },
+      "fan0_10v": {
+        "name": "Ventilatorhastighed"
+      },
+      "fanrpm": {
+        "name": "Ventilatorhastighed"
+      },
+      "qn8position": {
+        "name": "Shuntventil, tilskud (QN8)"
+      },
+      "gp1_speed": {
+        "name": "Cirkulationspumpe (GP1)"
+      },
+      "gp2_speed": {
+        "name": "Varmtvandsladningspumpe (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Guide ønsket temperatur"
+      },
+      "guide_he": {
+        "name": "Guide opvarmning"
+      },
+      "man_mode": {
+        "name": "Manuel tilstand"
+      },
+      "op_mode": {
+        "name": "Driftstilstand",
+        "state": {
+          "0": "Auto",
+          "1": "Manuel",
+          "2": "Tilskud"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Driftstilstandssensor"
+      },
+      "price_region": {
+        "name": "Prisregion"
+      },
+      "room_temp_ext": {
+        "name": "Rumtemperatur ekstern"
+      },
+      "compressorenergy": {
+        "name": "Kompresorenergi"
+      },
+      "totalenergy": {
+        "name": "Samlet energi"
+      },
+      "bt1": {
+        "name": "Outdoor (BT1)"
+      },
+      "bt2": {
+        "name": "Indoor (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Smart status for opvarmning"
+      },
+      "bt11": {
+        "name": "Varmebærer, fremløbsledning (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "Varmebærer, fremløbsledning, mål."
+      },
+      "start_cooling_temp": {
+        "name": "Starttemperatur for køling"
+      },
+      "bt30": {
+        "name": "Varmtvandsbeholder (BT30)"
+      },
+      "tap_water_start": {
+        "name": "Nedre grænse for varmtvandsbeholder"
+      },
+      "tap_water_stop": {
+        "name": "Øvre grænse for varmtvandsbeholder"
+      },
+      "tap_water_cap": {
+        "name": "Varmtvandskapacitet"
+      },
+      "tap_water_minutes": {
+        "name": "Varmt vand tilbage"
+      },
+      "additionalenergy": {
+        "name": "Ekstra energi"
+      },
+      "hpid": {
+        "name": "Id"
+      },
+      "smart_sh_mode": {
+        "name": "Smart SH-tilstand",
+        "state": {
+          "0": "Eco",
+          "1": "Balanceret",
+          "2": "Komfort"
+        }
+      },
+      "hp_status": {
+        "name": "Heat pump status",
+        "state": {
+          "0": "Ledig",
+          "1": "Defrosting",
+          "2": "Varmt vand",
+          "3": "Opvarmning",
+          "4": "Køling"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Smart status for varmt vand"
+      },
+      "smart_dhw_mode": {
+        "name": "Smart DHW-tilstand",
+        "state": {
+          "0": "Eco",
+          "1": "Balanceret",
+          "2": "Komfort"
+        }
+      },
+      "tap_stop": {
+        "name": "Ekstra varmtvandstop"
+      },
+      "ventilation_boost_stop": {
+        "name": "Boost ventilation stop"
+      },
+      "timestamp": {
+        "name": "Sidste opdatering"
+      },
+      "latency": {
+        "name": "Latency"
+      },
+      "disconnect_reason": {
+        "name": "Afbrydelsesårsag",
+        "state": {
+          "client-disconnect": "Klient afbrudt"
+        }
+      },
+      "heatingreleased": {
+        "name": "Opvarmning frigivet"
+      },
+      "coolingreleased": {
+        "name": "Køling frigivet"
+      },
+      "compressorreleased": {
+        "name": "Kompresor frigivet"
+      },
+      "additionreleased": {
+        "name": "Ekstra frigivet"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "Tid tilbage af varmtvandsprioritet"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Tid tilbage af varmeprioritet"
+      },
+      "cooling_prioritytimeleft": {
+        "name": "Tid tilbage af køleprioritet"
+      },
+      "switch_state": {
+        "name": "Kontaktstatus"
+      },
+      "dhwstop_temp": {
+        "name": "Stoptemperatur for varmt vand"
+      },
+      "dhwstart_temp": {
+        "name": "Starttemperatur for varmt vand"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Filtreret udetemperatur (60 s)"
+      },
+      "max_freq_env": {
+        "name": "Maks. frekvens i miljøet"
+      },
+      "calc_suppy_cpr": {
+        "name": "Beregnet forsynings-CPR"
+      },
+      "dhw_set": {
+        "name": "Varmtvandsindstilling"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "BP1-temp 20 min filter"
+      },
+      "max_bp2_env": {
+        "name": "Maks. BP2 i miljøet"
+      },
+      "picpin_mask": {
+        "name": "PIC-pinmaske"
+      },
+      "firmware_display_fw_version": {
+        "name": "Visningsfirmwareversion"
+      },
+      "firmware_cc_fw_version": {
+        "name": "CC-firmwareversion"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Omformerfirmwareversion"
+      },
+      "firmware_last_check": {
+        "name": "Firmware sidst kontrolleret"
+      },
+      "expires_at": {
+        "name": "Udløbstid for forhøjet adgang"
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Parallel kurveoffset"
+      },
+      "tap_water_capacity_target": {
+        "name": "Mål for varmtvandskapacitet"
+      },
+      "room_comp_factor": {
+        "name": "Rumkompensationsfaktor"
+      },
+      "tap_water_stop": {
+        "name": "Øvre temperaturgrænse for varmtvandsbeholder"
+      },
+      "tap_water_start": {
+        "name": "Nedre temperaturgrænse for varmtvandsbeholder"
+      },
+      "fan_normal": {
+        "name": "Normal ventilatorhastighed"
+      },
+      "fan_speed_2": {
+        "name": "Minimum ventilatorhastighed for kompressor"
+      },
+      "dhw_stop_extra": {
+        "name": "Stoptemperatur for ekstra varmt vand"
+      },
+      "room_temp_external": {
+        "name": "Ekstern indetemperatur"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Indeklima"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Ventilatorhastighed",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Fra",
+              "normal": "Normal",
+              "extra": "Ekstra"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Qvantum varmepumpe",
+    "abort": {
+      "already_configured": "Enheden er allerede konfigureret",
+      "reconfigure_successful": "Genkonfiguration lykkedes"
+    },
+    "error": {
+      "cannot_connect": "Kunne ikke oprette forbindelse",
+      "invalid_auth": "Ugyldig autentifikation",
+      "unknown": "Uventet fejl"
+    },
+    "step": {
+      "user": {
+        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. By default it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
+        "data": {
+          "password": "Adgangskode",
+          "username": "Brugernavn",
+          "modbus_tcp": "Brug Modbus-læsning i stedet for HTTP-polling",
+          "modbus_write": "Aktivér skrivning via Modbus"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
+          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
+        }
+      },
+      "reconfigure": {
+        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. By default it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
+        "data": {
+          "password": "Adgangskode",
+          "username": "Brugernavn",
+          "modbus_tcp": "Brug Modbus-læsning i stedet for HTTP-polling",
+          "modbus_write": "Aktivér skrivning via Modbus",
+          "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
+          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
+          "modbus_scan_interval": "Hvor ofte der skal polles til varmepumpen over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "HTTP-scanningsinterval (sekunder)",
+          "modbus_tcp": "Brug Modbus-læsning i stedet for HTTP-polling",
+          "modbus_host": "Qvantum vært/IP",
+          "modbus_write": "Aktivér skrivning via Modbus",
+          "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
+          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
+          "modbus_scan_interval": "Hvor ofte der skal polles til varmepumpen over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder."
+        },
+        "description": "Ret dine indstillinger.",
+        "title": "Indstillinger"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Ekstra varmt vand",
+      "description": "Aktivér ekstra varmt vand i en periode",
+      "fields": {
+        "device_id": {
+          "name": "Enheds-ID",
+          "description": "Qvantum-enhedens ID"
+        },
+        "minutes": {
+          "name": "Minutter",
+          "description": "Minutter til at producere ekstra varmt vand (0 minutter slukker)"
+        }
+      }
+    }
+  }
+}
