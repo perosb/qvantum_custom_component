@@ -551,7 +551,7 @@
         },
         "data_description": {
           "modbus_tcp": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.\nModbus skal aktiveres i installerindstillingerne i pumpeappen/skærmen, før du aktiverer det her. Bemærk, at den kun læser via Modbus; skrivninger/kontroller sker stadig via HTTP API, medmindre skrivning via Modbus også er aktiveret, hvor visse kontroller skrives via Modbus.",
-          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdiers, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne."
+          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne."
         }
       },
       "reconfigure": {
@@ -565,7 +565,7 @@
         },
         "data_description": {
           "modbus_tcp": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.\nModbus skal aktiveres i installerindstillingerne i pumpeappen/skærmen, før du aktiverer det her. Bemærk, at den kun læser via Modbus; skrivninger/kontroller sker stadig via HTTP API, medmindre skrivning via Modbus også er aktiveret, hvor visse kontroller skrives via Modbus.",
-          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdiers, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne.",
+          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne.",
           "modbus_scan_interval": "Hvor ofte der skal polles til varmepumpen over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder."
         }
       }
@@ -583,7 +583,7 @@
         },
         "data_description": {
           "modbus_tcp": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.\nModbus skal aktiveres i installerindstillingerne i pumpeappen/skærmen, før du aktiverer det her. Bemærk, at den kun læser via Modbus; skrivninger/kontroller sker stadig via HTTP API, medmindre skrivning via Modbus også er aktiveret, hvor visse kontroller skrives via Modbus.",
-          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdiers, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne.",
+          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne.",
           "modbus_scan_interval": "Hvor ofte der skal polles til varmepumpen over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder."
         },
         "description": "Ret dine indstillinger.",
