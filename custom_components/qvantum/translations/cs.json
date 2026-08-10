@@ -1,0 +1,610 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Extra teplá voda"
+      },
+      "op_man_addition": {
+        "name": "Ruční provozní režim: Příplatek"
+      },
+      "op_man_dhw": {
+        "name": "Ruční provozní režim: Teplá voda"
+      },
+      "op_mode": {
+        "name": "Ruční provozní režim"
+      },
+      "man_mode": {
+        "name": "Ruční provozní režim: Topení"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: TUV"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Topení"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "SmartControl",
+        "state": {
+          "off": "Vypnuto",
+          "0": "Eco",
+          "1": "Vyrovnané",
+          "2": "Komfort"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Režim Smart SH",
+        "state": {
+          "0": "Eco",
+          "1": "Vyrovnané",
+          "2": "Komfort"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Režim Smart DHW",
+        "state": {
+          "0": "Eco",
+          "1": "Vyrovnané",
+          "2": "Komfort"
+        }
+      },
+      "use_operation_sensor": {
+        "name": "Zdroj vnitřního senzoru",
+        "state": {
+          "0": "Zakázáno",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
+          "4": "Externí"
+        }
+      }
+    },
+    "button": {
+      "extra_tap_water_60min": {
+        "name": "Extra teplá voda 60 min"
+      },
+      "elevate_access": {
+        "name": "Zvýšit přístup"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Ruční provozní režim: Příplatek"
+      },
+      "op_man_cooling": {
+        "name": "Ruční provozní režim: Chlazení"
+      },
+      "op_man_dhw": {
+        "name": "Ruční provozní režim: Teplá voda"
+      },
+      "cooling_enabled": {
+        "name": "Chlazení povoleno"
+      },
+      "use_adaptive": {
+        "name": "SmartControl"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: TUV"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Topení"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Dodatečný výkon L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Dodatečný výkon L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Dodatečný výkon L3"
+      },
+      "picpin_relay_gp10": {
+        "name": "Oběhové čerpadlo (GP10)"
+      },
+      "picpin_relay_qm10": {
+        "name": "Přepínací ventil, TUV/topení (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Přídavný šuntový ventil (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Přídavný šuntový ventil (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Oběhové čerpadlo (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Oběhové čerpadlo"
+      },
+      "picpin_relay_ha12": {
+        "name": "Čerpadlo vytápěcí smyčky (HA12)"
+      },
+      "dhwdemand": {
+        "name": "Poptávka po teplé vodě"
+      },
+      "heatingdemand": {
+        "name": "Poptávka po topení"
+      },
+      "coolingdemand": {
+        "name": "Poptávka po chlazení"
+      },
+      "additiondemand": {
+        "name": "Poptávka po příplatku"
+      },
+      "additiondhwdemand": {
+        "name": "Poptávka po teplé vodě ve formě příplatku"
+      },
+      "time_to_defrost": {
+        "name": "Doba odmrazování"
+      }
+    },
+    "sensor": {
+      "compressor_state": {
+        "name": "Stav kompresoru",
+        "state": {
+          "0": "Vypnuto",
+          "1": "Nečinný",
+          "2": "Příprava na topení",
+          "3": "Příprava na chlazení",
+          "4": "Příprava 1 pro teplou vodu",
+          "5": "Příprava 2 pro teplou vodu",
+          "6": "Topení",
+          "7": "Chlazení",
+          "8": "Teplá voda",
+          "9": "Pasivní odmrazování teplé vody",
+          "10": "Pasivní odmrazování topení",
+          "11": "Příprava na bazén",
+          "12": "Bazén",
+          "13": "Pasivní odmrazování bazénu"
+        }
+      },
+      "smart_dhw_control_status": {
+        "name": "Stav Smart DHW",
+        "state": {
+          "0": "Čekání na ceny energií",
+          "1": "Pohotovost",
+          "2": "Zvyšování",
+          "3": "Snižování",
+          "4": "Dlouhodobé snižování",
+          "5": "Pozastaveno"
+        }
+      },
+      "powertotal": {
+        "name": "Celkový výkon"
+      },
+      "heatingpower": {
+        "name": "Výkon topení"
+      },
+      "dhwpower": {
+        "name": "Výkon teplé vody"
+      },
+      "compressor_power": {
+        "name": "Výkon kompresoru"
+      },
+      "heatingenergy": {
+        "name": "Energie topení"
+      },
+      "dhwenergy": {
+        "name": "Energie teplé vody"
+      },
+      "inputcurrent1": {
+        "name": "Příkon L1"
+      },
+      "inputcurrent2": {
+        "name": "Příkon L2"
+      },
+      "inputcurrent3": {
+        "name": "Příkon L3"
+      },
+      "degree_minute": {
+        "name": "Stupně/minuta"
+      },
+      "bf1_l_min": {
+        "name": "Čidlo průtoku TUV (BF1)"
+      },
+      "bf1_rpm": {
+        "name": "Rychlost čerpadla čidla průtoku TUV (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Nízký tlak bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Nízká teplota tlaku (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "Vysoký tlak bar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "Vysoká teplota tlaku (BP2)"
+      },
+      "bt10": {
+        "name": "Teplota kondenzátoru ven (BT10)"
+      },
+      "bt12": {
+        "name": "Tepelný nosič, vnější přívod (BT12)"
+      },
+      "bt13": {
+        "name": "Teplota kondenzátoru dovnitř (BT13)"
+      },
+      "bt14": {
+        "name": "Teplota odpadního vzduchu (BT14)"
+      },
+      "bt15": {
+        "name": "Teplota nasávaného vzduchu (BT15)"
+      },
+      "bt20": {
+        "name": "Výstupní trubka (BT20)"
+      },
+      "bt21": {
+        "name": "Kapalinová trubka (BT21)"
+      },
+      "bt22": {
+        "name": "Vstupní teplota výparníku (BT22)"
+      },
+      "bt23": {
+        "name": "Sací trubka (BT23)"
+      },
+      "bt31": {
+        "name": "Primární TUV, teplota nabíjení vstup (BT31)"
+      },
+      "bt33": {
+        "name": "Sekundární TUV, studená voda vstup (BT33)"
+      },
+      "bt34": {
+        "name": "Sekundární TUV, teplá voda výstup (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Rychlost kompresoru"
+      },
+      "dhw_outl_temp_15": {
+        "name": "Výstupní teplota TUV 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "Výstupní teplota TUV 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "Maximální výstupní teplota TUV"
+      },
+      "dhw_prioritytime": {
+        "name": "Prioritní doba TUV"
+      },
+      "fan0_10v": {
+        "name": "Rychlost ventilátoru"
+      },
+      "fanrpm": {
+        "name": "Rychlost ventilátoru"
+      },
+      "qn8position": {
+        "name": "Šuntový ventil, příplatek (QN8)"
+      },
+      "gp1_speed": {
+        "name": "Oběhové čerpadlo (GP1)"
+      },
+      "gp2_speed": {
+        "name": "Čerpadlo nabíjení TUV (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Cílová teplota"
+      },
+      "guide_he": {
+        "name": "Návod k topení"
+      },
+      "man_mode": {
+        "name": "Ruční režim"
+      },
+      "op_mode": {
+        "name": "Provozní režim",
+        "state": {
+          "0": "Auto",
+          "1": "Ruční",
+          "2": "Příplatek"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Snímač provozního režimu"
+      },
+      "price_region": {
+        "name": "Cenová oblast"
+      },
+      "room_temp_ext": {
+        "name": "Venkovní teplota místnosti"
+      },
+      "compressorenergy": {
+        "name": "Energie kompresoru"
+      },
+      "totalenergy": {
+        "name": "Celková energie"
+      },
+      "bt1": {
+        "name": "Outdoor (BT1)"
+      },
+      "bt2": {
+        "name": "Indoor (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Stav Smart pro topení"
+      },
+      "bt11": {
+        "name": "Tepelný medián, přívodní potrubí (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "Tepelný medián, přívodní potrubí, cíl."
+      },
+      "start_cooling_temp": {
+        "name": "Teplota spuštění chlazení"
+      },
+      "bt30": {
+        "name": "Nádrž teplé vody (BT30)"
+      },
+      "tap_water_start": {
+        "name": "Dolní hranice nádrže teplé vody"
+      },
+      "tap_water_stop": {
+        "name": "Horní hranice nádrže teplé vody"
+      },
+      "tap_water_cap": {
+        "name": "Kapacita teplé vody"
+      },
+      "tap_water_minutes": {
+        "name": "Zbývající teplá voda"
+      },
+      "additionalenergy": {
+        "name": "Dodatečná energie"
+      },
+      "hpid": {
+        "name": "ID"
+      },
+      "smart_sh_mode": {
+        "name": "Režim Smart SH",
+        "state": {
+          "0": "Eco",
+          "1": "Vyrovnané",
+          "2": "Komfort"
+        }
+      },
+      "hp_status": {
+        "name": "Status tepelného čerpadla",
+        "state": {
+          "0": "Nečinný",
+          "1": "Odmrazování",
+          "2": "Teplá voda",
+          "3": "Topení",
+          "4": "Chlazení"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Stav Smart pro teplou vodu"
+      },
+      "smart_dhw_mode": {
+        "name": "Režim Smart DHW",
+        "state": {
+          "0": "Eco",
+          "1": "Vyrovnané",
+          "2": "Komfort"
+        }
+      },
+      "tap_stop": {
+        "name": "Zastavení extra teplé vody"
+      },
+      "ventilation_boost_stop": {
+        "name": "Zastavení zvýšeného větrání"
+      },
+      "timestamp": {
+        "name": "Poslední aktualizace"
+      },
+      "latency": {
+        "name": "Latence"
+      },
+      "disconnect_reason": {
+        "name": "Důvod odpojení",
+        "state": {
+          "client-disconnect": "Klient odpojen"
+        }
+      },
+      "heatingreleased": {
+        "name": "Vypuštěno topení"
+      },
+      "coolingreleased": {
+        "name": "Vypuštěno chlazení"
+      },
+      "compressorreleased": {
+        "name": "Vypuštěn kompresor"
+      },
+      "additionreleased": {
+        "name": "Vypuštěno navíc"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "Zbývající doba priority TUV"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Zbývající doba priority topení"
+      },
+      "cooling_prioritytimeleft": {
+        "name": "Zbývající doba priority chlazení"
+      },
+      "switch_state": {
+        "name": "Stav spínače"
+      },
+      "dhwstop_temp": {
+        "name": "Teplota zastavení TUV"
+      },
+      "dhwstart_temp": {
+        "name": "Teplota spuštění TUV"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Filtrovaná venkovní teplota (60 s)"
+      },
+      "max_freq_env": {
+        "name": "Maximální frekvence prostředí"
+      },
+      "calc_suppy_cpr": {
+        "name": "Vypočítaný přísun CPR"
+      },
+      "dhw_set": {
+        "name": "Nastavení TUV"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "Filtr teploty BP1 20 min"
+      },
+      "max_bp2_env": {
+        "name": "Maximální prostředí BP2"
+      },
+      "picpin_mask": {
+        "name": "Maska pinů PIC"
+      },
+      "firmware_display_fw_version": {
+        "name": "Verze firmwaru displeje"
+      },
+      "firmware_cc_fw_version": {
+        "name": "Verze firmwaru CC"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Verze firmwaru měniče"
+      },
+      "firmware_last_check": {
+        "name": "Naposledy zkontrolovaný firmware"
+      },
+      "expires_at": {
+        "name": "Vypršení zvýšeného přístupu"
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Posun paralelní křivky"
+      },
+      "tap_water_capacity_target": {
+        "name": "Cílová kapacita teplé vody"
+      },
+      "room_comp_factor": {
+        "name": "Faktor kompenzace místnosti"
+      },
+      "tap_water_stop": {
+        "name": "Horní teplotní limit nádrže teplé vody"
+      },
+      "tap_water_start": {
+        "name": "Dolní teplotní limit nádrže teplé vody"
+      },
+      "fan_normal": {
+        "name": "Normální rychlost ventilátoru"
+      },
+      "fan_speed_2": {
+        "name": "Minimální rychlost ventilátoru pro kompresor"
+      },
+      "dhw_stop_extra": {
+        "name": "Teplota zastavení extra teplé vody"
+      },
+      "room_temp_external": {
+        "name": "Venkovní teplota v místnosti"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Vnitřní klima"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Rychlost ventilátoru",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Vypnuto",
+              "normal": "Normální",
+              "extra": "Extra"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Qvantum tepelné čerpadlo",
+    "abort": {
+      "already_configured": "Zařízení je již nakonfigurováno",
+      "reconfigure_successful": "Znovu nastavení proběhlo úspěšně"
+    },
+    "error": {
+      "cannot_connect": "Nepodařilo se připojit",
+      "invalid_auth": "Neplatná autentizace",
+      "unknown": "Neočekávaná chyba"
+    },
+    "step": {
+      "user": {
+        "description": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Ve výchozím nastavení čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
+        "data": {
+          "password": "Heslo",
+          "username": "Uživatelské jméno",
+          "modbus_tcp": "Použít čtení přes Modbus místo HTTP dotazování",
+          "modbus_write": "Povolit zápis přes Modbus"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Všimněte si, že čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
+          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku."
+        }
+      },
+      "reconfigure": {
+        "description": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Ve výchozím nastavení čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
+        "data": {
+          "password": "Heslo",
+          "username": "Uživatelské jméno",
+          "modbus_tcp": "Použít čtení přes Modbus místo HTTP dotazování",
+          "modbus_write": "Povolit zápis přes Modbus",
+          "modbus_scan_interval": "Interval skenování Modbus (sekundy)"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Všimněte si, že čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
+          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku.",
+          "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Interval skenování HTTP (sekundy)",
+          "modbus_tcp": "Použít čtení přes Modbus místo HTTP dotazování",
+          "modbus_host": "Host/IP Qvantum",
+          "modbus_write": "Povolit zápis přes Modbus",
+          "modbus_scan_interval": "Interval skenování Modbus (sekundy)"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Všimněte si, že čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
+          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku.",
+          "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund."
+        },
+        "description": "Upravte své možnosti.",
+        "title": "Možnosti"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Extra teplá voda",
+      "description": "Aktivovat extra teplou vodu po určitou dobu",
+      "fields": {
+        "device_id": {
+          "name": "ID zařízení",
+          "description": "ID zařízení Qvantum"
+        },
+        "minutes": {
+          "name": "Minuty",
+          "description": "Minuty pro výrobu extra teplé vody (0 minut vypne)"
+        }
+      }
+    }
+  }
+}
