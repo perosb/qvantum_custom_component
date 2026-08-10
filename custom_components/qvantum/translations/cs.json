@@ -165,7 +165,7 @@
         }
       },
       "smart_dhw_control_status": {
-        "name": "Smart DHW control status",
+        "name": "Stav Smart DHW",
         "state": {
           "0": "Čekání na ceny energií",
           "1": "Pohotovost",
@@ -375,10 +375,10 @@
         }
       },
       "hp_status": {
-        "name": "Heat pump status",
+        "name": "Status tepelného čerpadla",
         "state": {
           "0": "Nečinný",
-          "1": "Defrosting",
+          "1": "Odmrazování",
           "2": "Teplá voda",
           "3": "Topení",
           "4": "Chlazení"
@@ -399,7 +399,7 @@
         "name": "Zastavení extra teplé vody"
       },
       "ventilation_boost_stop": {
-        "name": "Boost ventilation stop"
+        "name": "Zastavení zvýšeného větrání"
       },
       "timestamp": {
         "name": "Poslední aktualizace"
@@ -542,7 +542,7 @@
     },
     "step": {
       "user": {
-        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. By default it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
+        "description": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Ve výchozím nastavení čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
         "data": {
           "password": "Heslo",
           "username": "Uživatelské jméno",
@@ -550,12 +550,12 @@
           "modbus_write": "Povolit zápis přes Modbus"
         },
         "data_description": {
-          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
-          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
+          "modbus_tcp": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Všimněte si, že čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
+          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku."
         }
       },
       "reconfigure": {
-        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. By default it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
+        "description": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Ve výchozím nastavení čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
         "data": {
           "password": "Heslo",
           "username": "Uživatelské jméno",
@@ -564,8 +564,8 @@
           "modbus_scan_interval": "Interval skenování Modbus (sekundy)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
-          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
+          "modbus_tcp": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Všimněte si, že čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
+          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku.",
           "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund."
         }
       }
@@ -582,8 +582,8 @@
           "modbus_scan_interval": "Interval skenování Modbus (sekundy)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
-          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
+          "modbus_tcp": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Všimněte si, že čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
+          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku.",
           "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund."
         },
         "description": "Upravte své možnosti.",

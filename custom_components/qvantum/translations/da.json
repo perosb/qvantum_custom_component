@@ -165,7 +165,7 @@
         }
       },
       "smart_dhw_control_status": {
-        "name": "Smart DHW control status",
+        "name": "Smart DHW-kontrolstatus",
         "state": {
           "0": "Venter på energipriser",
           "1": "Standby",
@@ -375,10 +375,10 @@
         }
       },
       "hp_status": {
-        "name": "Heat pump status",
+        "name": "Varmepumpestatus",
         "state": {
           "0": "Ledig",
-          "1": "Defrosting",
+          "1": "Afrimning",
           "2": "Varmt vand",
           "3": "Opvarmning",
           "4": "Køling"
@@ -399,7 +399,7 @@
         "name": "Ekstra varmtvandstop"
       },
       "ventilation_boost_stop": {
-        "name": "Boost ventilation stop"
+        "name": "Stop for boost-ventilation"
       },
       "timestamp": {
         "name": "Sidste opdatering"
@@ -542,7 +542,7 @@
     },
     "step": {
       "user": {
-        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. By default it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
+        "description": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.\nModbus skal aktiveres i installerindstillingerne i pumpeappen/skærmen, før du aktiverer det her. Som standard læser den kun via Modbus; skrivninger/kontroller sker stadig via HTTP API, medmindre skrivning via Modbus også er aktiveret, hvor visse kontroller skrives via Modbus.",
         "data": {
           "password": "Adgangskode",
           "username": "Brugernavn",
@@ -550,12 +550,12 @@
           "modbus_write": "Aktivér skrivning via Modbus"
         },
         "data_description": {
-          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
-          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
+          "modbus_tcp": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.\nModbus skal aktiveres i installerindstillingerne i pumpeappen/skærmen, før du aktiverer det her. Bemærk, at den kun læser via Modbus; skrivninger/kontroller sker stadig via HTTP API, medmindre skrivning via Modbus også er aktiveret, hvor visse kontroller skrives via Modbus.",
+          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdiers, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne."
         }
       },
       "reconfigure": {
-        "description": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. By default it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
+        "description": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.\nModbus skal aktiveres i installerindstillingerne i pumpeappen/skærmen, før du aktiverer det her. Som standard læser den kun via Modbus; skrivninger/kontroller sker stadig via HTTP API, medmindre skrivning via Modbus også er aktiveret, hvor visse kontroller skrives via Modbus.",
         "data": {
           "password": "Adgangskode",
           "username": "Brugernavn",
@@ -564,8 +564,8 @@
           "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
-          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
+          "modbus_tcp": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.\nModbus skal aktiveres i installerindstillingerne i pumpeappen/skærmen, før du aktiverer det her. Bemærk, at den kun læser via Modbus; skrivninger/kontroller sker stadig via HTTP API, medmindre skrivning via Modbus også er aktiveret, hvor visse kontroller skrives via Modbus.",
+          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdiers, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne.",
           "modbus_scan_interval": "Hvor ofte der skal polles til varmepumpen over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder."
         }
       }
@@ -582,8 +582,8 @@
           "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus will give you near realtime metrics by reading directly from the device.\nModbus must be enabled in Installer settings on the pump app/display before enabling here. Note that it only reads via Modbus; writes/controls are still via HTTP API unless Modbus writing is also enabled, in which case certain controls are written via Modbus.",
-          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
+          "modbus_tcp": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.\nModbus skal aktiveres i installerindstillingerne i pumpeappen/skærmen, før du aktiverer det her. Bemærk, at den kun læser via Modbus; skrivninger/kontroller sker stadig via HTTP API, medmindre skrivning via Modbus også er aktiveret, hvor visse kontroller skrives via Modbus.",
+          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdiers, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne.",
           "modbus_scan_interval": "Hvor ofte der skal polles til varmepumpen over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder."
         },
         "description": "Ret dine indstillinger.",

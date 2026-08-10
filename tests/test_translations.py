@@ -15,10 +15,18 @@ def test_danish_and_czech_translations_are_available():
         "da": {
             "config_title": "Qvantum varmepumpe",
             "powertotal": "Samlet effekt",
+            "smart_dhw_control_status": "Smart DHW-kontrolstatus",
+            "hp_status_name": "Varmepumpestatus",
+            "hp_status_defrosting": "Afrimning",
+            "config_description": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.",
         },
         "cs": {
             "config_title": "Qvantum tepelné čerpadlo",
             "powertotal": "Celkový výkon",
+            "smart_dhw_control_status": "Stav Smart DHW",
+            "hp_status_name": "Status tepelného čerpadla",
+            "hp_status_defrosting": "Odmrazování",
+            "config_description": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.",
         },
     }
 
@@ -29,3 +37,10 @@ def test_danish_and_czech_translations_are_available():
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["config"]["title"] == expected["config_title"]
         assert data["entity"]["sensor"]["powertotal"]["name"] == expected["powertotal"]
+        assert (
+            data["entity"]["sensor"]["smart_dhw_control_status"]["name"]
+            == expected["smart_dhw_control_status"]
+        )
+        assert data["entity"]["sensor"]["hp_status"]["name"] == expected["hp_status_name"]
+        assert data["entity"]["sensor"]["hp_status"]["state"]["1"] == expected["hp_status_defrosting"]
+        assert expected["config_description"] in data["config"]["step"]["user"]["description"]
