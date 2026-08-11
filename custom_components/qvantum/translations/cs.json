@@ -10,7 +10,7 @@
         "name": "Extra teplá voda"
       },
       "op_man_addition": {
-        "name": "Ruční provozní režim: Příplatek"
+        "name": "Ruční provozní režim: Přídavný ohřev"
       },
       "op_man_dhw": {
         "name": "Ruční provozní režim: Teplá voda"
@@ -70,12 +70,12 @@
         "name": "Extra teplá voda 60 min"
       },
       "elevate_access": {
-        "name": "Zvýšit přístup"
+        "name": "Zvýšit oprávnění"
       }
     },
     "binary_sensor": {
       "op_man_addition": {
-        "name": "Ruční provozní režim: Příplatek"
+        "name": "Ruční provozní režim: Přídavný ohřev"
       },
       "op_man_cooling": {
         "name": "Ruční provozní režim: Chlazení"
@@ -111,10 +111,10 @@
         "name": "Přepínací ventil, TUV/topení (QM10)"
       },
       "picpin_relay_qn8_1": {
-        "name": "Přídavný šuntový ventil (QN8_1)"
+        "name": "Směšovací ventil přídavného ohřevu (QN8_1)"
       },
       "picpin_relay_qn8_2": {
-        "name": "Přídavný šuntový ventil (QN8_2)"
+        "name": "Směšovací ventil přídavného ohřevu (QN8_2)"
       },
       "picpin_relay_gp3": {
         "name": "Oběhové čerpadlo (GP3)"
@@ -135,10 +135,10 @@
         "name": "Poptávka po chlazení"
       },
       "additiondemand": {
-        "name": "Poptávka po příplatku"
+        "name": "Požadavek přídavného ohřevu"
       },
       "additiondhwdemand": {
-        "name": "Poptávka po teplé vodě ve formě příplatku"
+        "name": "Požadavek přídavného ohřevu TUV"
       },
       "time_to_defrost": {
         "name": "Doba odmrazování"
@@ -165,7 +165,7 @@
         }
       },
       "smart_dhw_control_status": {
-        "name": "Stav Smart DHW",
+        "name": "Stav řízení Smart DHW",
         "state": {
           "0": "Čekání na ceny energií",
           "1": "Pohotovost",
@@ -209,7 +209,7 @@
         "name": "Čidlo průtoku TUV (BF1)"
       },
       "bf1_rpm": {
-        "name": "Rychlost čerpadla čidla průtoku TUV (BF1)"
+        "name": "Rychlost čerpadla průtoku TUV (BF1)"
       },
       "bp1_pressure": {
         "name": "Nízký tlak bar (BP1)"
@@ -227,7 +227,7 @@
         "name": "Teplota kondenzátoru ven (BT10)"
       },
       "bt12": {
-        "name": "Tepelný nosič, vnější přívod (BT12)"
+        "name": "Topné médium, vnější přívod (BT12)"
       },
       "bt13": {
         "name": "Teplota kondenzátoru dovnitř (BT13)"
@@ -239,7 +239,7 @@
         "name": "Teplota nasávaného vzduchu (BT15)"
       },
       "bt20": {
-        "name": "Výstupní trubka (BT20)"
+        "name": "Výtlačné potrubí (BT20)"
       },
       "bt21": {
         "name": "Kapalinová trubka (BT21)"
@@ -281,7 +281,7 @@
         "name": "Rychlost ventilátoru"
       },
       "qn8position": {
-        "name": "Šuntový ventil, příplatek (QN8)"
+        "name": "Směšovací ventil, přídavný ohřev (QN8)"
       },
       "gp1_speed": {
         "name": "Oběhové čerpadlo (GP1)"
@@ -290,10 +290,10 @@
         "name": "Čerpadlo nabíjení TUV (GP2)"
       },
       "guide_des_temp": {
-        "name": "Cílová teplota"
+        "name": "Řídicí požadovaná teplota"
       },
       "guide_he": {
-        "name": "Návod k topení"
+        "name": "Řídicí topení"
       },
       "man_mode": {
         "name": "Ruční režim"
@@ -303,7 +303,7 @@
         "state": {
           "0": "Auto",
           "1": "Ruční",
-          "2": "Příplatek"
+          "2": "Přídavný ohřev"
         }
       },
       "op_mode_sensor": {
@@ -313,7 +313,7 @@
         "name": "Cenová oblast"
       },
       "room_temp_ext": {
-        "name": "Venkovní teplota místnosti"
+        "name": "Externí teplota místnosti"
       },
       "compressorenergy": {
         "name": "Energie kompresoru"
@@ -322,10 +322,10 @@
         "name": "Celková energie"
       },
       "bt1": {
-        "name": "Outdoor (BT1)"
+        "name": "Venkovní teplota (BT1)"
       },
       "bt2": {
-        "name": "Indoor (BT2)"
+        "name": "Vnitřní teplota (BT2)"
       },
       "bt4": {
         "name": "BT4"
@@ -334,13 +334,13 @@
         "name": "BTX"
       },
       "smart_sh_status": {
-        "name": "Stav Smart pro topení"
+        "name": "Smart stav topení"
       },
       "bt11": {
-        "name": "Tepelný medián, přívodní potrubí (BT11)"
+        "name": "Topné médium, přívodní potrubí (BT11)"
       },
       "cal_heat_temp": {
-        "name": "Tepelný medián, přívodní potrubí, cíl."
+        "name": "Topné médium, přívodní potrubí, cíl"
       },
       "start_cooling_temp": {
         "name": "Teplota spuštění chlazení"
@@ -375,7 +375,7 @@
         }
       },
       "hp_status": {
-        "name": "Status tepelného čerpadla",
+        "name": "Stav tepelného čerpadla",
         "state": {
           "0": "Nečinný",
           "1": "Odmrazování",
@@ -385,7 +385,7 @@
         }
       },
       "smart_dhw_status": {
-        "name": "Stav Smart pro teplou vodu"
+        "name": "Smart stav teplé vody"
       },
       "smart_dhw_mode": {
         "name": "Režim Smart DHW",
@@ -414,16 +414,16 @@
         }
       },
       "heatingreleased": {
-        "name": "Vypuštěno topení"
+        "name": "Topení uvolněno"
       },
       "coolingreleased": {
-        "name": "Vypuštěno chlazení"
+        "name": "Chlazení uvolněno"
       },
       "compressorreleased": {
-        "name": "Vypuštěn kompresor"
+        "name": "Kompresor uvolněn"
       },
       "additionreleased": {
-        "name": "Vypuštěno navíc"
+        "name": "Přídavný ohřev uvolněn"
       },
       "dhw_prioritytimeleft": {
         "name": "Zbývající doba priority TUV"
@@ -435,7 +435,7 @@
         "name": "Zbývající doba priority chlazení"
       },
       "switch_state": {
-        "name": "Stav spínače"
+        "name": "Stav přepínače"
       },
       "dhwstop_temp": {
         "name": "Teplota zastavení TUV"
@@ -447,10 +447,10 @@
         "name": "Filtrovaná venkovní teplota (60 s)"
       },
       "max_freq_env": {
-        "name": "Maximální frekvence prostředí"
+        "name": "Max. frekvence prostředí"
       },
       "calc_suppy_cpr": {
-        "name": "Vypočítaný přísun CPR"
+        "name": "Vypočítaný přívod CPR"
       },
       "dhw_set": {
         "name": "Nastavení TUV"
@@ -459,7 +459,7 @@
         "name": "Filtr teploty BP1 20 min"
       },
       "max_bp2_env": {
-        "name": "Maximální prostředí BP2"
+        "name": "Max. prostředí BP2"
       },
       "picpin_mask": {
         "name": "Maska pinů PIC"
@@ -477,7 +477,7 @@
         "name": "Naposledy zkontrolovaný firmware"
       },
       "expires_at": {
-        "name": "Vypršení zvýšeného přístupu"
+        "name": "Vypršení zvýšených oprávnění"
       }
     },
     "number": {
@@ -506,7 +506,7 @@
         "name": "Teplota zastavení extra teplé vody"
       },
       "room_temp_external": {
-        "name": "Venkovní teplota v místnosti"
+        "name": "Externí vnitřní teplota"
       }
     },
     "climate": {
@@ -561,7 +561,7 @@
           "username": "Uživatelské jméno",
           "modbus_tcp": "Použít čtení přes Modbus místo HTTP dotazování",
           "modbus_write": "Povolit zápis přes Modbus",
-          "modbus_scan_interval": "Interval skenování Modbus (sekundy)"
+          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)"
         },
         "data_description": {
           "modbus_tcp": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Všimněte si, že čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",
@@ -575,11 +575,11 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Interval skenování HTTP (sekundy)",
+          "scan_interval": "Interval dotazování HTTP (sekundy)",
           "modbus_tcp": "Použít čtení přes Modbus místo HTTP dotazování",
           "modbus_host": "Host/IP Qvantum",
           "modbus_write": "Povolit zápis přes Modbus",
-          "modbus_scan_interval": "Interval skenování Modbus (sekundy)"
+          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)"
         },
         "data_description": {
           "modbus_tcp": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.\nPřed aktivací zde je třeba v nastavení instalátora v aplikaci nebo displeji čerpadla povolit Modbus. Všimněte si, že čte pouze přes Modbus; zápisy a ovládání jsou stále přes HTTP API, pokud není povolen i zápis přes Modbus, kdy se některá ovládání zapisují přes Modbus.",

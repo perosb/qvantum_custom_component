@@ -15,7 +15,7 @@ def test_danish_and_czech_translations_are_available():
         "da": {
             "config_title": "Qvantum varmepumpe",
             "powertotal": "Samlet effekt",
-            "smart_dhw_control_status": "Smart DHW-kontrolstatus",
+            "smart_dhw_control_status": "Smart DHW-styringsstatus",
             "hp_status_name": "Varmepumpestatus",
             "hp_status_defrosting": "Afrimning",
             "config_description": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.",
@@ -23,8 +23,8 @@ def test_danish_and_czech_translations_are_available():
         "cs": {
             "config_title": "Qvantum tepelné čerpadlo",
             "powertotal": "Celkový výkon",
-            "smart_dhw_control_status": "Stav Smart DHW",
-            "hp_status_name": "Status tepelného čerpadla",
+            "smart_dhw_control_status": "Stav řízení Smart DHW",
+            "hp_status_name": "Stav tepelného čerpadla",
             "hp_status_defrosting": "Odmrazování",
             "config_description": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.",
         },
