@@ -1,0 +1,610 @@
+{
+  "device": {
+    "qvantum_flvp": {
+      "name": "Qvantum"
+    }
+  },
+  "entity": {
+    "switch": {
+      "extra_tap_water": {
+        "name": "Lisälämmin käyttövesi"
+      },
+      "op_man_addition": {
+        "name": "Manuaalinen käyttötila: Lisä"
+      },
+      "op_man_dhw": {
+        "name": "Manuaalinen käyttötila: Käyttövesi"
+      },
+      "op_mode": {
+        "name": "Manuaalinen käyttötila"
+      },
+      "man_mode": {
+        "name": "Manuaalinen käyttötila: Lämmitys"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: Käyttövesi"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Lämmitys"
+      }
+    },
+    "select": {
+      "use_adaptive": {
+        "name": "SmartControl",
+        "state": {
+          "off": "Pois",
+          "0": "Eco",
+          "1": "Tasapainoinen",
+          "2": "Mukavuus"
+        }
+      },
+      "smart_sh_mode": {
+        "name": "Älykäs lämmitystila",
+        "state": {
+          "0": "Eco",
+          "1": "Tasapainoinen",
+          "2": "Mukavuus"
+        }
+      },
+      "smart_dhw_mode": {
+        "name": "Älykäs käyttövesitila",
+        "state": {
+          "0": "Eco",
+          "1": "Tasapainoinen",
+          "2": "Mukavuus"
+        }
+      },
+      "use_operation_sensor": {
+        "name": "Sisäanturin lähde",
+        "state": {
+          "0": "Pois käytöstä",
+          "1": "BT2",
+          "2": "BT3",
+          "3": "AUX",
+          "4": "Ulkoinen"
+        }
+      }
+    },
+    "button": {
+      "extra_tap_water_60min": {
+        "name": "Lisälämmin käyttövesi 60 min"
+      },
+      "elevate_access": {
+        "name": "Korota käyttöoikeuksia"
+      }
+    },
+    "binary_sensor": {
+      "op_man_addition": {
+        "name": "Manuaalinen käyttötila: Lisä"
+      },
+      "op_man_cooling": {
+        "name": "Manuaalinen käyttötila: Jäähdytys"
+      },
+      "op_man_dhw": {
+        "name": "Manuaalinen käyttötila: Käyttövesi"
+      },
+      "cooling_enabled": {
+        "name": "Jäähdytys käytössä"
+      },
+      "use_adaptive": {
+        "name": "SmartControl"
+      },
+      "enable_sc_dhw": {
+        "name": "SmartControl: Käyttövesi"
+      },
+      "enable_sc_sh": {
+        "name": "SmartControl: Lämmitys"
+      },
+      "picpin_relay_heat_l1": {
+        "name": "Lisäteho L1"
+      },
+      "picpin_relay_heat_l2": {
+        "name": "Lisäteho L2"
+      },
+      "picpin_relay_heat_l3": {
+        "name": "Lisäteho L3"
+      },
+      "picpin_relay_gp10": {
+        "name": "Kierrätyspumppu (GP10)"
+      },
+      "picpin_relay_qm10": {
+        "name": "Vaihtoventtiili, käyttövesi/lämmitys (QM10)"
+      },
+      "picpin_relay_qn8_1": {
+        "name": "Shunttiventtiili, lisä (QN8_1)"
+      },
+      "picpin_relay_qn8_2": {
+        "name": "Shunttiventtiili, lisä (QN8_2)"
+      },
+      "picpin_relay_gp3": {
+        "name": "Kierrätyspumppu (GP3)"
+      },
+      "picpin_relay_pump": {
+        "name": "Kierrätyspumppu"
+      },
+      "picpin_relay_ha12": {
+        "name": "Lämmityspiirin pumppu (HA12)"
+      },
+      "dhwdemand": {
+        "name": "Käyttöveden tarve"
+      },
+      "heatingdemand": {
+        "name": "Lämmitystarve"
+      },
+      "coolingdemand": {
+        "name": "Jäähdytystarve"
+      },
+      "additiondemand": {
+        "name": "Lisälämmityksen tarve"
+      },
+      "additiondhwdemand": {
+        "name": "Lisälämmityksen käyttövesitarve"
+      },
+      "time_to_defrost": {
+        "name": "Aika sulatukseen"
+      }
+    },
+    "sensor": {
+      "compressor_state": {
+        "name": "Kompressorin tila",
+        "state": {
+          "0": "Pois",
+          "1": "Joutokäynti",
+          "2": "Valmistaudutaan lämmitykseen",
+          "3": "Valmistaudutaan jäähdytykseen",
+          "4": "Valmistelu 1 käyttövedelle",
+          "5": "Valmistelu 2 käyttövedelle",
+          "6": "Lämmitys",
+          "7": "Jäähdytys",
+          "8": "Käyttövesi",
+          "9": "Passiivinen käyttöveden sulatus",
+          "10": "Passiivinen lämmityksen sulatus",
+          "11": "Valmistaudutaan uima-altaaseen",
+          "12": "Uima-allas",
+          "13": "Passiivinen uima-altaan sulatus"
+        }
+      },
+      "smart_dhw_control_status": {
+        "name": "Älykkään käyttöveden ohjaustila",
+        "state": {
+          "0": "Odotetaan energian hintoja",
+          "1": "Valmiustila",
+          "2": "Nosto",
+          "3": "Lasku",
+          "4": "Pitkäaikainen lasku",
+          "5": "Tauolla"
+        }
+      },
+      "powertotal": {
+        "name": "Kokonaisteho"
+      },
+      "heatingpower": {
+        "name": "Lämmitysteho"
+      },
+      "dhwpower": {
+        "name": "Käyttöveden teho"
+      },
+      "compressor_power": {
+        "name": "Kompressorin teho"
+      },
+      "heatingenergy": {
+        "name": "Lämmitysenergia"
+      },
+      "dhwenergy": {
+        "name": "Käyttöveden energia"
+      },
+      "inputcurrent1": {
+        "name": "Tulovirta L1"
+      },
+      "inputcurrent2": {
+        "name": "Tulovirta L2"
+      },
+      "inputcurrent3": {
+        "name": "Tulovirta L3"
+      },
+      "degree_minute": {
+        "name": "Aste-minuutti"
+      },
+      "bf1_l_min": {
+        "name": "Käyttöveden virtausanturi (BF1)"
+      },
+      "bf1_rpm": {
+        "name": "Käyttövesipumpun nopeus (BF1)"
+      },
+      "bp1_pressure": {
+        "name": "Matalapaine bar (BP1)"
+      },
+      "bp1_temp": {
+        "name": "Matalapaineen lämpötila (BP1)"
+      },
+      "bp2_pressure": {
+        "name": "Korkeapaine bar (BP2)"
+      },
+      "bp2_temp": {
+        "name": "Korkeapaineen lämpötila (BP2)"
+      },
+      "bt10": {
+        "name": "Lauhduttimen ulostulolämpötila (BT10)"
+      },
+      "bt12": {
+        "name": "Lämmönsiirtoneste, ulkoinen menolinja (BT12)"
+      },
+      "bt13": {
+        "name": "Lauhduttimen sisääntulolämpötila (BT13)"
+      },
+      "bt14": {
+        "name": "Jäteilman lämpötila (BT14)"
+      },
+      "bt15": {
+        "name": "Poistoilman lämpötila (BT15)"
+      },
+      "bt20": {
+        "name": "Kuuman kaasun linja (BT20)"
+      },
+      "bt21": {
+        "name": "Nestelinja (BT21)"
+      },
+      "bt22": {
+        "name": "Höyrystimen sisääntulolämpötila (BT22)"
+      },
+      "bt23": {
+        "name": "Imulinja (BT23)"
+      },
+      "bt31": {
+        "name": "Käyttövesi ensiö, latauslämpötila sisään (BT31)"
+      },
+      "bt33": {
+        "name": "Käyttövesi toisio, kylmä vesi sisään (BT33)"
+      },
+      "bt34": {
+        "name": "Käyttövesi toisio, lämmin vesi ulos (BT34)"
+      },
+      "compressormeasuredspeed": {
+        "name": "Kompressorin nopeus"
+      },
+      "dhw_outl_temp_15": {
+        "name": "Käyttöveden ulostulolämpötila 15"
+      },
+      "dhw_outl_temp_5": {
+        "name": "Käyttöveden ulostulolämpötila 5"
+      },
+      "dhw_outl_temp_max": {
+        "name": "Käyttöveden ulostulolämpötila maks."
+      },
+      "dhw_prioritytime": {
+        "name": "Käyttöveden prioriteettiaika"
+      },
+      "fan0_10v": {
+        "name": "Puhallinnopeus"
+      },
+      "fanrpm": {
+        "name": "Puhallinnopeus"
+      },
+      "qn8position": {
+        "name": "Shunttiventtiili, lisä (QN8)"
+      },
+      "gp1_speed": {
+        "name": "Kierrätyspumppu (GP1)"
+      },
+      "gp2_speed": {
+        "name": "Käyttöveden latauspumppu (GP2)"
+      },
+      "guide_des_temp": {
+        "name": "Ohjearvo, haluttu lämpötila"
+      },
+      "guide_he": {
+        "name": "Ohjearvo, lämmitys"
+      },
+      "man_mode": {
+        "name": "Manuaalinen tila"
+      },
+      "op_mode": {
+        "name": "Toimintatila",
+        "state": {
+          "0": "Auto",
+          "1": "Manuaalinen",
+          "2": "Lisä"
+        }
+      },
+      "op_mode_sensor": {
+        "name": "Käyttötilan anturi"
+      },
+      "price_region": {
+        "name": "Hintavyöhyke"
+      },
+      "room_temp_ext": {
+        "name": "Ulkoinen huonelämpötila"
+      },
+      "compressorenergy": {
+        "name": "Kompressorin energia"
+      },
+      "totalenergy": {
+        "name": "Kokonaisenergia"
+      },
+      "bt1": {
+        "name": "Ulkolämpötila (BT1)"
+      },
+      "bt2": {
+        "name": "Sisälämpötila (BT2)"
+      },
+      "bt4": {
+        "name": "BT4"
+      },
+      "btx": {
+        "name": "BTX"
+      },
+      "smart_sh_status": {
+        "name": "Älykäs lämmitystila"
+      },
+      "bt11": {
+        "name": "Lämmönsiirtoneste, menolinja (BT11)"
+      },
+      "cal_heat_temp": {
+        "name": "Lämmönsiirtoneste, menolinja, tavoite"
+      },
+      "start_cooling_temp": {
+        "name": "Jäähdytyksen käynnistyslämpötila"
+      },
+      "bt30": {
+        "name": "Käyttövesivaraaja (BT30)"
+      },
+      "tap_water_start": {
+        "name": "Käyttövesivaraajan alaraja"
+      },
+      "tap_water_stop": {
+        "name": "Käyttövesivaraajan yläraja"
+      },
+      "tap_water_cap": {
+        "name": "Käyttövesikapasiteetti"
+      },
+      "tap_water_minutes": {
+        "name": "Käyttövettä jäljellä"
+      },
+      "additionalenergy": {
+        "name": "Lisäenergia"
+      },
+      "hpid": {
+        "name": "Tunnus"
+      },
+      "smart_sh_mode": {
+        "name": "Älykäs lämmitystila",
+        "state": {
+          "0": "Eco",
+          "1": "Tasapainoinen",
+          "2": "Mukavuus"
+        }
+      },
+      "hp_status": {
+        "name": "Lämpöpumpun tila",
+        "state": {
+          "0": "Joutokäynti",
+          "1": "Sulatus",
+          "2": "Käyttövesi",
+          "3": "Lämmitys",
+          "4": "Jäähdytys"
+        }
+      },
+      "smart_dhw_status": {
+        "name": "Älykäs käyttöveden tila"
+      },
+      "smart_dhw_mode": {
+        "name": "Älykäs käyttövesitila",
+        "state": {
+          "0": "Eco",
+          "1": "Tasapainoinen",
+          "2": "Mukavuus"
+        }
+      },
+      "tap_stop": {
+        "name": "Lisälämpimän käyttöveden pysäytys"
+      },
+      "ventilation_boost_stop": {
+        "name": "Ilmanvaihdon tehostuksen pysäytys"
+      },
+      "timestamp": {
+        "name": "Viimeisin päivitys"
+      },
+      "latency": {
+        "name": "Viive"
+      },
+      "disconnect_reason": {
+        "name": "Katkaisun syy",
+        "state": {
+          "client-disconnect": "Asiakas irrotettu"
+        }
+      },
+      "heatingreleased": {
+        "name": "Lämmitys vapautettu"
+      },
+      "coolingreleased": {
+        "name": "Jäähdytys vapautettu"
+      },
+      "compressorreleased": {
+        "name": "Kompressori vapautettu"
+      },
+      "additionreleased": {
+        "name": "Lisälämmitys vapautettu"
+      },
+      "dhw_prioritytimeleft": {
+        "name": "Käyttöveden prioriteettiaika jäljellä"
+      },
+      "heating_prioritytimeleft": {
+        "name": "Lämmityksen prioriteettiaika jäljellä"
+      },
+      "cooling_prioritytimeleft": {
+        "name": "Jäähdytyksen prioriteettiaika jäljellä"
+      },
+      "switch_state": {
+        "name": "Vaihtoventtiilin tila"
+      },
+      "dhwstop_temp": {
+        "name": "Käyttöveden pysäytyslämpötila"
+      },
+      "dhwstart_temp": {
+        "name": "Käyttöveden käynnistyslämpötila"
+      },
+      "filtered60sec_outdoortemp": {
+        "name": "Suodatettu ulkolämpötila (60 s)"
+      },
+      "max_freq_env": {
+        "name": "Ympäristön maksimitaajuus"
+      },
+      "calc_suppy_cpr": {
+        "name": "Laskettu menoveden CPR"
+      },
+      "dhw_set": {
+        "name": "Käyttövesiasetus"
+      },
+      "bp1_temp_20min_filter": {
+        "name": "BP1-lämpötila, 20 min suodatin"
+      },
+      "max_bp2_env": {
+        "name": "BP2-ympäristön maksimi"
+      },
+      "picpin_mask": {
+        "name": "PIC-nastamaski"
+      },
+      "firmware_display_fw_version": {
+        "name": "Näytön laiteohjelmistoversio"
+      },
+      "firmware_cc_fw_version": {
+        "name": "CC-laiteohjelmistoversio"
+      },
+      "firmware_inv_fw_version": {
+        "name": "Invertterin laiteohjelmistoversio"
+      },
+      "firmware_last_check": {
+        "name": "Laiteohjelmisto tarkistettu viimeksi"
+      },
+      "expires_at": {
+        "name": "Korotettujen käyttöoikeuksien vanheneminen"
+      }
+    },
+    "number": {
+      "indoor_temperature_offset": {
+        "name": "Rinnakkaiskäyrän siirtymä"
+      },
+      "tap_water_capacity_target": {
+        "name": "Käyttövesikapasiteetin tavoite"
+      },
+      "room_comp_factor": {
+        "name": "Huoneen kompensaatiokerroin"
+      },
+      "tap_water_stop": {
+        "name": "Käyttövesivaraajan ylälämpötilaraja"
+      },
+      "tap_water_start": {
+        "name": "Käyttövesivaraajan alalämpötilaraja"
+      },
+      "fan_normal": {
+        "name": "Normaali puhallinnopeus"
+      },
+      "fan_speed_2": {
+        "name": "Kompressorin vähimmäistuuletinnopeus"
+      },
+      "dhw_stop_extra": {
+        "name": "Lisälämpimän käyttöveden pysäytyslämpötila"
+      },
+      "room_temp_external": {
+        "name": "Ulkoinen sisälämpötila"
+      }
+    },
+    "climate": {
+      "indoor_climate": {
+        "name": "Sisäilmasto"
+      }
+    },
+    "fan": {
+      "fanspeedselector": {
+        "name": "Puhallinnopeus",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Pois",
+              "normal": "Normaali",
+              "extra": "Tehostus"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config": {
+    "title": "Qvantum lämpöpumppu",
+    "abort": {
+      "already_configured": "Laite on jo määritetty",
+      "reconfigure_successful": "Uudelleenmääritys onnistui"
+    },
+    "error": {
+      "cannot_connect": "Yhdistäminen epäonnistui",
+      "invalid_auth": "Virheellinen tunnistautuminen",
+      "unknown": "Odottamaton virhe"
+    },
+    "step": {
+      "user": {
+        "description": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Oletuksena se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
+        "data": {
+          "password": "Salasana",
+          "username": "Käyttäjätunnus",
+          "modbus_tcp": "Käytä Modbus-lukemista HTTP-kyselyn sijaan",
+          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Huomaa, että se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
+          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn."
+        }
+      },
+      "reconfigure": {
+        "description": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Oletuksena se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
+        "data": {
+          "password": "Salasana",
+          "username": "Käyttäjätunnus",
+          "modbus_tcp": "Käytä Modbus-lukemista HTTP-kyselyn sijaan",
+          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta",
+          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Huomaa, että se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
+          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn.",
+          "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "HTTP-skannausväli (sekuntia)",
+          "modbus_tcp": "Käytä Modbus-lukemista HTTP-kyselyn sijaan",
+          "modbus_host": "Qvantum-isäntä/IP",
+          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta",
+          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
+        },
+        "data_description": {
+          "modbus_tcp": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Huomaa, että se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
+          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn.",
+          "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
+        },
+        "description": "Muokkaa asetuksiasi.",
+        "title": "Asetukset"
+      }
+    }
+  },
+  "services": {
+    "extra_hot_water": {
+      "name": "Lisälämmin käyttövesi",
+      "description": "Aktivoi lisälämmin käyttövesi määräajaksi",
+      "fields": {
+        "device_id": {
+          "name": "Laitetunnus",
+          "description": "Qvantum-laitteen tunnus"
+        },
+        "minutes": {
+          "name": "Minuutit",
+          "description": "Minuutteja lisälämpimän käyttöveden tuottamiseen (0 minuuttia kytkee pois päältä)"
+        }
+      }
+    }
+  }
+}
