@@ -31,7 +31,7 @@ def test_danish_and_czech_translations_are_available():
         "fi": {
             "config_title": "Qvantum lämpöpumppu",
             "powertotal": "Kokonaisteho",
-            "smart_dhw_control_status": "Älykäs käyttövesitila",
+            "smart_dhw_control_status": "Älykkään käyttöveden ohjaustila",
             "hp_status_name": "Lämpöpumpun tila",
             "hp_status_defrosting": "Sulatus",
             "config_description": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.",

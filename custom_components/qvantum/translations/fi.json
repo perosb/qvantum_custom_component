@@ -7,13 +7,13 @@
   "entity": {
     "switch": {
       "extra_tap_water": {
-        "name": "Lisäkuumaa vettä"
+        "name": "Lisälämmin käyttövesi"
       },
       "op_man_addition": {
         "name": "Manuaalinen käyttötila: Lisä"
       },
       "op_man_dhw": {
-        "name": "Manuaalinen käyttötila: Kuuma vesi"
+        "name": "Manuaalinen käyttötila: Käyttövesi"
       },
       "op_mode": {
         "name": "Manuaalinen käyttötila"
@@ -39,7 +39,7 @@
         }
       },
       "smart_sh_mode": {
-        "name": "Älykäs SH-tila",
+        "name": "Älykäs lämmitystila",
         "state": {
           "0": "Eco",
           "1": "Tasapainoinen",
@@ -55,7 +55,7 @@
         }
       },
       "use_operation_sensor": {
-        "name": "Sisäsensorin lähde",
+        "name": "Sisäanturin lähde",
         "state": {
           "0": "Pois käytöstä",
           "1": "BT2",
@@ -67,10 +67,10 @@
     },
     "button": {
       "extra_tap_water_60min": {
-        "name": "Lisäkuumaa vettä 60 min"
+        "name": "Lisälämmin käyttövesi 60 min"
       },
       "elevate_access": {
-        "name": "Korota pääsyä"
+        "name": "Korota käyttöoikeuksia"
       }
     },
     "binary_sensor": {
@@ -81,7 +81,7 @@
         "name": "Manuaalinen käyttötila: Jäähdytys"
       },
       "op_man_dhw": {
-        "name": "Manuaalinen käyttötila: Kuuma vesi"
+        "name": "Manuaalinen käyttötila: Käyttövesi"
       },
       "cooling_enabled": {
         "name": "Jäähdytys käytössä"
@@ -108,13 +108,13 @@
         "name": "Kierrätyspumppu (GP10)"
       },
       "picpin_relay_qm10": {
-        "name": "Jakoventtiili, käyttövesi/lämmitys (QM10)"
+        "name": "Vaihtoventtiili, käyttövesi/lämmitys (QM10)"
       },
       "picpin_relay_qn8_1": {
-        "name": "Sivuventtiilin lisäys (QN8_1)"
+        "name": "Shunttiventtiili, lisä (QN8_1)"
       },
       "picpin_relay_qn8_2": {
-        "name": "Sivuventtiilin lisäys (QN8_2)"
+        "name": "Shunttiventtiili, lisä (QN8_2)"
       },
       "picpin_relay_gp3": {
         "name": "Kierrätyspumppu (GP3)"
@@ -126,7 +126,7 @@
         "name": "Lämmityspiirin pumppu (HA12)"
       },
       "dhwdemand": {
-        "name": "Kuumaveden tarve"
+        "name": "Käyttöveden tarve"
       },
       "heatingdemand": {
         "name": "Lämmitystarve"
@@ -135,43 +135,43 @@
         "name": "Jäähdytystarve"
       },
       "additiondemand": {
-        "name": "Lisävaatimus"
+        "name": "Lisälämmityksen tarve"
       },
       "additiondhwdemand": {
-        "name": "Lisäkuumaveden tarve"
+        "name": "Lisälämmityksen käyttövesitarve"
       },
       "time_to_defrost": {
-        "name": "Aika sulattaa"
+        "name": "Aika sulatukseen"
       }
     },
     "sensor": {
       "compressor_state": {
-        "name": "Kompresorin tila",
+        "name": "Kompressorin tila",
         "state": {
           "0": "Pois",
-          "1": "Toimettomana",
+          "1": "Joutokäynti",
           "2": "Valmistaudutaan lämmitykseen",
           "3": "Valmistaudutaan jäähdytykseen",
-          "4": "Valmistelu 1 kuumavettä varten",
-          "5": "Valmistelu 2 kuumavettä varten",
+          "4": "Valmistelu 1 käyttövedelle",
+          "5": "Valmistelu 2 käyttövedelle",
           "6": "Lämmitys",
           "7": "Jäähdytys",
-          "8": "Kuuma vesi",
-          "9": "Kuumaveden sulatus passiivinen",
-          "10": "Lämmityksen sulatus passiivinen",
-          "11": "Valmistaudutaan uima-altaille",
+          "8": "Käyttövesi",
+          "9": "Passiivinen käyttöveden sulatus",
+          "10": "Passiivinen lämmityksen sulatus",
+          "11": "Valmistaudutaan uima-altaaseen",
           "12": "Uima-allas",
-          "13": "Uima-altaan sulatus passiivinen"
+          "13": "Passiivinen uima-altaan sulatus"
         }
       },
       "smart_dhw_control_status": {
-        "name": "Älykäs käyttövesitila",
+        "name": "Älykkään käyttöveden ohjaustila",
         "state": {
           "0": "Odotetaan energian hintoja",
           "1": "Valmiustila",
-          "2": "Nostaa",
-          "3": "Laskee",
-          "4": "Pitkän aikavälin lasku",
+          "2": "Nosto",
+          "3": "Lasku",
+          "4": "Pitkäaikainen lasku",
           "5": "Tauolla"
         }
       },
@@ -185,7 +185,7 @@
         "name": "Käyttöveden teho"
       },
       "compressor_power": {
-        "name": "Kompresorin teho"
+        "name": "Kompressorin teho"
       },
       "heatingenergy": {
         "name": "Lämmitysenergia"
@@ -206,61 +206,61 @@
         "name": "Aste-minuutti"
       },
       "bf1_l_min": {
-        "name": "Käyttöveden virtasensori (BF1)"
+        "name": "Käyttöveden virtausanturi (BF1)"
       },
       "bf1_rpm": {
-        "name": "Käyttöveden pumpun nopeusanturi (BF1)"
+        "name": "Käyttövesipumpun nopeus (BF1)"
       },
       "bp1_pressure": {
-        "name": "Alhainen paine bar (BP1)"
+        "name": "Matalapaine bar (BP1)"
       },
       "bp1_temp": {
-        "name": "Alhaisen paineen lämpötila (BP1)"
+        "name": "Matalapaineen lämpötila (BP1)"
       },
       "bp2_pressure": {
-        "name": "Korkea paine bar (BP2)"
+        "name": "Korkeapaine bar (BP2)"
       },
       "bp2_temp": {
-        "name": "Korkean paineen lämpötila (BP2)"
+        "name": "Korkeapaineen lämpötila (BP2)"
       },
       "bt10": {
-        "name": "Kondensaattorin ulostulolämpötila (BT10)"
+        "name": "Lauhduttimen ulostulolämpötila (BT10)"
       },
       "bt12": {
-        "name": "Lämmönsiirtoneste, ulkoinen menoveden linja (BT12)"
+        "name": "Lämmönsiirtoneste, ulkoinen menolinja (BT12)"
       },
       "bt13": {
-        "name": "Kondensaattorin sisääntulolämpötila (BT13)"
+        "name": "Lauhduttimen sisääntulolämpötila (BT13)"
       },
       "bt14": {
-        "name": "Poistoilman lämpötila (BT14)"
+        "name": "Jäteilman lämpötila (BT14)"
       },
       "bt15": {
-        "name": "Imuilman lämpötila (BT15)"
+        "name": "Poistoilman lämpötila (BT15)"
       },
       "bt20": {
-        "name": "Päästön linja (BT20)"
+        "name": "Kuuman kaasun linja (BT20)"
       },
       "bt21": {
         "name": "Nestelinja (BT21)"
       },
       "bt22": {
-        "name": "Haihduttimen sisääntulolämpötila (BT22)"
+        "name": "Höyrystimen sisääntulolämpötila (BT22)"
       },
       "bt23": {
         "name": "Imulinja (BT23)"
       },
       "bt31": {
-        "name": "Käyttövesi primäärinen, latauslämpötila sisään (BT31)"
+        "name": "Käyttövesi ensiö, latauslämpötila sisään (BT31)"
       },
       "bt33": {
-        "name": "Käyttövesi sekundäärinen, kylmä vesi sisään (BT33)"
+        "name": "Käyttövesi toisio, kylmä vesi sisään (BT33)"
       },
       "bt34": {
-        "name": "Käyttövesi sekundäärinen, kuuma vesi ulos (BT34)"
+        "name": "Käyttövesi toisio, lämmin vesi ulos (BT34)"
       },
       "compressormeasuredspeed": {
-        "name": "Kompresorin nopeus"
+        "name": "Kompressorin nopeus"
       },
       "dhw_outl_temp_15": {
         "name": "Käyttöveden ulostulolämpötila 15"
@@ -269,31 +269,31 @@
         "name": "Käyttöveden ulostulolämpötila 5"
       },
       "dhw_outl_temp_max": {
-        "name": "Käyttöveden ulostulolämpötila maks"
+        "name": "Käyttöveden ulostulolämpötila maks."
       },
       "dhw_prioritytime": {
         "name": "Käyttöveden prioriteettiaika"
       },
       "fan0_10v": {
-        "name": "Tuuletinnopeus"
+        "name": "Puhallinnopeus"
       },
       "fanrpm": {
-        "name": "Tuuletinnopeus"
+        "name": "Puhallinnopeus"
       },
       "qn8position": {
-        "name": "Sivuventtiili, lisä (QN8)"
+        "name": "Shunttiventtiili, lisä (QN8)"
       },
       "gp1_speed": {
         "name": "Kierrätyspumppu (GP1)"
       },
       "gp2_speed": {
-        "name": "Käyttövesipuristuspumppu (GP2)"
+        "name": "Käyttöveden latauspumppu (GP2)"
       },
       "guide_des_temp": {
-        "name": "Opas haluttu lämpötila"
+        "name": "Ohjearvo, haluttu lämpötila"
       },
       "guide_he": {
-        "name": "Opas lämmitys"
+        "name": "Ohjearvo, lämmitys"
       },
       "man_mode": {
         "name": "Manuaalinen tila"
@@ -307,25 +307,25 @@
         }
       },
       "op_mode_sensor": {
-        "name": "Toimintatilan sensori"
+        "name": "Käyttötilan anturi"
       },
       "price_region": {
         "name": "Hintavyöhyke"
       },
       "room_temp_ext": {
-        "name": "Huonelämpötila ulkoinen"
+        "name": "Ulkoinen huonelämpötila"
       },
       "compressorenergy": {
-        "name": "Kompresorin energia"
+        "name": "Kompressorin energia"
       },
       "totalenergy": {
         "name": "Kokonaisenergia"
       },
       "bt1": {
-        "name": "Ulkoilma (BT1)"
+        "name": "Ulkolämpötila (BT1)"
       },
       "bt2": {
-        "name": "Sisäilma (BT2)"
+        "name": "Sisälämpötila (BT2)"
       },
       "bt4": {
         "name": "BT4"
@@ -334,31 +334,31 @@
         "name": "BTX"
       },
       "smart_sh_status": {
-        "name": "Älykäs tila lämmitykselle"
+        "name": "Älykäs lämmitystila"
       },
       "bt11": {
-        "name": "Lämmönsiirtoneste, menoveden linja (BT11)"
+        "name": "Lämmönsiirtoneste, menolinja (BT11)"
       },
       "cal_heat_temp": {
-        "name": "Lämmönsiirtoneste, menoveden linja, tavoite."
+        "name": "Lämmönsiirtoneste, menolinja, tavoite"
       },
       "start_cooling_temp": {
         "name": "Jäähdytyksen käynnistyslämpötila"
       },
       "bt30": {
-        "name": "Kuumavesisäiliö (BT30)"
+        "name": "Käyttövesivaraaja (BT30)"
       },
       "tap_water_start": {
-        "name": "Kuumavesisäiliön alaraja"
+        "name": "Käyttövesivaraajan alaraja"
       },
       "tap_water_stop": {
-        "name": "Kuumavesisäiliön yläraja"
+        "name": "Käyttövesivaraajan yläraja"
       },
       "tap_water_cap": {
-        "name": "Kuumavesikapasiteetti"
+        "name": "Käyttövesikapasiteetti"
       },
       "tap_water_minutes": {
-        "name": "Kuumavettä jäljellä"
+        "name": "Käyttövettä jäljellä"
       },
       "additionalenergy": {
         "name": "Lisäenergia"
@@ -367,7 +367,7 @@
         "name": "Tunnus"
       },
       "smart_sh_mode": {
-        "name": "Älykäs SH-tila",
+        "name": "Älykäs lämmitystila",
         "state": {
           "0": "Eco",
           "1": "Tasapainoinen",
@@ -377,15 +377,15 @@
       "hp_status": {
         "name": "Lämpöpumpun tila",
         "state": {
-          "0": "Toimettomana",
+          "0": "Joutokäynti",
           "1": "Sulatus",
-          "2": "Kuuma vesi",
+          "2": "Käyttövesi",
           "3": "Lämmitys",
           "4": "Jäähdytys"
         }
       },
       "smart_dhw_status": {
-        "name": "Älykäs tila kuumalle vedelle"
+        "name": "Älykäs käyttöveden tila"
       },
       "smart_dhw_mode": {
         "name": "Älykäs käyttövesitila",
@@ -396,10 +396,10 @@
         }
       },
       "tap_stop": {
-        "name": "Lisäkuuman veden pysäytys"
+        "name": "Lisälämpimän käyttöveden pysäytys"
       },
       "ventilation_boost_stop": {
-        "name": "Tuuletuksen tehostuksen pysäytys"
+        "name": "Ilmanvaihdon tehostuksen pysäytys"
       },
       "timestamp": {
         "name": "Viimeisin päivitys"
@@ -408,9 +408,9 @@
         "name": "Viive"
       },
       "disconnect_reason": {
-        "name": "Katkaisu syy",
+        "name": "Katkaisun syy",
         "state": {
-          "client-disconnect": "Asiakas irti"
+          "client-disconnect": "Asiakas irrotettu"
         }
       },
       "heatingreleased": {
@@ -423,7 +423,7 @@
         "name": "Kompressori vapautettu"
       },
       "additionreleased": {
-        "name": "Lisä vapautettu"
+        "name": "Lisälämmitys vapautettu"
       },
       "dhw_prioritytimeleft": {
         "name": "Käyttöveden prioriteettiaika jäljellä"
@@ -435,7 +435,7 @@
         "name": "Jäähdytyksen prioriteettiaika jäljellä"
       },
       "switch_state": {
-        "name": "Kytkimen tila"
+        "name": "Vaihtoventtiilin tila"
       },
       "dhwstop_temp": {
         "name": "Käyttöveden pysäytyslämpötila"
@@ -447,28 +447,28 @@
         "name": "Suodatettu ulkolämpötila (60 s)"
       },
       "max_freq_env": {
-        "name": "Maksimitaajuus ympäristö"
+        "name": "Ympäristön maksimitaajuus"
       },
       "calc_suppy_cpr": {
-        "name": "Laskettu syöttö-CPR"
+        "name": "Laskettu menoveden CPR"
       },
       "dhw_set": {
         "name": "Käyttövesiasetus"
       },
       "bp1_temp_20min_filter": {
-        "name": "BP1 lämpötila 20 min suodatin"
+        "name": "BP1-lämpötila, 20 min suodatin"
       },
       "max_bp2_env": {
-        "name": "Maks BP2 ympäristö"
+        "name": "BP2-ympäristön maksimi"
       },
       "picpin_mask": {
-        "name": "PIC-nastinmaski"
+        "name": "PIC-nastamaski"
       },
       "firmware_display_fw_version": {
         "name": "Näytön laiteohjelmistoversio"
       },
       "firmware_cc_fw_version": {
-        "name": "CC laiteohjelmistoversio"
+        "name": "CC-laiteohjelmistoversio"
       },
       "firmware_inv_fw_version": {
         "name": "Invertterin laiteohjelmistoversio"
@@ -477,7 +477,7 @@
         "name": "Laiteohjelmisto tarkistettu viimeksi"
       },
       "expires_at": {
-        "name": "Korotetun pääsyn vanheneminen"
+        "name": "Korotettujen käyttöoikeuksien vanheneminen"
       }
     },
     "number": {
@@ -485,25 +485,25 @@
         "name": "Rinnakkaiskäyrän siirtymä"
       },
       "tap_water_capacity_target": {
-        "name": "Kuumavesikapasiteetin tavoite"
+        "name": "Käyttövesikapasiteetin tavoite"
       },
       "room_comp_factor": {
         "name": "Huoneen kompensaatiokerroin"
       },
       "tap_water_stop": {
-        "name": "Kuumavesisäiliön ylälämpötilaraja"
+        "name": "Käyttövesivaraajan ylälämpötilaraja"
       },
       "tap_water_start": {
-        "name": "Kuumavesisäiliön alalämpötilaraja"
+        "name": "Käyttövesivaraajan alalämpötilaraja"
       },
       "fan_normal": {
-        "name": "Tavallinen tuuletinnopeus"
+        "name": "Normaali puhallinnopeus"
       },
       "fan_speed_2": {
-        "name": "Kompresorin vähimmäistuuletinnopeus"
+        "name": "Kompressorin vähimmäistuuletinnopeus"
       },
       "dhw_stop_extra": {
-        "name": "Lisäkuuman veden pysäytyslämpötila"
+        "name": "Lisälämpimän käyttöveden pysäytyslämpötila"
       },
       "room_temp_external": {
         "name": "Ulkoinen sisälämpötila"
@@ -516,13 +516,13 @@
     },
     "fan": {
       "fanspeedselector": {
-        "name": "Tuuletinnopeus",
+        "name": "Puhallinnopeus",
         "state_attributes": {
           "preset_mode": {
             "state": {
               "off": "Pois",
               "normal": "Normaali",
-              "extra": "Extra"
+              "extra": "Tehostus"
             }
           }
         }
@@ -533,7 +533,7 @@
     "title": "Qvantum lämpöpumppu",
     "abort": {
       "already_configured": "Laite on jo määritetty",
-      "reconfigure_successful": "Määrittäminen uudelleen onnistui"
+      "reconfigure_successful": "Uudelleenmääritys onnistui"
     },
     "error": {
       "cannot_connect": "Yhdistäminen epäonnistui",
@@ -577,7 +577,7 @@
         "data": {
           "scan_interval": "HTTP-skannausväli (sekuntia)",
           "modbus_tcp": "Käytä Modbus-lukemista HTTP-kyselyn sijaan",
-          "modbus_host": "Qvantum isäntä/IP",
+          "modbus_host": "Qvantum-isäntä/IP",
           "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta",
           "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
         },
@@ -593,8 +593,8 @@
   },
   "services": {
     "extra_hot_water": {
-      "name": "Lisäkuumaa vettä",
-      "description": "Aktivoi lisäkuumaa vettä tietyn ajan",
+      "name": "Lisälämmin käyttövesi",
+      "description": "Aktivoi lisälämmin käyttövesi määräajaksi",
       "fields": {
         "device_id": {
           "name": "Laitetunnus",
@@ -602,7 +602,7 @@
         },
         "minutes": {
           "name": "Minuutit",
-          "description": "Minuuttia lisäkuuman veden tuottamiseen (0 minuuttia kytkee pois päältä)"
+          "description": "Minuutteja lisälämpimän käyttöveden tuottamiseen (0 minuuttia kytkee pois päältä)"
         }
       }
     }
