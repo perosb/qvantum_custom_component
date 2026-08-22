@@ -185,6 +185,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name=f"{DOMAIN} ({config_entry.unique_id})",
             update_method=self.async_update_data,
             update_interval=timedelta(seconds=self.poll_interval),

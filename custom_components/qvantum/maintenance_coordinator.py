@@ -38,6 +38,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name=f"{DOMAIN} Firmware ({config_entry.unique_id})",
             update_method=self.async_check_firmware_updates,
             update_interval=timedelta(hours=2),  # Check every 2 hours

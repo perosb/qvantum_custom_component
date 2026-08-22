@@ -63,6 +63,20 @@ class TestQvantumMaintenanceCoordinator:
             )
         return coordinator
 
+    def test_passes_config_entry_to_parent(
+        self, hass, mock_config_entry, mock_main_coordinator
+    ):
+        """Parent DataUpdateCoordinator must receive config_entry explicitly."""
+        from custom_components.qvantum.const import DOMAIN
+
+        hass.data[DOMAIN] = MagicMock()
+        coordinator = QvantumMaintenanceCoordinator(
+            hass=hass,
+            config_entry=mock_config_entry,
+            main_coordinator=mock_main_coordinator,
+        )
+        assert coordinator.config_entry is mock_config_entry
+
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_no_device(
         self, maintenance_coordinator, mock_main_coordinator

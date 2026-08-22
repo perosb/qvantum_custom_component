@@ -129,6 +129,23 @@ class TestQvantumDataUpdateCoordinator:
     """Test the QvantumDataUpdateCoordinator class."""
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_passes_config_entry_to_parent(self, mock_super_init):
+        """Parent DataUpdateCoordinator must receive config_entry explicitly."""
+        mock_super_init.return_value = None
+        mock_hass = MagicMock()
+        mock_hass.data = {DOMAIN: MagicMock()}
+        config_entry = MagicMock()
+        config_entry.options.get.return_value = 30
+        config_entry.unique_id = "test_device"
+        config_entry.entry_id = "test_entry_id"
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
+
+        mock_super_init.assert_called_once()
+        assert mock_super_init.call_args.kwargs["config_entry"] is config_entry
+        assert coordinator._config_entry is config_entry
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_with_device_found(self, mock_super_init):
         """Test _get_enabled_metrics when device is found in registry."""
         # Create mock hass with registries and API
