@@ -12,10 +12,34 @@ from custom_components.qvantum import (
     async_migrate_entry,
     PLATFORMS,
     _async_update_listener,
+    _has_required_device,
+    _device_sw_version,
 )
 
 # Mock HA imports after importing real functions
 # sys.modules['custom_components.qvantum'] = MagicMock()
+
+
+class TestSetupDeviceRequirements:
+    """Unit tests for setup device-identity helpers."""
+
+    def test_has_required_device_http_needs_metadata(self):
+        assert _has_required_device({"id": "abc"}, require_metadata=True) is False
+        assert (
+            _has_required_device(
+                {"id": "abc", "device_metadata": {"display_fw_version": "1"}},
+                require_metadata=True,
+            )
+            is True
+        )
+
+    def test_has_required_device_modbus_needs_id_only(self):
+        assert _has_required_device({}, require_metadata=False) is False
+        assert _has_required_device({"id": "abc"}, require_metadata=False) is True
+
+    def test_device_sw_version_omits_empty(self):
+        assert _device_sw_version({}) is None
+        assert _device_sw_version({"display_fw_version": "1.0"}) == "1.0/None/None"
 
 
 class TestIntegrationSetup:
@@ -331,6 +355,86 @@ class TestIntegrationSetup:
             mock_config_entry.entry_id
         )
         mock_coordinator.apply_poll_interval.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_without_metadata_succeeds(
+        self, hass, mock_config_entry, mock_api, mock_coordinator
+    ):
+        """Modbus setup should succeed with a device id even if cloud metadata is missing."""
+        mock_config_entry.options = {"modbus_tcp": True}
+        mock_coordinator.data = {
+            "device": {
+                "id": "test_device_123",
+                "model": "QE-6",
+                "vendor": "Qvantum",
+            },
+            "values": {},
+        }
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
+        mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_config_entry.add_update_listener = MagicMock()
+
+        mock_firmware_coordinator = MagicMock()
+        mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock()
+
+        with (
+            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch(
+                "custom_components.qvantum.QvantumDataUpdateCoordinator",
+                return_value=mock_coordinator,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
+                return_value=mock_firmware_coordinator,
+            ),
+            patch("custom_components.qvantum.services.async_setup_services"),
+        ):
+            result = await async_setup_entry(hass, mock_config_entry)
+
+        assert result is True
+        hass.config_entries.async_forward_entry_setups.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_continues_when_maintenance_http_down(
+        self, hass, mock_config_entry, mock_api, mock_coordinator
+    ):
+        """A down cloud API must not block Modbus setup at firmware-check time."""
+        from homeassistant.exceptions import ConfigEntryNotReady
+
+        mock_config_entry.options = {"modbus_tcp": True}
+        mock_coordinator.data = {
+            "device": {
+                "id": "test_device_123",
+                "model": "QE-6",
+                "vendor": "Qvantum",
+                "device_metadata": {"display_fw_version": "1.0"},
+            },
+            "values": {},
+        }
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
+        mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_config_entry.add_update_listener = MagicMock()
+
+        mock_firmware_coordinator = MagicMock()
+        mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock(
+            side_effect=ConfigEntryNotReady("HTTP API down")
+        )
+
+        with (
+            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch(
+                "custom_components.qvantum.QvantumDataUpdateCoordinator",
+                return_value=mock_coordinator,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
+                return_value=mock_firmware_coordinator,
+            ),
+            patch("custom_components.qvantum.services.async_setup_services"),
+        ):
+            result = await async_setup_entry(hass, mock_config_entry)
+
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_empty_device_metadata_fails(self, hass, mock_config_entry):

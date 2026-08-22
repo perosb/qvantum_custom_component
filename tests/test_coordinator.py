@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from custom_components.qvantum.coordinator import (
     handle_setting_update_response,
     QvantumDataUpdateCoordinator,
+    _firmware_metadata_from_sw_version,
 )
 from custom_components.qvantum.const import (
     CONF_MODBUS_SCAN_INTERVAL,
@@ -3151,3 +3152,129 @@ class TestCalculateTapWaterCap:
         )
         assert coordinator._last_shower_flow_lpm is None
         assert coordinator._shower_event_history == []
+
+
+class TestDeviceLookupWhenHttpDown:
+    """Device identity must not depend on a live HTTP API in Modbus mode."""
+
+    def _make_coordinator(self, mock_super_init, *, modbus: bool):
+        mock_super_init.return_value = None
+        mock_api = MagicMock()
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+        mock_config_entry = MagicMock()
+        mock_config_entry.entry_id = "test_entry_id"
+        mock_config_entry.unique_id = "test_device_123"
+        mock_config_entry.data = {}
+        if modbus:
+            mock_config_entry.options.get.side_effect = _modbus_options_get
+        else:
+            mock_config_entry.options.get.side_effect = lambda key, default=None: default
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+        coordinator.api = mock_api
+        coordinator.hass = mock_hass
+        coordinator._device_store = MagicMock()
+        coordinator._device_store.async_load = AsyncMock(return_value=None)
+        coordinator._device_store.async_save = AsyncMock()
+        return coordinator, mock_api
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_uses_cached_device_when_http_down(self, mock_super_init):
+        """Cached device identity is used so Modbus can start without HTTP."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        cached = {
+            "id": "test_device_123",
+            "vendor": "Qvantum",
+            "model": "QE-6",
+            "device_metadata": {"display_fw_version": "1.3.6"},
+        }
+        coordinator._device_store.async_load = AsyncMock(return_value=cached)
+        mock_api.get_metrics = AsyncMock(
+            return_value={"metrics": {"hpid": "test_device_123", "bt1": 7.5}}
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        mock_api.get_primary_device.assert_not_called()
+        assert result["device"]["id"] == "test_device_123"
+        assert result["values"]["bt1"] == 7.5
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_uses_device_registry_when_http_down(self, mock_super_init):
+        """After a restart with no store file, fall back to the device registry."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+        mock_api.get_metrics = AsyncMock(
+            return_value={"metrics": {"hpid": "test_device_123"}}
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        ha_device = MagicMock()
+        ha_device.config_entries = {"test_entry_id"}
+        ha_device.identifiers = {(DOMAIN, "qvantum-test_device_123")}
+        ha_device.manufacturer = "Qvantum"
+        ha_device.model = "QE-6"
+        ha_device.serial_number = "test_device_123"
+        ha_device.sw_version = "1.3.6/140/140"
+
+        mock_registry = MagicMock()
+        mock_registry.devices.values.return_value = [ha_device]
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            result = await coordinator.async_update_data()
+
+        assert result["device"]["id"] == "test_device_123"
+        assert result["device"]["device_metadata"]["display_fw_version"] == "1.3.6"
+        mock_api.get_primary_device.assert_awaited()
+        coordinator._device_store.async_save.assert_awaited()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_http_mode_still_fails_when_api_down(self, mock_super_init):
+        """HTTP-only mode still requires a live cloud device lookup."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=False)
+        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+
+        with pytest.raises(UpdateFailed):
+            await coordinator.async_update_data()
+
+        mock_api.get_metrics.assert_not_called()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_persists_device_after_successful_http_lookup(self, mock_super_init):
+        """A successful HTTP lookup is stored for later Modbus-only startups."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        device = {
+            "id": "test_device_123",
+            "vendor": "Qvantum",
+            "model": "QE-6",
+            "device_metadata": {"display_fw_version": "1.3.6"},
+        }
+        mock_api.get_primary_device = AsyncMock(return_value=device)
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        await coordinator.async_update_data()
+
+        coordinator._device_store.async_save.assert_awaited_once_with(device)
+
+    def test_firmware_metadata_from_sw_version(self):
+        assert _firmware_metadata_from_sw_version(None) == {}
+        assert _firmware_metadata_from_sw_version("1.3.6/140/141") == {
+            "display_fw_version": "1.3.6",
+            "cc_fw_version": "140",
+            "inv_fw_version": "141",
+        }

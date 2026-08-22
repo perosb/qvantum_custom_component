@@ -52,6 +52,10 @@ class QvantumAccessMixin:
                 self.coordinator.config_entry.runtime_data.maintenance_coordinator
             )
             if not maintenance_coordinator or not maintenance_coordinator.data:
+                # Cloud access cannot be checked (HTTP API down). Local Modbus
+                # writes remain available when the user has enabled them.
+                if hasattr(self, "_is_modbus_write_allowed"):
+                    return self._is_modbus_write_allowed()
                 return False
             access_level = maintenance_coordinator.data.get("access_level", {})
             return access_level.get("writeAccessLevel", 0) >= 20

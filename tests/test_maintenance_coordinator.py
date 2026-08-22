@@ -39,6 +39,7 @@ class TestQvantumMaintenanceCoordinator:
             }
         }
         coordinator._device = coordinator.data["device"]
+        coordinator.modbus_enabled = False
         return coordinator
 
     @pytest_asyncio.fixture
@@ -191,6 +192,20 @@ class TestQvantumMaintenanceCoordinator:
 
         with pytest.raises(Exception):
             await maintenance_coordinator.async_check_firmware_updates()
+
+    @pytest.mark.asyncio
+    async def test_async_check_firmware_updates_http_down_modbus_continues(
+        self, maintenance_coordinator, mock_main_coordinator
+    ):
+        """Modbus mode must not fail firmware check when the HTTP API is down."""
+        mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+            side_effect=Exception("HTTP API down")
+        )
+
+        result = await maintenance_coordinator.async_check_firmware_updates()
+
+        assert result == {}
 
     @pytest.mark.asyncio
     async def test_create_firmware_update_notifications(

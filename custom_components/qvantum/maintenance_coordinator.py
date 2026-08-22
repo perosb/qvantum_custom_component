@@ -127,6 +127,13 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Authentication error during firmware check: %s", err)
             raise UpdateFailed(err) from err
         except Exception as err:
+            if getattr(self.main_coordinator, "modbus_enabled", False):
+                _LOGGER.warning(
+                    "Cloud API unavailable during firmware/access check; "
+                    "continuing with local Modbus: %s",
+                    err,
+                )
+                return self.data or {}
             _LOGGER.error("Error checking firmware updates: %s", err)
             stack_trace = traceback.format_exc()
             raise UpdateFailed(

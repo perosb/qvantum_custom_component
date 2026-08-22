@@ -13,6 +13,7 @@ from homeassistant.const import Platform
 from homeassistant.core import callback
 from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -59,6 +60,32 @@ PLATFORMS: list[Platform] = [
 type MyConfigEntry = ConfigEntry[RuntimeData]
 
 
+def _coordinator_device(coordinator: QvantumDataUpdateCoordinator) -> dict:
+    """Return the coordinator device dict, or {} when missing."""
+    data = getattr(coordinator, "data", None) or {}
+    device = data.get("device") if isinstance(data, dict) else None
+    return device if isinstance(device, dict) else {}
+
+
+def _has_required_device(device: dict, *, require_metadata: bool) -> bool:
+    """Return True when setup has enough device identity to continue."""
+    if not device.get("id"):
+        return False
+    if require_metadata and not device.get("device_metadata"):
+        return False
+    return True
+
+
+def _device_sw_version(device_metadata: dict) -> str | None:
+    """Format firmware versions for DeviceInfo, omitting an empty triple."""
+    display = device_metadata.get("display_fw_version")
+    cc = device_metadata.get("cc_fw_version")
+    inv = device_metadata.get("inv_fw_version")
+    if not (display or cc or inv):
+        return None
+    return f"{display}/{cc}/{inv}"
+
+
 @dataclass
 class RuntimeData:
     """Class to hold your data."""
@@ -99,33 +126,35 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     await coordinator.async_restore_dhw_state()
     await coordinator.async_config_entry_first_refresh()
 
-    if not coordinator.data.get("device") or not coordinator.data.get("device").get(
-        "device_metadata"
-    ):
+    # HTTP mode needs live cloud metadata. Modbus mode only needs a device id
+    # (from HTTP, cache, or the device registry) so a down cloud API cannot
+    # block local startup.
+    require_metadata = not modbus_enabled
+    device_data = _coordinator_device(coordinator)
+    if not _has_required_device(device_data, require_metadata=require_metadata):
         _LOGGER.error(
             "No device data found when setting up Qvantum integration, 2nd attempt"
         )
         await coordinator.async_config_entry_first_refresh()
+        device_data = _coordinator_device(coordinator)
 
-    if not coordinator.data.get("device") or not coordinator.data.get("device").get(
-        "device_metadata"
-    ):
+    if not _has_required_device(device_data, require_metadata=require_metadata):
         _LOGGER.error(
             "No device data found when setting up Qvantum integration, failure"
         )
         return False
 
-    device_metadata = coordinator.data.get("device").get("device_metadata")
+    device_metadata = device_data.get("device_metadata") or {}
     device = DeviceInfo(
         identifiers={
-            (DOMAIN, f"qvantum-{coordinator.data.get('device').get('id')}"),
+            (DOMAIN, f"qvantum-{device_data.get('id')}"),
         },
-        manufacturer=coordinator.data.get("device").get("vendor"),
-        model=coordinator.data.get("device").get("model"),
+        manufacturer=device_data.get("vendor"),
+        model=device_data.get("model"),
         translation_key="qvantum_flvp",
         name="Qvantum",
-        serial_number=coordinator.data.get("device").get("serial"),
-        sw_version=f"{device_metadata.get('display_fw_version')}/{device_metadata.get('cc_fw_version')}/{device_metadata.get('inv_fw_version')}",
+        serial_number=device_data.get("serial"),
+        sw_version=_device_sw_version(device_metadata),
     )
 
     # Only register the service if it hasn't been registered yet
@@ -136,7 +165,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     maintenance_coordinator = QvantumMaintenanceCoordinator(
         hass, config_entry, coordinator
     )
-    await maintenance_coordinator.async_config_entry_first_refresh()
+    try:
+        await maintenance_coordinator.async_config_entry_first_refresh()
+    except ConfigEntryNotReady as err:
+        if not modbus_enabled:
+            raise
+        _LOGGER.warning(
+            "Cloud API unavailable during firmware/access check; continuing with local Modbus: %s",
+            err,
+        )
 
     remove_listener = config_entry.add_update_listener(_async_update_listener)
     config_entry.async_on_unload(remove_listener)

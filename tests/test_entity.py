@@ -20,6 +20,27 @@ def test_has_write_access_maintenance_entity():
     assert entity._has_write_access is True
 
 
+def test_has_write_access_allows_modbus_write_when_cloud_unavailable():
+    """Local Modbus writes stay available when the HTTP API cannot be checked."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+    coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+    coordinator.config_entry = MagicMock()
+    coordinator.config_entry.runtime_data = MagicMock()
+    coordinator.config_entry.runtime_data.maintenance_coordinator = None
+
+    class DummyModbusWriteEntity(QvantumAccessMixin):
+        def __init__(self, coordinator):
+            self.coordinator = coordinator
+            self._write_access_warning_logged = False
+
+        def _is_modbus_write_allowed(self):
+            return True
+
+    entity = DummyModbusWriteEntity(coordinator)
+    assert entity._has_write_access is True
+
+
 def test_has_write_access_denies_without_data():
     """Missing runtime_data should deny write access and log warning once."""
     from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
