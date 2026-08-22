@@ -36,13 +36,13 @@ from .const import (
     REQUIRED_MODBUS_METRICS,
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
+    HTTP_CLOUD_LOOKUP_TIMEOUT,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-# Bound cloud device lookups so a down HTTP API cannot stall Modbus startup.
-_HTTP_DEVICE_LOOKUP_TIMEOUT = 15
+
 
 _COMPRESSOR_TO_HP_STATUS_MAP = {
     2: HP_STATUS_HEATING,   # Heating → Heating
@@ -343,7 +343,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         try:
             device = await asyncio.wait_for(
                 self.api.get_primary_device(),
-                timeout=_HTTP_DEVICE_LOOKUP_TIMEOUT,
+                timeout=HTTP_CLOUD_LOOKUP_TIMEOUT,
             )
             if isinstance(device, dict) and device.get("id"):
                 self._device = device

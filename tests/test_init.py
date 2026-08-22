@@ -437,6 +437,46 @@ class TestIntegrationSetup:
         assert result is True
 
     @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_continues_when_maintenance_times_out(
+        self, hass, mock_config_entry, mock_api, mock_coordinator
+    ):
+        """A hung cloud firmware check must not stall Modbus setup."""
+        mock_config_entry.options = {"modbus_tcp": True}
+        mock_coordinator.data = {
+            "device": {
+                "id": "test_device_123",
+                "model": "QE-6",
+                "vendor": "Qvantum",
+                "device_metadata": {"display_fw_version": "1.0"},
+            },
+            "values": {},
+        }
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
+        mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_config_entry.add_update_listener = MagicMock()
+
+        mock_firmware_coordinator = MagicMock()
+        mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock(
+            side_effect=TimeoutError()
+        )
+
+        with (
+            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch(
+                "custom_components.qvantum.QvantumDataUpdateCoordinator",
+                return_value=mock_coordinator,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
+                return_value=mock_firmware_coordinator,
+            ),
+            patch("custom_components.qvantum.services.async_setup_services"),
+        ):
+            result = await async_setup_entry(hass, mock_config_entry)
+
+        assert result is True
+
+    @pytest.mark.asyncio
     async def test_async_setup_entry_empty_device_metadata_fails(self, hass, mock_config_entry):
         mock_api = MagicMock()
         mock_api.get_primary_device = AsyncMock(return_value={"id": "device123"})

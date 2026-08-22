@@ -124,25 +124,29 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
             }
 
         except APIAuthError as err:
+            if getattr(self.main_coordinator, "modbus_enabled", False):
+                return self._cloud_unavailable_result(err)
             _LOGGER.error("Authentication error during firmware check: %s", err)
             raise UpdateFailed(err) from err
         except Exception as err:
             if getattr(self.main_coordinator, "modbus_enabled", False):
-                _LOGGER.warning(
-                    "Cloud API unavailable during firmware/access check; "
-                    "continuing with local Modbus: %s",
-                    err,
-                )
-                previous = dict(self.data or {})
-                # Drop stale authorization so callers can tell an outage from
-                # a fresh access-level result.
-                previous["access_level"] = None
-                return previous
+                return self._cloud_unavailable_result(err)
             _LOGGER.error("Error checking firmware updates: %s", err)
             stack_trace = traceback.format_exc()
             raise UpdateFailed(
                 f"Error checking firmware updates: {err}\nStack trace:\n{stack_trace}"
             ) from err
+
+    def _cloud_unavailable_result(self, err: Exception) -> dict:
+        """Keep last firmware data but clear stale authorization after a cloud outage."""
+        _LOGGER.warning(
+            "Cloud API unavailable during firmware/access check; "
+            "continuing with local Modbus: %s",
+            err,
+        )
+        previous = dict(self.data or {})
+        previous["access_level"] = None
+        return previous
 
     async def _create_firmware_update_notifications(
         self, device_id: str, firmware_changes: list[dict[str, str]]

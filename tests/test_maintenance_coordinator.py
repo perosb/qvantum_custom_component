@@ -5,6 +5,7 @@ import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
+from custom_components.qvantum.api import APIAuthError
 from custom_components.qvantum.maintenance_coordinator import (
     QvantumMaintenanceCoordinator,
 )
@@ -225,6 +226,40 @@ class TestQvantumMaintenanceCoordinator:
 
         assert result["access_level"] is None
         assert result["firmware_versions"]["display_fw_version"] == "1.3.6"
+
+    @pytest.mark.asyncio
+    async def test_async_check_firmware_updates_auth_error_modbus_clears_access(
+        self, maintenance_coordinator, mock_main_coordinator
+    ):
+        """Auth failures in Modbus mode must not keep a previous access_level."""
+        mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.data = {
+            "firmware_versions": {"display_fw_version": "1.3.6"},
+            "access_level": {"writeAccessLevel": 20},
+        }
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+            side_effect=APIAuthError(None, "token refresh failed")
+        )
+
+        result = await maintenance_coordinator.async_check_firmware_updates()
+
+        assert result["access_level"] is None
+        assert result["firmware_versions"]["display_fw_version"] == "1.3.6"
+
+    @pytest.mark.asyncio
+    async def test_async_check_firmware_updates_auth_error_http_still_fails(
+        self, maintenance_coordinator, mock_main_coordinator
+    ):
+        """HTTP mode still treats authentication errors as a failed update."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        mock_main_coordinator.modbus_enabled = False
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+            side_effect=APIAuthError(None, "token refresh failed")
+        )
+
+        with pytest.raises(UpdateFailed):
+            await maintenance_coordinator.async_check_firmware_updates()
 
     @pytest.mark.asyncio
     async def test_create_firmware_update_notifications(

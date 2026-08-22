@@ -39,6 +39,7 @@ from .const import (
     DEFAULT_MODBUS_HOST,
     DEFAULT_MODBUS_PORT,
     DEFAULT_MODBUS_UNIT_ID,
+    HTTP_CLOUD_LOOKUP_TIMEOUT,
 )
 from .coordinator import QvantumDataUpdateCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
@@ -172,9 +173,16 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         hass, config_entry, coordinator
     )
     try:
-        await maintenance_coordinator.async_config_entry_first_refresh()
-    except ConfigEntryNotReady as err:
+        await asyncio.wait_for(
+            maintenance_coordinator.async_config_entry_first_refresh(),
+            timeout=HTTP_CLOUD_LOOKUP_TIMEOUT,
+        )
+    except (ConfigEntryNotReady, asyncio.TimeoutError) as err:
         if not modbus_enabled:
+            if isinstance(err, asyncio.TimeoutError):
+                raise ConfigEntryNotReady(
+                    "Firmware/access check timed out"
+                ) from err
             raise
         _LOGGER.warning(
             "Cloud API unavailable during firmware/access check; continuing with local Modbus: %s",
