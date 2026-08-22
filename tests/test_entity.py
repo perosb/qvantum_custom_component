@@ -34,7 +34,80 @@ def test_has_write_access_allows_modbus_write_when_cloud_unavailable():
             self.coordinator = coordinator
             self._write_access_warning_logged = False
 
-        def _is_modbus_write_allowed(self):
+        def _local_write_available(self):
+            return True
+
+    entity = DummyModbusWriteEntity(coordinator)
+    assert entity._has_write_access is True
+
+
+def test_has_write_access_denies_http_only_entity_when_cloud_unavailable():
+    """HTTP-backed Qvantum entities must not become writable during an outage."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+    from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
+
+    coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+    coordinator.config_entry = MagicMock()
+    coordinator.config_entry.options = {
+        CONF_MODBUS_TCP: True,
+        CONF_MODBUS_WRITE: True,
+    }
+    coordinator.config_entry.data = {}
+    coordinator.config_entry.runtime_data = MagicMock()
+    coordinator.config_entry.runtime_data.maintenance_coordinator = None
+
+    entity = QvantumEntity.__new__(QvantumEntity)
+    entity.coordinator = coordinator
+    entity._write_access_warning_logged = False
+    entity._metric_key = "extra_tap_water"
+
+    assert entity._has_write_access is False
+
+
+def test_has_write_access_allows_modbus_metric_when_cloud_unavailable():
+    """Entities that write via holding registers stay available offline."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+    from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
+
+    coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+    coordinator.config_entry = MagicMock()
+    coordinator.config_entry.options = {
+        CONF_MODBUS_TCP: True,
+        CONF_MODBUS_WRITE: True,
+    }
+    coordinator.config_entry.data = {}
+    coordinator.config_entry.runtime_data = MagicMock()
+    coordinator.config_entry.runtime_data.maintenance_coordinator = None
+
+    entity = QvantumEntity.__new__(QvantumEntity)
+    entity.coordinator = coordinator
+    entity._write_access_warning_logged = False
+    entity._metric_key = "room_temp_external"
+
+    assert entity._has_write_access is True
+
+
+def test_has_write_access_treats_cleared_access_level_as_outage():
+    """Stale firmware data with a cleared access_level uses the local fallback."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+    coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+    coordinator.config_entry = MagicMock()
+    maintenance_coordinator = MagicMock()
+    maintenance_coordinator.data = {
+        "firmware_versions": {"display_fw_version": "1.3.6"},
+        "access_level": None,
+    }
+    coordinator.config_entry.runtime_data = MagicMock(
+        maintenance_coordinator=maintenance_coordinator
+    )
+
+    class DummyModbusWriteEntity(QvantumAccessMixin):
+        def __init__(self, coordinator):
+            self.coordinator = coordinator
+            self._write_access_warning_logged = False
+
+        def _local_write_available(self):
             return True
 
     entity = DummyModbusWriteEntity(coordinator)

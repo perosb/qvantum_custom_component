@@ -133,7 +133,11 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
                     "continuing with local Modbus: %s",
                     err,
                 )
-                return self.data or {}
+                previous = dict(self.data or {})
+                # Drop stale authorization so callers can tell an outage from
+                # a fresh access-level result.
+                previous["access_level"] = None
+                return previous
             _LOGGER.error("Error checking firmware updates: %s", err)
             stack_trace = traceback.format_exc()
             raise UpdateFailed(

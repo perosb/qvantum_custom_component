@@ -77,13 +77,19 @@ def _has_required_device(device: dict, *, require_metadata: bool) -> bool:
 
 
 def _device_sw_version(device_metadata: dict) -> str | None:
-    """Format firmware versions for DeviceInfo, omitting an empty triple."""
-    display = device_metadata.get("display_fw_version")
-    cc = device_metadata.get("cc_fw_version")
-    inv = device_metadata.get("inv_fw_version")
-    if not (display or cc or inv):
+    """Format firmware versions for DeviceInfo, omitting an empty triple.
+
+    Missing slots are empty strings (not the literal ``"None"``) so the
+    registry parser can restore them without inventing firmware versions.
+    """
+    parts = [
+        device_metadata.get("display_fw_version"),
+        device_metadata.get("cc_fw_version"),
+        device_metadata.get("inv_fw_version"),
+    ]
+    if not any(parts):
         return None
-    return f"{display}/{cc}/{inv}"
+    return "/".join("" if value is None else str(value) for value in parts)
 
 
 @dataclass

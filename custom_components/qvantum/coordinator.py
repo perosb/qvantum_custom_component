@@ -88,11 +88,12 @@ def _firmware_metadata_from_sw_version(sw_version: str | None) -> dict:
     if not sw_version:
         return {}
     parts = str(sw_version).split("/")
-    return {
-        key: part
-        for key, part in zip(FIRMWARE_KEYS, parts)
-        if part
-    }
+    metadata = {}
+    for key, part in zip(FIRMWARE_KEYS, parts):
+        if not part or part == "None":
+            continue
+        metadata[key] = part
+    return metadata
 
 
 class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinator):
@@ -246,9 +247,22 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         except Exception:
             _LOGGER.debug("Failed to load cached device info", exc_info=True)
             return None
-        if isinstance(data, dict) and data.get("id"):
+        if self._is_usable_cached_device(data):
             return data
         return None
+
+    def _is_usable_cached_device(self, cached: dict | None) -> bool:
+        """Return True when cached identity is enough for the current transport.
+
+        HTTP mode needs metadata so a previous empty metadata response cannot
+        permanently skip a recovered cloud lookup. Modbus mode only needs an id.
+        """
+        if not isinstance(cached, dict) or not cached.get("id"):
+            return False
+        if self.modbus_enabled:
+            return True
+        metadata = cached.get("device_metadata")
+        return isinstance(metadata, dict) and bool(metadata)
 
     async def _persist_device_state(self) -> None:
         """Persist device identity so Modbus can start without the HTTP API."""

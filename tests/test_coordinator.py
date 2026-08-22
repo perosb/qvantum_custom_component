@@ -3278,3 +3278,46 @@ class TestDeviceLookupWhenHttpDown:
             "cc_fw_version": "140",
             "inv_fw_version": "141",
         }
+        assert _firmware_metadata_from_sw_version("1.0/None/None") == {
+            "display_fw_version": "1.0",
+        }
+        assert _firmware_metadata_from_sw_version("1.0//") == {
+            "display_fw_version": "1.0",
+        }
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_http_mode_ignores_id_only_cache(self, mock_super_init):
+        """Incomplete cached identity must not skip HTTP metadata lookup."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=False)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={"id": "test_device_123"}
+        )
+        device = {
+            "id": "test_device_123",
+            "device_metadata": {"display_fw_version": "1.3.6"},
+        }
+        mock_api.get_primary_device = AsyncMock(return_value=device)
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        mock_api.get_primary_device.assert_awaited()
+        assert result["device"]["device_metadata"]["display_fw_version"] == "1.3.6"
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_modbus_mode_accepts_id_only_cache(self, mock_super_init):
+        """Modbus startup only needs a device id from cache."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={"id": "test_device_123"}
+        )
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        mock_api.get_primary_device.assert_not_called()
+        assert result["device"]["id"] == "test_device_123"

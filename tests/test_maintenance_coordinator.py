@@ -205,7 +205,26 @@ class TestQvantumMaintenanceCoordinator:
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
-        assert result == {}
+        assert result["access_level"] is None
+
+    @pytest.mark.asyncio
+    async def test_async_check_firmware_updates_http_down_clears_stale_access(
+        self, maintenance_coordinator, mock_main_coordinator
+    ):
+        """A later outage must not keep a previous access_level in effect."""
+        mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.data = {
+            "firmware_versions": {"display_fw_version": "1.3.6"},
+            "access_level": {"writeAccessLevel": 20},
+        }
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+            side_effect=Exception("HTTP API down")
+        )
+
+        result = await maintenance_coordinator.async_check_firmware_updates()
+
+        assert result["access_level"] is None
+        assert result["firmware_versions"]["display_fw_version"] == "1.3.6"
 
     @pytest.mark.asyncio
     async def test_create_firmware_update_notifications(

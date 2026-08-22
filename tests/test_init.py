@@ -39,7 +39,7 @@ class TestSetupDeviceRequirements:
 
     def test_device_sw_version_omits_empty(self):
         assert _device_sw_version({}) is None
-        assert _device_sw_version({"display_fw_version": "1.0"}) == "1.0/None/None"
+        assert _device_sw_version({"display_fw_version": "1.0"}) == "1.0//"
 
 
 class TestIntegrationSetup:
