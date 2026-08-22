@@ -3357,3 +3357,102 @@ class TestDeviceLookupWhenHttpDown:
 
         mock_api.get_primary_device.assert_awaited()
         assert result["device"]["id"] == "new_device"
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_load_cached_device_swallows_store_errors(self, mock_super_init):
+        """A corrupted device store must not prevent an HTTP lookup."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device_store.async_load = AsyncMock(side_effect=OSError("disk"))
+        device = {"id": "test_device_123", "device_metadata": {"display_fw_version": "1"}}
+        mock_api.get_primary_device = AsyncMock(return_value=device)
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        assert result["device"]["id"] == "test_device_123"
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_persist_device_skips_without_username_or_id(self, mock_super_init):
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device = {}
+        await coordinator._persist_device_state()
+        coordinator._device_store.async_save.assert_not_called()
+
+        coordinator._device = {"id": "test_device_123"}
+        coordinator._config_entry.data = {"username": ""}
+        await coordinator._persist_device_state()
+        coordinator._device_store.async_save.assert_not_called()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_persist_device_swallows_store_errors(self, mock_super_init):
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device = {"id": "test_device_123"}
+        coordinator._device_store.async_save = AsyncMock(side_effect=OSError("disk"))
+        await coordinator._persist_device_state()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_device_from_registry_skips_unusable_entries(self, mock_super_init):
+        """Registry fallback must ignore devices that are not this config entry."""
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+
+        other_entry = MagicMock()
+        other_entry.config_entries = {"other_entry"}
+        other_entry.identifiers = {(DOMAIN, "qvantum-other")}
+
+        bad_identifier = MagicMock()
+        bad_identifier.config_entries = {"test_entry_id"}
+        bad_identifier.identifiers = {
+            "not-a-tuple",
+            (DOMAIN,),
+            ("other", "qvantum-x"),
+            (DOMAIN, 123),
+            (DOMAIN, "not-prefixed"),
+            (DOMAIN, "qvantum-"),
+        }
+
+        mock_registry = MagicMock()
+        mock_registry.devices.values.return_value = [other_entry, bad_identifier]
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            assert coordinator._device_from_registry() is None
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            side_effect=RuntimeError("registry unavailable"),
+        ):
+            assert coordinator._device_from_registry() is None
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=None,
+        ):
+            assert coordinator._device_from_registry() is None
+
+        empty_registry = MagicMock()
+        empty_registry.devices = None
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=empty_registry,
+        ):
+            assert coordinator._device_from_registry() is None
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_device_id_property_without_device(self, mock_super_init):
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device = None
+        assert coordinator.device_id is None
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_current_username_requires_non_empty_string(self, mock_super_init):
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._config_entry.data = {"username": 123}
+        assert coordinator._current_username() is None
+        coordinator._config_entry.data = {"username": ""}
+        assert coordinator._current_username() is None

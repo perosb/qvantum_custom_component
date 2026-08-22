@@ -87,6 +87,30 @@ def test_has_write_access_allows_modbus_metric_when_cloud_unavailable():
     assert entity._has_write_access is True
 
 
+def test_has_write_access_treats_empty_maintenance_data_as_outage():
+    """An empty maintenance payload is an outage, not a write denial."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+    coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+    coordinator.config_entry = MagicMock()
+    maintenance_coordinator = MagicMock()
+    maintenance_coordinator.data = {}
+    coordinator.config_entry.runtime_data = MagicMock(
+        maintenance_coordinator=maintenance_coordinator
+    )
+
+    class DummyModbusWriteEntity(QvantumAccessMixin):
+        def __init__(self, coordinator):
+            self.coordinator = coordinator
+            self._write_access_warning_logged = False
+
+        def _local_write_available(self):
+            return True
+
+    entity = DummyModbusWriteEntity(coordinator)
+    assert entity._has_write_access is True
+
+
 def test_has_write_access_treats_cleared_access_level_as_outage():
     """Stale firmware data with a cleared access_level uses the local fallback."""
     from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
@@ -137,6 +161,28 @@ def test_has_write_access_enabled_when_write_level_sufficient():
 
     entity = DummyAccessEntity(coordinator)
     assert entity._has_write_access is True
+
+
+def test_has_write_access_uses_live_access_level_on_qvantum_coordinator():
+    """A successful cloud check still gates writes on writeAccessLevel."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+    coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+    coordinator.config_entry = MagicMock()
+    maintenance_coordinator = MagicMock()
+    maintenance_coordinator.data = {"access_level": {"writeAccessLevel": 20}}
+    coordinator.config_entry.runtime_data = MagicMock(
+        maintenance_coordinator=maintenance_coordinator
+    )
+
+    entity = DummyAccessEntity(coordinator)
+    assert entity._has_write_access is True
+
+    maintenance_coordinator.data = {"access_level": {"writeAccessLevel": 10}}
+    assert entity._has_write_access is False
+
+    maintenance_coordinator.data = {"access_level": 0}
+    assert entity._has_write_access is False
 
 
 def test_resolve_device_id_from_identifier():

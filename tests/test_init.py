@@ -12,6 +12,7 @@ from custom_components.qvantum import (
     async_migrate_entry,
     PLATFORMS,
     _async_update_listener,
+    _coordinator_device,
     _has_required_device,
     _device_sw_version,
 )
@@ -40,6 +41,20 @@ class TestSetupDeviceRequirements:
     def test_device_sw_version_omits_empty(self):
         assert _device_sw_version({}) is None
         assert _device_sw_version({"display_fw_version": "1.0"}) == "1.0//"
+
+    def test_coordinator_device_handles_missing_or_invalid_payload(self):
+        coordinator = MagicMock()
+        coordinator.data = None
+        assert _coordinator_device(coordinator) == {}
+
+        coordinator.data = "not-a-dict"
+        assert _coordinator_device(coordinator) == {}
+
+        coordinator.data = {"device": "not-a-dict"}
+        assert _coordinator_device(coordinator) == {}
+
+        coordinator.data = {"device": {"id": "abc"}}
+        assert _coordinator_device(coordinator) == {"id": "abc"}
 
 
 class TestIntegrationSetup:
@@ -475,6 +490,86 @@ class TestIntegrationSetup:
             result = await async_setup_entry(hass, mock_config_entry)
 
         assert result is True
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_http_timeout_raises_not_ready(
+        self, hass, mock_config_entry, mock_api, mock_coordinator
+    ):
+        """HTTP mode must surface a hung firmware check as ConfigEntryNotReady."""
+        from homeassistant.exceptions import ConfigEntryNotReady
+
+        mock_config_entry.options = {}
+        mock_coordinator.data = {
+            "device": {
+                "id": "test_device_123",
+                "model": "QE-6",
+                "vendor": "Qvantum",
+                "device_metadata": {"display_fw_version": "1.0"},
+            },
+            "values": {},
+        }
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
+        mock_coordinator.async_restore_dhw_state = AsyncMock()
+
+        mock_firmware_coordinator = MagicMock()
+        mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock(
+            side_effect=TimeoutError()
+        )
+
+        with (
+            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch(
+                "custom_components.qvantum.QvantumDataUpdateCoordinator",
+                return_value=mock_coordinator,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
+                return_value=mock_firmware_coordinator,
+            ),
+            patch("custom_components.qvantum.services.async_setup_services"),
+        ):
+            with pytest.raises(ConfigEntryNotReady, match="timed out"):
+                await async_setup_entry(hass, mock_config_entry)
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_http_not_ready_propagates(
+        self, hass, mock_config_entry, mock_api, mock_coordinator
+    ):
+        """HTTP mode must not swallow ConfigEntryNotReady from firmware check."""
+        from homeassistant.exceptions import ConfigEntryNotReady
+
+        mock_config_entry.options = {}
+        mock_coordinator.data = {
+            "device": {
+                "id": "test_device_123",
+                "model": "QE-6",
+                "vendor": "Qvantum",
+                "device_metadata": {"display_fw_version": "1.0"},
+            },
+            "values": {},
+        }
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
+        mock_coordinator.async_restore_dhw_state = AsyncMock()
+
+        mock_firmware_coordinator = MagicMock()
+        mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock(
+            side_effect=ConfigEntryNotReady("HTTP API down")
+        )
+
+        with (
+            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch(
+                "custom_components.qvantum.QvantumDataUpdateCoordinator",
+                return_value=mock_coordinator,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
+                return_value=mock_firmware_coordinator,
+            ),
+            patch("custom_components.qvantum.services.async_setup_services"),
+        ):
+            with pytest.raises(ConfigEntryNotReady, match="HTTP API down"):
+                await async_setup_entry(hass, mock_config_entry)
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_empty_device_metadata_fails(self, hass, mock_config_entry):
