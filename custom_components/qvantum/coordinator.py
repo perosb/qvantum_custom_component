@@ -9,6 +9,7 @@ from typing import Any, Callable, Optional
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_SCAN_INTERVAL,
+    CONF_USERNAME,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -23,6 +24,7 @@ from .const import (
     DEFAULT_MODBUS_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    FIRMWARE_KEYS,
     HP_STATUS_COOLING,
     HP_STATUS_DEFROSTING,
     HP_STATUS_HEATING,
@@ -35,10 +37,13 @@ from .const import (
     REQUIRED_MODBUS_METRICS,
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
+    HTTP_CLOUD_LOOKUP_TIMEOUT,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
 
 _COMPRESSOR_TO_HP_STATUS_MAP = {
     2: HP_STATUS_HEATING,   # Heating → Heating
@@ -79,6 +84,19 @@ async def handle_setting_update_response(
     return False
 
 
+def _firmware_metadata_from_sw_version(sw_version: str | None) -> dict:
+    """Parse DeviceInfo sw_version (display/cc/inv) back into metadata keys."""
+    if not sw_version:
+        return {}
+    parts = str(sw_version).split("/")
+    metadata = {}
+    for key, part in zip(FIRMWARE_KEYS, parts):
+        if not part or part == "None":
+            continue
+        metadata[key] = part
+    return metadata
+
+
 class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinator):
     """Qvantum coordinator."""
 
@@ -116,6 +134,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         )
 
         self.api = hass.data[DOMAIN]
+        self._config_entry = config_entry
         self._device = None
         self._last_tap_stop_fetch: datetime | None = None
         self._cached_tap_stop: Any = None
@@ -158,10 +177,15 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._dhw_store: Store = Store(
             hass, 1, f"{DOMAIN}.dhw_ema.{config_entry.entry_id}"
         )
+        self._device_store: Store = Store(
+            hass, 1, f"{DOMAIN}.device.{config_entry.entry_id}"
+        )
+        self._store_account_mismatch = False
 
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name=f"{DOMAIN} ({config_entry.unique_id})",
             update_method=self.async_update_data,
             update_interval=timedelta(seconds=self.poll_interval),
@@ -218,6 +242,173 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._last_shower_duration_min or 0.0,
                 self._last_tap_water_cap or 0.0,
             )
+
+    async def _load_cached_device(self) -> dict | None:
+        """Load last-known device identity from persistent storage."""
+        self._store_account_mismatch = False
+        try:
+            data = await self._device_store.async_load()
+        except Exception:
+            _LOGGER.debug("Failed to load cached device info", exc_info=True)
+            return None
+        device = self._device_from_store_payload(data)
+        if self._is_usable_cached_device(device):
+            return device
+        return None
+
+    def _current_username(self) -> str | None:
+        """Return the configured account username, if any."""
+        data = getattr(self._config_entry, "data", None) or {}
+        username = data.get(CONF_USERNAME)
+        return username if isinstance(username, str) and username else None
+
+    def _device_from_store_payload(self, data: dict | None) -> dict | None:
+        """Unwrap a stored device bound to the current account.
+
+        Payloads without an account binding are ignored so a reconfigure that
+        keeps the same config-entry ID cannot keep serving the previous device.
+        """
+        if not isinstance(data, dict):
+            return None
+        stored_user = data.get("username")
+        device = data.get("device")
+        if stored_user != self._current_username():
+            # A present binding for another account must also block registry
+            # recovery: reconfigure keeps this config-entry ID, so the HA
+            # device registry still points at the previous account's device.
+            if stored_user:
+                self._store_account_mismatch = True
+            _LOGGER.debug(
+                "Ignoring cached device identity bound to a different account"
+            )
+            return None
+        return device if isinstance(device, dict) else None
+
+    def _is_usable_cached_device(self, cached: dict | None) -> bool:
+        """Return True when cached identity is enough for the current transport.
+
+        HTTP mode needs metadata so a previous empty metadata response cannot
+        permanently skip a recovered cloud lookup. Modbus mode only needs an id.
+        """
+        if not isinstance(cached, dict) or not cached.get("id"):
+            return False
+        if self.modbus_enabled:
+            return True
+        metadata = cached.get("device_metadata")
+        return isinstance(metadata, dict) and bool(metadata)
+
+    async def _persist_device_state(self) -> None:
+        """Persist device identity so Modbus can start without the HTTP API."""
+        if not isinstance(self._device, dict) or not self._device.get("id"):
+            return
+        username = self._current_username()
+        if not username:
+            return
+        try:
+            await self._device_store.async_save(
+                {"username": username, "device": self._device}
+            )
+        except Exception:
+            _LOGGER.debug("Failed to persist device info", exc_info=True)
+
+    def _device_from_registry(self) -> dict | None:
+        """Rebuild device identity from the HA device registry after a restart."""
+        try:
+            from homeassistant.helpers import device_registry as dr
+
+            registry = dr.async_get(self.hass)
+        except Exception:
+            return None
+        if registry is None:
+            return None
+
+        devices = getattr(registry, "devices", None)
+        if devices is None:
+            return None
+
+        entry_id = getattr(self._config_entry, "entry_id", None)
+        values = devices.values() if hasattr(devices, "values") else devices
+        prefix = f"{DOMAIN}-"
+        for ha_device in values:
+            config_entries = getattr(ha_device, "config_entries", None)
+            if (
+                entry_id
+                and config_entries is not None
+                and entry_id not in config_entries
+            ):
+                continue
+            identifiers = getattr(ha_device, "identifiers", None) or set()
+            for identifier in identifiers:
+                if not isinstance(identifier, (tuple, list)) or len(identifier) != 2:
+                    continue
+                domain, raw_id = identifier
+                if domain != DOMAIN or not isinstance(raw_id, str):
+                    continue
+                if not raw_id.startswith(prefix):
+                    continue
+                device_id = raw_id[len(prefix) :]
+                if not device_id:
+                    continue
+                return {
+                    "id": device_id,
+                    "vendor": getattr(ha_device, "manufacturer", None),
+                    "model": getattr(ha_device, "model", None),
+                    "serial": getattr(ha_device, "serial_number", None),
+                    "device_metadata": _firmware_metadata_from_sw_version(
+                        getattr(ha_device, "sw_version", None)
+                    ),
+                }
+        return None
+
+    async def _ensure_device(self) -> None:
+        """Populate device identity from cache, HTTP, or the device registry.
+
+        Cached identity is preferred so Modbus mode can start while the cloud
+        API is down. HTTP is only contacted when no cache is available.
+        """
+        if self._device is None:
+            cached = await self._load_cached_device()
+            if isinstance(cached, dict) and cached.get("id"):
+                self._device = cached
+                _LOGGER.debug(
+                    "Loaded cached device info for %s", cached.get("id")
+                )
+
+        if self._device is not None:
+            return
+
+        http_error: Exception | None = None
+        try:
+            device = await asyncio.wait_for(
+                self.api.get_primary_device(),
+                timeout=HTTP_CLOUD_LOOKUP_TIMEOUT,
+            )
+            if isinstance(device, dict) and device.get("id"):
+                self._device = device
+                await self._persist_device_state()
+                return
+        except Exception as err:
+            http_error = err
+            _LOGGER.warning(
+                "Failed to fetch device info from HTTP API: %s", err
+            )
+
+        if self.modbus_enabled and not self._store_account_mismatch:
+            from_registry = self._device_from_registry()
+            if from_registry:
+                self._device = from_registry
+                await self._persist_device_state()
+                _LOGGER.warning(
+                    "HTTP API unavailable; using device registry for local Modbus startup"
+                )
+                return
+        if self._store_account_mismatch:
+            _LOGGER.warning(
+                "Skipping device registry recovery; cached identity is bound to a different account"
+            )
+
+        if http_error is not None:
+            raise http_error
 
     def _persist_dhw_state(self) -> None:
         """Save DHW EMA snapshot via a debounced write so it survives a restart.
@@ -457,10 +648,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
     async def async_update_data(self):
         """Fetch data from API endpoint."""
         try:
-            # Get device info if not cached
-            if self._device is None:
-                _LOGGER.debug("Fetching primary device info")
-                self._device = await self.api.get_primary_device()
+            await self._ensure_device()
 
             # Validate device information before accessing it
             if self._device is None:
@@ -559,22 +747,28 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         except APIAuthError as err:
             _LOGGER.error(
                 "Authentication error for device %s: %s",
-                getattr(self, "_device", {}).get("id", "unknown"),
+                self._logged_device_id(),
                 err,
             )
             raise UpdateFailed(f"Authentication failed: {err}") from err
         except asyncio.TimeoutError as err:
             _LOGGER.error(
                 "Timeout fetching data for device %s",
-                getattr(self, "_device", {}).get("id", "unknown"),
+                self._logged_device_id(),
             )
             raise UpdateFailed("Request timeout") from err
         except Exception as err:
-            device_id = getattr(self, "_device", {}).get("id", "unknown")
             _LOGGER.error(
                 "Unexpected error fetching data for device %s: %s",
-                device_id,
+                self._logged_device_id(),
                 err,
                 exc_info=True,
             )
             raise UpdateFailed(f"Error communicating with API: {err}") from err
+
+    def _logged_device_id(self) -> str:
+        """Return a device id safe to include in error logs."""
+        device = self._device
+        if isinstance(device, dict):
+            return str(device.get("id") or "unknown")
+        return "unknown"

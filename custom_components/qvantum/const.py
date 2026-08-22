@@ -33,6 +33,8 @@ CONF_MODBUS_SCAN_INTERVAL = "modbus_scan_interval"
 DEFAULT_MODBUS_HOST = "Qvantum-HP"
 DEFAULT_MODBUS_PORT = 502
 DEFAULT_MODBUS_UNIT_ID = 1
+# Bound cloud lookups so a down HTTP API cannot stall Modbus startup.
+HTTP_CLOUD_LOOKUP_TIMEOUT = 15
 
 # Metrics available in both HTTP and Modbus modes
 DEFAULT_ENABLED_METRICS = [

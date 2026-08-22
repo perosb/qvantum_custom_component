@@ -5,6 +5,7 @@ import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
+from custom_components.qvantum.api import APIAuthError
 from custom_components.qvantum.maintenance_coordinator import (
     QvantumMaintenanceCoordinator,
 )
@@ -39,6 +40,7 @@ class TestQvantumMaintenanceCoordinator:
             }
         }
         coordinator._device = coordinator.data["device"]
+        coordinator.modbus_enabled = False
         return coordinator
 
     @pytest_asyncio.fixture
@@ -60,6 +62,20 @@ class TestQvantumMaintenanceCoordinator:
                 main_coordinator=mock_main_coordinator,
             )
         return coordinator
+
+    def test_passes_config_entry_to_parent(
+        self, hass, mock_config_entry, mock_main_coordinator
+    ):
+        """Parent DataUpdateCoordinator must receive config_entry explicitly."""
+        from custom_components.qvantum.const import DOMAIN
+
+        hass.data[DOMAIN] = MagicMock()
+        coordinator = QvantumMaintenanceCoordinator(
+            hass=hass,
+            config_entry=mock_config_entry,
+            main_coordinator=mock_main_coordinator,
+        )
+        assert coordinator.config_entry is mock_config_entry
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_no_device(
@@ -190,6 +206,73 @@ class TestQvantumMaintenanceCoordinator:
         )
 
         with pytest.raises(Exception):
+            await maintenance_coordinator.async_check_firmware_updates()
+
+    @pytest.mark.asyncio
+    async def test_async_check_firmware_updates_http_down_modbus_continues(
+        self, maintenance_coordinator, mock_main_coordinator
+    ):
+        """Modbus mode must not fail firmware check when the HTTP API is down."""
+        mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+            side_effect=Exception("HTTP API down")
+        )
+
+        result = await maintenance_coordinator.async_check_firmware_updates()
+
+        assert "access_level" not in result
+
+    @pytest.mark.asyncio
+    async def test_async_check_firmware_updates_http_down_clears_stale_access(
+        self, maintenance_coordinator, mock_main_coordinator
+    ):
+        """A later outage must not keep a previous access_level in effect."""
+        mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.data = {
+            "firmware_versions": {"display_fw_version": "1.3.6"},
+            "access_level": {"writeAccessLevel": 20},
+        }
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+            side_effect=Exception("HTTP API down")
+        )
+
+        result = await maintenance_coordinator.async_check_firmware_updates()
+
+        assert "access_level" not in result
+        assert result["firmware_versions"]["display_fw_version"] == "1.3.6"
+
+    @pytest.mark.asyncio
+    async def test_async_check_firmware_updates_auth_error_modbus_clears_access(
+        self, maintenance_coordinator, mock_main_coordinator
+    ):
+        """Auth failures in Modbus mode must not keep a previous access_level."""
+        mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.data = {
+            "firmware_versions": {"display_fw_version": "1.3.6"},
+            "access_level": {"writeAccessLevel": 20},
+        }
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+            side_effect=APIAuthError(None, "token refresh failed")
+        )
+
+        result = await maintenance_coordinator.async_check_firmware_updates()
+
+        assert "access_level" not in result
+        assert result["firmware_versions"]["display_fw_version"] == "1.3.6"
+
+    @pytest.mark.asyncio
+    async def test_async_check_firmware_updates_auth_error_http_still_fails(
+        self, maintenance_coordinator, mock_main_coordinator
+    ):
+        """HTTP mode still treats authentication errors as a failed update."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        mock_main_coordinator.modbus_enabled = False
+        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+            side_effect=APIAuthError(None, "token refresh failed")
+        )
+
+        with pytest.raises(UpdateFailed):
             await maintenance_coordinator.async_check_firmware_updates()
 
     @pytest.mark.asyncio

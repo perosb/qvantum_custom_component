@@ -51,9 +51,15 @@ class QvantumAccessMixin:
             maintenance_coordinator = (
                 self.coordinator.config_entry.runtime_data.maintenance_coordinator
             )
-            if not maintenance_coordinator or not maintenance_coordinator.data:
-                return False
-            access_level = maintenance_coordinator.data.get("access_level", {})
+            if not maintenance_coordinator:
+                return self._local_write_available()
+            data = maintenance_coordinator.data
+            # Missing/cleared access_level means the cloud check is unavailable,
+            # not that write access is denied. Only entities that actually write
+            # via Modbus remain available.
+            if not data or data.get("access_level") is None:
+                return self._local_write_available()
+            access_level = data.get("access_level") or {}
             return access_level.get("writeAccessLevel", 0) >= 20
         except AttributeError:
             # For tests or incomplete setup, deny write access and log misconfiguration once per entity
@@ -65,6 +71,19 @@ class QvantumAccessMixin:
                 )
                 self._write_access_warning_logged = True
             return False
+
+    def _local_write_available(self) -> bool:
+        """Return True when this entity can write locally without the cloud API."""
+        return False
+
+
+# Metrics whose entity implementations write via Modbus holding registers.
+# HTTP-backed controls must not become writable just because Modbus TCP is on.
+_LOCAL_MODBUS_WRITE_METRICS = {
+    "dhw_stop_extra",
+    "room_temp_external",
+    "use_operation_sensor",
+}
 
 
 # Centralized icon map for all Qvantum entities keyed by metric_key
@@ -146,6 +165,13 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
             config_entry.data.get(CONF_MODBUS_TCP, False),
         )
         return modbus_write_enabled and modbus_tcp_enabled
+
+    def _local_write_available(self) -> bool:
+        """Return True when this metric writes via Modbus and writes are enabled."""
+        return (
+            self._is_modbus_write_allowed()
+            and getattr(self, "_metric_key", None) in _LOCAL_MODBUS_WRITE_METRICS
+        )
 
     def _resolve_device_id(self, device: DeviceInfo | dict[str, object]) -> str | None:
         """Resolve device ID from device info or coordinator data."""

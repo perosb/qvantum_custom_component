@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from custom_components.qvantum.coordinator import (
     handle_setting_update_response,
     QvantumDataUpdateCoordinator,
+    _firmware_metadata_from_sw_version,
 )
 from custom_components.qvantum.const import (
     CONF_MODBUS_SCAN_INTERVAL,
@@ -126,6 +127,23 @@ class TestHandleSettingUpdateResponse:
 
 class TestQvantumDataUpdateCoordinator:
     """Test the QvantumDataUpdateCoordinator class."""
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_passes_config_entry_to_parent(self, mock_super_init):
+        """Parent DataUpdateCoordinator must receive config_entry explicitly."""
+        mock_super_init.return_value = None
+        mock_hass = MagicMock()
+        mock_hass.data = {DOMAIN: MagicMock()}
+        config_entry = MagicMock()
+        config_entry.options.get.return_value = 30
+        config_entry.unique_id = "test_device"
+        config_entry.entry_id = "test_entry_id"
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
+
+        mock_super_init.assert_called_once()
+        assert mock_super_init.call_args.kwargs["config_entry"] is config_entry
+        assert coordinator._config_entry is config_entry
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_with_device_found(self, mock_super_init):
@@ -3151,3 +3169,380 @@ class TestCalculateTapWaterCap:
         )
         assert coordinator._last_shower_flow_lpm is None
         assert coordinator._shower_event_history == []
+
+
+class TestDeviceLookupWhenHttpDown:
+    """Device identity must not depend on a live HTTP API in Modbus mode."""
+
+    def _make_coordinator(self, mock_super_init, *, modbus: bool):
+        mock_super_init.return_value = None
+        mock_api = MagicMock()
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+        mock_config_entry = MagicMock()
+        mock_config_entry.entry_id = "test_entry_id"
+        mock_config_entry.unique_id = "test_device_123"
+        mock_config_entry.data = {"username": "test@example.com"}
+        if modbus:
+            mock_config_entry.options.get.side_effect = _modbus_options_get
+        else:
+            mock_config_entry.options.get.side_effect = lambda key, default=None: default
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+        coordinator.api = mock_api
+        coordinator.hass = mock_hass
+        coordinator._device_store = MagicMock()
+        coordinator._device_store.async_load = AsyncMock(return_value=None)
+        coordinator._device_store.async_save = AsyncMock()
+        return coordinator, mock_api
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_uses_cached_device_when_http_down(self, mock_super_init):
+        """Cached device identity is used so Modbus can start without HTTP."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        cached = {
+            "id": "test_device_123",
+            "vendor": "Qvantum",
+            "model": "QE-6",
+            "device_metadata": {"display_fw_version": "1.3.6"},
+        }
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={"username": "test@example.com", "device": cached}
+        )
+        mock_api.get_metrics = AsyncMock(
+            return_value={"metrics": {"hpid": "test_device_123", "bt1": 7.5}}
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        mock_api.get_primary_device.assert_not_called()
+        assert result["device"]["id"] == "test_device_123"
+        assert result["values"]["bt1"] == 7.5
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_uses_device_registry_when_http_down(self, mock_super_init):
+        """After a restart with no store file, fall back to the device registry."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+        mock_api.get_metrics = AsyncMock(
+            return_value={"metrics": {"hpid": "test_device_123"}}
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        ha_device = MagicMock()
+        ha_device.config_entries = {"test_entry_id"}
+        ha_device.identifiers = {(DOMAIN, "qvantum-test_device_123")}
+        ha_device.manufacturer = "Qvantum"
+        ha_device.model = "QE-6"
+        ha_device.serial_number = "test_device_123"
+        ha_device.sw_version = "1.3.6/140/140"
+
+        mock_registry = MagicMock()
+        mock_registry.devices.values.return_value = [ha_device]
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            result = await coordinator.async_update_data()
+
+        assert result["device"]["id"] == "test_device_123"
+        assert result["device"]["device_metadata"]["display_fw_version"] == "1.3.6"
+        mock_api.get_primary_device.assert_awaited()
+        coordinator._device_store.async_save.assert_awaited()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_http_mode_still_fails_when_api_down(self, mock_super_init):
+        """HTTP-only mode still requires a live cloud device lookup."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=False)
+        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+
+        with pytest.raises(UpdateFailed):
+            await coordinator.async_update_data()
+
+        mock_api.get_metrics.assert_not_called()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_persists_device_after_successful_http_lookup(self, mock_super_init):
+        """A successful HTTP lookup is stored for later Modbus-only startups."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        device = {
+            "id": "test_device_123",
+            "vendor": "Qvantum",
+            "model": "QE-6",
+            "device_metadata": {"display_fw_version": "1.3.6"},
+        }
+        mock_api.get_primary_device = AsyncMock(return_value=device)
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        await coordinator.async_update_data()
+
+        coordinator._device_store.async_save.assert_awaited_once_with(
+            {"username": "test@example.com", "device": device}
+        )
+
+    def test_firmware_metadata_from_sw_version(self):
+        assert _firmware_metadata_from_sw_version(None) == {}
+        assert _firmware_metadata_from_sw_version("1.3.6/140/141") == {
+            "display_fw_version": "1.3.6",
+            "cc_fw_version": "140",
+            "inv_fw_version": "141",
+        }
+        assert _firmware_metadata_from_sw_version("1.0/None/None") == {
+            "display_fw_version": "1.0",
+        }
+        assert _firmware_metadata_from_sw_version("1.0//") == {
+            "display_fw_version": "1.0",
+        }
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_http_mode_ignores_id_only_cache(self, mock_super_init):
+        """Incomplete cached identity must not skip HTTP metadata lookup."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=False)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={
+                "username": "test@example.com",
+                "device": {"id": "test_device_123"},
+            }
+        )
+        device = {
+            "id": "test_device_123",
+            "device_metadata": {"display_fw_version": "1.3.6"},
+        }
+        mock_api.get_primary_device = AsyncMock(return_value=device)
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        mock_api.get_primary_device.assert_awaited()
+        assert result["device"]["device_metadata"]["display_fw_version"] == "1.3.6"
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_modbus_mode_accepts_id_only_cache(self, mock_super_init):
+        """Modbus startup only needs a device id from cache."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={
+                "username": "test@example.com",
+                "device": {"id": "test_device_123"},
+            }
+        )
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        mock_api.get_primary_device.assert_not_called()
+        assert result["device"]["id"] == "test_device_123"
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_modbus_mode_rejects_cache_for_other_account(self, mock_super_init):
+        """Cached identity from a previous account must not be reused after reconfigure."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={
+                "username": "old@example.com",
+                "device": {"id": "old_device", "model": "QE-6"},
+            }
+        )
+        device = {
+            "id": "new_device",
+            "vendor": "Qvantum",
+            "model": "QE-6",
+            "device_metadata": {"display_fw_version": "1.3.6"},
+        }
+        mock_api.get_primary_device = AsyncMock(return_value=device)
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        mock_api.get_primary_device.assert_awaited()
+        assert result["device"]["id"] == "new_device"
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_modbus_mode_skips_registry_when_store_bound_to_other_account(
+        self, mock_super_init
+    ):
+        """Registry recovery must not rebind the previous account's device after reconfigure."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={
+                "username": "old@example.com",
+                "device": {"id": "old_device", "model": "QE-6"},
+            }
+        )
+        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+
+        ha_device = MagicMock()
+        ha_device.config_entries = {"test_entry_id"}
+        ha_device.identifiers = {(DOMAIN, "qvantum-old_device")}
+        ha_device.manufacturer = "Qvantum"
+        ha_device.model = "QE-6"
+        ha_device.serial_number = "old_device"
+        ha_device.sw_version = "1.3.6/140/140"
+
+        mock_registry = MagicMock()
+        mock_registry.devices.values.return_value = [ha_device]
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            with pytest.raises(UpdateFailed):
+                await coordinator.async_update_data()
+
+        coordinator._device_store.async_save.assert_not_called()
+        mock_api.get_metrics.assert_not_called()
+        assert coordinator._device is None
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_modbus_mode_uses_registry_for_legacy_unbound_store(
+        self, mock_super_init
+    ):
+        """A store without an account binding still allows registry recovery."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={"id": "test_device_123", "model": "QE-6"}
+        )
+        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        ha_device = MagicMock()
+        ha_device.config_entries = {"test_entry_id"}
+        ha_device.identifiers = {(DOMAIN, "qvantum-test_device_123")}
+        ha_device.manufacturer = "Qvantum"
+        ha_device.model = "QE-6"
+        ha_device.serial_number = "test_device_123"
+        ha_device.sw_version = "1.3.6/140/140"
+
+        mock_registry = MagicMock()
+        mock_registry.devices.values.return_value = [ha_device]
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            result = await coordinator.async_update_data()
+
+        assert result["device"]["id"] == "test_device_123"
+        coordinator._device_store.async_save.assert_awaited()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_load_cached_device_swallows_store_errors(self, mock_super_init):
+        """A corrupted device store must not prevent an HTTP lookup."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device_store.async_load = AsyncMock(side_effect=OSError("disk"))
+        device = {"id": "test_device_123", "device_metadata": {"display_fw_version": "1"}}
+        mock_api.get_primary_device = AsyncMock(return_value=device)
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        assert result["device"]["id"] == "test_device_123"
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_persist_device_skips_without_username_or_id(self, mock_super_init):
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device = {}
+        await coordinator._persist_device_state()
+        coordinator._device_store.async_save.assert_not_called()
+
+        coordinator._device = {"id": "test_device_123"}
+        coordinator._config_entry.data = {"username": ""}
+        await coordinator._persist_device_state()
+        coordinator._device_store.async_save.assert_not_called()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_persist_device_swallows_store_errors(self, mock_super_init):
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device = {"id": "test_device_123"}
+        coordinator._device_store.async_save = AsyncMock(side_effect=OSError("disk"))
+        await coordinator._persist_device_state()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_device_from_registry_skips_unusable_entries(self, mock_super_init):
+        """Registry fallback must ignore devices that are not this config entry."""
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+
+        other_entry = MagicMock()
+        other_entry.config_entries = {"other_entry"}
+        other_entry.identifiers = {(DOMAIN, "qvantum-other")}
+
+        bad_identifier = MagicMock()
+        bad_identifier.config_entries = {"test_entry_id"}
+        bad_identifier.identifiers = {
+            "not-a-tuple",
+            (DOMAIN,),
+            ("other", "qvantum-x"),
+            (DOMAIN, 123),
+            (DOMAIN, "not-prefixed"),
+            (DOMAIN, "qvantum-"),
+        }
+
+        mock_registry = MagicMock()
+        mock_registry.devices.values.return_value = [other_entry, bad_identifier]
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            assert coordinator._device_from_registry() is None
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            side_effect=RuntimeError("registry unavailable"),
+        ):
+            assert coordinator._device_from_registry() is None
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=None,
+        ):
+            assert coordinator._device_from_registry() is None
+
+        empty_registry = MagicMock()
+        empty_registry.devices = None
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=empty_registry,
+        ):
+            assert coordinator._device_from_registry() is None
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_device_id_property_without_device(self, mock_super_init):
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device = None
+        assert coordinator.device_id is None
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_current_username_requires_non_empty_string(self, mock_super_init):
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._config_entry.data = {"username": 123}
+        assert coordinator._current_username() is None
+        coordinator._config_entry.data = {"username": ""}
+        assert coordinator._current_username() is None

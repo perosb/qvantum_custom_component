@@ -29,6 +29,11 @@ def mock_storage_save():
             Mock(return_value=None),
             raising=False,
         )
+        mp.setattr(
+            "homeassistant.helpers.storage.Store.async_load",
+            AsyncMock(return_value=None),
+            raising=False,
+        )
         yield
 
 
