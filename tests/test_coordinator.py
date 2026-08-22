@@ -3169,7 +3169,7 @@ class TestDeviceLookupWhenHttpDown:
         mock_config_entry = MagicMock()
         mock_config_entry.entry_id = "test_entry_id"
         mock_config_entry.unique_id = "test_device_123"
-        mock_config_entry.data = {}
+        mock_config_entry.data = {"username": "test@example.com"}
         if modbus:
             mock_config_entry.options.get.side_effect = _modbus_options_get
         else:
@@ -3193,7 +3193,9 @@ class TestDeviceLookupWhenHttpDown:
             "model": "QE-6",
             "device_metadata": {"display_fw_version": "1.3.6"},
         }
-        coordinator._device_store.async_load = AsyncMock(return_value=cached)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={"username": "test@example.com", "device": cached}
+        )
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123", "bt1": 7.5}}
         )
@@ -3269,7 +3271,9 @@ class TestDeviceLookupWhenHttpDown:
 
         await coordinator.async_update_data()
 
-        coordinator._device_store.async_save.assert_awaited_once_with(device)
+        coordinator._device_store.async_save.assert_awaited_once_with(
+            {"username": "test@example.com", "device": device}
+        )
 
     def test_firmware_metadata_from_sw_version(self):
         assert _firmware_metadata_from_sw_version(None) == {}
@@ -3291,7 +3295,10 @@ class TestDeviceLookupWhenHttpDown:
         """Incomplete cached identity must not skip HTTP metadata lookup."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=False)
         coordinator._device_store.async_load = AsyncMock(
-            return_value={"id": "test_device_123"}
+            return_value={
+                "username": "test@example.com",
+                "device": {"id": "test_device_123"},
+            }
         )
         device = {
             "id": "test_device_123",
@@ -3312,7 +3319,10 @@ class TestDeviceLookupWhenHttpDown:
         """Modbus startup only needs a device id from cache."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
         coordinator._device_store.async_load = AsyncMock(
-            return_value={"id": "test_device_123"}
+            return_value={
+                "username": "test@example.com",
+                "device": {"id": "test_device_123"},
+            }
         )
         mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
@@ -3321,3 +3331,29 @@ class TestDeviceLookupWhenHttpDown:
 
         mock_api.get_primary_device.assert_not_called()
         assert result["device"]["id"] == "test_device_123"
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_modbus_mode_rejects_cache_for_other_account(self, mock_super_init):
+        """Cached identity from a previous account must not be reused after reconfigure."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={
+                "username": "old@example.com",
+                "device": {"id": "old_device", "model": "QE-6"},
+            }
+        )
+        device = {
+            "id": "new_device",
+            "vendor": "Qvantum",
+            "model": "QE-6",
+            "device_metadata": {"display_fw_version": "1.3.6"},
+        }
+        mock_api.get_primary_device = AsyncMock(return_value=device)
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        mock_api.get_primary_device.assert_awaited()
+        assert result["device"]["id"] == "new_device"

@@ -206,7 +206,7 @@ class TestQvantumMaintenanceCoordinator:
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
-        assert result["access_level"] is None
+        assert "access_level" not in result
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_http_down_clears_stale_access(
@@ -224,7 +224,7 @@ class TestQvantumMaintenanceCoordinator:
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
-        assert result["access_level"] is None
+        assert "access_level" not in result
         assert result["firmware_versions"]["display_fw_version"] == "1.3.6"
 
     @pytest.mark.asyncio
@@ -243,7 +243,7 @@ class TestQvantumMaintenanceCoordinator:
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
-        assert result["access_level"] is None
+        assert "access_level" not in result
         assert result["firmware_versions"]["display_fw_version"] == "1.3.6"
 
     @pytest.mark.asyncio

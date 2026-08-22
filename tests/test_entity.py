@@ -96,7 +96,6 @@ def test_has_write_access_treats_cleared_access_level_as_outage():
     maintenance_coordinator = MagicMock()
     maintenance_coordinator.data = {
         "firmware_versions": {"display_fw_version": "1.3.6"},
-        "access_level": None,
     }
     coordinator.config_entry.runtime_data = MagicMock(
         maintenance_coordinator=maintenance_coordinator

@@ -145,7 +145,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
             err,
         )
         previous = dict(self.data or {})
-        previous["access_level"] = None
+        previous.pop("access_level", None)
         return previous
 
     async def _create_firmware_update_notifications(

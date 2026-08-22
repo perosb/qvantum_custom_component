@@ -9,6 +9,7 @@ from typing import Any, Callable, Optional
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_SCAN_INTERVAL,
+    CONF_USERNAME,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -247,9 +248,33 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         except Exception:
             _LOGGER.debug("Failed to load cached device info", exc_info=True)
             return None
-        if self._is_usable_cached_device(data):
-            return data
+        device = self._device_from_store_payload(data)
+        if self._is_usable_cached_device(device):
+            return device
         return None
+
+    def _current_username(self) -> str | None:
+        """Return the configured account username, if any."""
+        data = getattr(self._config_entry, "data", None) or {}
+        username = data.get(CONF_USERNAME)
+        return username if isinstance(username, str) and username else None
+
+    def _device_from_store_payload(self, data: dict | None) -> dict | None:
+        """Unwrap a stored device bound to the current account.
+
+        Payloads without an account binding are ignored so a reconfigure that
+        keeps the same config-entry ID cannot keep serving the previous device.
+        """
+        if not isinstance(data, dict):
+            return None
+        stored_user = data.get("username")
+        device = data.get("device")
+        if stored_user != self._current_username():
+            _LOGGER.debug(
+                "Ignoring cached device identity bound to a different account"
+            )
+            return None
+        return device if isinstance(device, dict) else None
 
     def _is_usable_cached_device(self, cached: dict | None) -> bool:
         """Return True when cached identity is enough for the current transport.
@@ -268,8 +293,13 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         """Persist device identity so Modbus can start without the HTTP API."""
         if not isinstance(self._device, dict) or not self._device.get("id"):
             return
+        username = self._current_username()
+        if not username:
+            return
         try:
-            await self._device_store.async_save(self._device)
+            await self._device_store.async_save(
+                {"username": username, "device": self._device}
+            )
         except Exception:
             _LOGGER.debug("Failed to persist device info", exc_info=True)
 
