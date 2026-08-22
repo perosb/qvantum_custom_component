@@ -180,6 +180,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._device_store: Store = Store(
             hass, 1, f"{DOMAIN}.device.{config_entry.entry_id}"
         )
+        self._store_account_mismatch = False
 
         super().__init__(
             hass,
@@ -243,6 +244,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
     async def _load_cached_device(self) -> dict | None:
         """Load last-known device identity from persistent storage."""
+        self._store_account_mismatch = False
         try:
             data = await self._device_store.async_load()
         except Exception:
@@ -270,6 +272,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         stored_user = data.get("username")
         device = data.get("device")
         if stored_user != self._current_username():
+            # A present binding for another account must also block registry
+            # recovery: reconfigure keeps this config-entry ID, so the HA
+            # device registry still points at the previous account's device.
+            if stored_user:
+                self._store_account_mismatch = True
             _LOGGER.debug(
                 "Ignoring cached device identity bound to a different account"
             )
@@ -385,7 +392,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 "Failed to fetch device info from HTTP API: %s", err
             )
 
-        if self.modbus_enabled:
+        if self.modbus_enabled and not self._store_account_mismatch:
             from_registry = self._device_from_registry()
             if from_registry:
                 self._device = from_registry
@@ -394,6 +401,10 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                     "HTTP API unavailable; using device registry for local Modbus startup"
                 )
                 return
+        if self._store_account_mismatch:
+            _LOGGER.warning(
+                "Skipping device registry recovery; cached identity is bound to a different account"
+            )
 
         if http_error is not None:
             raise http_error

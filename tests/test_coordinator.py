@@ -3360,6 +3360,79 @@ class TestDeviceLookupWhenHttpDown:
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
+    async def test_modbus_mode_skips_registry_when_store_bound_to_other_account(
+        self, mock_super_init
+    ):
+        """Registry recovery must not rebind the previous account's device after reconfigure."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={
+                "username": "old@example.com",
+                "device": {"id": "old_device", "model": "QE-6"},
+            }
+        )
+        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+
+        ha_device = MagicMock()
+        ha_device.config_entries = {"test_entry_id"}
+        ha_device.identifiers = {(DOMAIN, "qvantum-old_device")}
+        ha_device.manufacturer = "Qvantum"
+        ha_device.model = "QE-6"
+        ha_device.serial_number = "old_device"
+        ha_device.sw_version = "1.3.6/140/140"
+
+        mock_registry = MagicMock()
+        mock_registry.devices.values.return_value = [ha_device]
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            with pytest.raises(UpdateFailed):
+                await coordinator.async_update_data()
+
+        coordinator._device_store.async_save.assert_not_called()
+        mock_api.get_metrics.assert_not_called()
+        assert coordinator._device is None
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_modbus_mode_uses_registry_for_legacy_unbound_store(
+        self, mock_super_init
+    ):
+        """A store without an account binding still allows registry recovery."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        coordinator._device_store.async_load = AsyncMock(
+            return_value={"id": "test_device_123", "model": "QE-6"}
+        )
+        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        ha_device = MagicMock()
+        ha_device.config_entries = {"test_entry_id"}
+        ha_device.identifiers = {(DOMAIN, "qvantum-test_device_123")}
+        ha_device.manufacturer = "Qvantum"
+        ha_device.model = "QE-6"
+        ha_device.serial_number = "test_device_123"
+        ha_device.sw_version = "1.3.6/140/140"
+
+        mock_registry = MagicMock()
+        mock_registry.devices.values.return_value = [ha_device]
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            result = await coordinator.async_update_data()
+
+        assert result["device"]["id"] == "test_device_123"
+        coordinator._device_store.async_save.assert_awaited()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
     async def test_load_cached_device_swallows_store_errors(self, mock_super_init):
         """A corrupted device store must not prevent an HTTP lookup."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
