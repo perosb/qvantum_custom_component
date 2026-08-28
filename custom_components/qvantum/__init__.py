@@ -518,10 +518,11 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
 async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
     """Unload Qvantum Heat Pump Integration.
 
-    Shut down coordinators before closing the shared API client so in-flight
-    Modbus/HTTP polls are cancelled cleanly. Otherwise a poll cancelled mid-
-    request can fall back to HTTP against a closed session, or leave the Modbus
-    half-open so the next setup cannot reconnect without a full HA restart.
+    Shut down coordinators before closing the HTTP API client so in-flight
+    polls are cancelled first. Otherwise a cancelled Modbus poll can fall
+    back to HTTP against a session that is already closing. The shared
+    Modbus TCP connection is released by Home Assistant when this config
+    entry unloads; this integration never closes it.
     """
     runtime = getattr(config_entry, "runtime_data", None)
 

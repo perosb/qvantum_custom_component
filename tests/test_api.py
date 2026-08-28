@@ -274,7 +274,7 @@ class TestQvantumAPI:
 
     @pytest.mark.asyncio
     async def test_close_owned_session_and_modbus_client(self):
-        """Owned HTTP session and Modbus connection are closed under the lock."""
+        """Owned HTTP session is closed; the borrowed Modbus connection is not."""
         api = QvantumAPI("test@example.com", "password", "test-agent", modbus_tcp=True)
         mock_session = MagicMock()
         mock_session.close = AsyncMock()
@@ -365,6 +365,41 @@ class TestQvantumAPI:
                 await api.get_metrics("test_device_123", enabled_metrics=["bt1"])
 
         mock_session.get.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_shared_connection_closed_falls_back_to_http(
+        self, mock_session
+    ):
+        """A closed borrowed Modbus link must still fall back to HTTP."""
+        from modbus_connection import ClientClosedError
+
+        cm, mock_response = mock_session.make_cm_response(
+            status=200,
+            json_data={"values": {"bt1": 123}, "total_latency": 10},
+            headers={"ETag": "etag123"},
+        )
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        _connection, device = attach_mock_modbus(api)
+
+        async def closed_update():
+            raise ClientClosedError("connection closed")
+
+        device.async_update_inputs = closed_update
+
+        result = await api.get_metrics("test_device", enabled_metrics=["bt1"])
+
+        assert result["metrics"]["bt1"] == 123
+        assert mock_session.get.called
 
     @pytest.mark.asyncio
     async def test_close_waits_for_in_flight_modbus_lock(self):

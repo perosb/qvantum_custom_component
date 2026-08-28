@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 from typing import Any, Optional
 
-from modbus_connection import ClientClosedError, ModbusError, ModbusUnit
+from modbus_connection import ModbusError, ModbusUnit
 
 from .const import (
     DEFAULT_ENABLED_HTTP_METRICS,
@@ -167,8 +167,6 @@ class QvantumAPI:
                 # Reload/unload cancels in-flight polls. Do not close or
                 # disconnect the shared connection; other consumers may hold it.
                 raise
-            except ClientClosedError as err:
-                raise APIConnectionError(None, "API client is closed") from err
             except ModbusError as err:
                 _LOGGER.error("Modbus error %s: %s", error_label, err)
                 raise APIConnectionError(None, f"{failure_prefix}: {err}") from err
