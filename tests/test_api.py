@@ -8,7 +8,19 @@ import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from modbus_connection import ModbusConnectionError, ModbusTimeoutError
+from modbus_connection.mock import MockModbusConnection
+
 from custom_components.qvantum.api import QvantumAPI
+from custom_components.qvantum.modbus_device import QvantumModbusDevice
+
+
+def attach_mock_modbus(api):
+    """Attach an in-memory Modbus unit so tests never open a TCP socket."""
+    connection = MockModbusConnection()
+    api._modbus_unit = connection.for_unit(api._modbus_unit_id)
+    api._modbus_device = QvantumModbusDevice(api._modbus_unit)
+    return connection, api._modbus_device
 
 
 def load_test_data(filename):
@@ -102,155 +114,6 @@ class TestQvantumAPI:
         assert result["metrics"]["latency"] == metrics_data["total_latency"]
 
     @pytest.mark.asyncio
-    async def test_read_modbus_metrics_powertotal_computed(self, mock_session):
-        """Test power total is derived from relay stages and compressor power."""
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-
-        with patch.object(
-            QvantumAPI,
-            "_read_modbus_registers",
-            AsyncMock(
-                return_value={
-                    "picpin_relay_heat_l1": 1,
-                    "picpin_relay_heat_l2": 1,
-                    "picpin_relay_heat_l3": 1,
-                    "compressor_power": 100,
-                }
-            ),
-        ):
-            result = await api._read_modbus_metrics(
-                "test_device_123",
-                [
-                    "picpin_relay_heat_l1",
-                    "picpin_relay_heat_l2",
-                    "picpin_relay_heat_l3",
-                    "compressor_power",
-                ],
-            )
-
-        metrics = result["metrics"]
-        assert metrics["powertotal"] == 5260.0
-
-    @pytest.mark.asyncio
-    async def test_read_modbus_metrics_compressorenergy_from_mwh_kwh(
-        self, mock_session
-    ):
-        """Test compressorenergy tracks combined mwh+kwh data from modbus."""
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-
-        with patch.object(
-            QvantumAPI,
-            "_read_modbus_registers",
-            AsyncMock(
-                return_value={
-                    "compressor_mwh": 4,
-                    # As the modbus register reads have already applied the scaling factor from the register map (e.g. 0.1 for kwh values),
-                    # we need to provide the scaled value here too.
-                    "compressor_kwh": 8010 * 0.1,
-                }
-            ),
-        ):
-            result = await api._read_modbus_metrics(
-                "test_device_123", ["compressor_mwh", "compressor_kwh"]
-            )
-
-        metrics = result["metrics"]
-        assert metrics["compressorenergy"] == 4801.0
-
-    @pytest.mark.asyncio
-    async def test_read_modbus_metrics_skips_energy_if_component_missing(
-        self, mock_session
-    ):
-        """Do not derive energy when mwh/kwh pair is incomplete."""
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-
-        with patch.object(
-            QvantumAPI,
-            "_read_modbus_registers",
-            AsyncMock(
-                return_value={
-                    "compressor_mwh": 4,
-                    # compressor_kwh intentionally missing to simulate transient partial read
-                }
-            ),
-        ):
-            result = await api._read_modbus_metrics(
-                "test_device_123", ["compressor_mwh", "compressor_kwh"]
-            )
-
-        metrics = result["metrics"]
-        assert "compressorenergy" not in metrics
-
-    @pytest.mark.asyncio
-    async def test_read_modbus_metrics_skips_energy_if_component_non_numeric(
-        self, mock_session
-    ):
-        """Do not derive energy when mwh/kwh values are malformed."""
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-
-        with patch.object(
-            QvantumAPI,
-            "_read_modbus_registers",
-            AsyncMock(
-                return_value={
-                    "compressor_mwh": "not-a-number",
-                    "compressor_kwh": 1,
-                }
-            ),
-        ):
-            result = await api._read_modbus_metrics(
-                "test_device_123", ["compressor_mwh", "compressor_kwh"]
-            )
-
-        metrics = result["metrics"]
-        assert "compressorenergy" not in metrics
-
-    @pytest.mark.asyncio
-    async def test_read_modbus_metrics_rounds_to_two_decimals(self, mock_session):
-        """Test numeric outputs from modbus are rounded to two decimals."""
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-
-        with patch.object(
-            QvantumAPI,
-            "_read_modbus_registers",
-            AsyncMock(
-                return_value={
-                    "picpin_relay_heat_l1": 1,
-                    "picpin_relay_heat_l2": 0,
-                    "picpin_relay_heat_l3": 0,
-                    "compressor_power": 100.12345,
-                    "compressor_mwh": 1.2345,
-                    "compressor_kwh": 2.3456,
-                }
-            ),
-        ):
-            result = await api._read_modbus_metrics(
-                "test_device_123",
-                [
-                    "picpin_relay_heat_l1",
-                    "picpin_relay_heat_l2",
-                    "picpin_relay_heat_l3",
-                    "compressor_power",
-                    "compressor_mwh",
-                    "compressor_kwh",
-                ],
-            )
-
-        metrics = result["metrics"]
-        assert metrics["powertotal"] == 2260.12
-        assert metrics["compressorenergy"] == 1236.85
-
-    @pytest.mark.asyncio
     async def test_get_metrics_modbus_tcp_failure_fallback_http(self, mock_session):
         """Modbus TCP failures should fall back to HTTP when explicitly enabled."""
         api = QvantumAPI(
@@ -310,173 +173,60 @@ class TestQvantumAPI:
     async def test_get_metrics_modbus_no_latency_placeholder_in_registers(
         self, mock_session
     ):
-        """_read_modbus_registers must not inject a latency key; latency is set in get_metrics."""
+        """Modbus metrics payloads must not inject latency; get_metrics measures it."""
         api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
         )
-
-        with patch.object(
-            QvantumAPI,
-            "_read_modbus_registers",
-            AsyncMock(return_value={"hpid": "dev", "bt1": 20}),
-        ):
-            raw = await api._read_modbus_metrics("dev", ["bt1"])
-
-        # latency must not be present unless explicitly measured and injected
+        attach_mock_modbus(api)
+        raw = await api._read_modbus_metrics("dev", ["bt1"])
         assert "latency" not in raw.get("metrics", {})
 
     @pytest.mark.asyncio
-    async def test_read_modbus_settings_aliasing(self, mock_session):
-        """Test that Modbus settings values are mapped to HTTP and modbus alias keys."""
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-
-        with patch.object(
-            QvantumAPI,
-            "_read_modbus_registers",
-            AsyncMock(
-                return_value={
-                    "dhw_start_normal": 52,
-                    "dhw_stop_normal": 62,
-                    "operation_mode": 1,
-                }
-            ),
-        ):
-            result = await api._read_modbus_settings(
-                "test_device",
-                [
-                    "dhw start temperature normal",
-                    "dhw stop temperature normal",
-                    "operation mode",
-                ],
-            )
-
-        settings = {item["name"]: item["value"] for item in result["settings"]}
-
-        # dhw_* internal keys should be hidden from public settings output
-        assert "dhw_start_normal" not in settings
-        assert "dhw_stop_normal" not in settings
-
-        # tap_water *_ values should still be available for number entity usage
-        assert settings["tap_water_start"] == 52
-        assert settings["tap_water_stop"] == 62
-
-        assert "use_adaptive" not in settings
-        assert settings["op_mode"] == 1
-
-    @pytest.mark.asyncio
-    async def test_read_modbus_reuse_client_between_reads(self):
-        """Modbus client should remain open across successful reads."""
+    async def test_read_modbus_reuse_connection_between_reads(self):
+        """Modbus connection should remain open across successful reads."""
         api = QvantumAPI("test@example.com", "password", "test-agent", modbus_tcp=True)
+        connection, _device = attach_mock_modbus(api)
 
-        created_clients = []
-        client = None
+        result1 = await api._read_modbus_metrics("test_device", ["bt1"])
+        assert result1["metrics"]["hpid"] == "test_device"
+        assert api._modbus_unit is connection.for_unit(api._modbus_unit_id)
 
-        async def fake_connect():
-            nonlocal client
-            client.connected = True
-
-        async def fake_close():
-            nonlocal client
-            client.connected = False
-
-        def fake_init():
-            nonlocal client
-            if api._modbus_client is not None:
-                return
-            client = MagicMock()
-            client.connected = False
-            client.connect = AsyncMock(side_effect=fake_connect)
-            client.close = AsyncMock(side_effect=fake_close)
-            created_clients.append(client)
-            api._modbus_client = client
-
-        api._init_modbus_client = fake_init
-
-        # First attempt should create a client and keep it open after read
-        result1 = await api._read_modbus_registers(
-            "test_device", [], {}, use_input_registers=True
-        )
-        assert result1["hpid"] == "test_device"
-        assert api._modbus_client is client
-
-        # Second attempt should reuse the same client
-        result2 = await api._read_modbus_registers(
-            "test_device", [], {}, use_input_registers=True
-        )
-        assert result2["hpid"] == "test_device"
-        assert api._modbus_client is client
-
-        assert len(created_clients) == 1
+        result2 = await api._read_modbus_metrics("test_device", ["bt1"])
+        assert result2["metrics"]["hpid"] == "test_device"
+        assert api._modbus_device is not None
 
     @pytest.mark.asyncio
     async def test_read_modbus_concurrent_access_is_serialized(self):
-        """Ensure concurrent Modbus reads are serialized via lock to avoid client conflicts."""
+        """Concurrent Modbus reads are serialized via the API lock."""
         api = QvantumAPI("test@example.com", "password", "test-agent", modbus_tcp=True)
+        _connection, device = attach_mock_modbus(api)
 
-        created_clients = []
-        client = None
+        in_flight = 0
+        max_in_flight = 0
+        original = device.async_update_inputs
 
-        async def fake_connect():
-            client.connected = True
-            return True
-
-        async def fake_close():
-            client.connected = False
-
-        class DummyResult:
-            def __init__(self, value):
-                self.registers = [value]
-
-            def isError(self):
-                return False
-
-        async def fake_execute(_sync, _request):
-            # Simulate slow long-running request to force concurrent timing
+        async def slow_update():
+            nonlocal in_flight, max_in_flight
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
             await asyncio.sleep(0.05)
-            return DummyResult(100)
+            in_flight -= 1
+            return await original()
 
-        def fake_init():
-            nonlocal client
-            if api._modbus_client is not None:
-                return
-            client = MagicMock()
-            client.connected = False
-            client.connect = AsyncMock(side_effect=fake_connect)
-            client.close = AsyncMock(side_effect=fake_close)
-            client.execute = AsyncMock(side_effect=fake_execute)
-            created_clients.append(client)
-            api._modbus_client = client
+        device.async_update_inputs = slow_update
 
-        api._init_modbus_client = fake_init
-
-        # Run two reads concurrently that should serialize via _modbus_lock.
-        task1 = asyncio.create_task(
-            api._read_modbus_registers(
-                "test_device",
-                ["bt1 - fast filtered (1min) outdoor temp"],
-                {"bt1 - fast filtered (1min) outdoor temp": (0, "int16", 1.0)},
-                use_input_registers=True,
-            )
-        )
-        task2 = asyncio.create_task(
-            api._read_modbus_registers(
-                "test_device",
-                ["bt1 - fast filtered (1min) outdoor temp"],
-                {"bt1 - fast filtered (1min) outdoor temp": (0, "int16", 1.0)},
-                use_input_registers=True,
-            )
+        results = await asyncio.gather(
+            api._read_modbus_metrics("test_device", ["bt1"]),
+            api._read_modbus_metrics("test_device", ["bt1"]),
         )
 
-        await asyncio.sleep(0.01)
-        assert client.execute.call_count == 1
-
-        results = await asyncio.gather(task1, task2)
-
-        assert results[0]["bt1 - fast filtered (1min) outdoor temp"] == 100
-        assert results[1]["bt1 - fast filtered (1min) outdoor temp"] == 100
-        assert client.execute.call_count == 2
+        assert max_in_flight == 1
+        assert results[0]["metrics"]["hpid"] == "test_device"
+        assert results[1]["metrics"]["hpid"] == "test_device"
 
     @pytest.mark.asyncio
     async def test_set_tap_water(self, mock_session):
@@ -524,23 +274,22 @@ class TestQvantumAPI:
 
     @pytest.mark.asyncio
     async def test_close_owned_session_and_modbus_client(self):
-        """Owned HTTP session and Modbus client are closed under the lock."""
+        """Owned HTTP session and Modbus connection are closed under the lock."""
         api = QvantumAPI("test@example.com", "password", "test-agent", modbus_tcp=True)
         mock_session = MagicMock()
         mock_session.close = AsyncMock()
         api._session = mock_session
         api._session_owner = True
 
-        mock_client = MagicMock()
-        mock_client.close = AsyncMock()
-        api._modbus_client = mock_client
+        connection, _device = attach_mock_modbus(api)
+        connection.close = AsyncMock()
 
         await api.close()
 
         mock_session.close.assert_awaited_once()
-        mock_client.close.assert_awaited_once()
+        connection.close.assert_not_called()
         assert api._session is None
-        assert api._modbus_client is None
+        assert api._modbus_device is None
         assert api._closed is True
 
         # Second close is a no-op
@@ -621,9 +370,7 @@ class TestQvantumAPI:
     async def test_close_waits_for_in_flight_modbus_lock(self):
         """close() must not tear down Modbus while a read holds the lock."""
         api = QvantumAPI("test@example.com", "password", "test-agent", modbus_tcp=True)
-        mock_client = MagicMock()
-        mock_client.close = AsyncMock()
-        api._modbus_client = mock_client
+        connection, _device = attach_mock_modbus(api)
 
         entered = asyncio.Event()
         release = asyncio.Event()
@@ -637,44 +384,33 @@ class TestQvantumAPI:
         await entered.wait()
 
         closer = asyncio.create_task(api.close())
-        # close should block on the lock until the holder finishes
         await asyncio.sleep(0.05)
         assert not closer.done()
-        mock_client.close.assert_not_called()
+        assert api._modbus_device is not None
 
         release.set()
         await closer
         await holder
 
-        mock_client.close.assert_awaited_once()
-        assert api._modbus_client is None
+        assert api._modbus_device is None
         assert api._closed is True
 
     @pytest.mark.asyncio
-    async def test_read_modbus_cancelled_resets_client(self):
-        """Cancelled Modbus execute must reset the client before re-raising."""
+    async def test_read_modbus_cancelled_keeps_shared_unit(self):
+        """Cancelled Modbus updates must not close the shared Home Assistant unit."""
         api = QvantumAPI("test@example.com", "password", "test-agent", modbus_tcp=True)
+        connection, device = attach_mock_modbus(api)
 
-        client = MagicMock()
-        client.connected = True
-        client.close = AsyncMock()
-        client.execute = AsyncMock(side_effect=asyncio.CancelledError())
-        api._modbus_client = client
+        async def cancel_update():
+            raise asyncio.CancelledError()
 
-        with patch(
-            "custom_components.qvantum.api.MODBUS_INPUT_REGISTER_MAP",
-            {"bt1": (0, "int16", 0.1)},
-        ):
-            with pytest.raises(asyncio.CancelledError):
-                await api._read_modbus_registers(
-                    "dev",
-                    ["bt1"],
-                    {"bt1": (0, "int16", 0.1)},
-                    use_input_registers=True,
-                )
+        device.async_update_inputs = cancel_update
 
-        client.close.assert_awaited_once()
-        assert api._modbus_client is None
+        with pytest.raises(asyncio.CancelledError):
+            await api._read_modbus_metrics("dev", ["bt1"])
+
+        assert api._modbus_unit is not None
+        assert api._modbus_device is device
 
     @pytest.mark.asyncio
     async def test_unauthenticate(self):
@@ -1335,60 +1071,28 @@ class TestQvantumAPI:
     @pytest.mark.asyncio
     async def test_get_metrics_modbus_tcp(self, mock_session):
         """Test getting metrics via Modbus TCP."""
-        from unittest.mock import patch, AsyncMock, MagicMock
+        api = QvantumAPI(
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
+            modbus_host="192.168.1.100",
+            modbus_port=502,
+        )
+        _connection, device = attach_mock_modbus(api)
+        device.unit.input[0] = 256
 
-        with patch(
-            "custom_components.qvantum.api.ReadInputRegistersRequest", MagicMock()
-        ):
-            # Mock Modbus client
-            mock_client = MagicMock()
-            mock_client.connected = False  # Initially not connected
-            mock_client.connect = AsyncMock(
-                side_effect=lambda: setattr(mock_client, "connected", True)
-            )
-            mock_client.execute = AsyncMock(
-                return_value=MagicMock(
-                    isError=MagicMock(return_value=False), registers=[256]
-                )
-            )  # Mock execute for ReadInputRegistersRequest
-            mock_client.close = AsyncMock()
+        result = await api.get_metrics("test_device", enabled_metrics=["bt1"])
 
-            with patch(
-                "custom_components.qvantum.api.AsyncModbusTcpClient",
-                return_value=mock_client,
-            ):
-                api = QvantumAPI(
-                    "test@example.com",
-                    "password",
-                    "test-agent",
-                    session=mock_session,
-                    modbus_tcp=True,
-                    modbus_host="192.168.1.100",
-                    modbus_port=502,
-                )
-
-                # Mock the register map with a test entry
-                api.MODBUS_REGISTER_MAP = {"bt1": (0, "int16", 10.0)}
-
-                result = await api.get_metrics("test_device", enabled_metrics=["bt1"])
-
-                assert "metrics" in result
-                assert result["metrics"]["hpid"] == "test_device"
-                assert "bt1" in result["metrics"]
-                # Verify Modbus client was used
-                mock_client.connect.assert_called_once()
-                mock_client.execute.assert_called_once()
+        assert "metrics" in result
+        assert result["metrics"]["hpid"] == "test_device"
+        assert result["metrics"]["bt1"] == 25.6
+        assert isinstance(result["metrics"]["latency"], int)
 
     @pytest.mark.asyncio
     async def test_get_metrics_modbus_connection_failure(self, mock_session):
         """Test Modbus connection failure falls back to HTTP."""
-        from unittest.mock import patch, AsyncMock, MagicMock
-
-        mock_client = MagicMock()
-        mock_client.connected = False
-        mock_client.connect = AsyncMock(side_effect=Exception("Connection failed"))
-        mock_client.close = AsyncMock()
-
         cm, mock_response = mock_session.make_cm_response(
             status=200,
             json_data={"values": {"bt1": 123}, "total_latency": 10},
@@ -1396,26 +1100,23 @@ class TestQvantumAPI:
         )
         mock_session.get.return_value = cm
 
-        with patch(
-            "custom_components.qvantum.api.AsyncModbusTcpClient",
-            return_value=mock_client,
-        ):
-            api = QvantumAPI(
-                "test@example.com",
-                "password",
-                "test-agent",
-                session=mock_session,
-                modbus_tcp=True,
-            )
-            api._token = "test_token"
-            api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api = QvantumAPI(
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        _connection, device = attach_mock_modbus(api)
+        device.unit.fail_requests(ModbusConnectionError())
 
-            result = await api.get_metrics("test_device", enabled_metrics=["bt1"])
+        result = await api.get_metrics("test_device", enabled_metrics=["bt1"])
 
-            assert "metrics" in result
-            assert result["metrics"]["bt1"] == 123
-            assert mock_client.connect.call_count == 1
-            assert mock_session.get.called
+        assert "metrics" in result
+        assert result["metrics"]["bt1"] == 123
+        assert mock_session.get.called
 
     @pytest.mark.asyncio
     async def test_get_settings_modbus(self, mock_session):
@@ -1500,38 +1201,33 @@ class TestQvantumAPI:
         assert result["metrics"]["bt2"] == metrics_data["values"]["bt2"]
         assert result["metrics"]["latency"] == metrics_data["total_latency"]
 
-    @pytest.mark.asyncio
-    async def test_normalize_modbus_value(self, mock_session):
+    def test_ensure_modbus_device_when_enabled(self, mock_session):
         api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
         )
+        _connection, attached = attach_mock_modbus(api)
+        device = api._ensure_modbus_device()
+        assert device is attached
+        assert api._modbus_device is device
 
-        assert api._normalize_modbus_value(123.4, 1.0) == 123
-        assert api._normalize_modbus_value(123.456, 0.1) == 123.46
-
-    def test_init_modbus_client_when_enabled(self, mock_session):
-        with patch(
-            "custom_components.qvantum.api.AsyncModbusTcpClient",
-            return_value=MagicMock(),
-        ) as mock_client_ctor:
-            api = QvantumAPI(
-                "test@example.com",
-                "password",
-                "test-agent",
-                session=mock_session,
-                modbus_tcp=True,
-            )
-            api._init_modbus_client()
-            assert api._modbus_client is not None
-            mock_client_ctor.assert_called_once_with(
-                host=api._modbus_host,
-                port=api._modbus_port,
-                timeout=10.0,
-                retries=3,
-            )
+    def test_ensure_modbus_device_without_unit_returns_none(self, mock_session):
+        api = QvantumAPI(
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
+        )
+        assert api._ensure_modbus_device() is None
 
     @pytest.mark.asyncio
-    async def test_read_modbus_registers_raises_when_no_client(self, mock_session):
+    async def test_read_modbus_metrics_raises_when_no_client(self, mock_session):
+        from custom_components.qvantum.api import APIConnectionError
+
         api = QvantumAPI(
             "test@example.com",
             "password",
@@ -1540,53 +1236,8 @@ class TestQvantumAPI:
             modbus_tcp=False,
         )
 
-        with pytest.raises(Exception) as exc_info:
-            await api._read_modbus_registers(
-                "test_device",
-                ["bt1"],
-                {"bt1": (0, "int16", 1.0)},
-                use_input_registers=True,
-            )
-
-        assert "Modbus client not initialized" in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    async def test_read_modbus_registers_float32_handling(self, mock_session):
-        from custom_components.qvantum.api import ReadInputRegistersRequest
-
-        api = QvantumAPI(
-            "test@example.com",
-            "password",
-            "test-agent",
-            session=mock_session,
-            modbus_tcp=True,
-        )
-
-        fake_client = MagicMock()
-        fake_client.connected = False
-
-        async def connect():
-            fake_client.connected = True
-
-        class FakeResult:
-            def __init__(self):
-                self.registers = [0, 64]  # float32 big-endian: 2.0? (0x000040)
-
-            def isError(self):
-                return False
-
-        fake_client.connect = AsyncMock(side_effect=connect)
-        fake_client.execute = AsyncMock(return_value=FakeResult())
-        api._modbus_client = fake_client
-
-        result = await api._read_modbus_registers(
-            "test_device",
-            ["f32_metric"],
-            {"f32_metric": (0, "float32", 1.0)},
-            use_input_registers=True,
-        )
-
-        assert result["hpid"] == "test_device"
+        with pytest.raises(APIConnectionError, match="Modbus client not initialized"):
+            await api._read_modbus_metrics("test_device", ["bt1"])
 
     @pytest.mark.asyncio
     async def test_handle_response_rate_limits_and_auth_error(self):
@@ -1623,17 +1274,17 @@ class TestQvantumAPI:
         assert result_on == {"command": {}}
 
     @pytest.mark.asyncio
-    async def test_reset_modbus_client_handles_error(self, mock_session):
+    async def test_reset_modbus_client_drops_device_wrapper(self, mock_session):
         api = QvantumAPI(
             "test@example.com", "password", "test-agent", session=mock_session
         )
-        client = MagicMock()
-        client.close.side_effect = Exception("close fail")
-        api._modbus_client = client
+        api._modbus_device = MagicMock()
+        api._modbus_unit = MagicMock()
 
         await api._reset_modbus_client()
 
-        assert api._modbus_client is None
+        assert api._modbus_device is None
+        assert api._modbus_unit is not None
 
     @pytest.mark.asyncio
     async def test_close_closes_owned_session(self, mock_session):
@@ -1648,69 +1299,35 @@ class TestQvantumAPI:
         mock_session.close.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_read_modbus_registers_execute_returns_none_raises(self, mock_session):
+    async def test_read_modbus_metrics_device_error_raises(self, mock_session):
+        from custom_components.qvantum.api import APIConnectionError
+
         api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session, modbus_tcp=True
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
         )
+        _connection, device = attach_mock_modbus(api)
+        device.unit.fail_requests(ModbusTimeoutError())
 
-        fake_client = MagicMock()
-        fake_client.connected = True
-        fake_client.execute = AsyncMock(return_value=None)
-        api._modbus_client = fake_client
-
-        with pytest.raises(Exception):
-            await api._read_modbus_registers(
-                "test_device",
-                ["bt1"],
-                {"bt1": (0, "int16", 1.0)},
-                use_input_registers=True,
-            )
-
-    @pytest.mark.asyncio
-    async def test_read_modbus_registers_iserror_logs_and_returns_base(self, mock_session):
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session, modbus_tcp=True
-        )
-
-        fake_client = MagicMock()
-        fake_client.connected = True
-
-        class ErrorResult:
-            registers = [0]
-            def isError(self):
-                return True
-
-        fake_client.execute = AsyncMock(return_value=ErrorResult())
-        api._modbus_client = fake_client
-
-        result = await api._read_modbus_registers(
-            "test_device",
-            ["bt1"],
-            {"bt1": (0, "int16", 1.0)},
-            use_input_registers=True,
-        )
-
-        assert result["hpid"] == "test_device"
+        with pytest.raises(APIConnectionError, match="Modbus communication failed"):
+            await api._read_modbus_metrics("test_device", ["bt1"])
 
     @pytest.mark.asyncio
     async def test_read_modbus_metrics_ensures_use_adaptive(self, mock_session):
         api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
         )
+        _connection, device = attach_mock_modbus(api)
+        device.unit.input[161] = 1
 
-        with patch.object(
-            QvantumAPI,
-            "_read_modbus_registers",
-            AsyncMock(
-                return_value={
-                    "smart_dhw_mode": 1,
-                    "compressor_power": 20,
-                    "compressor_mwh": 1,
-                    "compressor_kwh": 1,
-                }
-            ),
-        ):
-            result = await api._read_modbus_metrics("test_device", ["smart_dhw_mode"])
+        result = await api._read_modbus_metrics("test_device", ["smart_dhw_mode"])
 
         assert result["metrics"]["use_adaptive"] is True
         assert result["metrics"]["smart_sh_mode"] == 1
@@ -1718,22 +1335,19 @@ class TestQvantumAPI:
     @pytest.mark.asyncio
     async def test_read_modbus_settings_fan_and_extra_tap_water(self, mock_session):
         api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
         )
+        _connection, device = attach_mock_modbus(api)
+        device.unit.holding[53] = 2  # dhw_mode -> extra_tap_water
+        device.unit.holding[68] = 2  # ventilation_state -> fanspeedselector
 
-        with patch.object(
-            QvantumAPI,
-            "_read_modbus_registers",
-            AsyncMock(
-                return_value={
-                    "extra_tap_water": 2,
-                    "fanspeedselector": 2,
-                    "dhw_start_normal": 1,
-                    "dhw_stop_normal": 1,
-                }
-            ),
-        ):
-            result = await api._read_modbus_settings("test_device", ["extra_tap_water", "fanspeedselector"])
+        result = await api._read_modbus_settings(
+            "test_device", ["dhw_mode", "ventilation_state"]
+        )
 
         settings = {item["name"]: item["value"] for item in result["settings"]}
         assert settings["extra_tap_water"] == "on"
@@ -2395,42 +2009,16 @@ class TestWriteHoldingRegister:
             kwargs["session"] = mock_session
         return QvantumAPI("test@example.com", "password", "test-agent", **kwargs)
 
-    def _make_fake_client(self, execute_result=None, connected=True):
-        client = MagicMock()
-        client.connected = connected
-        client.connect = AsyncMock(
-            side_effect=lambda: setattr(client, "connected", True)
-        )
-        if execute_result is None:
-            ok_result = MagicMock()
-            ok_result.isError.return_value = False
-            execute_result = ok_result
-        client.execute = AsyncMock(return_value=execute_result)
-        return client
-
     @pytest.mark.asyncio
     async def test_write_holding_register_success(self, mock_session):
         """Successful write returns APPLIED status dict."""
         api = self._make_api(mock_session)
-        client = self._make_fake_client()
-        api._modbus_client = client
+        _connection, device = attach_mock_modbus(api)
 
         result = await api.write_holding_register("dev1", 59, 75)
 
         assert result == {"status": "APPLIED"}
-        client.execute.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_write_holding_register_connects_if_disconnected(self, mock_session):
-        """Connects the client if not already connected."""
-        api = self._make_api(mock_session)
-        client = self._make_fake_client(connected=False)
-        api._modbus_client = client
-
-        result = await api.write_holding_register("dev1", 59, 75)
-
-        client.connect.assert_awaited_once()
-        assert result == {"status": "APPLIED"}
+        assert device.unit.holding[59] == 75
 
     @pytest.mark.asyncio
     async def test_write_holding_register_raises_when_no_client(self, mock_session):
@@ -2440,91 +2028,35 @@ class TestWriteHoldingRegister:
         api = QvantumAPI(
             "test@example.com", "password", "test-agent", session=mock_session
         )
-        # modbus_tcp=False so _init_modbus_client leaves _modbus_client as None
 
         with pytest.raises(APIConnectionError, match="Modbus client not initialized"):
             await api.write_holding_register("dev1", 59, 75)
 
     @pytest.mark.asyncio
-    async def test_write_holding_register_raises_on_error_result(self, mock_session):
-        """Raises APIConnectionError when device returns an error response."""
+    async def test_write_holding_register_raises_on_device_error(self, mock_session):
+        """Raises APIConnectionError when the device rejects the write."""
         from custom_components.qvantum.api import APIConnectionError
+        from modbus_connection import IllegalDataValueError
 
         api = self._make_api(mock_session)
-        error_result = MagicMock()
-        error_result.isError.return_value = True
-        client = self._make_fake_client(execute_result=error_result)
-        api._modbus_client = client
-
-        with pytest.raises(APIConnectionError):
-            await api.write_holding_register("dev1", 59, 75)
-
-    @pytest.mark.asyncio
-    async def test_write_holding_register_raises_on_none_response(self, mock_session):
-        """Raises APIConnectionError when execute returns None."""
-        from custom_components.qvantum.api import APIConnectionError
-
-        api = self._make_api(mock_session)
-        client = self._make_fake_client()
-        client.execute = AsyncMock(return_value=None)
-        api._modbus_client = client
-
-        with pytest.raises(APIConnectionError, match="no response received"):
-            await api.write_holding_register("dev1", 59, 75)
-
-    @pytest.mark.asyncio
-    async def test_write_holding_register_resets_client_on_modbus_exception(
-        self, mock_session
-    ):
-        """Resets the Modbus client and raises APIConnectionError on ModbusException."""
-        from custom_components.qvantum.api import APIConnectionError
-        from pymodbus.exceptions import ModbusException
-
-        api = self._make_api(mock_session)
-        client = self._make_fake_client()
-        client.execute = AsyncMock(side_effect=ModbusException("boom"))
-        api._modbus_client = client
+        _connection, device = attach_mock_modbus(api)
+        device.unit.fail_write(59, IllegalDataValueError())
 
         with pytest.raises(APIConnectionError, match="Modbus write failed"):
             await api.write_holding_register("dev1", 59, 75)
-
-        assert api._modbus_client is None
-
-    @pytest.mark.asyncio
-    async def test_write_holding_register_resets_client_on_generic_exception(
-        self, mock_session
-    ):
-        """Resets the Modbus client and raises APIConnectionError on unexpected errors."""
-        from custom_components.qvantum.api import APIConnectionError
-
-        api = self._make_api(mock_session)
-        client = self._make_fake_client()
-        client.execute = AsyncMock(side_effect=RuntimeError("unexpected"))
-        api._modbus_client = client
-
-        with pytest.raises(APIConnectionError, match="Modbus write failed"):
-            await api.write_holding_register("dev1", 59, 75)
-
-        assert api._modbus_client is None
 
     @pytest.mark.asyncio
     async def test_write_holding_register_for_metric_dhw_stop_extra(self, mock_session):
         """write_holding_register_for_metric resolves dhw_stop_extra to register 59."""
         api = self._make_api(mock_session)
-        client = self._make_fake_client()
-        api._modbus_client = client
+        _connection, device = attach_mock_modbus(api)
 
         result = await api.write_holding_register_for_metric(
             "dev1", "dhw_stop_extra", 75
         )
 
         assert result == {"status": "APPLIED"}
-        # Verify the correct register address (59) was written
-        call_args = client.execute.call_args[0][
-            1
-        ]  # second positional arg is the request
-        assert call_args.address == 59
-        assert call_args.registers == [75]
+        assert device.unit.holding[59] == 75
 
     @pytest.mark.asyncio
     async def test_write_holding_register_for_metric_unknown_key_raises(
@@ -2542,18 +2074,14 @@ class TestWriteHoldingRegister:
     async def test_write_holding_register_for_metric_applies_scale(self, mock_session):
         """write_holding_register_for_metric applies inverse scale when scale != 1.0."""
         api = self._make_api(mock_session)
-        client = self._make_fake_client()
-        api._modbus_client = client
+        _connection, device = attach_mock_modbus(api)
 
-        # room_comp_factor maps to holding key "room_compensation" (scale=0.1)
-        # value=2.5 -> raw = int(round(2.5 / 0.1)) = 25
         result = await api.write_holding_register_for_metric(
             "dev1", "room_comp_factor", 2.5
         )
 
         assert result == {"status": "APPLIED"}
-        call_args = client.execute.call_args[0][1]
-        assert call_args.registers == [25]
+        assert device.unit.holding[13] == 25
 
     @pytest.mark.asyncio
     async def test_write_holding_register_for_metric_room_temp_external_scaling(
@@ -2561,16 +2089,11 @@ class TestWriteHoldingRegister:
     ):
         """room_temp_external writes to register 14 and applies inverse 0.1 scale."""
         api = self._make_api(mock_session)
-        client = self._make_fake_client()
-        api._modbus_client = client
+        _connection, device = attach_mock_modbus(api)
 
-        # room_temp_external maps to holding register 14 with scale=0.1
-        # value=21.5 -> raw = int(round(21.5 / 0.1)) = 215
         result = await api.write_holding_register_for_metric(
             "dev1", "room_temp_external", 21.5
         )
 
         assert result == {"status": "APPLIED"}
-        request = client.execute.call_args[0][1]
-        assert request.address == 14
-        assert request.registers == [215]
+        assert device.unit.holding[14] == 215

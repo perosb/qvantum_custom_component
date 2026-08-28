@@ -22,6 +22,8 @@ FAN_SPEED_VALUE_NORMAL = 1
 FAN_SPEED_VALUE_EXTRA = 2
 VERSION = "2026.8.3"
 CONFIG_VERSION = 7
+# Shared Modbus units (`async_get_unit`) shipped in Home Assistant 2026.9.
+MIN_HA_VERSION = "2026.9.0"
 
 # Modbus TCP configuration
 CONF_MODBUS_TCP = "modbus_tcp"

@@ -2,36 +2,20 @@
 
 import aiohttp
 import asyncio
-import inspect
 import json
 from datetime import datetime, timedelta, timezone
 import logging
 from typing import Any, Optional
 
-from pymodbus.client.tcp import AsyncModbusTcpClient
-from pymodbus.pdu.register_message import (
-    ReadHoldingRegistersRequest,
-    ReadInputRegistersRequest,
-    WriteSingleRegisterRequest,
-)
-from pymodbus.exceptions import ModbusException
+from modbus_connection import ClientClosedError, ModbusError, ModbusUnit
 
 from .const import (
-    FAN_SPEED_STATE_EXTRA,
-    FAN_SPEED_STATE_NORMAL,
-    FAN_SPEED_STATE_OFF,
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
     TAP_WATER_CAPACITY_MAPPINGS,
-    RELAY_STAGE_POWER_MAP,
-    BASE_SYSTEM_POWER_W,
 )
-from .modbus import (
-    MODBUS_INPUT_REGISTER_MAP,
-    MODBUS_HOLDING_REGISTER_MAP,
-    RELAY_BIT_MAP,
-    MODBUS_HOLDING_TO_SETTINGS_MAP,
-)
+from .modbus import MODBUS_HOLDING_REGISTER_MAP, MODBUS_HOLDING_TO_SETTINGS_MAP
+from .modbus_device import QvantumModbusDevice, holding_field_for_metric
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,6 +49,7 @@ class QvantumAPI:
         modbus_host: str = "qvantum-hp",
         modbus_port: int = 502,
         modbus_unit_id: int = 1,
+        modbus_unit: Optional[ModbusUnit] = None,
     ) -> None:
         """Initialise."""
         self._auth_url = AUTH_URL
@@ -78,7 +63,8 @@ class QvantumAPI:
         self._modbus_host = modbus_host
         self._modbus_port = modbus_port
         self._modbus_unit_id = modbus_unit_id
-        self._modbus_client = None
+        self._modbus_unit = modbus_unit
+        self._modbus_device: QvantumModbusDevice | None = None
         self._modbus_lock = asyncio.Lock()
         self._closed = False
         # Accept an optional aiohttp session for easier testing. If not provided,
@@ -113,46 +99,38 @@ class QvantumAPI:
         if self._closed:
             raise APIConnectionError(None, "API client is closed")
 
-    def _init_modbus_client(self):
-        """Initialize Modbus TCP client if not already done."""
+    def _ensure_modbus_device(self) -> QvantumModbusDevice | None:
+        """Return the device wrapper for the Home Assistant-owned Modbus unit."""
         if self._closed:
-            return
-        if self._modbus_tcp and self._modbus_client is None:
-            self._modbus_client = AsyncModbusTcpClient(
-                host=self._modbus_host,
-                port=self._modbus_port,
-                timeout=10.0,  # Increased timeout
-                retries=3,
-            )
+            return None
+        if not self._modbus_tcp:
+            return None
+        if self._modbus_device is None:
+            if self._modbus_unit is None:
+                return None
+            self._modbus_device = QvantumModbusDevice(self._modbus_unit)
+        return self._modbus_device
 
     async def _reset_modbus_client(self):
-        """Close and clear Modbus client so reconnect starts from scratch.
+        """Drop the device wrapper. The shared connection is owned by ``modbus``.
 
         Must only be called while holding ``_modbus_lock`` (or during final
         teardown after no more Modbus work can start).
         """
-        if self._modbus_client:
-            try:
-                close_result = self._modbus_client.close()
-                if inspect.isawaitable(close_result):
-                    await close_result
-            except Exception as exc:
-                _LOGGER.debug("Error closing modbus client during reset: %s", exc)
-            self._modbus_client = None
+        self._modbus_device = None
 
     async def close(self):
-        """Close HTTP session and Modbus client; reject further API use.
+        """Close HTTP session and stop Modbus use; reject further API use.
 
         Acquires the Modbus lock so an in-flight register read/write finishes
-        (or is cancelled by the coordinator) before the TCP client is torn down.
-        This avoids leaving a half-closed pymodbus client that blocks reconnects
-        after config option changes (e.g. poll interval reload).
+        before the wrapper is dropped. The TCP connection itself is owned by
+        Home Assistant's ``modbus`` integration and is released with the entry.
         """
         if self._closed:
             return
         self._closed = True
 
-        # Wait for any in-flight Modbus operation, then dispose the client.
+        # Wait for any in-flight Modbus operation, then drop the wrapper.
         async with self._modbus_lock:
             await self._reset_modbus_client()
 
@@ -168,283 +146,62 @@ class QvantumAPI:
                 _LOGGER.debug("Error closing HTTP session: %s", exc)
             self._session = None
 
-    def _normalize_modbus_value(self, value: float, scale: float) -> int | float:
-        """Normalize a Modbus register value to the correct type and precision."""
-        if scale == 1.0:
-            return int(value)
-        return round(value, 2)
-
-    async def _read_modbus_registers(
+    async def _run_modbus(
         self,
-        device_id: str,
-        enabled_items: list[str],
-        register_map: dict,
-        use_input_registers: bool = True,
-        handle_relay_bits: bool = False,
+        operation,
+        *,
+        error_label: str,
+        missing_client_message: str = "Modbus client not initialized",
+        failure_prefix: str = "Modbus communication failed",
     ):
-        """Generic method to read Modbus registers (input or holding)."""
+        """Run a Modbus device operation under the lock, mapping errors."""
         self._ensure_open()
         async with self._modbus_lock:
             self._ensure_open()
-            self._init_modbus_client()
-            if not self._modbus_client:
-                raise APIConnectionError(None, "Modbus client not initialized")
-
-            data = {}
-            data["hpid"] = device_id
-
+            device = self._ensure_modbus_device()
+            if not device:
+                raise APIConnectionError(None, missing_client_message)
             try:
-                if not self._modbus_client.connected:
-                    await self._modbus_client.connect()
-                    if not self._modbus_client.connected:
-                        raise APIConnectionError(None, "Modbus client connection failed")
-
-                # Collect all registers we need to read
-                registers_to_read = {}
-                relay_items = [] if handle_relay_bits else None
-
-                for item_name in enabled_items:
-                    if handle_relay_bits and item_name in RELAY_BIT_MAP:
-                        relay_items.append(item_name)
-                    elif item_name in register_map:
-                        addr, data_type, scale = register_map[item_name]
-                        registers_to_read[addr] = (item_name, data_type, scale, 1)
-
-                # Group registers into contiguous blocks for efficient reading
-                if registers_to_read:
-                    sorted_addresses = sorted(registers_to_read.keys())
-                    blocks = []
-                    current_block_start = sorted_addresses[0]
-                    current_block_end = sorted_addresses[0]
-
-                    for addr in sorted_addresses[1:]:
-                        if addr == current_block_end + 1:
-                            current_block_end = addr
-                        else:
-                            blocks.append((current_block_start, current_block_end))
-                            current_block_start = addr
-                            current_block_end = addr
-                    blocks.append((current_block_start, current_block_end))
-
-                    # Read each block
-                    for block_start, block_end in blocks:
-                        count = block_end - block_start + 1
-                        if use_input_registers:
-                            request = ReadInputRegistersRequest(
-                                dev_id=self._modbus_unit_id,
-                                address=block_start,
-                                count=count,
-                            )
-                        else:
-                            request = ReadHoldingRegistersRequest(
-                                dev_id=self._modbus_unit_id,
-                                address=block_start,
-                                count=count,
-                            )
-                        result = await self._modbus_client.execute(False, request)
-                        if result is None:
-                            raise APIConnectionError(
-                                None,
-                                "Modbus operation failed: no response received from device",
-                            )
-                        if result.isError():
-                            register_type = "input" if use_input_registers else "holding"
-                            _LOGGER.warning(
-                                f"Failed to read {register_type} register block {block_start}-{block_end}"
-                            )
-                            continue
-
-                        # Parse the block results
-                        for i, addr in enumerate(range(block_start, block_end + 1)):
-                            if addr in registers_to_read:
-                                item_name, data_type, scale, reg_count = registers_to_read[
-                                    addr
-                                ]
-                                if item_name in data:
-                                    continue  # Already processed this item
-
-                                if data_type in ("int16", "uint16"):
-                                    value = result.registers[i]
-                                    if data_type == "int16":
-                                        if value > 32767:
-                                            value -= 65536
-                                    value *= scale
-
-                                    data[item_name] = self._normalize_modbus_value(
-                                        value, scale
-                                    )
-
-                # Handle relay bit extraction from relays_bitmask
-                if handle_relay_bits and relay_items:
-                    bitmask_addr = register_map["relays_bitmask"][0]
-                    request = ReadInputRegistersRequest(
-                        dev_id=self._modbus_unit_id, address=bitmask_addr, count=1
-                    )
-                    result = await self._modbus_client.execute(False, request)
-                    if result is None:
-                        raise APIConnectionError(
-                            None,
-                            "Modbus operation failed: no response received from device",
-                        )
-                    if result.isError():
-                        _LOGGER.warning(
-                            f"Failed to read relays bitmask from register {bitmask_addr}"
-                        )
-                    else:
-                        bitmask = result.registers[0]
-                        for item_name in relay_items:
-                            bit = RELAY_BIT_MAP[item_name]
-                            value = (bitmask >> bit) & 1
-                            data[item_name] = value
-
+                return await operation(device)
             except asyncio.CancelledError:
-                # Reload/unload cancels in-flight polls; reset the client so the
-                # next setup does not inherit a half-closed TCP session.
-                await self._reset_modbus_client()
+                # Reload/unload cancels in-flight polls. Do not close or
+                # disconnect the shared connection; other consumers may hold it.
                 raise
-            except ModbusException as e:
-                error_msg = f"Modbus error reading {'input' if use_input_registers else 'holding'} registers: {e}"
-                _LOGGER.error(error_msg)
-                await self._reset_modbus_client()
-                raise APIConnectionError(None, f"Modbus communication failed: {e}")
-            except APIConnectionError:
-                await self._reset_modbus_client()
+            except ClientClosedError as err:
+                raise APIConnectionError(None, "API client is closed") from err
+            except ModbusError as err:
+                _LOGGER.error("Modbus error %s: %s", error_label, err)
+                raise APIConnectionError(None, f"{failure_prefix}: {err}") from err
+            except (APIConnectionError, ValueError):
                 raise
-            except Exception as e:
-                # Catch non-Modbus exceptions (e.g. NoneType on execute) and recover gracefully.
+            except Exception as err:
                 _LOGGER.error(
-                    "Unexpected error reading %s registers: %s",
-                    'input' if use_input_registers else 'holding',
-                    e,
-                    exc_info=True,
+                    "Unexpected error %s: %s", error_label, err, exc_info=True
                 )
-                await self._reset_modbus_client()
-                raise APIConnectionError(None, f"Modbus communication failed: {e}")
-
-            # Keep Modbus client open for subsequent reads to reuse the connection.
-            return data
+                raise APIConnectionError(None, f"{failure_prefix}: {err}") from err
 
     async def _read_modbus_metrics(self, device_id: str, enabled_metrics: list[str]):
         """Read metrics from Modbus TCP."""
-        metrics = await self._read_modbus_registers(
-            device_id=device_id,
-            enabled_items=enabled_metrics,
-            register_map=MODBUS_INPUT_REGISTER_MAP,
-            use_input_registers=True,
-            handle_relay_bits=True,
-        )
 
-        _LOGGER.debug("Raw Modbus metrics read: %s", sorted(metrics.items()))
-
-        # Derive use_adaptive from smart control modes if both are available
-        if "smart_dhw_mode" in metrics:
+        async def _update(device: QvantumModbusDevice):
+            await device.async_update_inputs()
+            payload = device.metrics_payload(device_id, enabled_metrics)
             _LOGGER.debug(
-                "Deriving smart_sh_mode and use_adaptive from smart_dhw_mode: %s",
-                metrics["smart_dhw_mode"],
+                "Raw Modbus metrics read: %s",
+                sorted(payload.get("metrics", {}).items()),
             )
-            # Both HTTP and Modbus use -1 to represent "smart control disabled".
-            # Any non-negative value indicates a specific smart/adaptive mode.
-            # Modbus specification is inconsistent here, so we standardize on -1 for disabled and 0/1/2 for modes.
-            # Mirror smart_dhw_mode into smart_sh_mode and derive use_adaptive from it.
-            metrics["smart_sh_mode"] = metrics["smart_dhw_mode"]
-            metrics["use_adaptive"] = metrics["smart_dhw_mode"] != -1
+            return payload
 
-        # Provide a combined power metric using compressor power and the three relay heat stages.
-        # Relay stage values are boolean (0/1), with each stage representing fixed wattage.
-        # power values are configured in const.py for maintainability and future model-specific changes.
-        stage_power_map = RELAY_STAGE_POWER_MAP
-        relay_sum = 0.0
-        for key, wattage in stage_power_map.items():
-            value = metrics.get(key, 0)
-            try:
-                relay_sum += float(value) * wattage
-            except (TypeError, ValueError):
-                continue
-
-        compressor_power = float(metrics.get("compressor_power", 0.0))
-        metrics.pop("compressor_power", None)
-
-        # Add fixed base power overhead from system baseline consumption.
-        # This includes circulation pumps, controls and other auxiliary constant loads.
-        metrics["powertotal"] = round(
-            BASE_SYSTEM_POWER_W + relay_sum + compressor_power, 2
-        )
-
-        # Compute energy from mwh/kwh components (preferred modbus format: kwh entry scaled x10).
-        # Only derive an energy counter when both components are present and numeric.
-        # This avoids synthesizing misleading 0 values during transient partial reads.
-        for prefix in ["compressor", "additional", "heating", "cooling", "dhw"]:
-            mwh = metrics.get(f"{prefix}_mwh")
-            kwh = metrics.get(f"{prefix}_kwh")
-            if mwh is not None and kwh is not None:
-                try:
-                    mwh_val = float(mwh)
-                    kwh_val = float(kwh)
-                except (TypeError, ValueError):
-                    _LOGGER.debug(
-                        "Skipping energy derivation for %s due to non-numeric components: mwh=%s, kwh=%s",
-                        prefix,
-                        mwh,
-                        kwh,
-                    )
-                else:
-                    # NOTE: kwh values in `metrics` are already normalized by the Modbus register map
-                    # (e.g. raw x10 register values have been de-scaled), so we can add them directly
-                    # to mwh * 1000.0 here without applying any additional scaling factor.
-                    metrics[f"{prefix}energy"] = round(mwh_val * 1000.0 + kwh_val, 2)
-            metrics.pop(f"{prefix}_mwh", None)
-            metrics.pop(f"{prefix}_kwh", None)
-
-            _LOGGER.debug(
-                "Computed energy for %s: mwh=%s, kwh=%s, total energy=%s",
-                prefix,
-                mwh,
-                kwh,
-                metrics.get(f"{prefix}energy"),
-            )
-
-        return {"metrics": metrics}
+        return await self._run_modbus(_update, error_label="reading input registers")
 
     async def _read_modbus_settings(self, device_id: str, enabled_settings: list[str]):
         """Read settings from Modbus TCP holding registers."""
-        settings = await self._read_modbus_registers(
-            device_id=device_id,
-            enabled_items=enabled_settings,
-            register_map=MODBUS_HOLDING_REGISTER_MAP,
-            use_input_registers=False,
-            handle_relay_bits=False,
-        )
 
-        # Convert to the same format as HTTP API and include original modbus keys for compatibility.
-        settings_dict: dict[str, Any] = {}
-        for k, v in settings.items():
-            if k == "hpid":
-                continue
-            settings_dict[k] = v
-            http_key = MODBUS_HOLDING_TO_SETTINGS_MAP.get(k)
-            if http_key and http_key != k:
-                settings_dict[http_key] = v
+        async def _update(device: QvantumModbusDevice):
+            await device.async_update_settings()
+            return device.settings_payload(enabled_settings)
 
-        if "extra_tap_water" in settings_dict:
-            settings_dict["extra_tap_water"] = (
-                # If the value is 2, it means "on" (max tap water), otherwise "off" (normal tap water)
-                "on" if settings_dict["extra_tap_water"] == 2 else "off"
-            )
-
-        if "fanspeedselector" in settings_dict:
-            match settings_dict["fanspeedselector"]:
-                case 0:
-                    settings_dict["fanspeedselector"] = FAN_SPEED_STATE_OFF
-                case 1:
-                    settings_dict["fanspeedselector"] = FAN_SPEED_STATE_NORMAL
-                case 2:
-                    settings_dict["fanspeedselector"] = FAN_SPEED_STATE_EXTRA
-
-        # hide internal dhw_* keys from public settings output
-        for hide_key in ["dhw_start_normal", "dhw_stop_normal"]:
-            settings_dict.pop(hide_key, None)
-
-        return {"settings": [{"name": n, "value": v} for n, v in settings_dict.items()]}
+        return await self._run_modbus(_update, error_label="reading holding registers")
 
     async def _handle_response(self, response: aiohttp.ClientResponse):
         """Handle API response, raising exceptions for errors."""
@@ -590,87 +347,34 @@ class QvantumAPI:
         self, device_id: str, register_address: int, value: int
     ) -> dict:
         """Write a single Modbus holding register and return a status dict."""
-        self._ensure_open()
-        async with self._modbus_lock:
-            self._ensure_open()
-            self._init_modbus_client()
-            if not self._modbus_client:
-                raise APIConnectionError(
-                    None, f"Modbus client not initialized for device {device_id}"
-                )
 
-            try:
-                if not self._modbus_client.connected:
-                    await self._modbus_client.connect()
-                    if not self._modbus_client.connected:
-                        raise APIConnectionError(
-                            None,
-                            f"Modbus client connection failed for device {device_id}",
-                        )
+        async def _write(device: QvantumModbusDevice):
+            await device.write_holding_register(register_address, int(value))
+            return {"status": "APPLIED"}
 
-                request = WriteSingleRegisterRequest(
-                    dev_id=self._modbus_unit_id,
-                    address=register_address,
-                    # pymodbus 3.x uses a shared ModbusPDU base class where all register
-                    # values are stored as list[int]. For WriteSingleRegisterRequest the
-                    # value to write is accessed as registers[0] internally, so a
-                    # single-element list is the correct API.
-                    registers=[value],
-                )
-                result = await self._modbus_client.execute(False, request)
-                if result is None:
-                    raise APIConnectionError(
-                        None,
-                        f"Modbus write failed for device {device_id}: no response received from device",
-                    )
-                if result.isError():
-                    raise APIConnectionError(
-                        None,
-                        f"Modbus write error on register {register_address} for device {device_id}: {result}",
-                    )
-            except asyncio.CancelledError:
-                await self._reset_modbus_client()
-                raise
-            except ModbusException as e:
-                _LOGGER.error(
-                    "Modbus error writing holding register %d for device %s: %s",
-                    register_address,
-                    device_id,
-                    e,
-                )
-                await self._reset_modbus_client()
-                raise APIConnectionError(None, f"Modbus write failed: {e}")
-            except APIConnectionError:
-                await self._reset_modbus_client()
-                raise
-            except Exception as e:
-                _LOGGER.error(
-                    "Unexpected error writing holding register %d for device %s: %s",
-                    register_address,
-                    device_id,
-                    e,
-                    exc_info=True,
-                )
-                await self._reset_modbus_client()
-                raise APIConnectionError(None, f"Modbus write failed: {e}")
-
-        return {"status": "APPLIED"}
+        return await self._run_modbus(
+            _write,
+            error_label=f"writing holding register {register_address} for device {device_id}",
+            missing_client_message=f"Modbus client not initialized for device {device_id}",
+            failure_prefix="Modbus write failed",
+        )
 
     async def write_holding_register_for_metric(
         self, device_id: str, metric_key: str, value: float
     ) -> dict:
         """Write a Modbus holding register looked up by metric key."""
-        holding_key = next(
-            (k for k, v in MODBUS_HOLDING_TO_SETTINGS_MAP.items() if v == metric_key),
-            None,
+        holding_field_for_metric(metric_key)
+
+        async def _write(device: QvantumModbusDevice):
+            await device.write_metric(metric_key, value)
+            return {"status": "APPLIED"}
+
+        return await self._run_modbus(
+            _write,
+            error_label=f"writing metric {metric_key} for device {device_id}",
+            missing_client_message=f"Modbus client not initialized for device {device_id}",
+            failure_prefix="Modbus write failed",
         )
-        if holding_key is None or holding_key not in MODBUS_HOLDING_REGISTER_MAP:
-            raise ValueError(
-                f"No Modbus holding register mapping found for metric '{metric_key}'"
-            )
-        register_address, _data_type, scale = MODBUS_HOLDING_REGISTER_MAP[holding_key]
-        raw_value = int(round(value / scale)) if scale != 1.0 else int(value)
-        return await self.write_holding_register(device_id, register_address, raw_value)
 
     async def _update_settings(self, device_id: str, payload: dict):
         """Update one or several settings."""
