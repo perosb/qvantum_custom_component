@@ -26,6 +26,12 @@ from custom_components.qvantum import (
 class TestSetupDeviceRequirements:
     """Unit tests for setup device-identity helpers."""
 
+    def test_home_assistant_exposes_async_get_unit(self):
+        """The declared HA floor must ship shared Modbus units."""
+        from homeassistant.components.modbus import async_get_unit
+
+        assert callable(async_get_unit)
+
     def test_modbus_link_settings_from_options(self):
         entry = MagicMock()
         entry.options = {
@@ -50,7 +56,6 @@ class TestSetupDeviceRequirements:
         unit = MagicMock()
         with patch(
             "homeassistant.components.modbus.async_get_unit",
-            create=True,
             return_value=unit,
         ) as get_unit:
             result = _async_modbus_unit(hass, entry)
