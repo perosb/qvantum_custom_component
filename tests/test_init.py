@@ -1,6 +1,7 @@
 """Tests for Qvantum integration setup."""
 
 import sys
+import types
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,9 +13,11 @@ from custom_components.qvantum import (
     async_migrate_entry,
     PLATFORMS,
     _async_update_listener,
+    _async_modbus_unit,
     _coordinator_device,
     _has_required_device,
     _device_sw_version,
+    _modbus_link_settings,
 )
 
 # Mock HA imports after importing real functions
@@ -23,6 +26,39 @@ from custom_components.qvantum import (
 
 class TestSetupDeviceRequirements:
     """Unit tests for setup device-identity helpers."""
+
+    def test_modbus_link_settings_from_options(self):
+        entry = MagicMock()
+        entry.options = {
+            "modbus_tcp": True,
+            "modbus_host": "hp.local",
+            "modbus_port": 1502,
+            "modbus_unit_id": 7,
+        }
+        entry.data = {}
+        assert _modbus_link_settings(entry) == (True, "hp.local", 1502, 7)
+
+    def test_async_modbus_unit_http_mode_skips_shared_connection(self, hass):
+        entry = MagicMock()
+        entry.options = {}
+        entry.data = {}
+        assert _async_modbus_unit(hass, entry) is None
+
+    def test_async_modbus_unit_asks_home_assistant_modbus(self, hass):
+        """Borrow a unit via the lazy HA modbus import, without loading serial deps."""
+        entry = MagicMock()
+        entry.options = {"modbus_tcp": True, "modbus_host": "hp.local"}
+        entry.data = {}
+        unit = MagicMock()
+        get_unit = MagicMock(return_value=unit)
+        fake_modbus = types.ModuleType("homeassistant.components.modbus")
+        fake_modbus.async_get_unit = get_unit
+        with patch.dict(sys.modules, {"homeassistant.components.modbus": fake_modbus}):
+            result = _async_modbus_unit(hass, entry)
+        assert result is unit
+        assert get_unit.call_args.args[0] is hass
+        assert get_unit.call_args.args[1] is entry
+        assert get_unit.call_args.args[3] == 1
 
     def test_has_required_device_http_needs_metadata(self):
         assert _has_required_device({"id": "abc"}, require_metadata=True) is False
@@ -286,6 +322,8 @@ class TestIntegrationSetup:
         mock_api = MagicMock()
         mock_api._modbus_tcp = True
         mock_api._modbus_host = "Qvantum-HP"
+        mock_api._modbus_port = 502
+        mock_api._modbus_unit_id = 1
 
         mock_coordinator = MagicMock()
         mock_coordinator.modbus_enabled = True
@@ -318,6 +356,8 @@ class TestIntegrationSetup:
         mock_api = MagicMock()
         mock_api._modbus_tcp = True
         mock_api._modbus_host = "old-host"
+        mock_api._modbus_port = 502
+        mock_api._modbus_unit_id = 1
 
         mock_coordinator = MagicMock()
         mock_coordinator.modbus_enabled = True
@@ -350,6 +390,8 @@ class TestIntegrationSetup:
         mock_api = MagicMock()
         mock_api._modbus_tcp = False
         mock_api._modbus_host = "Qvantum-HP"
+        mock_api._modbus_port = 502
+        mock_api._modbus_unit_id = 1
 
         mock_coordinator = MagicMock()
         mock_coordinator.modbus_enabled = False
@@ -361,6 +403,40 @@ class TestIntegrationSetup:
         mock_config_entry.options = {
             "modbus_tcp": True,
             "modbus_host": "Qvantum-HP",
+        }
+        mock_config_entry.data = {}
+
+        await _async_update_listener(hass, mock_config_entry)
+
+        hass.config_entries.async_reload.assert_called_once_with(
+            mock_config_entry.entry_id
+        )
+        mock_coordinator.apply_poll_interval.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_async_update_listener_reloads_on_modbus_port_change(
+        self, hass, mock_config_entry
+    ):
+        """Changing Modbus port still requires a full reload."""
+        hass.config_entries.async_reload = AsyncMock()
+
+        mock_api = MagicMock()
+        mock_api._modbus_tcp = True
+        mock_api._modbus_host = "Qvantum-HP"
+        mock_api._modbus_port = 502
+        mock_api._modbus_unit_id = 1
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.api = mock_api
+        mock_coordinator.apply_poll_interval = MagicMock()
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = mock_coordinator
+        mock_config_entry.options = {
+            "modbus_tcp": True,
+            "modbus_host": "Qvantum-HP",
+            "modbus_port": 1502,
         }
         mock_config_entry.data = {}
 
@@ -393,6 +469,9 @@ class TestIntegrationSetup:
         mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock()
 
         with (
+            patch(
+                "custom_components.qvantum._async_modbus_unit", return_value=MagicMock()
+            ),
             patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
@@ -436,6 +515,9 @@ class TestIntegrationSetup:
         )
 
         with (
+            patch(
+                "custom_components.qvantum._async_modbus_unit", return_value=MagicMock()
+            ),
             patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
@@ -476,6 +558,9 @@ class TestIntegrationSetup:
         )
 
         with (
+            patch(
+                "custom_components.qvantum._async_modbus_unit", return_value=MagicMock()
+            ),
             patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
@@ -490,6 +575,67 @@ class TestIntegrationSetup:
             result = await async_setup_entry(hass, mock_config_entry)
 
         assert result is True
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_requests_shared_modbus_unit(
+        self, hass, mock_config_entry, mock_api, mock_coordinator
+    ):
+        """Modbus setup borrows a unit from Home Assistant instead of opening TCP."""
+        mock_config_entry.options = {
+            "modbus_tcp": True,
+            "modbus_host": "hp.local",
+            "modbus_port": 502,
+            "modbus_unit_id": 1,
+        }
+        mock_coordinator.data = {
+            "device": {"id": "test_device_123", "model": "QE-6", "vendor": "Qvantum"},
+            "values": {},
+        }
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
+        mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_config_entry.add_update_listener = MagicMock()
+        unit = MagicMock()
+        mock_firmware_coordinator = MagicMock()
+        mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock()
+
+        with (
+            patch(
+                "custom_components.qvantum._async_modbus_unit", return_value=unit
+            ) as get_unit,
+            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api) as api_ctor,
+            patch(
+                "custom_components.qvantum.QvantumDataUpdateCoordinator",
+                return_value=mock_coordinator,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumMaintenanceCoordinator",
+                return_value=mock_firmware_coordinator,
+            ),
+            patch("custom_components.qvantum.services.async_setup_services"),
+        ):
+            result = await async_setup_entry(hass, mock_config_entry)
+
+        assert result is True
+        get_unit.assert_called_once_with(hass, mock_config_entry)
+        assert api_ctor.call_args.kwargs["modbus_unit"] is unit
+        assert api_ctor.call_args.kwargs["modbus_tcp"] is True
+        assert api_ctor.call_args.kwargs["modbus_host"] == "hp.local"
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_conflict_raises_not_ready(
+        self, hass, mock_config_entry
+    ):
+        """Conflicting link settings on a shared Modbus endpoint fail setup."""
+        from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
+
+        mock_config_entry.options = {"modbus_tcp": True, "modbus_host": "hp.local"}
+
+        with patch(
+            "custom_components.qvantum._async_modbus_unit",
+            side_effect=HomeAssistantError("already in use"),
+        ):
+            with pytest.raises(ConfigEntryNotReady, match="already in use"):
+                await async_setup_entry(hass, mock_config_entry)
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_http_timeout_raises_not_ready(

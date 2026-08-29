@@ -1,4 +1,9 @@
-"""Modbus constants and mappings for the Qvantum Heat Pump Integration."""
+"""Modbus constants and mappings for the Qvantum Heat Pump Integration.
+
+These maps are the datasheet. ``modbus_model`` builds typed components from
+them, and ``modbus_device`` adapts decoded values to the HTTP-shaped payloads
+the rest of the integration already consumes.
+"""
 
 # Modbus input register map using internal metric names as keys.
 # Format: internal_name -> (register_address, data_type, scale)

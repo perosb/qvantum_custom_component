@@ -1,5 +1,6 @@
 {
     "name": "Qvantum Heat Pump",
     "zip_release": true,
-    "filename": "qvantum.zip"
+    "filename": "qvantum.zip",
+    "homeassistant": "2026.9.0b0"
   }

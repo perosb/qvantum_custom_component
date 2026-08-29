@@ -11,22 +11,17 @@ if [ ! -f "custom_components/qvantum/__init__.py" ]; then
     exit 1
 fi
 
-# Install test dependencies if needed
-if [ ! -d ".venv" ] || ! python3 -c "import homeassistant" 2>/dev/null; then
+# Create the venv if needed, then always install requirements so pip
+# upgrades stale Home Assistant / modbus-connection versions.
+if [ ! -d ".venv" ]; then
     echo "Setting up virtual environment..."
-    rm -rf .venv
     python3 -m venv .venv
-    source .venv/bin/activate
-    pip install --upgrade pip
-    pip install -r requirements-test.txt
-else
-    source .venv/bin/activate
-    # Ensure pymodbus is installed
-    if ! python3 -c "import pymodbus" 2>/dev/null; then
-        echo "Installing pymodbus..."
-        pip install "pymodbus>=3.0.0"
-    fi
 fi
+# shellcheck disable=SC1091
+source .venv/bin/activate
+pip install --upgrade pip
+echo "Installing test dependencies..."
+pip install -r requirements-test.txt
 
 # Run tests
 echo "Running pytest..."

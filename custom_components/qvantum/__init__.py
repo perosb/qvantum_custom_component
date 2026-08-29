@@ -13,7 +13,7 @@ from homeassistant.const import Platform
 from homeassistant.core import callback
 from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -36,6 +36,8 @@ from .const import (
     FIRMWARE_KEYS,
     CONF_MODBUS_TCP,
     CONF_MODBUS_HOST,
+    CONF_MODBUS_PORT,
+    CONF_MODBUS_UNIT_ID,
     DEFAULT_MODBUS_HOST,
     DEFAULT_MODBUS_PORT,
     DEFAULT_MODBUS_UNIT_ID,
@@ -59,6 +61,51 @@ PLATFORMS: list[Platform] = [
 ]
 
 type MyConfigEntry = ConfigEntry[RuntimeData]
+
+
+def _modbus_link_settings(config_entry: ConfigEntry) -> tuple[bool, str, int, int]:
+    """Return (enabled, host, port, unit_id) from entry options/data."""
+    enabled = bool(
+        config_entry.options.get(
+            CONF_MODBUS_TCP,
+            config_entry.data.get(CONF_MODBUS_TCP, False),
+        )
+    )
+    host = str(
+        config_entry.options.get(
+            CONF_MODBUS_HOST,
+            config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
+        )
+    )
+    port = int(
+        config_entry.options.get(
+            CONF_MODBUS_PORT,
+            config_entry.data.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
+        )
+    )
+    unit_id = int(
+        config_entry.options.get(
+            CONF_MODBUS_UNIT_ID,
+            config_entry.data.get(CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID),
+        )
+    )
+    return enabled, host, port, unit_id
+
+
+def _async_modbus_unit(hass: HomeAssistant, config_entry: ConfigEntry):
+    """Borrow a unit from the shared Home Assistant Modbus connection."""
+    enabled, host, port, unit_id = _modbus_link_settings(config_entry)
+    if not enabled:
+        return None
+    from homeassistant.components.modbus import async_get_unit
+    from modbus_connection import ModbusTcpParams
+
+    return async_get_unit(
+        hass,
+        config_entry,
+        ModbusTcpParams(host=host, port=port),
+        unit_id,
+    )
 
 
 def _coordinator_device(coordinator: QvantumDataUpdateCoordinator) -> dict:
@@ -109,14 +156,16 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     password = config_entry.data[CONF_PASSWORD]
     user_agent = f"Home Assistant/{MAJOR_VERSION}.{MINOR_VERSION}.{PATCH_VERSION} Qvantum/{VERSION}"
 
-    modbus_enabled = config_entry.options.get(
-        CONF_MODBUS_TCP,
-        config_entry.data.get(CONF_MODBUS_TCP, False),
+    modbus_enabled, modbus_host, modbus_port, modbus_unit_id = _modbus_link_settings(
+        config_entry
     )
-    modbus_host = config_entry.options.get(
-        CONF_MODBUS_HOST,
-        config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
-    )
+    try:
+        modbus_unit = _async_modbus_unit(hass, config_entry)
+    except HomeAssistantError as err:
+        raise ConfigEntryNotReady(
+            f"Modbus connection for {modbus_host}:{modbus_port} is already in use "
+            f"with different link settings: {err}"
+        ) from err
 
     hass.data[DOMAIN] = QvantumAPI(
         username=username,
@@ -124,8 +173,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         user_agent=user_agent,
         modbus_tcp=modbus_enabled,
         modbus_host=modbus_host,
-        modbus_port=DEFAULT_MODBUS_PORT,
-        modbus_unit_id=DEFAULT_MODBUS_UNIT_ID,
+        modbus_port=modbus_port,
+        modbus_unit_id=modbus_unit_id,
+        modbus_unit=modbus_unit,
     )
     hass.data[DOMAIN].hass = hass
 
@@ -204,35 +254,26 @@ def _modbus_transport_changed(
     config_entry: ConfigEntry, runtime: RuntimeData
 ) -> bool:
     """Return True when Modbus enablement or host requires a full reload."""
-    new_modbus_enabled = bool(
-        config_entry.options.get(
-            CONF_MODBUS_TCP,
-            config_entry.data.get(CONF_MODBUS_TCP, False),
-        )
-    )
-    new_modbus_host = str(
-        config_entry.options.get(
-            CONF_MODBUS_HOST,
-            config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
-        )
-    )
+    new_enabled, new_host, new_port, new_unit_id = _modbus_link_settings(config_entry)
 
     coordinator = getattr(runtime, "coordinator", None)
     if coordinator is None:
         return True
 
-    if new_modbus_enabled != bool(getattr(coordinator, "modbus_enabled", False)):
+    if new_enabled != bool(getattr(coordinator, "modbus_enabled", False)):
         return True
 
     api = getattr(coordinator, "api", None)
     if api is not None:
-        current_host = str(getattr(api, "_modbus_host", DEFAULT_MODBUS_HOST))
-        if new_modbus_host != current_host:
+        if new_host != str(getattr(api, "_modbus_host", DEFAULT_MODBUS_HOST)):
             return True
-        current_enabled = bool(
-            getattr(api, "_modbus_tcp", coordinator.modbus_enabled)
-        )
-        if new_modbus_enabled != current_enabled:
+        if new_port != int(getattr(api, "_modbus_port", DEFAULT_MODBUS_PORT)):
+            return True
+        if new_unit_id != int(
+            getattr(api, "_modbus_unit_id", DEFAULT_MODBUS_UNIT_ID)
+        ):
+            return True
+        if new_enabled != bool(getattr(api, "_modbus_tcp", coordinator.modbus_enabled)):
             return True
 
     return False
@@ -477,10 +518,11 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
 async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
     """Unload Qvantum Heat Pump Integration.
 
-    Shut down coordinators before closing the shared API client so in-flight
-    Modbus/HTTP polls are cancelled cleanly. Otherwise a poll cancelled mid-
-    request can fall back to HTTP against a closed session, or leave pymodbus
-    half-open so the next setup cannot reconnect without a full HA restart.
+    Shut down coordinators before closing the HTTP API client so in-flight
+    polls are cancelled first. Otherwise a cancelled Modbus poll can fall
+    back to HTTP against a session that is already closing. The shared
+    Modbus TCP connection is released by Home Assistant when this config
+    entry unloads; this integration never closes it.
     """
     runtime = getattr(config_entry, "runtime_data", None)
 

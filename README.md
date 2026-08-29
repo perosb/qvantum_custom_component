@@ -32,6 +32,8 @@ Disrupting the ordinary takes courage, but with experience, deep knowledge and d
 
 ### Installation
 
+Requires Home Assistant **2026.9** or newer (shared Modbus connection).
+
 1. **Install via HACS** (recommended):
    - Search for "Qvantum Heat Pump" in HACS
    - Install the Qvantum Heat Pump integration
