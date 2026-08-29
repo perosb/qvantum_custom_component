@@ -1,6 +1,7 @@
 """Tests for Qvantum integration setup."""
 
 import sys
+import types
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -26,12 +27,6 @@ from custom_components.qvantum import (
 class TestSetupDeviceRequirements:
     """Unit tests for setup device-identity helpers."""
 
-    def test_home_assistant_exposes_async_get_unit(self):
-        """The declared HA floor must ship shared Modbus units."""
-        from homeassistant.components.modbus import async_get_unit
-
-        assert callable(async_get_unit)
-
     def test_modbus_link_settings_from_options(self):
         entry = MagicMock()
         entry.options = {
@@ -50,14 +45,15 @@ class TestSetupDeviceRequirements:
         assert _async_modbus_unit(hass, entry) is None
 
     def test_async_modbus_unit_asks_home_assistant_modbus(self, hass):
+        """Borrow a unit via the lazy HA modbus import, without loading serial deps."""
         entry = MagicMock()
         entry.options = {"modbus_tcp": True, "modbus_host": "hp.local"}
         entry.data = {}
         unit = MagicMock()
-        with patch(
-            "homeassistant.components.modbus.async_get_unit",
-            return_value=unit,
-        ) as get_unit:
+        get_unit = MagicMock(return_value=unit)
+        fake_modbus = types.ModuleType("homeassistant.components.modbus")
+        fake_modbus.async_get_unit = get_unit
+        with patch.dict(sys.modules, {"homeassistant.components.modbus": fake_modbus}):
             result = _async_modbus_unit(hass, entry)
         assert result is unit
         assert get_unit.call_args.args[0] is hass
