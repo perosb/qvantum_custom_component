@@ -376,6 +376,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         if self.modbus_enabled:
             try:
                 probed = await self.api.async_probe_identity()
+            except asyncio.CancelledError:
+                raise
             except Exception as err:
                 _LOGGER.warning("Failed to probe Modbus identity: %s", err)
                 probed = None
@@ -407,6 +409,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._device = device
                 await self._persist_device_state()
                 return
+        except asyncio.CancelledError:
+            raise
         except Exception as err:
             _LOGGER.warning(
                 "Failed to fetch device info from HTTP API: %s", err

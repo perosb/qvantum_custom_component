@@ -1,5 +1,6 @@
 """Tests for Qvantum coordinator functions."""
 
+import asyncio
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -3364,7 +3365,7 @@ class TestDeviceLookupWhenHttpDown:
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
     async def test_load_cached_device_swallows_store_errors(self, mock_super_init):
-        """A corrupted device store must not prevent an HTTP lookup."""
+        """A corrupted device store must not prevent a Modbus-only update."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
         coordinator._device_store.async_load = AsyncMock(side_effect=OSError("disk"))
         mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
@@ -3377,7 +3378,8 @@ class TestDeviceLookupWhenHttpDown:
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
-    async def test_persist_device_skips_without_username_or_id(self, mock_super_init):
+    async def test_persist_device_saves_unbound_payload_without_username(self, mock_super_init):
+        """Missing username still persists device identity without an account binding."""
         coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
         coordinator._device = {}
         await coordinator._persist_device_state()
@@ -3389,6 +3391,18 @@ class TestDeviceLookupWhenHttpDown:
         coordinator._device_store.async_save.assert_awaited_once_with(
             {"device": {"id": "test_device_123"}}
         )
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_modbus_identity_probe_propagates_cancellation(self, mock_super_init):
+        """Task cancellation during identity probe must abort the update."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        mock_api.async_probe_identity = AsyncMock(side_effect=asyncio.CancelledError())
+
+        with pytest.raises(asyncio.CancelledError):
+            await coordinator._ensure_device()
+
+        mock_api.get_primary_device.assert_not_called()
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
