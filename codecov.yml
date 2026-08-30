@@ -1,0 +1,13 @@
+# Codecov GitHub checks (codecov/project, codecov/patch).
+# pytest.ini still enforces a hard --cov-fail-under=80 floor in CI.
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        # Pass when overall coverage drops by at most 1% vs the PR base.
+        threshold: 1%
+    patch:
+      default:
+        # Changed-line coverage is reported on the PR but does not fail CI.
+        informational: true
