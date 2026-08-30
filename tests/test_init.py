@@ -57,6 +57,27 @@ class TestSetupDeviceRequirements:
         hass.services.async_remove.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_sync_extra_hot_water_registers_during_cloud_setup(self, hass):
+        """SETUP_IN_PROGRESS cloud entries must register extra_hot_water."""
+        from homeassistant.config_entries import ConfigEntryState
+
+        cloud = MagicMock()
+        cloud.entry_id = "cloud"
+        cloud.options = {}
+        cloud.data = {}
+        cloud.state = ConfigEntryState.SETUP_IN_PROGRESS
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[])
+        hass.config_entries.async_entries = MagicMock(return_value=[cloud])
+        hass.services.has_service = MagicMock(return_value=False)
+        hass.services.async_remove = MagicMock()
+        with patch(
+            "custom_components.qvantum.async_setup_services", new_callable=AsyncMock
+        ) as setup:
+            await _async_sync_extra_hot_water_service(hass)
+        setup.assert_awaited_once_with(hass)
+        hass.services.async_remove.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_sync_extra_hot_water_removes_when_only_modbus_remains(self, hass):
         modbus = MagicMock()
         modbus.entry_id = "modbus"

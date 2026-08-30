@@ -92,30 +92,29 @@ def _modbus_link_settings(config_entry: ConfigEntry) -> tuple[bool, str, int, in
     return enabled, host, port, unit_id
 
 
+def _qvantum_entry_is_active(entry: ConfigEntry) -> bool:
+    """Return True for loaded or in-setup entries (tests may omit state)."""
+    state = getattr(entry, "state", None)
+    if isinstance(state, ConfigEntryState):
+        return state in (
+            ConfigEntryState.LOADED,
+            ConfigEntryState.SETUP_IN_PROGRESS,
+        )
+    return True
+
+
 def _qvantum_entries(hass: HomeAssistant) -> list[ConfigEntry]:
-    """Return loaded Qvantum config entries, or [] in incomplete tests."""
+    """Return active Qvantum config entries, or [] in incomplete tests."""
     config_entries = getattr(hass, "config_entries", None)
     if config_entries is None:
         return []
-    loaded_fn = getattr(config_entries, "async_loaded_entries", None)
-    if callable(loaded_fn):
-        try:
-            entries = loaded_fn(DOMAIN)
-        except TypeError:
-            entries = None
-        if isinstance(entries, (list, tuple)):
-            return list(entries)
     getter = getattr(config_entries, "async_entries", None)
     if getter is None:
         return []
     entries = getter(DOMAIN)
     if not isinstance(entries, (list, tuple)):
         return []
-    return [
-        entry
-        for entry in entries
-        if getattr(entry, "state", None) in (ConfigEntryState.LOADED, None)
-    ]
+    return [entry for entry in entries if _qvantum_entry_is_active(entry)]
 
 
 def _any_cloud_qvantum_entry(
