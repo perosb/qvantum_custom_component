@@ -55,7 +55,7 @@ jobs:
     permissions:
       pull-requests: write
       contents: write
-    if: ${{ github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'}}
+    if: ${{ github.actor == 'dependabot[bot]' && github.event_name == 'pull_request' && github.base_ref == 'main' }}
     steps:
       - id: metadata
         uses: dependabot/fetch-metadata@v3
