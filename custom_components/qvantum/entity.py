@@ -48,6 +48,8 @@ class QvantumAccessMixin:
         try:
             if not isinstance(self.coordinator, QvantumDataUpdateCoordinator):
                 return True  # Maintenance entities always available
+            if getattr(self.coordinator, "modbus_enabled", False):
+                return False
             maintenance_coordinator = (
                 self.coordinator.config_entry.runtime_data.maintenance_coordinator
             )

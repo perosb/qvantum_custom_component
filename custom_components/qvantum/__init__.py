@@ -220,7 +220,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     )
 
     # Only register the service if it hasn't been registered yet
-    if not hass.services.has_service(DOMAIN, "extra_hot_water"):
+    if not modbus_enabled and not hass.services.has_service(DOMAIN, "extra_hot_water"):
         await async_setup_services(hass)
 
     # Initialize maintenance coordinator (handles firmware updates and maintenance tasks)

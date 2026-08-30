@@ -74,6 +74,7 @@ def mock_coordinator():
             "tap_stop": 1712232000,
         },
     }
+    coordinator.modbus_enabled = False
     return coordinator
 
 
