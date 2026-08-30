@@ -74,6 +74,7 @@ def mock_coordinator():
             "tap_stop": 1712232000,
         },
     }
+    coordinator.modbus_enabled = False
     return coordinator
 
 
@@ -545,6 +546,32 @@ class TestSensorSetup:
         assert (
             mock_entity_registry.async_update_entity.call_count == expected_call_count
         )
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_cleanup_drops_cloud_special_sensors(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """HTTP-only special sensors must not be kept when cleaning up Modbus mode."""
+        from custom_components.qvantum.const import CONF_MODBUS_TCP
+
+        mock_config_entry.options = {CONF_MODBUS_TCP: True}
+        mock_coordinator.modbus_enabled = True
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch(
+                "custom_components.qvantum.entity.cleanup_disabled_entities"
+            ) as cleanup,
+        ):
+            await async_setup_entry(mock_hass, mock_config_entry, MagicMock())
+
+        allowed = cleanup.call_args.args[2]
+        assert "totalenergy" in allowed
+        assert "latency" in allowed
+        assert "hpid" in allowed
+        assert "tap_stop" not in allowed
+        assert "expiresAt" not in allowed
+        assert "firmware_last_check" not in allowed
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_respects_user_enabled_entities(

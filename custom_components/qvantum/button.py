@@ -34,14 +34,20 @@ async def async_setup_entry(
 
     buttons = []
     buttons.append(QvantumButtonEntity(coordinator, "extra_tap_water_60min", device))
-
-    buttons.append(
-        QvantumButtonEntity(
-            coordinator, "elevate_access", device, maintenance_coordinator
+    button_keys = {"extra_tap_water_60min"}
+    if not coordinator.modbus_enabled:
+        buttons.append(
+            QvantumButtonEntity(
+                coordinator, "elevate_access", device, maintenance_coordinator
+            )
         )
-    )
+        button_keys.add("elevate_access")
 
     async_add_entities(buttons)
+
+    from .entity import cleanup_disabled_entities
+
+    cleanup_disabled_entities(hass, coordinator, button_keys, "button")
 
     _LOGGER.debug("Setting up platform BUTTON")
 
@@ -66,6 +72,11 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
         """Handle the button press."""
         match self._metric_key:
             case "extra_tap_water_60min":
+                if getattr(self.coordinator, "modbus_enabled", False):
+                    _LOGGER.debug(
+                        "extra_tap_water_60min has no local write in this mode; ignoring press"
+                    )
+                    return
                 # Activate extra tap water for 60 minutes
                 response = await self.coordinator.api.set_extra_tap_water(
                     self._hpid, 60
@@ -77,6 +88,11 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
                     "Extra tap water activated for 60 minutes via button press"
                 )
             case "elevate_access":
+                if getattr(self.coordinator, "modbus_enabled", False):
+                    _LOGGER.debug(
+                        "elevate_access is cloud-only; ignoring press in Modbus mode"
+                    )
+                    return
                 # Elevate access level for the device
                 response = await self.coordinator.api.elevate_access(self._hpid)
 
@@ -95,8 +111,7 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
     def available(self):
         """Check if button is available."""
         if self._metric_key == "elevate_access":
-            # Elevate access button is always available
-            return True
+            return not getattr(self.coordinator, "modbus_enabled", False)
         else:
             # Other action buttons require write access
             return self._has_write_access

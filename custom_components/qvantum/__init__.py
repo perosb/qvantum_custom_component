@@ -8,7 +8,7 @@ import inspect
 import logging
 import json
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import callback
 from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION
@@ -90,6 +90,56 @@ def _modbus_link_settings(config_entry: ConfigEntry) -> tuple[bool, str, int, in
         )
     )
     return enabled, host, port, unit_id
+
+
+def _qvantum_entry_is_active(entry: ConfigEntry) -> bool:
+    """Return True for loaded or in-setup entries (tests may omit state)."""
+    state = getattr(entry, "state", None)
+    if isinstance(state, ConfigEntryState):
+        return state in (
+            ConfigEntryState.LOADED,
+            ConfigEntryState.SETUP_IN_PROGRESS,
+        )
+    return True
+
+
+def _qvantum_entries(hass: HomeAssistant) -> list[ConfigEntry]:
+    """Return active Qvantum config entries, or [] in incomplete tests."""
+    config_entries = getattr(hass, "config_entries", None)
+    if config_entries is None:
+        return []
+    getter = getattr(config_entries, "async_entries", None)
+    if getter is None:
+        return []
+    entries = getter(DOMAIN)
+    if not isinstance(entries, (list, tuple)):
+        return []
+    return [entry for entry in entries if _qvantum_entry_is_active(entry)]
+
+
+def _any_cloud_qvantum_entry(
+    hass: HomeAssistant, *, skip_entry_id: str | None = None
+) -> bool:
+    """Return True when any remaining Qvantum entry uses the cloud HTTP API."""
+    for entry in _qvantum_entries(hass):
+        if skip_entry_id and getattr(entry, "entry_id", None) == skip_entry_id:
+            continue
+        if not _modbus_link_settings(entry)[0]:
+            return True
+    return False
+
+
+async def _async_sync_extra_hot_water_service(
+    hass: HomeAssistant, *, skip_entry_id: str | None = None
+) -> None:
+    """Register extra_hot_water for cloud entries; remove it when none remain."""
+    registered = bool(hass.services.has_service(DOMAIN, "extra_hot_water"))
+    if _any_cloud_qvantum_entry(hass, skip_entry_id=skip_entry_id):
+        if not registered:
+            await async_setup_services(hass)
+        return
+    if registered:
+        hass.services.async_remove(DOMAIN, "extra_hot_water")
 
 
 def _async_modbus_unit(hass: HomeAssistant, config_entry: ConfigEntry):
@@ -219,9 +269,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         or _device_sw_version(device_metadata),
     )
 
-    # Only register the service if it hasn't been registered yet
-    if not hass.services.has_service(DOMAIN, "extra_hot_water"):
-        await async_setup_services(hass)
+    await _async_sync_extra_hot_water_service(hass)
 
     # Initialize maintenance coordinator (handles firmware updates and maintenance tasks)
     maintenance_coordinator = QvantumMaintenanceCoordinator(
@@ -553,6 +601,10 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
     unload_ok = await hass.config_entries.async_unload_platforms(
         config_entry, PLATFORMS
     )
+    if unload_ok:
+        await _async_sync_extra_hot_water_service(
+            hass, skip_entry_id=config_entry.entry_id
+        )
 
     if hass.data.get(DOMAIN) is not None:
         try:

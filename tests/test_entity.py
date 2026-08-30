@@ -20,11 +20,12 @@ def test_has_write_access_maintenance_entity():
     assert entity._has_write_access is True
 
 
-def test_has_write_access_allows_modbus_write_when_cloud_unavailable():
-    """Local Modbus writes stay available when the HTTP API cannot be checked."""
+def test_has_write_access_denied_in_modbus_mode():
+    """Modbus mode has no writes in this phase, even if cloud access is missing."""
     from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
 
     coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+    coordinator.modbus_enabled = True
     coordinator.config_entry = MagicMock()
     coordinator.config_entry.runtime_data = MagicMock()
     coordinator.config_entry.runtime_data.maintenance_coordinator = None
@@ -38,7 +39,7 @@ def test_has_write_access_allows_modbus_write_when_cloud_unavailable():
             return True
 
     entity = DummyModbusWriteEntity(coordinator)
-    assert entity._has_write_access is True
+    assert entity._has_write_access is False
 
 
 def test_has_write_access_denies_http_only_entity_when_cloud_unavailable():
@@ -64,8 +65,8 @@ def test_has_write_access_denies_http_only_entity_when_cloud_unavailable():
     assert entity._has_write_access is False
 
 
-def test_has_write_access_allows_modbus_metric_when_cloud_unavailable():
-    """Entities that write via holding registers stay available offline."""
+def test_has_write_access_denies_modbus_metric_in_modbus_mode():
+    """Holding-register writes are still gated off in Modbus mode for now."""
     from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
     from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
 
@@ -78,13 +79,14 @@ def test_has_write_access_allows_modbus_metric_when_cloud_unavailable():
     coordinator.config_entry.data = {}
     coordinator.config_entry.runtime_data = MagicMock()
     coordinator.config_entry.runtime_data.maintenance_coordinator = None
+    coordinator.modbus_enabled = True
 
     entity = QvantumEntity.__new__(QvantumEntity)
     entity.coordinator = coordinator
     entity._write_access_warning_logged = False
     entity._metric_key = "room_temp_external"
 
-    assert entity._has_write_access is True
+    assert entity._has_write_access is False
 
 
 def test_has_write_access_treats_empty_maintenance_data_as_outage():

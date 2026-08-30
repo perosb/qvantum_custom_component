@@ -109,31 +109,34 @@ async def async_setup_entry(
     sensors.append(QvantumTotalEnergyEntity(coordinator, "totalenergy", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "latency", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device, True))
-    sensors.append(QvantumTimerEntity(coordinator, "tap_stop", device, True))
+    if not coordinator.modbus_enabled:
+        sensors.append(QvantumTimerEntity(coordinator, "tap_stop", device, True))
 
-    # Add maintenance sensors (firmware and access level)
-    maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
-    sensors.append(
-        QvantumAccessExpireEntity(maintenance_coordinator, "expiresAt", device, True)
-    )
-    sensors.append(
-        QvantumFirmwareSensorEntity(
-            maintenance_coordinator, "display_fw_version", device, True
+        # Cloud-only: firmware and access level from the HTTP API
+        maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
+        sensors.append(
+            QvantumAccessExpireEntity(maintenance_coordinator, "expiresAt", device, True)
         )
-    )
-    sensors.append(
-        QvantumFirmwareSensorEntity(maintenance_coordinator, "cc_fw_version", device, True)
-    )
-    sensors.append(
-        QvantumFirmwareSensorEntity(
-            maintenance_coordinator, "inv_fw_version", device, True
+        sensors.append(
+            QvantumFirmwareSensorEntity(
+                maintenance_coordinator, "display_fw_version", device, True
+            )
         )
-    )
-    sensors.append(
-        QvantumFirmwareLastCheckSensorEntity(
-            maintenance_coordinator, "firmware_last_check", device, True
+        sensors.append(
+            QvantumFirmwareSensorEntity(
+                maintenance_coordinator, "cc_fw_version", device, True
+            )
         )
-    )
+        sensors.append(
+            QvantumFirmwareSensorEntity(
+                maintenance_coordinator, "inv_fw_version", device, True
+            )
+        )
+        sensors.append(
+            QvantumFirmwareLastCheckSensorEntity(
+                maintenance_coordinator, "firmware_last_check", device, True
+            )
+        )
 
     async_add_entities(sensors)
 
@@ -144,11 +147,18 @@ async def async_setup_entry(
 
     # Clean up disabled entities that are no longer supported in the current mode.
     # Include special sensor keys so they are never removed by cleanup.
-    special_sensor_keys = {
-        "totalenergy", "latency", "hpid", "tap_stop",
-        "expiresAt", "display_fw_version", "cc_fw_version",
-        "inv_fw_version", "firmware_last_check",
-    }
+    special_sensor_keys = {"totalenergy", "latency", "hpid"}
+    if not coordinator.modbus_enabled:
+        special_sensor_keys.update(
+            {
+                "tap_stop",
+                "expiresAt",
+                "display_fw_version",
+                "cc_fw_version",
+                "inv_fw_version",
+                "firmware_last_check",
+            }
+        )
     from .entity import cleanup_disabled_entities
 
     cleanup_disabled_entities(hass, coordinator, possible_metrics | special_sensor_keys, "sensor")
