@@ -78,7 +78,7 @@ class TestSetupDeviceRequirements:
         hass.services.async_remove.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_sync_extra_hot_water_removes_when_only_modbus_remains(self, hass):
+    async def test_sync_extra_hot_water_keeps_service_for_modbus_entry(self, hass):
         modbus = MagicMock()
         modbus.entry_id = "modbus"
         modbus.options = {"modbus_tcp": True}
@@ -92,6 +92,17 @@ class TestSetupDeviceRequirements:
         ) as setup:
             await _async_sync_extra_hot_water_service(hass)
         setup.assert_not_called()
+        hass.services.async_remove.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_sync_extra_hot_water_removes_when_last_entry_unloads(self, hass):
+        modbus = MagicMock()
+        modbus.entry_id = "modbus"
+        modbus.options = {"modbus_tcp": True}
+        modbus.data = {}
+        hass.config_entries.async_entries = MagicMock(return_value=[modbus])
+        hass.services.has_service = MagicMock(return_value=True)
+        await _async_sync_extra_hot_water_service(hass, skip_entry_id="modbus")
         hass.services.async_remove.assert_called_once_with("qvantum", "extra_hot_water")
 
     @pytest.mark.asyncio

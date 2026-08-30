@@ -46,8 +46,9 @@ class QvantumAccessMixin:
     def _has_write_access(self) -> bool:
         """Return whether this entity may write.
 
-        Cloud mode requires writeAccessLevel >= 20. Modbus mode has no local
-        writes in this phase, so access is denied.
+        Cloud mode requires writeAccessLevel >= 20. Modbus mode allows
+        holding-register writes when the Modbus write option is enabled,
+        except for cloud-only controls.
         """
         try:
             if not isinstance(self.coordinator, QvantumDataUpdateCoordinator):
