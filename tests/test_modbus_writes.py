@@ -146,7 +146,7 @@ class TestExtraTapWaterModbus:
             await api.set_extra_tap_water("dev1", 60)
         write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_EXTRA)
         later.assert_called_once()
-        assert later.call_args.args[1] == 3600
+        assert later.call_args.args[1] == pytest.approx(3600, abs=1)
         assert api._extra_dhw_unsub is unsub
 
     @pytest.mark.asyncio
@@ -194,6 +194,101 @@ class TestExtraTapWaterModbus:
             write.reset_mock()
             await captured["cb"](None)
         write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_NORMAL)
+
+    @pytest.mark.asyncio
+    async def test_timed_extra_persists_restore_deadline(self):
+        api = _modbus_api()
+        api.hass = MagicMock()
+        api.hass.async_create_task = MagicMock()
+        store = MagicMock()
+        store.async_save = MagicMock()
+        api._extra_dhw_store = store
+        with (
+            patch.object(
+                api,
+                "write_holding_register_for_metric",
+                AsyncMock(return_value={"status": "APPLIED"}),
+            ),
+            patch("homeassistant.helpers.event.async_call_later", return_value=MagicMock()),
+        ):
+            await api.set_extra_tap_water("dev1", 60)
+        store.async_save.assert_called_once()
+        payload = store.async_save.call_args.args[0]
+        assert payload["device_id"] == "dev1"
+        assert payload["restore_at"] > 0
+        assert api._extra_dhw_restore_at == payload["restore_at"]
+
+    @pytest.mark.asyncio
+    async def test_off_clears_persisted_timer(self):
+        api = _modbus_api()
+        api.hass = MagicMock()
+        api.hass.async_create_task = MagicMock()
+        store = MagicMock()
+        store.async_remove = MagicMock()
+        api._extra_dhw_store = store
+        api._extra_dhw_restore_at = 123.0
+        with patch.object(
+            api,
+            "write_holding_register_for_metric",
+            AsyncMock(return_value={"status": "APPLIED"}),
+        ):
+            await api.set_extra_tap_water("dev1", 0)
+        store.async_remove.assert_called()
+        assert api._extra_dhw_restore_at is None
+
+    @pytest.mark.asyncio
+    async def test_close_keeps_persisted_timer(self):
+        api = _modbus_api()
+        api.hass = MagicMock()
+        api.hass.async_create_task = MagicMock()
+        store = MagicMock()
+        store.async_remove = AsyncMock()
+        api._extra_dhw_store = store
+        api._extra_dhw_restore_at = 123.0
+        unsub = MagicMock()
+        api._extra_dhw_unsub = unsub
+        await api.close()
+        unsub.assert_called_once()
+        store.async_remove.assert_not_called()
+        assert api._extra_dhw_restore_at == 123.0
+
+    @pytest.mark.asyncio
+    async def test_restore_timer_reschedules_remaining(self):
+        api = _modbus_api()
+        api.hass = MagicMock()
+        restore_at = __import__("time").time() + 120
+        store = MagicMock()
+        store.async_load = AsyncMock(
+            return_value={"device_id": "dev1", "restore_at": restore_at}
+        )
+        api._extra_dhw_store = store
+        with patch(
+            "homeassistant.helpers.event.async_call_later", return_value=MagicMock()
+        ) as later:
+            await api.async_restore_extra_dhw_timer()
+        later.assert_called_once()
+        assert later.call_args.args[1] == pytest.approx(120, abs=2)
+        assert api._extra_dhw_restore_at == restore_at
+
+    @pytest.mark.asyncio
+    async def test_restore_timer_writes_normal_when_expired(self):
+        api = _modbus_api()
+        api.hass = MagicMock()
+        store = MagicMock()
+        store.async_load = AsyncMock(
+            return_value={"device_id": "dev1", "restore_at": 1.0}
+        )
+        store.async_remove = AsyncMock()
+        api._extra_dhw_store = store
+        with patch.object(
+            api,
+            "write_holding_register_for_metric",
+            AsyncMock(return_value={"status": "APPLIED"}),
+        ) as write:
+            await api.async_restore_extra_dhw_timer()
+        write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_NORMAL)
+        store.async_remove.assert_awaited()
+        assert api._extra_dhw_restore_at is None
 
 
 class TestModbusWriteOptionGate:

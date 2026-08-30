@@ -569,7 +569,7 @@ class TestSensorSetup:
         assert "totalenergy" in allowed
         assert "latency" in allowed
         assert "hpid" in allowed
-        assert "tap_stop" not in allowed
+        assert "tap_stop" in allowed
         assert "expiresAt" not in allowed
         assert "firmware_last_check" not in allowed
 

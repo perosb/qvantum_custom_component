@@ -687,6 +687,10 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             # Settings take precedence over metrics in case of conflicts
             values = {**metrics_dict, **settings_dict}
 
+            restore_at = getattr(self.api, "_extra_dhw_restore_at", None)
+            if self.modbus_enabled and isinstance(restore_at, (int, float)):
+                values["tap_stop"] = int(restore_at)
+
             self._derive_tap_water_capacity(values)
 
             if self.modbus_enabled:

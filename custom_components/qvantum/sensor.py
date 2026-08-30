@@ -109,9 +109,8 @@ async def async_setup_entry(
     sensors.append(QvantumTotalEnergyEntity(coordinator, "totalenergy", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "latency", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device, True))
+    sensors.append(QvantumTimerEntity(coordinator, "tap_stop", device, True))
     if not coordinator.modbus_enabled:
-        sensors.append(QvantumTimerEntity(coordinator, "tap_stop", device, True))
-
         # Cloud-only: firmware and access level from the HTTP API
         maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
         sensors.append(
@@ -147,11 +146,10 @@ async def async_setup_entry(
 
     # Clean up disabled entities that are no longer supported in the current mode.
     # Include special sensor keys so they are never removed by cleanup.
-    special_sensor_keys = {"totalenergy", "latency", "hpid"}
+    special_sensor_keys = {"totalenergy", "latency", "hpid", "tap_stop"}
     if not coordinator.modbus_enabled:
         special_sensor_keys.update(
             {
-                "tap_stop",
                 "expiresAt",
                 "display_fw_version",
                 "cc_fw_version",

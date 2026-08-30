@@ -141,7 +141,7 @@ SmartControl **status** can still be **read** on Modbus (`smart_dhw_mode` 161, `
 | Extra switch ON | HTTP `minutes=-1` (indefinite) | Extra mode, **no timer** |
 | Service `qvantum.extra_hot_water` | Always (uses HTTP); 0–480 min, default 120 | Registered; writes holding if `modbus_write`; same in-memory timer for `minutes > 0` |
 | `tap_stop` sensor | Yes | No |
-| HA restart during the hour | Cloud still ends extra | **Never writes Normal back** |
+| HA restart during the hour | Cloud still ends extra | Restore deadline is persisted; Normal is written when it expires |
 
 That restart hole is the leftover note on #181, not a regression vs “local previous” — previous extra DHW simply was not local. Turning `modbus_write` off cancels a pending restore timer.
 
