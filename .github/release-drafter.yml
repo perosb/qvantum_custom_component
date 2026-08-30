@@ -8,21 +8,16 @@ template: |
 
 
   > [!IMPORTANT]
-  > By default, this integration uses Modbus for **reading only**.
-  > Modbus write support is disabled unless you explicitly enable it in the integration options,
-  > and only supported controls use that path. Other configuration/set commands continue to use the existing HTTP API.
+  > Setup is **cloud HTTP** or **local Modbus**. Local Modbus is read-only until writing is enabled.
+  > SmartControl and elevate-access stay cloud-only.
 
 
   > [!WARNING]
-  >The Elevate access rights works by assigning "Remote Service" access to your user.
-  >Essentially it gives you service tech access.
-  >This is apparently required to us to change some settings on our pumps.
-  
-  
+  > Elevate access assigns "Remote Service" (service tech) rights to your user. Cloud HTTP only.
+
+
   > [!CAUTION]
-  >Uses the same internal API for all metrics that is also used by the app.
-  >This API pulls live metrics from FLVP.
-  >Use at your own risk ;)
+  > Cloud mode uses the same internal API as the app. Use at your own risk ;)
 
 include-labels:
   - "bug"
