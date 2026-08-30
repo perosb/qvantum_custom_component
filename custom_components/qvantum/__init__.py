@@ -8,7 +8,7 @@ import inspect
 import logging
 import json
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import callback
 from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION
@@ -94,13 +94,28 @@ def _modbus_link_settings(config_entry: ConfigEntry) -> tuple[bool, str, int, in
 
 def _qvantum_entries(hass: HomeAssistant) -> list[ConfigEntry]:
     """Return loaded Qvantum config entries, or [] in incomplete tests."""
-    getter = getattr(hass.config_entries, "async_entries", None)
+    config_entries = getattr(hass, "config_entries", None)
+    if config_entries is None:
+        return []
+    loaded_fn = getattr(config_entries, "async_loaded_entries", None)
+    if callable(loaded_fn):
+        try:
+            entries = loaded_fn(DOMAIN)
+        except TypeError:
+            entries = None
+        if isinstance(entries, (list, tuple)):
+            return list(entries)
+    getter = getattr(config_entries, "async_entries", None)
     if getter is None:
         return []
     entries = getter(DOMAIN)
-    if isinstance(entries, (list, tuple)):
-        return list(entries)
-    return []
+    if not isinstance(entries, (list, tuple)):
+        return []
+    return [
+        entry
+        for entry in entries
+        if getattr(entry, "state", None) in (ConfigEntryState.LOADED, None)
+    ]
 
 
 def _any_cloud_qvantum_entry(

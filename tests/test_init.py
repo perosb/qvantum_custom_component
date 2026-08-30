@@ -45,6 +45,7 @@ class TestSetupDeviceRequirements:
         cloud.entry_id = "cloud"
         cloud.options = {}
         cloud.data = {}
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[cloud])
         hass.config_entries.async_entries = MagicMock(return_value=[cloud])
         hass.services.has_service = MagicMock(return_value=False)
         hass.services.async_remove = MagicMock()
@@ -61,6 +62,7 @@ class TestSetupDeviceRequirements:
         modbus.entry_id = "modbus"
         modbus.options = {"modbus_tcp": True}
         modbus.data = {}
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[modbus])
         hass.config_entries.async_entries = MagicMock(return_value=[modbus])
         hass.services.has_service = MagicMock(return_value=True)
         hass.services.async_remove = MagicMock()
@@ -70,6 +72,27 @@ class TestSetupDeviceRequirements:
             await _async_sync_extra_hot_water_service(hass)
         setup.assert_not_called()
         hass.services.async_remove.assert_called_once_with("qvantum", "extra_hot_water")
+
+    @pytest.mark.asyncio
+    async def test_sync_extra_hot_water_ignores_unloaded_cloud_entry(self, hass):
+        """Disabled/unloaded cloud entries must not keep extra_hot_water registered."""
+        from homeassistant.config_entries import ConfigEntryState
+
+        cloud = MagicMock()
+        cloud.entry_id = "cloud"
+        cloud.options = {}
+        cloud.data = {}
+        cloud.state = ConfigEntryState.NOT_LOADED
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[])
+        hass.config_entries.async_entries = MagicMock(return_value=[cloud])
+        hass.services.has_service = MagicMock(return_value=False)
+        hass.services.async_remove = MagicMock()
+        with patch(
+            "custom_components.qvantum.async_setup_services", new_callable=AsyncMock
+        ) as setup:
+            await _async_sync_extra_hot_water_service(hass)
+        setup.assert_not_called()
+        hass.services.async_remove.assert_not_called()
 
     def test_async_modbus_unit_http_mode_skips_shared_connection(self, hass):
         entry = MagicMock()
