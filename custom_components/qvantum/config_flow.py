@@ -76,9 +76,6 @@ def _modbus_user_schema(
     )
 
 
-STEP_MODBUS_DATA_SCHEMA = _modbus_user_schema()
-
-
 def _normalize_modbus_scan_interval(value: Any) -> int:
     """Coerce Modbus scan interval to int and enforce the configured minimum."""
     try:
@@ -288,7 +285,7 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         config_entry = self._reconfigure_entry()
         if user_input is not None:
             try:
-                await validate_input(self.hass, user_input)
+                info = await validate_input(self.hass, user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
@@ -299,7 +296,7 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_update_reload_and_abort(
                     config_entry,
-                    unique_id=config_entry.unique_id,
+                    unique_id=info.get("serial") or info["title"],
                     data={
                         CONF_USERNAME: user_input[CONF_USERNAME],
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
@@ -366,7 +363,7 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 user_input.get(CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL)
             )
             try:
-                await validate_modbus(self.hass, host, port, unit_id)
+                info = await validate_modbus(self.hass, host, port, unit_id)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except Exception:
@@ -375,7 +372,7 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_update_reload_and_abort(
                     config_entry,
-                    unique_id=config_entry.unique_id,
+                    unique_id=info["serial"],
                     data={
                         CONF_MODBUS_TCP: True,
                         CONF_MODBUS_WRITE: False,

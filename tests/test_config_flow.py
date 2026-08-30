@@ -343,6 +343,7 @@ class TestQvantumConfigFlow:
                 {"username": "new@example.com", "password": "newpass"}
             )
         assert result == {"type": "abort"}
+        assert mock_update.call_args.kwargs["unique_id"] == "12345"
         assert mock_update.call_args.kwargs["data"]["modbus_tcp"] is False
 
     @pytest.mark.asyncio
@@ -374,6 +375,7 @@ class TestQvantumConfigFlow:
                 }
             )
         assert result == {"type": "abort"}
+        assert mock_update.call_args.kwargs["unique_id"] == "1"
         assert mock_update.call_args.kwargs["data"]["modbus_tcp"] is True
         assert mock_update.call_args.kwargs["options"]["modbus_host"] == "hp.local"
 
