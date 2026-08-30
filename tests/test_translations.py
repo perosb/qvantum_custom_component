@@ -18,7 +18,6 @@ def test_danish_and_czech_translations_are_available():
             "smart_dhw_control_status": "Smart DHW-styringsstatus",
             "hp_status_name": "Varmepumpestatus",
             "hp_status_defrosting": "Afrimning",
-            "config_description": "Modbus giver dig næsten realtidsmålinger ved direkte læsning fra enheden.",
         },
         "cs": {
             "config_title": "Qvantum tepelné čerpadlo",
@@ -26,7 +25,6 @@ def test_danish_and_czech_translations_are_available():
             "smart_dhw_control_status": "Stav řízení Smart DHW",
             "hp_status_name": "Stav tepelného čerpadla",
             "hp_status_defrosting": "Odmrazování",
-            "config_description": "Modbus vám poskytne téměř okamžitá měření přímo čtením ze zařízení.",
         },
         "fi": {
             "config_title": "Qvantum lämpöpumppu",
@@ -34,7 +32,6 @@ def test_danish_and_czech_translations_are_available():
             "smart_dhw_control_status": "Älykkään käyttöveden ohjaustila",
             "hp_status_name": "Lämpöpumpun tila",
             "hp_status_defrosting": "Sulatus",
-            "config_description": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.",
         },
     }
 
@@ -51,4 +48,5 @@ def test_danish_and_czech_translations_are_available():
         )
         assert data["entity"]["sensor"]["hp_status"]["name"] == expected["hp_status_name"]
         assert data["entity"]["sensor"]["hp_status"]["state"]["1"] == expected["hp_status_defrosting"]
-        assert expected["config_description"] in data["config"]["step"]["user"]["description"]
+        assert "cloud" in data["config"]["step"]["user"]["menu_options"]
+        assert "modbus" in data["config"]["step"]["user"]["menu_options"]

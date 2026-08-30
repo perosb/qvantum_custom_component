@@ -530,43 +530,71 @@
     }
   },
   "config": {
-    "title": "Qvantum Wärmepumpe",
+    "title": "Qvantum Heat pump",
     "abort": {
-      "already_configured": "Gerät ist bereits konfiguriert",
-      "reconfigure_successful": "Rekonfiguration erfolgreich"
+      "already_configured": "Device is already configured",
+      "reconfigure_successful": "Reconfiguration successful"
     },
     "error": {
-      "cannot_connect": "Verbindung fehlgeschlagen",
-      "invalid_auth": "Ungültige Authentifizierung",
-      "unknown": "Unerwarteter Fehler"
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
     },
     "step": {
       "user": {
-        "description": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest; Schreiben/Steuerung erfolgt weiterhin über die HTTP-API, es sei denn, Schreiben ist ebenfalls aktiviert. Bestimmte Steuerungen werden über Modbus geschrieben.",
+        "title": "Connection",
+        "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
+        "menu_options": {
+          "cloud": "Qvantum cloud (HTTP)",
+          "modbus": "Local Modbus (offline)"
+        }
+      },
+      "cloud": {
+        "title": "Qvantum cloud",
+        "description": "Sign in with your Qvantum account. Metrics and controls use the cloud API.",
         "data": {
-          "password": "Passwort",
-          "username": "Benutzername",
-          "modbus_tcp": "Modbus-Lesen statt HTTP-Abfragen verwenden",
-          "modbus_write": "Schreiben über Modbus aktivieren"
+          "password": "Password",
+          "username": "Username"
+        }
+      },
+      "modbus": {
+        "title": "Local Modbus",
+        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "data": {
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Scan interval (seconds)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest; Schreiben/Steuerung erfolgt weiterhin über die HTTP-API, es sei denn, Schreiben ist ebenfalls aktiviert. Bestimmte Steuerungen werden über Modbus geschrieben.",
-          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen."
+          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
+          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
         }
       },
       "reconfigure": {
-        "description": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest; Schreiben/Steuerung erfolgt weiterhin über die HTTP-API, es sei denn, Schreiben ist ebenfalls aktiviert. Bestimmte Steuerungen werden über Modbus geschrieben.",
+        "title": "Reconfigure",
+        "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
+        "menu_options": {
+          "reconfigure_cloud": "Qvantum cloud (HTTP)",
+          "reconfigure_modbus": "Local Modbus (offline)"
+        }
+      },
+      "reconfigure_cloud": {
+        "title": "Qvantum cloud",
+        "description": "Sign in with your Qvantum account.",
         "data": {
-          "password": "Passwort",
-          "username": "Benutzername",
-          "modbus_tcp": "Modbus-Lesen statt HTTP-Abfragen verwenden",
-          "modbus_write": "Schreiben über Modbus aktivieren",
-          "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)"
-        },
-        "data_description": {
-          "modbus_tcp": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest; Schreiben/Steuerung erfolgt weiterhin über die HTTP-API, es sei denn, Schreiben ist ebenfalls aktiviert. Bestimmte Steuerungen werden über Modbus geschrieben.",
-          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen.",
-          "modbus_scan_interval": "Wie oft die Wärmepumpe über Modbus TCP abgefragt wird. Niedrigere Werte ermöglichen nahezu Echtzeit-Durchfluss- und Volumenmessung. Minimum sind 5 Sekunden. Standard sind 15 Sekunden."
+          "password": "Password",
+          "username": "Username"
+        }
+      },
+      "reconfigure_modbus": {
+        "title": "Local Modbus",
+        "description": "Enable Modbus external in the Qvantum app first. Home Assistant will probe serial and firmware on the pump.",
+        "data": {
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Scan interval (seconds)"
         }
       }
     }
@@ -575,19 +603,17 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "HTTP-Scan-Intervall (Sekunden)",
-          "modbus_tcp": "Modbus-Lesen statt HTTP-Abfragen verwenden",
-          "modbus_host": "Qvantum Host/IP",
-          "modbus_write": "Schreiben über Modbus aktivieren",
-          "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)"
+          "scan_interval": "HTTP scan interval (seconds)",
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Modbus scan interval (seconds)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus liefert nahezu Echtzeitmetriken, indem es direkt vom Gerät liest.\nModbus muss in den Installatoreinstellungen in der Pumpen-App/Anzeige aktiviert werden, bevor es hier aktiviert wird. Beachte, dass es nur über Modbus liest; Schreiben/Steuerung erfolgt weiterhin über die HTTP-API, es sei denn, Schreiben ist ebenfalls aktiviert. Bestimmte Steuerungen werden über Modbus geschrieben.",
-          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen.",
-          "modbus_scan_interval": "Wie oft die Wärmepumpe über Modbus TCP abgefragt wird. Niedrigere Werte ermöglichen nahezu Echtzeit-Durchfluss- und Volumenmessung. Minimum sind 5 Sekunden. Standard sind 15 Sekunden."
+          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
         },
-        "description": "Ändern Sie Ihre Optionen.",
-        "title": "Optionen"
+        "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
+        "title": "Options"
       }
     }
   },

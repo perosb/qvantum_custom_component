@@ -530,43 +530,71 @@
     }
   },
   "config": {
-    "title": "Qvantum hőszivattyú",
+    "title": "Qvantum Heat pump",
     "abort": {
-      "already_configured": "Az eszköz már konfigurálva van",
-      "reconfigure_successful": "Újrakonfigurálás sikeres"
+      "already_configured": "Device is already configured",
+      "reconfigure_successful": "Reconfiguration successful"
     },
     "error": {
-      "cannot_connect": "Sikertelen csatlakozás",
-      "invalid_auth": "Érvénytelen hitelesítés",
-      "unknown": "Váratlan hiba"
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
     },
     "step": {
       "user": {
-        "description": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
+        "title": "Connection",
+        "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
+        "menu_options": {
+          "cloud": "Qvantum cloud (HTTP)",
+          "modbus": "Local Modbus (offline)"
+        }
+      },
+      "cloud": {
+        "title": "Qvantum cloud",
+        "description": "Sign in with your Qvantum account. Metrics and controls use the cloud API.",
         "data": {
-          "password": "Jelszó",
-          "username": "Felhasználónév",
-          "modbus_tcp": "Modbus-olvasás használata HTTP lekérdezés helyett",
-          "modbus_write": "Modbus alapú írás engedélyezése"
+          "password": "Password",
+          "username": "Username"
+        }
+      },
+      "modbus": {
+        "title": "Local Modbus",
+        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "data": {
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Scan interval (seconds)"
         },
         "data_description": {
-          "modbus_tcp": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
-          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét."
+          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
+          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
         }
       },
       "reconfigure": {
-        "description": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
+        "title": "Reconfigure",
+        "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
+        "menu_options": {
+          "reconfigure_cloud": "Qvantum cloud (HTTP)",
+          "reconfigure_modbus": "Local Modbus (offline)"
+        }
+      },
+      "reconfigure_cloud": {
+        "title": "Qvantum cloud",
+        "description": "Sign in with your Qvantum account.",
         "data": {
-          "password": "Jelszó",
-          "username": "Felhasználónév",
-          "modbus_tcp": "Modbus-olvasás használata HTTP lekérdezés helyett",
-          "modbus_write": "Modbus alapú írás engedélyezése",
-          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)"
-        },
-        "data_description": {
-          "modbus_tcp": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
-          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét.",
-          "modbus_scan_interval": "Milyen gyakran kérdezze le a hőszivattyút Modbus TCP-n. Az alacsonyabb értékek közel valós idejű áramlás- és térfogatpontosságot adnak. Minimum 5 másodperc. Alapértelmezett 15 másodperc."
+          "password": "Password",
+          "username": "Username"
+        }
+      },
+      "reconfigure_modbus": {
+        "title": "Local Modbus",
+        "description": "Enable Modbus external in the Qvantum app first. Home Assistant will probe serial and firmware on the pump.",
+        "data": {
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Scan interval (seconds)"
         }
       }
     }
@@ -575,19 +603,17 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "HTTP lekérdezési időköz (másodperc)",
-          "modbus_tcp": "Modbus-olvasás használata HTTP lekérdezés helyett",
-          "modbus_host": "Qvantum Hoszt/IP",
-          "modbus_write": "Modbus alapú írás engedélyezése",
-          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)"
+          "scan_interval": "HTTP scan interval (seconds)",
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Modbus scan interval (seconds)"
         },
         "data_description": {
-          "modbus_tcp": "A Modbus közel valós idejű adatokat ad az eszköz közvetlen olvasásával.\nA Modbus-t engedélyezni kell a szivattyú alkalmazás/kijelző Telepítő beállításaiban, mielőtt itt bekapcsolja. Fontos: itt csak Modbus-olvasás történik; az írás/vezérlés továbbra is HTTP API-n keresztül történik, kivéve, ha az írás is engedélyezve van. Bizonyos vezérlések Modbuson keresztül íródnak.",
-          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét.",
-          "modbus_scan_interval": "Milyen gyakran kérdezze le a hőszivattyút Modbus TCP-n. Az alacsonyabb értékek közel valós idejű áramlás- és térfogatpontosságot adnak. Minimum 5 másodperc. Alapértelmezett 15 másodperc."
+          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
         },
-        "description": "Módosítsa a beállításait.",
-        "title": "Beállítások"
+        "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
+        "title": "Options"
       }
     }
   },

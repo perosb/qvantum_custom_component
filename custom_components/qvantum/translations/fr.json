@@ -530,43 +530,71 @@
     }
   },
   "config": {
-    "title": "Pompe à chaleur Qvantum",
+    "title": "Qvantum Heat pump",
     "abort": {
-      "already_configured": "L'appareil est déjà configuré",
-      "reconfigure_successful": "Reconfiguration réussie"
+      "already_configured": "Device is already configured",
+      "reconfigure_successful": "Reconfiguration successful"
     },
     "error": {
-      "cannot_connect": "Échec de connexion",
-      "invalid_auth": "Authentification invalide",
-      "unknown": "Erreur inattendue"
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
     },
     "step": {
       "user": {
-        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
+        "title": "Connection",
+        "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
+        "menu_options": {
+          "cloud": "Qvantum cloud (HTTP)",
+          "modbus": "Local Modbus (offline)"
+        }
+      },
+      "cloud": {
+        "title": "Qvantum cloud",
+        "description": "Sign in with your Qvantum account. Metrics and controls use the cloud API.",
         "data": {
-          "password": "Mot de passe",
-          "username": "Nom d'utilisateur",
-          "modbus_tcp": "Utiliser la lecture Modbus au lieu du polling HTTP",
-          "modbus_write": "Activer l'écriture via Modbus"
+          "password": "Password",
+          "username": "Username"
+        }
+      },
+      "modbus": {
+        "title": "Local Modbus",
+        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "data": {
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Scan interval (seconds)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
-          "modbus_write": "En activant l'écriture Modbus, vous acceptez l'entière responsabilité de toutes les valeurs écrites via l'interface. Le fabricant n'est pas responsable des problèmes causés par des valeurs incorrectes ou hors limites, et de telles actions peuvent annuler la garantie et/ou affecter le cycle de vie et les performances du produit."
+          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
+          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
         }
       },
       "reconfigure": {
-        "description": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
+        "title": "Reconfigure",
+        "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
+        "menu_options": {
+          "reconfigure_cloud": "Qvantum cloud (HTTP)",
+          "reconfigure_modbus": "Local Modbus (offline)"
+        }
+      },
+      "reconfigure_cloud": {
+        "title": "Qvantum cloud",
+        "description": "Sign in with your Qvantum account.",
         "data": {
-          "password": "Mot de passe",
-          "username": "Nom d'utilisateur",
-          "modbus_tcp": "Utiliser la lecture Modbus au lieu du polling HTTP",
-          "modbus_write": "Activer l'écriture via Modbus",
-          "modbus_scan_interval": "Intervalle de scan Modbus (secondes)"
-        },
-        "data_description": {
-          "modbus_tcp": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
-          "modbus_write": "En activant l'écriture Modbus, vous acceptez l'entière responsabilité de toutes les valeurs écrites via l'interface. Le fabricant n'est pas responsable des problèmes causés par des valeurs incorrectes ou hors limites, et de telles actions peuvent annuler la garantie et/ou affecter le cycle de vie et les performances du produit.",
-          "modbus_scan_interval": "Fréquence d'interrogation de la pompe à chaleur via Modbus TCP. Des valeurs plus basses offrent une précision quasi temps réel du débit et du volume. Minimum 5 secondes. Par défaut 15 secondes."
+          "password": "Password",
+          "username": "Username"
+        }
+      },
+      "reconfigure_modbus": {
+        "title": "Local Modbus",
+        "description": "Enable Modbus external in the Qvantum app first. Home Assistant will probe serial and firmware on the pump.",
+        "data": {
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Scan interval (seconds)"
         }
       }
     }
@@ -575,18 +603,16 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Intervalle de scan HTTP (secondes)",
-          "modbus_tcp": "Utiliser la lecture Modbus au lieu du polling HTTP",
-          "modbus_host": "Hôte/IP Qvantum",
-          "modbus_write": "Activer l'écriture via Modbus",
-          "modbus_scan_interval": "Intervalle de scan Modbus (secondes)"
+          "scan_interval": "HTTP scan interval (seconds)",
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Modbus scan interval (seconds)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus fournit des métriques en temps quasi réel en lisant directement depuis l'appareil.\nModbus doit être activé dans les paramètres installateur de l'application/affichage de la pompe avant activation ici. Note : il lit uniquement via Modbus ; les écritures/contrôles se font toujours via l'API HTTP sauf si l'écriture est également activée. Certains contrôles sont écrits via Modbus.",
-          "modbus_write": "En activant l'écriture Modbus, vous acceptez l'entière responsabilité de toutes les valeurs écrites via l'interface. Le fabricant n'est pas responsable des problèmes causés par des valeurs incorrectes ou hors limites, et de telles actions peuvent annuler la garantie et/ou affecter le cycle de vie et les performances du produit.",
-          "modbus_scan_interval": "Fréquence d'interrogation de la pompe à chaleur via Modbus TCP. Des valeurs plus basses offrent une précision quasi temps réel du débit et du volume. Minimum 5 secondes. Par défaut 15 secondes."
+          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
         },
-        "description": "Modifiez vos options.",
+        "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
         "title": "Options"
       }
     }

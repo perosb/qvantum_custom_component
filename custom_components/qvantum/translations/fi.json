@@ -532,41 +532,69 @@
   "config": {
     "title": "Qvantum lämpöpumppu",
     "abort": {
-      "already_configured": "Laite on jo määritetty",
-      "reconfigure_successful": "Uudelleenmääritys onnistui"
+      "already_configured": "Device is already configured",
+      "reconfigure_successful": "Reconfiguration successful"
     },
     "error": {
-      "cannot_connect": "Yhdistäminen epäonnistui",
-      "invalid_auth": "Virheellinen tunnistautuminen",
-      "unknown": "Odottamaton virhe"
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
     },
     "step": {
       "user": {
-        "description": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Oletuksena se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
+        "title": "Connection",
+        "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
+        "menu_options": {
+          "cloud": "Qvantum cloud (HTTP)",
+          "modbus": "Local Modbus (offline)"
+        }
+      },
+      "cloud": {
+        "title": "Qvantum cloud",
+        "description": "Sign in with your Qvantum account. Metrics and controls use the cloud API.",
         "data": {
-          "password": "Salasana",
-          "username": "Käyttäjätunnus",
-          "modbus_tcp": "Käytä Modbus-lukemista HTTP-kyselyn sijaan",
-          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta"
+          "password": "Password",
+          "username": "Username"
+        }
+      },
+      "modbus": {
+        "title": "Local Modbus",
+        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "data": {
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Scan interval (seconds)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Huomaa, että se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
-          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn."
+          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
+          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
         }
       },
       "reconfigure": {
-        "description": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Oletuksena se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
+        "title": "Reconfigure",
+        "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
+        "menu_options": {
+          "reconfigure_cloud": "Qvantum cloud (HTTP)",
+          "reconfigure_modbus": "Local Modbus (offline)"
+        }
+      },
+      "reconfigure_cloud": {
+        "title": "Qvantum cloud",
+        "description": "Sign in with your Qvantum account.",
         "data": {
-          "password": "Salasana",
-          "username": "Käyttäjätunnus",
-          "modbus_tcp": "Käytä Modbus-lukemista HTTP-kyselyn sijaan",
-          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta",
-          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
-        },
-        "data_description": {
-          "modbus_tcp": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Huomaa, että se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
-          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn.",
-          "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
+          "password": "Password",
+          "username": "Username"
+        }
+      },
+      "reconfigure_modbus": {
+        "title": "Local Modbus",
+        "description": "Enable Modbus external in the Qvantum app first. Home Assistant will probe serial and firmware on the pump.",
+        "data": {
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Scan interval (seconds)"
         }
       }
     }
@@ -575,19 +603,17 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "HTTP-skannausväli (sekuntia)",
-          "modbus_tcp": "Käytä Modbus-lukemista HTTP-kyselyn sijaan",
-          "modbus_host": "Qvantum-isäntä/IP",
-          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta",
-          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
+          "scan_interval": "HTTP scan interval (seconds)",
+          "modbus_host": "Host / IP",
+          "modbus_port": "Port",
+          "modbus_unit_id": "Unit ID",
+          "modbus_scan_interval": "Modbus scan interval (seconds)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Huomaa, että se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
-          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn.",
-          "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
+          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
         },
-        "description": "Muokkaa asetuksiasi.",
-        "title": "Asetukset"
+        "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
+        "title": "Options"
       }
     }
   },

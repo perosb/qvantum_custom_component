@@ -38,7 +38,7 @@ class TestValidateInput:
                 hass, {"username": "test@example.com", "password": "testpass"}
             )
 
-            assert result == {"title": "Qvantum QE-6 (12345)"}
+            assert result == {"title": "Qvantum QE-6 (12345)", "serial": "12345"}
             mock_api.authenticate.assert_called_once()
             mock_api.get_primary_device.assert_called_once()
             mock_api.close.assert_called_once()
@@ -101,50 +101,18 @@ class TestQvantumConfigFlow:
 
     def test_config_flow_version(self, config_flow):
         """Test that config flow has correct version."""
-        assert config_flow.VERSION == 7  # From const.py CONFIG_VERSION
+        assert config_flow.VERSION == 7
 
     @pytest.mark.asyncio
-    async def test_user_step_cannot_connect(self, hass, config_flow):
-        """Test user step when connection to the API cannot be established."""
-        # Mock the hass.config_entries.flow property
-        hass.config_entries = MagicMock()
-        hass.config_entries.flow = MagicMock()
-        hass.config_entries.flow.async_progress_by_handler = AsyncMock(return_value=[])
-
-        with patch("custom_components.qvantum.config_flow.validate_input") as mock_validate:
-            mock_validate.side_effect = CannotConnect()
-
-            result = await config_flow.async_step_user({
-                "username": "test@example.com",
-                "password": "testpass"
-            })
-
-            assert result["type"] == "form"
-            assert result["errors"]["base"] == "cannot_connect"
+    async def test_user_step_shows_mode_menu(self, hass, config_flow):
+        result = await config_flow.async_step_user()
+        assert result["type"] == "menu"
+        assert result["step_id"] == "user"
+        assert "cloud" in result["menu_options"]
+        assert "modbus" in result["menu_options"]
 
     @pytest.mark.asyncio
-    async def test_user_step_invalid_auth(self, hass, config_flow):
-        """Test user step with authentication error."""
-        # Mock the hass.config_entries.flow property
-        hass.config_entries = MagicMock()
-        hass.config_entries.flow = MagicMock()
-        hass.config_entries.flow.async_progress_by_handler = AsyncMock(return_value=[])
-
-        with patch("custom_components.qvantum.config_flow.validate_input") as mock_validate:
-            mock_validate.side_effect = InvalidAuth()
-
-            result = await config_flow.async_step_user({
-                "username": "test@example.com",
-                "password": "testpass"
-            })
-
-            assert result["type"] == "form"
-            assert result["errors"]["base"] == "invalid_auth"
-
-    @pytest.mark.asyncio
-    async def test_user_step_success(self, hass, config_flow):
-        """Test user step with successful validation."""
-        # Mock the hass.config_entries.flow property
+    async def test_cloud_step_success(self, hass, config_flow):
         hass.config_entries = MagicMock()
         hass.config_entries.flow = MagicMock()
         hass.config_entries.flow.async_progress_by_handler = AsyncMock(return_value=[])
@@ -154,587 +122,211 @@ class TestQvantumConfigFlow:
                 "custom_components.qvantum.config_flow.validate_input"
             ) as mock_validate,
             patch.object(config_flow, "async_set_unique_id") as mock_set_unique_id,
-            patch.object(config_flow, "_abort_if_unique_id_configured") as mock_abort,
+            patch.object(config_flow, "_abort_if_unique_id_configured"),
             patch.object(config_flow, "async_create_entry") as mock_create_entry,
         ):
-            mock_validate.return_value = {"title": "Test Device"}
+            mock_validate.return_value = {
+                "title": "Qvantum QE-6 (12345)",
+                "serial": "12345",
+            }
             mock_create_entry.return_value = {"type": "create_entry"}
 
-            result = await config_flow.async_step_user(
-                {
-                    "username": "test@example.com",
-                    "password": "testpass",
-                    "modbus_tcp": True,
-                }
-            )
-
-            assert result == {"type": "create_entry"}
-
-            mock_validate.assert_called_once_with(
-                hass,
-                {
-                    "username": "test@example.com",
-                    "password": "testpass",
-                    "modbus_tcp": True,
-                },
-            )
-            mock_set_unique_id.assert_called_once_with("Test Device")
-            mock_abort.assert_called_once()
-            mock_create_entry.assert_called_once_with(
-                title="Test Device",
-                data={
-                    "username": "test@example.com",
-                    "password": "testpass",
-                    "modbus_tcp": True,
-                    "modbus_write": False,
-                },
-                options={
-                    "modbus_tcp": True,
-                    "modbus_write": False,
-                },
-            )
-
-    @pytest.mark.asyncio
-    async def test_user_step_normalizes_modbus_write_without_tcp(
-        self, hass, config_flow
-    ):
-        """Test user step coerces modbus_write to false when modbus_tcp is disabled."""
-        hass.config_entries = MagicMock()
-        hass.config_entries.flow = MagicMock()
-        hass.config_entries.flow.async_progress_by_handler = AsyncMock(return_value=[])
-
-        with (
-            patch(
-                "custom_components.qvantum.config_flow.validate_input"
-            ) as mock_validate,
-            patch.object(config_flow, "async_set_unique_id") as mock_set_unique_id,
-            patch.object(config_flow, "_abort_if_unique_id_configured") as mock_abort,
-            patch.object(config_flow, "async_create_entry") as mock_create_entry,
-        ):
-            mock_validate.return_value = {"title": "Test Device"}
-            mock_create_entry.return_value = {"type": "create_entry"}
-
-            result = await config_flow.async_step_user(
-                {
-                    "username": "test@example.com",
-                    "password": "testpass",
-                    "modbus_tcp": False,
-                    "modbus_write": True,
-                }
-            )
-
-            assert result == {"type": "create_entry"}
-            mock_set_unique_id.assert_called_once_with("Test Device")
-            mock_abort.assert_called_once()
-            mock_create_entry.assert_called_once_with(
-                title="Test Device",
-                data={
-                    "username": "test@example.com",
-                    "password": "testpass",
-                    "modbus_tcp": False,
-                    "modbus_write": False,
-                },
-                options={
-                    "modbus_tcp": False,
-                    "modbus_write": False,
-                },
-            )
-
-    @pytest.mark.asyncio
-    async def test_user_step_unknown_error(self, hass, config_flow):
-        """Test user step with unknown error."""
-        # Mock the hass.config_entries.flow property
-        hass.config_entries = MagicMock()
-        hass.config_entries.flow = MagicMock()
-        hass.config_entries.flow.async_progress_by_handler = AsyncMock(return_value=[])
-
-        with patch(
-            "custom_components.qvantum.config_flow.validate_input"
-        ) as mock_validate:
-            mock_validate.side_effect = Exception("Unknown error")
-
-            result = await config_flow.async_step_user(
+            result = await config_flow.async_step_cloud(
                 {"username": "test@example.com", "password": "testpass"}
             )
 
-            assert result["type"] == "form"
-            assert result["errors"]["base"] == "unknown"
+            assert result == {"type": "create_entry"}
+            mock_set_unique_id.assert_called_once_with("12345")
+            mock_create_entry.assert_called_once_with(
+                title="Qvantum QE-6 (12345)",
+                data={
+                    "username": "test@example.com",
+                    "password": "testpass",
+                    "modbus_tcp": False,
+                    "modbus_write": False,
+                },
+                options={"modbus_tcp": False, "modbus_write": False},
+            )
 
     @pytest.mark.asyncio
-    async def test_user_step_initial_form(self, hass, config_flow):
-        """Test user step showing initial form."""
-        # Mock the hass.config_entries.flow property
-        hass.config_entries = MagicMock()
-        hass.config_entries.flow = MagicMock()
-        hass.config_entries.flow.async_progress_by_handler = AsyncMock(return_value=[])
-
-        result = await config_flow.async_step_user()
-
+    async def test_cloud_step_invalid_auth(self, hass, config_flow):
+        with patch(
+            "custom_components.qvantum.config_flow.validate_input"
+        ) as mock_validate:
+            mock_validate.side_effect = InvalidAuth()
+            result = await config_flow.async_step_cloud(
+                {"username": "test@example.com", "password": "bad"}
+            )
         assert result["type"] == "form"
-        assert result["step_id"] == "user"
-        assert "errors" in result
+        assert result["errors"]["base"] == "invalid_auth"
 
     @pytest.mark.asyncio
-    async def test_step_reconfigure_success(self, hass, config_flow):
-        """Test reconfigure step with successful validation."""
-        # Mock config entry
+    async def test_modbus_step_success(self, hass, config_flow):
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_modbus",
+                AsyncMock(
+                    return_value={
+                        "title": "Qvantum (12003)",
+                        "serial": "12003",
+                        "sw_version": "1.7.22",
+                    }
+                ),
+            ),
+            patch.object(config_flow, "async_set_unique_id") as mock_set_unique_id,
+            patch.object(config_flow, "_abort_if_unique_id_configured"),
+            patch.object(config_flow, "async_create_entry") as mock_create_entry,
+        ):
+            mock_create_entry.return_value = {"type": "create_entry"}
+            result = await config_flow.async_step_modbus(
+                {
+                    "modbus_host": "Qvantum-HP",
+                    "modbus_port": 502,
+                    "modbus_unit_id": 1,
+                    "modbus_scan_interval": 10,
+                }
+            )
+        assert result == {"type": "create_entry"}
+        mock_set_unique_id.assert_called_once_with("12003")
+        created = mock_create_entry.call_args.kwargs
+        assert created["data"]["modbus_tcp"] is True
+        assert "username" not in created["data"]
+        assert created["options"]["modbus_scan_interval"] == 10
+
+    @pytest.mark.asyncio
+    async def test_modbus_step_cannot_connect(self, hass, config_flow):
+        with patch(
+            "custom_components.qvantum.config_flow.validate_modbus",
+            AsyncMock(side_effect=CannotConnect()),
+        ):
+            result = await config_flow.async_step_modbus(
+                {"modbus_host": "bad-host"}
+            )
+        assert result["type"] == "form"
+        assert result["errors"]["base"] == "cannot_connect"
+
+    @pytest.mark.asyncio
+    async def test_reconfigure_shows_mode_menu(self, hass, config_flow):
+        result = await config_flow.async_step_reconfigure()
+        assert result["type"] == "menu"
+        assert "reconfigure_cloud" in result["menu_options"]
+        assert "reconfigure_modbus" in result["menu_options"]
+
+    @pytest.mark.asyncio
+    async def test_reconfigure_cloud_success(self, hass, config_flow):
         config_entry = MagicMock()
         config_entry.data = {"username": "old@example.com", "password": "oldpass"}
         config_entry.options = {}
         config_entry.unique_id = "test_unique_id"
-
         hass.config_entries = MagicMock()
         hass.config_entries.async_get_entry.return_value = config_entry
-
         config_flow.context = {"entry_id": "test_entry_id"}
 
         with (
             patch(
-                "custom_components.qvantum.config_flow.validate_input"
-            ) as mock_validate,
+                "custom_components.qvantum.config_flow.validate_input",
+                AsyncMock(return_value={"title": "Updated", "serial": "12345"}),
+            ),
             patch.object(
                 config_flow, "async_update_reload_and_abort"
-            ) as mock_update_reload,
+            ) as mock_update,
         ):
-            mock_validate.return_value = {"title": "Updated Device"}
-            mock_update_reload.return_value = {"type": "abort"}
-
-            result = await config_flow.async_step_reconfigure(
+            mock_update.return_value = {"type": "abort"}
+            result = await config_flow.async_step_reconfigure_cloud(
                 {"username": "new@example.com", "password": "newpass"}
             )
-
-            assert result == {"type": "abort"}
-
-            mock_validate.assert_called_once_with(
-                hass, {"username": "new@example.com", "password": "newpass"}
-            )
-            mock_update_reload.assert_called_once_with(
-                config_entry,
-                unique_id="test_unique_id",
-                data={
-                    "username": "new@example.com",
-                    "password": "newpass",
-                    "modbus_tcp": False,
-                    "modbus_write": False,
-                },
-                options={
-                    "modbus_tcp": False,
-                    "modbus_write": False,
-                    "modbus_scan_interval": DEFAULT_MODBUS_SCAN_INTERVAL,
-                },
-                reason="reconfigure_successful",
-            )
+        assert result == {"type": "abort"}
+        assert mock_update.call_args.kwargs["data"]["modbus_tcp"] is False
 
     @pytest.mark.asyncio
-    async def test_step_reconfigure_cannot_connect(self, hass, config_flow):
-        """Test reconfigure step with connection error."""
-        # Mock config entry
+    async def test_reconfigure_modbus_success(self, hass, config_flow):
         config_entry = MagicMock()
-        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
-
-        hass.config_entries = MagicMock()
-        hass.config_entries.async_get_entry.return_value = config_entry
-
-        config_flow.context = {"entry_id": "test_entry_id"}
-
-        with patch(
-            "custom_components.qvantum.config_flow.validate_input"
-        ) as mock_validate:
-            mock_validate.side_effect = CannotConnect()
-
-            result = await config_flow.async_step_reconfigure(
-                {"username": "new@example.com", "password": "newpass"}
-            )
-
-            assert result["type"] == "form"
-            assert result["errors"]["base"] == "cannot_connect"
-
-    @pytest.mark.asyncio
-    async def test_step_reconfigure_initial_form(self, hass, config_flow):
-        """Test reconfigure step showing initial form."""
-        # Mock config entry
-        config_entry = MagicMock()
-        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
-
-        hass.config_entries = MagicMock()
-        hass.config_entries.async_get_entry.return_value = config_entry
-
-        config_flow.context = {"entry_id": "test_entry_id"}
-
-        result = await config_flow.async_step_reconfigure()
-
-        assert result["type"] == "form"
-        assert result["step_id"] == "reconfigure"
-        assert "data_schema" in result
-
-    @pytest.mark.asyncio
-    async def test_step_reconfigure_sets_modbus_tcp(self, hass, config_flow):
-        """Test reconfigure updates modbus_tcp in config data and triggers reload."""
-        config_entry = MagicMock()
-        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
-        config_entry.options = {"modbus_tcp": False}
-
-        hass.config_entries = MagicMock()
-        hass.config_entries.async_get_entry.return_value = config_entry
-
-        config_flow.context = {"entry_id": "test_entry_id"}
-
-        with (
-            patch(
-                "custom_components.qvantum.config_flow.validate_input"
-            ) as mock_validate,
-            patch.object(
-                config_flow, "async_update_reload_and_abort"
-            ) as mock_update_reload,
-        ):
-            user_input = {
-                "username": "new@example.com",
-                "password": "newpass",
-                "modbus_tcp": True,
-            }
-            mock_validate.return_value = None
-            mock_update_reload.return_value = {"type": "abort"}
-
-            result = await config_flow.async_step_reconfigure(user_input)
-
-            assert result == {"type": "abort"}
-            mock_update_reload.assert_called_once()
-            assert mock_update_reload.call_args.kwargs["data"]["modbus_tcp"] is True
-            assert mock_update_reload.call_args.kwargs["options"]["modbus_tcp"] is True
-
-    @pytest.mark.asyncio
-    async def test_step_reconfigure_normalizes_modbus_write_without_tcp(
-        self, hass, config_flow
-    ):
-        """Test reconfigure coerces modbus_write to false when modbus_tcp is disabled."""
-        config_entry = MagicMock()
-        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
-        config_entry.options = {"modbus_tcp": True, "modbus_write": True}
+        config_entry.data = {}
+        config_entry.options = {}
         config_entry.unique_id = "test_unique_id"
-
         hass.config_entries = MagicMock()
         hass.config_entries.async_get_entry.return_value = config_entry
-
         config_flow.context = {"entry_id": "test_entry_id"}
 
         with (
             patch(
-                "custom_components.qvantum.config_flow.validate_input"
-            ) as mock_validate,
+                "custom_components.qvantum.config_flow.validate_modbus",
+                AsyncMock(return_value={"title": "Qvantum (1)", "serial": "1"}),
+            ),
             patch.object(
                 config_flow, "async_update_reload_and_abort"
-            ) as mock_update_reload,
+            ) as mock_update,
         ):
-            mock_validate.return_value = None
-            mock_update_reload.return_value = {"type": "abort"}
-
-            result = await config_flow.async_step_reconfigure(
+            mock_update.return_value = {"type": "abort"}
+            result = await config_flow.async_step_reconfigure_modbus(
                 {
-                    "username": "new@example.com",
-                    "password": "newpass",
-                    "modbus_tcp": False,
-                    "modbus_write": True,
-                }
-            )
-
-            assert result == {"type": "abort"}
-            mock_update_reload.assert_called_once()
-            assert mock_update_reload.call_args.kwargs["data"]["modbus_tcp"] is False
-            assert mock_update_reload.call_args.kwargs["data"]["modbus_write"] is False
-            assert mock_update_reload.call_args.kwargs["options"]["modbus_tcp"] is False
-            assert (
-                mock_update_reload.call_args.kwargs["options"]["modbus_write"] is False
-            )
-
-    @pytest.mark.asyncio
-    async def test_step_reconfigure_sets_modbus_scan_interval(self, hass, config_flow):
-        """Test reconfigure stores a custom Modbus poll interval in options."""
-        config_entry = MagicMock()
-        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
-        config_entry.options = {"modbus_tcp": True, "modbus_scan_interval": 15}
-        config_entry.unique_id = "test_unique_id"
-
-        hass.config_entries = MagicMock()
-        hass.config_entries.async_get_entry.return_value = config_entry
-
-        config_flow.context = {"entry_id": "test_entry_id"}
-
-        with (
-            patch(
-                "custom_components.qvantum.config_flow.validate_input"
-            ) as mock_validate,
-            patch.object(
-                config_flow, "async_update_reload_and_abort"
-            ) as mock_update_reload,
-        ):
-            mock_validate.return_value = None
-            mock_update_reload.return_value = {"type": "abort"}
-
-            result = await config_flow.async_step_reconfigure(
-                {
-                    "username": "new@example.com",
-                    "password": "newpass",
-                    "modbus_tcp": True,
-                    "modbus_write": False,
-                    "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
-                }
-            )
-
-            assert result == {"type": "abort"}
-            mock_update_reload.assert_called_once()
-            assert (
-                mock_update_reload.call_args.kwargs["options"]["modbus_scan_interval"]
-                == MIN_MODBUS_SCAN_INTERVAL
-            )
-            assert mock_update_reload.call_args.kwargs["options"]["modbus_tcp"] is True
-
-    @pytest.mark.asyncio
-    async def test_step_reconfigure_normalizes_invalid_modbus_scan_interval(
-        self, hass, config_flow
-    ):
-        """Test reconfigure coerces invalid Modbus intervals to a valid int."""
-        config_entry = MagicMock()
-        config_entry.data = {"username": "old@example.com", "password": "oldpass"}
-        config_entry.options = {
-            "modbus_tcp": True,
-            "modbus_scan_interval": "not-a-number",
-        }
-        config_entry.unique_id = "test_unique_id"
-
-        hass.config_entries = MagicMock()
-        hass.config_entries.async_get_entry.return_value = config_entry
-
-        config_flow.context = {"entry_id": "test_entry_id"}
-
-        with (
-            patch(
-                "custom_components.qvantum.config_flow.validate_input"
-            ) as mock_validate,
-            patch.object(
-                config_flow, "async_update_reload_and_abort"
-            ) as mock_update_reload,
-        ):
-            mock_validate.return_value = None
-            mock_update_reload.return_value = {"type": "abort"}
-
-            # Missing field falls back to stored invalid value, then normalizes.
-            result = await config_flow.async_step_reconfigure(
-                {
-                    "username": "new@example.com",
-                    "password": "newpass",
-                    "modbus_tcp": True,
-                    "modbus_write": False,
-                }
-            )
-
-            assert result == {"type": "abort"}
-            assert (
-                mock_update_reload.call_args.kwargs["options"]["modbus_scan_interval"]
-                == DEFAULT_MODBUS_SCAN_INTERVAL
-            )
-
-            mock_update_reload.reset_mock()
-            result = await config_flow.async_step_reconfigure(
-                {
-                    "username": "new@example.com",
-                    "password": "newpass",
-                    "modbus_tcp": True,
-                    "modbus_write": False,
-                    "modbus_scan_interval": "3",
-                }
-            )
-
-            assert result == {"type": "abort"}
-            assert (
-                mock_update_reload.call_args.kwargs["options"]["modbus_scan_interval"]
-                == MIN_MODBUS_SCAN_INTERVAL
-            )
-
-    @pytest.mark.asyncio
-    async def test_options_flow_init_success(self, hass):
-        """Test options flow init step with successful update."""
-        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
-        from homeassistant.config_entries import ConfigEntry
-
-        config_entry = ConfigEntry(
-            version=1,
-            minor_version=1,
-            domain="qvantum",
-            title="Test",
-            data={},
-            options={"scan_interval": 120},
-            source="user",
-            unique_id="test_unique_id",
-            discovery_keys={},
-            subentries_data={},
-        )
-
-        flow = QvantumOptionsFlowHandler(config_entry)
-
-        with patch.object(flow, "async_create_entry") as mock_create_entry:
-            mock_create_entry.return_value = {"type": "create_entry"}
-
-            result = await flow.async_step_init({"scan_interval": 300})
-
-            assert result == {"type": "create_entry"}
-
-            mock_create_entry.assert_called_once_with(
-                title="", data={"scan_interval": 300}
-            )
-
-    @pytest.mark.asyncio
-    async def test_options_flow_init_initial_form(self, hass):
-        """Test options flow init step showing initial form."""
-        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
-        from homeassistant.config_entries import ConfigEntry
-
-        config_entry = ConfigEntry(
-            version=1,
-            minor_version=1,
-            domain="qvantum",
-            title="Test",
-            data={},
-            options={"scan_interval": 120},
-            source="user",
-            unique_id="test_unique_id",
-            discovery_keys={},
-            subentries_data={},
-        )
-
-        flow = QvantumOptionsFlowHandler(config_entry)
-
-        result = await flow.async_step_init()
-
-        assert result["type"] == "form"
-        assert result["step_id"] == "init"
-        assert "data_schema" in result
-
-    @pytest.mark.asyncio
-    async def test_options_flow_init_normalizes_modbus_write_without_tcp(self, hass):
-        """Test options flow coerces modbus_write to false when modbus_tcp is disabled."""
-        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
-        from homeassistant.config_entries import ConfigEntry
-
-        config_entry = ConfigEntry(
-            version=1,
-            minor_version=1,
-            domain="qvantum",
-            title="Test",
-            data={},
-            options={"scan_interval": 120},
-            source="user",
-            unique_id="test_unique_id",
-            discovery_keys={},
-            subentries_data={},
-        )
-
-        flow = QvantumOptionsFlowHandler(config_entry)
-
-        with patch.object(flow, "async_create_entry") as mock_create_entry:
-            mock_create_entry.return_value = {"type": "create_entry"}
-
-            result = await flow.async_step_init(
-                {
-                    "scan_interval": 300,
-                    "modbus_tcp": False,
-                    "modbus_write": True,
-                }
-            )
-
-            assert result == {"type": "create_entry"}
-            mock_create_entry.assert_called_once_with(
-                title="",
-                data={
-                    "scan_interval": 300,
-                    "modbus_tcp": False,
-                    "modbus_write": False,
-                },
-            )
-
-    @pytest.mark.asyncio
-    async def test_options_flow_sets_modbus_scan_interval(self, hass):
-        """Test options flow stores a custom Modbus poll interval."""
-        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
-        from homeassistant.config_entries import ConfigEntry
-
-        config_entry = ConfigEntry(
-            version=1,
-            minor_version=1,
-            domain="qvantum",
-            title="Test",
-            data={},
-            options={"scan_interval": 120, "modbus_tcp": True},
-            source="user",
-            unique_id="test_unique_id",
-            discovery_keys={},
-            subentries_data={},
-        )
-
-        flow = QvantumOptionsFlowHandler(config_entry)
-
-        with patch.object(flow, "async_create_entry") as mock_create_entry:
-            mock_create_entry.return_value = {"type": "create_entry"}
-
-            result = await flow.async_step_init(
-                {
-                    "scan_interval": 120,
-                    "modbus_tcp": True,
-                    "modbus_write": False,
-                    "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
-                }
-            )
-
-            assert result == {"type": "create_entry"}
-            mock_create_entry.assert_called_once_with(
-                title="",
-                data={
-                    "scan_interval": 120,
-                    "modbus_tcp": True,
-                    "modbus_write": False,
-                    "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
-                },
-            )
-
-    @pytest.mark.asyncio
-    async def test_options_flow_normalizes_invalid_modbus_scan_interval(self, hass):
-        """Test options flow coerces invalid Modbus intervals before persisting."""
-        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
-        from homeassistant.config_entries import ConfigEntry
-
-        config_entry = ConfigEntry(
-            version=1,
-            minor_version=1,
-            domain="qvantum",
-            title="Test",
-            data={},
-            options={"scan_interval": 120, "modbus_tcp": True},
-            source="user",
-            unique_id="test_unique_id",
-            discovery_keys={},
-            subentries_data={},
-        )
-
-        flow = QvantumOptionsFlowHandler(config_entry)
-
-        with patch.object(flow, "async_create_entry") as mock_create_entry:
-            mock_create_entry.return_value = {"type": "create_entry"}
-
-            result = await flow.async_step_init(
-                {
-                    "scan_interval": 120,
-                    "modbus_tcp": True,
-                    "modbus_write": False,
-                    "modbus_scan_interval": "2",
-                }
-            )
-
-            assert result == {"type": "create_entry"}
-            mock_create_entry.assert_called_once_with(
-                title="",
-                data={
-                    "scan_interval": 120,
-                    "modbus_tcp": True,
-                    "modbus_write": False,
+                    "modbus_host": "hp.local",
+                    "modbus_port": 502,
+                    "modbus_unit_id": 1,
                     "modbus_scan_interval": 5,
-                },
+                }
             )
+        assert result == {"type": "abort"}
+        assert mock_update.call_args.kwargs["data"]["modbus_tcp"] is True
+        assert mock_update.call_args.kwargs["options"]["modbus_host"] == "hp.local"
+
+
+class TestQvantumOptionsFlow:
+    """Options show only fields for the current connection mode."""
+
+    def _entry(self, **options):
+        from homeassistant.config_entries import ConfigEntry
+
+        return ConfigEntry(
+            version=1,
+            minor_version=1,
+            domain="qvantum",
+            title="Test",
+            data={},
+            options=options,
+            source="user",
+            unique_id="test_unique_id",
+            discovery_keys={},
+            subentries_data={},
+        )
+
+    @pytest.mark.asyncio
+    async def test_cloud_options_update_scan_interval(self, hass):
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        flow = QvantumOptionsFlowHandler(self._entry(scan_interval=120))
+        with patch.object(flow, "async_create_entry") as mock_create_entry:
+            mock_create_entry.return_value = {"type": "create_entry"}
+            result = await flow.async_step_init({"scan_interval": 300})
+        assert result == {"type": "create_entry"}
+        mock_create_entry.assert_called_once_with(
+            title="",
+            data={
+                "scan_interval": 300,
+                "modbus_tcp": False,
+                "modbus_write": False,
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_modbus_options_update_host_and_interval(self, hass):
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        flow = QvantumOptionsFlowHandler(self._entry(modbus_tcp=True))
+        with patch.object(flow, "async_create_entry") as mock_create_entry:
+            mock_create_entry.return_value = {"type": "create_entry"}
+            result = await flow.async_step_init(
+                {
+                    "modbus_host": "hp.local",
+                    "modbus_port": 502,
+                    "modbus_unit_id": 1,
+                    "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
+                }
+            )
+        assert result == {"type": "create_entry"}
+        data = mock_create_entry.call_args.kwargs["data"]
+        assert data["modbus_tcp"] is True
+        assert data["modbus_host"] == "hp.local"
+        assert data["modbus_scan_interval"] == MIN_MODBUS_SCAN_INTERVAL
+        assert "scan_interval" not in data or True
+
