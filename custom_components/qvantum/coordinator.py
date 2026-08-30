@@ -12,7 +12,6 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
 
@@ -136,8 +135,6 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self.api = hass.data[DOMAIN]
         self._config_entry = config_entry
         self._device = None
-        self._last_tap_stop_fetch: datetime | None = None
-        self._cached_tap_stop: Any = None
         self._last_heatingenergy: float | None = None
         self._last_heatingenergy_time: datetime | None = None
         self._last_dhwenergy: float | None = None
@@ -301,13 +298,12 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         """Persist device identity so Modbus can start without the HTTP API."""
         if not isinstance(self._device, dict) or not self._device.get("id"):
             return
+        payload: dict[str, Any] = {"device": self._device}
         username = self._current_username()
-        if not username:
-            return
+        if username:
+            payload["username"] = username
         try:
-            await self._device_store.async_save(
-                {"username": username, "device": self._device}
-            )
+            await self._device_store.async_save(payload)
         except Exception:
             _LOGGER.debug("Failed to persist device info", exc_info=True)
 
@@ -361,10 +357,10 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         return None
 
     async def _ensure_device(self) -> None:
-        """Populate device identity from cache, HTTP, or the device registry.
+        """Populate device identity from cache, Modbus probe, HTTP, or registry.
 
-        Cached identity is preferred so Modbus mode can start while the cloud
-        API is down. HTTP is only contacted when no cache is available.
+        Modbus mode never contacts the cloud. Cached identity is preferred so
+        existing unique IDs stay stable; otherwise the pump is probed.
         """
         if self._device is None:
             cached = await self._load_cached_device()
@@ -377,7 +373,31 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         if self._device is not None:
             return
 
-        http_error: Exception | None = None
+        if self.modbus_enabled:
+            try:
+                probed = await self.api.async_probe_identity()
+            except Exception as err:
+                _LOGGER.warning("Failed to probe Modbus identity: %s", err)
+                probed = None
+            if isinstance(probed, dict) and probed.get("id"):
+                self._device = probed
+                await self._persist_device_state()
+                return
+            if not self._store_account_mismatch:
+                from_registry = self._device_from_registry()
+                if from_registry:
+                    self._device = from_registry
+                    await self._persist_device_state()
+                    _LOGGER.warning(
+                        "Using device registry for local Modbus startup"
+                    )
+                    return
+            if self._store_account_mismatch:
+                _LOGGER.warning(
+                    "Skipping device registry recovery; cached identity is bound to a different account"
+                )
+            raise UpdateFailed("No device identity from Modbus or device registry")
+
         try:
             device = await asyncio.wait_for(
                 self.api.get_primary_device(),
@@ -388,27 +408,10 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 await self._persist_device_state()
                 return
         except Exception as err:
-            http_error = err
             _LOGGER.warning(
                 "Failed to fetch device info from HTTP API: %s", err
             )
-
-        if self.modbus_enabled and not self._store_account_mismatch:
-            from_registry = self._device_from_registry()
-            if from_registry:
-                self._device = from_registry
-                await self._persist_device_state()
-                _LOGGER.warning(
-                    "HTTP API unavailable; using device registry for local Modbus startup"
-                )
-                return
-        if self._store_account_mismatch:
-            _LOGGER.warning(
-                "Skipping device registry recovery; cached identity is bound to a different account"
-            )
-
-        if http_error is not None:
-            raise http_error
+            raise
 
     def _persist_dhw_state(self) -> None:
         """Save DHW EMA snapshot via a debounced write so it survives a restart.
@@ -580,41 +583,6 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         _LOGGER.debug("Processed %d settings", len(settings_dict))
         return settings_dict
 
-    async def _fetch_tap_stop_modbus(self, device_id: str, values: dict) -> None:
-        """Poll tap_stop via HTTP in Modbus mode when extra_tap_water is active.
-
-        tap_stop is HTTP-only; it is fetched at the DEFAULT HTTP scan interval
-        and cached between fetches.
-        """
-        now = dt_util.utcnow()
-        elapsed = (
-            (now - self._last_tap_stop_fetch).total_seconds()
-            if self._last_tap_stop_fetch is not None
-            else float("inf")
-        )
-        if elapsed > DEFAULT_SCAN_INTERVAL:
-            try:
-                _LOGGER.debug(
-                    "Fetching tap_stop via HTTP for device %s due to active extra_tap_water and elapsed time %.1f seconds",
-                    device_id,
-                    elapsed,
-                )
-                http_data = await self.api.get_http_metrics(device_id, ["tap_stop"])
-                tap_stop = http_data.get("metrics", {}).get("tap_stop")
-                if tap_stop is not None:
-                    self._cached_tap_stop = tap_stop
-                    values["tap_stop"] = tap_stop
-            except Exception as exc:
-                _LOGGER.warning(
-                    "Failed to fetch tap_stop via HTTP in Modbus mode for device %s: %s",
-                    device_id,
-                    exc,
-                )
-            finally:
-                self._last_tap_stop_fetch = now
-        elif self._cached_tap_stop is not None:
-            values["tap_stop"] = self._cached_tap_stop
-
     def _derive_tap_water_capacity(self, values: dict) -> None:
         """Derive tap_water_capacity_target from tap_water_start/stop when absent.
 
@@ -714,11 +682,6 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             # Merge metrics and settings into unified values structure
             # Settings take precedence over metrics in case of conflicts
             values = {**metrics_dict, **settings_dict}
-
-            # In Modbus mode, tap_stop is HTTP-only. Poll it at the DEFAULT HTTP
-            # scan interval whenever extra_tap_water is active.
-            if self.modbus_enabled and values.get("extra_tap_water") == "on":
-                await self._fetch_tap_stop_modbus(device_id, values)
 
             self._derive_tap_water_capacity(values)
 

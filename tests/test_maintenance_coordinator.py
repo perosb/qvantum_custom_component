@@ -100,6 +100,21 @@ class TestQvantumMaintenanceCoordinator:
         assert result == {}
 
     @pytest.mark.asyncio
+    async def test_async_check_firmware_updates_skips_cloud_in_modbus_mode(
+        self, maintenance_coordinator, mock_main_coordinator
+    ):
+        """Modbus mode must not call the cloud firmware/access APIs."""
+        mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.api.get_device_metadata = AsyncMock()
+        maintenance_coordinator.api.get_access_level = AsyncMock()
+
+        result = await maintenance_coordinator.async_check_firmware_updates()
+
+        assert result == {}
+        maintenance_coordinator.api.get_device_metadata.assert_not_called()
+        maintenance_coordinator.api.get_access_level.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_async_check_firmware_updates_initial_versions(
         self, maintenance_coordinator, mock_main_coordinator
     ):
@@ -220,32 +235,31 @@ class TestQvantumMaintenanceCoordinator:
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
-        assert "access_level" not in result
+        assert result == {}
+        maintenance_coordinator.api.get_device_metadata.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_http_down_clears_stale_access(
         self, maintenance_coordinator, mock_main_coordinator
     ):
-        """A later outage must not keep a previous access_level in effect."""
+        """Modbus mode does not keep cloud access_level; it never fetches it."""
         mock_main_coordinator.modbus_enabled = True
         maintenance_coordinator.data = {
             "firmware_versions": {"display_fw_version": "1.3.6"},
             "access_level": {"writeAccessLevel": 20},
         }
-        maintenance_coordinator.api.get_device_metadata = AsyncMock(
-            side_effect=Exception("HTTP API down")
-        )
+        maintenance_coordinator.api.get_device_metadata = AsyncMock()
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
-        assert "access_level" not in result
-        assert result["firmware_versions"]["display_fw_version"] == "1.3.6"
+        assert result == {}
+        maintenance_coordinator.api.get_device_metadata.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_auth_error_modbus_clears_access(
         self, maintenance_coordinator, mock_main_coordinator
     ):
-        """Auth failures in Modbus mode must not keep a previous access_level."""
+        """Modbus mode does not call the cloud, so auth errors cannot occur."""
         mock_main_coordinator.modbus_enabled = True
         maintenance_coordinator.data = {
             "firmware_versions": {"display_fw_version": "1.3.6"},
@@ -257,8 +271,8 @@ class TestQvantumMaintenanceCoordinator:
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
-        assert "access_level" not in result
-        assert result["firmware_versions"]["display_fw_version"] == "1.3.6"
+        assert result == {}
+        maintenance_coordinator.api.get_device_metadata.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_auth_error_http_still_fails(

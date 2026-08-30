@@ -15,7 +15,11 @@ from .const import (
     TAP_WATER_CAPACITY_MAPPINGS,
 )
 from .modbus import MODBUS_HOLDING_REGISTER_MAP, MODBUS_HOLDING_TO_SETTINGS_MAP
-from .modbus_device import QvantumModbusDevice, holding_field_for_metric
+from .modbus_device import (
+    IdentityProbeError,
+    QvantumModbusDevice,
+    holding_field_for_metric,
+)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,9 +45,9 @@ class QvantumAPI:
 
     def __init__(
         self,
-        username: str,
-        password: str,
-        user_agent: str,
+        username: str | None = None,
+        password: str | None = None,
+        user_agent: str = "",
         session: Optional[aiohttp.ClientSession] = None,
         modbus_tcp: bool = False,
         modbus_host: str = "qvantum-hp",
@@ -67,12 +71,12 @@ class QvantumAPI:
         self._modbus_device: QvantumModbusDevice | None = None
         self._modbus_lock = asyncio.Lock()
         self._closed = False
-        # Accept an optional aiohttp session for easier testing. If not provided,
-        # create one and mark it as owned so we can close it when `close()` is called.
+        # Modbus-only mode never opens an HTTP session. Cloud mode owns one
+        # unless a test injects a session.
         if session is not None:
             self._session = session
             self._session_owner = False
-        else:
+        elif not modbus_tcp:
             self._session = aiohttp.ClientSession(
                 headers={
                     "Content-Type": "application/json",
@@ -80,6 +84,9 @@ class QvantumAPI:
                 }
             )
             self._session_owner = True
+        else:
+            self._session = None
+            self._session_owner = False
         self._reset_state()
 
     def _reset_state(self):
@@ -170,7 +177,7 @@ class QvantumAPI:
             except ModbusError as err:
                 _LOGGER.error("Modbus error %s: %s", error_label, err)
                 raise APIConnectionError(None, f"{failure_prefix}: {err}") from err
-            except (APIConnectionError, ValueError):
+            except (APIConnectionError, ValueError, IdentityProbeError):
                 raise
             except Exception as err:
                 _LOGGER.error(
@@ -244,6 +251,7 @@ class QvantumAPI:
     async def authenticate(self):
         """Authenticate with the API using username and password to retrieve a token."""
         self._ensure_open()
+        self._ensure_http()
         payload = {
             "returnSecureToken": "true",
             "email": self._username,
@@ -303,9 +311,34 @@ class QvantumAPI:
                     _LOGGER.error("Token refresh failed: %s", response.status)
                     # Don't raise exception here, let _ensure_valid_token handle it
 
+    def _ensure_http(self) -> None:
+        """Raise if this client has no HTTP session (Modbus-only mode)."""
+        if self._session is None:
+            raise APIConnectionError(
+                None, "HTTP API is not available in Modbus mode"
+            )
+
+    async def async_probe_identity(self) -> dict[str, Any]:
+        """Read serial and firmware from the heat pump over Modbus."""
+
+        async def _probe(device: QvantumModbusDevice):
+            await device.async_update_identity()
+            serial = device.serial_number
+            if not serial:
+                raise IdentityProbeError("Heat pump did not return a serial number")
+            return {
+                "id": serial,
+                "serial": serial,
+                "vendor": "Qvantum",
+                "sw_version": device.sw_version,
+            }
+
+        return await self._run_modbus(_probe, error_label="probing identity")
+
     async def _ensure_valid_token(self):
         """Ensure a valid token is available, refreshing if expired."""
         self._ensure_open()
+        self._ensure_http()
         if not self._token or datetime.now() >= self._token_expiry:
             try:
                 await self._refresh_authentication_token()
@@ -718,38 +751,19 @@ class QvantumAPI:
         )
 
         if self._modbus_tcp:
-            # Try Modbus first, then fall back to HTTP if Modbus is unavailable.
-            try:
-                modbus_start = asyncio.get_running_loop().time()
-                self._metrics_data = await self._read_modbus_metrics(device_id, names)
-                modbus_latency = int(
-                    (asyncio.get_running_loop().time() - modbus_start) * 1000
-                )
-                if (
-                    isinstance(self._metrics_data, dict)
-                    and "metrics" in self._metrics_data
-                ):
-                    self._metrics_data["metrics"]["latency"] = modbus_latency
-                return self._metrics_data
-            except (asyncio.CancelledError, APIConnectionError) as e:
-                # Do not HTTP-fallback when the client is closing/closed or the
-                # poll task was cancelled (config reload). Falling back would race
-                # unload and hit a None aiohttp session.
-                if isinstance(e, asyncio.CancelledError) or self._closed:
-                    raise
-                if "API client is closed" in str(e):
-                    raise
-                _LOGGER.warning(
-                    "Failed to read metrics via Modbus, falling back to HTTP: %s",
-                    e,
-                )
-            except Exception as e:
-                _LOGGER.warning(
-                    "Failed to read metrics via Modbus, falling back to HTTP: %s",
-                    e,
-                )
+            modbus_start = asyncio.get_running_loop().time()
+            self._metrics_data = await self._read_modbus_metrics(device_id, names)
+            modbus_latency = int(
+                (asyncio.get_running_loop().time() - modbus_start) * 1000
+            )
+            if (
+                isinstance(self._metrics_data, dict)
+                and "metrics" in self._metrics_data
+            ):
+                self._metrics_data["metrics"]["latency"] = modbus_latency
+            return self._metrics_data
 
-        # Fall back to HTTP API if Modbus is not available or fails.
+        # HTTP cloud mode.
         http_values, etag, total_latency = await self._get_http_values(
             device_id, names, etag_header=self._metrics_etag
         )
@@ -834,31 +848,14 @@ class QvantumAPI:
         self._ensure_open()
 
         if self._modbus_tcp:
-            # Read settings from Modbus holding registers
-            try:
-                # Read all settings that have a corresponding holding register
-                settings_to_read = [
-                    setting_key
-                    for setting_key in MODBUS_HOLDING_TO_SETTINGS_MAP.keys()
-                    if setting_key in MODBUS_HOLDING_REGISTER_MAP
-                ]
-                result = await self._read_modbus_settings(device_id, settings_to_read)
-                return result
-            except (asyncio.CancelledError, APIConnectionError) as e:
-                if isinstance(e, asyncio.CancelledError) or self._closed:
-                    raise
-                if "API client is closed" in str(e):
-                    raise
-                _LOGGER.warning(
-                    "Failed to read settings via Modbus, falling back to HTTP: %s", e
-                )
-            except Exception as e:
-                _LOGGER.warning(
-                    "Failed to read settings via Modbus, falling back to HTTP: %s", e
-                )
-                # Fall through to HTTP logic below
+            settings_to_read = [
+                setting_key
+                for setting_key in MODBUS_HOLDING_TO_SETTINGS_MAP.keys()
+                if setting_key in MODBUS_HOLDING_REGISTER_MAP
+            ]
+            return await self._read_modbus_settings(device_id, settings_to_read)
 
-        # Original HTTP logic
+        # HTTP cloud mode.
         await self._ensure_valid_token()
         headers = self._request_headers()
         if self._settings_etag:

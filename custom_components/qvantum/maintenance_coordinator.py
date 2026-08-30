@@ -46,6 +46,8 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
 
     async def async_check_firmware_updates(self):
         """Check for firmware updates by fetching device metadata and comparing versions."""
+        if getattr(self.main_coordinator, "modbus_enabled", False):
+            return {}
         try:
             # Get the device from the main coordinator
             device = self.main_coordinator._device
