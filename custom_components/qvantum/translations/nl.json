@@ -542,31 +542,59 @@
     },
     "step": {
       "user": {
-        "description": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest; schrijven/sturing gebeurt nog via de HTTP API, tenzij schrijven ook is ingeschakeld. Bepaalde besturingen worden via Modbus geschreven.",
-        "data": {
-          "password": "Wachtwoord",
-          "username": "Gebruikersnaam",
-          "modbus_tcp": "Gebruik Modbus-uitlezing in plaats van HTTP-polling",
-          "modbus_write": "Schrijven via Modbus inschakelen"
-        },
-        "data_description": {
-          "modbus_tcp": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest; schrijven/sturing gebeurt nog via de HTTP API, tenzij schrijven ook is ingeschakeld. Bepaalde besturingen worden via Modbus geschreven.",
-          "modbus_write": "Door het activeren van Modbus-schrijven aanvaardt u volledige verantwoordelijkheid voor alle waarden die via de interface worden geschreven. De fabrikant is niet aansprakelijk voor problemen veroorzaakt door onjuiste of buiten bereik vallende waarden, en dergelijke acties kunnen de garantie en/of de levensduur en prestaties van het product beïnvloeden."
+        "title": "Verbinding",
+        "description": "Kies hoe Home Assistant met de warmtepomp communiceert. U kunt later wisselen via herconfiguratie.",
+        "menu_options": {
+          "cloud": "Qvantum-cloud (HTTP)",
+          "modbus": "Lokale Modbus (offline)"
         }
       },
-      "reconfigure": {
-        "description": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest; schrijven/sturing gebeurt nog via de HTTP API, tenzij schrijven ook is ingeschakeld. Bepaalde besturingen worden via Modbus geschreven.",
+      "cloud": {
+        "title": "Qvantum-cloud",
+        "description": "Meld u aan met uw Qvantum-account. Metingen en bediening gebruiken de cloud-API.",
         "data": {
           "password": "Wachtwoord",
-          "username": "Gebruikersnaam",
-          "modbus_tcp": "Gebruik Modbus-uitlezing in plaats van HTTP-polling",
-          "modbus_write": "Schrijven via Modbus inschakelen",
+          "username": "Gebruikersnaam"
+        }
+      },
+      "modbus": {
+        "title": "Lokale Modbus",
+        "description": "Leest de warmtepomp op uw LAN. Geen aanmelding. Schakel eerst Modbus external in in de Qvantum-app (Installateur → Servicemodus → Connectiviteit). Bediening is in deze modus niet beschikbaar.",
+        "data": {
+          "modbus_host": "Qvantum Host/IP",
+          "modbus_port": "Poort",
+          "modbus_unit_id": "Unit-ID",
           "modbus_scan_interval": "Modbus-scaninterval (seconden)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest; schrijven/sturing gebeurt nog via de HTTP API, tenzij schrijven ook is ingeschakeld. Bepaalde besturingen worden via Modbus geschreven.",
-          "modbus_write": "Door het activeren van Modbus-schrijven aanvaardt u volledige verantwoordelijkheid voor alle waarden die via de interface worden geschreven. De fabrikant is niet aansprakelijk voor problemen veroorzaakt door onjuiste of buiten bereik vallende waarden, en dergelijke acties kunnen de garantie en/of de levensduur en prestaties van het product beïnvloeden.",
-          "modbus_scan_interval": "Hoe vaak de warmtepomp via Modbus TCP wordt gepolld. Lagere waarden geven bijna realtime debiet- en volumenauwkeurigheid. Minimum is 5 seconden. Standaard is 15 seconden."
+          "modbus_host": "Hostnaam of IP-adres van de warmtepomp. Standaard is Qvantum-HP.",
+          "modbus_scan_interval": "Hoe vaak er via Modbus TCP wordt gepolld. Minimum is 5 seconden. Standaard is 15 seconden."
+        }
+      },
+      "reconfigure": {
+        "title": "Herconfigureren",
+        "description": "Schakel tussen cloud-HTTP en lokale Modbus, of werk de huidige verbinding bij.",
+        "menu_options": {
+          "reconfigure_cloud": "Qvantum-cloud (HTTP)",
+          "reconfigure_modbus": "Lokale Modbus (offline)"
+        }
+      },
+      "reconfigure_cloud": {
+        "title": "Qvantum-cloud",
+        "description": "Meld u aan met uw Qvantum-account.",
+        "data": {
+          "password": "Wachtwoord",
+          "username": "Gebruikersnaam"
+        }
+      },
+      "reconfigure_modbus": {
+        "title": "Lokale Modbus",
+        "description": "Schakel eerst Modbus external in in de Qvantum-app. Home Assistant leest serienummer en firmware van de pomp.",
+        "data": {
+          "modbus_host": "Qvantum Host/IP",
+          "modbus_port": "Poort",
+          "modbus_unit_id": "Unit-ID",
+          "modbus_scan_interval": "Modbus-scaninterval (seconden)"
         }
       }
     }
@@ -576,17 +604,15 @@
       "init": {
         "data": {
           "scan_interval": "HTTP-scaninterval (seconden)",
-          "modbus_tcp": "Gebruik Modbus-uitlezing in plaats van HTTP-polling",
           "modbus_host": "Qvantum Host/IP",
-          "modbus_write": "Schrijven via Modbus inschakelen",
+          "modbus_port": "Poort",
+          "modbus_unit_id": "Unit-ID",
           "modbus_scan_interval": "Modbus-scaninterval (seconden)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus geeft bijna realtime statistieken door direct vanaf het apparaat te lezen.\nModbus moet zijn ingeschakeld in de installateurinstellingen in de pomp-app/display voordat het hier kan worden ingeschakeld. Houd er rekening mee dat het alleen via Modbus leest; schrijven/sturing gebeurt nog via de HTTP API, tenzij schrijven ook is ingeschakeld. Bepaalde besturingen worden via Modbus geschreven.",
-          "modbus_write": "Door het activeren van Modbus-schrijven aanvaardt u volledige verantwoordelijkheid voor alle waarden die via de interface worden geschreven. De fabrikant is niet aansprakelijk voor problemen veroorzaakt door onjuiste of buiten bereik vallende waarden, en dergelijke acties kunnen de garantie en/of de levensduur en prestaties van het product beïnvloeden.",
           "modbus_scan_interval": "Hoe vaak de warmtepomp via Modbus TCP wordt gepolld. Lagere waarden geven bijna realtime debiet- en volumenauwkeurigheid. Minimum is 5 seconden. Standaard is 15 seconden."
         },
-        "description": "Wijzig uw opties.",
+        "description": "Instellingen voor de huidige verbindingsmodus. Gebruik herconfiguratie om te wisselen tussen cloud en Modbus.",
         "title": "Opties"
       }
     }

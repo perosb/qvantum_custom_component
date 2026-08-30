@@ -542,31 +542,59 @@
     },
     "step": {
       "user": {
-        "description": "Modbus zapewnia dane w czasie niemal rzeczywistym, czytając bezpośrednio z urządzenia.\nModbus musi być włączony w ustawieniach instalatora w aplikacji/wyświetlaczu pompy przed włączeniem tutaj. Uwaga: tutaj działa tylko odczyt przez Modbus; zapis/sterowanie nadal odbywa się przez HTTP API, chyba że zapis również jest włączony. Niektóre funkcje sterowania są zapisywane przez Modbus.",
-        "data": {
-          "password": "Hasło",
-          "username": "Nazwa użytkownika",
-          "modbus_tcp": "Użyj odczytu Modbus zamiast odpytywania HTTP",
-          "modbus_write": "Włącz zapis przez Modbus"
-        },
-        "data_description": {
-          "modbus_tcp": "Modbus zapewnia dane w czasie niemal rzeczywistym, czytając bezpośrednio z urządzenia.\nModbus musi być włączony w ustawieniach instalatora w aplikacji/wyświetlaczu pompy przed włączeniem tutaj. Uwaga: tutaj działa tylko odczyt przez Modbus; zapis/sterowanie nadal odbywa się przez HTTP API, chyba że zapis również jest włączony. Niektóre funkcje sterowania są zapisywane przez Modbus.",
-          "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu."
+        "title": "Połączenie",
+        "description": "Wybierz, jak Home Assistant ma komunikować się z pompą ciepła. Tryb można później zmienić przez rekonfigurację.",
+        "menu_options": {
+          "cloud": "Chmura Qvantum (HTTP)",
+          "modbus": "Lokalny Modbus (offline)"
         }
       },
-      "reconfigure": {
-        "description": "Modbus zapewnia dane w czasie niemal rzeczywistym, czytając bezpośrednio z urządzenia.\nModbus musi być włączony w ustawieniach instalatora w aplikacji/wyświetlaczu pompy przed włączeniem tutaj. Uwaga: tutaj działa tylko odczyt przez Modbus; zapis/sterowanie nadal odbywa się przez HTTP API, chyba że zapis również jest włączony. Niektóre funkcje sterowania są zapisywane przez Modbus.",
+      "cloud": {
+        "title": "Chmura Qvantum",
+        "description": "Zaloguj się na konto Qvantum. Pomiary i sterowanie korzystają z API w chmurze.",
         "data": {
           "password": "Hasło",
-          "username": "Nazwa użytkownika",
-          "modbus_tcp": "Użyj odczytu Modbus zamiast odpytywania HTTP",
-          "modbus_write": "Włącz zapis przez Modbus",
+          "username": "Nazwa użytkownika"
+        }
+      },
+      "modbus": {
+        "title": "Lokalny Modbus",
+        "description": "Odczytuje pompę ciepła w sieci lokalnej. Bez logowania. Najpierw włącz Modbus external w aplikacji Qvantum (Instalator → Tryb serwisowy → Łączność). Sterowanie jest w tym trybie niedostępne.",
+        "data": {
+          "modbus_host": "Host/IP Qvantum",
+          "modbus_port": "Port",
+          "modbus_unit_id": "ID jednostki",
           "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus zapewnia dane w czasie niemal rzeczywistym, czytając bezpośrednio z urządzenia.\nModbus musi być włączony w ustawieniach instalatora w aplikacji/wyświetlaczu pompy przed włączeniem tutaj. Uwaga: tutaj działa tylko odczyt przez Modbus; zapis/sterowanie nadal odbywa się przez HTTP API, chyba że zapis również jest włączony. Niektóre funkcje sterowania są zapisywane przez Modbus.",
-          "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu.",
-          "modbus_scan_interval": "Jak często odpytywać pompę ciepła przez Modbus TCP. Niższe wartości dają prawie rzeczywistą dokładność przepływu i objętości. Minimum to 5 sekund. Domyślnie 15 sekund."
+          "modbus_host": "Nazwa hosta lub adres IP pompy ciepła. Domyślnie Qvantum-HP.",
+          "modbus_scan_interval": "Jak często odpytywać przez Modbus TCP. Minimum to 5 sekund. Domyślnie 15 sekund."
+        }
+      },
+      "reconfigure": {
+        "title": "Rekonfiguruj",
+        "description": "Przełącz między chmurą HTTP a lokalnym Modbusem albo zaktualizuj bieżące połączenie.",
+        "menu_options": {
+          "reconfigure_cloud": "Chmura Qvantum (HTTP)",
+          "reconfigure_modbus": "Lokalny Modbus (offline)"
+        }
+      },
+      "reconfigure_cloud": {
+        "title": "Chmura Qvantum",
+        "description": "Zaloguj się na konto Qvantum.",
+        "data": {
+          "password": "Hasło",
+          "username": "Nazwa użytkownika"
+        }
+      },
+      "reconfigure_modbus": {
+        "title": "Lokalny Modbus",
+        "description": "Najpierw włącz Modbus external w aplikacji Qvantum. Home Assistant odczyta numer seryjny i oprogramowanie układowe pompy.",
+        "data": {
+          "modbus_host": "Host/IP Qvantum",
+          "modbus_port": "Port",
+          "modbus_unit_id": "ID jednostki",
+          "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)"
         }
       }
     }
@@ -576,17 +604,15 @@
       "init": {
         "data": {
           "scan_interval": "Interwał skanowania HTTP (sekundy)",
-          "modbus_tcp": "Użyj odczytu Modbus zamiast odpytywania HTTP",
           "modbus_host": "Host/IP Qvantum",
-          "modbus_write": "Włącz zapis przez Modbus",
+          "modbus_port": "Port",
+          "modbus_unit_id": "ID jednostki",
           "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus zapewnia dane w czasie niemal rzeczywistym, czytając bezpośrednio z urządzenia.\nModbus musi być włączony w ustawieniach instalatora w aplikacji/wyświetlaczu pompy przed włączeniem tutaj. Uwaga: tutaj działa tylko odczyt przez Modbus; zapis/sterowanie nadal odbywa się przez HTTP API, chyba że zapis również jest włączony. Niektóre funkcje sterowania są zapisywane przez Modbus.",
-          "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu.",
           "modbus_scan_interval": "Jak często odpytywać pompę ciepła przez Modbus TCP. Niższe wartości dają prawie rzeczywistą dokładność przepływu i objętości. Minimum to 5 sekund. Domyślnie 15 sekund."
         },
-        "description": "Zmień swoje opcje.",
+        "description": "Ustawienia bieżącego trybu połączenia. Użyj rekonfiguracji, aby przełączyć między chmurą a Modbusem.",
         "title": "Opcje"
       }
     }

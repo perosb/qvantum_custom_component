@@ -542,31 +542,59 @@
     },
     "step": {
       "user": {
-        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
-        "data": {
-          "password": "Contraseña",
-          "username": "Nombre de usuario",
-          "modbus_tcp": "Usar lectura Modbus en lugar de sondeo HTTP",
-          "modbus_write": "Activar escritura mediante Modbus"
-        },
-        "data_description": {
-          "modbus_tcp": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
-          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto."
+        "title": "Conexión",
+        "description": "Elige cómo Home Assistant se comunica con la bomba de calor. Puedes cambiarlo más tarde mediante la reconfiguración.",
+        "menu_options": {
+          "cloud": "Nube Qvantum (HTTP)",
+          "modbus": "Modbus local (sin conexión)"
         }
       },
-      "reconfigure": {
-        "description": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
+      "cloud": {
+        "title": "Nube Qvantum",
+        "description": "Inicia sesión con tu cuenta Qvantum. Las métricas y los controles usan la API en la nube.",
         "data": {
           "password": "Contraseña",
-          "username": "Nombre de usuario",
-          "modbus_tcp": "Usar lectura Modbus en lugar de sondeo HTTP",
-          "modbus_write": "Activar escritura mediante Modbus",
+          "username": "Nombre de usuario"
+        }
+      },
+      "modbus": {
+        "title": "Modbus local",
+        "description": "Lee la bomba de calor en tu red local. Sin inicio de sesión. Activa primero Modbus external en la app Qvantum (Instalador → Modo servicio → Conectividad). Los controles no están disponibles en este modo.",
+        "data": {
+          "modbus_host": "Qvantum Host/IP",
+          "modbus_port": "Puerto",
+          "modbus_unit_id": "ID de unidad",
           "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
-          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto.",
-          "modbus_scan_interval": "Con qué frecuencia se consulta la bomba de calor por Modbus TCP. Valores más bajos dan precisión casi en tiempo real de caudal y volumen. El mínimo es 5 segundos. El valor predeterminado es 15 segundos."
+          "modbus_host": "Nombre de host o IP de la bomba de calor. El valor predeterminado es Qvantum-HP.",
+          "modbus_scan_interval": "Con qué frecuencia consultar por Modbus TCP. El mínimo es 5 segundos. El valor predeterminado es 15 segundos."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigurar",
+        "description": "Cambia entre HTTP en la nube y Modbus local, o actualiza la conexión actual.",
+        "menu_options": {
+          "reconfigure_cloud": "Nube Qvantum (HTTP)",
+          "reconfigure_modbus": "Modbus local (sin conexión)"
+        }
+      },
+      "reconfigure_cloud": {
+        "title": "Nube Qvantum",
+        "description": "Inicia sesión con tu cuenta Qvantum.",
+        "data": {
+          "password": "Contraseña",
+          "username": "Nombre de usuario"
+        }
+      },
+      "reconfigure_modbus": {
+        "title": "Modbus local",
+        "description": "Activa primero Modbus external en la app Qvantum. Home Assistant leerá el número de serie y el firmware de la bomba.",
+        "data": {
+          "modbus_host": "Qvantum Host/IP",
+          "modbus_port": "Puerto",
+          "modbus_unit_id": "ID de unidad",
+          "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)"
         }
       }
     }
@@ -576,17 +604,15 @@
       "init": {
         "data": {
           "scan_interval": "Intervalo de exploración HTTP (segundos)",
-          "modbus_tcp": "Usar lectura Modbus en lugar de sondeo HTTP",
           "modbus_host": "Qvantum Host/IP",
-          "modbus_write": "Activar escritura mediante Modbus",
+          "modbus_port": "Puerto",
+          "modbus_unit_id": "ID de unidad",
           "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus te dará métricas casi en tiempo real leyendo directamente desde el dispositivo.\nModbus debe habilitarse en la configuración del instalador en la aplicación/visualización de la bomba antes de habilitarlo aquí. Ten en cuenta que solo lee a través de Modbus; la escritura/control sigue siendo vía API HTTP a menos que también se habilite la escritura. Algunos controles se escriben mediante Modbus.",
-          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto.",
           "modbus_scan_interval": "Con qué frecuencia se consulta la bomba de calor por Modbus TCP. Valores más bajos dan precisión casi en tiempo real de caudal y volumen. El mínimo es 5 segundos. El valor predeterminado es 15 segundos."
         },
-        "description": "Modifique sus opciones.",
+        "description": "Ajustes del modo de conexión actual. Usa reconfigurar para cambiar entre nube y Modbus.",
         "title": "Opciones"
       }
     }

@@ -542,31 +542,59 @@
     },
     "step": {
       "user": {
-        "description": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Oletuksena se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
-        "data": {
-          "password": "Salasana",
-          "username": "Käyttäjätunnus",
-          "modbus_tcp": "Käytä Modbus-lukemista HTTP-kyselyn sijaan",
-          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta"
-        },
-        "data_description": {
-          "modbus_tcp": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Huomaa, että se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
-          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn."
+        "title": "Yhteys",
+        "description": "Valitse, miten Home Assistant keskustelee lämpöpumpun kanssa. Voit vaihtaa myöhemmin uudelleenmäärityksessä.",
+        "menu_options": {
+          "cloud": "Qvantum-pilvi (HTTP)",
+          "modbus": "Paikallinen Modbus (offline)"
         }
       },
-      "reconfigure": {
-        "description": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Oletuksena se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
+      "cloud": {
+        "title": "Qvantum-pilvi",
+        "description": "Kirjaudu Qvantum-tililläsi. Mittaukset ja ohjaukset käyttävät pilvi-API:a.",
         "data": {
           "password": "Salasana",
-          "username": "Käyttäjätunnus",
-          "modbus_tcp": "Käytä Modbus-lukemista HTTP-kyselyn sijaan",
-          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta",
+          "username": "Käyttäjätunnus"
+        }
+      },
+      "modbus": {
+        "title": "Paikallinen Modbus",
+        "description": "Lukee lämpöpumpun lähiverkossa. Ei kirjautumista. Ota ensin Modbus external käyttöön Qvantum-sovelluksessa (Asentaja → Huoltotila → Yhteydet). Ohjaukset eivät ole käytettävissä tässä tilassa.",
+        "data": {
+          "modbus_host": "Qvantum-isäntä/IP",
+          "modbus_port": "Portti",
+          "modbus_unit_id": "Yksikkö-ID",
           "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Huomaa, että se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
-          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn.",
-          "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
+          "modbus_host": "Lämpöpumpun isäntänimi tai IP-osoite. Oletus on Qvantum-HP.",
+          "modbus_scan_interval": "Kuinka usein kysely tehdään Modbus TCP:n kautta. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
+        }
+      },
+      "reconfigure": {
+        "title": "Määritä uudelleen",
+        "description": "Vaihda pilvi-HTTP:n ja paikallisen Modbusin välillä tai päivitä nykyinen yhteys.",
+        "menu_options": {
+          "reconfigure_cloud": "Qvantum-pilvi (HTTP)",
+          "reconfigure_modbus": "Paikallinen Modbus (offline)"
+        }
+      },
+      "reconfigure_cloud": {
+        "title": "Qvantum-pilvi",
+        "description": "Kirjaudu Qvantum-tililläsi.",
+        "data": {
+          "password": "Salasana",
+          "username": "Käyttäjätunnus"
+        }
+      },
+      "reconfigure_modbus": {
+        "title": "Paikallinen Modbus",
+        "description": "Ota ensin Modbus external käyttöön Qvantum-sovelluksessa. Home Assistant lukee sarjanumeron ja laiteohjelmiston pumpusta.",
+        "data": {
+          "modbus_host": "Qvantum-isäntä/IP",
+          "modbus_port": "Portti",
+          "modbus_unit_id": "Yksikkö-ID",
+          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
         }
       }
     }
@@ -576,17 +604,15 @@
       "init": {
         "data": {
           "scan_interval": "HTTP-skannausväli (sekuntia)",
-          "modbus_tcp": "Käytä Modbus-lukemista HTTP-kyselyn sijaan",
           "modbus_host": "Qvantum-isäntä/IP",
-          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta",
+          "modbus_port": "Portti",
+          "modbus_unit_id": "Yksikkö-ID",
           "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
         },
         "data_description": {
-          "modbus_tcp": "Modbus antaa sinulle lähes reaaliaikaisia mittauksia lukemalla laitetta suoraan.\nModbus on otettava käyttöön pumpun sovelluksen/näytön asentajan asetuksissa ennen tämän ottamista käyttöön. Huomaa, että se lukee vain Modbusin kautta; kirjoitukset/ohjaukset tapahtuvat edelleen HTTP-rajapinnan kautta, ellei myös Modbus-kirjoitus ole käytössä, jolloin jotkin ohjaukset kirjoitetaan Modbusin kautta.",
-          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn.",
           "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
         },
-        "description": "Muokkaa asetuksiasi.",
+        "description": "Nykyisen yhteystilan asetukset. Käytä uudelleenmääritystä vaihtaaksesi pilven ja Modbusin välillä.",
         "title": "Asetukset"
       }
     }
