@@ -34,14 +34,20 @@ async def async_setup_entry(
 
     buttons = []
     buttons.append(QvantumButtonEntity(coordinator, "extra_tap_water_60min", device))
-
-    buttons.append(
-        QvantumButtonEntity(
-            coordinator, "elevate_access", device, maintenance_coordinator
+    button_keys = {"extra_tap_water_60min"}
+    if not coordinator.modbus_enabled:
+        buttons.append(
+            QvantumButtonEntity(
+                coordinator, "elevate_access", device, maintenance_coordinator
+            )
         )
-    )
+        button_keys.add("elevate_access")
 
     async_add_entities(buttons)
+
+    from .entity import cleanup_disabled_entities
+
+    cleanup_disabled_entities(hass, coordinator, button_keys, "button")
 
     _LOGGER.debug("Setting up platform BUTTON")
 

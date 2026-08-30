@@ -1,7 +1,7 @@
 """Tests for Qvantum button entities."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from homeassistant.const import EntityCategory
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -203,9 +203,11 @@ class TestQvantumButtonEntity:
 
         async_add_entities = MagicMock()
 
-        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+        with patch(
+            "custom_components.qvantum.entity.cleanup_disabled_entities"
+        ) as cleanup:
+            await async_setup_entry(hass, mock_config_entry, async_add_entities)
 
-        # Check that entities were added
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
         assert len(entities) == 2
@@ -213,3 +215,38 @@ class TestQvantumButtonEntity:
         assert entities[0]._metric_key == "extra_tap_water_60min"
         assert isinstance(entities[1], QvantumButtonEntity)
         assert entities[1]._metric_key == "elevate_access"
+        assert cleanup.call_args.args[2] == {
+            "extra_tap_water_60min",
+            "elevate_access",
+        }
+        assert cleanup.call_args.args[3] == "button"
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_omits_elevate_access(
+        self,
+        hass,
+        mock_config_entry,
+        mock_coordinator,
+        mock_device,
+        mock_maintenance_coordinator,
+    ):
+        """Elevate access is cloud-only and must not be created in Modbus mode."""
+        mock_coordinator.modbus_enabled = True
+        mock_config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator,
+            device=mock_device,
+            maintenance_coordinator=mock_maintenance_coordinator,
+        )
+        async_add_entities = MagicMock()
+
+        with patch(
+            "custom_components.qvantum.entity.cleanup_disabled_entities"
+        ) as cleanup:
+            await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        assert [entity._metric_key for entity in entities] == [
+            "extra_tap_water_60min"
+        ]
+        assert "elevate_access" not in cleanup.call_args.args[2]
+        assert cleanup.call_args.args[3] == "button"
