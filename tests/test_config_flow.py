@@ -262,24 +262,24 @@ class TestQvantumConfigFlow:
                     "modbus_scan_interval": 10,
                 }
             )
-        assert result == {"type": "create_entry"}
-        assert mock_validate.await_args.args[1] == "hp.local"
-        created = mock_create_entry.call_args.kwargs
-        assert created["data"]["modbus_host"] == "hp.local"
-        assert created["options"]["modbus_host"] == "hp.local"
+            assert result == {"type": "create_entry"}
+            assert mock_validate.await_args.args[1] == "hp.local"
+            created = mock_create_entry.call_args.kwargs
+            assert created["data"]["modbus_host"] == "hp.local"
+            assert created["options"]["modbus_host"] == "hp.local"
 
-        mock_create_entry.return_value = {"type": "create_entry"}
-        await config_flow.async_step_modbus(
-            {
-                "modbus_host": "   ",
-                "modbus_port": 502,
-                "modbus_unit_id": 1,
-                "modbus_scan_interval": 10,
-            }
-        )
-        assert mock_validate.await_args.args[1] == DEFAULT_MODBUS_HOST
-        created = mock_create_entry.call_args.kwargs
-        assert created["data"]["modbus_host"] == DEFAULT_MODBUS_HOST
+            mock_create_entry.return_value = {"type": "create_entry"}
+            await config_flow.async_step_modbus(
+                {
+                    "modbus_host": "   ",
+                    "modbus_port": 502,
+                    "modbus_unit_id": 1,
+                    "modbus_scan_interval": 10,
+                }
+            )
+            assert mock_validate.await_args.args[1] == DEFAULT_MODBUS_HOST
+            created = mock_create_entry.call_args.kwargs
+            assert created["data"]["modbus_host"] == DEFAULT_MODBUS_HOST
 
     @pytest.mark.asyncio
     async def test_modbus_step_cannot_connect(self, hass, config_flow):
@@ -405,7 +405,7 @@ class TestQvantumOptionsFlow:
             mock_create_entry.return_value = {"type": "create_entry"}
             result = await flow.async_step_init(
                 {
-                    "modbus_host": "hp.local",
+                    "modbus_host": "  hp.local  ",
                     "modbus_port": 502,
                     "modbus_unit_id": 1,
                     "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
@@ -417,17 +417,4 @@ class TestQvantumOptionsFlow:
         assert data["modbus_host"] == "hp.local"
         assert data["modbus_scan_interval"] == MIN_MODBUS_SCAN_INTERVAL
         assert "scan_interval" not in data
-
-        mock_create_entry.reset_mock()
-        mock_create_entry.return_value = {"type": "create_entry"}
-        await flow.async_step_init(
-            {
-                "modbus_host": "  hp.local  ",
-                "modbus_port": 502,
-                "modbus_unit_id": 1,
-                "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
-            }
-        )
-        data = mock_create_entry.call_args.kwargs["data"]
-        assert data["modbus_host"] == "hp.local"
 
