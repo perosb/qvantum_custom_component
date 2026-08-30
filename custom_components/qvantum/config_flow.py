@@ -77,6 +77,12 @@ def _normalize_modbus_scan_interval(value: Any) -> int:
     return max(interval, MIN_MODBUS_SCAN_INTERVAL)
 
 
+def _normalize_modbus_host(value: Any) -> str:
+    """Strip host whitespace and fall back to the default when empty."""
+    host = str(value or "").strip()
+    return host or DEFAULT_MODBUS_HOST
+
+
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate cloud credentials and return a title."""
     user_agent = f"Home Assistant/{ha_version} Qvantum/{VERSION}"
@@ -205,7 +211,7 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         """Set up using local Modbus TCP."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            host = str(user_input[CONF_MODBUS_HOST])
+            host = _normalize_modbus_host(user_input.get(CONF_MODBUS_HOST))
             port = int(user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT))
             unit_id = int(user_input.get(CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID))
             interval = _normalize_modbus_scan_interval(
@@ -313,7 +319,7 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         config_entry = self._reconfigure_entry()
         if user_input is not None:
-            host = str(user_input[CONF_MODBUS_HOST])
+            host = _normalize_modbus_host(user_input.get(CONF_MODBUS_HOST))
             port = int(user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT))
             unit_id = int(user_input.get(CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID))
             interval = _normalize_modbus_scan_interval(
@@ -419,8 +425,8 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                 normalized = {
                     CONF_MODBUS_TCP: True,
                     CONF_MODBUS_WRITE: False,
-                    CONF_MODBUS_HOST: user_input.get(
-                        CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST
+                    CONF_MODBUS_HOST: _normalize_modbus_host(
+                        user_input.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST)
                     ),
                     CONF_MODBUS_PORT: int(
                         user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT)

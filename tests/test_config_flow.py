@@ -234,6 +234,54 @@ class TestQvantumConfigFlow:
         assert created["options"]["modbus_scan_interval"] == 10
 
     @pytest.mark.asyncio
+    async def test_modbus_step_strips_host_whitespace(self, hass, config_flow):
+        """Padded or empty hosts should not be persisted as-is."""
+        from custom_components.qvantum.const import DEFAULT_MODBUS_HOST
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_modbus",
+                AsyncMock(
+                    return_value={
+                        "title": "Qvantum (12003)",
+                        "serial": "12003",
+                        "sw_version": "1.7.22",
+                    }
+                ),
+            ) as mock_validate,
+            patch.object(config_flow, "async_set_unique_id"),
+            patch.object(config_flow, "_abort_if_unique_id_configured"),
+            patch.object(config_flow, "async_create_entry") as mock_create_entry,
+        ):
+            mock_create_entry.return_value = {"type": "create_entry"}
+            result = await config_flow.async_step_modbus(
+                {
+                    "modbus_host": "  hp.local  ",
+                    "modbus_port": 502,
+                    "modbus_unit_id": 1,
+                    "modbus_scan_interval": 10,
+                }
+            )
+        assert result == {"type": "create_entry"}
+        assert mock_validate.await_args.args[1] == "hp.local"
+        created = mock_create_entry.call_args.kwargs
+        assert created["data"]["modbus_host"] == "hp.local"
+        assert created["options"]["modbus_host"] == "hp.local"
+
+        mock_create_entry.return_value = {"type": "create_entry"}
+        await config_flow.async_step_modbus(
+            {
+                "modbus_host": "   ",
+                "modbus_port": 502,
+                "modbus_unit_id": 1,
+                "modbus_scan_interval": 10,
+            }
+        )
+        assert mock_validate.await_args.args[1] == DEFAULT_MODBUS_HOST
+        created = mock_create_entry.call_args.kwargs
+        assert created["data"]["modbus_host"] == DEFAULT_MODBUS_HOST
+
+    @pytest.mark.asyncio
     async def test_modbus_step_cannot_connect(self, hass, config_flow):
         with patch(
             "custom_components.qvantum.config_flow.validate_modbus",
@@ -369,4 +417,17 @@ class TestQvantumOptionsFlow:
         assert data["modbus_host"] == "hp.local"
         assert data["modbus_scan_interval"] == MIN_MODBUS_SCAN_INTERVAL
         assert "scan_interval" not in data
+
+        mock_create_entry.reset_mock()
+        mock_create_entry.return_value = {"type": "create_entry"}
+        await flow.async_step_init(
+            {
+                "modbus_host": "  hp.local  ",
+                "modbus_port": 502,
+                "modbus_unit_id": 1,
+                "modbus_scan_interval": MIN_MODBUS_SCAN_INTERVAL,
+            }
+        )
+        data = mock_create_entry.call_args.kwargs["data"]
+        assert data["modbus_host"] == "hp.local"
 
