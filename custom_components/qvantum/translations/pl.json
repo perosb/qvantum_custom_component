@@ -530,71 +530,71 @@
     }
   },
   "config": {
-    "title": "Qvantum Heat pump",
+    "title": "Pompa ciepła Qvantum",
     "abort": {
-      "already_configured": "Device is already configured",
-      "reconfigure_successful": "Reconfiguration successful"
+      "already_configured": "Urządzenie jest już skonfigurowane",
+      "reconfigure_successful": "Rekonfiguracja powiodła się"
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Nie udało się połączyć",
+      "invalid_auth": "Nieprawidłowe uwierzytelnienie",
+      "unknown": "Nieoczekiwany błąd"
     },
     "step": {
       "user": {
-        "title": "Connection",
-        "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
+        "title": "Połączenie",
+        "description": "Wybierz, jak Home Assistant ma komunikować się z pompą ciepła. Tryb można później zmienić przez rekonfigurację.",
         "menu_options": {
-          "cloud": "Qvantum cloud (HTTP)",
-          "modbus": "Local Modbus (offline)"
+          "cloud": "Chmura Qvantum (HTTP)",
+          "modbus": "Lokalny Modbus (offline)"
         }
       },
       "cloud": {
-        "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account. Metrics and controls use the cloud API.",
+        "title": "Chmura Qvantum",
+        "description": "Zaloguj się na konto Qvantum. Pomiary i sterowanie korzystają z API w chmurze.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Hasło",
+          "username": "Nazwa użytkownika"
         }
       },
       "modbus": {
-        "title": "Local Modbus",
-        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "title": "Lokalny Modbus",
+        "description": "Odczytuje pompę ciepła w sieci lokalnej. Bez logowania. Najpierw włącz Modbus external w aplikacji Qvantum (Instalator → Tryb serwisowy → Łączność). Sterowanie jest w tym trybie niedostępne.",
         "data": {
-          "modbus_host": "Host / IP",
+          "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_unit_id": "ID jednostki",
+          "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)"
         },
         "data_description": {
-          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
-          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_host": "Nazwa hosta lub adres IP pompy ciepła. Domyślnie Qvantum-HP.",
+          "modbus_scan_interval": "Jak często odpytywać przez Modbus TCP. Minimum to 5 sekund. Domyślnie 15 sekund."
         }
       },
       "reconfigure": {
-        "title": "Reconfigure",
-        "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
+        "title": "Rekonfiguruj",
+        "description": "Przełącz między chmurą HTTP a lokalnym Modbusem albo zaktualizuj bieżące połączenie.",
         "menu_options": {
-          "reconfigure_cloud": "Qvantum cloud (HTTP)",
-          "reconfigure_modbus": "Local Modbus (offline)"
+          "reconfigure_cloud": "Chmura Qvantum (HTTP)",
+          "reconfigure_modbus": "Lokalny Modbus (offline)"
         }
       },
       "reconfigure_cloud": {
-        "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account.",
+        "title": "Chmura Qvantum",
+        "description": "Zaloguj się na konto Qvantum.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Hasło",
+          "username": "Nazwa użytkownika"
         }
       },
       "reconfigure_modbus": {
-        "title": "Local Modbus",
-        "description": "Enable Modbus external in the Qvantum app first. Home Assistant will probe serial and firmware on the pump.",
+        "title": "Lokalny Modbus",
+        "description": "Najpierw włącz Modbus external w aplikacji Qvantum. Home Assistant odczyta numer seryjny i oprogramowanie układowe pompy.",
         "data": {
-          "modbus_host": "Host / IP",
+          "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_unit_id": "ID jednostki",
+          "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)"
         }
       }
     }
@@ -603,17 +603,17 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "HTTP scan interval (seconds)",
-          "modbus_host": "Host / IP",
+          "scan_interval": "Interwał skanowania HTTP (sekundy)",
+          "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Modbus scan interval (seconds)"
+          "modbus_unit_id": "ID jednostki",
+          "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)"
         },
         "data_description": {
-          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_scan_interval": "Jak często odpytywać pompę ciepła przez Modbus TCP. Niższe wartości dają prawie rzeczywistą dokładność przepływu i objętości. Minimum to 5 sekund. Domyślnie 15 sekund."
         },
-        "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
-        "title": "Options"
+        "description": "Ustawienia bieżącego trybu połączenia. Użyj rekonfiguracji, aby przełączyć między chmurą a Modbusem.",
+        "title": "Opcje"
       }
     }
   },

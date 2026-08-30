@@ -532,69 +532,69 @@
   "config": {
     "title": "Qvantum tepelné čerpadlo",
     "abort": {
-      "already_configured": "Device is already configured",
-      "reconfigure_successful": "Reconfiguration successful"
+      "already_configured": "Zařízení je již nakonfigurováno",
+      "reconfigure_successful": "Znovu nastavení proběhlo úspěšně"
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Nepodařilo se připojit",
+      "invalid_auth": "Neplatná autentizace",
+      "unknown": "Neočekávaná chyba"
     },
     "step": {
       "user": {
-        "title": "Connection",
-        "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
+        "title": "Připojení",
+        "description": "Vyberte, jak má Home Assistant komunikovat s tepelným čerpadlem. Režim lze později změnit v novém nastavení.",
         "menu_options": {
           "cloud": "Qvantum cloud (HTTP)",
-          "modbus": "Local Modbus (offline)"
+          "modbus": "Místní Modbus (offline)"
         }
       },
       "cloud": {
         "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account. Metrics and controls use the cloud API.",
+        "description": "Přihlaste se ke svému účtu Qvantum. Měření a ovládání používají cloudové API.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Heslo",
+          "username": "Uživatelské jméno"
         }
       },
       "modbus": {
-        "title": "Local Modbus",
-        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "title": "Místní Modbus",
+        "description": "Čte tepelné čerpadlo v místní síti. Bez přihlášení. Nejprve v aplikaci Qvantum povolte Modbus external (Instalatér → Servisní režim → Připojení). Ovládání v tomto režimu není dostupné.",
         "data": {
-          "modbus_host": "Host / IP",
+          "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_unit_id": "ID jednotky",
+          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)"
         },
         "data_description": {
-          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
-          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_host": "Název hostitele nebo IP adresa tepelného čerpadla. Výchozí je Qvantum-HP.",
+          "modbus_scan_interval": "Jak často dotazovat přes Modbus TCP. Minimum je 5 sekund. Výchozí je 15 sekund."
         }
       },
       "reconfigure": {
-        "title": "Reconfigure",
-        "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
+        "title": "Nové nastavení",
+        "description": "Přepněte mezi cloudovým HTTP a místním Modbusem nebo aktualizujte aktuální připojení.",
         "menu_options": {
           "reconfigure_cloud": "Qvantum cloud (HTTP)",
-          "reconfigure_modbus": "Local Modbus (offline)"
+          "reconfigure_modbus": "Místní Modbus (offline)"
         }
       },
       "reconfigure_cloud": {
         "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account.",
+        "description": "Přihlaste se ke svému účtu Qvantum.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Heslo",
+          "username": "Uživatelské jméno"
         }
       },
       "reconfigure_modbus": {
-        "title": "Local Modbus",
-        "description": "Enable Modbus external in the Qvantum app first. Home Assistant will probe serial and firmware on the pump.",
+        "title": "Místní Modbus",
+        "description": "Nejprve v aplikaci Qvantum povolte Modbus external. Home Assistant načte sériové číslo a firmware z čerpadla.",
         "data": {
-          "modbus_host": "Host / IP",
+          "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_unit_id": "ID jednotky",
+          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)"
         }
       }
     }
@@ -603,17 +603,17 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "HTTP scan interval (seconds)",
-          "modbus_host": "Host / IP",
+          "scan_interval": "Interval dotazování HTTP (sekundy)",
+          "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Modbus scan interval (seconds)"
+          "modbus_unit_id": "ID jednotky",
+          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)"
         },
         "data_description": {
-          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund."
         },
-        "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
-        "title": "Options"
+        "description": "Nastavení aktuálního režimu připojení. Pro přepnutí mezi cloudem a Modbusem použijte nové nastavení.",
+        "title": "Možnosti"
       }
     }
   },

@@ -532,69 +532,69 @@
   "config": {
     "title": "Qvantum lämpöpumppu",
     "abort": {
-      "already_configured": "Device is already configured",
-      "reconfigure_successful": "Reconfiguration successful"
+      "already_configured": "Laite on jo määritetty",
+      "reconfigure_successful": "Uudelleenmääritys onnistui"
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Yhdistäminen epäonnistui",
+      "invalid_auth": "Virheellinen tunnistautuminen",
+      "unknown": "Odottamaton virhe"
     },
     "step": {
       "user": {
-        "title": "Connection",
-        "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
+        "title": "Yhteys",
+        "description": "Valitse, miten Home Assistant keskustelee lämpöpumpun kanssa. Voit vaihtaa myöhemmin uudelleenmäärityksessä.",
         "menu_options": {
-          "cloud": "Qvantum cloud (HTTP)",
-          "modbus": "Local Modbus (offline)"
+          "cloud": "Qvantum-pilvi (HTTP)",
+          "modbus": "Paikallinen Modbus (offline)"
         }
       },
       "cloud": {
-        "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account. Metrics and controls use the cloud API.",
+        "title": "Qvantum-pilvi",
+        "description": "Kirjaudu Qvantum-tililläsi. Mittaukset ja ohjaukset käyttävät pilvi-API:a.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Salasana",
+          "username": "Käyttäjätunnus"
         }
       },
       "modbus": {
-        "title": "Local Modbus",
-        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "title": "Paikallinen Modbus",
+        "description": "Lukee lämpöpumpun lähiverkossa. Ei kirjautumista. Ota ensin Modbus external käyttöön Qvantum-sovelluksessa (Asentaja → Huoltotila → Yhteydet). Ohjaukset eivät ole käytettävissä tässä tilassa.",
         "data": {
-          "modbus_host": "Host / IP",
-          "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_host": "Qvantum-isäntä/IP",
+          "modbus_port": "Portti",
+          "modbus_unit_id": "Yksikkö-ID",
+          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
         },
         "data_description": {
-          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
-          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_host": "Lämpöpumpun isäntänimi tai IP-osoite. Oletus on Qvantum-HP.",
+          "modbus_scan_interval": "Kuinka usein kysely tehdään Modbus TCP:n kautta. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
         }
       },
       "reconfigure": {
-        "title": "Reconfigure",
-        "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
+        "title": "Määritä uudelleen",
+        "description": "Vaihda pilvi-HTTP:n ja paikallisen Modbusin välillä tai päivitä nykyinen yhteys.",
         "menu_options": {
-          "reconfigure_cloud": "Qvantum cloud (HTTP)",
-          "reconfigure_modbus": "Local Modbus (offline)"
+          "reconfigure_cloud": "Qvantum-pilvi (HTTP)",
+          "reconfigure_modbus": "Paikallinen Modbus (offline)"
         }
       },
       "reconfigure_cloud": {
-        "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account.",
+        "title": "Qvantum-pilvi",
+        "description": "Kirjaudu Qvantum-tililläsi.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Salasana",
+          "username": "Käyttäjätunnus"
         }
       },
       "reconfigure_modbus": {
-        "title": "Local Modbus",
-        "description": "Enable Modbus external in the Qvantum app first. Home Assistant will probe serial and firmware on the pump.",
+        "title": "Paikallinen Modbus",
+        "description": "Ota ensin Modbus external käyttöön Qvantum-sovelluksessa. Home Assistant lukee sarjanumeron ja laiteohjelmiston pumpusta.",
         "data": {
-          "modbus_host": "Host / IP",
-          "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_host": "Qvantum-isäntä/IP",
+          "modbus_port": "Portti",
+          "modbus_unit_id": "Yksikkö-ID",
+          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
         }
       }
     }
@@ -603,17 +603,17 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "HTTP scan interval (seconds)",
-          "modbus_host": "Host / IP",
-          "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Modbus scan interval (seconds)"
+          "scan_interval": "HTTP-skannausväli (sekuntia)",
+          "modbus_host": "Qvantum-isäntä/IP",
+          "modbus_port": "Portti",
+          "modbus_unit_id": "Yksikkö-ID",
+          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
         },
         "data_description": {
-          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
         },
-        "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
-        "title": "Options"
+        "description": "Nykyisen yhteystilan asetukset. Käytä uudelleenmääritystä vaihtaaksesi pilven ja Modbusin välillä.",
+        "title": "Asetukset"
       }
     }
   },

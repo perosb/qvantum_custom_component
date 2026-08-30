@@ -530,71 +530,71 @@
     }
   },
   "config": {
-    "title": "Qvantum Heat pump",
+    "title": "Qvantum Warmtepomp",
     "abort": {
-      "already_configured": "Device is already configured",
-      "reconfigure_successful": "Reconfiguration successful"
+      "already_configured": "Apparaat is al geconfigureerd",
+      "reconfigure_successful": "Herconfiguratie succesvol"
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Kan niet verbinden",
+      "invalid_auth": "Ongeldige authenticatie",
+      "unknown": "Onbekende fout"
     },
     "step": {
       "user": {
-        "title": "Connection",
-        "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
+        "title": "Verbinding",
+        "description": "Kies hoe Home Assistant met de warmtepomp communiceert. U kunt later wisselen via herconfiguratie.",
         "menu_options": {
-          "cloud": "Qvantum cloud (HTTP)",
-          "modbus": "Local Modbus (offline)"
+          "cloud": "Qvantum-cloud (HTTP)",
+          "modbus": "Lokale Modbus (offline)"
         }
       },
       "cloud": {
-        "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account. Metrics and controls use the cloud API.",
+        "title": "Qvantum-cloud",
+        "description": "Meld u aan met uw Qvantum-account. Metingen en bediening gebruiken de cloud-API.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Wachtwoord",
+          "username": "Gebruikersnaam"
         }
       },
       "modbus": {
-        "title": "Local Modbus",
-        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "title": "Lokale Modbus",
+        "description": "Leest de warmtepomp op uw LAN. Geen aanmelding. Schakel eerst Modbus external in in de Qvantum-app (Installateur → Servicemodus → Connectiviteit). Bediening is in deze modus niet beschikbaar.",
         "data": {
-          "modbus_host": "Host / IP",
-          "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_host": "Qvantum Host/IP",
+          "modbus_port": "Poort",
+          "modbus_unit_id": "Unit-ID",
+          "modbus_scan_interval": "Modbus-scaninterval (seconden)"
         },
         "data_description": {
-          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
-          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_host": "Hostnaam of IP-adres van de warmtepomp. Standaard is Qvantum-HP.",
+          "modbus_scan_interval": "Hoe vaak er via Modbus TCP wordt gepolld. Minimum is 5 seconden. Standaard is 15 seconden."
         }
       },
       "reconfigure": {
-        "title": "Reconfigure",
-        "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
+        "title": "Herconfigureren",
+        "description": "Schakel tussen cloud-HTTP en lokale Modbus, of werk de huidige verbinding bij.",
         "menu_options": {
-          "reconfigure_cloud": "Qvantum cloud (HTTP)",
-          "reconfigure_modbus": "Local Modbus (offline)"
+          "reconfigure_cloud": "Qvantum-cloud (HTTP)",
+          "reconfigure_modbus": "Lokale Modbus (offline)"
         }
       },
       "reconfigure_cloud": {
-        "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account.",
+        "title": "Qvantum-cloud",
+        "description": "Meld u aan met uw Qvantum-account.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Wachtwoord",
+          "username": "Gebruikersnaam"
         }
       },
       "reconfigure_modbus": {
-        "title": "Local Modbus",
-        "description": "Enable Modbus external in the Qvantum app first. Home Assistant will probe serial and firmware on the pump.",
+        "title": "Lokale Modbus",
+        "description": "Schakel eerst Modbus external in in de Qvantum-app. Home Assistant leest serienummer en firmware van de pomp.",
         "data": {
-          "modbus_host": "Host / IP",
-          "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_host": "Qvantum Host/IP",
+          "modbus_port": "Poort",
+          "modbus_unit_id": "Unit-ID",
+          "modbus_scan_interval": "Modbus-scaninterval (seconden)"
         }
       }
     }
@@ -603,17 +603,17 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "HTTP scan interval (seconds)",
-          "modbus_host": "Host / IP",
-          "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Modbus scan interval (seconds)"
+          "scan_interval": "HTTP-scaninterval (seconden)",
+          "modbus_host": "Qvantum Host/IP",
+          "modbus_port": "Poort",
+          "modbus_unit_id": "Unit-ID",
+          "modbus_scan_interval": "Modbus-scaninterval (seconden)"
         },
         "data_description": {
-          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_scan_interval": "Hoe vaak de warmtepomp via Modbus TCP wordt gepolld. Lagere waarden geven bijna realtime debiet- en volumenauwkeurigheid. Minimum is 5 seconden. Standaard is 15 seconden."
         },
-        "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
-        "title": "Options"
+        "description": "Instellingen voor de huidige verbindingsmodus. Gebruik herconfiguratie om te wisselen tussen cloud en Modbus.",
+        "title": "Opties"
       }
     }
   },

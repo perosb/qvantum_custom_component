@@ -44,6 +44,46 @@ class TestValidateInput:
             mock_api.close.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_validate_input_omits_missing_serial_from_title(self, hass):
+        """Title should not include (None) when the device has no serial."""
+        with patch(
+            "custom_components.qvantum.config_flow.QvantumAPI"
+        ) as mock_api_class:
+            mock_api = MagicMock()
+            mock_api_class.return_value = mock_api
+            mock_api.authenticate = AsyncMock()
+            mock_api.get_primary_device = AsyncMock(
+                return_value={"vendor": "Qvantum", "model": "QE-6"}
+            )
+            mock_api.close = AsyncMock()
+
+            result = await validate_input(
+                hass, {"username": "test@example.com", "password": "testpass"}
+            )
+
+            assert result == {"title": "Qvantum QE-6", "serial": None}
+
+    @pytest.mark.asyncio
+    async def test_validate_input_defaults_vendor_model_without_serial(self, hass):
+        """Missing vendor/model/serial should fall back to a plain Qvantum title."""
+        with patch(
+            "custom_components.qvantum.config_flow.QvantumAPI"
+        ) as mock_api_class:
+            mock_api = MagicMock()
+            mock_api_class.return_value = mock_api
+            mock_api.authenticate = AsyncMock()
+            mock_api.get_primary_device = AsyncMock(
+                return_value={"vendor": None, "model": None, "serial": None}
+            )
+            mock_api.close = AsyncMock()
+
+            result = await validate_input(
+                hass, {"username": "test@example.com", "password": "testpass"}
+            )
+
+            assert result == {"title": "Qvantum", "serial": None}
+
+    @pytest.mark.asyncio
     async def test_validate_input_auth_error(self, hass):
         """Test validate_input with authentication error."""
         from custom_components.qvantum.api import APIAuthError
@@ -328,5 +368,5 @@ class TestQvantumOptionsFlow:
         assert data["modbus_tcp"] is True
         assert data["modbus_host"] == "hp.local"
         assert data["modbus_scan_interval"] == MIN_MODBUS_SCAN_INTERVAL
-        assert "scan_interval" not in data or True
+        assert "scan_interval" not in data
 

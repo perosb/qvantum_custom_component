@@ -530,71 +530,71 @@
     }
   },
   "config": {
-    "title": "Qvantum Heat pump",
+    "title": "Pompe à chaleur Qvantum",
     "abort": {
-      "already_configured": "Device is already configured",
-      "reconfigure_successful": "Reconfiguration successful"
+      "already_configured": "L'appareil est déjà configuré",
+      "reconfigure_successful": "Reconfiguration réussie"
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Échec de connexion",
+      "invalid_auth": "Authentification invalide",
+      "unknown": "Erreur inattendue"
     },
     "step": {
       "user": {
-        "title": "Connection",
-        "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
+        "title": "Connexion",
+        "description": "Choisissez comment Home Assistant communique avec la pompe à chaleur. Vous pourrez changer plus tard via la reconfiguration.",
         "menu_options": {
-          "cloud": "Qvantum cloud (HTTP)",
-          "modbus": "Local Modbus (offline)"
+          "cloud": "Cloud Qvantum (HTTP)",
+          "modbus": "Modbus local (hors ligne)"
         }
       },
       "cloud": {
-        "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account. Metrics and controls use the cloud API.",
+        "title": "Cloud Qvantum",
+        "description": "Connectez-vous avec votre compte Qvantum. Les mesures et les commandes utilisent l'API cloud.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Mot de passe",
+          "username": "Nom d'utilisateur"
         }
       },
       "modbus": {
-        "title": "Local Modbus",
-        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "title": "Modbus local",
+        "description": "Lit la pompe à chaleur sur votre réseau local. Sans connexion. Activez d'abord Modbus external dans l'application Qvantum (Installateur → Mode service → Connectivité). Les commandes ne sont pas disponibles dans ce mode.",
         "data": {
-          "modbus_host": "Host / IP",
+          "modbus_host": "Hôte/IP Qvantum",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_unit_id": "ID d'unité",
+          "modbus_scan_interval": "Intervalle de scan Modbus (secondes)"
         },
         "data_description": {
-          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
-          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_host": "Nom d'hôte ou adresse IP de la pompe à chaleur. La valeur par défaut est Qvantum-HP.",
+          "modbus_scan_interval": "Fréquence d'interrogation via Modbus TCP. Le minimum est de 5 secondes. La valeur par défaut est de 15 secondes."
         }
       },
       "reconfigure": {
-        "title": "Reconfigure",
-        "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
+        "title": "Reconfigurer",
+        "description": "Basculez entre le HTTP cloud et le Modbus local, ou mettez à jour la connexion actuelle.",
         "menu_options": {
-          "reconfigure_cloud": "Qvantum cloud (HTTP)",
-          "reconfigure_modbus": "Local Modbus (offline)"
+          "reconfigure_cloud": "Cloud Qvantum (HTTP)",
+          "reconfigure_modbus": "Modbus local (hors ligne)"
         }
       },
       "reconfigure_cloud": {
-        "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account.",
+        "title": "Cloud Qvantum",
+        "description": "Connectez-vous avec votre compte Qvantum.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Mot de passe",
+          "username": "Nom d'utilisateur"
         }
       },
       "reconfigure_modbus": {
-        "title": "Local Modbus",
-        "description": "Enable Modbus external in the Qvantum app first. Home Assistant will probe serial and firmware on the pump.",
+        "title": "Modbus local",
+        "description": "Activez d'abord Modbus external dans l'application Qvantum. Home Assistant lira le numéro de série et le micrologiciel de la pompe.",
         "data": {
-          "modbus_host": "Host / IP",
+          "modbus_host": "Hôte/IP Qvantum",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_unit_id": "ID d'unité",
+          "modbus_scan_interval": "Intervalle de scan Modbus (secondes)"
         }
       }
     }
@@ -603,16 +603,16 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "HTTP scan interval (seconds)",
-          "modbus_host": "Host / IP",
+          "scan_interval": "Intervalle de scan HTTP (secondes)",
+          "modbus_host": "Hôte/IP Qvantum",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Modbus scan interval (seconds)"
+          "modbus_unit_id": "ID d'unité",
+          "modbus_scan_interval": "Intervalle de scan Modbus (secondes)"
         },
         "data_description": {
-          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_scan_interval": "Fréquence d'interrogation de la pompe à chaleur via Modbus TCP. Des valeurs plus basses offrent une précision quasi temps réel du débit et du volume. Minimum 5 secondes. Par défaut 15 secondes."
         },
-        "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
+        "description": "Paramètres du mode de connexion actuel. Utilisez la reconfiguration pour basculer entre le cloud et Modbus.",
         "title": "Options"
       }
     }

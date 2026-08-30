@@ -84,12 +84,17 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     try:
         await api.authenticate()
         device = await api.get_primary_device()
-        serial = device.get("serial") if isinstance(device, dict) else None
-        title = (
-            f"{device.get('vendor')} {device.get('model')} ({serial})"
-            if isinstance(device, dict)
-            else "Qvantum"
-        )
+        if isinstance(device, dict):
+            serial = device.get("serial")
+            if serial is not None:
+                serial = str(serial).strip() or None
+            vendor = str(device.get("vendor") or "").strip()
+            model = str(device.get("model") or "").strip()
+            name = " ".join(part for part in (vendor, model) if part) or "Qvantum"
+            title = f"{name} ({serial})" if serial else name
+        else:
+            serial = None
+            title = "Qvantum"
         return {"title": title, "serial": serial}
     except APIAuthError as err:
         raise InvalidAuth from err

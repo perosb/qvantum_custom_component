@@ -530,71 +530,71 @@
     }
   },
   "config": {
-    "title": "Qvantum Heat pump",
+    "title": "Qvantum hőszivattyú",
     "abort": {
-      "already_configured": "Device is already configured",
-      "reconfigure_successful": "Reconfiguration successful"
+      "already_configured": "Az eszköz már konfigurálva van",
+      "reconfigure_successful": "Újrakonfigurálás sikeres"
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Sikertelen csatlakozás",
+      "invalid_auth": "Érvénytelen hitelesítés",
+      "unknown": "Váratlan hiba"
     },
     "step": {
       "user": {
-        "title": "Connection",
-        "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
+        "title": "Kapcsolat",
+        "description": "Válassza ki, hogyan kommunikáljon a Home Assistant a hőszivattyúval. Később az újrakonfigurálással válthat.",
         "menu_options": {
-          "cloud": "Qvantum cloud (HTTP)",
-          "modbus": "Local Modbus (offline)"
+          "cloud": "Qvantum felhő (HTTP)",
+          "modbus": "Helyi Modbus (offline)"
         }
       },
       "cloud": {
-        "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account. Metrics and controls use the cloud API.",
+        "title": "Qvantum felhő",
+        "description": "Jelentkezzen be Qvantum-fiókjával. A mérések és a vezérlés a felhő API-t használja.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Jelszó",
+          "username": "Felhasználónév"
         }
       },
       "modbus": {
-        "title": "Local Modbus",
-        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "title": "Helyi Modbus",
+        "description": "A hőszivattyút a helyi hálózaton olvassa. Nincs bejelentkezés. Először engedélyezze a Modbus external funkciót a Qvantum alkalmazásban (Telepítő → Szerviz mód → Kapcsolódás). A vezérlés ebben a módban nem érhető el.",
         "data": {
-          "modbus_host": "Host / IP",
+          "modbus_host": "Qvantum Hoszt/IP",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_unit_id": "Egységazonosító",
+          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)"
         },
         "data_description": {
-          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
-          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_host": "A hőszivattyú gépneve vagy IP-címe. Az alapértelmezett a Qvantum-HP.",
+          "modbus_scan_interval": "Milyen gyakran kérdezzen le Modbus TCP-n. A minimum 5 másodperc. Az alapértelmezett 15 másodperc."
         }
       },
       "reconfigure": {
-        "title": "Reconfigure",
-        "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
+        "title": "Újrakonfigurálás",
+        "description": "Váltson a felhő HTTP és a helyi Modbus között, vagy frissítse az aktuális kapcsolatot.",
         "menu_options": {
-          "reconfigure_cloud": "Qvantum cloud (HTTP)",
-          "reconfigure_modbus": "Local Modbus (offline)"
+          "reconfigure_cloud": "Qvantum felhő (HTTP)",
+          "reconfigure_modbus": "Helyi Modbus (offline)"
         }
       },
       "reconfigure_cloud": {
-        "title": "Qvantum cloud",
-        "description": "Sign in with your Qvantum account.",
+        "title": "Qvantum felhő",
+        "description": "Jelentkezzen be Qvantum-fiókjával.",
         "data": {
-          "password": "Password",
-          "username": "Username"
+          "password": "Jelszó",
+          "username": "Felhasználónév"
         }
       },
       "reconfigure_modbus": {
-        "title": "Local Modbus",
-        "description": "Enable Modbus external in the Qvantum app first. Home Assistant will probe serial and firmware on the pump.",
+        "title": "Helyi Modbus",
+        "description": "Először engedélyezze a Modbus external funkciót a Qvantum alkalmazásban. A Home Assistant beolvassa a szivattyú sorozatszámát és firmware-ét.",
         "data": {
-          "modbus_host": "Host / IP",
+          "modbus_host": "Qvantum Hoszt/IP",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_unit_id": "Egységazonosító",
+          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)"
         }
       }
     }
@@ -603,17 +603,17 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "HTTP scan interval (seconds)",
-          "modbus_host": "Host / IP",
+          "scan_interval": "HTTP lekérdezési időköz (másodperc)",
+          "modbus_host": "Qvantum Hoszt/IP",
           "modbus_port": "Port",
-          "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Modbus scan interval (seconds)"
+          "modbus_unit_id": "Egységazonosító",
+          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)"
         },
         "data_description": {
-          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_scan_interval": "Milyen gyakran kérdezze le a hőszivattyút Modbus TCP-n. Az alacsonyabb értékek közel valós idejű áramlás- és térfogatpontosságot adnak. Minimum 5 másodperc. Alapértelmezett 15 másodperc."
         },
-        "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
-        "title": "Options"
+        "description": "Az aktuális kapcsolódási mód beállításai. A felhő és a Modbus közötti váltáshoz használja az újrakonfigurálást.",
+        "title": "Beállítások"
       }
     }
   },
