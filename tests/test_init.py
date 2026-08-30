@@ -97,6 +97,16 @@ class TestIntegrationSetup:
     """Test the integration setup functions."""
 
     @pytest.mark.asyncio
+    async def test_async_setup_entry_cloud_requires_credentials(
+        self, hass, mock_config_entry
+    ):
+        """Cloud setup must fail fast when username or password is missing."""
+        mock_config_entry.data = {}
+        mock_config_entry.options = {}
+        with pytest.raises(KeyError):
+            await async_setup_entry(hass, mock_config_entry)
+
+    @pytest.mark.asyncio
     async def test_async_setup_entry_success(
         self, hass, mock_config_entry, mock_api, mock_coordinator
     ):

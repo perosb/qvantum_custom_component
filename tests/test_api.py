@@ -114,8 +114,10 @@ class TestQvantumAPI:
         assert result["metrics"]["latency"] == metrics_data["total_latency"]
 
     @pytest.mark.asyncio
-    async def test_get_metrics_modbus_tcp_failure_fallback_http(self, mock_session):
-        """Modbus TCP failures should fall back to HTTP when explicitly enabled."""
+    async def test_get_metrics_modbus_tcp_failure_does_not_use_http(self, mock_session):
+        """Modbus TCP failures must not fall back to HTTP."""
+        from custom_components.qvantum.api import APIConnectionError
+
         api = QvantumAPI(
             "test@example.com",
             "password",
@@ -123,26 +125,16 @@ class TestQvantumAPI:
             session=mock_session,
             modbus_tcp=True,
         )
-        api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
-
-        cm, mock_response = mock_session.make_cm_response(
-            status=200,
-            json_data={"values": {"bt1": 123}, "total_latency": 10},
-            headers={"ETag": "etag123"},
-        )
-        mock_session.get.return_value = cm
 
         with patch.object(
             QvantumAPI,
             "_read_modbus_metrics",
-            AsyncMock(side_effect=Exception("modbus not reachable")),
+            AsyncMock(side_effect=APIConnectionError(None, "modbus not reachable")),
         ):
-            result = await api.get_metrics("test_device_123", enabled_metrics=["bt1"])
+            with pytest.raises(APIConnectionError, match="modbus not reachable"):
+                await api.get_metrics("test_device_123", enabled_metrics=["bt1"])
 
-        assert "metrics" in result
-        assert result["metrics"]["bt1"] == 123
-        assert mock_session.get.called
+        mock_session.get.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_get_metrics_modbus_sets_latency_ms(self, mock_session):
@@ -317,6 +309,46 @@ class TestQvantumAPI:
         mock_session.post.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_modbus_mode_does_not_open_http_session(self):
+        """Modbus-only clients must not construct an aiohttp session."""
+        with patch("aiohttp.ClientSession") as mock_session_class:
+            api = QvantumAPI(modbus_tcp=True, user_agent="test-agent")
+        mock_session_class.assert_not_called()
+        assert api._session is None
+
+    @pytest.mark.asyncio
+    async def test_modbus_mode_discards_injected_http_session(self, mock_session):
+        """An injected aiohttp session must not be kept in Modbus-only mode."""
+        api = QvantumAPI(
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
+        )
+        assert api._session is None
+        assert api._session_owner is False
+
+    @pytest.mark.asyncio
+    async def test_async_probe_identity(self):
+        api = QvantumAPI(modbus_tcp=True, user_agent="test-agent")
+        _connection, device = attach_mock_modbus(api)
+        api._modbus_unit.input[180] = 12
+        api._modbus_unit.input[181] = 3
+        api._modbus_unit.input[182] = 45
+        api._modbus_unit.input[183] = 6
+        api._modbus_unit.input[184] = 7
+        api._modbus_unit.input[191] = 1
+        api._modbus_unit.input[192] = 7
+        api._modbus_unit.input[193] = 22
+
+        result = await api.async_probe_identity()
+        assert result["id"] == "12003045006007"
+        assert result["serial"] == "12003045006007"
+        assert result["vendor"] == "Qvantum"
+        assert result["sw_version"] == "1.7.22"
+
+    @pytest.mark.asyncio
     async def test_get_metrics_modbus_cancel_does_not_http_fallback(self, mock_session):
         """Cancelled Modbus polls must not fall back to HTTP (reload race)."""
         api = QvantumAPI(
@@ -367,18 +399,12 @@ class TestQvantumAPI:
         mock_session.get.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_get_metrics_shared_connection_closed_falls_back_to_http(
+    async def test_get_metrics_shared_connection_closed_does_not_use_http(
         self, mock_session
     ):
-        """A closed borrowed Modbus link must still fall back to HTTP."""
+        """A closed borrowed Modbus link must not fall back to HTTP."""
+        from custom_components.qvantum.api import APIConnectionError
         from modbus_connection import ClientClosedError
-
-        cm, mock_response = mock_session.make_cm_response(
-            status=200,
-            json_data={"values": {"bt1": 123}, "total_latency": 10},
-            headers={"ETag": "etag123"},
-        )
-        mock_session.get.return_value = cm
 
         api = QvantumAPI(
             "test@example.com",
@@ -387,8 +413,6 @@ class TestQvantumAPI:
             session=mock_session,
             modbus_tcp=True,
         )
-        api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
         _connection, device = attach_mock_modbus(api)
 
         async def closed_update():
@@ -396,10 +420,10 @@ class TestQvantumAPI:
 
         device.async_update_inputs = closed_update
 
-        result = await api.get_metrics("test_device", enabled_metrics=["bt1"])
+        with pytest.raises(APIConnectionError, match="Modbus communication failed"):
+            await api.get_metrics("test_device", enabled_metrics=["bt1"])
 
-        assert result["metrics"]["bt1"] == 123
-        assert mock_session.get.called
+        mock_session.get.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_close_waits_for_in_flight_modbus_lock(self):
@@ -1127,13 +1151,8 @@ class TestQvantumAPI:
 
     @pytest.mark.asyncio
     async def test_get_metrics_modbus_connection_failure(self, mock_session):
-        """Test Modbus connection failure falls back to HTTP."""
-        cm, mock_response = mock_session.make_cm_response(
-            status=200,
-            json_data={"values": {"bt1": 123}, "total_latency": 10},
-            headers={"ETag": "etag123"},
-        )
-        mock_session.get.return_value = cm
+        """Modbus connection failure must not fall back to HTTP."""
+        from custom_components.qvantum.api import APIConnectionError
 
         api = QvantumAPI(
             "test@example.com",
@@ -1142,16 +1161,13 @@ class TestQvantumAPI:
             session=mock_session,
             modbus_tcp=True,
         )
-        api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
         _connection, device = attach_mock_modbus(api)
         device.unit.fail_requests(ModbusConnectionError())
 
-        result = await api.get_metrics("test_device", enabled_metrics=["bt1"])
+        with pytest.raises(APIConnectionError, match="Modbus communication failed"):
+            await api.get_metrics("test_device", enabled_metrics=["bt1"])
 
-        assert "metrics" in result
-        assert result["metrics"]["bt1"] == 123
-        assert mock_session.get.called
+        mock_session.get.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_get_settings_modbus(self, mock_session):

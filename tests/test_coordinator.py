@@ -1,5 +1,6 @@
 """Tests for Qvantum coordinator functions."""
 
+import asyncio
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -548,7 +549,9 @@ class TestQvantumDataUpdateCoordinator:
         mock_super_init.return_value = None
 
         mock_api = MagicMock()
-        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.async_probe_identity = AsyncMock(
+            return_value={"id": "test_device_123"}
+        )
         mock_api.get_metrics = AsyncMock(
             return_value={
                 "metrics": {
@@ -596,19 +599,16 @@ class TestQvantumDataUpdateCoordinator:
 
         assert result == {"a": 1}
 
-    @patch("custom_components.qvantum.coordinator.dt_util.utcnow")
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
-    async def test_modbus_fetches_tap_stop_when_extra_tap_water_on(
-        self, mock_super_init, mock_utcnow
-    ):
-        """Test that tap_stop is fetched via HTTP when extra_tap_water is on in Modbus mode."""
+    async def test_modbus_never_fetches_tap_stop_via_http(self, mock_super_init):
+        """Modbus mode must not poll tap_stop over HTTP."""
         mock_super_init.return_value = None
-        fixed_now = datetime(2026, 4, 4, 12, 0, 0, tzinfo=timezone.utc)
-        mock_utcnow.return_value = fixed_now
 
         mock_api = MagicMock()
-        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.async_probe_identity = AsyncMock(
+            return_value={"id": "test_device_123"}
+        )
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123"}}
         )
@@ -637,110 +637,8 @@ class TestQvantumDataUpdateCoordinator:
 
         result = await coordinator.async_update_data()
 
-        mock_api.get_http_metrics.assert_called_once_with(
-            "test_device_123", ["tap_stop"]
-        )
-        assert result["values"]["tap_stop"] == 9999
-        assert coordinator._last_tap_stop_fetch == fixed_now
-
-    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
-    @pytest.mark.asyncio
-    async def test_modbus_uses_cached_tap_stop_within_poll_interval(
-        self, mock_super_init
-    ):
-        """Test that the cached tap_stop value is returned when within the poll interval."""
-        mock_super_init.return_value = None
-
-        mock_api = MagicMock()
-        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
-        mock_api.get_metrics = AsyncMock(
-            return_value={"metrics": {"hpid": "test_device_123"}}
-        )
-        mock_api.get_settings = AsyncMock(
-            return_value={"settings": [{"name": "extra_tap_water", "value": "on"}]}
-        )
-        mock_api.get_http_metrics = AsyncMock(
-            return_value={"metrics": {"tap_stop": 9999}}
-        )
-
-        mock_hass = MagicMock()
-        mock_hass.data = {
-            DOMAIN: mock_api,
-            "device_registry": MagicMock(),
-            "entity_registry": MagicMock(),
-        }
-
-        mock_config_entry = MagicMock()
-        mock_config_entry.options.get.side_effect = _modbus_options_get
-        mock_config_entry.data = {}
-        mock_config_entry.unique_id = "test_device_123"
-
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
-        coordinator.hass = mock_hass
-
-        # First call: fetches from HTTP and caches
-        result1 = await coordinator.async_update_data()
-        assert result1["values"]["tap_stop"] == 9999
-        mock_api.get_http_metrics.assert_called_once()
-
-        # Second call within interval: should NOT fetch again but still return cached value
-        result2 = await coordinator.async_update_data()
-        assert result2["values"]["tap_stop"] == 9999
-        mock_api.get_http_metrics.assert_called_once()  # still only one call total
-
-    @patch("custom_components.qvantum.coordinator.dt_util.utcnow")
-    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
-    @pytest.mark.asyncio
-    async def test_modbus_refetches_tap_stop_after_interval_elapsed(
-        self, mock_super_init, mock_utcnow
-    ):
-        """Test that tap_stop is re-fetched after DEFAULT_SCAN_INTERVAL seconds have elapsed."""
-        mock_super_init.return_value = None
-        fixed_now = datetime(2026, 4, 4, 12, 0, 0, tzinfo=timezone.utc)
-        mock_utcnow.return_value = fixed_now
-
-        mock_api = MagicMock()
-        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
-        mock_api.get_metrics = AsyncMock(
-            return_value={"metrics": {"hpid": "test_device_123"}}
-        )
-        mock_api.get_settings = AsyncMock(
-            return_value={"settings": [{"name": "extra_tap_water", "value": "on"}]}
-        )
-        mock_api.get_http_metrics = AsyncMock(
-            return_value={"metrics": {"tap_stop": 7777}}
-        )
-
-        mock_hass = MagicMock()
-        mock_hass.data = {
-            DOMAIN: mock_api,
-            "device_registry": MagicMock(),
-            "entity_registry": MagicMock(),
-        }
-
-        mock_config_entry = MagicMock()
-        mock_config_entry.options.get.side_effect = _modbus_options_get
-        mock_config_entry.data = {}
-        mock_config_entry.unique_id = "test_device_123"
-
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
-        coordinator.hass = mock_hass
-
-        # Simulate a previous fetch older than DEFAULT_SCAN_INTERVAL
-        coordinator._last_tap_stop_fetch = fixed_now - timedelta(
-            seconds=DEFAULT_SCAN_INTERVAL + 1
-        )
-        coordinator._cached_tap_stop = 1234  # stale cached value
-
-        result = await coordinator.async_update_data()
-
-        mock_api.get_http_metrics.assert_called_once_with(
-            "test_device_123", ["tap_stop"]
-        )
-        assert result["values"]["tap_stop"] == 7777
-        assert coordinator._last_tap_stop_fetch == fixed_now
+        mock_api.get_http_metrics.assert_not_called()
+        assert "tap_stop" not in result["values"]
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
@@ -751,7 +649,9 @@ class TestQvantumDataUpdateCoordinator:
         mock_super_init.return_value = None
 
         mock_api = MagicMock()
-        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.async_probe_identity = AsyncMock(
+            return_value={"id": "test_device_123"}
+        )
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123"}}
         )
@@ -789,7 +689,9 @@ class TestQvantumDataUpdateCoordinator:
         mock_super_init.return_value = None
 
         mock_api = MagicMock()
-        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.async_probe_identity = AsyncMock(
+            return_value={"id": "test_device_123"}
+        )
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123"}}
         )
@@ -824,6 +726,9 @@ class TestHpStatusPostProcessing:
         mock_super_init.return_value = None
 
         mock_api = MagicMock()
+        mock_api.async_probe_identity = AsyncMock(
+            return_value={"id": "test_device_123"}
+        )
         mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
         mock_api.get_metrics = AsyncMock(return_value={"metrics": metrics})
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
@@ -3177,6 +3082,14 @@ class TestDeviceLookupWhenHttpDown:
     def _make_coordinator(self, mock_super_init, *, modbus: bool):
         mock_super_init.return_value = None
         mock_api = MagicMock()
+        mock_api.async_probe_identity = AsyncMock(
+            return_value={
+                "id": "test_device_123",
+                "serial": "test_device_123",
+                "vendor": "Qvantum",
+            }
+        )
+        mock_api.get_primary_device = AsyncMock()
         mock_hass = MagicMock()
         mock_hass.data = {
             DOMAIN: mock_api,
@@ -3229,7 +3142,7 @@ class TestDeviceLookupWhenHttpDown:
     async def test_uses_device_registry_when_http_down(self, mock_super_init):
         """After a restart with no store file, fall back to the device registry."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
-        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+        mock_api.async_probe_identity = AsyncMock(side_effect=Exception("probe failed"))
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123"}}
         )
@@ -3254,7 +3167,7 @@ class TestDeviceLookupWhenHttpDown:
 
         assert result["device"]["id"] == "test_device_123"
         assert result["device"]["device_metadata"]["display_fw_version"] == "1.3.6"
-        mock_api.get_primary_device.assert_awaited()
+        mock_api.get_primary_device.assert_not_called()
         coordinator._device_store.async_save.assert_awaited()
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
@@ -3273,21 +3186,22 @@ class TestDeviceLookupWhenHttpDown:
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
-    async def test_persists_device_after_successful_http_lookup(self, mock_super_init):
-        """A successful HTTP lookup is stored for later Modbus-only startups."""
+    async def test_persists_device_after_successful_probe(self, mock_super_init):
+        """A successful Modbus identity probe is stored for later startups."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
         device = {
-            "id": "test_device_123",
+            "id": "12003045006007",
+            "serial": "12003045006007",
             "vendor": "Qvantum",
-            "model": "QE-6",
-            "device_metadata": {"display_fw_version": "1.3.6"},
+            "sw_version": "1.7.22",
         }
-        mock_api.get_primary_device = AsyncMock(return_value=device)
+        mock_api.async_probe_identity = AsyncMock(return_value=device)
         mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
 
         await coordinator.async_update_data()
 
+        mock_api.get_primary_device.assert_not_called()
         coordinator._device_store.async_save.assert_awaited_once_with(
             {"username": "test@example.com", "device": device}
         )
@@ -3362,17 +3276,17 @@ class TestDeviceLookupWhenHttpDown:
         )
         device = {
             "id": "new_device",
+            "serial": "new_device",
             "vendor": "Qvantum",
-            "model": "QE-6",
-            "device_metadata": {"display_fw_version": "1.3.6"},
         }
-        mock_api.get_primary_device = AsyncMock(return_value=device)
+        mock_api.async_probe_identity = AsyncMock(return_value=device)
         mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
 
         result = await coordinator.async_update_data()
 
-        mock_api.get_primary_device.assert_awaited()
+        mock_api.get_primary_device.assert_not_called()
+        mock_api.async_probe_identity.assert_awaited()
         assert result["device"]["id"] == "new_device"
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
@@ -3390,7 +3304,7 @@ class TestDeviceLookupWhenHttpDown:
                 "device": {"id": "old_device", "model": "QE-6"},
             }
         )
-        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+        mock_api.async_probe_identity = AsyncMock(side_effect=Exception("probe failed"))
 
         ha_device = MagicMock()
         ha_device.config_entries = {"test_entry_id"}
@@ -3424,7 +3338,7 @@ class TestDeviceLookupWhenHttpDown:
         coordinator._device_store.async_load = AsyncMock(
             return_value={"id": "test_device_123", "model": "QE-6"}
         )
-        mock_api.get_primary_device = AsyncMock(side_effect=Exception("HTTP API down"))
+        mock_api.async_probe_identity = AsyncMock(side_effect=Exception("probe failed"))
         mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
 
@@ -3451,21 +3365,21 @@ class TestDeviceLookupWhenHttpDown:
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
     async def test_load_cached_device_swallows_store_errors(self, mock_super_init):
-        """A corrupted device store must not prevent an HTTP lookup."""
+        """A corrupted device store must not prevent a Modbus-only update."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
         coordinator._device_store.async_load = AsyncMock(side_effect=OSError("disk"))
-        device = {"id": "test_device_123", "device_metadata": {"display_fw_version": "1"}}
-        mock_api.get_primary_device = AsyncMock(return_value=device)
         mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
 
         result = await coordinator.async_update_data()
 
+        mock_api.get_primary_device.assert_not_called()
         assert result["device"]["id"] == "test_device_123"
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
-    async def test_persist_device_skips_without_username_or_id(self, mock_super_init):
+    async def test_persist_device_saves_unbound_payload_without_username(self, mock_super_init):
+        """Missing username still persists device identity without an account binding."""
         coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
         coordinator._device = {}
         await coordinator._persist_device_state()
@@ -3474,7 +3388,21 @@ class TestDeviceLookupWhenHttpDown:
         coordinator._device = {"id": "test_device_123"}
         coordinator._config_entry.data = {"username": ""}
         await coordinator._persist_device_state()
-        coordinator._device_store.async_save.assert_not_called()
+        coordinator._device_store.async_save.assert_awaited_once_with(
+            {"device": {"id": "test_device_123"}}
+        )
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_modbus_identity_probe_propagates_cancellation(self, mock_super_init):
+        """Task cancellation during identity probe must abort the update."""
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
+        mock_api.async_probe_identity = AsyncMock(side_effect=asyncio.CancelledError())
+
+        with pytest.raises(asyncio.CancelledError):
+            await coordinator._ensure_device()
+
+        mock_api.get_primary_device.assert_not_called()
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio

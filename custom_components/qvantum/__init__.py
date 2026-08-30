@@ -152,13 +152,17 @@ class RuntimeData:
 async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
     """Set up Qvantum Heat Pump Integration from a config entry."""
 
-    username = config_entry.data[CONF_USERNAME]
-    password = config_entry.data[CONF_PASSWORD]
     user_agent = f"Home Assistant/{MAJOR_VERSION}.{MINOR_VERSION}.{PATCH_VERSION} Qvantum/{VERSION}"
 
     modbus_enabled, modbus_host, modbus_port, modbus_unit_id = _modbus_link_settings(
         config_entry
     )
+    if modbus_enabled:
+        username = None
+        password = None
+    else:
+        username = config_entry.data[CONF_USERNAME]
+        password = config_entry.data[CONF_PASSWORD]
     try:
         modbus_unit = _async_modbus_unit(hass, config_entry)
     except HomeAssistantError as err:
@@ -168,8 +172,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         ) from err
 
     hass.data[DOMAIN] = QvantumAPI(
-        username=username,
-        password=password,
+        username=None if modbus_enabled else username,
+        password=None if modbus_enabled else password,
         user_agent=user_agent,
         modbus_tcp=modbus_enabled,
         modbus_host=modbus_host,
@@ -211,7 +215,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         translation_key="qvantum_flvp",
         name="Qvantum",
         serial_number=device_data.get("serial"),
-        sw_version=_device_sw_version(device_metadata),
+        sw_version=device_data.get("sw_version")
+        or _device_sw_version(device_metadata),
     )
 
     # Only register the service if it hasn't been registered yet
@@ -222,22 +227,18 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     maintenance_coordinator = QvantumMaintenanceCoordinator(
         hass, config_entry, coordinator
     )
-    try:
-        await asyncio.wait_for(
-            maintenance_coordinator.async_config_entry_first_refresh(),
-            timeout=HTTP_CLOUD_LOOKUP_TIMEOUT,
-        )
-    except (ConfigEntryNotReady, asyncio.TimeoutError) as err:
-        if not modbus_enabled:
+    if not modbus_enabled:
+        try:
+            await asyncio.wait_for(
+                maintenance_coordinator.async_config_entry_first_refresh(),
+                timeout=HTTP_CLOUD_LOOKUP_TIMEOUT,
+            )
+        except (ConfigEntryNotReady, asyncio.TimeoutError) as err:
             if isinstance(err, asyncio.TimeoutError):
                 raise ConfigEntryNotReady(
                     "Firmware/access check timed out"
                 ) from err
             raise
-        _LOGGER.warning(
-            "Cloud API unavailable during firmware/access check; continuing with local Modbus: %s",
-            err,
-        )
 
     remove_listener = config_entry.add_update_listener(_async_update_listener)
     config_entry.async_on_unload(remove_listener)
