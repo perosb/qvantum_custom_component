@@ -25,6 +25,7 @@ def mock_coordinator():
     coordinator.api = MagicMock()
     coordinator.api.set_extra_tap_water = AsyncMock(return_value={"status": "APPLIED"})
     coordinator.api.elevate_access = AsyncMock(return_value={"writeAccessLevel": 30})
+    coordinator.modbus_enabled = False
 
     # Mock config_entry and runtime_data for access level check
     config_entry = MagicMock()
@@ -150,6 +151,25 @@ class TestQvantumButtonEntity:
         assert "Failed to elevate access" in caplog.text
         # Verify maintenance coordinator is not refreshed on failure
         mock_maintenance_coordinator.async_refresh.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_async_press_elevate_access_noop_in_modbus_mode(
+        self, mock_coordinator, mock_device, mock_maintenance_coordinator
+    ):
+        """Service press of elevate_access must not call HTTP in Modbus mode."""
+        mock_coordinator.modbus_enabled = True
+        button = QvantumButtonEntity(
+            mock_coordinator,
+            "elevate_access",
+            mock_device,
+            mock_maintenance_coordinator,
+        )
+
+        await button.async_press()
+
+        mock_coordinator.api.elevate_access.assert_not_called()
+        mock_maintenance_coordinator.async_refresh.assert_not_called()
+        mock_coordinator.async_refresh.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_setup_entry(
