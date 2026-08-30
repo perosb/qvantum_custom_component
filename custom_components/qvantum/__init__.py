@@ -128,7 +128,7 @@ async def _async_sync_extra_hot_water_service(
         if getattr(entry, "entry_id", None) != skip_entry_id
     ]
     registered = bool(hass.services.has_service(DOMAIN, "extra_hot_water"))
-    if remaining or skip_entry_id is None:
+    if remaining:
         if not registered:
             await async_setup_services(hass)
         return
@@ -355,10 +355,15 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
 
     api = getattr(runtime.coordinator, "api", None)
     if api is not None:
-        api._modbus_write = bool(
+        write_enabled = bool(
             getattr(api, "_modbus_tcp", False)
             and _modbus_write_enabled(config_entry)
         )
+        if getattr(api, "_modbus_write", False) and not write_enabled:
+            cancel = getattr(api, "_cancel_extra_dhw_timer", None)
+            if callable(cancel):
+                cancel()
+        api._modbus_write = write_enabled
 
     changed = runtime.coordinator.apply_poll_interval(config_entry)
     if changed:
