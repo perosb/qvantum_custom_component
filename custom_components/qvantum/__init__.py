@@ -132,9 +132,14 @@ def _any_cloud_qvantum_entry(
 async def _async_sync_extra_hot_water_service(
     hass: HomeAssistant, *, skip_entry_id: str | None = None
 ) -> None:
-    """Register extra_hot_water for cloud entries; remove it when none remain."""
+    """Keep extra_hot_water registered while any Qvantum entry is loaded."""
+    remaining = [
+        entry
+        for entry in _qvantum_entries(hass)
+        if getattr(entry, "entry_id", None) != skip_entry_id
+    ]
     registered = bool(hass.services.has_service(DOMAIN, "extra_hot_water"))
-    if _any_cloud_qvantum_entry(hass, skip_entry_id=skip_entry_id):
+    if remaining or skip_entry_id is None:
         if not registered:
             await async_setup_services(hass)
         return

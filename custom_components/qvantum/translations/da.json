@@ -559,16 +559,18 @@
       },
       "modbus": {
         "title": "Lokal Modbus",
-        "description": "Læser varmepumpen på dit lokale netværk. Ingen login. Aktivér først Modbus external i Qvantum-appen (Installatør → Servicetilstand → Tilslutning). Styring er ikke tilgængelig i denne tilstand.",
+        "description": "Læser varmepumpen på dit lokale netværk. Ingen login. Aktivér først Modbus external i Qvantum-appen (Installatør → Servicetilstand → Tilslutning). Styring forbliver utilgængelig, medmindre du aktiverer skrivning via Modbus. SmartControl og elevate-access forbliver kun i skyen.",
         "data": {
           "modbus_host": "Qvantum vært/IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Enheds-ID",
-          "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)"
+          "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)",
+          "modbus_write": "Aktivér skrivning via Modbus"
         },
         "data_description": {
           "modbus_host": "Værtsnavn eller IP-adresse på varmepumpen. Standard er Qvantum-HP.",
-          "modbus_scan_interval": "Hvor ofte der forespørges over Modbus TCP. Minimum er 5 sekunder. Standard er 15 sekunder."
+          "modbus_scan_interval": "Hvor ofte der forespørges over Modbus TCP. Minimum er 5 sekunder. Standard er 15 sekunder.",
+          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne."
         }
       },
       "reconfigure": {
@@ -594,7 +596,8 @@
           "modbus_host": "Qvantum vært/IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Enheds-ID",
-          "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)"
+          "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)",
+          "modbus_write": "Aktivér skrivning via Modbus"
         }
       }
     }
@@ -607,10 +610,12 @@
           "modbus_host": "Qvantum vært/IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Enheds-ID",
-          "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)"
+          "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)",
+          "modbus_write": "Aktivér skrivning via Modbus"
         },
         "data_description": {
-          "modbus_scan_interval": "Hvor ofte varmepumpen skal forespørges over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder."
+          "modbus_scan_interval": "Hvor ofte varmepumpen skal forespørges over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder.",
+          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne."
         },
         "description": "Indstillinger for den aktuelle forbindelsestilstand. Brug genkonfiguration til at skifte mellem sky og Modbus.",
         "title": "Indstillinger"

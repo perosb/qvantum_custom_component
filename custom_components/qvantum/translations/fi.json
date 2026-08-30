@@ -559,16 +559,18 @@
       },
       "modbus": {
         "title": "Paikallinen Modbus",
-        "description": "Lukee lämpöpumpun lähiverkossa. Ei kirjautumista. Ota ensin Modbus external käyttöön Qvantum-sovelluksessa (Asentaja → Huoltotila → Yhteydet). Ohjaukset eivät ole käytettävissä tässä tilassa.",
+        "description": "Lukee lämpöpumpun lähiverkossa. Ei kirjautumista. Ota ensin Modbus external käyttöön Qvantum-sovelluksessa (Asentaja → Huoltotila → Yhteydet). Ohjaukset pysyvät poissa käytöstä, ellet ota Modbus-kirjoitusta käyttöön. SmartControl ja elevate-access pysyvät vain pilvessä.",
         "data": {
           "modbus_host": "Qvantum-isäntä/IP",
           "modbus_port": "Portti",
           "modbus_unit_id": "Yksikkö-ID",
-          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
+          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)",
+          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta"
         },
         "data_description": {
           "modbus_host": "Lämpöpumpun isäntänimi tai IP-osoite. Oletus on Qvantum-HP.",
-          "modbus_scan_interval": "Kuinka usein kysely tehdään Modbus TCP:n kautta. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
+          "modbus_scan_interval": "Kuinka usein kysely tehdään Modbus TCP:n kautta. Minimi on 5 sekuntia. Oletus on 15 sekuntia.",
+          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn."
         }
       },
       "reconfigure": {
@@ -594,7 +596,8 @@
           "modbus_host": "Qvantum-isäntä/IP",
           "modbus_port": "Portti",
           "modbus_unit_id": "Yksikkö-ID",
-          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
+          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)",
+          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta"
         }
       }
     }
@@ -607,10 +610,12 @@
           "modbus_host": "Qvantum-isäntä/IP",
           "modbus_port": "Portti",
           "modbus_unit_id": "Yksikkö-ID",
-          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)"
+          "modbus_scan_interval": "Modbus-skannausväli (sekuntia)",
+          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta"
         },
         "data_description": {
-          "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia."
+          "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia.",
+          "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn."
         },
         "description": "Nykyisen yhteystilan asetukset. Käytä uudelleenmääritystä vaihtaaksesi pilven ja Modbusin välillä.",
         "title": "Asetukset"

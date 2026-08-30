@@ -559,16 +559,18 @@
       },
       "modbus": {
         "title": "Lokalny Modbus",
-        "description": "Odczytuje pompę ciepła w sieci lokalnej. Bez logowania. Najpierw włącz Modbus external w aplikacji Qvantum (Instalator → Tryb serwisowy → Łączność). Sterowanie jest w tym trybie niedostępne.",
+        "description": "Odczytuje pompę ciepła w sieci lokalnej. Bez logowania. Najpierw włącz Modbus external w aplikacji Qvantum (Instalator → Tryb serwisowy → Łączność). Sterowanie pozostaje niedostępne, dopóki nie włączysz zapisu przez Modbus. SmartControl i elevate-access pozostają wyłącznie w chmurze.",
         "data": {
           "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
           "modbus_unit_id": "ID jednostki",
-          "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)"
+          "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)",
+          "modbus_write": "Włącz zapis przez Modbus"
         },
         "data_description": {
           "modbus_host": "Nazwa hosta lub adres IP pompy ciepła. Domyślnie Qvantum-HP.",
-          "modbus_scan_interval": "Jak często odpytywać przez Modbus TCP. Minimum to 5 sekund. Domyślnie 15 sekund."
+          "modbus_scan_interval": "Jak często odpytywać przez Modbus TCP. Minimum to 5 sekund. Domyślnie 15 sekund.",
+          "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu."
         }
       },
       "reconfigure": {
@@ -594,7 +596,8 @@
           "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
           "modbus_unit_id": "ID jednostki",
-          "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)"
+          "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)",
+          "modbus_write": "Włącz zapis przez Modbus"
         }
       }
     }
@@ -607,10 +610,12 @@
           "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
           "modbus_unit_id": "ID jednostki",
-          "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)"
+          "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)",
+          "modbus_write": "Włącz zapis przez Modbus"
         },
         "data_description": {
-          "modbus_scan_interval": "Jak często odpytywać pompę ciepła przez Modbus TCP. Niższe wartości dają prawie rzeczywistą dokładność przepływu i objętości. Minimum to 5 sekund. Domyślnie 15 sekund."
+          "modbus_scan_interval": "Jak często odpytywać pompę ciepła przez Modbus TCP. Niższe wartości dają prawie rzeczywistą dokładność przepływu i objętości. Minimum to 5 sekund. Domyślnie 15 sekund.",
+          "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu."
         },
         "description": "Ustawienia bieżącego trybu połączenia. Użyj rekonfiguracji, aby przełączyć między chmurą a Modbusem.",
         "title": "Opcje"

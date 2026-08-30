@@ -21,12 +21,14 @@ def test_has_write_access_maintenance_entity():
 
 
 def test_has_write_access_denied_in_modbus_mode():
-    """Modbus mode has no writes in this phase, even if cloud access is missing."""
+    """Modbus writes stay off until the option is enabled."""
     from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
 
     coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
     coordinator.modbus_enabled = True
     coordinator.config_entry = MagicMock()
+    coordinator.config_entry.options = {}
+    coordinator.config_entry.data = {}
     coordinator.config_entry.runtime_data = MagicMock()
     coordinator.config_entry.runtime_data.maintenance_coordinator = None
 
@@ -39,6 +41,45 @@ def test_has_write_access_denied_in_modbus_mode():
             return True
 
     entity = DummyModbusWriteEntity(coordinator)
+    assert entity._has_write_access is False
+
+
+def test_has_write_access_allowed_when_modbus_write_enabled():
+    """Direct holding writes are available when Modbus writing is on."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+    from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
+
+    coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+    coordinator.modbus_enabled = True
+    coordinator.config_entry = MagicMock()
+    coordinator.config_entry.options = {
+        CONF_MODBUS_TCP: True,
+        CONF_MODBUS_WRITE: True,
+    }
+    coordinator.config_entry.data = {}
+    coordinator.config_entry.runtime_data = MagicMock()
+
+    entity = DummyAccessEntity(coordinator)
+    entity._metric_key = "indoor_temperature_target"
+    assert entity._has_write_access is True
+
+
+def test_has_write_access_denied_for_smartcontrol_in_modbus_mode():
+    """SmartControl has no holding-register write."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+    from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
+
+    coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+    coordinator.modbus_enabled = True
+    coordinator.config_entry = MagicMock()
+    coordinator.config_entry.options = {
+        CONF_MODBUS_TCP: True,
+        CONF_MODBUS_WRITE: True,
+    }
+    coordinator.config_entry.data = {}
+
+    entity = DummyAccessEntity(coordinator)
+    entity._metric_key = "use_adaptive"
     assert entity._has_write_access is False
 
 
@@ -86,7 +127,7 @@ def test_has_write_access_denies_modbus_metric_in_modbus_mode():
     entity._write_access_warning_logged = False
     entity._metric_key = "room_temp_external"
 
-    assert entity._has_write_access is False
+    assert entity._has_write_access is True
 
 
 def test_has_write_access_treats_empty_maintenance_data_as_outage():

@@ -559,16 +559,18 @@
       },
       "modbus": {
         "title": "Helyi Modbus",
-        "description": "A hőszivattyút a helyi hálózaton olvassa. Nincs bejelentkezés. Először engedélyezze a Modbus external funkciót a Qvantum alkalmazásban (Telepítő → Szerviz mód → Kapcsolódás). A vezérlés ebben a módban nem érhető el.",
+        "description": "A hőszivattyút a helyi hálózaton olvassa. Nincs bejelentkezés. Először engedélyezze a Modbus external funkciót a Qvantum alkalmazásban (Telepítő → Szerviz mód → Kapcsolódás). A vezérlés mindaddig nem érhető el, amíg a Modbus-írást nem engedélyezi. A SmartControl és az elevate-access felhőalapú marad.",
         "data": {
           "modbus_host": "Qvantum Hoszt/IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Egységazonosító",
-          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)"
+          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)",
+          "modbus_write": "Modbus alapú írás engedélyezése"
         },
         "data_description": {
           "modbus_host": "A hőszivattyú gépneve vagy IP-címe. Az alapértelmezett a Qvantum-HP.",
-          "modbus_scan_interval": "Milyen gyakran kérdezzen le Modbus TCP-n. A minimum 5 másodperc. Az alapértelmezett 15 másodperc."
+          "modbus_scan_interval": "Milyen gyakran kérdezzen le Modbus TCP-n. A minimum 5 másodperc. Az alapértelmezett 15 másodperc.",
+          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét."
         }
       },
       "reconfigure": {
@@ -594,7 +596,8 @@
           "modbus_host": "Qvantum Hoszt/IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Egységazonosító",
-          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)"
+          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)",
+          "modbus_write": "Modbus alapú írás engedélyezése"
         }
       }
     }
@@ -607,10 +610,12 @@
           "modbus_host": "Qvantum Hoszt/IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Egységazonosító",
-          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)"
+          "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)",
+          "modbus_write": "Modbus alapú írás engedélyezése"
         },
         "data_description": {
-          "modbus_scan_interval": "Milyen gyakran kérdezze le a hőszivattyút Modbus TCP-n. Az alacsonyabb értékek közel valós idejű áramlás- és térfogatpontosságot adnak. Minimum 5 másodperc. Alapértelmezett 15 másodperc."
+          "modbus_scan_interval": "Milyen gyakran kérdezze le a hőszivattyút Modbus TCP-n. Az alacsonyabb értékek közel valós idejű áramlás- és térfogatpontosságot adnak. Minimum 5 másodperc. Alapértelmezett 15 másodperc.",
+          "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét."
         },
         "description": "Az aktuális kapcsolódási mód beállításai. A felhő és a Modbus közötti váltáshoz használja az újrakonfigurálást.",
         "title": "Beállítások"

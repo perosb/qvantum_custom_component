@@ -559,16 +559,18 @@
       },
       "modbus": {
         "title": "Modbus local",
-        "description": "Lee la bomba de calor en tu red local. Sin inicio de sesión. Activa primero Modbus external en la app Qvantum (Instalador → Modo servicio → Conectividad). Los controles no están disponibles en este modo.",
+        "description": "Lee la bomba de calor en tu red local. Sin inicio de sesión. Activa primero Modbus external en la app Qvantum (Instalador → Modo servicio → Conectividad). Los controles siguen no disponibles salvo que actives la escritura Modbus. SmartControl y elevate-access siguen siendo solo en la nube.",
         "data": {
           "modbus_host": "Qvantum Host/IP",
           "modbus_port": "Puerto",
           "modbus_unit_id": "ID de unidad",
-          "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)"
+          "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)",
+          "modbus_write": "Activar escritura mediante Modbus"
         },
         "data_description": {
           "modbus_host": "Nombre de host o IP de la bomba de calor. El valor predeterminado es Qvantum-HP.",
-          "modbus_scan_interval": "Con qué frecuencia consultar por Modbus TCP. El mínimo es 5 segundos. El valor predeterminado es 15 segundos."
+          "modbus_scan_interval": "Con qué frecuencia consultar por Modbus TCP. El mínimo es 5 segundos. El valor predeterminado es 15 segundos.",
+          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto."
         }
       },
       "reconfigure": {
@@ -594,7 +596,8 @@
           "modbus_host": "Qvantum Host/IP",
           "modbus_port": "Puerto",
           "modbus_unit_id": "ID de unidad",
-          "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)"
+          "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)",
+          "modbus_write": "Activar escritura mediante Modbus"
         }
       }
     }
@@ -607,10 +610,12 @@
           "modbus_host": "Qvantum Host/IP",
           "modbus_port": "Puerto",
           "modbus_unit_id": "ID de unidad",
-          "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)"
+          "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)",
+          "modbus_write": "Activar escritura mediante Modbus"
         },
         "data_description": {
-          "modbus_scan_interval": "Con qué frecuencia se consulta la bomba de calor por Modbus TCP. Valores más bajos dan precisión casi en tiempo real de caudal y volumen. El mínimo es 5 segundos. El valor predeterminado es 15 segundos."
+          "modbus_scan_interval": "Con qué frecuencia se consulta la bomba de calor por Modbus TCP. Valores más bajos dan precisión casi en tiempo real de caudal y volumen. El mínimo es 5 segundos. El valor predeterminado es 15 segundos.",
+          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto."
         },
         "description": "Ajustes del modo de conexión actual. Usa reconfigurar para cambiar entre nube y Modbus.",
         "title": "Opciones"

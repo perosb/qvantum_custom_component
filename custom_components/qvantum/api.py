@@ -12,6 +12,14 @@ from modbus_connection import ModbusError, ModbusUnit
 from .const import (
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
+    DHW_MODE_EXTRA,
+    DHW_MODE_NORMAL,
+    FAN_SPEED_STATE_EXTRA,
+    FAN_SPEED_STATE_NORMAL,
+    FAN_SPEED_STATE_OFF,
+    FAN_SPEED_VALUE_EXTRA,
+    FAN_SPEED_VALUE_NORMAL,
+    FAN_SPEED_VALUE_OFF,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
 from .modbus import MODBUS_HOLDING_REGISTER_MAP, MODBUS_HOLDING_TO_SETTINGS_MAP
@@ -71,6 +79,7 @@ class QvantumAPI:
         self._modbus_device: QvantumModbusDevice | None = None
         self._modbus_lock = asyncio.Lock()
         self._closed = False
+        self._extra_dhw_unsub = None
         # Modbus-only mode never opens an HTTP session, even if a caller
         # injects one. Cloud mode owns a session unless a test injects it.
         if modbus_tcp:
@@ -136,6 +145,7 @@ class QvantumAPI:
         if self._closed:
             return
         self._closed = True
+        self._cancel_extra_dhw_timer()
 
         # Wait for any in-flight Modbus operation, then drop the wrapper.
         async with self._modbus_lock:
@@ -360,8 +370,43 @@ class QvantumAPI:
             "Authorization": f"Bearer {self._token}",
         }
 
+    def _cancel_extra_dhw_timer(self) -> None:
+        """Cancel a pending extra-DHW restore callback."""
+        unsub = self._extra_dhw_unsub
+        self._extra_dhw_unsub = None
+        if unsub:
+            unsub()
+
+    def _schedule_extra_dhw_restore(self, device_id: str, minutes: int) -> None:
+        """After *minutes*, write DHW mode back to Normal."""
+        self._cancel_extra_dhw_timer()
+        if not self.hass or minutes <= 0:
+            return
+        from homeassistant.helpers.event import async_call_later
+
+        async def _restore(_now) -> None:
+            self._extra_dhw_unsub = None
+            try:
+                await self.write_holding_register_for_metric(
+                    device_id, "extra_tap_water", DHW_MODE_NORMAL
+                )
+            except Exception as err:
+                _LOGGER.warning(
+                    "Failed to restore DHW mode after extra hot water timer: %s", err
+                )
+
+        self._extra_dhw_unsub = async_call_later(
+            self.hass, minutes * 60, _restore
+        )
+
     async def update_setting(self, device_id: str, name: str, value: any):
         """Update one setting."""
+        if self._modbus_tcp:
+            if isinstance(value, bool):
+                value = int(value)
+            return await self.write_holding_register_for_metric(
+                device_id, name, value
+            )
 
         payload = {"update_settings": {name: value}}
 
@@ -582,6 +627,18 @@ class QvantumAPI:
 
     async def set_extra_tap_water(self, device_id: str, minutes: int):
         """Update extra_tap_water setting."""
+        if self._modbus_tcp:
+            self._cancel_extra_dhw_timer()
+            if minutes == 0:
+                return await self.write_holding_register_for_metric(
+                    device_id, "extra_tap_water", DHW_MODE_NORMAL
+                )
+            result = await self.write_holding_register_for_metric(
+                device_id, "extra_tap_water", DHW_MODE_EXTRA
+            )
+            if minutes > 0:
+                self._schedule_extra_dhw_restore(device_id, minutes)
+            return result
 
         # Capture current time once to ensure consistency across all code paths
         current_time = datetime.now()
@@ -614,6 +671,10 @@ class QvantumAPI:
 
     async def set_indoor_temperature_offset(self, device_id: str, value: int):
         """Update indoor_temperature_offset setting."""
+        if self._modbus_tcp:
+            return await self.write_holding_register_for_metric(
+                device_id, "indoor_temperature_offset", value
+            )
 
         payload = {"settings": [{"name": "indoor_temperature_offset", "value": value}]}
 
@@ -621,6 +682,17 @@ class QvantumAPI:
 
     async def set_fanspeedselector(self, device_id: str, preset_mode: str):
         """Update set_fanspeedselector setting."""
+        if self._modbus_tcp:
+            presets = {
+                FAN_SPEED_STATE_OFF: FAN_SPEED_VALUE_OFF,
+                FAN_SPEED_STATE_NORMAL: FAN_SPEED_VALUE_NORMAL,
+                FAN_SPEED_STATE_EXTRA: FAN_SPEED_VALUE_EXTRA,
+            }
+            if preset_mode not in presets:
+                raise ValueError(f"Invalid preset_mode: {preset_mode}")
+            return await self.write_holding_register_for_metric(
+                device_id, "fanspeedselector", presets[preset_mode]
+            )
 
         # Capture current time once to ensure consistency across all code paths
         current_time = datetime.now()
@@ -654,9 +726,10 @@ class QvantumAPI:
 
         # Capacities 1, 6, and 7 are "custom" levels that the API does not accept
         # directly — they must be set by writing the corresponding stop/start temperatures.
+        # Modbus has no capacity register; always write the start/stop pair.
         _CUSTOM_CAPACITIES = {1, 6, 7}
 
-        if capacity in _CUSTOM_CAPACITIES:
+        if self._modbus_tcp or capacity in _CUSTOM_CAPACITIES:
             capacity_to_stop_start = {
                 v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()
             }
@@ -683,6 +756,17 @@ class QvantumAPI:
             _LOGGER.debug("No tap water settings to update, both stop and start are 0.")
             return
 
+        if self._modbus_tcp:
+            if stop:
+                await self.write_holding_register_for_metric(
+                    device_id, "tap_water_stop", stop
+                )
+            if start:
+                await self.write_holding_register_for_metric(
+                    device_id, "tap_water_start", start
+                )
+            return {"status": "APPLIED"}
+
         payload = {"settings": []}
 
         if stop:
@@ -694,6 +778,10 @@ class QvantumAPI:
 
     async def set_indoor_temperature_target(self, device_id: str, temperature: float):
         """Update indoor_temperature_target setting."""
+        if self._modbus_tcp:
+            return await self.write_holding_register_for_metric(
+                device_id, "indoor_temperature_target", temperature
+            )
 
         payload = {
             "settings": [{"name": "indoor_temperature_target", "value": temperature}]
