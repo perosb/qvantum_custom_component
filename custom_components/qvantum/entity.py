@@ -46,14 +46,17 @@ class QvantumAccessMixin:
     def _has_write_access(self) -> bool:
         """Return whether this entity may write.
 
-        Cloud mode requires writeAccessLevel >= 20. Modbus mode has no local
-        writes in this phase, so access is denied.
+        Cloud mode requires writeAccessLevel >= 20. Modbus mode allows
+        holding-register writes when the Modbus write option is enabled,
+        except for cloud-only controls.
         """
         try:
             if not isinstance(self.coordinator, QvantumDataUpdateCoordinator):
                 return True  # Maintenance entities always available
             if getattr(self.coordinator, "modbus_enabled", False):
-                return False
+                if getattr(self, "_metric_key", None) in _CLOUD_ONLY_WRITE_METRICS:
+                    return False
+                return self._is_modbus_write_allowed()
             maintenance_coordinator = (
                 self.coordinator.config_entry.runtime_data.maintenance_coordinator
             )
@@ -78,6 +81,21 @@ class QvantumAccessMixin:
                 self._write_access_warning_logged = True
             return False
 
+    def _is_modbus_write_allowed(self) -> bool:
+        """Return True when Modbus TCP and Modbus writes are both enabled."""
+        config_entry = getattr(self.coordinator, "config_entry", None)
+        if config_entry is None:
+            return False
+        modbus_write_enabled = config_entry.options.get(
+            CONF_MODBUS_WRITE,
+            config_entry.data.get(CONF_MODBUS_WRITE, False),
+        )
+        modbus_tcp_enabled = config_entry.options.get(
+            CONF_MODBUS_TCP,
+            config_entry.data.get(CONF_MODBUS_TCP, False),
+        )
+        return bool(modbus_write_enabled and modbus_tcp_enabled)
+
     def _local_write_available(self) -> bool:
         """Return True when this entity can write locally without the cloud API."""
         return False
@@ -90,6 +108,16 @@ _LOCAL_MODBUS_WRITE_METRICS = {
     "room_temp_external",
     "use_operation_sensor",
 }
+
+# No holding-register write exists for these; they stay cloud-only.
+_CLOUD_ONLY_WRITE_METRICS = frozenset(
+    {
+        "use_adaptive",
+        "enable_sc_sh",
+        "enable_sc_dhw",
+        "elevate_access",
+    }
+)
 
 
 # Centralized icon map for all Qvantum entities keyed by metric_key
@@ -158,19 +186,6 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
     def _values(self) -> dict:
         """Return current values from coordinator data, safe when data is None."""
         return (self.coordinator.data or {}).get("values", {})
-
-    def _is_modbus_write_allowed(self) -> bool:
-        """Return True when Modbus write actions are explicitly enabled and available."""
-        config_entry = self.coordinator.config_entry
-        modbus_write_enabled = config_entry.options.get(
-            CONF_MODBUS_WRITE,
-            config_entry.data.get(CONF_MODBUS_WRITE, False),
-        )
-        modbus_tcp_enabled = config_entry.options.get(
-            CONF_MODBUS_TCP,
-            config_entry.data.get(CONF_MODBUS_TCP, False),
-        )
-        return modbus_write_enabled and modbus_tcp_enabled
 
     def _local_write_available(self) -> bool:
         """Return True when this metric writes via Modbus and writes are enabled."""

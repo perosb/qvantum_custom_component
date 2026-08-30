@@ -559,16 +559,18 @@
       },
       "modbus": {
         "title": "Lokale Modbus",
-        "description": "Leest de warmtepomp op uw LAN. Geen aanmelding. Schakel eerst Modbus external in in de Qvantum-app (Installateur → Servicemodus → Connectiviteit). Bediening is in deze modus niet beschikbaar.",
+        "description": "Leest de warmtepomp op uw LAN. Geen aanmelding. Schakel eerst Modbus external in in de Qvantum-app (Installateur → Servicemodus → Connectiviteit). Bediening blijft onbeschikbaar totdat u schrijven via Modbus inschakelt. SmartControl en elevate-access blijven alleen in de cloud.",
         "data": {
           "modbus_host": "Qvantum Host/IP",
           "modbus_port": "Poort",
           "modbus_unit_id": "Unit-ID",
-          "modbus_scan_interval": "Modbus-scaninterval (seconden)"
+          "modbus_scan_interval": "Modbus-scaninterval (seconden)",
+          "modbus_write": "Schrijven via Modbus inschakelen"
         },
         "data_description": {
           "modbus_host": "Hostnaam of IP-adres van de warmtepomp. Standaard is Qvantum-HP.",
-          "modbus_scan_interval": "Hoe vaak er via Modbus TCP wordt gepolld. Minimum is 5 seconden. Standaard is 15 seconden."
+          "modbus_scan_interval": "Hoe vaak er via Modbus TCP wordt gepolld. Minimum is 5 seconden. Standaard is 15 seconden.",
+          "modbus_write": "Door het activeren van Modbus-schrijven aanvaardt u volledige verantwoordelijkheid voor alle waarden die via de interface worden geschreven. De fabrikant is niet aansprakelijk voor problemen veroorzaakt door onjuiste of buiten bereik vallende waarden, en dergelijke acties kunnen de garantie en/of de levensduur en prestaties van het product beïnvloeden."
         }
       },
       "reconfigure": {
@@ -594,7 +596,8 @@
           "modbus_host": "Qvantum Host/IP",
           "modbus_port": "Poort",
           "modbus_unit_id": "Unit-ID",
-          "modbus_scan_interval": "Modbus-scaninterval (seconden)"
+          "modbus_scan_interval": "Modbus-scaninterval (seconden)",
+          "modbus_write": "Schrijven via Modbus inschakelen"
         }
       }
     }
@@ -607,10 +610,12 @@
           "modbus_host": "Qvantum Host/IP",
           "modbus_port": "Poort",
           "modbus_unit_id": "Unit-ID",
-          "modbus_scan_interval": "Modbus-scaninterval (seconden)"
+          "modbus_scan_interval": "Modbus-scaninterval (seconden)",
+          "modbus_write": "Schrijven via Modbus inschakelen"
         },
         "data_description": {
-          "modbus_scan_interval": "Hoe vaak de warmtepomp via Modbus TCP wordt gepolld. Lagere waarden geven bijna realtime debiet- en volumenauwkeurigheid. Minimum is 5 seconden. Standaard is 15 seconden."
+          "modbus_scan_interval": "Hoe vaak de warmtepomp via Modbus TCP wordt gepolld. Lagere waarden geven bijna realtime debiet- en volumenauwkeurigheid. Minimum is 5 seconden. Standaard is 15 seconden.",
+          "modbus_write": "Door het activeren van Modbus-schrijven aanvaardt u volledige verantwoordelijkheid voor alle waarden die via de interface worden geschreven. De fabrikant is niet aansprakelijk voor problemen veroorzaakt door onjuiste of buiten bereik vallende waarden, en dergelijke acties kunnen de garantie en/of de levensduur en prestaties van het product beïnvloeden."
         },
         "description": "Instellingen voor de huidige verbindingsmodus. Gebruik herconfiguratie om te wisselen tussen cloud en Modbus.",
         "title": "Opties"

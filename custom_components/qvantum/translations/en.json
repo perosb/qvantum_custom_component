@@ -559,16 +559,18 @@
       },
       "modbus": {
         "title": "Local Modbus",
-        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls are unavailable in this mode.",
+        "description": "Reads the heat pump on your LAN. No login. Enable Modbus external in the Qvantum app (Installer → Service mode → Connectivity) first. Controls stay unavailable unless you enable Modbus writing. SmartControl and elevate-access stay cloud-only.",
         "data": {
           "modbus_host": "Host / IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_scan_interval": "Scan interval (seconds)",
+          "modbus_write": "Enable writing via Modbus"
         },
         "data_description": {
           "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
-          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds.",
+          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
         }
       },
       "reconfigure": {
@@ -594,7 +596,8 @@
           "modbus_host": "Host / IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Scan interval (seconds)"
+          "modbus_scan_interval": "Scan interval (seconds)",
+          "modbus_write": "Enable writing via Modbus"
         }
       }
     }
@@ -607,10 +610,12 @@
           "modbus_host": "Host / IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Unit ID",
-          "modbus_scan_interval": "Modbus scan interval (seconds)"
+          "modbus_scan_interval": "Modbus scan interval (seconds)",
+          "modbus_write": "Enable writing via Modbus"
         },
         "data_description": {
-          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds."
+          "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds.",
+          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
         },
         "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
         "title": "Options"

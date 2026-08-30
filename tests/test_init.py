@@ -78,7 +78,7 @@ class TestSetupDeviceRequirements:
         hass.services.async_remove.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_sync_extra_hot_water_removes_when_only_modbus_remains(self, hass):
+    async def test_sync_extra_hot_water_keeps_service_for_modbus_entry(self, hass):
         modbus = MagicMock()
         modbus.entry_id = "modbus"
         modbus.options = {"modbus_tcp": True}
@@ -92,6 +92,19 @@ class TestSetupDeviceRequirements:
         ) as setup:
             await _async_sync_extra_hot_water_service(hass)
         setup.assert_not_called()
+        hass.services.async_remove.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_sync_extra_hot_water_removes_when_last_entry_unloads(self, hass):
+        modbus = MagicMock()
+        modbus.entry_id = "modbus"
+        modbus.options = {"modbus_tcp": True}
+        modbus.data = {}
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[modbus])
+        hass.config_entries.async_entries = MagicMock(return_value=[modbus])
+        hass.services.has_service = MagicMock(return_value=True)
+        hass.services.async_remove = MagicMock()
+        await _async_sync_extra_hot_water_service(hass, skip_entry_id="modbus")
         hass.services.async_remove.assert_called_once_with("qvantum", "extra_hot_water")
 
     @pytest.mark.asyncio
@@ -106,6 +119,19 @@ class TestSetupDeviceRequirements:
         cloud.state = ConfigEntryState.NOT_LOADED
         hass.config_entries.async_loaded_entries = MagicMock(return_value=[])
         hass.config_entries.async_entries = MagicMock(return_value=[cloud])
+        hass.services.has_service = MagicMock(return_value=False)
+        hass.services.async_remove = MagicMock()
+        with patch(
+            "custom_components.qvantum.async_setup_services", new_callable=AsyncMock
+        ) as setup:
+            await _async_sync_extra_hot_water_service(hass)
+        setup.assert_not_called()
+        hass.services.async_remove.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_sync_extra_hot_water_does_not_register_without_entries(self, hass):
+        hass.config_entries.async_loaded_entries = MagicMock(return_value=[])
+        hass.config_entries.async_entries = MagicMock(return_value=[])
         hass.services.has_service = MagicMock(return_value=False)
         hass.services.async_remove = MagicMock()
         with patch(
@@ -439,6 +465,7 @@ class TestIntegrationSetup:
             "modbus_tcp": True,
             "modbus_host": "Qvantum-HP",
             "modbus_scan_interval": 10,
+            "modbus_write": True,
         }
         mock_config_entry.data = {}
         mock_config_entry.title = "Qvantum"
@@ -447,6 +474,43 @@ class TestIntegrationSetup:
 
         hass.config_entries.async_reload.assert_not_called()
         mock_coordinator.apply_poll_interval.assert_called_once_with(mock_config_entry)
+        assert mock_api._modbus_write is True
+
+    @pytest.mark.asyncio
+    async def test_async_update_listener_cancels_extra_dhw_timer_when_writes_disabled(
+        self, hass, mock_config_entry
+    ):
+        """Turning off Modbus writing must cancel a pending extra-DHW restore."""
+        hass.config_entries.async_reload = AsyncMock()
+
+        mock_api = MagicMock()
+        mock_api._modbus_tcp = True
+        mock_api._modbus_write = True
+        mock_api._modbus_host = "Qvantum-HP"
+        mock_api._modbus_port = 502
+        mock_api._modbus_unit_id = 1
+        mock_api._cancel_extra_dhw_timer = MagicMock()
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.api = mock_api
+        mock_coordinator.apply_poll_interval = MagicMock(return_value=False)
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = mock_coordinator
+        mock_config_entry.options = {
+            "modbus_tcp": True,
+            "modbus_host": "Qvantum-HP",
+            "modbus_scan_interval": 10,
+            "modbus_write": False,
+        }
+        mock_config_entry.data = {}
+
+        await _async_update_listener(hass, mock_config_entry)
+
+        hass.config_entries.async_reload.assert_not_called()
+        mock_api._cancel_extra_dhw_timer.assert_called_once()
+        assert mock_api._modbus_write is False
 
     @pytest.mark.asyncio
     async def test_async_update_listener_reloads_on_modbus_host_change(

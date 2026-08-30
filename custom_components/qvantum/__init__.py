@@ -35,6 +35,7 @@ from .const import (
     CONFIG_VERSION,
     FIRMWARE_KEYS,
     CONF_MODBUS_TCP,
+    CONF_MODBUS_WRITE,
     CONF_MODBUS_HOST,
     CONF_MODBUS_PORT,
     CONF_MODBUS_UNIT_ID,
@@ -117,29 +118,32 @@ def _qvantum_entries(hass: HomeAssistant) -> list[ConfigEntry]:
     return [entry for entry in entries if _qvantum_entry_is_active(entry)]
 
 
-def _any_cloud_qvantum_entry(
-    hass: HomeAssistant, *, skip_entry_id: str | None = None
-) -> bool:
-    """Return True when any remaining Qvantum entry uses the cloud HTTP API."""
-    for entry in _qvantum_entries(hass):
-        if skip_entry_id and getattr(entry, "entry_id", None) == skip_entry_id:
-            continue
-        if not _modbus_link_settings(entry)[0]:
-            return True
-    return False
-
-
 async def _async_sync_extra_hot_water_service(
     hass: HomeAssistant, *, skip_entry_id: str | None = None
 ) -> None:
-    """Register extra_hot_water for cloud entries; remove it when none remain."""
+    """Keep extra_hot_water registered while any Qvantum entry is loaded."""
+    remaining = [
+        entry
+        for entry in _qvantum_entries(hass)
+        if getattr(entry, "entry_id", None) != skip_entry_id
+    ]
     registered = bool(hass.services.has_service(DOMAIN, "extra_hot_water"))
-    if _any_cloud_qvantum_entry(hass, skip_entry_id=skip_entry_id):
+    if remaining:
         if not registered:
             await async_setup_services(hass)
         return
     if registered:
         hass.services.async_remove(DOMAIN, "extra_hot_water")
+
+
+def _modbus_write_enabled(config_entry: ConfigEntry) -> bool:
+    """Return True when holding-register writes are enabled for this entry."""
+    return bool(
+        config_entry.options.get(
+            CONF_MODBUS_WRITE,
+            config_entry.data.get(CONF_MODBUS_WRITE, False),
+        )
+    )
 
 
 def _async_modbus_unit(hass: HomeAssistant, config_entry: ConfigEntry):
@@ -230,6 +234,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         modbus_port=modbus_port,
         modbus_unit_id=modbus_unit_id,
         modbus_unit=modbus_unit,
+        modbus_write=modbus_enabled and _modbus_write_enabled(config_entry),
     )
     hass.data[DOMAIN].hass = hass
 
@@ -347,6 +352,18 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
         )
         await hass.config_entries.async_reload(config_entry.entry_id)
         return
+
+    api = getattr(runtime.coordinator, "api", None)
+    if api is not None:
+        write_enabled = bool(
+            getattr(api, "_modbus_tcp", False)
+            and _modbus_write_enabled(config_entry)
+        )
+        if getattr(api, "_modbus_write", False) and not write_enabled:
+            cancel = getattr(api, "_cancel_extra_dhw_timer", None)
+            if callable(cancel):
+                cancel()
+        api._modbus_write = write_enabled
 
     changed = runtime.coordinator.apply_poll_interval(config_entry)
     if changed:

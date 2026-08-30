@@ -47,9 +47,23 @@ Requires Home Assistant **2026.9** or newer (shared Modbus connection).
 3. **Setup**:
    - Go to Settings → Devices & Services → Add Integration
    - Search for "Qvantum Heat Pump"
-   - Sign in using your Qvantum account email and password
+   - Choose **Qvantum cloud (HTTP)** or **Local Modbus (offline)**
 
-The integration will automatically discover your Qvantum devices and create comprehensive sensors for all supported metrics.
+Only one Qvantum instance can be configured. Use **reconfigure** to switch between cloud and local later.
+
+#### Qvantum cloud (HTTP)
+
+Sign in with your Qvantum account email and password. Metrics, firmware, SmartControl, elevate-access, and most settings use the cloud API.
+
+#### Local Modbus (offline)
+
+Reads the heat pump on your LAN. No login and no cloud session.
+
+1. In the Qvantum app, enable **Modbus external** (Installer → Service mode → Connectivity).
+2. Enter host (default `Qvantum-HP`), port, unit ID, and poll interval (default 15 seconds, minimum 5).
+3. Home Assistant probes serial and firmware from identity registers 180–193.
+
+Cloud-only sensors (firmware boards, access expiry, extra-DHW `tap_stop` countdown) are not created in this mode.
 
 ### Features
 
@@ -59,16 +73,25 @@ The integration will automatically discover your Qvantum devices and create comp
 - **Smart Status**: Heat pump status, defrost cycles, priority modes
 - **Comprehensive Coverage**: Supports all major Qvantum heat pump parameters
 
-### Real time Modbus Support
+### Local Modbus
 
-- **Efficient polling** of live data from the pump’s Modbus interface
-- **Highly granular metrics** for temperatures, flows, pressures, power, and energy
-- **Stable backup path** for metrics when REST data is unavailable
-- **Minimal network impact** with optimized modbus register reads
-- **Optional Modbus writes** for supported controls when explicitly enabled in the integration options
+- **Offline**: no Qvantum account, no HTTP fallback
+- **Faster polling** of live data from the pump’s Modbus interface (default 15 s)
+- **Extra local metrics**: heating/DHW power, tap-water capacity estimate, compressor state, extra demand relays
+- **Optional writes** for supported holding-register controls when you enable **Enable writing via Modbus**
 
 > [!IMPORTANT]
-> By default, this integration uses Modbus for **reading only**. Modbus write support is disabled unless you explicitly enable it in the integration options, and only supported controls use that path. Other configuration/set commands continue to use the existing HTTP API.
+> Local Modbus is **read-only** until you enable writing. Writes never go to the cloud API.
+>
+> Supported local writes include indoor target/offset, DHW start/stop, extra DHW, fan preset, operation/manual switches, room compensation, fan speeds, extra-DHW stop, external room temperature, and indoor sensor source.
+>
+> **SmartControl** (`use_adaptive`, `enable_sc_sh`, `enable_sc_dhw`) and **elevate-access** stay cloud-only. They are unavailable in local mode.
+>
+> By enabling Modbus writing you accept full responsibility for values written to the pump. Incorrect or out-of-range values may void the warranty and/or affect lifecycle and performance.
+
+Extra DHW on local Modbus writes DHW mode Extra/Normal. A timed extra (button or `qvantum.extra_hot_water`) is restored by Home Assistant after the interval; it is **not** stored on the pump, so a restart during that window will not write Normal back.
+
+Fan extra on local Modbus is a sticky preset. Cloud extra ventilation is a timed boost.
 
 ### External room sensor support
 
@@ -94,10 +117,10 @@ action:
 The integration provides the following services for advanced control and testing:
 
 #### `qvantum.extra_hot_water`
-Schedule extra hot water production for a specified duration.
+Schedule extra hot water production for a specified duration. On cloud this uses the HTTP extra-DHW command. On local Modbus it writes DHW Extra/Normal (requires Modbus writing).
 
 **Parameters:**
-- `device_id` (integer, required): The device ID to control
+- `device_id` (integer, required): The heat pump id (same as the serial)
 - `minutes` (integer, optional, default: 120): Duration in minutes (0-480)
 
 **Example:**
@@ -110,7 +133,7 @@ data:
 
 ### Elevate Access Button
 
-The **Elevate Access** button grants temporary elevated permissions to access advanced heat pump settings and maintenance functions.
+Cloud HTTP only. The **Elevate Access** button grants temporary elevated permissions to access advanced heat pump settings and maintenance functions. It is not created in local Modbus mode.
 
 **Features:**
 - Temporarily elevates access level for configuration tasks

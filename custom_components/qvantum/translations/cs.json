@@ -559,16 +559,18 @@
       },
       "modbus": {
         "title": "Místní Modbus",
-        "description": "Čte tepelné čerpadlo v místní síti. Bez přihlášení. Nejprve v aplikaci Qvantum povolte Modbus external (Instalatér → Servisní režim → Připojení). Ovládání v tomto režimu není dostupné.",
+        "description": "Čte tepelné čerpadlo v místní síti. Bez přihlášení. Nejprve v aplikaci Qvantum povolte Modbus external (Instalatér → Servisní režim → Připojení). Ovládání zůstane nedostupné, dokud nepovolíte zápis přes Modbus. SmartControl a elevate-access zůstávají pouze v cloudu.",
         "data": {
           "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
           "modbus_unit_id": "ID jednotky",
-          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)"
+          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)",
+          "modbus_write": "Povolit zápis přes Modbus"
         },
         "data_description": {
           "modbus_host": "Název hostitele nebo IP adresa tepelného čerpadla. Výchozí je Qvantum-HP.",
-          "modbus_scan_interval": "Jak často dotazovat přes Modbus TCP. Minimum je 5 sekund. Výchozí je 15 sekund."
+          "modbus_scan_interval": "Jak často dotazovat přes Modbus TCP. Minimum je 5 sekund. Výchozí je 15 sekund.",
+          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku."
         }
       },
       "reconfigure": {
@@ -594,7 +596,8 @@
           "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
           "modbus_unit_id": "ID jednotky",
-          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)"
+          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)",
+          "modbus_write": "Povolit zápis přes Modbus"
         }
       }
     }
@@ -607,10 +610,12 @@
           "modbus_host": "Host/IP Qvantum",
           "modbus_port": "Port",
           "modbus_unit_id": "ID jednotky",
-          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)"
+          "modbus_scan_interval": "Interval dotazování Modbus (sekundy)",
+          "modbus_write": "Povolit zápis přes Modbus"
         },
         "data_description": {
-          "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund."
+          "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund.",
+          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku."
         },
         "description": "Nastavení aktuálního režimu připojení. Pro přepnutí mezi cloudem a Modbusem použijte nové nastavení.",
         "title": "Možnosti"

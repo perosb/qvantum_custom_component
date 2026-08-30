@@ -559,16 +559,18 @@
       },
       "modbus": {
         "title": "Lokaler Modbus",
-        "description": "Liest die Wärmepumpe in Ihrem LAN. Keine Anmeldung. Aktivieren Sie zuerst Modbus external in der Qvantum-App (Installateur → Servicemodus → Konnektivität). Steuerungen sind in diesem Modus nicht verfügbar.",
+        "description": "Liest die Wärmepumpe in Ihrem LAN. Keine Anmeldung. Aktivieren Sie zuerst Modbus external in der Qvantum-App (Installateur → Servicemodus → Konnektivität). Steuerungen bleiben unzugänglich, bis Sie das Modbus-Schreiben aktivieren. SmartControl und elevate-access bleiben ausschließlich in der Cloud.",
         "data": {
           "modbus_host": "Qvantum Host/IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Geräte-ID",
-          "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)"
+          "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)",
+          "modbus_write": "Schreiben über Modbus aktivieren"
         },
         "data_description": {
           "modbus_host": "Hostname oder IP-Adresse der Wärmepumpe. Standard ist Qvantum-HP.",
-          "modbus_scan_interval": "Wie oft über Modbus TCP abgefragt wird. Minimum sind 5 Sekunden. Standard sind 15 Sekunden."
+          "modbus_scan_interval": "Wie oft über Modbus TCP abgefragt wird. Minimum sind 5 Sekunden. Standard sind 15 Sekunden.",
+          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen."
         }
       },
       "reconfigure": {
@@ -594,7 +596,8 @@
           "modbus_host": "Qvantum Host/IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Geräte-ID",
-          "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)"
+          "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)",
+          "modbus_write": "Schreiben über Modbus aktivieren"
         }
       }
     }
@@ -607,10 +610,12 @@
           "modbus_host": "Qvantum Host/IP",
           "modbus_port": "Port",
           "modbus_unit_id": "Geräte-ID",
-          "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)"
+          "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)",
+          "modbus_write": "Schreiben über Modbus aktivieren"
         },
         "data_description": {
-          "modbus_scan_interval": "Wie oft die Wärmepumpe über Modbus TCP abgefragt wird. Niedrigere Werte ermöglichen nahezu Echtzeit-Durchfluss- und Volumenmessung. Minimum sind 5 Sekunden. Standard sind 15 Sekunden."
+          "modbus_scan_interval": "Wie oft die Wärmepumpe über Modbus TCP abgefragt wird. Niedrigere Werte ermöglichen nahezu Echtzeit-Durchfluss- und Volumenmessung. Minimum sind 5 Sekunden. Standard sind 15 Sekunden.",
+          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen."
         },
         "description": "Einstellungen für den aktuellen Verbindungsmodus. Über Rekonfiguration zwischen Cloud und Modbus wechseln.",
         "title": "Optionen"

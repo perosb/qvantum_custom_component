@@ -58,6 +58,7 @@ def _modbus_user_schema(
     port: int = DEFAULT_MODBUS_PORT,
     unit_id: int = DEFAULT_MODBUS_UNIT_ID,
     interval: int = DEFAULT_MODBUS_SCAN_INTERVAL,
+    write_enabled: bool = False,
 ) -> vol.Schema:
     """Build the Modbus form, preserving submitted values on retry."""
     return vol.Schema(
@@ -72,6 +73,7 @@ def _modbus_user_schema(
             vol.Optional(CONF_MODBUS_SCAN_INTERVAL, default=interval): vol.All(
                 vol.Coerce(int), vol.Clamp(min=MIN_MODBUS_SCAN_INTERVAL)
             ),
+            vol.Optional(CONF_MODBUS_WRITE, default=write_enabled): bool,
         }
     )
 
@@ -222,6 +224,7 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         port = DEFAULT_MODBUS_PORT
         unit_id = DEFAULT_MODBUS_UNIT_ID
         interval = DEFAULT_MODBUS_SCAN_INTERVAL
+        write_enabled = False
         if user_input is not None:
             host = _normalize_modbus_host(user_input.get(CONF_MODBUS_HOST))
             port = int(user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT))
@@ -229,6 +232,7 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
             interval = _normalize_modbus_scan_interval(
                 user_input.get(CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL)
             )
+            write_enabled = bool(user_input.get(CONF_MODBUS_WRITE, False))
             try:
                 info = await validate_modbus(self.hass, host, port, unit_id)
             except CannotConnect:
@@ -243,14 +247,14 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                     title=info["title"],
                     data={
                         CONF_MODBUS_TCP: True,
-                        CONF_MODBUS_WRITE: False,
+                        CONF_MODBUS_WRITE: write_enabled,
                         CONF_MODBUS_HOST: host,
                         CONF_MODBUS_PORT: port,
                         CONF_MODBUS_UNIT_ID: unit_id,
                     },
                     options={
                         CONF_MODBUS_TCP: True,
-                        CONF_MODBUS_WRITE: False,
+                        CONF_MODBUS_WRITE: write_enabled,
                         CONF_MODBUS_HOST: host,
                         CONF_MODBUS_PORT: port,
                         CONF_MODBUS_UNIT_ID: unit_id,
@@ -260,7 +264,11 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="modbus",
             data_schema=_modbus_user_schema(
-                host=host, port=port, unit_id=unit_id, interval=interval
+                host=host,
+                port=port,
+                unit_id=unit_id,
+                interval=interval,
+                write_enabled=write_enabled,
             ),
             errors=errors,
         )
@@ -355,6 +363,12 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL
             )
         )
+        write_enabled = bool(
+            config_entry.options.get(
+                CONF_MODBUS_WRITE,
+                config_entry.data.get(CONF_MODBUS_WRITE, False),
+            )
+        )
         if user_input is not None:
             host = _normalize_modbus_host(user_input.get(CONF_MODBUS_HOST))
             port = int(user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT))
@@ -362,6 +376,7 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
             interval = _normalize_modbus_scan_interval(
                 user_input.get(CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL)
             )
+            write_enabled = bool(user_input.get(CONF_MODBUS_WRITE, False))
             try:
                 info = await validate_modbus(self.hass, host, port, unit_id)
             except CannotConnect:
@@ -375,14 +390,14 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                     unique_id=info["serial"],
                     data={
                         CONF_MODBUS_TCP: True,
-                        CONF_MODBUS_WRITE: False,
+                        CONF_MODBUS_WRITE: write_enabled,
                         CONF_MODBUS_HOST: host,
                         CONF_MODBUS_PORT: port,
                         CONF_MODBUS_UNIT_ID: unit_id,
                     },
                     options={
                         CONF_MODBUS_TCP: True,
-                        CONF_MODBUS_WRITE: False,
+                        CONF_MODBUS_WRITE: write_enabled,
                         CONF_MODBUS_HOST: host,
                         CONF_MODBUS_PORT: port,
                         CONF_MODBUS_UNIT_ID: unit_id,
@@ -393,7 +408,11 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="reconfigure_modbus",
             data_schema=_modbus_user_schema(
-                host=host, port=port, unit_id=unit_id, interval=interval
+                host=host,
+                port=port,
+                unit_id=unit_id,
+                interval=interval,
+                write_enabled=write_enabled,
             ),
             errors=errors,
         )
@@ -426,7 +445,7 @@ class QvantumOptionsFlowHandler(OptionsFlow):
             if self._modbus_enabled():
                 normalized = {
                     CONF_MODBUS_TCP: True,
-                    CONF_MODBUS_WRITE: False,
+                    CONF_MODBUS_WRITE: bool(user_input.get(CONF_MODBUS_WRITE, False)),
                     CONF_MODBUS_HOST: _normalize_modbus_host(
                         user_input.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST)
                     ),
@@ -487,6 +506,15 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                     ): vol.All(
                         vol.Coerce(int), vol.Clamp(min=MIN_MODBUS_SCAN_INTERVAL)
                     ),
+                    vol.Optional(
+                        CONF_MODBUS_WRITE,
+                        default=bool(
+                            self.options.get(
+                                CONF_MODBUS_WRITE,
+                                entry.data.get(CONF_MODBUS_WRITE, False),
+                            )
+                        ),
+                    ): bool,
                 }
             )
         else:

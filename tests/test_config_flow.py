@@ -224,14 +224,17 @@ class TestQvantumConfigFlow:
                     "modbus_port": 502,
                     "modbus_unit_id": 1,
                     "modbus_scan_interval": 10,
+                    "modbus_write": True,
                 }
             )
         assert result == {"type": "create_entry"}
         mock_set_unique_id.assert_called_once_with("12003")
         created = mock_create_entry.call_args.kwargs
         assert created["data"]["modbus_tcp"] is True
+        assert created["data"]["modbus_write"] is True
         assert "username" not in created["data"]
         assert created["options"]["modbus_scan_interval"] == 10
+        assert created["options"]["modbus_write"] is True
 
     @pytest.mark.asyncio
     async def test_modbus_step_strips_host_whitespace(self, hass, config_flow):
