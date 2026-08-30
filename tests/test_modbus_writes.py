@@ -9,8 +9,10 @@ from custom_components.qvantum.const import DHW_MODE_EXTRA, DHW_MODE_NORMAL
 from tests.test_api import attach_mock_modbus
 
 
-def _modbus_api():
-    api = QvantumAPI(modbus_tcp=True, user_agent="test-agent")
+def _modbus_api(*, modbus_write: bool = True):
+    api = QvantumAPI(
+        modbus_tcp=True, user_agent="test-agent", modbus_write=modbus_write
+    )
     attach_mock_modbus(api)
     return api
 
@@ -192,3 +194,21 @@ class TestExtraTapWaterModbus:
             write.reset_mock()
             await captured["cb"](None)
         write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_NORMAL)
+
+
+class TestModbusWriteOptionGate:
+    @pytest.mark.asyncio
+    async def test_extra_tap_water_rejected_when_writes_disabled(self):
+        from custom_components.qvantum.api import APIConnectionError
+
+        api = _modbus_api(modbus_write=False)
+        with pytest.raises(APIConnectionError, match="Modbus writing is disabled"):
+            await api.set_extra_tap_water("dev1", 60)
+
+    @pytest.mark.asyncio
+    async def test_update_setting_rejected_when_writes_disabled(self):
+        from custom_components.qvantum.api import APIConnectionError
+
+        api = _modbus_api(modbus_write=False)
+        with pytest.raises(APIConnectionError, match="Modbus writing is disabled"):
+            await api.update_setting("dev1", "op_mode", 1)

@@ -62,6 +62,7 @@ class QvantumAPI:
         modbus_port: int = 502,
         modbus_unit_id: int = 1,
         modbus_unit: Optional[ModbusUnit] = None,
+        modbus_write: bool = False,
     ) -> None:
         """Initialise."""
         self._auth_url = AUTH_URL
@@ -76,6 +77,7 @@ class QvantumAPI:
         self._modbus_port = modbus_port
         self._modbus_unit_id = modbus_unit_id
         self._modbus_unit = modbus_unit
+        self._modbus_write = bool(modbus_write)
         self._modbus_device: QvantumModbusDevice | None = None
         self._modbus_lock = asyncio.Lock()
         self._closed = False
@@ -399,7 +401,12 @@ class QvantumAPI:
             self.hass, minutes * 60, _restore
         )
 
-    async def update_setting(self, device_id: str, name: str, value: any):
+    def _ensure_modbus_write_allowed(self) -> None:
+        """Raise when Modbus TCP is on but holding-register writes are disabled."""
+        if self._modbus_tcp and not self._modbus_write:
+            raise APIConnectionError(None, "Modbus writing is disabled")
+
+    async def update_setting(self, device_id: str, name: str, value: Any):
         """Update one setting."""
         if self._modbus_tcp:
             if isinstance(value, bool):
@@ -423,6 +430,7 @@ class QvantumAPI:
         self, device_id: str, register_address: int, value: int
     ) -> dict:
         """Write a single Modbus holding register and return a status dict."""
+        self._ensure_modbus_write_allowed()
 
         async def _write(device: QvantumModbusDevice):
             await device.write_holding_register(register_address, int(value))
@@ -439,6 +447,7 @@ class QvantumAPI:
         self, device_id: str, metric_key: str, value: float
     ) -> dict:
         """Write a Modbus holding register looked up by metric key."""
+        self._ensure_modbus_write_allowed()
         holding_field_for_metric(metric_key)
 
         async def _write(device: QvantumModbusDevice):

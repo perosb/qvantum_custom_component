@@ -106,8 +106,8 @@ def test_has_write_access_denies_http_only_entity_when_cloud_unavailable():
     assert entity._has_write_access is False
 
 
-def test_has_write_access_denies_modbus_metric_in_modbus_mode():
-    """Holding-register writes are still gated off in Modbus mode for now."""
+def test_has_write_access_allows_modbus_metric_when_cloud_unavailable():
+    """Holding-register writes stay available when Modbus writing is enabled."""
     from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
     from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
 

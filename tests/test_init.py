@@ -439,6 +439,7 @@ class TestIntegrationSetup:
             "modbus_tcp": True,
             "modbus_host": "Qvantum-HP",
             "modbus_scan_interval": 10,
+            "modbus_write": True,
         }
         mock_config_entry.data = {}
         mock_config_entry.title = "Qvantum"
@@ -447,6 +448,7 @@ class TestIntegrationSetup:
 
         hass.config_entries.async_reload.assert_not_called()
         mock_coordinator.apply_poll_interval.assert_called_once_with(mock_config_entry)
+        assert mock_api._modbus_write is True
 
     @pytest.mark.asyncio
     async def test_async_update_listener_reloads_on_modbus_host_change(

@@ -2053,6 +2053,7 @@ class TestWriteHoldingRegister:
     def _make_api(self, mock_session=None):
         kwargs = {
             "modbus_tcp": True,
+            "modbus_write": True,
             "modbus_host": "192.168.1.100",
             "modbus_port": 502,
         }
