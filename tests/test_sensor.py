@@ -557,9 +557,12 @@ class TestSensorSetup:
         mock_config_entry.options = {CONF_MODBUS_TCP: True}
         mock_coordinator.modbus_enabled = True
 
-        with patch(
-            "custom_components.qvantum.entity.cleanup_disabled_entities"
-        ) as cleanup:
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch(
+                "custom_components.qvantum.entity.cleanup_disabled_entities"
+            ) as cleanup,
+        ):
             await async_setup_entry(mock_hass, mock_config_entry, MagicMock())
 
         allowed = cleanup.call_args.args[2]
