@@ -587,9 +587,10 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
     unload_ok = await hass.config_entries.async_unload_platforms(
         config_entry, PLATFORMS
     )
-    await _async_sync_extra_hot_water_service(
-        hass, skip_entry_id=config_entry.entry_id
-    )
+    if unload_ok:
+        await _async_sync_extra_hot_water_service(
+            hass, skip_entry_id=config_entry.entry_id
+        )
 
     if hass.data.get(DOMAIN) is not None:
         try:

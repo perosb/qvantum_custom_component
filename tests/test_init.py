@@ -47,6 +47,7 @@ class TestSetupDeviceRequirements:
         cloud.data = {}
         hass.config_entries.async_entries = MagicMock(return_value=[cloud])
         hass.services.has_service = MagicMock(return_value=False)
+        hass.services.async_remove = MagicMock()
         with patch(
             "custom_components.qvantum.async_setup_services", new_callable=AsyncMock
         ) as setup:
@@ -62,6 +63,7 @@ class TestSetupDeviceRequirements:
         modbus.data = {}
         hass.config_entries.async_entries = MagicMock(return_value=[modbus])
         hass.services.has_service = MagicMock(return_value=True)
+        hass.services.async_remove = MagicMock()
         with patch(
             "custom_components.qvantum.async_setup_services", new_callable=AsyncMock
         ) as setup:
@@ -222,6 +224,21 @@ class TestIntegrationSetup:
         assert result is True
         hass.config_entries.async_unload_platforms.assert_called_once()
         mock_api.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_async_unload_entry_skips_service_sync_when_unload_fails(
+        self, hass, mock_config_entry
+    ):
+        """Failed platform unload must not drop extra_hot_water."""
+        hass.config_entries.async_unload_platforms = AsyncMock(return_value=False)
+        mock_config_entry.runtime_data = None
+        with patch(
+            "custom_components.qvantum._async_sync_extra_hot_water_service",
+            new_callable=AsyncMock,
+        ) as sync:
+            result = await async_unload_entry(hass, mock_config_entry)
+        assert result is False
+        sync.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_unload_entry_shuts_down_coordinators_before_api_close(
