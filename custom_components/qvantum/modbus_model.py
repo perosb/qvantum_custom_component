@@ -11,6 +11,7 @@ from modbus_connection.model import Component, bit, gauge, integer
 
 from .modbus import (
     MODBUS_HOLDING_REGISTER_MAP,
+    MODBUS_IDENTITY_REGISTER_MAP,
     MODBUS_INPUT_REGISTER_MAP,
     RELAY_BIT_MAP,
 )
@@ -75,4 +76,13 @@ QvantumSettings = _component_from_map(
     writable=True,
     # Live probe: the mapped holding span 0-88 answers as one block.
     register_ranges=((0, 88),),
+)
+
+QvantumIdentity = _component_from_map(
+    "QvantumIdentity",
+    "input",
+    MODBUS_IDENTITY_REGISTER_MAP,
+    # Datasheet island after the 105-160 hole: serial 180-184, IP 186-189,
+    # version 191-193. Unused 185/190 sit inside the range.
+    register_ranges=((180, 193),),
 )

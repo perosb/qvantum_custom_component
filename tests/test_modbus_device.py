@@ -5,17 +5,24 @@ from modbus_connection.mock import MockModbusConnection
 
 from custom_components.qvantum.modbus import (
     MODBUS_HOLDING_REGISTER_MAP,
+    MODBUS_IDENTITY_REGISTER_MAP,
     MODBUS_INPUT_REGISTER_MAP,
     RELAY_BIT_MAP,
 )
 from custom_components.qvantum.modbus_device import (
+    IdentityProbeError,
     QvantumModbusDevice,
+    async_probe_identity,
     build_metrics_payload,
     build_settings_payload,
     component_values,
     holding_field_for_metric,
 )
-from custom_components.qvantum.modbus_model import QvantumInputs, QvantumSettings
+from custom_components.qvantum.modbus_model import (
+    QvantumIdentity,
+    QvantumInputs,
+    QvantumSettings,
+)
 
 
 def _device():
@@ -48,6 +55,13 @@ class TestRegisterMapAlignment:
             assert field.signed is (data_type == "int16")
             assert (field.scale or 1.0) == scale
             assert field.writable is True
+
+    def test_identity_fields_match_register_map(self):
+        for name, (address, data_type, scale) in MODBUS_IDENTITY_REGISTER_MAP.items():
+            field = QvantumIdentity.declared_fields[name]
+            assert field.address == address
+            assert field.signed is (data_type == "int16")
+            assert (field.scale or 1.0) == scale
 
 
 class TestComponentDecode:
@@ -87,6 +101,26 @@ class TestComponentDecode:
             for addr in range(event.address, event.address + event.count)
         }
         assert not set(range(105, 161)) & covered
+        assert not set(range(180, 194)) & covered
+
+    @pytest.mark.asyncio
+    async def test_identity_poll_reads_serial_and_version_island(self):
+        _, unit, device = _device()
+        await device.async_update_identity()
+        input_reads = [
+            event for event in unit.read_events if event.register_type == "input"
+        ]
+        assert len(input_reads) == 1
+        assert input_reads[0].address == 180
+        assert input_reads[0].count == 14
+        covered = {
+            addr
+            for event in input_reads
+            for addr in range(event.address, event.address + event.count)
+        }
+        assert set(range(180, 194)) <= covered
+        assert not set(range(105, 161)) & covered
+        assert not set(range(161, 165)) & covered
 
     @pytest.mark.asyncio
     async def test_settings_poll_uses_one_block_read(self):
@@ -115,6 +149,55 @@ class TestComponentDecode:
         _, unit, device = _device()
         await device.write_holding_register(9, 4)
         assert unit.holding[9] == 4
+
+
+class TestIdentityProbe:
+    @pytest.mark.asyncio
+    async def test_decodes_serial_and_firmware(self):
+        _, unit, device = _device()
+        unit.input[180] = 12
+        unit.input[181] = 3
+        unit.input[182] = 45
+        unit.input[183] = 6
+        unit.input[184] = 7
+        unit.input[191] = 1
+        unit.input[192] = 7
+        unit.input[193] = 22
+
+        await device.async_update_identity()
+        assert device.serial_number == "12003045006007"
+        assert device.sw_version == "1.7.22"
+
+    @pytest.mark.asyncio
+    async def test_probe_returns_serial_and_version(self):
+        _, unit, _ = _device()
+        unit.input[180] = 99
+        unit.input[181] = 1
+        unit.input[182] = 2
+        unit.input[183] = 3
+        unit.input[184] = 4
+        unit.input[191] = 2
+        unit.input[192] = 0
+        unit.input[193] = 1
+
+        serial, version = await async_probe_identity(unit)
+        assert serial == "99001002003004"
+        assert version == "2.0.1"
+
+    @pytest.mark.asyncio
+    async def test_probe_rejects_all_zero_serial(self):
+        _, unit, _ = _device()
+        unit.input[180] = 0
+        unit.input[181] = 0
+        unit.input[182] = 0
+        unit.input[183] = 0
+        unit.input[184] = 0
+        unit.input[191] = 1
+        unit.input[192] = 0
+        unit.input[193] = 0
+
+        with pytest.raises(IdentityProbeError, match="serial number"):
+            await async_probe_identity(unit)
 
 
 class TestPayloadAdapter:

@@ -64,6 +64,23 @@ MODBUS_INPUT_REGISTER_MAP = {
     "enable_sc_sh": (164, "uint16", 1.0),
 }
 
+# Device identity (QAD EN 2609-AXC input 180-193). Kept off the metrics map so
+# a refused identity block cannot fail the 0-104 / 161-164 poll.
+MODBUS_IDENTITY_REGISTER_MAP = {
+    "serial_1": (180, "uint16", 1.0),
+    "serial_2": (181, "uint16", 1.0),
+    "serial_3": (182, "uint16", 1.0),
+    "serial_4": (183, "uint16", 1.0),
+    "serial_5": (184, "uint16", 1.0),
+    "ip_1": (186, "uint16", 1.0),
+    "ip_2": (187, "uint16", 1.0),
+    "ip_3": (188, "uint16", 1.0),
+    "ip_4": (189, "uint16", 1.0),
+    "version_major": (191, "uint16", 1.0),
+    "version_minor": (192, "uint16", 1.0),
+    "version_patch": (193, "uint16", 1.0),
+}
+
 MODBUS_HOLDING_REGISTER_MAP = {
     "unit_on_off": (0, "uint16", 1.0),
     "operation_mode": (1, "uint16", 1.0),

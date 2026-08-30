@@ -16,7 +16,7 @@ from .const import (
     RELAY_STAGE_POWER_MAP,
 )
 from .modbus import MODBUS_HOLDING_TO_SETTINGS_MAP
-from .modbus_model import QvantumInputs, QvantumSettings
+from .modbus_model import QvantumIdentity, QvantumInputs, QvantumSettings
 
 if TYPE_CHECKING:
     from modbus_connection import ModbusUnit
@@ -136,6 +136,51 @@ def build_settings_payload(
     return {"settings": [{"name": name, "value": value} for name, value in settings_dict.items()]}
 
 
+class IdentityProbeError(Exception):
+    """The pump did not return a usable serial number."""
+
+
+def decode_serial_number(identity: QvantumIdentity) -> str | None:
+    """Join the five identity words into a serial string.
+
+    QAD EN 2609-AXC lists the words but not the packing. The first word is
+    used as-is; the rest are zero-padded to three digits.
+    """
+    words = [
+        identity.serial_1,
+        identity.serial_2,
+        identity.serial_3,
+        identity.serial_4,
+        identity.serial_5,
+    ]
+    if any(word is None for word in words):
+        return None
+    if all(int(word) == 0 for word in words):
+        return None
+    first, *rest = (int(word) for word in words)
+    return str(first) + "".join(f"{word:03d}" for word in rest)
+
+
+def decode_sw_version(identity: QvantumIdentity) -> str | None:
+    """Format version major/minor/patch as ``major.minor.patch``."""
+    major = identity.version_major
+    minor = identity.version_minor
+    patch = identity.version_patch
+    if major is None or minor is None or patch is None:
+        return None
+    return f"{int(major)}.{int(minor)}.{int(patch)}"
+
+
+async def async_probe_identity(unit: "ModbusUnit") -> tuple[str, str | None]:
+    """Read serial and firmware from a unit. Raises if serial is missing."""
+    identity = QvantumIdentity(unit)
+    await identity.async_update()
+    serial = decode_serial_number(identity)
+    if not serial:
+        raise IdentityProbeError("Heat pump did not return a serial number")
+    return serial, decode_sw_version(identity)
+
+
 def holding_field_for_metric(metric_key: str) -> str:
     """Resolve an HTTP/settings metric key to a holding-register field name."""
     if metric_key in QvantumSettings.declared_fields:
@@ -153,6 +198,7 @@ class QvantumModbusDevice:
         self.unit = unit
         self.inputs = QvantumInputs(unit)
         self.settings = QvantumSettings(unit)
+        self.identity = QvantumIdentity(unit)
 
     async def async_update_inputs(self) -> None:
         """Refresh input-register metrics."""
@@ -161,6 +207,20 @@ class QvantumModbusDevice:
     async def async_update_settings(self) -> None:
         """Refresh holding-register settings."""
         await self.settings.async_update()
+
+    async def async_update_identity(self) -> None:
+        """Refresh serial, IP, and firmware version."""
+        await self.identity.async_update()
+
+    @property
+    def serial_number(self) -> str | None:
+        """Serial from the last identity update."""
+        return decode_serial_number(self.identity)
+
+    @property
+    def sw_version(self) -> str | None:
+        """Firmware triple from the last identity update."""
+        return decode_sw_version(self.identity)
 
     def metrics_payload(
         self, device_id: str, enabled_metrics: list[str] | None = None
