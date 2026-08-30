@@ -71,12 +71,15 @@ class QvantumAPI:
         self._modbus_device: QvantumModbusDevice | None = None
         self._modbus_lock = asyncio.Lock()
         self._closed = False
-        # Modbus-only mode never opens an HTTP session. Cloud mode owns one
-        # unless a test injects a session.
-        if session is not None:
+        # Modbus-only mode never opens an HTTP session, even if a caller
+        # injects one. Cloud mode owns a session unless a test injects it.
+        if modbus_tcp:
+            self._session = None
+            self._session_owner = False
+        elif session is not None:
             self._session = session
             self._session_owner = False
-        elif not modbus_tcp:
+        else:
             self._session = aiohttp.ClientSession(
                 headers={
                     "Content-Type": "application/json",
@@ -84,9 +87,6 @@ class QvantumAPI:
                 }
             )
             self._session_owner = True
-        else:
-            self._session = None
-            self._session_owner = False
         self._reset_state()
 
     def _reset_state(self):

@@ -317,6 +317,19 @@ class TestQvantumAPI:
         assert api._session is None
 
     @pytest.mark.asyncio
+    async def test_modbus_mode_discards_injected_http_session(self, mock_session):
+        """An injected aiohttp session must not be kept in Modbus-only mode."""
+        api = QvantumAPI(
+            "test@example.com",
+            "password",
+            "test-agent",
+            session=mock_session,
+            modbus_tcp=True,
+        )
+        assert api._session is None
+        assert api._session_owner is False
+
+    @pytest.mark.asyncio
     async def test_async_probe_identity(self):
         api = QvantumAPI(modbus_tcp=True, user_agent="test-agent")
         _connection, device = attach_mock_modbus(api)

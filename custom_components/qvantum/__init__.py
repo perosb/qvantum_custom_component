@@ -152,13 +152,17 @@ class RuntimeData:
 async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
     """Set up Qvantum Heat Pump Integration from a config entry."""
 
-    username = config_entry.data.get(CONF_USERNAME)
-    password = config_entry.data.get(CONF_PASSWORD)
     user_agent = f"Home Assistant/{MAJOR_VERSION}.{MINOR_VERSION}.{PATCH_VERSION} Qvantum/{VERSION}"
 
     modbus_enabled, modbus_host, modbus_port, modbus_unit_id = _modbus_link_settings(
         config_entry
     )
+    if modbus_enabled:
+        username = None
+        password = None
+    else:
+        username = config_entry.data[CONF_USERNAME]
+        password = config_entry.data[CONF_PASSWORD]
     try:
         modbus_unit = _async_modbus_unit(hass, config_entry)
     except HomeAssistantError as err:
