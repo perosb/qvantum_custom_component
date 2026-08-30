@@ -172,6 +172,20 @@ class TestQvantumButtonEntity:
         mock_coordinator.async_refresh.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_async_press_extra_tap_water_60min_noop_in_modbus_mode(
+        self, mock_coordinator, mock_device
+    ):
+        """Service press of extra_tap_water_60min must not call HTTP in Modbus mode."""
+        mock_coordinator.modbus_enabled = True
+        button = QvantumButtonEntity(
+            mock_coordinator, "extra_tap_water_60min", mock_device
+        )
+
+        await button.async_press()
+
+        mock_coordinator.api.set_extra_tap_water.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_async_setup_entry(
         self,
         hass,

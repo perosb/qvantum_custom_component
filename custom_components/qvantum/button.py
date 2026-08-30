@@ -66,6 +66,11 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
         """Handle the button press."""
         match self._metric_key:
             case "extra_tap_water_60min":
+                if getattr(self.coordinator, "modbus_enabled", False):
+                    _LOGGER.debug(
+                        "extra_tap_water_60min has no local write in this mode; ignoring press"
+                    )
+                    return
                 # Activate extra tap water for 60 minutes
                 response = await self.coordinator.api.set_extra_tap_water(
                     self._hpid, 60

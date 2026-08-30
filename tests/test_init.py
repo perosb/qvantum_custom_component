@@ -18,6 +18,7 @@ from custom_components.qvantum import (
     _has_required_device,
     _device_sw_version,
     _modbus_link_settings,
+    _async_sync_extra_hot_water_service,
 )
 
 # Mock HA imports after importing real functions
@@ -37,6 +38,36 @@ class TestSetupDeviceRequirements:
         }
         entry.data = {}
         assert _modbus_link_settings(entry) == (True, "hp.local", 1502, 7)
+
+    @pytest.mark.asyncio
+    async def test_sync_extra_hot_water_registers_for_cloud_entry(self, hass):
+        cloud = MagicMock()
+        cloud.entry_id = "cloud"
+        cloud.options = {}
+        cloud.data = {}
+        hass.config_entries.async_entries = MagicMock(return_value=[cloud])
+        hass.services.has_service = MagicMock(return_value=False)
+        with patch(
+            "custom_components.qvantum.async_setup_services", new_callable=AsyncMock
+        ) as setup:
+            await _async_sync_extra_hot_water_service(hass)
+        setup.assert_awaited_once_with(hass)
+        hass.services.async_remove.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_sync_extra_hot_water_removes_when_only_modbus_remains(self, hass):
+        modbus = MagicMock()
+        modbus.entry_id = "modbus"
+        modbus.options = {"modbus_tcp": True}
+        modbus.data = {}
+        hass.config_entries.async_entries = MagicMock(return_value=[modbus])
+        hass.services.has_service = MagicMock(return_value=True)
+        with patch(
+            "custom_components.qvantum.async_setup_services", new_callable=AsyncMock
+        ) as setup:
+            await _async_sync_extra_hot_water_service(hass)
+        setup.assert_not_called()
+        hass.services.async_remove.assert_called_once_with("qvantum", "extra_hot_water")
 
     def test_async_modbus_unit_http_mode_skips_shared_connection(self, hass):
         entry = MagicMock()
