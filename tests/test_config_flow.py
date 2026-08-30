@@ -288,10 +288,29 @@ class TestQvantumConfigFlow:
             AsyncMock(side_effect=CannotConnect()),
         ):
             result = await config_flow.async_step_modbus(
-                {"modbus_host": "bad-host"}
+                {
+                    "modbus_host": "bad-host",
+                    "modbus_port": 1502,
+                    "modbus_unit_id": 7,
+                    "modbus_scan_interval": 20,
+                }
             )
         assert result["type"] == "form"
         assert result["errors"]["base"] == "cannot_connect"
+        defaults = {
+            (key.schema if hasattr(key, "schema") else key): key.default
+            for key in result["data_schema"].schema
+            if hasattr(key, "default")
+        }
+
+        def _default(name):
+            value = defaults[name]
+            return value() if callable(value) else value
+
+        assert _default("modbus_host") == "bad-host"
+        assert _default("modbus_port") == 1502
+        assert _default("modbus_unit_id") == 7
+        assert _default("modbus_scan_interval") == 20
 
     @pytest.mark.asyncio
     async def test_reconfigure_shows_mode_menu(self, hass, config_flow):

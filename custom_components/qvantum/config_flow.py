@@ -52,20 +52,31 @@ STEP_CLOUD_DATA_SCHEMA = vol.Schema(
     }
 )
 
-STEP_MODBUS_DATA_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_MODBUS_HOST, default=DEFAULT_MODBUS_HOST): str,
-        vol.Optional(CONF_MODBUS_PORT, default=DEFAULT_MODBUS_PORT): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=65535)
-        ),
-        vol.Optional(CONF_MODBUS_UNIT_ID, default=DEFAULT_MODBUS_UNIT_ID): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=247)
-        ),
-        vol.Optional(
-            CONF_MODBUS_SCAN_INTERVAL, default=DEFAULT_MODBUS_SCAN_INTERVAL
-        ): vol.All(vol.Coerce(int), vol.Clamp(min=MIN_MODBUS_SCAN_INTERVAL)),
-    }
-)
+def _modbus_user_schema(
+    *,
+    host: str = DEFAULT_MODBUS_HOST,
+    port: int = DEFAULT_MODBUS_PORT,
+    unit_id: int = DEFAULT_MODBUS_UNIT_ID,
+    interval: int = DEFAULT_MODBUS_SCAN_INTERVAL,
+) -> vol.Schema:
+    """Build the Modbus form, preserving submitted values on retry."""
+    return vol.Schema(
+        {
+            vol.Required(CONF_MODBUS_HOST, default=host): str,
+            vol.Optional(CONF_MODBUS_PORT, default=port): vol.All(
+                vol.Coerce(int), vol.Range(min=1, max=65535)
+            ),
+            vol.Optional(CONF_MODBUS_UNIT_ID, default=unit_id): vol.All(
+                vol.Coerce(int), vol.Range(min=1, max=247)
+            ),
+            vol.Optional(CONF_MODBUS_SCAN_INTERVAL, default=interval): vol.All(
+                vol.Coerce(int), vol.Clamp(min=MIN_MODBUS_SCAN_INTERVAL)
+            ),
+        }
+    )
+
+
+STEP_MODBUS_DATA_SCHEMA = _modbus_user_schema()
 
 
 def _normalize_modbus_scan_interval(value: Any) -> int:
@@ -210,6 +221,10 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Set up using local Modbus TCP."""
         errors: dict[str, str] = {}
+        host = DEFAULT_MODBUS_HOST
+        port = DEFAULT_MODBUS_PORT
+        unit_id = DEFAULT_MODBUS_UNIT_ID
+        interval = DEFAULT_MODBUS_SCAN_INTERVAL
         if user_input is not None:
             host = _normalize_modbus_host(user_input.get(CONF_MODBUS_HOST))
             port = int(user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT))
@@ -247,7 +262,9 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
         return self.async_show_form(
             step_id="modbus",
-            data_schema=STEP_MODBUS_DATA_SCHEMA,
+            data_schema=_modbus_user_schema(
+                host=host, port=port, unit_id=unit_id, interval=interval
+            ),
             errors=errors,
         )
 
@@ -318,6 +335,29 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         """Reconfigure using local Modbus TCP."""
         errors: dict[str, str] = {}
         config_entry = self._reconfigure_entry()
+        host = _normalize_modbus_host(
+            config_entry.options.get(
+                CONF_MODBUS_HOST,
+                config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
+            )
+        )
+        port = int(
+            config_entry.options.get(
+                CONF_MODBUS_PORT,
+                config_entry.data.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
+            )
+        )
+        unit_id = int(
+            config_entry.options.get(
+                CONF_MODBUS_UNIT_ID,
+                config_entry.data.get(CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID),
+            )
+        )
+        interval = _normalize_modbus_scan_interval(
+            config_entry.options.get(
+                CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL
+            )
+        )
         if user_input is not None:
             host = _normalize_modbus_host(user_input.get(CONF_MODBUS_HOST))
             port = int(user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT))
@@ -355,43 +395,8 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
         return self.async_show_form(
             step_id="reconfigure_modbus",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_MODBUS_HOST,
-                        default=config_entry.options.get(
-                            CONF_MODBUS_HOST,
-                            config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
-                        ),
-                    ): str,
-                    vol.Optional(
-                        CONF_MODBUS_PORT,
-                        default=config_entry.options.get(
-                            CONF_MODBUS_PORT,
-                            config_entry.data.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
-                        ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-                    vol.Optional(
-                        CONF_MODBUS_UNIT_ID,
-                        default=config_entry.options.get(
-                            CONF_MODBUS_UNIT_ID,
-                            config_entry.data.get(
-                                CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID
-                            ),
-                        ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=247)),
-                    vol.Optional(
-                        CONF_MODBUS_SCAN_INTERVAL,
-                        default=_normalize_modbus_scan_interval(
-                            config_entry.options.get(
-                                CONF_MODBUS_SCAN_INTERVAL,
-                                DEFAULT_MODBUS_SCAN_INTERVAL,
-                            )
-                        ),
-                    ): vol.All(
-                        vol.Coerce(int), vol.Clamp(min=MIN_MODBUS_SCAN_INTERVAL)
-                    ),
-                }
+            data_schema=_modbus_user_schema(
+                host=host, port=port, unit_id=unit_id, interval=interval
             ),
             errors=errors,
         )
