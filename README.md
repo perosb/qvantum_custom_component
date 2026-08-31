@@ -63,7 +63,7 @@ Reads the heat pump on your LAN. No login and no cloud session.
 2. Enter host (default `Qvantum-HP`), port, unit ID, and poll interval (default 15 seconds, minimum 5).
 3. Home Assistant probes serial and firmware from identity registers 180–193.
 
-Cloud-only sensors (firmware boards, access expiry, extra-DHW `tap_stop` countdown) are not created in this mode.
+Cloud-only sensors (firmware boards and access expiry) are not created in this mode. Extra-DHW `tap_stop` is created from the local restore deadline.
 
 ### Features
 

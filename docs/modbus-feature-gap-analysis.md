@@ -61,12 +61,12 @@ Reinstalling a pump that was on the previous overlay as current local-only **cre
 Gone in current local. Previous Modbus could still show some of these via HTTP fallback:
 
 - `bp1_pressure`, `bp1_temp`, `bp2_pressure`, `bp2_temp`, `fan0_10v`
-- `tap_stop` extra-DHW countdown
+- Cloud extra-DHW countdown (HTTP `tap_stop` epoch from the pump/cloud)
 - Firmware sensors: `display_fw_version`, `cc_fw_version`, `inv_fw_version`, `firmware_last_check`
 - Access: `expiresAt`
 - Default-disabled HTTP metrics with no register, including `calc_suppy_cpr`, `dhw_outl_temp_*`, `guide_*`, `price_region`, `heatingreleased` / `coolingreleased` / `compressorreleased` / `additionreleased`, `inputcurrent1–3`, …
 
-Previous Modbus **still created** `tap_stop`, firmware, and access sensors even when Modbus was on (often stale or empty if the cloud was down). Current local **hides** them and cleans leftovers out of the entity registry.
+Previous Modbus **still created** cloud `tap_stop`, firmware, and access sensors even when Modbus was on (often stale or empty if the cloud was down). Current local **hides** firmware/access and leftover cloud sensors, and cleans those leftovers out of the entity registry. Extra-DHW `tap_stop` is still created locally from the persisted restore epoch (`_extra_dhw_restore_at`), not the cloud countdown.
 
 ### Modbus-only (HTTP never had these as first-class live sensors)
 
@@ -125,7 +125,7 @@ Climate is heat-only. `async_set_hvac_mode` is a no-op in **all** modes. Target-
 | **SmartControl** (`use_adaptive`, `smart_sh_mode`, `smart_dhw_mode`) | Constraint: never write SmartControl locally. Select stays cloud-only. |
 | **`enable_sc_sh` / `enable_sc_dhw`** | Readable as inputs 163–164; no holding in the write map. Switches exist but are unavailable. |
 | **`elevate_access`** | Cloud grant flow. The button is not created in local Modbus mode. |
-| **Timed extra DHW** | Cloud has `stopTime` / indefinite / cancel. Local only flips DHW mode. |
+| **Timed extra DHW** | Cloud has pump-side `stopTime` / indefinite / cancel. Local writes Extra/Normal and Home Assistant restores Normal from a restore timer with a persisted deadline (`tap_stop` from that epoch). |
 | **Timed fan boost** | Cloud extra fan uses a ~120 minute stop timestamp. Local writes 0/1/2 with no restore timer (sticky). |
 
 SmartControl **status** can still be **read** on Modbus (`smart_dhw_mode` 161, `smart_dhw_control_status` 162, `enable_sc_dhw` 163, `enable_sc_sh` 164). `use_adaptive` is derived (`smart_dhw_mode != -1`).
@@ -136,14 +136,14 @@ SmartControl **status** can still be **read** on Modbus (`smart_dhw_mode` 161, `
 
 | | HTTP / previous Modbus | Current local |
 |---|---|---|
-| Mechanism | Cloud command with end epoch | Holding 53 Extra vs Normal |
-| 60-min button | Pump/cloud enforces the window | In-memory `async_call_later` (60 min) |
+| Mechanism | Cloud command with end epoch | Holding 53 Extra vs Normal; HA restore timer for timed extra |
+| 60-min button | Pump/cloud enforces the window | Restore timer with persisted deadline (60 min) |
 | Extra switch ON | HTTP `minutes=-1` (indefinite) | Extra mode, **no timer** |
-| Service `qvantum.extra_hot_water` | Always (uses HTTP); 0–480 min, default 120 | Registered; writes holding if `modbus_write`; same in-memory timer for `minutes > 0` |
-| `tap_stop` sensor | Yes | No |
+| Service `qvantum.extra_hot_water` | Always (uses HTTP); 0–480 min, default 120 | Registered; writes holding if `modbus_write`; persisted restore timer for `minutes > 0` |
+| `tap_stop` sensor | Yes (cloud countdown) | Yes, from `_extra_dhw_restore_at` |
 | HA restart during the hour | Cloud still ends extra | Restore deadline is persisted; Normal is written when it expires |
 
-That restart hole is the leftover note on #181, not a regression vs “local previous” — previous extra DHW simply was not local. Turning `modbus_write` off cancels a pending restore timer.
+Turning `modbus_write` off cancels a pending restore timer.
 
 ---
 
@@ -168,12 +168,12 @@ The holding map includes many registers that are **not** in `MODBUS_HOLDING_TO_S
 ### Current local vs HTTP
 
 - **Gain:** no cloud, faster poll, derived power / DHW capacity, extra relays/state, local writes for the mapped setpoints.
-- **Lose:** SmartControl, elevate access, compressor/inverter/display firmware sensors, `tap_stop`, bp1/bp2, `fan0_10v`, true timed extra DHW / fan boost, any HTTP-only disabled metric, vendor/model from inventory.
+- **Lose:** SmartControl, elevate access, compressor/inverter/display firmware sensors, bp1/bp2, `fan0_10v`, timed fan boost, any HTTP-only disabled metric, vendor/model from inventory. Extra-DHW `tap_stop` remains (local restore epoch, not the cloud countdown).
 
 ### Current local vs previous Modbus
 
 - **Gain:** works with no account and no internet; serial unique id; no refused dual-span HTTP; extra DHW / climate / fan / DHW start-stop / op-mode actually write locally; cloud-only entities are hidden instead of sitting unavailable; write access does not need cloud elevation.
-- **Lose:** HTTP fallback if Modbus drops; cloud-backed extra DHW duration and `tap_stop`; SmartControl and elevate-access while “on Modbus”; bp1/bp2/`fan0_10v` via fallback; write access via cloud when `modbus_write` is off; stable cloud `hpid` in entity unique IDs.
+- **Lose:** HTTP fallback if Modbus drops; pump/cloud-enforced extra DHW `stopTime` (local `tap_stop` is HA’s persisted restore epoch); SmartControl and elevate-access while “on Modbus”; bp1/bp2/`fan0_10v` via fallback; write access via cloud when `modbus_write` is off; stable cloud `hpid` in entity unique IDs.
 
 ### Previous Modbus vs HTTP
 
@@ -197,8 +197,9 @@ That is no longer true on this stack. Local is XOR cloud; writes never fall back
 
 ## 9. Highest-value remaining local gaps
 
-1. Persist extra-DHW restore across a Home Assistant restart (and optionally restore `tap_stop`-like remaining time).
-2. Decide whether unused holdings (on/off, cooling allow, curves, pump speeds) should become entities.
-3. Confirm SmartControl stays permanently cloud-only (current constraint).
-4. Update README for exclusive Cloud vs Modbus setup, identity probe, and holding writes.
-5. Entity unique-id migration for users who already ran the hybrid overlay (cloud `hpid` → serial).
+1. Decide whether unused holdings (on/off, cooling allow, curves, pump speeds) should become entities.
+2. Confirm SmartControl stays permanently cloud-only (current constraint).
+3. Update README for exclusive Cloud vs Modbus setup, identity probe, and holding writes.
+4. Entity unique-id migration for users who already ran the hybrid overlay (cloud `hpid` → serial).
+
+Done in this persist-across-restart work: extra-DHW restore deadline is stored and resumed after a Home Assistant restart; local `tap_stop` is the restore epoch.
