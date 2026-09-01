@@ -25,10 +25,10 @@ DHW_MODE_ECO = 0
 DHW_MODE_NORMAL = 1
 DHW_MODE_EXTRA = 2
 DHW_MODE_SMART = 3
-VERSION = "2026.8.5"
+VERSION = "2026.9.1"
 CONFIG_VERSION = 7
 # Shared Modbus units (`async_get_unit`) shipped in Home Assistant 2026.9.
-MIN_HA_VERSION = "2026.8.5"
+MIN_HA_VERSION = "2026.9.1"
 
 # Modbus TCP configuration
 CONF_MODBUS_TCP = "modbus_tcp"

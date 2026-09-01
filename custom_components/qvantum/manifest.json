@@ -15,5 +15,5 @@
         "modbus-connection>=4.10.0,<5.0.0"
     ],
     "single_config_entry": true,
-    "version": "2026.8.5"
+    "version": "2026.9.1"
 }
