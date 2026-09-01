@@ -467,18 +467,20 @@ class TestExtraTapWaterModbus:
         api = _modbus_api()
         api.hass = MagicMock()
         api._extra_dhw_store = MagicMock()
-        calls = []
+        seen = []
 
         def create_task(coro, name=None):
+            seen.append((coro, name))
             if name is not None:
-                coro.close()
                 raise TypeError("unexpected keyword argument 'name'")
-            calls.append({"name": name})
             coro.close()
 
         api.hass.async_create_task = create_task
         api._persist_extra_dhw(None)
-        assert calls == [{"name": None}]
+        assert len(seen) == 2
+        assert seen[0][0] is seen[1][0]
+        assert seen[0][1] == "qvantum_persist_extra_dhw"
+        assert seen[1][1] is None
 
     @pytest.mark.asyncio
     async def test_schedule_expired_deadline_still_restores(self):
