@@ -82,6 +82,8 @@ class QvantumAPI:
         self._modbus_lock = asyncio.Lock()
         self._closed = False
         self._extra_dhw_unsub = None
+        self._extra_dhw_restore_at: float | None = None
+        self._extra_dhw_store = None
         # Modbus-only mode never opens an HTTP session, even if a caller
         # injects one. Cloud mode owns a session unless a test injects it.
         if modbus_tcp:
@@ -372,18 +374,65 @@ class QvantumAPI:
             "Authorization": f"Bearer {self._token}",
         }
 
-    def _cancel_extra_dhw_timer(self) -> None:
+    def _cancel_extra_dhw_timer(self, *, clear_store: bool = False) -> None:
         """Cancel a pending extra-DHW restore callback."""
         unsub = self._extra_dhw_unsub
         self._extra_dhw_unsub = None
         if unsub:
             unsub()
+        if clear_store:
+            self._extra_dhw_restore_at = None
+            self._persist_extra_dhw(None)
 
-    def _schedule_extra_dhw_restore(self, device_id: str, minutes: int) -> None:
-        """After *minutes*, write DHW mode back to Normal."""
-        self._cancel_extra_dhw_timer()
-        if not self.hass or minutes <= 0:
+    async def async_persist_extra_dhw(self, payload: dict | None) -> None:
+        """Save or clear the extra-DHW restore deadline."""
+        store = self._extra_dhw_store
+        if store is None:
             return
+        try:
+            if payload is None:
+                await store.async_remove()
+            else:
+                await store.async_save(payload)
+        except Exception:
+            if payload is None:
+                _LOGGER.debug("Failed to clear extra DHW timer", exc_info=True)
+            else:
+                _LOGGER.debug("Failed to persist extra DHW timer", exc_info=True)
+
+    def _persist_extra_dhw(self, payload: dict | None) -> None:
+        """Fire-and-forget persist for sync callers (options listener)."""
+        hass = self.hass
+        if self._extra_dhw_store is None or hass is None:
+            return
+        create_task = getattr(hass, "async_create_task", None)
+        if callable(create_task):
+            coro = self.async_persist_extra_dhw(payload)
+            try:
+                create_task(coro, name="qvantum_persist_extra_dhw")
+            except TypeError:
+                create_task(coro)
+
+    async def _schedule_extra_dhw_restore(self, device_id: str, minutes: int) -> None:
+        """After *minutes*, write DHW mode back to Normal."""
+        if minutes <= 0:
+            return
+        restore_at = datetime.now(timezone.utc).timestamp() + minutes * 60
+        await self._schedule_extra_dhw_at(device_id, restore_at, persist=True)
+
+    async def _schedule_extra_dhw_at(
+        self, device_id: str, restore_at: float, *, persist: bool
+    ) -> None:
+        """Schedule restore at an absolute UTC epoch; persist when requested."""
+        self._cancel_extra_dhw_timer(clear_store=False)
+        remaining = restore_at - datetime.now(timezone.utc).timestamp()
+        if not self.hass:
+            return
+        self._extra_dhw_restore_at = restore_at
+        if persist:
+            await self.async_persist_extra_dhw(
+                {"device_id": str(device_id), "restore_at": restore_at}
+            )
         from homeassistant.helpers.event import async_call_later
 
         async def _restore(_now) -> None:
@@ -396,10 +445,57 @@ class QvantumAPI:
                 _LOGGER.warning(
                     "Failed to restore DHW mode after extra hot water timer: %s", err
                 )
+                return
+            self._extra_dhw_restore_at = None
+            try:
+                await self.async_persist_extra_dhw(None)
+            except Exception:
+                _LOGGER.debug("Failed to clear extra DHW timer", exc_info=True)
 
-        self._extra_dhw_unsub = async_call_later(
-            self.hass, minutes * 60, _restore
-        )
+        delay = max(remaining, 0)
+        self._extra_dhw_unsub = async_call_later(self.hass, delay, _restore)
+
+    async def async_restore_extra_dhw_timer(self) -> None:
+        """Resume a persisted extra-DHW restore after Home Assistant restart."""
+        if not self._modbus_tcp:
+            return
+        if not self._modbus_write:
+            # Writes off: do not reschedule, and drop any saved deadline.
+            await self.async_persist_extra_dhw(None)
+            return
+        store = self._extra_dhw_store
+        if store is None:
+            return
+        try:
+            data = await store.async_load()
+        except Exception:
+            _LOGGER.debug("Failed to load extra DHW timer", exc_info=True)
+            return
+        if not isinstance(data, dict):
+            return
+        device_id = data.get("device_id")
+        restore_at = data.get("restore_at")
+        if not device_id or not isinstance(restore_at, (int, float)):
+            return
+        remaining = float(restore_at) - datetime.now(timezone.utc).timestamp()
+        if remaining <= 0:
+            self._extra_dhw_restore_at = float(restore_at)
+            try:
+                await self.write_holding_register_for_metric(
+                    device_id, "extra_tap_water", DHW_MODE_NORMAL
+                )
+            except Exception as err:
+                _LOGGER.warning(
+                    "Failed to restore DHW mode after extra hot water timer: %s", err
+                )
+                return
+            self._extra_dhw_restore_at = None
+            try:
+                await self.async_persist_extra_dhw(None)
+            except Exception:
+                _LOGGER.debug("Failed to clear extra DHW timer", exc_info=True)
+            return
+        await self._schedule_extra_dhw_at(str(device_id), float(restore_at), persist=False)
 
     def _ensure_modbus_write_allowed(self) -> None:
         """Raise when Modbus TCP is on but holding-register writes are disabled."""
@@ -637,16 +733,25 @@ class QvantumAPI:
     async def set_extra_tap_water(self, device_id: str, minutes: int):
         """Update extra_tap_water setting."""
         if self._modbus_tcp:
-            self._cancel_extra_dhw_timer()
+            if minutes > 0:
+                result = await self.write_holding_register_for_metric(
+                    device_id, "extra_tap_water", DHW_MODE_EXTRA
+                )
+                await self._schedule_extra_dhw_restore(device_id, minutes)
+                return result
+            # Off or indefinite: write first so a failed write keeps the
+            # persisted timed restore for the next restart.
             if minutes == 0:
-                return await self.write_holding_register_for_metric(
+                result = await self.write_holding_register_for_metric(
                     device_id, "extra_tap_water", DHW_MODE_NORMAL
                 )
-            result = await self.write_holding_register_for_metric(
-                device_id, "extra_tap_water", DHW_MODE_EXTRA
-            )
-            if minutes > 0:
-                self._schedule_extra_dhw_restore(device_id, minutes)
+            else:
+                result = await self.write_holding_register_for_metric(
+                    device_id, "extra_tap_water", DHW_MODE_EXTRA
+                )
+            self._cancel_extra_dhw_timer(clear_store=False)
+            self._extra_dhw_restore_at = None
+            await self.async_persist_extra_dhw(None)
             return result
 
         # Capture current time once to ensure consistency across all code paths

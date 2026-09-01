@@ -237,6 +237,19 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         modbus_write=modbus_enabled and _modbus_write_enabled(config_entry),
     )
     hass.data[DOMAIN].hass = hass
+    if modbus_enabled:
+        if isinstance(getattr(getattr(hass, "config", None), "config_dir", None), str):
+            from homeassistant.helpers.storage import Store
+
+            api = hass.data[DOMAIN]
+            api._extra_dhw_store = Store(
+                hass, 1, f"{DOMAIN}.extra_dhw.{config_entry.entry_id}"
+            )
+            restore = getattr(api, "async_restore_extra_dhw_timer", None)
+            if callable(restore):
+                restore_result = restore()
+                if inspect.isawaitable(restore_result):
+                    await restore_result
 
     coordinator = QvantumDataUpdateCoordinator(hass, config_entry)
     await coordinator.async_restore_dhw_state()
@@ -362,7 +375,7 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
         if getattr(api, "_modbus_write", False) and not write_enabled:
             cancel = getattr(api, "_cancel_extra_dhw_timer", None)
             if callable(cancel):
-                cancel()
+                cancel(clear_store=True)
         api._modbus_write = write_enabled
 
     changed = runtime.coordinator.apply_poll_interval(config_entry)
