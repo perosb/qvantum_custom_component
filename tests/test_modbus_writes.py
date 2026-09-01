@@ -418,6 +418,53 @@ class TestExtraTapWaterModbus:
         store.async_remove.assert_not_called()
         assert api._extra_dhw_restore_at == deadline
 
+    @pytest.mark.asyncio
+    async def test_persist_extra_dhw_swallows_store_errors(self):
+        api = _modbus_api()
+        store = MagicMock()
+        store.async_save = AsyncMock(side_effect=OSError("disk full"))
+        store.async_remove = AsyncMock(side_effect=OSError("disk full"))
+        api._extra_dhw_store = store
+        await api.async_persist_extra_dhw({"device_id": "dev1", "restore_at": 1.0})
+        await api.async_persist_extra_dhw(None)
+        store.async_save.assert_awaited_once()
+        store.async_remove.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_schedule_expired_deadline_still_restores(self):
+        api = _modbus_api()
+        api.hass = MagicMock()
+        captured = {}
+
+        def fake_later(_hass, seconds, callback):
+            captured["delay"] = seconds
+            captured["cb"] = callback
+            return MagicMock()
+
+        with (
+            patch.object(
+                api,
+                "write_holding_register_for_metric",
+                AsyncMock(return_value={"status": "APPLIED"}),
+            ) as write,
+            patch("homeassistant.helpers.event.async_call_later", side_effect=fake_later),
+        ):
+            await api._schedule_extra_dhw_at("dev1", 1.0, persist=False)
+            assert captured["delay"] == 0
+            await captured["cb"](None)
+        write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_NORMAL)
+
+    @pytest.mark.asyncio
+    async def test_schedule_clamps_negative_delay(self):
+        api = _modbus_api()
+        api.hass = MagicMock()
+        with patch(
+            "homeassistant.helpers.event.async_call_later", return_value=MagicMock()
+        ) as later:
+            await api._schedule_extra_dhw_at("dev1", 1.0, persist=False)
+        later.assert_called_once()
+        assert later.call_args.args[1] >= 0
+
 
 class TestModbusWriteOptionGate:
     @pytest.mark.asyncio

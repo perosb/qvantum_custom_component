@@ -238,8 +238,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     )
     hass.data[DOMAIN].hass = hass
     if modbus_enabled:
-        config_dir = getattr(getattr(hass, "config", None), "config_dir", None)
-        if isinstance(config_dir, str):
+        if isinstance(getattr(getattr(hass, "config", None), "config_dir", None), str):
             from homeassistant.helpers.storage import Store
 
             api = hass.data[DOMAIN]

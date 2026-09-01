@@ -389,10 +389,16 @@ class QvantumAPI:
         store = self._extra_dhw_store
         if store is None:
             return
-        if payload is None:
-            await store.async_remove()
-        else:
-            await store.async_save(payload)
+        try:
+            if payload is None:
+                await store.async_remove()
+            else:
+                await store.async_save(payload)
+        except Exception:
+            if payload is None:
+                _LOGGER.debug("Failed to clear extra DHW timer", exc_info=True)
+            else:
+                _LOGGER.debug("Failed to persist extra DHW timer", exc_info=True)
 
     def _persist_extra_dhw(self, payload: dict | None) -> None:
         """Fire-and-forget persist for sync callers (options listener)."""
@@ -419,7 +425,7 @@ class QvantumAPI:
         """Schedule restore at an absolute UTC epoch; persist when requested."""
         self._cancel_extra_dhw_timer(clear_store=False)
         remaining = restore_at - datetime.now(timezone.utc).timestamp()
-        if not self.hass or remaining <= 0:
+        if not self.hass:
             return
         self._extra_dhw_restore_at = restore_at
         if persist:
@@ -445,7 +451,8 @@ class QvantumAPI:
             except Exception:
                 _LOGGER.debug("Failed to clear extra DHW timer", exc_info=True)
 
-        self._extra_dhw_unsub = async_call_later(self.hass, remaining, _restore)
+        delay = max(remaining, 0)
+        self._extra_dhw_unsub = async_call_later(self.hass, delay, _restore)
 
     async def async_restore_extra_dhw_timer(self) -> None:
         """Resume a persisted extra-DHW restore after Home Assistant restart."""
