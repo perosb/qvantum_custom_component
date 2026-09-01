@@ -456,7 +456,11 @@ class QvantumAPI:
 
     async def async_restore_extra_dhw_timer(self) -> None:
         """Resume a persisted extra-DHW restore after Home Assistant restart."""
-        if not self._modbus_tcp or not self._modbus_write:
+        if not self._modbus_tcp:
+            return
+        if not self._modbus_write:
+            # Writes off: do not reschedule, and drop any saved deadline.
+            await self.async_persist_extra_dhw(None)
             return
         store = self._extra_dhw_store
         if store is None:

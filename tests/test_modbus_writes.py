@@ -279,6 +279,25 @@ class TestExtraTapWaterModbus:
         assert api._extra_dhw_restore_at == 123.0
 
     @pytest.mark.asyncio
+    async def test_restore_timer_clears_store_when_writes_disabled(self):
+        api = _modbus_api(modbus_write=False)
+        api.hass = MagicMock()
+        store = MagicMock()
+        store.async_load = AsyncMock(
+            return_value={"device_id": "dev1", "restore_at": 9999999999.0}
+        )
+        store.async_remove = AsyncMock()
+        api._extra_dhw_store = store
+        with patch(
+            "homeassistant.helpers.event.async_call_later", return_value=MagicMock()
+        ) as later:
+            await api.async_restore_extra_dhw_timer()
+        later.assert_not_called()
+        store.async_load.assert_not_called()
+        store.async_remove.assert_awaited_once()
+        assert api._extra_dhw_restore_at is None
+
+    @pytest.mark.asyncio
     async def test_restore_timer_reschedules_remaining(self):
         api = _modbus_api()
         api.hass = MagicMock()
