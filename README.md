@@ -2,16 +2,28 @@
 
 ## Qvantum Heat Pump Integration for Home Assistant
 
+This integration supports two connection modes for your Qvantum heat pump:
+
+- **Cloud mode (HTTP)**: Connects through your Qvantum account and cloud API to read live metrics, firmware details, SmartControl, and cloud-based settings.
+- **Modbus mode (offline/local)**: Connects directly to the heat pump on your local network over Modbus TCP, without requiring a Qvantum account or cloud session.
+
+Choose the mode that matches your setup:
+- Use **Cloud mode** for the full cloud-integrated feature set and account-based controls.
+- Use **Modbus (offline/local)** when you want local, direct access to the heat pump, faster local polling, or to keep everything running without cloud connectivity.
 
 > [!CAUTION]
->This custom component uses the same internal API for all metrics that is also used by the app.  
->It pulls live metrics from the heat pump.  
->Use at your own risk ;)  
+>Cloud mode uses the same internal API that the Qvantum app uses to fetch live metrics from the heat pump.  
+>This is a cloud-based integration and should be considered experimental and at your own risk.  
 
 > [!WARNING]
->The Elevate access rights works by creating a "Remote Service" access to your user.  
->Essentially it gives you service tech/installer access.  
->This is apparently required for us to change some settings on our own pumps.  
+>Cloud mode only: the Elevate Access feature creates a "Remote Service" access for your user.  
+>It effectively grants service/installer-level access to the heat pump.  
+>This is required for some advanced cloud-based settings and maintenance actions.  
+
+> [!IMPORTANT]
+>Modbus mode is local and offline. It does not use the cloud API.
+>When you enable Modbus write mode, you are directly writing values to the heat pump.  
+>Only enable writing if you understand the consequences. Incorrect or out-of-range values may affect performance, warranty, and the system lifecycle.  
 
 ### Transform Your Home's Energy Efficiency with Qvantum
 
