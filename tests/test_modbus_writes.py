@@ -449,6 +449,37 @@ class TestExtraTapWaterModbus:
         store.async_save.assert_awaited_once()
         store.async_remove.assert_awaited_once()
 
+    def test_persist_extra_dhw_schedules_named_task(self):
+        api = _modbus_api()
+        api.hass = MagicMock()
+        api._extra_dhw_store = MagicMock()
+        calls = []
+
+        def create_task(coro, name=None):
+            calls.append({"name": name})
+            coro.close()
+
+        api.hass.async_create_task = create_task
+        api._persist_extra_dhw(None)
+        assert calls == [{"name": "qvantum_persist_extra_dhw"}]
+
+    def test_persist_extra_dhw_retries_without_name(self):
+        api = _modbus_api()
+        api.hass = MagicMock()
+        api._extra_dhw_store = MagicMock()
+        calls = []
+
+        def create_task(coro, name=None):
+            if name is not None:
+                coro.close()
+                raise TypeError("unexpected keyword argument 'name'")
+            calls.append({"name": name})
+            coro.close()
+
+        api.hass.async_create_task = create_task
+        api._persist_extra_dhw(None)
+        assert calls == [{"name": None}]
+
     @pytest.mark.asyncio
     async def test_schedule_expired_deadline_still_restores(self):
         api = _modbus_api()

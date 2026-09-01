@@ -407,10 +407,13 @@ class QvantumAPI:
             return
         create_task = getattr(hass, "async_create_task", None)
         if callable(create_task):
-            create_task(
-                self.async_persist_extra_dhw(payload),
-                name="qvantum_persist_extra_dhw",
-            )
+            try:
+                create_task(
+                    self.async_persist_extra_dhw(payload),
+                    name="qvantum_persist_extra_dhw",
+                )
+            except TypeError:
+                create_task(self.async_persist_extra_dhw(payload))
 
     async def _schedule_extra_dhw_restore(self, device_id: str, minutes: int) -> None:
         """After *minutes*, write DHW mode back to Normal."""
