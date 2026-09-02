@@ -116,6 +116,7 @@ _CLOUD_ONLY_WRITE_METRICS = frozenset(
         "enable_sc_sh",
         "enable_sc_dhw",
         "elevate_access",
+        "vacation_mode",
     }
 )
 
@@ -145,6 +146,7 @@ _ENTITY_ICONS: dict[str, str] = {
     "extra_tap_water": "mdi:water-boiler",
     "enable_sc_sh": "mdi:radiator",
     "enable_sc_dhw": "mdi:water-thermometer",
+    "vacation_mode": "mdi:palm-tree",
     # Select
     "use_adaptive": "mdi:leaf",
     "use_operation_sensor": "mdi:motion-sensor",

@@ -19,6 +19,7 @@ This document outlines the AI agents, assistants, and tools that contributed to 
   - Derived metric implementation: `heatingpower` calculated from `heatingenergy` counter delta with accurate time-window measurement and hold-last-value while heating
   - Centralized icon mapping in `QvantumEntity` base class
   - Bug fixes for heating power overestimation caused by coarse counter resolution vs. fast poll intervals
+  - Vacation mode (`vacation_mode`) switch entity support
 - **Tools Used**:
   - Code completion and suggestions
   - Multi-file editing capabilities
