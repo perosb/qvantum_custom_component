@@ -40,13 +40,17 @@ with patch(
                     ):
                         from homeassistant.helpers.device_registry import DeviceInfo
 
-                        from custom_components.qvantum.switch import QvantumSwitchEntity
+                        from custom_components.qvantum.switch import (
+                            QvantumDataUpdateCoordinator,
+                            QvantumSwitchEntity,
+                        )
 
 
 @pytest.fixture
 def mock_coordinator():
     """Create a mock coordinator with test data."""
-    coordinator = MagicMock()
+    coordinator = MagicMock(spec=QvantumDataUpdateCoordinator)
+    coordinator.modbus_enabled = False
     coordinator.data = {
         "device": {"id": "test_device_123"},
         "values": {
@@ -122,6 +126,11 @@ class TestQvantumSwitchEntity:
         """Test switch entity initialization with op_man_addition icon."""
         entity = QvantumSwitchEntity(mock_coordinator, "op_man_addition", mock_device)
         assert entity._attr_icon == "mdi:transmission-tower-import"
+
+    def test_init_vacation_mode_icon(self, mock_coordinator, mock_device):
+        """Test switch entity initialization with vacation_mode icon."""
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+        assert entity._attr_icon == "mdi:palm-tree"
 
     def test_init_default_icon(self, mock_coordinator, mock_device):
         """Test switch entity initialization with unknown metric has no icon."""
@@ -448,6 +457,95 @@ class TestQvantumSwitchEntity:
         )
         # The method updates metrics
         assert mock_coordinator.data["values"]["enable_sc_sh"] is False
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
+
+    def test_is_on_vacation_mode_off(self, mock_coordinator, mock_device):
+        """Test is_on when vacation_mode is 'off'."""
+        mock_coordinator.data["values"]["vacation_mode"] = "off"
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+        assert entity.is_on is False
+
+    def test_is_on_vacation_mode_on(self, mock_coordinator, mock_device):
+        """Test is_on when vacation_mode is 'on'."""
+        mock_coordinator.data["values"]["vacation_mode"] = "on"
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+        assert entity.is_on is True
+
+    def test_is_on_vacation_mode_bool(self, mock_coordinator, mock_device):
+        """Test is_on when vacation_mode is boolean."""
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+        mock_coordinator.data["values"]["vacation_mode"] = True
+        assert entity.is_on is True
+        mock_coordinator.data["values"]["vacation_mode"] = False
+        assert entity.is_on is False
+
+    def test_available_vacation_mode_available(self, mock_coordinator, mock_device):
+        """Test available for vacation_mode when data is present."""
+        mock_coordinator.data["values"]["vacation_mode"] = "off"
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+        assert entity.available is True
+
+    def test_available_vacation_mode_without_elevated_access(
+        self, mock_coordinator, mock_device
+    ):
+        """Test vacation_mode is available even without elevated write access (level 10)."""
+        mock_coordinator.data["values"]["vacation_mode"] = "off"
+        mock_coordinator.config_entry.runtime_data.maintenance_coordinator.data = {
+            "access_level": {"writeAccessLevel": 10}
+        }
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+        assert entity._has_write_access is False
+        assert entity.available is True
+
+    def test_available_vacation_mode_none(self, mock_coordinator, mock_device):
+        """Test available for vacation_mode when value is None."""
+        mock_coordinator.data["values"]["vacation_mode"] = None
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+        assert entity.available is False
+
+    def test_available_vacation_mode_modbus_unavailable(self, mock_coordinator, mock_device):
+        """Test vacation_mode is unavailable in Modbus mode (cloud-only write)."""
+        mock_coordinator.data["values"]["vacation_mode"] = "off"
+        mock_coordinator.modbus_enabled = True
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_async_turn_on_vacation_mode(self, mock_coordinator, mock_device):
+        """Test turning on vacation_mode."""
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_turn_on()
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "vacation_mode", True
+        )
+        assert mock_coordinator.data["values"]["vacation_mode"] is True
+        mock_coordinator.async_set_updated_data.assert_called_once_with(
+            mock_coordinator.data
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_turn_off_vacation_mode(self, mock_coordinator, mock_device):
+        """Test turning off vacation_mode."""
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_turn_off()
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "vacation_mode", False
+        )
+        assert mock_coordinator.data["values"]["vacation_mode"] is False
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )

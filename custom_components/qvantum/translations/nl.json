@@ -26,6 +26,9 @@
       },
       "enable_sc_sh": {
         "name": "SmartControl: Verwarming"
+      },
+      "vacation_mode": {
+        "name": "Vakantiemodus"
       }
     },
     "select": {

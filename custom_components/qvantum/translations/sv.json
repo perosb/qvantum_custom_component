@@ -66,6 +66,9 @@
       },
       "enable_sc_sh": {
         "name": "SmartControl: Uppvärmning"
+      },
+      "vacation_mode": {
+        "name": "Semesterläge"
       }
     },
     "button": {

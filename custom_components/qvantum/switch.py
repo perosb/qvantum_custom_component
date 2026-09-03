@@ -32,6 +32,7 @@ async def async_setup_entry(
         "man_mode",
         "enable_sc_sh",
         "enable_sc_dhw",
+        "vacation_mode",
     ]
 
     sensors = []
@@ -66,7 +67,7 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
                     response, self.coordinator, "values", self._metric_key, "off"
                 )
 
-            case "enable_sc_dhw" | "enable_sc_sh":
+            case "enable_sc_dhw" | "enable_sc_sh" | "vacation_mode":
                 response = await self.coordinator.api.update_setting(
                     self._hpid, self._metric_key, False
                 )
@@ -93,7 +94,7 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
                     response, self.coordinator, "values", self._metric_key, "on"
                 )
 
-            case "enable_sc_dhw" | "enable_sc_sh":
+            case "enable_sc_dhw" | "enable_sc_sh" | "vacation_mode":
                 response = await self.coordinator.api.update_setting(
                     self._hpid, self._metric_key, True
                 )
@@ -143,6 +144,12 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
                     and values.get("use_adaptive") is True
                     and self._has_write_access
                 )
+
+            case "vacation_mode":
+                if getattr(self.coordinator, "modbus_enabled", False):
+                    return False
+                return values.get("vacation_mode") is not None
+
             case _:
                 return (
                     values.get(self._metric_key) is not None

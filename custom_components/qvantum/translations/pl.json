@@ -26,6 +26,9 @@
       },
       "enable_sc_sh": {
         "name": "SmartControl: Ogrzewanie"
+      },
+      "vacation_mode": {
+        "name": "Tryb wakacyjny"
       }
     },
     "select": {

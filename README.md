@@ -80,7 +80,7 @@ Cloud-only sensors (firmware boards and access expiry) are not created in this m
 ### Features
 
 - **Real-time Monitoring**: Temperature sensors, pressure readings, energy consumption
-- **System Control**: Adjust operation modes, set temperatures, control ventilation
+- **System Control**: Adjust operation modes, set temperatures, toggle vacation mode, control ventilation
 - **Energy Analytics**: Daily and total energy usage tracking
 - **Smart Status**: Heat pump status, defrost cycles, priority modes
 - **Comprehensive Coverage**: Supports all major Qvantum heat pump parameters
@@ -97,7 +97,7 @@ Cloud-only sensors (firmware boards and access expiry) are not created in this m
 >
 > Supported local writes include indoor target/offset, DHW start/stop, extra DHW, fan preset, operation/manual switches, room compensation, fan speeds, extra-DHW stop, external room temperature, and indoor sensor source.
 >
-> **SmartControl** (`use_adaptive`, `enable_sc_sh`, `enable_sc_dhw`) and **elevate-access** stay cloud-only. They are unavailable in local mode.
+> **SmartControl** (`use_adaptive`, `enable_sc_sh`, `enable_sc_dhw`), **vacation mode**, and **elevate-access** stay cloud-only. They are unavailable in local mode.
 >
 > By enabling Modbus writing you accept full responsibility for values written to the pump. Incorrect or out-of-range values may void the warranty and/or affect lifecycle and performance.
 
