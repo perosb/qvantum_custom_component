@@ -28,7 +28,7 @@ def update_manifest():
     manifest["version"] = version
 
 
-    pattern = r'VERSION\s*=\s*"\d+\.\d+\.\d+"'
+    pattern = r'^VERSION\s*=\s*"\d+\.\d+\.\d+"'
     replacement = f'VERSION = "{version}"'
 
     with open(f"{os.getcwd()}/{manifest_path}/const.py",'r') as file:
