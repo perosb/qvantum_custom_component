@@ -14,14 +14,23 @@ fi
 # Create the venv if needed, then always install requirements so pip
 # upgrades stale Home Assistant / modbus-connection versions.
 if [ ! -d ".venv" ]; then
-    echo "Setting up virtual environment..."
-    python3 -m venv .venv
+    if command -v uv >/dev/null 2>&1; then
+        echo "Setting up Python 3.14 virtual environment with uv..."
+        uv venv --seed .venv --python 3.14
+    else
+        echo "Setting up virtual environment..."
+        python3 -m venv .venv
+    fi
 fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
-pip install --upgrade pip
 echo "Installing test dependencies..."
-pip install -r requirements-test.txt
+if command -v uv >/dev/null 2>&1; then
+    uv pip install -r requirements-test.txt
+else
+    pip install --upgrade pip
+    pip install -r requirements-test.txt
+fi
 
 # Run tests
 echo "Running pytest..."
