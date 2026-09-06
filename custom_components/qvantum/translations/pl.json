@@ -511,7 +511,7 @@
       "room_temp_external": {
         "name": "Zewnętrzna temperatura wewnętrzna"
       },
-      "outdoor_stop_heating": {
+      "stop_heating": {
         "name": "Temperatura zewnętrzna wyłączenia ogrzewania"
       }
     },

@@ -113,7 +113,7 @@ If `modbus_write` is off, current local is **read-only**. Previous Modbus with w
 | `op_mode`, `man_mode`, `op_man_dhw`, `op_man_addition` | 1 / 2 / 5 / 4 | HTTP `update_settings` |
 | `room_comp_factor`, `fan_normal`, `fan_speed_2` | 13 / 70 / 69 | HTTP |
 | `dhw_stop_extra`, `room_temp_external`, sensor mode | 59 / 14 / 9 | Same as previous local writes |
-| `outdoor_stop_heating` | 18 | Number entity, Modbus-only |
+| `stop_heating` | 18 `outdoor_stop_heating` | HTTP setting `stop_heating` |
 
 `start_cooling_temp` (38) is **readable** as a sensor; there is no number entity to write it.
 
