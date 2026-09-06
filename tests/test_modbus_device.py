@@ -139,7 +139,7 @@ class TestComponentDecode:
         await device.write_metric("room_comp_factor", 2.5)
         await device.write_metric("room_temp_external", 21.5)
         await device.write_metric("dhw_stop_extra", 75)
-        await device.write_metric("outdoor_stop_heating", -15)
+        await device.write_metric("stop_heating", -15)
 
         assert unit.holding[13] == 25
         assert unit.holding[14] == 215
@@ -291,6 +291,12 @@ class TestPayloadAdapter:
         assert settings["extra_tap_water"] == "on"
         assert settings["fanspeedselector"] == "extra"
 
+    def test_stop_heating_http_alias(self):
+        payload = build_settings_payload({"outdoor_stop_heating": 18})
+        settings = {item["name"]: item["value"] for item in payload["settings"]}
+        assert settings["stop_heating"] == 18
+        assert settings["outdoor_stop_heating"] == 18
+
     def test_unknown_metric_raises(self):
         with pytest.raises(
             ValueError, match="No Modbus holding register mapping found"
@@ -300,4 +306,5 @@ class TestPayloadAdapter:
     def test_holding_field_for_http_alias(self):
         assert holding_field_for_metric("room_comp_factor") == "room_compensation"
         assert holding_field_for_metric("dhw_stop_extra") == "dhw_stop_extra"
+        assert holding_field_for_metric("stop_heating") == "outdoor_stop_heating"
         assert holding_field_for_metric("outdoor_stop_heating") == "outdoor_stop_heating"

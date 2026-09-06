@@ -163,5 +163,5 @@ MODBUS_HOLDING_TO_SETTINGS_MAP = {
     "ventilation_state": "fanspeedselector",
     "dhw_stop_extra": "dhw_stop_extra",
     "room_temp_external": "room_temp_external",
-    "outdoor_stop_heating": "outdoor_stop_heating",
+    "outdoor_stop_heating": "stop_heating",
 }

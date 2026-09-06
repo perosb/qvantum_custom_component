@@ -2164,3 +2164,18 @@ class TestWriteHoldingRegister:
 
         assert result == {"status": "APPLIED"}
         assert device.unit.holding[18] == 0xFFF1
+
+    @pytest.mark.asyncio
+    async def test_write_holding_register_for_metric_stop_heating_alias(
+        self, mock_session
+    ):
+        """HTTP setting stop_heating writes signed int16 to holding register 18."""
+        api = self._make_api(mock_session)
+        _connection, device = attach_mock_modbus(api)
+
+        result = await api.write_holding_register_for_metric(
+            "dev1", "stop_heating", -15
+        )
+
+        assert result == {"status": "APPLIED"}
+        assert device.unit.holding[18] == 0xFFF1

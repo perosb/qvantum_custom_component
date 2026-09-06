@@ -43,6 +43,11 @@
       "name": "tap_water_start",
       "value": 52,
       "read_only": false
+    },
+    {
+      "name": "stop_heating",
+      "value": 18,
+      "read_only": false
     }
   ]
 }

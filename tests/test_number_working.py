@@ -734,131 +734,139 @@ class TestRoomTempExternal:
         mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
 
 
-class TestOutdoorStopHeating:
-    """Tests for the outdoor_stop_heating number entity (Modbus holding 18)."""
+class TestStopHeating:
+    """Tests for the stop_heating number entity (HTTP setting / Modbus holding 18)."""
 
-    def test_init_outdoor_stop_heating(self, mock_coordinator, mock_device):
-        """Test outdoor_stop_heating entity initialization."""
-        mock_coordinator.data["values"]["outdoor_stop_heating"] = 15
-        mock_coordinator.config_entry.options = {
-            "modbus_write": True,
-            "modbus_tcp": True,
-        }
+    def test_init_stop_heating(self, mock_coordinator, mock_device):
+        """Test stop_heating entity initialization."""
+        mock_coordinator.modbus_enabled = False
+        mock_coordinator.data["values"]["stop_heating"] = 15
         entity = QvantumNumberEntity(
-            mock_coordinator, "outdoor_stop_heating", -30, 30, 1, mock_device
+            mock_coordinator, "stop_heating", -30, 30, 1, mock_device
         )
 
-        assert entity._metric_key == "outdoor_stop_heating"
+        assert entity._metric_key == "stop_heating"
         assert entity._attr_native_min_value == -30
         assert entity._attr_native_max_value == 30
         assert entity._attr_native_step == 1
-        assert (
-            entity._attr_unique_id
-            == "qvantum_number_outdoor_stop_heating_test_device_123"
-        )
+        assert entity._attr_unique_id == "qvantum_number_stop_heating_test_device_123"
         assert entity.state == 15
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
 
-    def test_available_when_modbus_write_enabled(
-        self, mock_coordinator, mock_device
-    ):
-        """Test entity is available when Modbus write is enabled."""
-        mock_coordinator.data["values"]["outdoor_stop_heating"] = 15
-        mock_coordinator.config_entry.options = {
+    def test_available_in_cloud_mode(self, mock_coordinator, mock_device):
+        """Test entity is available in cloud mode when write access is granted."""
+        mock_coordinator.modbus_enabled = False
+        mock_coordinator.data["values"]["stop_heating"] = 15
+        entity = QvantumNumberEntity(
+            mock_coordinator, "stop_heating", -30, 30, 1, mock_device
+        )
+        assert entity.available is True
+
+    def test_available_when_modbus_write_enabled(self, mock_device):
+        """Test entity is available in Modbus mode when writing is enabled."""
+        from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+        coordinator = QvantumDataUpdateCoordinator.__new__(
+            QvantumDataUpdateCoordinator
+        )
+        coordinator.data = {
+            "values": {"stop_heating": 15, "hpid": "test_device_123"}
+        }
+        coordinator.modbus_enabled = True
+        coordinator.config_entry = MagicMock()
+        coordinator.config_entry.options = {
             "modbus_write": True,
             "modbus_tcp": True,
         }
+        coordinator.config_entry.data = {}
         entity = QvantumNumberEntity(
-            mock_coordinator, "outdoor_stop_heating", -30, 30, 1, mock_device
+            coordinator, "stop_heating", -30, 30, 1, mock_device
         )
         assert entity.available is True
 
     def test_unavailable_when_modbus_write_disabled(
         self, mock_coordinator, mock_device
     ):
-        """Test entity is unavailable when Modbus write is disabled."""
-        mock_coordinator.data["values"]["outdoor_stop_heating"] = 15
-        mock_coordinator.config_entry.options = {}
-        mock_coordinator.config_entry.data = {}
-        entity = QvantumNumberEntity(
-            mock_coordinator, "outdoor_stop_heating", -30, 30, 1, mock_device
-        )
-        assert entity.available is False
+        """Test entity is unavailable in Modbus mode when writing is disabled."""
+        from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
 
-    def test_unavailable_when_modbus_tcp_disabled(
-        self, mock_coordinator, mock_device
-    ):
-        """Test entity is unavailable when Modbus TCP is disabled."""
-        mock_coordinator.data["values"]["outdoor_stop_heating"] = 15
-        mock_coordinator.config_entry.options = {
-            "modbus_write": True,
-            "modbus_tcp": False,
+        coordinator = QvantumDataUpdateCoordinator.__new__(
+            QvantumDataUpdateCoordinator
+        )
+        coordinator.data = {
+            "values": {"stop_heating": 15, "hpid": "test_device_123"}
         }
-        mock_coordinator.config_entry.data = {}
+        coordinator.modbus_enabled = True
+        coordinator.config_entry = MagicMock()
+        coordinator.config_entry.options = {}
+        coordinator.config_entry.data = {}
         entity = QvantumNumberEntity(
-            mock_coordinator, "outdoor_stop_heating", -30, 30, 1, mock_device
+            coordinator, "stop_heating", -30, 30, 1, mock_device
         )
         assert entity.available is False
 
     @pytest.mark.asyncio
-    async def test_async_set_native_value_outdoor_stop_heating(
+    async def test_async_set_native_value_cloud(
         self, mock_coordinator, mock_device
     ):
-        """Test setting outdoor_stop_heating writes via Modbus holding register."""
-        mock_coordinator.data["values"]["outdoor_stop_heating"] = 15
+        """Test setting stop_heating in cloud mode uses update_setting."""
+        mock_coordinator.modbus_enabled = False
+        mock_coordinator.data["values"]["stop_heating"] = 15
+        entity = QvantumNumberEntity(
+            mock_coordinator, "stop_heating", -30, 30, 1, mock_device
+        )
+
+        mock_coordinator.api.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
+
+        await entity.async_set_native_value(-5.0)
+
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "stop_heating", -5
+        )
+        mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
+        assert mock_coordinator.data["values"]["stop_heating"] == -5
+
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_modbus(
+        self, mock_coordinator, mock_device
+    ):
+        """Test setting stop_heating in Modbus mode uses update_setting (holding write)."""
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.data["values"]["stop_heating"] = 15
         mock_coordinator.config_entry.options = {
             "modbus_write": True,
             "modbus_tcp": True,
         }
         entity = QvantumNumberEntity(
-            mock_coordinator, "outdoor_stop_heating", -30, 30, 1, mock_device
+            mock_coordinator, "stop_heating", -30, 30, 1, mock_device
         )
 
-        mock_coordinator.api.write_holding_register_for_metric = AsyncMock(
-            return_value={"status": "APPLIED"}
-        )
         mock_coordinator.api.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
+        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
 
         await entity.async_set_native_value(-5.0)
 
-        mock_coordinator.api.write_holding_register_for_metric.assert_called_once_with(
-            "test_device_123", "outdoor_stop_heating", -5
+        mock_coordinator.api.update_setting.assert_called_once_with(
+            "test_device_123", "stop_heating", -5
         )
-        mock_coordinator.api.update_setting.assert_not_called()
-        assert mock_coordinator.data["values"]["outdoor_stop_heating"] == -5
-
-    @pytest.mark.asyncio
-    async def test_async_set_native_value_raises_when_write_disabled(
-        self, mock_coordinator, mock_device
-    ):
-        """Test that HomeAssistantError is raised when Modbus write is disabled."""
-        from homeassistant.exceptions import HomeAssistantError
-
-        mock_coordinator.data["values"]["outdoor_stop_heating"] = 15
-        mock_coordinator.config_entry.options = {}
-        mock_coordinator.config_entry.data = {}
-        entity = QvantumNumberEntity(
-            mock_coordinator, "outdoor_stop_heating", -30, 30, 1, mock_device
-        )
-        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
-
-        with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
-            await entity.async_set_native_value(-5.0)
-
         mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
+        assert mock_coordinator.data["values"]["stop_heating"] == -5
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry_creates_outdoor_stop_heating(
+    async def test_async_setup_entry_creates_stop_heating(
         self, hass, mock_config_entry, mock_coordinator, mock_device
     ):
-        """Test setup creates the number when the holding value is present."""
+        """Test setup creates the number when stop_heating is present."""
         from custom_components.qvantum import RuntimeData
 
-        mock_coordinator.modbus_enabled = True
-        mock_coordinator.data["values"]["outdoor_stop_heating"] = 18
+        mock_coordinator.modbus_enabled = False
+        mock_coordinator.data["values"]["stop_heating"] = 18
         mock_config_entry.runtime_data = RuntimeData(
             coordinator=mock_coordinator, device=mock_device
         )
@@ -868,4 +876,4 @@ class TestOutdoorStopHeating:
 
         entities = async_add_entities.call_args[0][0]
         entity_keys = [entity._metric_key for entity in entities]
-        assert "outdoor_stop_heating" in entity_keys
+        assert "stop_heating" in entity_keys
