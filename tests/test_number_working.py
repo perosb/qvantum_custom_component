@@ -118,6 +118,8 @@ class TestQvantumNumberEntity:
         assert entity._attr_native_min_value == -10
         assert entity._attr_native_max_value == 10
         assert entity._attr_native_step == 1
+        assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
+        assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
 
     def test_init_tap_water_stop(self, mock_coordinator, mock_device):
         """Test tap water stop number entity initialization."""
@@ -129,6 +131,8 @@ class TestQvantumNumberEntity:
         assert entity._attr_native_min_value == 60
         assert entity._attr_native_max_value == 90
         assert entity._attr_native_step == 1
+        assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
+        assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
 
     def test_init_tap_water_start(self, mock_coordinator, mock_device):
         """Test tap water start number entity initialization."""
@@ -140,6 +144,8 @@ class TestQvantumNumberEntity:
         assert entity._attr_native_min_value == 50
         assert entity._attr_native_max_value == 65
         assert entity._attr_native_step == 1
+        assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
+        assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
 
     def test_init_fan_normal(self, mock_coordinator, mock_device):
         """Test fan normal number entity initialization."""
@@ -550,6 +556,17 @@ class TestQvantumNumberEntity:
         )
         assert entity.available is False
 
+    def test_init_dhw_stop_extra_temperature_unit_device_class(
+        self, mock_coordinator, mock_device
+    ):
+        """Test dhw_stop_extra gets °C unit and temperature device class."""
+        mock_coordinator.data["values"]["dhw_stop_extra"] = 65
+        entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
+        )
+        assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
+        assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
+
 
 class TestNumberSetup:
     """Test number platform setup."""
@@ -617,6 +634,8 @@ class TestRoomTempExternal:
             entity._attr_unique_id
             == "qvantum_number_room_temp_external_test_device_123"
         )
+        assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
+        assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
 
     def test_available_when_use_operation_sensor_4(
         self, mock_coordinator, mock_device

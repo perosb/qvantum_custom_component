@@ -27,6 +27,18 @@ MODBUS_WRITE_METRICS = {
     "outdoor_stop_heating",  # Holding 18: outdoor temperature that stops heating.
 }
 
+# Number metrics that represent temperatures (°C).
+TEMPERATURE_NUMBER_METRICS = frozenset(
+    {
+        "outdoor_stop_heating",
+        "indoor_temperature_offset",
+        "tap_water_start",
+        "tap_water_stop",
+        "dhw_stop_extra",
+        "room_temp_external",
+    }
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -87,7 +99,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         self._attr_native_min_value = min_value
         self._attr_native_max_value = max_value
         self._attr_native_step = step
-        if metric_key == "outdoor_stop_heating":
+        if metric_key in TEMPERATURE_NUMBER_METRICS:
             self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
             self._attr_device_class = NumberDeviceClass.TEMPERATURE
 
