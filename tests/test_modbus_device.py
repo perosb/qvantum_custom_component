@@ -139,10 +139,12 @@ class TestComponentDecode:
         await device.write_metric("room_comp_factor", 2.5)
         await device.write_metric("room_temp_external", 21.5)
         await device.write_metric("dhw_stop_extra", 75)
+        await device.write_metric("outdoor_stop_heating", -15)
 
         assert unit.holding[13] == 25
         assert unit.holding[14] == 215
         assert unit.holding[59] == 75
+        assert unit.holding[18] == 0xFFF1  # int16 -15
 
     @pytest.mark.asyncio
     async def test_raw_holding_write(self):
@@ -298,3 +300,4 @@ class TestPayloadAdapter:
     def test_holding_field_for_http_alias(self):
         assert holding_field_for_metric("room_comp_factor") == "room_compensation"
         assert holding_field_for_metric("dhw_stop_extra") == "dhw_stop_extra"
+        assert holding_field_for_metric("outdoor_stop_heating") == "outdoor_stop_heating"

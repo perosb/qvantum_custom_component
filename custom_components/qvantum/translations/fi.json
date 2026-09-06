@@ -510,6 +510,9 @@
       },
       "room_temp_external": {
         "name": "Ulkoinen sisälämpötila"
+      },
+      "outdoor_stop_heating": {
+        "name": "Ulkolämpötila lämmityksen pysäytys"
       }
     },
     "climate": {

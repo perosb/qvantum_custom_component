@@ -113,6 +113,7 @@ If `modbus_write` is off, current local is **read-only**. Previous Modbus with w
 | `op_mode`, `man_mode`, `op_man_dhw`, `op_man_addition` | 1 / 2 / 5 / 4 | HTTP `update_settings` |
 | `room_comp_factor`, `fan_normal`, `fan_speed_2` | 13 / 70 / 69 | HTTP |
 | `dhw_stop_extra`, `room_temp_external`, sensor mode | 59 / 14 / 9 | Same as previous local writes |
+| `outdoor_stop_heating` | 18 | Number entity, Modbus-only |
 
 `start_cooling_temp` (38) is **readable** as a sensor; there is no number entity to write it.
 
@@ -153,7 +154,7 @@ The holding map includes many registers that are **not** in `MODBUS_HOLDING_TO_S
 
 - `unit_on_off` (0), `allow_cooling` (3)
 - `time_between_modes` (6), `allow_addition_temp` (7), `filtertime_outdoor` (8)
-- Heating: outdoor stop, min/max supply, curve type, temp compensation (18–23)
+- Heating: min/max supply, curve type, temp compensation (19–23)
 - Cooling: offset, dew point, min supply (36, 39, 40)
 - DHW: `dhw_start_extra` (58), `dhw_outlet_temp` (60), `dhw_uninterrupted_cooling` (61)
 - Pump speeds (63–66)

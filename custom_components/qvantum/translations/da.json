@@ -510,6 +510,9 @@
       },
       "room_temp_external": {
         "name": "Ekstern indetemperatur"
+      },
+      "outdoor_stop_heating": {
+        "name": "Udetemperatur stop opvarmning"
       }
     },
     "climate": {
