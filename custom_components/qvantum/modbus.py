@@ -96,7 +96,7 @@ MODBUS_HOLDING_REGISTER_MAP = {
     "room_compensation": (13, "uint16", 0.1),
     "room_temp_external": (14, "int16", 0.1),
     "heating_offset": (15, "int16", 1.0),
-    "outdoor_stop_heating": (18, "int16", 1.0),
+    "stop_heating": (18, "int16", 1.0),
     "max_heating_supply": (19, "int16", 1.0),
     "min_heating_supply": (20, "uint16", 1.0),
     "curve_type_heating": (22, "uint16", 1.0),
@@ -163,5 +163,5 @@ MODBUS_HOLDING_TO_SETTINGS_MAP = {
     "ventilation_state": "fanspeedselector",
     "dhw_stop_extra": "dhw_stop_extra",
     "room_temp_external": "room_temp_external",
-    "outdoor_stop_heating": "stop_heating",
+    "stop_heating": "stop_heating",
 }
