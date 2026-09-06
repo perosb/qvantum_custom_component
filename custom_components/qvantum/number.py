@@ -2,7 +2,7 @@
 
 import logging
 
-from homeassistant.components.number import NumberEntity
+from homeassistant.components.number import NumberEntity, NumberDeviceClass
 from homeassistant.const import UnitOfEnergy, UnitOfTemperature, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -87,6 +87,9 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         self._attr_native_min_value = min_value
         self._attr_native_max_value = max_value
         self._attr_native_step = step
+        if metric_key == "outdoor_stop_heating":
+            self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+            self._attr_device_class = NumberDeviceClass.TEMPERATURE
 
     async def async_set_native_value(self, value: float) -> None:
         """Update the current value."""

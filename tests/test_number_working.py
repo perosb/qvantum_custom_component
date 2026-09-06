@@ -27,6 +27,8 @@ with patch(
     with patch("homeassistant.components.number.NumberEntity", MockNumberEntity):
         with patch("homeassistant.const.EntityCategory", MockEntityCategory):
             from homeassistant.helpers.device_registry import DeviceInfo
+            from homeassistant.const import UnitOfTemperature
+            from homeassistant.components.number import NumberDeviceClass
 
             from custom_components.qvantum.number import (
                 QvantumNumberEntity,
@@ -736,6 +738,8 @@ class TestOutdoorStopHeating:
             == "qvantum_number_outdoor_stop_heating_test_device_123"
         )
         assert entity.state == 15
+        assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
+        assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
 
     def test_available_when_modbus_write_enabled(
         self, mock_coordinator, mock_device
