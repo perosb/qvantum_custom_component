@@ -107,6 +107,7 @@ _LOCAL_MODBUS_WRITE_METRICS = {
     "dhw_stop_extra",
     "room_temp_external",
     "use_operation_sensor",
+    "outdoor_stop_heating",
 }
 
 # No holding-register write exists for these; they stay cloud-only.
@@ -152,6 +153,7 @@ _ENTITY_ICONS: dict[str, str] = {
     "use_operation_sensor": "mdi:motion-sensor",
     # Number / writable temperature
     "room_temp_external": "mdi:thermometer",
+    "outdoor_stop_heating": "mdi:thermometer-off",
 }
 
 

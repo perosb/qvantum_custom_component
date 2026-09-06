@@ -24,6 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 MODBUS_WRITE_METRICS = {
     "dhw_stop_extra",
     "room_temp_external",  # Written via Modbus and only relevant when the external room sensor mode is enabled.
+    "outdoor_stop_heating",  # Holding 18: outdoor temperature that stops heating.
 }
 
 
@@ -47,6 +48,7 @@ async def async_setup_entry(
         "fan_normal": (0, 100, 5),
         "fan_speed_2": (0, 100, 5),
         "room_temp_external": (10, 40, 0.1),
+        "outdoor_stop_heating": (-30, 30, 1),
     }
 
     # Only create number entities for metrics present in the coordinator's current data.
@@ -118,8 +120,8 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                     self._hpid, self._metric_key, coordinator_update_value
                 )
 
-            case "dhw_stop_extra":
-                # dhw_stop_extra has no update_setting HTTP endpoint; write via Modbus holding register
+            case "dhw_stop_extra" | "outdoor_stop_heating":
+                # These settings have no update_setting HTTP endpoint; write via Modbus holding register.
                 if not self._is_modbus_write_allowed():
                     raise HomeAssistantError(
                         "Modbus writing is disabled. Turn on writing via Modbus in the integration options."

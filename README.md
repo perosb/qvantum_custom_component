@@ -95,7 +95,7 @@ Cloud-only sensors (firmware boards and access expiry) are not created in this m
 > [!IMPORTANT]
 > Local Modbus is **read-only** until you enable writing. Writes never go to the cloud API.
 >
-> Supported local writes include indoor target/offset, DHW start/stop, extra DHW, fan preset, operation/manual switches, room compensation, fan speeds, extra-DHW stop, external room temperature, and indoor sensor source.
+> Supported local writes include indoor target/offset, DHW start/stop, extra DHW, fan preset, operation/manual switches, room compensation, fan speeds, extra-DHW stop, outdoor temperature stop heating, external room temperature, and indoor sensor source.
 >
 > **SmartControl** (`use_adaptive`, `enable_sc_sh`, `enable_sc_dhw`), **vacation mode**, and **elevate-access** stay cloud-only. They are unavailable in local mode.
 >

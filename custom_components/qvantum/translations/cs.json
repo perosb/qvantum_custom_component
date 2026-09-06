@@ -510,6 +510,9 @@
       },
       "room_temp_external": {
         "name": "Externí vnitřní teplota"
+      },
+      "outdoor_stop_heating": {
+        "name": "Venkovní teplota zastavení topení"
       }
     },
     "climate": {
