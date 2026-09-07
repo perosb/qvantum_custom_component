@@ -97,7 +97,7 @@ Cloud-only sensors (firmware boards and access expiry) are not created in this m
 >
 > Supported local writes include indoor target/offset, DHW start/stop, extra DHW, fan preset, operation/manual switches, room compensation, fan speeds, extra-DHW stop, outdoor temperature stop heating (`stop_heating`), external room temperature, and indoor sensor source.
 >
-> **SmartControl** (`use_adaptive`, `enable_sc_sh`, `enable_sc_dhw`), **vacation mode**, and **elevate-access** stay cloud-only. They are unavailable in local mode.
+> **SmartControl** (`use_adaptive`, `enable_sc_sh`, `enable_sc_dhw`) and **elevate-access** are not created in local Modbus mode. **Vacation mode** stays cloud-only.
 >
 > By enabling Modbus writing you accept full responsibility for values written to the pump. Incorrect or out-of-range values may void the warranty and/or affect lifecycle and performance.
 

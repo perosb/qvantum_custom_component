@@ -42,6 +42,7 @@ with patch(
 def mock_coordinator():
     """Create a mock coordinator with test data."""
     coordinator = MagicMock()
+    coordinator.modbus_enabled = False
     coordinator.data = {
         "device": {"id": "test_device_123"},
         "values": {

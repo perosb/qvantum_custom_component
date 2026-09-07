@@ -30,10 +30,10 @@ async def async_setup_entry(
         "op_man_dhw",
         "op_man_addition",
         "man_mode",
-        "enable_sc_sh",
-        "enable_sc_dhw",
         "vacation_mode",
     ]
+    if not coordinator.modbus_enabled:
+        switch_names.extend(["enable_sc_sh", "enable_sc_dhw"])
 
     sensors = []
     for switch_name in switch_names:
@@ -41,6 +41,10 @@ async def async_setup_entry(
             sensors.append(QvantumSwitchEntity(coordinator, switch_name, device))
 
     async_add_entities(sensors)
+
+    from .entity import cleanup_disabled_entities
+
+    cleanup_disabled_entities(hass, coordinator, set(switch_names), "switch")
 
     _LOGGER.debug("Setting up platform SWITCH")
 

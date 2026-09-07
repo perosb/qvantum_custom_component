@@ -27,13 +27,23 @@ async def async_setup_entry(
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo = config_entry.runtime_data.device
 
+    values = coordinator.data.get("values", {})
     entities = []
-    if "use_adaptive" in coordinator.data.get("values", {}):
-        entities.append(QvantumSelectEntity(coordinator, "use_adaptive", device))
-    if "use_operation_sensor" in coordinator.data.get("values", {}):
-        entities.append(QvantumSelectEntity(coordinator, "use_operation_sensor", device))
+    select_keys = {"use_operation_sensor"}
+    if not coordinator.modbus_enabled:
+        select_keys.add("use_adaptive")
+        if "use_adaptive" in values:
+            entities.append(QvantumSelectEntity(coordinator, "use_adaptive", device))
+    if "use_operation_sensor" in values:
+        entities.append(
+            QvantumSelectEntity(coordinator, "use_operation_sensor", device)
+        )
 
     async_add_entities(entities)
+
+    from .entity import cleanup_disabled_entities
+
+    cleanup_disabled_entities(hass, coordinator, select_keys, "select")
 
     _LOGGER.debug("Setting up platform SELECT")
 
