@@ -1,0 +1,3 @@
+# Auto-request Code Reviewer wake (via perosb-bot collaborator).
+# Reviews are posted as perosb-code-reviewer[bot], not as this user.
+* @perosb-bot
