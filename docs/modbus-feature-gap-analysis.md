@@ -144,7 +144,7 @@ SmartControl **status** can still be **read** on Modbus (`smart_dhw_mode` 161, `
 | `tap_stop` sensor | Yes (cloud countdown) | Yes, from `_extra_dhw_restore_at` |
 | HA restart during the hour | Cloud still ends extra | Restore deadline is persisted; Normal is written when it expires |
 
-Turning `modbus_write` off cancels a pending restore timer.
+Turning `modbus_write` off cancels a pending restore timer. Extra DHW going off on the pump (or from the extra switch) also cancels the HA restore timer and clears `tap_stop`.
 
 ---
 

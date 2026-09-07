@@ -323,6 +323,8 @@ class TestQvantumSwitchEntity:
         mock_coordinator.api.set_extra_tap_water = AsyncMock(
             return_value={"status": "APPLIED"}
         )
+        mock_coordinator.api._extra_dhw_restore_at = 1712232000.0
+        mock_coordinator.data["values"]["tap_stop"] = 1712232000
 
         await entity.async_turn_off()
 
@@ -333,6 +335,7 @@ class TestQvantumSwitchEntity:
         mock_coordinator.async_set_updated_data.assert_called_once()
         updated_data = mock_coordinator.async_set_updated_data.call_args[0][0]
         assert updated_data["values"]["extra_tap_water"] == "off"
+        assert "tap_stop" not in updated_data["values"]
         # No immediate refresh to avoid overwriting the update
 
     @pytest.mark.asyncio

@@ -92,6 +92,95 @@ class TestHandleSettingUpdateResponse:
         coordinator.async_refresh.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_extra_tap_water_off_clears_tap_stop(self):
+        """Turning extra DHW off must drop the extra-DHW timer sensor immediately."""
+        coordinator = MagicMock()
+        coordinator.data = {
+            "values": {"extra_tap_water": "on", "tap_stop": 1712232000}
+        }
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.api = MagicMock()
+        coordinator.api._extra_dhw_restore_at = 1712232000.0
+
+        result = await handle_setting_update_response(
+            {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", "off"
+        )
+
+        assert result is True
+        assert coordinator.data["values"]["extra_tap_water"] == "off"
+        assert "tap_stop" not in coordinator.data["values"]
+
+    @pytest.mark.asyncio
+    async def test_extra_tap_water_on_sets_tap_stop_from_restore(self):
+        """Timed extra DHW should surface tap_stop from the restore deadline."""
+        coordinator = MagicMock()
+        coordinator.data = {"values": {"extra_tap_water": "off"}}
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.api = MagicMock()
+        coordinator.api._extra_dhw_restore_at = 1712232000.7
+
+        result = await handle_setting_update_response(
+            {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", "on"
+        )
+
+        assert result is True
+        assert coordinator.data["values"]["tap_stop"] == 1712232000
+
+    @pytest.mark.asyncio
+    async def test_extra_tap_water_on_indefinite_clears_tap_stop(self):
+        """Indefinite extra DHW has no restore timer, so tap_stop is cleared."""
+        coordinator = MagicMock()
+        coordinator.data = {
+            "values": {"extra_tap_water": "off", "tap_stop": 1712232000}
+        }
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.api = MagicMock()
+        coordinator.api._extra_dhw_restore_at = None
+
+        result = await handle_setting_update_response(
+            {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", "on"
+        )
+
+        assert result is True
+        assert "tap_stop" not in coordinator.data["values"]
+
+    @pytest.mark.asyncio
+    async def test_extra_tap_water_false_clears_tap_stop(self):
+        """Boolean/integer extra-off values also drop tap_stop."""
+        coordinator = MagicMock()
+        coordinator.data = {
+            "values": {"extra_tap_water": "on", "tap_stop": 1712232000}
+        }
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.api = MagicMock()
+        coordinator.api._extra_dhw_restore_at = 1712232000.0
+
+        result = await handle_setting_update_response(
+            {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", False
+        )
+
+        assert result is True
+        assert "tap_stop" not in coordinator.data["values"]
+
+    @pytest.mark.asyncio
+    async def test_extra_tap_water_unknown_leaves_tap_stop(self):
+        """Unrecognized extra DHW values must not touch tap_stop."""
+        coordinator = MagicMock()
+        coordinator.data = {
+            "values": {"extra_tap_water": "on", "tap_stop": 1712232000}
+        }
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.api = MagicMock()
+        coordinator.api._extra_dhw_restore_at = 1712232000.0
+
+        result = await handle_setting_update_response(
+            {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", "unknown"
+        )
+
+        assert result is True
+        assert coordinator.data["values"]["tap_stop"] == 1712232000
+
+    @pytest.mark.asyncio
     async def test_handle_setting_update_no_data_section(self):
         """Test setting update with no data section."""
         coordinator = MagicMock()
@@ -717,6 +806,99 @@ class TestQvantumDataUpdateCoordinator:
         await coordinator.async_update_data()
 
         mock_api.get_http_metrics.assert_not_called()
+
+
+class TestModbusExtraDhwTimerSync:
+    """Cancel the HA extra-DHW restore timer when Modbus reports Extra is off."""
+
+    def _make_coordinator(self, mock_super_init, extra_tap_water, restore_at, armed_at):
+        mock_super_init.return_value = None
+
+        mock_api = MagicMock()
+        mock_api.async_probe_identity = AsyncMock(
+            return_value={"id": "test_device_123"}
+        )
+        mock_api.get_metrics = AsyncMock(
+            return_value={"metrics": {"hpid": "test_device_123"}}
+        )
+        mock_api.get_settings = AsyncMock(
+            return_value={
+                "settings": [{"name": "extra_tap_water", "value": extra_tap_water}]
+            }
+        )
+        mock_api.get_http_metrics = AsyncMock()
+        mock_api._extra_dhw_restore_at = restore_at
+        mock_api._extra_dhw_armed_at = armed_at
+        mock_api.async_clear_extra_dhw_timer = AsyncMock()
+
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+
+        mock_config_entry = MagicMock()
+        mock_config_entry.options.get.side_effect = _modbus_options_get
+        mock_config_entry.data = {}
+        mock_config_entry.unique_id = "test_device_123"
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+        coordinator.api = mock_api
+        coordinator.hass = mock_hass
+        return coordinator, mock_api
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_extra_on_keeps_restore_timer(self, mock_super_init):
+        coordinator, mock_api = self._make_coordinator(
+            mock_super_init, "on", 1712232000.0, 0.0
+        )
+
+        result = await coordinator.async_update_data()
+
+        mock_api.async_clear_extra_dhw_timer.assert_not_awaited()
+        assert result["values"]["tap_stop"] == 1712232000
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_extra_off_clears_restore_timer(self, mock_super_init):
+        coordinator, mock_api = self._make_coordinator(
+            mock_super_init, "off", 1712232000.0, 0.0
+        )
+
+        result = await coordinator.async_update_data()
+
+        mock_api.async_clear_extra_dhw_timer.assert_awaited_once()
+        assert "tap_stop" not in result["values"]
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_stale_off_poll_keeps_just_armed_timer(self, mock_super_init):
+        """A poll started before Extra was written must not cancel that timer."""
+        import time
+
+        coordinator, mock_api = self._make_coordinator(
+            mock_super_init, "off", 1712232000.0, time.monotonic() + 60
+        )
+
+        result = await coordinator.async_update_data()
+
+        mock_api.async_clear_extra_dhw_timer.assert_not_awaited()
+        assert result["values"]["tap_stop"] == 1712232000
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_unknown_extra_keeps_restore_timer(self, mock_super_init):
+        coordinator, mock_api = self._make_coordinator(
+            mock_super_init, None, 1712232000.0, 0.0
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        result = await coordinator.async_update_data()
+
+        mock_api.async_clear_extra_dhw_timer.assert_not_awaited()
+        assert result["values"]["tap_stop"] == 1712232000
 
 
 class TestHpStatusPostProcessing:

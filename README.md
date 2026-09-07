@@ -101,7 +101,7 @@ Cloud-only sensors (firmware boards and access expiry) are not created in this m
 >
 > By enabling Modbus writing you accept full responsibility for values written to the pump. Incorrect or out-of-range values may void the warranty and/or affect lifecycle and performance.
 
-Extra DHW on local Modbus writes DHW mode Extra/Normal. Use the extra-DHW button (60 minutes) or `qvantum.extra_hot_water` with `minutes` (0–480). Home Assistant restores Normal when the timer ends, including after a restart. The extra-DHW timer entity (`tap_stop`) shows the end time. The extra switch without a duration stays Extra until you turn it off.
+Extra DHW on local Modbus writes DHW mode Extra/Normal. Use the extra-DHW button (60 minutes) or `qvantum.extra_hot_water` with `minutes` (0–480). Home Assistant restores Normal when the timer ends, including after a restart. The extra-DHW timer entity (`tap_stop`) shows the end time. If extra DHW is stopped on the heat pump or from the extra switch, that timer is cancelled. The extra switch without a duration stays Extra until you turn it off.
 
 Fan extra on local Modbus is a sticky preset. Cloud extra ventilation is a timed boost.
 
