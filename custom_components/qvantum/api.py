@@ -3,6 +3,7 @@
 import aiohttp
 import asyncio
 import json
+import time
 from datetime import datetime, timedelta, timezone
 import logging
 from typing import Any, Optional
@@ -83,6 +84,7 @@ class QvantumAPI:
         self._closed = False
         self._extra_dhw_unsub = None
         self._extra_dhw_restore_at: float | None = None
+        self._extra_dhw_armed_at: float | None = None
         self._extra_dhw_store = None
         # Modbus-only mode never opens an HTTP session, even if a caller
         # injects one. Cloud mode owns a session unless a test injects it.
@@ -378,11 +380,18 @@ class QvantumAPI:
         """Cancel a pending extra-DHW restore callback."""
         unsub = self._extra_dhw_unsub
         self._extra_dhw_unsub = None
+        self._extra_dhw_armed_at = None
         if unsub:
             unsub()
         if clear_store:
             self._extra_dhw_restore_at = None
             self._persist_extra_dhw(None)
+
+    async def async_clear_extra_dhw_timer(self) -> None:
+        """Stop a pending extra-DHW restore because extra DHW is no longer active."""
+        self._cancel_extra_dhw_timer(clear_store=False)
+        self._extra_dhw_restore_at = None
+        await self.async_persist_extra_dhw(None)
 
     async def async_persist_extra_dhw(self, payload: dict | None) -> None:
         """Save or clear the extra-DHW restore deadline."""
@@ -429,6 +438,7 @@ class QvantumAPI:
         if not self.hass:
             return
         self._extra_dhw_restore_at = restore_at
+        self._extra_dhw_armed_at = time.monotonic()
         if persist:
             await self.async_persist_extra_dhw(
                 {"device_id": str(device_id), "restore_at": restore_at}
@@ -447,6 +457,7 @@ class QvantumAPI:
                 )
                 return
             self._extra_dhw_restore_at = None
+            self._extra_dhw_armed_at = None
             try:
                 await self.async_persist_extra_dhw(None)
             except Exception:
@@ -490,6 +501,7 @@ class QvantumAPI:
                 )
                 return
             self._extra_dhw_restore_at = None
+            self._extra_dhw_armed_at = None
             try:
                 await self.async_persist_extra_dhw(None)
             except Exception:
@@ -749,9 +761,7 @@ class QvantumAPI:
                 result = await self.write_holding_register_for_metric(
                     device_id, "extra_tap_water", DHW_MODE_EXTRA
                 )
-            self._cancel_extra_dhw_timer(clear_store=False)
-            self._extra_dhw_restore_at = None
-            await self.async_persist_extra_dhw(None)
+            await self.async_clear_extra_dhw_timer()
             return result
 
         # Capture current time once to ensure consistency across all code paths

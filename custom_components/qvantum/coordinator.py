@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
 from homeassistant.config_entries import ConfigEntry
@@ -22,6 +23,7 @@ from .const import (
     DEFAULT_DISABLED_MODBUS_METRICS,
     DEFAULT_MODBUS_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
+    DHW_MODE_EXTRA,
     DOMAIN,
     FIRMWARE_KEYS,
     HP_STATUS_COOLING,
@@ -77,10 +79,33 @@ async def handle_setting_update_response(
     )
     if success and data_section and key is not None:
         coordinator.data.get(data_section)[key] = value
+        if key == "extra_tap_water":
+            _apply_extra_dhw_tap_stop(coordinator, coordinator.data.get(data_section), value)
         # async_set_updated_data is a synchronous method despite the name
         coordinator.async_set_updated_data(coordinator.data)
         return True
     return False
+
+
+def _is_extra_dhw_on(value: Any) -> bool:
+    """Return True when extra DHW is active (holding 53 Extra, or on/True)."""
+    return value in ("on", True, DHW_MODE_EXTRA)
+
+
+def _apply_extra_dhw_tap_stop(coordinator: Any, section: Any, extra_value: Any) -> None:
+    """Keep the extra-DHW timer sensor in sync with an optimistic extra DHW write."""
+    if not isinstance(section, dict):
+        return
+    if extra_value in ("off", False, 0):
+        section.pop("tap_stop", None)
+        return
+    if not _is_extra_dhw_on(extra_value):
+        return
+    restore_at = getattr(getattr(coordinator, "api", None), "_extra_dhw_restore_at", None)
+    if isinstance(restore_at, (int, float)):
+        section["tap_stop"] = int(restore_at)
+    elif restore_at is None:
+        section.pop("tap_stop", None)
 
 
 def _firmware_metadata_from_sw_version(sw_version: str | None) -> dict:
@@ -617,6 +642,33 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 values.get("tap_water_capacity_target", "none"),
             )
 
+    async def _sync_modbus_extra_dhw_timer(
+        self, values: dict[str, Any], *, poll_started: float
+    ) -> None:
+        """Cancel the HA extra-DHW restore timer when Modbus reports Extra is off.
+
+        Extra DHW can be stopped on the heat pump (display or its own timeout)
+        without going through ``set_extra_tap_water``. The local ``tap_stop``
+        sensor is the restore deadline, so it must be cleared too.
+
+        A poll that started before Extra was written must not cancel the timer
+        just scheduled for that write.
+        """
+        restore_at = getattr(self.api, "_extra_dhw_restore_at", None)
+        if not isinstance(restore_at, (int, float)):
+            return
+        extra = values.get("extra_tap_water")
+        if extra is None or _is_extra_dhw_on(extra):
+            values["tap_stop"] = int(restore_at)
+            return
+        armed_at = getattr(self.api, "_extra_dhw_armed_at", None)
+        if isinstance(armed_at, (int, float)) and armed_at > poll_started:
+            values["tap_stop"] = int(restore_at)
+            return
+        await self.api.async_clear_extra_dhw_timer()
+        values.pop("tap_stop", None)
+        _LOGGER.debug("Cleared extra-DHW restore timer; extra DHW is off")
+
     async def async_update_data(self):
         """Fetch data from API endpoint."""
         try:
@@ -640,6 +692,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             )
 
             # Fetch metrics and settings concurrently for better performance
+            poll_started = time.monotonic()
             metrics_task = self.api.get_metrics(
                 device_id, enabled_metrics=enabled_metrics
             )
@@ -687,9 +740,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             # Settings take precedence over metrics in case of conflicts
             values = {**metrics_dict, **settings_dict}
 
-            restore_at = getattr(self.api, "_extra_dhw_restore_at", None)
-            if self.modbus_enabled and isinstance(restore_at, (int, float)):
-                values["tap_stop"] = int(restore_at)
+            if self.modbus_enabled:
+                await self._sync_modbus_extra_dhw_timer(values, poll_started=poll_started)
 
             self._derive_tap_water_capacity(values)
 

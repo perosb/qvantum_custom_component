@@ -148,6 +148,7 @@ class TestExtraTapWaterModbus:
         later.assert_called_once()
         assert later.call_args.args[1] == pytest.approx(3600, abs=1)
         assert api._extra_dhw_unsub is unsub
+        assert api._extra_dhw_armed_at is not None
 
     @pytest.mark.asyncio
     async def test_off_cancels_pending_timer(self):
@@ -162,6 +163,26 @@ class TestExtraTapWaterModbus:
             await api.set_extra_tap_water("dev1", 0)
         unsub.assert_called_once()
         assert api._extra_dhw_unsub is None
+        assert api._extra_dhw_armed_at is None
+
+    @pytest.mark.asyncio
+    async def test_clear_extra_dhw_timer_drops_deadline(self):
+        api = _modbus_api()
+        store = MagicMock()
+        store.async_remove = AsyncMock()
+        api._extra_dhw_store = store
+        unsub = MagicMock()
+        api._extra_dhw_unsub = unsub
+        api._extra_dhw_restore_at = 123.0
+        api._extra_dhw_armed_at = 1.0
+
+        await api.async_clear_extra_dhw_timer()
+
+        unsub.assert_called_once()
+        store.async_remove.assert_awaited_once()
+        assert api._extra_dhw_unsub is None
+        assert api._extra_dhw_restore_at is None
+        assert api._extra_dhw_armed_at is None
 
     @pytest.mark.asyncio
     async def test_close_cancels_timer(self):
@@ -344,6 +365,7 @@ class TestExtraTapWaterModbus:
         store.async_remove.assert_awaited()
         assert order == ["write", "remove"]
         assert api._extra_dhw_restore_at is None
+        assert api._extra_dhw_armed_at is None
 
     @pytest.mark.asyncio
     async def test_restore_timer_keeps_deadline_when_expired_write_fails(self):
@@ -403,6 +425,7 @@ class TestExtraTapWaterModbus:
         store.async_remove.assert_awaited()
         assert order == ["write", "remove"]
         assert api._extra_dhw_restore_at is None
+        assert api._extra_dhw_armed_at is None
 
     @pytest.mark.asyncio
     async def test_restore_callback_keeps_store_when_write_fails(self):
