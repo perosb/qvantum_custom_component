@@ -248,7 +248,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_device = MagicMock()
         mock_device.id = "device_id_123"
         mock_device.identifiers = {(DOMAIN, "qvantum-test_device")}
-        mock_device_registry.devices.values.return_value = [mock_device]
+        mock_device_registry.async_get_device_by_identifier.return_value = mock_device
 
         # Mock entities
         mock_entity1 = MagicMock()
@@ -266,7 +266,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_entity3.disabled_by = "user"
         mock_entity3.unique_id = "qvantum_bt4_test_device"
 
-        mock_entity_registry.entities.values.return_value = [
+        mock_entity_registry.entities.get_entries_for_device_id.return_value = [
             mock_entity1,
             mock_entity2,
             mock_entity3,
@@ -307,7 +307,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_device = MagicMock()
         mock_device.id = "device_id_123"
         mock_device.identifiers = {(DOMAIN, "qvantum-test_device")}
-        mock_device_registry.devices.values.return_value = [mock_device]
+        mock_device_registry.async_get_device_by_identifier.return_value = mock_device
 
         # Disabled HTTP metric in entity registry already; should stay out of final metrics
         mock_entity_disabled = MagicMock()
@@ -315,7 +315,9 @@ class TestQvantumDataUpdateCoordinator:
         mock_entity_disabled.disabled_by = "user"
         mock_entity_disabled.unique_id = "qvantum_calc_suppy_cpr_test_device"
 
-        mock_entity_registry.entities.values.return_value = [mock_entity_disabled]
+        mock_entity_registry.entities.get_entries_for_device_id.return_value = [
+            mock_entity_disabled
+        ]
 
         mock_hass.data = {
             DOMAIN: mock_api,
@@ -343,7 +345,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_hass = MagicMock()
         mock_device_registry = MagicMock()
         mock_api = MagicMock()
-        mock_device_registry.devices.values.return_value = []
+        mock_device_registry.async_get_device_by_identifier.return_value = None
 
         mock_hass.data = {DOMAIN: mock_api, "device_registry": mock_device_registry}
 
@@ -380,7 +382,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_device = MagicMock()
         mock_device.id = "device_id_123"
         mock_device.identifiers = {(DOMAIN, "qvantum-test_device")}
-        mock_device_registry.devices.values.return_value = [mock_device]
+        mock_device_registry.async_get_device_by_identifier.return_value = mock_device
 
         # Mock entities that don't match our criteria
         mock_entity = MagicMock()
@@ -388,7 +390,9 @@ class TestQvantumDataUpdateCoordinator:
         mock_entity.disabled_by = None
         mock_entity.unique_id = "other_prefix_test_device"  # Wrong prefix
 
-        mock_entity_registry.entities.values.return_value = [mock_entity]
+        mock_entity_registry.entities.get_entries_for_device_id.return_value = [
+            mock_entity
+        ]
 
         mock_hass.data = {
             DOMAIN: mock_api,
@@ -422,14 +426,16 @@ class TestQvantumDataUpdateCoordinator:
         mock_device = MagicMock()
         mock_device.id = "device_id_123"
         mock_device.identifiers = {(DOMAIN, "qvantum-test_device")}
-        mock_device_registry.devices.values.return_value = [mock_device]
+        mock_device_registry.async_get_device_by_identifier.return_value = mock_device
 
         mock_entity = MagicMock()
         mock_entity.device_id = "device_id_123"
         mock_entity.disabled_by = None
         mock_entity.unique_id = "qvantum_bt1_test_device"
 
-        mock_entity_registry.entities.values.return_value = [mock_entity]
+        mock_entity_registry.entities.get_entries_for_device_id.return_value = [
+            mock_entity
+        ]
 
         mock_hass.data = {
             DOMAIN: mock_api,
@@ -459,14 +465,16 @@ class TestQvantumDataUpdateCoordinator:
         mock_device = MagicMock()
         mock_device.id = "device_id_123"
         mock_device.identifiers = {(DOMAIN, "qvantum-test_device")}
-        mock_device_registry.devices.values.return_value = [mock_device]
+        mock_device_registry.async_get_device_by_identifier.return_value = mock_device
 
         mock_entity_registry = MagicMock()
         mock_entity = MagicMock()
         mock_entity.device_id = "device_id_123"
         mock_entity.unique_id = "qvantum_inputcurrent1_test_device"
         mock_entity.disabled_by = None
-        mock_entity_registry.entities.values.return_value = [mock_entity]
+        mock_entity_registry.entities.get_entries_for_device_id.return_value = [
+            mock_entity
+        ]
 
         mock_hass = MagicMock()
         mock_hass.data = {
@@ -3391,11 +3399,13 @@ class TestDeviceLookupWhenHttpDown:
         ha_device.sw_version = "1.3.6/140/140"
 
         mock_registry = MagicMock()
-        mock_registry.devices.values.return_value = [ha_device]
 
         with patch(
             "homeassistant.helpers.device_registry.async_get",
             return_value=mock_registry,
+        ), patch(
+            "homeassistant.helpers.device_registry.async_entries_for_config_entry",
+            return_value=[ha_device],
         ):
             result = await coordinator.async_update_data()
 
@@ -3549,11 +3559,13 @@ class TestDeviceLookupWhenHttpDown:
         ha_device.sw_version = "1.3.6/140/140"
 
         mock_registry = MagicMock()
-        mock_registry.devices.values.return_value = [ha_device]
 
         with patch(
             "homeassistant.helpers.device_registry.async_get",
             return_value=mock_registry,
+        ), patch(
+            "homeassistant.helpers.device_registry.async_entries_for_config_entry",
+            return_value=[ha_device],
         ):
             with pytest.raises(UpdateFailed):
                 await coordinator.async_update_data()
@@ -3585,11 +3597,13 @@ class TestDeviceLookupWhenHttpDown:
         ha_device.sw_version = "1.3.6/140/140"
 
         mock_registry = MagicMock()
-        mock_registry.devices.values.return_value = [ha_device]
 
         with patch(
             "homeassistant.helpers.device_registry.async_get",
             return_value=mock_registry,
+        ), patch(
+            "homeassistant.helpers.device_registry.async_entries_for_config_entry",
+            return_value=[ha_device],
         ):
             result = await coordinator.async_update_data()
 
@@ -3648,15 +3662,10 @@ class TestDeviceLookupWhenHttpDown:
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_device_from_registry_skips_unusable_entries(self, mock_super_init):
-        """Registry fallback must ignore devices that are not this config entry."""
+        """Registry fallback must ignore unusable identifiers and missing registry."""
         coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
 
-        other_entry = MagicMock()
-        other_entry.config_entries = {"other_entry"}
-        other_entry.identifiers = {(DOMAIN, "qvantum-other")}
-
         bad_identifier = MagicMock()
-        bad_identifier.config_entries = {"test_entry_id"}
         bad_identifier.identifiers = {
             "not-a-tuple",
             (DOMAIN,),
@@ -3667,11 +3676,13 @@ class TestDeviceLookupWhenHttpDown:
         }
 
         mock_registry = MagicMock()
-        mock_registry.devices.values.return_value = [other_entry, bad_identifier]
 
         with patch(
             "homeassistant.helpers.device_registry.async_get",
             return_value=mock_registry,
+        ), patch(
+            "homeassistant.helpers.device_registry.async_entries_for_config_entry",
+            return_value=[bad_identifier],
         ):
             assert coordinator._device_from_registry() is None
 
@@ -3687,11 +3698,10 @@ class TestDeviceLookupWhenHttpDown:
         ):
             assert coordinator._device_from_registry() is None
 
-        empty_registry = MagicMock()
-        empty_registry.devices = None
+        coordinator._config_entry.entry_id = None
         with patch(
             "homeassistant.helpers.device_registry.async_get",
-            return_value=empty_registry,
+            return_value=mock_registry,
         ):
             assert coordinator._device_from_registry() is None
 

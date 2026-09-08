@@ -343,21 +343,12 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         if registry is None:
             return None
 
-        devices = getattr(registry, "devices", None)
-        if devices is None:
+        entry_id = getattr(self._config_entry, "entry_id", None)
+        if not entry_id:
             return None
 
-        entry_id = getattr(self._config_entry, "entry_id", None)
-        values = devices.values() if hasattr(devices, "values") else devices
         prefix = f"{DOMAIN}-"
-        for ha_device in values:
-            config_entries = getattr(ha_device, "config_entries", None)
-            if (
-                entry_id
-                and config_entries is not None
-                and entry_id not in config_entries
-            ):
-                continue
+        for ha_device in dr.async_entries_for_config_entry(registry, entry_id):
             identifiers = getattr(ha_device, "identifiers", None) or set()
             for identifier in identifiers:
                 if not isinstance(identifier, (tuple, list)) or len(identifier) != 2:
@@ -487,8 +478,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
     def _get_enabled_metrics(self, device_id: str) -> list[str]:
         """Get list of enabled metrics for a device based on entity registry."""
-        from homeassistant.helpers import device_registry as dr
         from homeassistant.helpers import entity_registry as er
+
+        from .entity import async_get_qvantum_device_entry, extract_metric_key
 
         default_metrics = (
             DEFAULT_ENABLED_MODBUS_METRICS
@@ -496,24 +488,21 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             else DEFAULT_ENABLED_HTTP_METRICS
         )
 
-        device_registry = dr.async_get(self.hass)
-        device_reg_id = None
-        for device in device_registry.devices.values():
-            if (DOMAIN, f"qvantum-{device_id}") in device.identifiers:
-                device_reg_id = device.id
-                break
-        if device_reg_id:
+        device_entry = async_get_qvantum_device_entry(
+            self.hass,
+            device_id,
+            getattr(self._config_entry, "entry_id", None),
+        )
+        if device_entry:
             registry = er.async_get(self.hass)
             enabled_metrics = set()
             known_metrics = set()
-            for entity in registry.entities.values():
-                if (
-                    entity.device_id == device_reg_id
-                    and entity.unique_id.startswith("qvantum_")
-                    and entity.unique_id.endswith(f"_{device_id}")
+            for entity in er.async_entries_for_device(
+                registry, device_entry.id, include_disabled_entities=True
+            ):
+                if entity.unique_id.startswith("qvantum_") and entity.unique_id.endswith(
+                    f"_{device_id}"
                 ):
-                    from .entity import extract_metric_key
-
                     metric_key = extract_metric_key(entity.unique_id, device_id)
 
                     # Known metrics include the default metrics always.

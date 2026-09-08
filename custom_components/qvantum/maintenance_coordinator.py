@@ -216,13 +216,14 @@ The firmware has been automatically updated. No action is required.
         """Update the device registry with current firmware versions."""
         try:
             device_registry = async_get(self.hass)
-
-            # Find the device entry
-            device_entry = None
-            for device in device_registry.devices.values():
-                if (DOMAIN, f"qvantum-{device_id}") in device.identifiers:
-                    device_entry = device
-                    break
+            config_entry_id = getattr(self.config_entry, "entry_id", None)
+            device_entry = (
+                device_registry.async_get_device_by_identifier(
+                    (DOMAIN, f"qvantum-{device_id}"), config_entry_id
+                )
+                if config_entry_id
+                else None
+            )
 
             if not device_entry:
                 _LOGGER.debug("Device entry not found for device %s", device_id)

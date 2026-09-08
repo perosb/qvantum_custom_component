@@ -257,6 +257,32 @@ def extract_metric_key(unique_id: str, device_id: str) -> str:
     return unique_id[len(prefix) : len(unique_id) - len(suffix)]
 
 
+def async_get_qvantum_device_entry(
+    hass: HomeAssistant,
+    device_id: str | None,
+    config_entry_id: str | None,
+):
+    """Return the device registry entry for a Qvantum heat pump, if registered.
+
+    Looks the device up by identifier, scoped to the owning config entry.
+    """
+    from homeassistant.helpers import device_registry as dr
+
+    if not device_id or not config_entry_id:
+        return None
+    return dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"qvantum-{device_id}"), config_entry_id
+    )
+
+
+def _coordinator_config_entry_id(coordinator: QvantumDataUpdateCoordinator) -> str | None:
+    """Return the config entry id that owns this coordinator, if known."""
+    config_entry = getattr(coordinator, "config_entry", None) or getattr(
+        coordinator, "_config_entry", None
+    )
+    return getattr(config_entry, "entry_id", None)
+
+
 def cleanup_disabled_entities(
     hass: HomeAssistant,
     coordinator: QvantumDataUpdateCoordinator,
@@ -265,28 +291,27 @@ def cleanup_disabled_entities(
 ) -> None:
     """Clean up disabled entities that are no longer supported in the current mode."""
     from homeassistant.helpers import entity_registry as er
-    from homeassistant.helpers import device_registry as dr
+
+    device_entry = async_get_qvantum_device_entry(
+        hass, coordinator.device_id, _coordinator_config_entry_id(coordinator)
+    )
+    if not device_entry:
+        return
 
     entity_registry = er.async_get(hass)
-    device_registry = dr.async_get(hass)
-    device_reg_id = None
-    for dev in device_registry.devices.values():
-        if (DOMAIN, f"qvantum-{coordinator.device_id}") in dev.identifiers:
-            device_reg_id = dev.id
-            break
-    if device_reg_id:
-        entities_to_remove = []
-        for entity_entry in entity_registry.entities.values():
-            if (
-                entity_entry.device_id == device_reg_id
-                and entity_entry.domain == domain
-                and entity_entry.unique_id.startswith("qvantum_")
-                and entity_entry.unique_id.endswith(f"_{coordinator.device_id}")
-            ):
-                metric_key = extract_metric_key(
-                    entity_entry.unique_id, coordinator.device_id
-                )
-                if metric_key not in possible_metrics:
-                    entities_to_remove.append(entity_entry.entity_id)
-        for entity_id in entities_to_remove:
-            entity_registry.async_remove(entity_id)
+    entities_to_remove = []
+    for entity_entry in er.async_entries_for_device(
+        entity_registry, device_entry.id, include_disabled_entities=True
+    ):
+        if (
+            entity_entry.domain == domain
+            and entity_entry.unique_id.startswith("qvantum_")
+            and entity_entry.unique_id.endswith(f"_{coordinator.device_id}")
+        ):
+            metric_key = extract_metric_key(
+                entity_entry.unique_id, coordinator.device_id
+            )
+            if metric_key not in possible_metrics:
+                entities_to_remove.append(entity_entry.entity_id)
+    for entity_id in entities_to_remove:
+        entity_registry.async_remove(entity_id)
