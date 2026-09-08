@@ -8,6 +8,24 @@ body:
       value: |
         Please do **not** include passwords, API tokens, or other secrets.
 
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      description: Settings → About.
+      placeholder: "2026.9.0"
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      description: HACS → Qvantum Heat Pump, or `custom_components/qvantum/manifest.json` (`version`).
+      placeholder: "2026.9.6"
+    validations:
+      required: true
+
   - type: dropdown
     id: connection_mode
     attributes:
@@ -47,6 +65,6 @@ body:
     id: description
     attributes:
       label: Describe the bug
-      description: What happened? Include Home Assistant version, integration version, expected behavior, and logs if you have them.
+      description: What happened? Include expected behavior and logs if you have them.
     validations:
       required: true
