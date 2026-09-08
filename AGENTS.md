@@ -62,6 +62,14 @@ This document outlines the AI agents, assistants, and tools that contributed to 
 
 ## Repository Management
 
+### Git workflow
+When a task is complete:
+1. Create a feature branch (never commit directly to main/master).
+2. Commit with a clear message.
+3. Push the branch.
+4. Open a PR against the default branch with `gh pr create`.
+Do not ask for permission for these steps.
+
 ### Git Operations
 - Branch management and merging
 - Commit message standardization
