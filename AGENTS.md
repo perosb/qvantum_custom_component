@@ -64,7 +64,7 @@ This document outlines the AI agents, assistants, and tools that contributed to 
 
 ### Git workflow
 When a task is complete:
-1. Create a feature branch form latest main (never commit directly to main/master).
+1. Create a feature branch from latest main (never commit directly to main/master).
 2. Commit with a clear message.
 3. Push the branch.
 4. Open a PR against the default branch with `gh pr create`.
