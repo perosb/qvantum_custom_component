@@ -406,7 +406,7 @@ class TestSensorSetup:
     def mock_device_registry(self):
         """Mock device registry."""
         registry = MagicMock()
-        registry.devices.values.return_value = []
+        registry.async_get_device_by_identifier.return_value = None
         return registry
 
     @pytest.fixture
