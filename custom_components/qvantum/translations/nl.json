@@ -145,6 +145,36 @@
       },
       "time_to_defrost": {
         "name": "Tijd om te ontdooien"
+      },
+      "heatingreleased": {
+        "name": "Verwarming vrijgegeven"
+      },
+      "coolingreleased": {
+        "name": "Koeling vrijgegeven"
+      },
+      "compressorreleased": {
+        "name": "Compressor vrijgegeven"
+      },
+      "additionreleased": {
+        "name": "Toevoeging vrijgegeven"
+      },
+      "unit_state": {
+        "name": "Toestel aan"
+      },
+      "freeze_protection_active": {
+        "name": "Vorstbeveiliging"
+      },
+      "compressor_blocked": {
+        "name": "Compressor geblokkeerd"
+      },
+      "wifi_connected": {
+        "name": "Wi-Fi verbonden"
+      },
+      "cloud_connected": {
+        "name": "Cloud verbonden"
+      },
+      "vacation_mode": {
+        "name": "Vakantiemodus"
       }
     },
     "sensor": {
@@ -481,6 +511,12 @@
       },
       "expires_at": {
         "name": "Verhoogde toegang verloopt"
+      },
+      "compressor_blocked_sec": {
+        "name": "Compressor geblokkeerd tijd"
+      },
+      "ventilation_filter_time_left": {
+        "name": "Ventilatiefilter resterende tijd"
       }
     },
     "number": {

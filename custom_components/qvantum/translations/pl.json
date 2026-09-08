@@ -145,6 +145,36 @@
       },
       "time_to_defrost": {
         "name": "Czas rozmrażania"
+      },
+      "heatingreleased": {
+        "name": "Ogrzewanie dozwolone"
+      },
+      "coolingreleased": {
+        "name": "Chłodzenie dozwolone"
+      },
+      "compressorreleased": {
+        "name": "Sprężarka dozwolona"
+      },
+      "additionreleased": {
+        "name": "Dogrzewanie dozwolone"
+      },
+      "unit_state": {
+        "name": "Jednostka włączona"
+      },
+      "freeze_protection_active": {
+        "name": "Ochrona przed zamarzaniem"
+      },
+      "compressor_blocked": {
+        "name": "Sprężarka zablokowana"
+      },
+      "wifi_connected": {
+        "name": "Wi-Fi połączone"
+      },
+      "cloud_connected": {
+        "name": "Chmura połączona"
+      },
+      "vacation_mode": {
+        "name": "Tryb wakacyjny"
       }
     },
     "sensor": {
@@ -417,16 +447,16 @@
         }
       },
       "heatingreleased": {
-        "name": "Ogrzewanie zwolnione"
+        "name": "Ogrzewanie dozwolone"
       },
       "coolingreleased": {
-        "name": "Chłodzenie zwolnione"
+        "name": "Chłodzenie dozwolone"
       },
       "compressorreleased": {
-        "name": "Sprężarka zwolniona"
+        "name": "Sprężarka dozwolona"
       },
       "additionreleased": {
-        "name": "Dogrzewanie zwolnione"
+        "name": "Dogrzewanie dozwolone"
       },
       "dhw_prioritytimeleft": {
         "name": "Pozostały czas priorytetu DHW"
@@ -481,6 +511,12 @@
       },
       "expires_at": {
         "name": "Wygaśnięcie podwyższonego dostępu"
+      },
+      "compressor_blocked_sec": {
+        "name": "Czas blokady sprężarki"
+      },
+      "ventilation_filter_time_left": {
+        "name": "Pozostały czas filtra wentylacji"
       }
     },
     "number": {

@@ -52,6 +52,20 @@ def test_danish_and_czech_translations_are_available():
         assert "modbus" in data["config"]["step"]["user"]["menu_options"]
 
 
+def test_released_translations_mean_permitted():
+    """Released flags mean the function is permitted, not that it is running."""
+    en = json.loads((TRANSLATIONS_DIR / "en.json").read_text(encoding="utf-8"))
+    sv = json.loads((TRANSLATIONS_DIR / "sv.json").read_text(encoding="utf-8"))
+    de = json.loads((TRANSLATIONS_DIR / "de.json").read_text(encoding="utf-8"))
+
+    assert en["entity"]["binary_sensor"]["heatingreleased"]["name"] == "Heating permitted"
+    assert en["entity"]["sensor"]["heatingreleased"]["name"] == "Heating permitted"
+    assert sv["entity"]["binary_sensor"]["heatingreleased"]["name"] == "Värme tillåten"
+    assert de["entity"]["binary_sensor"]["heatingreleased"]["name"] == "Heizung freigegeben"
+    assert en["entity"]["binary_sensor"]["wifi_connected"]["name"] == "Wi-Fi connected"
+    assert en["entity"]["binary_sensor"]["cloud_connected"]["name"] == "Cloud connected"
+
+
 def test_config_flow_strings_are_localized():
     """Non-English locales must keep localized config abort/error/title strings."""
     en = json.loads((TRANSLATIONS_DIR / "en.json").read_text(encoding="utf-8"))

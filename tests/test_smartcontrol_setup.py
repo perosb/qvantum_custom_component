@@ -69,9 +69,10 @@ async def test_cloud_setup_creates_smartcontrol_entities(
     with patch("custom_components.qvantum.entity.cleanup_disabled_entities") as cleanup:
         await setup_switch(hass, mock_config_entry, added)
     keys = {entity._metric_key for entity in added.call_args.args[0]}
-    assert {"enable_sc_sh", "enable_sc_dhw"}.issubset(keys)
+    assert {"enable_sc_sh", "enable_sc_dhw", "vacation_mode"}.issubset(keys)
     assert "enable_sc_sh" in cleanup.call_args.args[2]
     assert "enable_sc_dhw" in cleanup.call_args.args[2]
+    assert "vacation_mode" in cleanup.call_args.args[2]
     assert cleanup.call_args.args[3] == "switch"
 
 
@@ -99,6 +100,8 @@ async def test_modbus_setup_omits_smartcontrol_entities(
     keys = {entity._metric_key for entity in added.call_args.args[0]}
     assert "enable_sc_sh" not in keys
     assert "enable_sc_dhw" not in keys
+    assert "vacation_mode" not in keys
     assert "enable_sc_sh" not in cleanup.call_args.args[2]
     assert "enable_sc_dhw" not in cleanup.call_args.args[2]
+    assert "vacation_mode" not in cleanup.call_args.args[2]
     assert cleanup.call_args.args[3] == "switch"

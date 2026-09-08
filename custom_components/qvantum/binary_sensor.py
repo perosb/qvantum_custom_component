@@ -3,8 +3,10 @@
 import logging
 
 from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
     BinarySensorEntity,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -13,14 +15,15 @@ from .const import (
     BINARY_SENSOR_NAMES,
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
+    MODBUS_ONLY_BINARY_SENSORS,
 )
-
-
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
 from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+_CONNECTIVITY_BINARY_SENSORS = frozenset({"wifi_connected", "cloud_connected"})
 
 
 async def async_setup_entry(
@@ -41,7 +44,11 @@ async def async_setup_entry(
         else DEFAULT_DISABLED_HTTP_METRICS
     )
 
-    for metric in sorted(BINARY_SENSOR_NAMES):
+    names = list(BINARY_SENSOR_NAMES)
+    if coordinator.modbus_enabled:
+        names.extend(MODBUS_ONLY_BINARY_SENSORS)
+
+    for metric in sorted(names):
         enabled_by_default = metric not in disabled_metrics
         if enabled_by_default and metric not in values:
             continue
@@ -65,11 +72,23 @@ async def async_setup_entry(
     # Clean up disabled entities that are no longer supported in the current mode
     from .entity import cleanup_disabled_entities
 
-    cleanup_disabled_entities(hass, coordinator, BINARY_SENSOR_NAMES, "binary_sensor")
+    cleanup_disabled_entities(hass, coordinator, set(names), "binary_sensor")
 
 
 class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
     """Base binary sensor entity for Qvantum devices."""
+
+    def __init__(
+        self,
+        coordinator: QvantumDataUpdateCoordinator,
+        metric_key: str,
+        device: DeviceInfo,
+        enabled_by_default: bool = True,
+    ) -> None:
+        super().__init__(coordinator, metric_key, device, enabled_by_default)
+        if metric_key in _CONNECTIVITY_BINARY_SENSORS:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
 
     @property
     def is_on(self):

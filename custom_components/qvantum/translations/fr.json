@@ -145,6 +145,36 @@
       },
       "time_to_defrost": {
         "name": "Temps de dégivrage"
+      },
+      "heatingreleased": {
+        "name": "Chauffage autorisé"
+      },
+      "coolingreleased": {
+        "name": "Refroidissement autorisé"
+      },
+      "compressorreleased": {
+        "name": "Compresseur autorisé"
+      },
+      "additionreleased": {
+        "name": "Appoint autorisé"
+      },
+      "unit_state": {
+        "name": "Appareil allumé"
+      },
+      "freeze_protection_active": {
+        "name": "Protection antigel"
+      },
+      "compressor_blocked": {
+        "name": "Compresseur bloqué"
+      },
+      "wifi_connected": {
+        "name": "Wi-Fi connecté"
+      },
+      "cloud_connected": {
+        "name": "Cloud connecté"
+      },
+      "vacation_mode": {
+        "name": "Mode vacances"
       }
     },
     "sensor": {
@@ -481,6 +511,12 @@
       },
       "expires_at": {
         "name": "Expiration accès élevé"
+      },
+      "compressor_blocked_sec": {
+        "name": "Durée de blocage du compresseur"
+      },
+      "ventilation_filter_time_left": {
+        "name": "Temps restant du filtre de ventilation"
       }
     },
     "number": {

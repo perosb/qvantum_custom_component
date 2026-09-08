@@ -127,6 +127,25 @@ class TestQvantumBaseBinaryEntity:
         )
         assert entity.available is False
 
+    def test_connectivity_entities_are_diagnostic(self, mock_coordinator, mock_device):
+        """Wi-Fi and cloud connected sensors belong in the diagnostics category."""
+        wifi = QvantumBaseBinaryEntity(
+            mock_coordinator, "wifi_connected", mock_device, True
+        )
+        cloud = QvantumBaseBinaryEntity(
+            mock_coordinator, "cloud_connected", mock_device, True
+        )
+        heating = QvantumBaseBinaryEntity(
+            mock_coordinator, "heatingreleased", mock_device, True
+        )
+
+        assert wifi._attr_entity_category.name == "DIAGNOSTIC"
+        assert wifi._attr_device_class.name == "CONNECTIVITY"
+        assert cloud._attr_entity_category.name == "DIAGNOSTIC"
+        assert cloud._attr_device_class.name == "CONNECTIVITY"
+        assert getattr(heating, "_attr_entity_category", None) is None
+        assert getattr(heating, "_attr_device_class", None) is None
+
 
 @pytest.mark.asyncio
 async def test_async_setup_entry(
@@ -168,21 +187,26 @@ async def test_async_setup_entry(
         # Check that entities were added
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
-        assert len(entities) == 11  # 11 sensor names
+        assert len(entities) == 16
 
         # Check that we have the expected sensor types
         sensor_names = [
             "additiondemand",
             "additiondhwdemand",
+            "additionreleased",
             "cooling_enabled",
             "coolingdemand",
+            "coolingreleased",
+            "compressorreleased",
             "heatingdemand",
+            "heatingreleased",
             "dhwdemand",
             "picpin_relay_heat_l1",
             "picpin_relay_heat_l2",
             "picpin_relay_heat_l3",
             "picpin_relay_qm10",
             "time_to_defrost",
+            "unit_state",
         ]
 
         entity_metric_keys = sorted([e._metric_key for e in entities])

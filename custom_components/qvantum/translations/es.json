@@ -145,6 +145,36 @@
       },
       "time_to_defrost": {
         "name": "Tiempo de descongelación"
+      },
+      "heatingreleased": {
+        "name": "Calefacción permitida"
+      },
+      "coolingreleased": {
+        "name": "Refrigeración permitida"
+      },
+      "compressorreleased": {
+        "name": "Compresor permitido"
+      },
+      "additionreleased": {
+        "name": "Apoyo permitido"
+      },
+      "unit_state": {
+        "name": "Unidad encendida"
+      },
+      "freeze_protection_active": {
+        "name": "Protección contra heladas"
+      },
+      "compressor_blocked": {
+        "name": "Compresor bloqueado"
+      },
+      "wifi_connected": {
+        "name": "Wi-Fi conectado"
+      },
+      "cloud_connected": {
+        "name": "Nube conectada"
+      },
+      "vacation_mode": {
+        "name": "Modo vacaciones"
       }
     },
     "sensor": {
@@ -417,16 +447,16 @@
         }
       },
       "heatingreleased": {
-        "name": "Calefacción liberada"
+        "name": "Calefacción permitida"
       },
       "coolingreleased": {
-        "name": "Refrigeración liberada"
+        "name": "Refrigeración permitida"
       },
       "compressorreleased": {
-        "name": "Compresor liberado"
+        "name": "Compresor permitido"
       },
       "additionreleased": {
-        "name": "Adición liberada"
+        "name": "Apoyo permitido"
       },
       "dhw_prioritytimeleft": {
         "name": "Tiempo de prioridad ACS restante"
@@ -481,6 +511,12 @@
       },
       "expires_at": {
         "name": "Expiración acceso elevado"
+      },
+      "compressor_blocked_sec": {
+        "name": "Tiempo de bloqueo del compresor"
+      },
+      "ventilation_filter_time_left": {
+        "name": "Tiempo restante del filtro de ventilación"
       }
     },
     "number": {

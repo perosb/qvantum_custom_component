@@ -145,6 +145,36 @@
       },
       "time_to_defrost": {
         "name": "Leolvasztás ideje"
+      },
+      "heatingreleased": {
+        "name": "Fűtés engedélyezve"
+      },
+      "coolingreleased": {
+        "name": "Hűtés engedélyezve"
+      },
+      "compressorreleased": {
+        "name": "Kompresszor engedélyezve"
+      },
+      "additionreleased": {
+        "name": "Kiegészítő fűtés engedélyezve"
+      },
+      "unit_state": {
+        "name": "Egység be"
+      },
+      "freeze_protection_active": {
+        "name": "Fagyvédelem"
+      },
+      "compressor_blocked": {
+        "name": "Kompresszor blokkolva"
+      },
+      "wifi_connected": {
+        "name": "Wi-Fi csatlakoztatva"
+      },
+      "cloud_connected": {
+        "name": "Felhő csatlakoztatva"
+      },
+      "vacation_mode": {
+        "name": "Szabadság üzemmód"
       }
     },
     "sensor": {
@@ -426,7 +456,7 @@
         "name": "Kompresszor engedélyezve"
       },
       "additionreleased": {
-        "name": "Rásegítés engedélyezve"
+        "name": "Kiegészítő fűtés engedélyezve"
       },
       "dhw_prioritytimeleft": {
         "name": "HMV prioritás hátralévő ideje"
@@ -481,6 +511,12 @@
       },
       "expires_at": {
         "name": "Emelt hozzáférés lejárata"
+      },
+      "compressor_blocked_sec": {
+        "name": "Kompresszor blokkolási ideje"
+      },
+      "ventilation_filter_time_left": {
+        "name": "Szellőzőszűrő hátralévő ideje"
       }
     },
     "number": {

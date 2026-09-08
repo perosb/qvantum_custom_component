@@ -65,8 +65,9 @@ QvantumInputs = _component_from_map(
         name: bit(_RELAYS_BITMASK_ADDRESS, index)
         for name, index in RELAY_BIT_MAP.items()
     },
-    # Live probe: 0-104 answers, 105-160 raises 0x04, 161-164 answers.
-    register_ranges=((0, 104), (161, 164)),
+    # Live probe: 0-104 answers, 105-160 raises 0x04, 161-170 answers
+    # (price registers 165-166 are unread; wifi/cloud/vacation sit at 168-170).
+    register_ranges=((0, 104), (161, 170)),
 )
 
 QvantumSettings = _component_from_map(
