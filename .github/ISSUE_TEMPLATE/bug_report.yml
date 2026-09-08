@@ -1,0 +1,105 @@
+name: Bug report
+description: Report a problem with the Qvantum Heat Pump integration
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Fill in the environment details first — they are required to diagnose HTTP vs Modbus issues.
+
+        Please do **not** include passwords, API tokens, or other secrets.
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      description: Settings → About (or Settings → System → Repairs → ⋮ → System information).
+      placeholder: "2026.9.0"
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      description: HACS → Qvantum Heat Pump, or `custom_components/qvantum/manifest.json` (`version`).
+      placeholder: "2026.9.6"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: connection_mode
+    attributes:
+      label: Connection mode
+      description: How is the integration connected to the heat pump? (Settings → Devices & Services → Qvantum Heat Pump)
+      options:
+        - Cloud (HTTP)
+        - Local Modbus (offline)
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Installation method
+      options:
+        - HACS
+        - Manual
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: modbus_write
+    attributes:
+      label: Modbus writing
+      description: Only relevant in Local Modbus mode. Choose N/A for Cloud (HTTP).
+      options:
+        - N/A (Cloud HTTP)
+        - Disabled (read-only)
+        - Enabled
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that trigger the problem.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant Home Assistant logs (Settings → System → Logs). Remove secrets before pasting.
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Heat pump model, firmware, screenshots, or anything else that might help.
