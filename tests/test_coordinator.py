@@ -365,6 +365,8 @@ class TestQvantumDataUpdateCoordinator:
         assert set(result) == expected_metrics
         # Extra hot water stop timestamp must be fetched in HTTP mode
         assert "tap_stop" in result
+        # stop_heating is required by the number entity in HTTP mode
+        assert "stop_heating" in result
         # tap_water_start/stop come from the settings endpoint, not HTTP /values
         assert "tap_water_start" not in result
         assert "tap_water_stop" not in result
@@ -690,6 +692,44 @@ class TestQvantumDataUpdateCoordinator:
         assert "tap_water_stop" not in enabled_metrics
         assert result["values"]["tap_water_start"] == 52
         assert result["values"]["tap_water_stop"] == 62
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_async_update_data_http_stop_heating(self, mock_super_init):
+        """HTTP stop_heating is requested in metrics and populated into values."""
+        mock_super_init.return_value = None
+
+        mock_api = MagicMock()
+        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.get_metrics = AsyncMock(
+            return_value={"metrics": {"hpid": "test_device_123", "stop_heating": 16}}
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+
+        mock_config_entry = MagicMock()
+        mock_config_entry.options.get.side_effect = lambda key, default=None: (
+            120 if key == CONF_SCAN_INTERVAL else default
+        )
+        mock_config_entry.data = {}
+        mock_config_entry.unique_id = "test_device_123"
+
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
+        coordinator.api = mock_api
+        coordinator.hass = mock_hass
+        coordinator.modbus_enabled = False
+
+        result = await coordinator.async_update_data()
+
+        enabled_metrics = mock_api.get_metrics.await_args.kwargs["enabled_metrics"]
+        assert "stop_heating" in enabled_metrics
+        assert result["values"]["stop_heating"] == 16
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio

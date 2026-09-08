@@ -203,6 +203,7 @@ REQUIRED_METRICS = [
     "room_comp_factor",  # Required by number component
     "fan_normal",  # Required by number component
     "fan_speed_2",  # Required by number component
+    "stop_heating",  # Required by number component
     "enable_sc_dhw",
     "enable_sc_sh",
     "compressorenergy",
