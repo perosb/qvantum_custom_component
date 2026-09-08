@@ -176,15 +176,15 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
     "time_to_defrost",  # should be interpreted as binary (defrosting vs not) rather than a continuous time value
 ]
 
-# Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus)
+# Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus).
+# tap_water_start/stop are settings (HTTP settings API / Modbus holdings), not /values
+# metrics. Requesting them as HTTP metrics logs "Metric X not found in response data".
 REQUIRED_METRICS = [
     "bt2",  # Required by climate component for current temperature
     "man_mode",  # Required by switch component
     "op_man_addition",  # Required by switch component
     "op_man_dhw",  # Required by switch component
     "op_mode",  # Required by switch components for availability checks
-    "tap_water_stop",  # Required by number component
-    "tap_water_start",  # Required by number component
     "smart_sh_mode",  # Required by select component
     "smart_dhw_mode",  # Required by select component
     "use_adaptive",  # Required by select component and switch components
