@@ -6,27 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug. Fill in the environment details first — they are required to diagnose HTTP vs Modbus issues.
-
         Please do **not** include passwords, API tokens, or other secrets.
-
-  - type: input
-    id: ha_version
-    attributes:
-      label: Home Assistant version
-      description: Settings → About (or Settings → System → Repairs → ⋮ → System information).
-      placeholder: "2026.9.0"
-    validations:
-      required: true
-
-  - type: input
-    id: integration_version
-    attributes:
-      label: Integration version
-      description: HACS → Qvantum Heat Pump, or `custom_components/qvantum/manifest.json` (`version`).
-      placeholder: "2026.9.6"
-    validations:
-      required: true
 
   - type: dropdown
     id: connection_mode
@@ -67,39 +47,6 @@ body:
     id: description
     attributes:
       label: Describe the bug
-      description: What happened?
+      description: What happened? Include Home Assistant version, integration version, expected behavior, and logs if you have them.
     validations:
       required: true
-
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected behavior
-      description: What should have happened?
-    validations:
-      required: true
-
-  - type: textarea
-    id: steps
-    attributes:
-      label: Steps to reproduce
-      description: Numbered steps that trigger the problem.
-      placeholder: |
-        1.
-        2.
-        3.
-    validations:
-      required: true
-
-  - type: textarea
-    id: logs
-    attributes:
-      label: Logs
-      description: Relevant Home Assistant logs (Settings → System → Logs). Remove secrets before pasting.
-      render: shell
-
-  - type: textarea
-    id: additional
-    attributes:
-      label: Additional context
-      description: Heat pump model, firmware, screenshots, or anything else that might help.
