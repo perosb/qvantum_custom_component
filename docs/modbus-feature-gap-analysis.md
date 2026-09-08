@@ -64,7 +64,7 @@ Gone in current local. Previous Modbus could still show some of these via HTTP f
 - Cloud extra-DHW countdown (HTTP `tap_stop` epoch from the pump/cloud)
 - Firmware sensors: `display_fw_version`, `cc_fw_version`, `inv_fw_version`, `firmware_last_check`
 - Access: `expiresAt`
-- Default-disabled HTTP metrics with no register, including `calc_suppy_cpr`, `dhw_outl_temp_*`, `guide_*`, `price_region`, `heatingreleased` / `coolingreleased` / `compressorreleased` / `additionreleased`, `inputcurrent1–3`, …
+- Default-disabled HTTP metrics with no register, including `calc_suppy_cpr`, `dhw_outl_temp_*`, `guide_*`, `price_region`, `inputcurrent1–3`, …
 
 Previous Modbus **still created** cloud `tap_stop`, firmware, and access sensors even when Modbus was on (often stale or empty if the cloud was down). Current local **hides** firmware/access and leftover cloud sensors, and cleans those leftovers out of the entity registry. Extra-DHW `tap_stop` is still created locally from the persisted restore epoch (`_extra_dhw_restore_at`), not the cloud countdown.
 
@@ -77,6 +77,26 @@ Previous and current local both have them; HTTP does not at the default poll:
 - Holding as sensor: `start_cooling_temp`
 - Binary: `additiondemand`, `additiondhwdemand`, `cooling_prioritytimeleft`
 - Default poll ~15 s vs HTTP ~120 s
+
+### Newly mapped status inputs (0–104 and 168–170)
+
+Poll `register_ranges=((0, 104), (161, 170))`. Skip 105–160 and unread electricity-price 165–166.
+
+Binary (0/1 flags):
+
+- `unit_state` (40)
+- `heatingreleased` (42), `coolingreleased` (43), `compressorreleased` (44), `additionreleased` (45) — translations: “permitted”
+- `compressor_blocked` (71)
+- `freeze_protection_active` (87)
+- `wifi_connected` (168), `cloud_connected` (169) — diagnostic + CONNECTIVITY
+- `vacation_mode` (170) — Modbus-only read-only binary; HTTP keeps the writable `vacation_mode` switch
+
+Duration:
+
+- `compressor_blocked_sec` (72)
+- `ventilation_filter_time_left` (91)
+
+`heatingreleased` / `coolingreleased` / `compressorreleased` / `additionreleased` also exist as default-disabled HTTP metrics; they are no longer HTTP-only.
 
 ### `tap_water_cap` is not the same metric
 
@@ -125,6 +145,7 @@ Climate is heat-only. `async_set_hvac_mode` is a no-op in **all** modes. Target-
 |---|---|
 | **SmartControl** (`use_adaptive`, `smart_sh_mode`, `smart_dhw_mode`) | Constraint: never write SmartControl locally. Select stays cloud-only. |
 | **`enable_sc_sh` / `enable_sc_dhw`** | Readable as inputs 163–164; no holding in the write map. Switches exist but are unavailable. |
+| **`vacation_mode`** | Readable as input 170 (binary sensor). No holding; writable switch is HTTP-only. |
 | **`elevate_access`** | Cloud grant flow. The button is not created in local Modbus mode. |
 | **Timed extra DHW** | Cloud has pump-side `stopTime` / indefinite / cancel. Local writes Extra/Normal and Home Assistant restores Normal from a restore timer with a persisted deadline (`tap_stop` from that epoch). |
 | **Timed fan boost** | Cloud extra fan uses a ~120 minute stop timestamp. Local writes 0/1/2 with no restore timer (sticky). |
@@ -168,19 +189,19 @@ The holding map includes many registers that are **not** in `MODBUS_HOLDING_TO_S
 
 ### Current local vs HTTP
 
-- **Gain:** no cloud, faster poll, derived power / DHW capacity, extra relays/state, local writes for the mapped setpoints.
+- **Gain:** no cloud, faster poll, derived power / DHW capacity, extra relays/state, status/connectivity/filter/vacation reads, local writes for the mapped setpoints.
 - **Lose:** SmartControl, elevate access, compressor/inverter/display firmware sensors, bp1/bp2, `fan0_10v`, timed fan boost, any HTTP-only disabled metric, vendor/model from inventory. Extra-DHW `tap_stop` remains (local restore epoch, not the cloud countdown).
 
 ### Current local vs previous Modbus
 
-- **Gain:** works with no account and no internet; serial unique id; no refused dual-span HTTP; extra DHW / climate / fan / DHW start-stop / op-mode actually write locally; cloud-only entities are hidden instead of sitting unavailable; write access does not need cloud elevation.
+- **Gain:** works with no account and no internet; serial unique id; no refused dual-span HTTP; extra DHW / climate / fan / DHW start-stop / op-mode actually write locally; cloud-only entities are hidden instead of sitting unavailable; write access does not need cloud elevation; status/connectivity/filter/vacation input reads.
 - **Lose:** HTTP fallback if Modbus drops; pump/cloud-enforced extra DHW `stopTime` (local `tap_stop` is HA’s persisted restore epoch); SmartControl and elevate-access while “on Modbus”; bp1/bp2/`fan0_10v` via fallback; write access via cloud when `modbus_write` is off; stable cloud `hpid` in entity unique IDs.
 
 ### Previous Modbus vs HTTP
 
 Was mostly “HTTP plus a faster read path.” Controls did not become local. Offline was “start from cache,” not “run forever.”
 
-**Unchanged read surface** across previous and current Modbus: heating/DHW power, tap-water cap (local meaning), demand binary sensors, relay sensors, 15 s poll, shared HA Modbus unit, derived `hp_status` from `compressor_state`.
+**Unchanged read surface** across previous and current Modbus: heating/DHW power, tap-water cap (local meaning), demand binary sensors, relay sensors, 15 s poll, shared HA Modbus unit, derived `hp_status` from `compressor_state`. Current also maps the status/connectivity/vacation inputs above.
 
 ---
 
@@ -204,3 +225,5 @@ That is no longer true on this stack. Local is XOR cloud; writes never fall back
 4. Entity unique-id migration for users who already ran the hybrid overlay (cloud `hpid` → serial).
 
 Done in this persist-across-restart work: extra-DHW restore deadline is stored and resumed after a Home Assistant restart; local `tap_stop` is the restore epoch.
+
+Done in this input-status work: remaining readable inputs in 0–104 and 168–170 (except electricity-price 165–166) are mapped as binaries or duration sensors; vacation on Modbus is read-only.

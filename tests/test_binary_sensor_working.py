@@ -171,6 +171,8 @@ async def test_async_setup_entry(
         coordinator=mock_coordinator,
         device=mock_device,
     )
+    # HTTP path: MagicMock would otherwise make modbus_enabled truthy.
+    mock_coordinator.modbus_enabled = False
 
     async_add_entities = MagicMock()
 
@@ -187,26 +189,22 @@ async def test_async_setup_entry(
         # Check that entities were added
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
-        assert len(entities) == 16
+        assert len(entities) == 12
 
         # Check that we have the expected sensor types
         sensor_names = [
-            "additiondemand",
-            "additiondhwdemand",
             "additionreleased",
+            "compressorreleased",
             "cooling_enabled",
             "coolingdemand",
             "coolingreleased",
-            "compressorreleased",
+            "dhwdemand",
             "heatingdemand",
             "heatingreleased",
-            "dhwdemand",
             "picpin_relay_heat_l1",
             "picpin_relay_heat_l2",
             "picpin_relay_heat_l3",
             "picpin_relay_qm10",
-            "time_to_defrost",
-            "unit_state",
         ]
 
         entity_metric_keys = sorted([e._metric_key for e in entities])
