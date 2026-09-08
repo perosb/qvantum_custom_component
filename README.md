@@ -89,7 +89,7 @@ Cloud-only sensors (firmware boards and access expiry) are not created in this m
 
 - **Offline**: no Qvantum account, no HTTP fallback
 - **Faster polling** of live data from the pump’s Modbus interface (default 15 s)
-- **Extra local metrics**: heating/DHW power, tap-water capacity estimate, compressor state, extra demand relays
+- **Extra local metrics**: heating/DHW power, tap-water capacity estimate, compressor state, extra demand relays, unit/released/blocked/freeze status, Wi-Fi and cloud connectivity, filter time left, read-only vacation mode
 - **Optional writes** for supported holding-register controls when you enable **Enable writing via Modbus**
 
 > [!IMPORTANT]
@@ -97,7 +97,7 @@ Cloud-only sensors (firmware boards and access expiry) are not created in this m
 >
 > Supported local writes include indoor target/offset, DHW start/stop, extra DHW, fan preset, operation/manual switches, room compensation, fan speeds, extra-DHW stop, outdoor temperature stop heating (`stop_heating`), external room temperature, and indoor sensor source.
 >
-> **SmartControl** (`use_adaptive`, `enable_sc_sh`, `enable_sc_dhw`) and **elevate-access** are not created in local Modbus mode. **Vacation mode** stays cloud-only.
+> **SmartControl** (`use_adaptive`, `enable_sc_sh`, `enable_sc_dhw`) and **elevate-access** are not created in local Modbus mode. On local Modbus, **vacation mode** is a read-only binary from input 170; the writable vacation switch remains HTTP-only.
 >
 > By enabling Modbus writing you accept full responsibility for values written to the pump. Incorrect or out-of-range values may void the warranty and/or affect lifecycle and performance.
 

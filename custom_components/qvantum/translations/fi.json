@@ -145,6 +145,36 @@
       },
       "time_to_defrost": {
         "name": "Aika sulatukseen"
+      },
+      "heatingreleased": {
+        "name": "Lämmitys sallittu"
+      },
+      "coolingreleased": {
+        "name": "Jäähdytys sallittu"
+      },
+      "compressorreleased": {
+        "name": "Kompressori sallittu"
+      },
+      "additionreleased": {
+        "name": "Lisälämmitys sallittu"
+      },
+      "unit_state": {
+        "name": "Laite päällä"
+      },
+      "freeze_protection_active": {
+        "name": "Jäätymissuoja"
+      },
+      "compressor_blocked": {
+        "name": "Kompressori estetty"
+      },
+      "wifi_connected": {
+        "name": "Wi-Fi yhdistetty"
+      },
+      "cloud_connected": {
+        "name": "Pilvi yhdistetty"
+      },
+      "vacation_mode": {
+        "name": "Lomatila"
       }
     },
     "sensor": {
@@ -417,16 +447,16 @@
         }
       },
       "heatingreleased": {
-        "name": "Lämmitys vapautettu"
+        "name": "Lämmitys sallittu"
       },
       "coolingreleased": {
-        "name": "Jäähdytys vapautettu"
+        "name": "Jäähdytys sallittu"
       },
       "compressorreleased": {
-        "name": "Kompressori vapautettu"
+        "name": "Kompressori sallittu"
       },
       "additionreleased": {
-        "name": "Lisälämmitys vapautettu"
+        "name": "Lisälämmitys sallittu"
       },
       "dhw_prioritytimeleft": {
         "name": "Käyttöveden prioriteettiaika jäljellä"
@@ -481,6 +511,12 @@
       },
       "expires_at": {
         "name": "Korotettujen käyttöoikeuksien vanheneminen"
+      },
+      "compressor_blocked_sec": {
+        "name": "Kompressorin esto aika"
+      },
+      "ventilation_filter_time_left": {
+        "name": "Ilmanvaihtosuodattimen jäljellä oleva aika"
       }
     },
     "number": {

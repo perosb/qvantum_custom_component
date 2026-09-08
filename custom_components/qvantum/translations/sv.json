@@ -148,6 +148,36 @@
       },
       "time_to_defrost": {
         "name": "Tid för avfrostning"
+      },
+      "heatingreleased": {
+        "name": "Värme tillåten"
+      },
+      "coolingreleased": {
+        "name": "Kyla tillåten"
+      },
+      "compressorreleased": {
+        "name": "Kompressor tillåten"
+      },
+      "additionreleased": {
+        "name": "Tillsats tillåten"
+      },
+      "unit_state": {
+        "name": "Enhet på"
+      },
+      "freeze_protection_active": {
+        "name": "Frysskydd"
+      },
+      "compressor_blocked": {
+        "name": "Kompressor blockerad"
+      },
+      "wifi_connected": {
+        "name": "Wi-Fi ansluten"
+      },
+      "cloud_connected": {
+        "name": "Moln anslutet"
+      },
+      "vacation_mode": {
+        "name": "Semesterläge"
       }
     },
     "sensor": {
@@ -396,16 +426,16 @@
         }
       },
       "heatingreleased": {
-        "name": "Värme frigjord"
+        "name": "Värme tillåten"
       },
       "coolingreleased": {
-        "name": "Kylning frigjord"
+        "name": "Kyla tillåten"
       },
       "compressorreleased": {
-        "name": "Kompressor frigjord"
+        "name": "Kompressor tillåten"
       },
       "additionreleased": {
-        "name": "Tillsats frigjord"
+        "name": "Tillsats tillåten"
       },
       "dhw_prioritytimeleft": {
         "name": "Varmvattenprioritetstid kvar"
@@ -484,6 +514,12 @@
       },
       "expires_at": {
         "name": "Förhöjd åtkomst upphör"
+      },
+      "compressor_blocked_sec": {
+        "name": "Kompressor blockerad tid"
+      },
+      "ventilation_filter_time_left": {
+        "name": "Ventilationsfilter tid kvar"
       }
     },
     "number": {

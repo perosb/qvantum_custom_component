@@ -145,6 +145,36 @@
       },
       "time_to_defrost": {
         "name": "Doba odmrazování"
+      },
+      "heatingreleased": {
+        "name": "Topení povoleno"
+      },
+      "coolingreleased": {
+        "name": "Chlazení povoleno"
+      },
+      "compressorreleased": {
+        "name": "Kompresor povolen"
+      },
+      "additionreleased": {
+        "name": "Přídavný ohřev povolen"
+      },
+      "unit_state": {
+        "name": "Jednotka zapnuta"
+      },
+      "freeze_protection_active": {
+        "name": "Ochrana proti zamrznutí"
+      },
+      "compressor_blocked": {
+        "name": "Kompresor zablokován"
+      },
+      "wifi_connected": {
+        "name": "Wi-Fi připojeno"
+      },
+      "cloud_connected": {
+        "name": "Cloud připojen"
+      },
+      "vacation_mode": {
+        "name": "Režim dovolené"
       }
     },
     "sensor": {
@@ -417,16 +447,16 @@
         }
       },
       "heatingreleased": {
-        "name": "Topení uvolněno"
+        "name": "Topení povoleno"
       },
       "coolingreleased": {
-        "name": "Chlazení uvolněno"
+        "name": "Chlazení povoleno"
       },
       "compressorreleased": {
-        "name": "Kompresor uvolněn"
+        "name": "Kompresor povolen"
       },
       "additionreleased": {
-        "name": "Přídavný ohřev uvolněn"
+        "name": "Přídavný ohřev povolen"
       },
       "dhw_prioritytimeleft": {
         "name": "Zbývající doba priority TUV"
@@ -481,6 +511,12 @@
       },
       "expires_at": {
         "name": "Vypršení zvýšených oprávnění"
+      },
+      "compressor_blocked_sec": {
+        "name": "Doba blokování kompresoru"
+      },
+      "ventilation_filter_time_left": {
+        "name": "Zbývající doba filtru ventilace"
       }
     },
     "number": {

@@ -30,10 +30,11 @@ async def async_setup_entry(
         "op_man_dhw",
         "op_man_addition",
         "man_mode",
-        "vacation_mode",
     ]
     if not coordinator.modbus_enabled:
-        switch_names.extend(["enable_sc_sh", "enable_sc_dhw"])
+        # Cloud-only writes: SmartControl and vacation_mode. On Modbus,
+        # vacation_mode is a read-only input (binary sensor).
+        switch_names.extend(["enable_sc_sh", "enable_sc_dhw", "vacation_mode"])
 
     sensors = []
     for switch_name in switch_names:

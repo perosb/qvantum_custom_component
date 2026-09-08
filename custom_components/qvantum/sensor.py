@@ -28,6 +28,7 @@ from .const import (
     DEFAULT_ENABLED_MODBUS_METRICS,
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
+    EXCLUDED_METRIC_NAMES,
     EXCLUDED_METRIC_PATTERNS,
     TEMPERATURE_METRICS,
     ENERGY_METRICS,
@@ -187,8 +188,12 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             or metric_key.startswith("qn8")
         ):
             self._attr_native_unit_of_measurement = "%"
-        elif "timeleft" in metric_key:
-            self._attr_native_unit_of_measurement = "s"
+        elif "timeleft" in metric_key or metric_key == "compressor_blocked_sec":
+            self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
+            self._attr_device_class = SensorDeviceClass.DURATION
+            self._attr_suggested_display_precision = 0
+        elif metric_key == "ventilation_filter_time_left":
+            self._attr_native_unit_of_measurement = UnitOfTime.HOURS
             self._attr_device_class = SensorDeviceClass.DURATION
             self._attr_suggested_display_precision = 0
         elif "tap_water_cap" == metric_key:
@@ -419,6 +424,8 @@ class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
 
 def _should_exclude_metric(metric: str) -> bool:
     """Check if a metric should be excluded from sensor creation."""
+    if metric in EXCLUDED_METRIC_NAMES:
+        return True
     return any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
 
 

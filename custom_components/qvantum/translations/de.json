@@ -145,6 +145,36 @@
       },
       "time_to_defrost": {
         "name": "Zeit zum Abtauen"
+      },
+      "heatingreleased": {
+        "name": "Heizung freigegeben"
+      },
+      "coolingreleased": {
+        "name": "Kühlung freigegeben"
+      },
+      "compressorreleased": {
+        "name": "Kompressor freigegeben"
+      },
+      "additionreleased": {
+        "name": "Zusatz freigegeben"
+      },
+      "unit_state": {
+        "name": "Gerät ein"
+      },
+      "freeze_protection_active": {
+        "name": "Frostschutz"
+      },
+      "compressor_blocked": {
+        "name": "Kompressor gesperrt"
+      },
+      "wifi_connected": {
+        "name": "WLAN verbunden"
+      },
+      "cloud_connected": {
+        "name": "Cloud verbunden"
+      },
+      "vacation_mode": {
+        "name": "Urlaubsmodus"
       }
     },
     "sensor": {
@@ -481,6 +511,12 @@
       },
       "expires_at": {
         "name": "Ablauf des erweiterten Zugriffs"
+      },
+      "compressor_blocked_sec": {
+        "name": "Kompressor-Sperrzeit"
+      },
+      "ventilation_filter_time_left": {
+        "name": "Lüftungsfilter Restlaufzeit"
       }
     },
     "number": {

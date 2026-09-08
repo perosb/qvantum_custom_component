@@ -93,6 +93,12 @@ DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "smart_dhw_control_status",
     "compressor_state",
     "picpin_relay_pump",
+    "freeze_protection_active",
+    "compressor_blocked",
+    "ventilation_filter_time_left",
+    "wifi_connected",
+    "cloud_connected",
+    "vacation_mode",
 ]
 
 # Holding register keys that should be exposed as sensor entities in Modbus mode
@@ -174,6 +180,12 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
     "cooling_prioritytimeleft",
     "degree_minute",
     "time_to_defrost",  # should be interpreted as binary (defrosting vs not) rather than a continuous time value
+    "heatingreleased",
+    "coolingreleased",
+    "compressorreleased",
+    "additionreleased",
+    "unit_state",
+    "compressor_blocked_sec",
 ]
 
 # Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus).
@@ -324,9 +336,23 @@ BINARY_SENSOR_NAMES = [
     "additiondemand",
     "additiondhwdemand",
     "time_to_defrost",  # should be interpreted as binary (defrosting vs not) rather than a continuous time value
+    "heatingreleased",
+    "coolingreleased",
+    "compressorreleased",
+    "additionreleased",
+    "unit_state",
+    "freeze_protection_active",
+    "compressor_blocked",
+    "wifi_connected",
+    "cloud_connected",
 ]
 
-# Sensor filtering patterns
+# Read-only on Modbus (input 170). HTTP keeps the writable vacation_mode switch.
+MODBUS_ONLY_BINARY_SENSORS = [
+    "vacation_mode",
+]
+
+# Sensor filtering: substring patterns vs exact binary-sensor metric names.
 EXCLUDED_METRIC_PATTERNS = [
     "op_man_",
     "enable",
@@ -334,4 +360,5 @@ EXCLUDED_METRIC_PATTERNS = [
     "smart_dhw_mode",
     "picpin_",
     "use_",
-] + BINARY_SENSOR_NAMES
+]
+EXCLUDED_METRIC_NAMES = frozenset(BINARY_SENSOR_NAMES + MODBUS_ONLY_BINARY_SENSORS)

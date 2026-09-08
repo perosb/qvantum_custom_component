@@ -29,6 +29,7 @@ with patch(
             UnitOfPower,
             UnitOfPressure,
             UnitOfElectricCurrent,
+            UnitOfTime,
         )
         from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -143,6 +144,24 @@ class TestQvantumBaseSensorEntity:
             mock_coordinator, "bf1_l_min", mock_device, True
         )
         assert entity._attr_native_unit_of_measurement == "l/m"
+
+    def test_compressor_blocked_sec_unit_assignment(self, mock_coordinator, mock_device):
+        """Blocked-compressor countdown is a duration in seconds."""
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "compressor_blocked_sec", mock_device, True
+        )
+        assert entity._attr_native_unit_of_measurement == UnitOfTime.SECONDS
+        assert entity._attr_device_class == SensorDeviceClass.DURATION
+
+    def test_ventilation_filter_time_left_unit_assignment(
+        self, mock_coordinator, mock_device
+    ):
+        """Filter remaining life is a duration in hours."""
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "ventilation_filter_time_left", mock_device, True
+        )
+        assert entity._attr_native_unit_of_measurement == UnitOfTime.HOURS
+        assert entity._attr_device_class == SensorDeviceClass.DURATION
 
 
 class TestQvantumTemperatureEntity:
@@ -488,6 +507,11 @@ class TestSensorSetup:
             "additiondemand",
             "additiondhwdemand",
             "time_to_defrost",
+            "heatingreleased",
+            "coolingreleased",
+            "compressorreleased",
+            "additionreleased",
+            "unit_state",
         }
 
         # Mark config entry as Modbus mode
@@ -639,10 +663,8 @@ class TestSensorSetup:
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):
         """Test that entities disabled by integration can be updated on subsequent restarts."""
-        from custom_components.qvantum.const import (
-            DEFAULT_DISABLED_HTTP_METRICS,
-            EXCLUDED_METRIC_PATTERNS,
-        )
+        from custom_components.qvantum.const import DEFAULT_DISABLED_HTTP_METRICS
+        from custom_components.qvantum.sensor import _should_exclude_metric
 
         # Calculate expected calls for disabled-by-default HTTP metrics that are not
         # excluded by patterns. Setup is hybrid: enabled-by-default metrics are only
@@ -652,7 +674,7 @@ class TestSensorSetup:
             [
                 metric
                 for metric in DEFAULT_DISABLED_HTTP_METRICS
-                if not any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
+                if not _should_exclude_metric(metric)
             ]
         )
 
@@ -676,9 +698,7 @@ class TestSensorSetup:
                     parts[2:-1]
                 )  # Skip "sensor", "qvantum", and last part (hpid)
                 # Check if metric should be included (not excluded by patterns)
-                should_exclude = any(
-                    pattern in metric_key for pattern in EXCLUDED_METRIC_PATTERNS
-                )
+                should_exclude = _should_exclude_metric(metric_key)
                 if metric_key in DEFAULT_DISABLED_HTTP_METRICS and not should_exclude:
                     return mock_entity
             return None

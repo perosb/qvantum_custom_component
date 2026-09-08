@@ -87,6 +87,34 @@ class TestComponentDecode:
         assert values["compressor_kwh"] == 801.0
 
     @pytest.mark.asyncio
+    async def test_decodes_status_and_connectivity_inputs(self):
+        _, unit, device = _device()
+        unit.input[40] = 1  # unit_state on
+        unit.input[42] = 1  # heatingreleased
+        unit.input[43] = 0
+        unit.input[71] = 1  # compressor_blocked
+        unit.input[72] = 45
+        unit.input[87] = 1  # freeze protection
+        unit.input[91] = 120  # filter hours
+        unit.input[168] = 1
+        unit.input[169] = 0
+        unit.input[170] = 1
+
+        await device.async_update_inputs()
+        values = component_values(device.inputs)
+
+        assert values["unit_state"] == 1
+        assert values["heatingreleased"] == 1
+        assert values["coolingreleased"] == 0
+        assert values["compressor_blocked"] == 1
+        assert values["compressor_blocked_sec"] == 45
+        assert values["freeze_protection_active"] == 1
+        assert values["ventilation_filter_time_left"] == 120
+        assert values["wifi_connected"] == 1
+        assert values["cloud_connected"] == 0
+        assert values["vacation_mode"] == 1
+
+    @pytest.mark.asyncio
     async def test_input_poll_uses_few_block_reads(self):
         _, unit, device = _device()
         await device.async_update_inputs()
@@ -102,6 +130,7 @@ class TestComponentDecode:
         }
         assert not set(range(105, 161)) & covered
         assert not set(range(180, 194)) & covered
+        assert set(range(161, 171)) <= covered
 
     @pytest.mark.asyncio
     async def test_identity_poll_reads_serial_and_version_island(self):

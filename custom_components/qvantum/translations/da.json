@@ -145,6 +145,36 @@
       },
       "time_to_defrost": {
         "name": "Tid til afrimning"
+      },
+      "heatingreleased": {
+        "name": "Varme tilladt"
+      },
+      "coolingreleased": {
+        "name": "Køling tilladt"
+      },
+      "compressorreleased": {
+        "name": "Kompressor tilladt"
+      },
+      "additionreleased": {
+        "name": "Tilskud tilladt"
+      },
+      "unit_state": {
+        "name": "Enhed til"
+      },
+      "freeze_protection_active": {
+        "name": "Frostbeskyttelse"
+      },
+      "compressor_blocked": {
+        "name": "Kompressor blokeret"
+      },
+      "wifi_connected": {
+        "name": "Wi-Fi tilsluttet"
+      },
+      "cloud_connected": {
+        "name": "Cloud tilsluttet"
+      },
+      "vacation_mode": {
+        "name": "Ferietilstand"
       }
     },
     "sensor": {
@@ -417,16 +447,16 @@
         }
       },
       "heatingreleased": {
-        "name": "Opvarmning frigivet"
+        "name": "Varme tilladt"
       },
       "coolingreleased": {
-        "name": "Køling frigivet"
+        "name": "Køling tilladt"
       },
       "compressorreleased": {
-        "name": "Kompressor frigivet"
+        "name": "Kompressor tilladt"
       },
       "additionreleased": {
-        "name": "Tillæg frigivet"
+        "name": "Tilskud tilladt"
       },
       "dhw_prioritytimeleft": {
         "name": "Tid tilbage af varmtvandsprioritet"
@@ -481,6 +511,12 @@
       },
       "expires_at": {
         "name": "Udløb af forhøjet adgang"
+      },
+      "compressor_blocked_sec": {
+        "name": "Kompressor blokeret tid"
+      },
+      "ventilation_filter_time_left": {
+        "name": "Ventilationsfilter tid tilbage"
       }
     },
     "number": {

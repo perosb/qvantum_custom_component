@@ -35,7 +35,12 @@ MODBUS_INPUT_REGISTER_MAP = {
     "relays_bitmask": (33, "uint16", 1.0),
     "degree_minute": (34, "int16", 0.1),
     "cal_heat_temp": (35, "int16", 0.1),
+    "unit_state": (40, "uint16", 1.0),
     "hp_status": (41, "uint16", 1.0),
+    "heatingreleased": (42, "uint16", 1.0),
+    "coolingreleased": (43, "uint16", 1.0),
+    "compressorreleased": (44, "uint16", 1.0),
+    "additionreleased": (45, "uint16", 1.0),
     "heatingdemand": (50, "uint16", 1.0),
     "coolingdemand": (51, "uint16", 1.0),
     "additiondemand": (52, "uint16", 1.0),
@@ -46,7 +51,11 @@ MODBUS_INPUT_REGISTER_MAP = {
     "dhw_prioritytimeleft": (65, "uint16", 1.0),
     "time_to_defrost": (67, "uint16", 1.0),
     "compressor_state": (70, "uint16", 1.0),
+    "compressor_blocked": (71, "uint16", 1.0),
+    "compressor_blocked_sec": (72, "uint16", 1.0),
     "qn8position": (76, "int16", 1.0),
+    "freeze_protection_active": (87, "uint16", 1.0),
+    "ventilation_filter_time_left": (91, "uint16", 1.0),
     "compressor_power": (93, "uint16", 1.0),
     "compressor_mwh": (95, "uint16", 1.0),
     "compressor_kwh": (96, "uint16", 0.1),
@@ -62,10 +71,13 @@ MODBUS_INPUT_REGISTER_MAP = {
     "smart_dhw_control_status": (162, "uint16", 1.0),
     "enable_sc_dhw": (163, "uint16", 1.0),
     "enable_sc_sh": (164, "uint16", 1.0),
+    "wifi_connected": (168, "uint16", 1.0),
+    "cloud_connected": (169, "uint16", 1.0),
+    "vacation_mode": (170, "uint16", 1.0),
 }
 
 # Device identity (QAD EN 2609-AXC input 180-193). Kept off the metrics map so
-# a refused identity block cannot fail the 0-104 / 161-164 poll.
+# a refused identity block cannot fail the 0-104 / 161-170 poll.
 MODBUS_IDENTITY_REGISTER_MAP = {
     "serial_1": (180, "uint16", 1.0),
     "serial_2": (181, "uint16", 1.0),

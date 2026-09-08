@@ -370,6 +370,10 @@ def test_should_exclude_metric_respects_excluded_patterns():
     assert _should_exclude_metric("op_man_dhw") is True
     assert _should_exclude_metric("smart_dhw_mode") is True
     assert _should_exclude_metric("picpin_relay_gp10") is True
+    assert _should_exclude_metric("vacation_mode") is True
+    assert _should_exclude_metric("heatingreleased") is True
+    assert _should_exclude_metric("compressor_blocked") is True
+    assert _should_exclude_metric("compressor_blocked_sec") is False
     assert _should_exclude_metric("some_other_metric") is False
 
     def test_state_from_firmware_coordinator(
