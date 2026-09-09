@@ -64,7 +64,12 @@ def mock_coordinator():
             "picpin_relay_heat_l1": 1,
             "picpin_relay_heat_l2": 0,
             "picpin_relay_heat_l3": 1,
+            "picpin_relay_gp10": 0,
             "picpin_relay_qm10": 0,
+            "picpin_relay_qn8_1": 0,
+            "picpin_relay_qn8_2": 1,
+            "picpin_relay_gp3": 0,
+            "picpin_relay_ha12": 1,
             "qn8position": 1,
         },
         "connectivity": {
@@ -189,7 +194,7 @@ async def test_async_setup_entry(
         # Check that entities were added
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
-        assert len(entities) == 12
+        assert len(entities) == 17
 
         # Check that we have the expected sensor types
         sensor_names = [
@@ -201,15 +206,64 @@ async def test_async_setup_entry(
             "dhwdemand",
             "heatingdemand",
             "heatingreleased",
+            "picpin_relay_gp10",
+            "picpin_relay_gp3",
+            "picpin_relay_ha12",
             "picpin_relay_heat_l1",
             "picpin_relay_heat_l2",
             "picpin_relay_heat_l3",
             "picpin_relay_qm10",
+            "picpin_relay_qn8_1",
+            "picpin_relay_qn8_2",
         ]
 
         entity_metric_keys = sorted([e._metric_key for e in entities])
         assert entity_metric_keys == sorted(sensor_names)
     finally:
         # Clean up
+        if hasattr(QvantumBaseBinaryEntity, "entity_id"):
+            delattr(QvantumBaseBinaryEntity, "entity_id")
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_modbus_includes_pump_relay(
+    hass, mock_config_entry, mock_coordinator, mock_device
+):
+    """Modbus setup creates picpin_relay_pump; HTTP setup does not."""
+    from custom_components.qvantum.binary_sensor import (
+        async_setup_entry,
+        QvantumBaseBinaryEntity,
+    )
+    from custom_components.qvantum import RuntimeData
+
+    hass.data["entity_registry"] = MagicMock()
+    mock_device_registry = MagicMock()
+    mock_device_registry.async_get_device_by_identifier.return_value = None
+    hass.data["device_registry"] = mock_device_registry
+
+    mock_config_entry.runtime_data = RuntimeData(
+        coordinator=mock_coordinator,
+        device=mock_device,
+    )
+    mock_coordinator.modbus_enabled = True
+    mock_coordinator.data["values"]["picpin_relay_pump"] = 1
+    mock_coordinator.data["values"]["vacation_mode"] = 0
+
+    async_add_entities = MagicMock()
+
+    @property
+    def entity_id(self):
+        return f"binary_sensor.{self._attr_unique_id}"
+
+    QvantumBaseBinaryEntity.entity_id = entity_id
+
+    try:
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+        keys = {entity._metric_key for entity in async_add_entities.call_args[0][0]}
+        assert "picpin_relay_pump" in keys
+        assert "vacation_mode" in keys
+        assert "picpin_relay_gp10" in keys
+        assert "picpin_relay_ha12" in keys
+    finally:
         if hasattr(QvantumBaseBinaryEntity, "entity_id"):
             delattr(QvantumBaseBinaryEntity, "entity_id")

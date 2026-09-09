@@ -144,6 +144,13 @@ _ENTITY_ICONS: dict[str, str] = {
     "picpin_relay_heat_l1": "mdi:transmission-tower-import",
     "picpin_relay_heat_l2": "mdi:transmission-tower-import",
     "picpin_relay_heat_l3": "mdi:transmission-tower-import",
+    "picpin_relay_gp10": "mdi:pump",
+    "picpin_relay_qm10": "mdi:valve",
+    "picpin_relay_qn8_1": "mdi:valve",
+    "picpin_relay_qn8_2": "mdi:valve",
+    "picpin_relay_gp3": "mdi:pump",
+    "picpin_relay_pump": "mdi:pump",
+    "picpin_relay_ha12": "mdi:pump",
     # Sensors
     "tap_water_cap": "mdi:account-group",
     "fanrpm": "mdi:fan",

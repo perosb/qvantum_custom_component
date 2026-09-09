@@ -330,7 +330,12 @@ BINARY_SENSOR_NAMES = [
     "picpin_relay_heat_l1",
     "picpin_relay_heat_l2",
     "picpin_relay_heat_l3",
+    "picpin_relay_gp10",
     "picpin_relay_qm10",
+    "picpin_relay_qn8_1",
+    "picpin_relay_qn8_2",
+    "picpin_relay_gp3",
+    "picpin_relay_ha12",
     "dhwdemand",
     "heatingdemand",
     "coolingdemand",
@@ -349,8 +354,10 @@ BINARY_SENSOR_NAMES = [
 ]
 
 # Read-only on Modbus (input 170). HTTP keeps the writable vacation_mode switch.
+# picpin_relay_pump is bit 8 of input 33; HTTP has no equivalent metric.
 MODBUS_ONLY_BINARY_SENSORS = [
     "vacation_mode",
+    "picpin_relay_pump",
 ]
 
 # Sensor filtering: substring patterns vs exact binary-sensor metric names.
@@ -363,3 +370,14 @@ EXCLUDED_METRIC_PATTERNS = [
     "use_",
 ]
 EXCLUDED_METRIC_NAMES = frozenset(BINARY_SENSOR_NAMES + MODBUS_ONLY_BINARY_SENSORS)
+
+
+def default_metric_creates_entity(metric: str) -> bool:
+    """Return True if a default-enabled metric can appear in the entity registry.
+
+    Numeric sensors skip EXCLUDED_METRIC_PATTERNS. Binary sensors are created
+    anyway and are listed in EXCLUDED_METRIC_NAMES.
+    """
+    if metric in EXCLUDED_METRIC_NAMES:
+        return True
+    return not any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)

@@ -40,6 +40,7 @@ from .const import (
     CONF_MODBUS_TCP,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
     TAP_WATER_CAPACITY_MAPPINGS,
+    default_metric_creates_entity,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -546,11 +547,12 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 for metric in default_metrics:
                     if metric not in known_metrics:
                         final_metrics.add(metric)
-                        _LOGGER.debug(
-                            "Adding new default metric '%s' for device %s since it's not in the registry",
-                            metric,
-                            device_id,
-                        )
+                        if default_metric_creates_entity(metric):
+                            _LOGGER.debug(
+                                "Adding new default metric '%s' for device %s since it's not in the registry",
+                                metric,
+                                device_id,
+                            )
 
             _LOGGER.debug(
                 "Final enabled metrics for device %s: %s",
