@@ -18,6 +18,7 @@ from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_registry import (
+    async_entries_for_config_entry,
     async_get as async_get_entity_registry,
     async_migrate_entries,
 )
@@ -493,11 +494,9 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
         # "live" sensor that was already created with the new metric name) the
         # entity being renamed is an orphaned stale entry and should be removed.
         ent_reg = async_get_entity_registry(hass)
-        entry_entities = [
-            e
-            for e in ent_reg.entities.values()
-            if e.config_entry_id == config_entry.entry_id
-        ]
+        entry_entities = list(
+            async_entries_for_config_entry(ent_reg, config_entry.entry_id)
+        )
         uid_map: dict[str, str] = {e.unique_id: e.entity_id for e in entry_entities}
         for entity_entry in entry_entities:
             if entity_entry.domain == "number":

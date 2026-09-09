@@ -291,6 +291,9 @@ class TestQvantumDataUpdateCoordinator:
         assert "bt1" in result
         assert "bt2" in result
         assert "bt4" not in result  # Disabled entity should not be included
+        mock_entity_registry.entities.get_entries_for_device_id.assert_called_once_with(
+            "device_id_123", True
+        )
 
         # Verify that all REQUIRED_METRICS are always included
         for metric in REQUIRED_METRICS:
@@ -3739,11 +3742,53 @@ class TestDeviceLookupWhenHttpDown:
             assert coordinator._device_from_registry() is None
 
         coordinator._config_entry.entry_id = None
+        coordinator.config_entry = None
         with patch(
             "homeassistant.helpers.device_registry.async_get",
             return_value=mock_registry,
         ):
             assert coordinator._device_from_registry() is None
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_device_from_registry_ignores_other_config_entry_devices(
+        self, mock_super_init
+    ):
+        """Devices belonging to another config entry must not be used as fallback."""
+        coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
+
+        other_entry_device = MagicMock()
+        other_entry_device.config_entries = {"other_entry"}
+        other_entry_device.identifiers = {(DOMAIN, "qvantum-other")}
+        other_entry_device.manufacturer = "Qvantum"
+        other_entry_device.model = "QE-other"
+        other_entry_device.serial_number = "other-serial"
+        other_entry_device.sw_version = "1/2/3"
+
+        our_entry_id = coordinator._config_entry.entry_id
+        mock_registry = MagicMock()
+        seen_entry_ids = []
+
+        def entries_for_config_entry(registry, entry_id):
+            seen_entry_ids.append(entry_id)
+            # HA scopes by config entry: foreign devices are never returned here.
+            # If production code scanned all devices, other_entry_device would leak in.
+            assert entry_id == our_entry_id
+            return []
+
+        with patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ), patch(
+            "homeassistant.helpers.device_registry.async_entries_for_config_entry",
+            side_effect=entries_for_config_entry,
+        ):
+            # Foreign device exists in the overall registry but not for our entry.
+            mock_registry.devices = {
+                "foreign": other_entry_device,
+            }
+            assert coordinator._device_from_registry() is None
+
+        assert seen_entry_ids == [our_entry_id]
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_device_id_property_without_device(self, mock_super_init):

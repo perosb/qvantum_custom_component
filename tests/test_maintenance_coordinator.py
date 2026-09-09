@@ -344,24 +344,28 @@ class TestQvantumMaintenanceCoordinator:
             }
         }
 
-        # Mock device registry
+        # Mock shared device lookup + registry update
         mock_device_registry = MagicMock()
         mock_device_entry = MagicMock()
         mock_device_entry.id = "device_id_123"
-        mock_device_entry.identifiers = {("qvantum", "qvantum-test_device_123")}
-        mock_device_registry.async_get_device_by_identifier.return_value = (
-            mock_device_entry
-        )
         mock_device_registry.async_update_device = MagicMock()
 
         with patch(
-            "custom_components.qvantum.maintenance_coordinator.async_get",
+            "custom_components.qvantum.entity.async_get_qvantum_device_entry",
+            return_value=mock_device_entry,
+        ) as mock_lookup, patch(
+            "homeassistant.helpers.device_registry.async_get",
             return_value=mock_device_registry,
         ):
             await maintenance_coordinator._update_device_registry_firmware_versions(
                 "test_device_123"
             )
 
+            mock_lookup.assert_called_once_with(
+                maintenance_coordinator.hass,
+                "test_device_123",
+                "test_entry_id",
+            )
             # Verify device registry was updated
             mock_device_registry.async_update_device.assert_called_once_with(
                 "device_id_123", sw_version="1.3.6/140/140"
@@ -372,12 +376,13 @@ class TestQvantumMaintenanceCoordinator:
         self, maintenance_coordinator
     ):
         """Test device registry update when device is not found."""
-        # Mock device registry with no matching device
         mock_device_registry = MagicMock()
-        mock_device_registry.async_get_device_by_identifier.return_value = None
 
         with patch(
-            "custom_components.qvantum.maintenance_coordinator.async_get",
+            "custom_components.qvantum.entity.async_get_qvantum_device_entry",
+            return_value=None,
+        ), patch(
+            "homeassistant.helpers.device_registry.async_get",
             return_value=mock_device_registry,
         ):
             await maintenance_coordinator._update_device_registry_firmware_versions(
@@ -401,16 +406,15 @@ class TestQvantumMaintenanceCoordinator:
             }
         }
 
-        # Mock device registry
         mock_device_registry = MagicMock()
         mock_device_entry = MagicMock()
         mock_device_entry.id = "device_id_123"
-        mock_device_registry.async_get_device_by_identifier.return_value = (
-            mock_device_entry
-        )
 
         with patch(
-            "custom_components.qvantum.maintenance_coordinator.async_get",
+            "custom_components.qvantum.entity.async_get_qvantum_device_entry",
+            return_value=mock_device_entry,
+        ), patch(
+            "homeassistant.helpers.device_registry.async_get",
             return_value=mock_device_registry,
         ):
             await maintenance_coordinator._update_device_registry_firmware_versions(
@@ -434,15 +438,9 @@ class TestQvantumMaintenanceCoordinator:
             }
         }
 
-        # Mock device registry to raise an exception
-        mock_device_registry = MagicMock()
-        mock_device_registry.async_get_device_by_identifier.side_effect = Exception(
-            "Registry error"
-        )
-
         with patch(
-            "custom_components.qvantum.maintenance_coordinator.async_get",
-            return_value=mock_device_registry,
+            "custom_components.qvantum.entity.async_get_qvantum_device_entry",
+            side_effect=Exception("Registry error"),
         ):
             # Should not raise exception, just log error
             await maintenance_coordinator._update_device_registry_firmware_versions(

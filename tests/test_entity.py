@@ -273,6 +273,77 @@ def test_async_get_qvantum_device_entry_looks_up_by_identifier():
     assert async_get_qvantum_device_entry(hass, "pump-1", None) is None
 
 
+def test_async_get_qvantum_device_entry_ignores_other_config_entry_device():
+    """A device owned by another config entry must not be returned for ours.
+
+    Simulate HA's scoped identifier lookup: the device exists under a foreign
+    entry_id, so async_get_device_by_identifier returns None for our entry.
+    """
+    hass = MagicMock()
+    mock_registry = MagicMock()
+    foreign_device = MagicMock()
+    foreign_device.id = "foreign-ha-device"
+
+    def scoped_lookup(identifier, config_entry_id):
+        # Device is registered only under another config entry.
+        if config_entry_id == "other-entry":
+            return foreign_device
+        return None
+
+    mock_registry.async_get_device_by_identifier.side_effect = scoped_lookup
+
+    with patch(
+        "homeassistant.helpers.device_registry.async_get", return_value=mock_registry
+    ):
+        assert async_get_qvantum_device_entry(hass, "pump-1", "entry-1") is None
+        assert (
+            async_get_qvantum_device_entry(hass, "pump-1", "other-entry")
+            is foreign_device
+        )
+
+    mock_registry.async_get_device_by_identifier.assert_any_call(
+        (DOMAIN, "qvantum-pump-1"), "entry-1"
+    )
+
+
+def test_cleanup_disabled_entities_ignores_other_config_entry_device():
+    """Cleanup must not touch entities when the heat pump belongs to another entry."""
+    hass = MagicMock()
+    coordinator = MagicMock()
+    coordinator.device_id = "pump-1"
+    coordinator.config_entry.entry_id = "entry-1"
+    # Prefer public config_entry; also clear private alias so helper stays consistent.
+    coordinator._config_entry = None
+
+    mock_registry = MagicMock()
+
+    def scoped_lookup(identifier, config_entry_id):
+        # Same identifier exists, but only under a foreign config entry.
+        if config_entry_id == "other-entry":
+            return MagicMock(id="foreign-device")
+        return None
+
+    mock_registry.async_get_device_by_identifier.side_effect = scoped_lookup
+    mock_entity_registry = MagicMock()
+
+    with (
+        patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ),
+        patch(
+            "homeassistant.helpers.entity_registry.async_get",
+            return_value=mock_entity_registry,
+        ),
+    ):
+        cleanup_disabled_entities(hass, coordinator, {"bt1"}, "sensor")
+
+    mock_registry.async_get_device_by_identifier.assert_called_once_with(
+        (DOMAIN, "qvantum-pump-1"), "entry-1"
+    )
+    mock_entity_registry.async_remove.assert_not_called()
+
+
 def test_cleanup_disabled_entities_removes_unsupported_metrics():
     """Stale entities for a known device are removed; current metrics stay."""
     hass = MagicMock()
@@ -317,6 +388,9 @@ def test_cleanup_disabled_entities_removes_unsupported_metrics():
     ):
         cleanup_disabled_entities(hass, coordinator, {"bt1"}, "sensor")
 
+    mock_entity_registry.entities.get_entries_for_device_id.assert_called_once_with(
+        "ha-device-1", True
+    )
     mock_entity_registry.async_remove.assert_called_once_with("sensor.qvantum_obsolete")
 
 

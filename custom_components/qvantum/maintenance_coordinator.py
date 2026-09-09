@@ -12,8 +12,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from homeassistant.helpers.device_registry import async_get
-
 from .api import APIAuthError
 from .const import DOMAIN, FIRMWARE_KEYS
 import traceback
@@ -215,14 +213,14 @@ The firmware has been automatically updated. No action is required.
     async def _update_device_registry_firmware_versions(self, device_id: str) -> None:
         """Update the device registry with current firmware versions."""
         try:
-            device_registry = async_get(self.hass)
-            config_entry_id = getattr(self.config_entry, "entry_id", None)
-            device_entry = (
-                device_registry.async_get_device_by_identifier(
-                    (DOMAIN, f"qvantum-{device_id}"), config_entry_id
-                )
-                if config_entry_id
-                else None
+            from homeassistant.helpers.device_registry import async_get
+
+            from .entity import async_get_qvantum_device_entry
+
+            device_entry = async_get_qvantum_device_entry(
+                self.hass,
+                device_id,
+                getattr(self.config_entry, "entry_id", None),
             )
 
             if not device_entry:
@@ -241,7 +239,7 @@ The firmware has been automatically updated. No action is required.
                 new_sw_version = f"{display_version}/{cc_version}/{inv_version}"
 
                 # Update the device registry entry
-                device_registry.async_update_device(
+                async_get(self.hass).async_update_device(
                     device_entry.id, sw_version=new_sw_version
                 )
 
