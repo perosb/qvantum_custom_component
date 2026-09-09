@@ -343,7 +343,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         if registry is None:
             return None
 
-        entry_id = getattr(self._config_entry, "entry_id", None)
+        from .entity import _coordinator_config_entry_id
+
+        entry_id = _coordinator_config_entry_id(self)
         if not entry_id:
             return None
 
@@ -480,7 +482,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         """Get list of enabled metrics for a device based on entity registry."""
         from homeassistant.helpers import entity_registry as er
 
-        from .entity import async_get_qvantum_device_entry, extract_metric_key
+        from .entity import (
+            _coordinator_config_entry_id,
+            async_get_qvantum_device_entry,
+            extract_metric_key,
+        )
 
         default_metrics = (
             DEFAULT_ENABLED_MODBUS_METRICS
@@ -491,7 +497,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         device_entry = async_get_qvantum_device_entry(
             self.hass,
             device_id,
-            getattr(self._config_entry, "entry_id", None),
+            _coordinator_config_entry_id(self),
         )
         if device_entry:
             registry = er.async_get(self.hass)

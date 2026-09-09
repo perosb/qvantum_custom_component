@@ -931,7 +931,6 @@ class TestIntegrationSetup:
         config_entry = MagicMock(version=4, minor_version=0, entry_id="test")
 
         mock_ent_reg = MagicMock()
-        mock_ent_reg.entities.values.return_value = []
 
         with patch(
             "custom_components.qvantum.async_migrate_entries",
@@ -941,22 +940,25 @@ class TestIntegrationSetup:
                 "custom_components.qvantum.async_get_entity_registry",
                 return_value=mock_ent_reg,
             ):
-                with patch.object(
-                    hass.config_entries, "async_update_entry"
-                ) as mock_update:
-                    result = await async_migrate_entry(hass, config_entry)
+                with patch(
+                    "custom_components.qvantum.async_entries_for_config_entry",
+                    return_value=[],
+                ):
+                    with patch.object(
+                        hass.config_entries, "async_update_entry"
+                    ) as mock_update:
+                        result = await async_migrate_entry(hass, config_entry)
 
-                    assert result is True
-                    # v5 numbers, v6, v7 (v5 sensors now uses entity registry directly)
-                    assert mock_migrate.call_count == 3
-                    mock_update.assert_called_once_with(config_entry, version=7)
+                        assert result is True
+                        # v5 numbers, v6, v7 (v5 sensors now uses entity registry directly)
+                        assert mock_migrate.call_count == 3
+                        mock_update.assert_called_once_with(config_entry, version=7)
 
     @pytest.mark.asyncio
     async def test_async_migrate_entry_legacy(self, hass, mock_config_entry):
         config_entry = MagicMock(version=1, minor_version=0, entry_id="test")
 
         mock_ent_reg = MagicMock()
-        mock_ent_reg.entities.values.return_value = []
 
         with patch(
             "custom_components.qvantum.async_migrate_entries",
@@ -966,18 +968,22 @@ class TestIntegrationSetup:
                 "custom_components.qvantum.async_get_entity_registry",
                 return_value=mock_ent_reg,
             ):
-                with patch.object(
-                    hass.config_entries, "async_update_entry"
-                ) as mock_update:
-                    result = await async_migrate_entry(hass, config_entry)
+                with patch(
+                    "custom_components.qvantum.async_entries_for_config_entry",
+                    return_value=[],
+                ):
+                    with patch.object(
+                        hass.config_entries, "async_update_entry"
+                    ) as mock_update:
+                        result = await async_migrate_entry(hass, config_entry)
 
-                    assert result is True
-                    # v1, v5 numbers, v6, v7 (v5 sensors now uses entity registry directly)
-                    assert mock_migrate.call_count == 4
-                    mock_update.assert_called_once_with(config_entry, version=7)
+                        assert result is True
+                        # v1, v5 numbers, v6, v7 (v5 sensors now uses entity registry directly)
+                        assert mock_migrate.call_count == 4
+                        mock_update.assert_called_once_with(config_entry, version=7)
 
-                    # Verify migration calls were made with correct arguments
-                    assert len(mock_migrate.call_args_list) == 4
+                        # Verify migration calls were made with correct arguments
+                        assert len(mock_migrate.call_args_list) == 4
 
                     first_call_args = mock_migrate.call_args_list[0].args
                     _, first_entry_id, first_migration_fn = first_call_args
@@ -1011,7 +1017,6 @@ class TestMigrateToV5Callbacks:
             captured.append(fn)
 
         mock_ent_reg = MagicMock()
-        mock_ent_reg.entities.values.return_value = []
 
         with patch(
             "custom_components.qvantum.async_migrate_entries",
@@ -1021,8 +1026,12 @@ class TestMigrateToV5Callbacks:
                 "custom_components.qvantum.async_get_entity_registry",
                 return_value=mock_ent_reg,
             ):
-                with patch.object(hass.config_entries, "async_update_entry"):
-                    await async_migrate_entry(hass, config_entry)
+                with patch(
+                    "custom_components.qvantum.async_entries_for_config_entry",
+                    return_value=[],
+                ):
+                    with patch.object(hass.config_entries, "async_update_entry"):
+                        await async_migrate_entry(hass, config_entry)
 
         return captured
 
@@ -1118,7 +1127,6 @@ class TestMigrateToV5Callbacks:
         """Run async_migrate_entry for v4 with a mocked entity registry
         and return the registry mock."""
         mock_ent_reg = MagicMock()
-        mock_ent_reg.entities.values.return_value = entities
 
         config_entry = MagicMock(version=4, minor_version=0, entry_id="test")
         with patch(
@@ -1128,8 +1136,12 @@ class TestMigrateToV5Callbacks:
                 "custom_components.qvantum.async_get_entity_registry",
                 return_value=mock_ent_reg,
             ):
-                with patch.object(hass.config_entries, "async_update_entry"):
-                    await async_migrate_entry(hass, config_entry)
+                with patch(
+                    "custom_components.qvantum.async_entries_for_config_entry",
+                    return_value=entities,
+                ):
+                    with patch.object(hass.config_entries, "async_update_entry"):
+                        await async_migrate_entry(hass, config_entry)
         return mock_ent_reg
 
     @pytest.mark.asyncio
