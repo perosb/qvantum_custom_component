@@ -388,6 +388,9 @@ def test_cleanup_disabled_entities_removes_unsupported_metrics():
     ):
         cleanup_disabled_entities(hass, coordinator, {"bt1"}, "sensor")
 
+    mock_entity_registry.entities.get_entries_for_device_id.assert_called_once_with(
+        "ha-device-1", True
+    )
     mock_entity_registry.async_remove.assert_called_once_with("sensor.qvantum_obsolete")
 
 

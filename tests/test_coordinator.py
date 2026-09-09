@@ -291,6 +291,9 @@ class TestQvantumDataUpdateCoordinator:
         assert "bt1" in result
         assert "bt2" in result
         assert "bt4" not in result  # Disabled entity should not be included
+        mock_entity_registry.entities.get_entries_for_device_id.assert_called_once_with(
+            "device_id_123", True
+        )
 
         # Verify that all REQUIRED_METRICS are always included
         for metric in REQUIRED_METRICS:
