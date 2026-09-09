@@ -102,9 +102,9 @@ Duration:
 
 On HTTP it is a cloud value (disabled by default). On Modbus it is a local shower-capacity estimate from `bt30` / `bt33` / `bf1_l_min`. Same entity name, different meaning.
 
-### Polled but never shown
+### Relay bits as binary sensors
 
-`picpin_relay_pump` is in the Modbus-only metric list, but `picpin_` is in `EXCLUDED_METRIC_PATTERNS`, so there is no sensor or binary sensor. Same for `gp10`, `qn8_*`, `gp3`, `ha12`.
+All `RELAY_BIT_MAP` bits are binary sensors: L1/L2/L3, QM10, GP10, QN8_1/QN8_2, GP3, and HA12 on both transports; `picpin_relay_pump` is Modbus-only. `picpin_` stays in `EXCLUDED_METRIC_PATTERNS` so they are not also created as numeric sensors.
 
 ---
 

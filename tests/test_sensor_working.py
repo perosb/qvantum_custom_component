@@ -412,6 +412,17 @@ def test_should_exclude_metric_respects_excluded_patterns():
         assert entity.state is None
 
 
+def test_default_metric_creates_entity_for_binary_sensors_not_switches():
+    """Relay bits become binary sensors; switch-style excluded patterns do not."""
+    from custom_components.qvantum.const import default_metric_creates_entity
+
+    assert default_metric_creates_entity("picpin_relay_gp10") is True
+    assert default_metric_creates_entity("picpin_relay_pump") is True
+    assert default_metric_creates_entity("bt1") is True
+    assert default_metric_creates_entity("op_man_dhw") is False
+    assert default_metric_creates_entity("use_adaptive") is False
+
+
 class TestQvantumFirmwareLastCheckSensorEntity:
     """Test the QvantumFirmwareLastCheckSensorEntity class."""
 

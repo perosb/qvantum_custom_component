@@ -1,6 +1,7 @@
 """Tests for Qvantum coordinator functions."""
 
 import asyncio
+import logging
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -459,6 +460,61 @@ class TestQvantumDataUpdateCoordinator:
 
         assert "bt1" in result
         assert "compressor_state" in result
+        assert "picpin_relay_gp10" in result
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_get_enabled_metrics_skips_new_default_log_for_non_entities(
+        self, mock_super_init, caplog
+    ):
+        """Defaults that cannot become entities are still fetched, but not logged as new."""
+        mock_hass = MagicMock()
+        mock_device_registry = MagicMock()
+        mock_entity_registry = MagicMock()
+
+        mock_device = MagicMock()
+        mock_device.id = "device_id_123"
+        mock_device.identifiers = {(DOMAIN, "qvantum-test_device")}
+        mock_device_registry.async_get_device_by_identifier.return_value = mock_device
+
+        mock_entity = MagicMock()
+        mock_entity.device_id = "device_id_123"
+        mock_entity.disabled_by = None
+        mock_entity.unique_id = "qvantum_bt1_test_device"
+        mock_entity_registry.entities.get_entries_for_device_id.return_value = [
+            mock_entity
+        ]
+
+        mock_hass.data = {
+            DOMAIN: MagicMock(),
+            "device_registry": mock_device_registry,
+            "entity_registry": mock_entity_registry,
+        }
+
+        mock_super_init.return_value = None
+        config_entry = MagicMock()
+        config_entry.options.get.side_effect = lambda key, default=None: (
+            False if key == CONF_MODBUS_TCP else 30
+        )
+        config_entry.unique_id = "test_device"
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry)
+        coordinator.hass = mock_hass
+
+        with (
+            patch(
+                "custom_components.qvantum.coordinator.DEFAULT_ENABLED_HTTP_METRICS",
+                ["bt1", "op_man_dhw", "picpin_relay_gp10"],
+            ),
+            caplog.at_level(
+                logging.DEBUG, logger="custom_components.qvantum.coordinator"
+            ),
+        ):
+            result = coordinator._get_enabled_metrics("test_device")
+
+        assert "bt1" in result
+        assert "op_man_dhw" in result
+        assert "picpin_relay_gp10" in result
+        assert "Adding new default metric 'op_man_dhw'" not in caplog.text
+        assert "Adding new default metric 'picpin_relay_gp10'" in caplog.text
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_modbus_excludes_http_disabled_metrics(self, mock_super_init):

@@ -3,6 +3,10 @@
 import pytest
 from modbus_connection.mock import MockModbusConnection
 
+from custom_components.qvantum.const import (
+    BINARY_SENSOR_NAMES,
+    MODBUS_ONLY_BINARY_SENSORS,
+)
 from custom_components.qvantum.modbus import (
     MODBUS_HOLDING_REGISTER_MAP,
     MODBUS_IDENTITY_REGISTER_MAP,
@@ -47,6 +51,12 @@ class TestRegisterMapAlignment:
             field = QvantumInputs.declared_fields[name]
             assert field.address == bitmask_address
             assert field.start == index
+
+    def test_all_relay_bits_are_binary_sensors(self):
+        exposed = set(BINARY_SENSOR_NAMES) | set(MODBUS_ONLY_BINARY_SENSORS)
+        assert set(RELAY_BIT_MAP) <= exposed
+        assert "picpin_relay_pump" in MODBUS_ONLY_BINARY_SENSORS
+        assert "picpin_relay_pump" not in BINARY_SENSOR_NAMES
 
     def test_holding_fields_match_register_map(self):
         for name, (address, data_type, scale) in MODBUS_HOLDING_REGISTER_MAP.items():
