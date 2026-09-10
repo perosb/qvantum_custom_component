@@ -5,9 +5,7 @@ import logging
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.const import (
     PRECISION_TENTHS,
-    UnitOfEnergy,
     UnitOfTemperature,
-    EntityCategory,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
