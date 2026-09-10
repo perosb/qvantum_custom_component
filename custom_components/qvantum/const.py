@@ -60,6 +60,22 @@ class SensorMode(IntEnum):
             return value in (cls.BT2, cls.EXTERNAL)
         return False
 
+    @classmethod
+    def current_temperature_keys(cls, value: object) -> tuple[str, ...]:
+        """Coordinator value keys for climate current temperature.
+
+        BT2 uses ``bt2``. External room sensor uses the Modbus holding
+        ``room_temp_external`` or the HTTP metric ``room_temp_ext``.
+        Missing ``sensor_mode`` falls back to BT2. Other modes have no indoor reading.
+        """
+        if isinstance(value, bool):
+            return ()
+        if value is None or value in (cls.BT2, SENSOR_MODE_HTTP_BT2):
+            return ("bt2",)
+        if value in (cls.EXTERNAL, SENSOR_MODE_HTTP_EXT_ROOM_SENSOR):
+            return ("room_temp_external", "room_temp_ext")
+        return ()
+
 
 VERSION = "2026.9.10"
 CONFIG_VERSION = 7
@@ -228,7 +244,8 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
 # tap_water_start/stop are settings (HTTP settings API / Modbus holdings), not /values
 # metrics. Requesting them as HTTP metrics logs "Metric X not found in response data".
 REQUIRED_METRICS = [
-    "bt2",  # Required by climate component for current temperature
+    "bt2",  # Required by climate when sensor_mode is BT2
+    "room_temp_ext",  # Required by climate when sensor_mode is external (HTTP)
     "man_mode",  # Required by switch component
     "op_man_addition",  # Required by switch component
     "op_man_dhw",  # Required by switch component

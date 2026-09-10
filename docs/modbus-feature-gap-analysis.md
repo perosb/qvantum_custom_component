@@ -137,7 +137,7 @@ If `modbus_write` is off, current local is **read-only**. Previous Modbus with w
 
 `start_cooling_temp` (38) is **readable** as a sensor; there is no number entity to write it.
 
-Climate is heat-only. `async_set_hvac_mode` is a no-op in **all** modes. Target-temperature is offered when `sensor_mode` is BT2 (`bt2` / `1`) or external room sensor (`ext_room_sensor` / `4`).
+Climate is heat-only. `async_set_hvac_mode` is a no-op in **all** modes. Target-temperature is offered when `sensor_mode` is BT2 (`bt2` / `1`) or external room sensor (`ext_room_sensor` / `4`). Current temperature follows the same source: `bt2`, or `room_temp_external` (Modbus holding 14) / `room_temp_ext` (HTTP). Mode resolution uses `sensor_mode`, falling back to `use_operation_sensor`.
 
 ### Not writable locally (HTTP / previous hybrid still can)
 
