@@ -110,6 +110,7 @@ class TestQvantumIndoorClimateEntity:
         assert entity._hpid == "test_device_123"
         assert entity._attr_unique_id == "qvantum_indoor_climate_test_device_123"
         assert entity._attr_temperature_unit == "°C"
+        assert entity._attr_target_temperature_step == 0.1
         assert entity._attr_device_info == mock_device
         assert entity._attr_translation_key == "indoor_climate"
         assert entity._attr_has_entity_name is True
