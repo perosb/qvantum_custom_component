@@ -36,6 +36,7 @@ with patch(
                 from homeassistant.helpers.device_registry import DeviceInfo
 
                 from custom_components.qvantum.select import QvantumSelectEntity
+                from custom_components.qvantum.const import SensorMode
 
 
 @pytest.fixture
@@ -320,7 +321,7 @@ class TestQvantumSelectEntityOperationSensor:
 
         assert entity._metric_key == "use_operation_sensor"
         assert entity._attr_unique_id == "qvantum_use_operation_sensor_test_device_123"
-        assert entity._attr_options == ["0", "1", "2", "3", "4"]
+        assert entity._attr_options == [str(mode.value) for mode in SensorMode]
         assert entity._attr_icon == "mdi:motion-sensor"
         assert entity._attr_translation_key == "use_operation_sensor"
 
@@ -331,9 +332,9 @@ class TestQvantumSelectEntityOperationSensor:
             mock_coordinator, "use_operation_sensor", mock_device
         )
 
-        for val in range(5):
-            mock_coordinator.data["values"]["use_operation_sensor"] = val
-            assert entity.current_option == str(val)
+        for mode in SensorMode:
+            mock_coordinator.data["values"]["use_operation_sensor"] = mode
+            assert entity.current_option == str(mode.value)
 
     def test_current_option_no_data(self, mock_coordinator, mock_device):
         """Test current_option returns None when metric key is missing from values."""
@@ -361,13 +362,14 @@ class TestQvantumSelectEntityOperationSensor:
         )
         mock_coordinator.data["values"]["sensor_mode"] = 0
 
-        for opt in ["0", "1", "2", "3", "4"]:
+        for mode in SensorMode:
+            opt = str(mode.value)
             mock_coordinator.api.write_holding_register.reset_mock()
             await entity.async_select_option(opt)
             mock_coordinator.api.write_holding_register.assert_called_once_with(
-                "test_device_123", 9, int(opt)
+                "test_device_123", 9, mode.value
             )
-            assert mock_coordinator.data["values"]["sensor_mode"] == int(opt)
+            assert mock_coordinator.data["values"]["sensor_mode"] == mode.value
 
     def test_available_modbus_write_enabled(self, mock_coordinator, mock_device):
         """Test entity is available when Modbus write is enabled."""

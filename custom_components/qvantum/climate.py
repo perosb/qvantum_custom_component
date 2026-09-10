@@ -18,6 +18,7 @@ from homeassistant.components.climate.const import ClimateEntityFeature
 from .entity import QvantumAccessMixin
 from .coordinator import QvantumDataUpdateCoordinator
 from .coordinator import handle_setting_update_response
+from .const import SensorMode
 from . import MyConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
     def supported_features(self):
         """Return the list of supported features."""
         values = (self.coordinator.data or {}).get("values", {})
-        if values.get("sensor_mode") in ("bt2", 1):
+        if SensorMode.allows_target_temperature(values.get("sensor_mode")):
             return ClimateEntityFeature.TARGET_TEMPERATURE
 
         return {}

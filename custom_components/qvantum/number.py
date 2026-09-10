@@ -11,9 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
-from .const import (
-    TAP_WATER_CAPACITY_MAPPINGS,
-)
+from .const import SensorMode, TAP_WATER_CAPACITY_MAPPINGS
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity
 
@@ -192,10 +190,9 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
             and self._has_write_access
             and (
                 # `room_temp_external` is only meaningful when the heat pump is
-                # configured to use the external operation sensor; in the API,
-                # `use_operation_sensor == 4` represents the "External" sensor.
+                # configured to use the external operation sensor.
                 self._metric_key != "room_temp_external"
-                or self._values.get("use_operation_sensor") == 4
+                or self._values.get("use_operation_sensor") == SensorMode.EXTERNAL
             )
         )
 

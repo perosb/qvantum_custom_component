@@ -9,7 +9,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.qvantum.const import SETTING_UPDATE_APPLIED
+from custom_components.qvantum.const import SETTING_UPDATE_APPLIED, SensorMode
 
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
@@ -68,7 +68,7 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
                     "2",
                 ]  # Translation keys that will be translated by HA
             case "use_operation_sensor":
-                self._attr_options = ["0", "1", "2", "3", "4"]
+                self._attr_options = [str(mode.value) for mode in SensorMode]
 
     def _is_valid_mode(self, mode, valid_modes: set) -> bool:
         """Check if a mode value is valid."""
