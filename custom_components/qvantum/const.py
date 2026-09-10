@@ -1,5 +1,7 @@
 """Constants for the Qvantum Heat Pump Integration."""
 
+from enum import IntEnum
+
 DOMAIN = "qvantum"
 DEFAULT_SCAN_INTERVAL = 120
 MIN_SCAN_INTERVAL = 60
@@ -25,6 +27,35 @@ DHW_MODE_ECO = 0
 DHW_MODE_NORMAL = 1
 DHW_MODE_EXTRA = 2
 DHW_MODE_SMART = 3
+
+# Cloud/HTTP `sensor_mode` setting names (same meanings as SensorMode).
+SENSOR_MODE_HTTP_BT2 = "bt2"
+SENSOR_MODE_HTTP_EXT_ROOM_SENSOR = "ext_room_sensor"
+
+
+class SensorMode(IntEnum):
+    """Indoor sensor source. Modbus holding 9 (`use_operation_sensor`)."""
+
+    DISABLED = 0
+    BT2 = 1
+    BT3 = 2
+    AUX = 3
+    EXTERNAL = 4
+
+    @classmethod
+    def allows_target_temperature(cls, value: object) -> bool:
+        """True when indoor setpoint is used (BT2 or external room sensor).
+
+        Cloud/HTTP reports string names; Modbus reports the integer register value.
+        """
+        return value in (
+            cls.BT2,
+            cls.EXTERNAL,
+            SENSOR_MODE_HTTP_BT2,
+            SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
+        )
+
+
 VERSION = "2026.9.9"
 CONFIG_VERSION = 7
 # Shared Modbus units (`async_get_unit`) shipped in Home Assistant 2026.9.

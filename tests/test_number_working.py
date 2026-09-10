@@ -34,6 +34,7 @@ with patch(
                 QvantumNumberEntity,
                 async_setup_entry,
             )
+            from custom_components.qvantum.const import SensorMode
 
 
 @pytest.fixture
@@ -617,7 +618,7 @@ class TestRoomTempExternal:
     def test_init_room_temp_external(self, mock_coordinator, mock_device):
         """Test room_temp_external entity initialization."""
         mock_coordinator.data["values"]["room_temp_external"] = 20.0
-        mock_coordinator.data["values"]["use_operation_sensor"] = 4
+        mock_coordinator.data["values"]["use_operation_sensor"] = SensorMode.EXTERNAL
         mock_coordinator.config_entry.options = {
             "modbus_write": True,
             "modbus_tcp": True,
@@ -637,12 +638,12 @@ class TestRoomTempExternal:
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
 
-    def test_available_when_use_operation_sensor_4(
+    def test_available_when_use_operation_sensor_external(
         self, mock_coordinator, mock_device
     ):
-        """Test entity is available when use_operation_sensor == 4 and Modbus write on."""
+        """Test entity is available when sensor mode is EXTERNAL and Modbus write on."""
         mock_coordinator.data["values"]["room_temp_external"] = 20.0
-        mock_coordinator.data["values"]["use_operation_sensor"] = 4
+        mock_coordinator.data["values"]["use_operation_sensor"] = SensorMode.EXTERNAL
         mock_coordinator.config_entry.options = {
             "modbus_write": True,
             "modbus_tcp": True,
@@ -652,10 +653,10 @@ class TestRoomTempExternal:
         )
         assert entity.available is True
 
-    def test_unavailable_when_use_operation_sensor_not_4(
+    def test_unavailable_when_use_operation_sensor_not_external(
         self, mock_coordinator, mock_device
     ):
-        """Test entity is unavailable when use_operation_sensor != 4."""
+        """Test entity is unavailable when sensor mode is not EXTERNAL."""
         mock_coordinator.data["values"]["room_temp_external"] = 20.0
         mock_coordinator.config_entry.options = {
             "modbus_write": True,
@@ -664,16 +665,22 @@ class TestRoomTempExternal:
         entity = QvantumNumberEntity(
             mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
-        for val in [0, 1, 2, 3, None]:
+        for val in [
+            SensorMode.DISABLED,
+            SensorMode.BT2,
+            SensorMode.BT3,
+            SensorMode.AUX,
+            None,
+        ]:
             mock_coordinator.data["values"]["use_operation_sensor"] = val
             assert entity.available is False, f"Expected unavailable for sensor={val}"
 
     def test_unavailable_when_modbus_write_disabled(
         self, mock_coordinator, mock_device
     ):
-        """Test entity is unavailable when Modbus write is disabled, even if sensor == 4."""
+        """Test entity is unavailable when Modbus write is disabled, even if sensor is EXTERNAL."""
         mock_coordinator.data["values"]["room_temp_external"] = 20.0
-        mock_coordinator.data["values"]["use_operation_sensor"] = 4
+        mock_coordinator.data["values"]["use_operation_sensor"] = SensorMode.EXTERNAL
         mock_coordinator.config_entry.options = {}
         mock_coordinator.config_entry.data = {}
         entity = QvantumNumberEntity(
@@ -687,7 +694,7 @@ class TestRoomTempExternal:
     ):
         """Test setting room_temp_external writes via Modbus holding register with float value."""
         mock_coordinator.data["values"]["room_temp_external"] = 20.0
-        mock_coordinator.data["values"]["use_operation_sensor"] = 4
+        mock_coordinator.data["values"]["use_operation_sensor"] = SensorMode.EXTERNAL
         mock_coordinator.config_entry.options = {
             "modbus_write": True,
             "modbus_tcp": True,
@@ -720,7 +727,7 @@ class TestRoomTempExternal:
         from homeassistant.exceptions import HomeAssistantError
 
         mock_coordinator.data["values"]["room_temp_external"] = 20.0
-        mock_coordinator.data["values"]["use_operation_sensor"] = 4
+        mock_coordinator.data["values"]["use_operation_sensor"] = SensorMode.EXTERNAL
         mock_coordinator.config_entry.options = {}
         mock_coordinator.config_entry.data = {}
         entity = QvantumNumberEntity(

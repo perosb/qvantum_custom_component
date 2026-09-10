@@ -59,7 +59,12 @@ with patch(
                             from custom_components.qvantum.climate import (
                                 QvantumIndoorClimateEntity,
                             )
-                            from custom_components.qvantum.const import SETTING_UPDATE_APPLIED
+                            from custom_components.qvantum.const import (
+                                SENSOR_MODE_HTTP_BT2,
+                                SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
+                                SETTING_UPDATE_APPLIED,
+                                SensorMode,
+                            )
 
 
 @pytest.fixture
@@ -73,7 +78,7 @@ def mock_coordinator():
             "bt2": 22.5,  # Current temperature
             "hp_status": 3,  # Heating status
             "indoor_temperature_target": 21.0,
-            "sensor_mode": "bt2",
+            "sensor_mode": SENSOR_MODE_HTTP_BT2,
         },
     }
     coordinator.api = MagicMock()
@@ -98,6 +103,39 @@ def mock_device():
         manufacturer="Qvantum",
         model="QE-6",
     )
+
+
+class TestSensorMode:
+    """Test Modbus SensorMode enum and HTTP name mapping."""
+
+    def test_modbus_values(self):
+        """Modbus holding 9 uses these integer values."""
+        assert SensorMode.DISABLED == 0
+        assert SensorMode.BT2 == 1
+        assert SensorMode.BT3 == 2
+        assert SensorMode.AUX == 3
+        assert SensorMode.EXTERNAL == 4
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            SENSOR_MODE_HTTP_BT2,
+            SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
+            SensorMode.BT2,
+            SensorMode.EXTERNAL,
+            1,
+            4,
+        ],
+    )
+    def test_allows_target_temperature(self, value):
+        assert SensorMode.allows_target_temperature(value) is True
+
+    @pytest.mark.parametrize(
+        "value",
+        [None, "other", SensorMode.DISABLED, SensorMode.BT3, SensorMode.AUX, 0, 2, 3],
+    )
+    def test_disallows_target_temperature(self, value):
+        assert SensorMode.allows_target_temperature(value) is False
 
 
 class TestQvantumIndoorClimateEntity:
@@ -157,14 +195,43 @@ class TestQvantumIndoorClimateEntity:
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.hvac_action == "idle"  # Default to idle
 
-    def test_supported_features_with_bt2(self, mock_coordinator, mock_device):
-        """Test supported features when sensor_mode is bt2."""
+    @pytest.mark.parametrize(
+        "sensor_mode",
+        [
+            SENSOR_MODE_HTTP_BT2,
+            SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
+            SensorMode.BT2,
+            SensorMode.EXTERNAL,
+            SensorMode.BT2.value,
+            SensorMode.EXTERNAL.value,
+        ],
+    )
+    def test_supported_features_with_indoor_sensor(
+        self, mock_coordinator, mock_device, sensor_mode
+    ):
+        """Target temperature is offered for BT2 and external room sensor."""
+        mock_coordinator.data["values"]["sensor_mode"] = sensor_mode
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.supported_features == 1  # TARGET_TEMPERATURE
 
-    def test_supported_features_without_bt2(self, mock_coordinator, mock_device):
-        """Test supported features when sensor_mode is not bt2."""
-        mock_coordinator.data["values"]["sensor_mode"] = "other"
+    @pytest.mark.parametrize(
+        "sensor_mode",
+        [
+            "other",
+            None,
+            SensorMode.DISABLED,
+            SensorMode.BT3,
+            SensorMode.AUX,
+            SensorMode.DISABLED.value,
+            SensorMode.BT3.value,
+            SensorMode.AUX.value,
+        ],
+    )
+    def test_supported_features_without_indoor_sensor(
+        self, mock_coordinator, mock_device, sensor_mode
+    ):
+        """Target temperature is hidden when no indoor room sensor is in use."""
+        mock_coordinator.data["values"]["sensor_mode"] = sensor_mode
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.supported_features == {}
 
