@@ -61,7 +61,7 @@ class SensorMode(IntEnum):
         return False
 
 
-VERSION = "2026.9.9"
+VERSION = "2026.9.10"
 CONFIG_VERSION = 7
 # Shared Modbus units (`async_get_unit`) shipped in Home Assistant 2026.9.
 MIN_HA_VERSION = "2026.9.0"
