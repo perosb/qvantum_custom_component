@@ -138,6 +138,29 @@ class TestSensorMode:
     def test_disallows_target_temperature(self, value):
         assert SensorMode.allows_target_temperature(value) is False
 
+    @pytest.mark.parametrize(
+        ("value", "keys"),
+        [
+            (None, ("bt2",)),
+            (SENSOR_MODE_HTTP_BT2, ("bt2",)),
+            (SensorMode.BT2, ("bt2",)),
+            (1, ("bt2",)),
+            (
+                SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
+                ("room_temp_external", "room_temp_ext"),
+            ),
+            (SensorMode.EXTERNAL, ("room_temp_external", "room_temp_ext")),
+            (4, ("room_temp_external", "room_temp_ext")),
+            (SensorMode.DISABLED, ()),
+            (SensorMode.BT3, ()),
+            (SensorMode.AUX, ()),
+            (True, ()),
+            (False, ()),
+        ],
+    )
+    def test_current_temperature_keys(self, value, keys):
+        assert SensorMode.current_temperature_keys(value) == keys
+
 
 class TestQvantumIndoorClimateEntity:
     """Test the QvantumIndoorClimateEntity class."""
@@ -158,6 +181,49 @@ class TestQvantumIndoorClimateEntity:
         """Test getting current temperature."""
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.current_temperature == 22.5
+
+    def test_current_temperature_uses_bt2_for_bt2_mode(
+        self, mock_coordinator, mock_device
+    ):
+        """BT2 mode reads bt2 even when an external reading is also present."""
+        mock_coordinator.data["values"]["sensor_mode"] = SENSOR_MODE_HTTP_BT2
+        mock_coordinator.data["values"]["bt2"] = 22.5
+        mock_coordinator.data["values"]["room_temp_ext"] = 19.0
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.current_temperature == 22.5
+
+    def test_current_temperature_uses_http_external_sensor(
+        self, mock_coordinator, mock_device
+    ):
+        """HTTP ext_room_sensor mode reads room_temp_ext, not bt2."""
+        mock_coordinator.data["values"]["sensor_mode"] = (
+            SENSOR_MODE_HTTP_EXT_ROOM_SENSOR
+        )
+        mock_coordinator.data["values"]["bt2"] = 22.5
+        mock_coordinator.data["values"]["room_temp_ext"] = 19.4
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.current_temperature == 19.4
+
+    def test_current_temperature_uses_modbus_external_sensor(
+        self, mock_coordinator, mock_device
+    ):
+        """Modbus EXTERNAL mode reads room_temp_external, not bt2."""
+        mock_coordinator.data["values"]["sensor_mode"] = SensorMode.EXTERNAL
+        mock_coordinator.data["values"]["bt2"] = 22.5
+        mock_coordinator.data["values"]["room_temp_external"] = 18.7
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.current_temperature == 18.7
+
+    def test_current_temperature_falls_back_to_use_operation_sensor(
+        self, mock_coordinator, mock_device
+    ):
+        """If sensor_mode is missing, use_operation_sensor selects the reading."""
+        del mock_coordinator.data["values"]["sensor_mode"]
+        mock_coordinator.data["values"]["use_operation_sensor"] = SensorMode.EXTERNAL
+        mock_coordinator.data["values"]["bt2"] = 22.5
+        mock_coordinator.data["values"]["room_temp_external"] = 18.1
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.current_temperature == 18.1
 
     def test_target_temperature(self, mock_coordinator, mock_device):
         """Test getting target temperature."""
@@ -253,6 +319,28 @@ class TestQvantumIndoorClimateEntity:
         mock_coordinator.data["values"]["bt2"] = None
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.available is False
+
+    def test_available_true_external_without_bt2(
+        self, mock_coordinator, mock_device
+    ):
+        """External mode is available from the external reading, even without bt2."""
+        mock_coordinator.data["values"]["sensor_mode"] = SensorMode.EXTERNAL
+        del mock_coordinator.data["values"]["bt2"]
+        mock_coordinator.data["values"]["room_temp_external"] = 19.0
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.available is True
+
+    def test_available_false_external_without_room_temp(
+        self, mock_coordinator, mock_device
+    ):
+        """External mode is unavailable when the external reading is missing."""
+        mock_coordinator.data["values"]["sensor_mode"] = (
+            SENSOR_MODE_HTTP_EXT_ROOM_SENSOR
+        )
+        mock_coordinator.data["values"]["bt2"] = 22.5
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.available is False
+        assert entity.current_temperature is None
 
     @pytest.mark.asyncio
     async def test_async_set_temperature(self, mock_coordinator, mock_device):

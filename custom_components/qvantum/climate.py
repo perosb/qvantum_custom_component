@@ -87,13 +87,20 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
     @property
     def available(self):
         """Check if data is available."""
-        values = (self.coordinator.data or {}).get("values", {})
-        return values.get("bt2") is not None and self._has_write_access
+        return self.current_temperature is not None and self._has_write_access
 
     @property
     def current_temperature(self):
-        """Return the temperature we try to reach."""
-        return (self.coordinator.data or {}).get("values", {}).get("bt2")
+        """Return the indoor temperature from the selected sensor."""
+        values = (self.coordinator.data or {}).get("values", {})
+        sensor_mode = values.get("sensor_mode")
+        if sensor_mode is None:
+            sensor_mode = values.get("use_operation_sensor")
+        for key in SensorMode.current_temperature_keys(sensor_mode):
+            temperature = values.get(key)
+            if temperature is not None:
+                return temperature
+        return None
 
     @property
     def target_temperature(self):
