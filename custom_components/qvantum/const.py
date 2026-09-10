@@ -47,13 +47,18 @@ class SensorMode(IntEnum):
         """True when indoor setpoint is used (BT2 or external room sensor).
 
         Cloud/HTTP reports string names; Modbus reports the integer register value.
+        Reject bool explicitly: ``True == 1`` / ``False == 0`` would otherwise match.
         """
-        return value in (
-            cls.BT2,
-            cls.EXTERNAL,
-            SENSOR_MODE_HTTP_BT2,
-            SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
-        )
+        if isinstance(value, bool):
+            return False
+        if isinstance(value, str):
+            return value in (
+                SENSOR_MODE_HTTP_BT2,
+                SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
+            )
+        if isinstance(value, int):
+            return value in (cls.BT2, cls.EXTERNAL)
+        return False
 
 
 VERSION = "2026.9.9"

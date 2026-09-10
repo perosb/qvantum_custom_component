@@ -132,7 +132,7 @@ class TestSensorMode:
 
     @pytest.mark.parametrize(
         "value",
-        [None, "other", SensorMode.DISABLED, SensorMode.BT3, SensorMode.AUX, 0, 2, 3],
+        [None, "other", True, False, SensorMode.DISABLED, SensorMode.BT3, SensorMode.AUX, 0, 2, 3],
     )
     def test_disallows_target_temperature(self, value):
         assert SensorMode.allows_target_temperature(value) is False
