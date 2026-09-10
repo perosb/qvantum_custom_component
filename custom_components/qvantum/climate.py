@@ -3,7 +3,10 @@
 import logging
 
 from homeassistant.components.climate import ClimateEntity
-from homeassistant.const import UnitOfEnergy, UnitOfTemperature, EntityCategory
+from homeassistant.const import (
+    PRECISION_TENTHS,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -48,6 +51,7 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         self._hpid = (self.coordinator.data or {}).get("values", {}).get("hpid")
         self._attr_unique_id = f"qvantum_indoor_climate_{self._hpid}"
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
+        self._attr_target_temperature_step = PRECISION_TENTHS
         self._attr_device_info = device
         self._attr_translation_key = "indoor_climate"
         self._attr_has_entity_name = True
