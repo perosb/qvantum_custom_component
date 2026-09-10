@@ -214,16 +214,15 @@ class TestQvantumIndoorClimateEntity:
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.current_temperature == 18.7
 
-    def test_current_temperature_falls_back_to_use_operation_sensor(
-        self, mock_coordinator, mock_device
-    ):
-        """If sensor_mode is missing, use_operation_sensor selects the reading."""
+    def test_falls_back_to_use_operation_sensor(self, mock_coordinator, mock_device):
+        """If sensor_mode is missing, use_operation_sensor selects reading and features."""
         del mock_coordinator.data["values"]["sensor_mode"]
         mock_coordinator.data["values"]["use_operation_sensor"] = SensorMode.EXTERNAL
         mock_coordinator.data["values"]["bt2"] = 22.5
         mock_coordinator.data["values"]["room_temp_external"] = 18.1
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.current_temperature == 18.1
+        assert entity.supported_features == 1  # TARGET_TEMPERATURE
 
     def test_target_temperature(self, mock_coordinator, mock_device):
         """Test getting target temperature."""

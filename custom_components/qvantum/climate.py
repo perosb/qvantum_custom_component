@@ -75,11 +75,18 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         """Set new target hvac mode."""
         _LOGGER.debug(hvac_mode)
 
+    def _sensor_mode(self):
+        """HTTP `sensor_mode`, falling back to Modbus `use_operation_sensor`."""
+        values = (self.coordinator.data or {}).get("values", {})
+        sensor_mode = values.get("sensor_mode")
+        if sensor_mode is None:
+            return values.get("use_operation_sensor")
+        return sensor_mode
+
     @property
     def supported_features(self):
         """Return the list of supported features."""
-        values = (self.coordinator.data or {}).get("values", {})
-        if SensorMode.allows_target_temperature(values.get("sensor_mode")):
+        if SensorMode.allows_target_temperature(self._sensor_mode()):
             return ClimateEntityFeature.TARGET_TEMPERATURE
 
         return {}
@@ -93,10 +100,7 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
     def current_temperature(self):
         """Return the indoor temperature from the selected sensor."""
         values = (self.coordinator.data or {}).get("values", {})
-        sensor_mode = values.get("sensor_mode")
-        if sensor_mode is None:
-            sensor_mode = values.get("use_operation_sensor")
-        for key in SensorMode.current_temperature_keys(sensor_mode):
+        for key in SensorMode.current_temperature_keys(self._sensor_mode()):
             temperature = values.get(key)
             if temperature is not None:
                 return temperature
