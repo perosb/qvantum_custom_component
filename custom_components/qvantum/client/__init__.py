@@ -34,6 +34,7 @@ from .exceptions import (
 from .models import ApplyResult, Device, MetricsPayload, SettingsPayload
 from .modbus import (
     IdentityProbeError,
+    QvantumModbusClient,
     QvantumModbusDevice,
     async_probe_identity,
     holding_field_for_metric,
@@ -62,6 +63,7 @@ __all__ = [
     "IdentityProbeError",
     "MetricsPayload",
     "QvantumClient",
+    "QvantumModbusClient",
     "QvantumModbusDevice",
     "async_probe_identity",
     "holding_field_for_metric",

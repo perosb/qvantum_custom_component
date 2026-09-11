@@ -1,5 +1,6 @@
 """Qvantum Modbus maps, typed components, and HTTP-shaped adapter."""
 
+from .client import QvantumModbusClient
 from .device import (
     IdentityProbeError,
     QvantumModbusDevice,
@@ -28,6 +29,7 @@ __all__ = [
     "MODBUS_INPUT_REGISTER_MAP",
     "QvantumIdentity",
     "QvantumInputs",
+    "QvantumModbusClient",
     "QvantumModbusDevice",
     "QvantumSettings",
     "RELAY_BIT_MAP",
