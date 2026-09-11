@@ -82,7 +82,7 @@ def mock_coordinator():
             "sensor_mode": SENSOR_MODE_HTTP_BT2,
         },
     }
-    coordinator.api = MagicMock()
+    coordinator.client = MagicMock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 
@@ -347,13 +347,13 @@ class TestQvantumIndoorClimateEntity:
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
 
         # Mock the API response
-        mock_coordinator.api.set_indoor_temperature_target = AsyncMock(
+        mock_coordinator.client.set_indoor_temperature_target = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_temperature(temperature=23.5)
 
-        mock_coordinator.api.set_indoor_temperature_target.assert_called_once_with(
+        mock_coordinator.client.set_indoor_temperature_target.assert_called_once_with(
             "test_device_123", 23.5
         )
         # Check that async_set_updated_data was called (indicating successful update)

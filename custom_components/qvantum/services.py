@@ -5,8 +5,13 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 import homeassistant.helpers.config_validation as cv
 
+from .client.exceptions import (
+    APIAuthError,
+    APIConnectionError,
+    APIRateLimitError,
+)
 from .const import DOMAIN
-from .api import APIAuthError, APIConnectionError, APIRateLimitError
+from .extra_dhw import async_apply_extra_tap_water
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,12 +30,26 @@ async def async_setup_services(hass: HomeAssistant):
 
     async def extra_hot_water(service_call: ServiceCall) -> Any:
         data = service_call.data
-        api = service_call.hass.data[DOMAIN]
+        entries = service_call.hass.config_entries.async_entries(DOMAIN)
+        runtime = None
+        for entry in entries:
+            runtime = getattr(entry, "runtime_data", None)
+            if runtime is not None and getattr(runtime, "client", None) is not None:
+                break
+        if runtime is None or getattr(runtime, "client", None) is None:
+            return {
+                "qvantum": {
+                    "exception": "unknown_error",
+                    "details": "Qvantum is not set up",
+                }
+            }
 
         device_id = data["device_id"]
         minutes = data["minutes"]
         try:
-            response = await api.set_extra_tap_water(device_id, minutes)
+            response = await async_apply_extra_tap_water(
+                runtime.client, runtime.extra_dhw, device_id, minutes
+            )
             return {"qvantum": [response]}
         except APIAuthError as err:
             _LOGGER.error(

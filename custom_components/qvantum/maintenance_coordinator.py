@@ -12,7 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import APIAuthError
+from .client.exceptions import AuthError as APIAuthError
 from .const import DOMAIN, FIRMWARE_KEYS
 import traceback
 
@@ -29,7 +29,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
         main_coordinator: "QvantumDataUpdateCoordinator",
     ) -> None:
         """Initialize firmware coordinator."""
-        self.api = hass.data[DOMAIN]
+        self.client = main_coordinator.client
         self.main_coordinator = main_coordinator
         self._last_firmware_versions = {}
 
@@ -59,14 +59,14 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
                 return {}
 
             # Fetch fresh device metadata
-            metadata = await self.api.get_device_metadata(device_id)
+            metadata = await self.client.get_device_metadata(device_id)
 
             if not metadata or "device_metadata" not in metadata:
                 _LOGGER.debug("No device metadata available for firmware check")
                 return {}
 
             # Fetch access level
-            access_level = await self.api.get_access_level(device_id)
+            access_level = await self.client.get_access_level(device_id)
 
             current_versions = metadata["device_metadata"]
             firmware_changed = False

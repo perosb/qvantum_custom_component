@@ -67,13 +67,15 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
         """Update the current value."""
         match self._metric_key:
             case "extra_tap_water":
-                response = await self.coordinator.api.set_extra_tap_water(self._hpid, 0)
+                response = await self.coordinator.async_set_extra_tap_water(
+                    self._hpid, 0
+                )
                 await handle_setting_update_response(
                     response, self.coordinator, "values", self._metric_key, "off"
                 )
 
             case "enable_sc_dhw" | "enable_sc_sh" | "vacation_mode":
-                response = await self.coordinator.api.update_setting(
+                response = await self.coordinator.client.update_setting(
                     self._hpid, self._metric_key, False
                 )
                 await handle_setting_update_response(
@@ -81,7 +83,7 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
                 )
 
             case _:
-                response = await self.coordinator.api.update_setting(
+                response = await self.coordinator.client.update_setting(
                     self._hpid, self._metric_key, 0
                 )
                 await handle_setting_update_response(
@@ -92,7 +94,7 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
         """Update the current value."""
         match self._metric_key:
             case "extra_tap_water":
-                response = await self.coordinator.api.set_extra_tap_water(
+                response = await self.coordinator.async_set_extra_tap_water(
                     self._hpid, -1
                 )
                 await handle_setting_update_response(
@@ -100,7 +102,7 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
                 )
 
             case "enable_sc_dhw" | "enable_sc_sh" | "vacation_mode":
-                response = await self.coordinator.api.update_setting(
+                response = await self.coordinator.client.update_setting(
                     self._hpid, self._metric_key, True
                 )
                 await handle_setting_update_response(
@@ -108,7 +110,7 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
                 )
 
             case _:
-                response = await self.coordinator.api.update_setting(
+                response = await self.coordinator.client.update_setting(
                     self._hpid, self._metric_key, 1
                 )
                 await handle_setting_update_response(

@@ -99,8 +99,8 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
                     "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
                 )
             option_value = int(option)
-            response = await self.coordinator.api.write_holding_register(
-                self._hpid, 9, option_value
+            response = await self.coordinator.client.write_metric(
+                self._hpid, "sensor_mode", option_value
             )
             if response and (
                 response.get("status") == SETTING_UPDATE_APPLIED
@@ -120,7 +120,7 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
         sh_mode = mode_value
         dhw_mode = mode_value
 
-        response = await self.coordinator.api.set_smartcontrol(
+        response = await self.coordinator.client.set_smartcontrol(
             self._hpid, sh_mode, dhw_mode
         )
         # Handle response

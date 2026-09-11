@@ -23,7 +23,9 @@ from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
-from .api import QvantumAPI, APIAuthError, APIConnectionError
+from .client.cloud import QvantumCloudClient
+from .client.exceptions import APIAuthError, APIConnectionError
+from .client.modbus.device import IdentityProbeError, async_probe_identity
 from .const import (
     DEFAULT_MODBUS_HOST,
     DEFAULT_MODBUS_PORT,
@@ -95,8 +97,15 @@ def _normalize_modbus_host(value: Any) -> str:
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate cloud credentials and return a title."""
+    from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
     user_agent = f"Home Assistant/{ha_version} Qvantum/{VERSION}"
-    api = QvantumAPI(data[CONF_USERNAME], data[CONF_PASSWORD], user_agent=user_agent)
+    api = QvantumCloudClient(
+        data[CONF_USERNAME],
+        data[CONF_PASSWORD],
+        user_agent=user_agent,
+        session=async_get_clientsession(hass),
+    )
     try:
         await api.authenticate()
         device = await api.get_primary_device()
@@ -135,8 +144,6 @@ async def validate_modbus(
     """Probe the heat pump over Modbus TCP and return serial identity."""
     from homeassistant.components.modbus import async_get_temporary_unit
     from modbus_connection import ModbusTcpParams
-
-    from .modbus_device import IdentityProbeError, async_probe_identity
 
     try:
         async with async_get_temporary_unit(

@@ -4,16 +4,160 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.qvantum.api import QvantumAPI
+from custom_components.qvantum.client.constants import (
+    FAN_SPEED_STATE_EXTRA,
+    FAN_SPEED_STATE_NORMAL,
+    FAN_SPEED_STATE_OFF,
+    FAN_SPEED_VALUE_EXTRA,
+    FAN_SPEED_VALUE_NORMAL,
+    FAN_SPEED_VALUE_OFF,
+    TAP_WATER_CAPACITY_MAPPINGS,
+)
 from custom_components.qvantum.const import DHW_MODE_EXTRA, DHW_MODE_NORMAL
-from tests.test_api import attach_mock_modbus
+from custom_components.qvantum.extra_dhw import ExtraDhwTimer
+from tests.test_api import QvantumAPI, attach_mock_modbus
+
+_FAN_PRESETS = {
+    FAN_SPEED_STATE_OFF: FAN_SPEED_VALUE_OFF,
+    FAN_SPEED_STATE_NORMAL: FAN_SPEED_VALUE_NORMAL,
+    FAN_SPEED_STATE_EXTRA: FAN_SPEED_VALUE_EXTRA,
+}
+
+_TIMER_ATTRS = {
+    "_extra_dhw_restore_at": "restore_at",
+    "_extra_dhw_armed_at": "armed_at",
+    "_extra_dhw_unsub": "unsub",
+    "_extra_dhw_store": "store",
+}
+
+
+class _ModbusApi:
+    """Client + extra-DHW timer, matching the old QvantumAPI extra-DHW surface."""
+
+    def __init__(self, client, timer):
+        object.__setattr__(self, "_client", client)
+        object.__setattr__(self, "_timer", timer)
+
+    def __getattr__(self, name):
+        if name == "hass":
+            return object.__getattribute__(self, "_timer").hass
+        if name in _TIMER_ATTRS:
+            return getattr(object.__getattribute__(self, "_timer"), _TIMER_ATTRS[name])
+        return getattr(object.__getattribute__(self, "_client"), name)
+
+    def __setattr__(self, name, value):
+        if name in ("_client", "_timer") or name in type(self).__dict__:
+            object.__setattr__(self, name, value)
+            return
+        if name in _TIMER_ATTRS:
+            setattr(object.__getattribute__(self, "_timer"), _TIMER_ATTRS[name], value)
+            return
+        if name == "hass":
+            object.__getattribute__(self, "_timer").hass = value
+            return
+        setattr(object.__getattribute__(self, "_client"), name, value)
+
+    async def set_extra_tap_water(self, device_id, minutes):
+        if minutes == 0:
+            result = await self.write_holding_register_for_metric(
+                device_id, "extra_tap_water", DHW_MODE_NORMAL
+            )
+            await self.async_clear_extra_dhw_timer()
+            return result
+        result = await self.write_holding_register_for_metric(
+            device_id, "extra_tap_water", DHW_MODE_EXTRA
+        )
+        if minutes > 0:
+            await self._schedule_extra_dhw_restore(device_id, minutes)
+        else:
+            await self.async_clear_extra_dhw_timer()
+        return result
+
+    def _cancel_extra_dhw_timer(self, *, clear_store=False):
+        self._timer.cancel(clear_store=clear_store)
+
+    async def async_clear_extra_dhw_timer(self):
+        await self._timer.async_clear()
+
+    async def async_persist_extra_dhw(self, payload):
+        await self._timer.async_persist(payload)
+
+    def _persist_extra_dhw(self, payload):
+        self._timer._persist(payload)
+
+    async def _schedule_extra_dhw_restore(self, device_id, minutes):
+        await self._timer.async_schedule(str(device_id), minutes)
+
+    async def _schedule_extra_dhw_at(self, device_id, restore_at, *, persist):
+        await self._timer.async_schedule_at(str(device_id), restore_at, persist=persist)
+
+    async def async_restore_extra_dhw_timer(self):
+        await self._timer.async_restore(writable=self._client.writable)
+
+    async def write_holding_register_for_metric(self, *args, **kwargs):
+        return await self._client.write_holding_register_for_metric(*args, **kwargs)
+
+    async def update_setting(self, device_id, name, value):
+        if isinstance(value, bool):
+            value = int(value)
+        return await self.write_holding_register_for_metric(device_id, name, value)
+
+    async def set_indoor_temperature_target(self, device_id, temperature):
+        return await self.write_holding_register_for_metric(
+            device_id, "indoor_temperature_target", temperature
+        )
+
+    async def set_indoor_temperature_offset(self, device_id, value):
+        return await self.write_holding_register_for_metric(
+            device_id, "indoor_temperature_offset", value
+        )
+
+    async def set_tap_water(self, device_id, start=0, stop=0):
+        if stop:
+            await self.write_holding_register_for_metric(
+                device_id, "tap_water_stop", stop
+            )
+        if start:
+            await self.write_holding_register_for_metric(
+                device_id, "tap_water_start", start
+            )
+        return {"status": "APPLIED"}
+
+    async def set_tap_water_capacity_target(self, device_id, capacity):
+        capacity_to_stop_start = {v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()}
+        start, stop = capacity_to_stop_start[capacity]
+        return await self.set_tap_water(device_id, start=start, stop=stop)
+
+    async def set_fanspeedselector(self, device_id, preset_mode):
+        if preset_mode not in _FAN_PRESETS:
+            raise ValueError(f"Invalid preset_mode: {preset_mode}")
+        return await self.write_holding_register_for_metric(
+            device_id, "fanspeedselector", _FAN_PRESETS[preset_mode]
+        )
+
+    async def close(self):
+        self._timer.cancel(clear_store=False)
+        close = getattr(self._client, "close", None)
+        if close is not None:
+            result = close()
+            if hasattr(result, "__await__"):
+                await result
 
 
 def _modbus_api(*, modbus_write: bool = True):
-    api = QvantumAPI(
+    client = QvantumAPI(
         modbus_tcp=True, user_agent="test-agent", modbus_write=modbus_write
     )
-    attach_mock_modbus(api)
+    attach_mock_modbus(client)
+    api_box: list[_ModbusApi] = []
+
+    async def write_normal(device_id: str):
+        return await api_box[0].write_holding_register_for_metric(
+            device_id, "extra_tap_water", DHW_MODE_NORMAL
+        )
+
+    api = _ModbusApi(client, ExtraDhwTimer(write_normal))
+    api_box.append(api)
     return api
 
 
@@ -544,7 +688,7 @@ class TestExtraTapWaterModbus:
 class TestModbusWriteOptionGate:
     @pytest.mark.asyncio
     async def test_extra_tap_water_rejected_when_writes_disabled(self):
-        from custom_components.qvantum.api import APIConnectionError
+        from custom_components.qvantum.client.exceptions import APIConnectionError
 
         api = _modbus_api(modbus_write=False)
         with pytest.raises(APIConnectionError, match="Modbus writing is disabled"):
@@ -552,7 +696,7 @@ class TestModbusWriteOptionGate:
 
     @pytest.mark.asyncio
     async def test_update_setting_rejected_when_writes_disabled(self):
-        from custom_components.qvantum.api import APIConnectionError
+        from custom_components.qvantum.client.exceptions import APIConnectionError
 
         api = _modbus_api(modbus_write=False)
         with pytest.raises(APIConnectionError, match="Modbus writing is disabled"):

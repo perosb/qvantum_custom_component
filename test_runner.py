@@ -37,16 +37,15 @@ def test_api():
         sys.modules['custom_components.qvantum.const'] = const_mock
 
         # Import the API
-        from custom_components.qvantum.api import QvantumAPI
+        from custom_components.qvantum.client.cloud import QvantumCloudClient
 
         # Test initialization
-        api = QvantumAPI("test@example.com", "password", "test-agent")
+        api = QvantumCloudClient("test@example.com", "password", "test-agent")
         assert api._username == "test@example.com"
         assert api._password == "password"
         assert api._user_agent == "test-agent"
-        assert api.hass is None
 
-        print("✓ QvantumAPI initialization test passed")
+        print("✓ QvantumCloudClient initialization test passed")
         return True
 
     except Exception as e:

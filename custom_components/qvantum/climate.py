@@ -60,7 +60,7 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""
         temperature = kwargs["temperature"]
-        response = await self.coordinator.api.set_indoor_temperature_target(
+        response = await self.coordinator.client.set_indoor_temperature_target(
             self._hpid, temperature
         )
         await handle_setting_update_response(

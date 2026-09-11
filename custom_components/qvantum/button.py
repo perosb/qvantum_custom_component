@@ -78,7 +78,7 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
                     )
                     return
                 # Activate extra tap water for 60 minutes
-                response = await self.coordinator.api.set_extra_tap_water(
+                response = await self.coordinator.async_set_extra_tap_water(
                     self._hpid, 60
                 )
                 await handle_setting_update_response(
@@ -94,7 +94,7 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
                     )
                     return
                 # Elevate access level for the device
-                response = await self.coordinator.api.elevate_access(self._hpid)
+                response = await self.coordinator.client.elevate_access(self._hpid)
 
                 if response is None:
                     _LOGGER.error("Failed to elevate access")

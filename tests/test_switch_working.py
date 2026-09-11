@@ -71,7 +71,7 @@ def mock_coordinator():
             "smart_price_heating_enabled": True,
         },
     }
-    coordinator.api = MagicMock()
+    coordinator.client = MagicMock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 
@@ -299,13 +299,13 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.set_extra_tap_water = AsyncMock(
+        mock_coordinator.async_set_extra_tap_water = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_on()
 
-        mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
+        mock_coordinator.async_set_extra_tap_water.assert_called_once_with(
             "test_device_123", -1
         )
         # Data is updated after successful API response
@@ -320,15 +320,16 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.set_extra_tap_water = AsyncMock(
+        mock_coordinator.async_set_extra_tap_water = AsyncMock(
             return_value={"status": "APPLIED"}
         )
-        mock_coordinator.api._extra_dhw_restore_at = 1712232000.0
+        mock_coordinator.extra_dhw = MagicMock()
+        mock_coordinator.extra_dhw.restore_at = 1712232000.0
         mock_coordinator.data["values"]["tap_stop"] = 1712232000
 
         await entity.async_turn_off()
 
-        mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
+        mock_coordinator.async_set_extra_tap_water.assert_called_once_with(
             "test_device_123", 0
         )
         # Data is updated after successful API response
@@ -344,13 +345,13 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "other_switch", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_on()
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "other_switch", 1
         )
         # The method updates metrics
@@ -365,13 +366,13 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "other_switch", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_off()
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "other_switch", 0
         )
         # The method updates metrics
@@ -386,13 +387,13 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_dhw", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_on()
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "enable_sc_dhw", True
         )
         # The method updates metrics
@@ -407,13 +408,13 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_dhw", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_off()
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "enable_sc_dhw", False
         )
         # The method updates metrics
@@ -428,13 +429,13 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_sh", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_on()
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "enable_sc_sh", True
         )
         # The method updates metrics
@@ -449,13 +450,13 @@ class TestQvantumSwitchEntity:
         entity = QvantumSwitchEntity(mock_coordinator, "enable_sc_sh", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_off()
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "enable_sc_sh", False
         )
         # The method updates metrics
@@ -520,13 +521,13 @@ class TestQvantumSwitchEntity:
         """Test turning on vacation_mode."""
         entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
 
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_on()
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "vacation_mode", True
         )
         assert mock_coordinator.data["values"]["vacation_mode"] is True
@@ -539,13 +540,13 @@ class TestQvantumSwitchEntity:
         """Test turning off vacation_mode."""
         entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
 
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_off()
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "vacation_mode", False
         )
         assert mock_coordinator.data["values"]["vacation_mode"] is False

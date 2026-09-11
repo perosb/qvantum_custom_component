@@ -57,7 +57,7 @@ def mock_coordinator():
             "smart_dhw_mode": 0,  # legacy - not used in values mode
         },
     }
-    coordinator.api = MagicMock()
+    coordinator.client = MagicMock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 
@@ -148,23 +148,23 @@ class TestQvantumSelectEntity:
         entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
 
         # Mock the API call
-        mock_coordinator.api.set_smartcontrol = AsyncMock()
+        mock_coordinator.client.set_smartcontrol = AsyncMock()
 
         # Test selecting Off
         await entity.async_select_option("off")
-        mock_coordinator.api.set_smartcontrol.assert_called_with(
+        mock_coordinator.client.set_smartcontrol.assert_called_with(
             "test_device_123", -1, -1
         )
 
         # Test selecting Eco
         await entity.async_select_option("0")
-        mock_coordinator.api.set_smartcontrol.assert_called_with(
+        mock_coordinator.client.set_smartcontrol.assert_called_with(
             "test_device_123", 0, 0
         )
 
         # Test selecting Balanced
         await entity.async_select_option("1")
-        mock_coordinator.api.set_smartcontrol.assert_called_with(
+        mock_coordinator.client.set_smartcontrol.assert_called_with(
             "test_device_123", 1, 1
         )
 
@@ -176,7 +176,7 @@ class TestQvantumSelectEntity:
         entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
 
         # Mock successful API response
-        mock_coordinator.api.set_smartcontrol = AsyncMock(
+        mock_coordinator.client.set_smartcontrol = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
@@ -200,7 +200,7 @@ class TestQvantumSelectEntity:
         entity = QvantumSelectEntity(mock_coordinator, "use_adaptive", mock_device)
 
         # Mock API response with heatpump_status success
-        mock_coordinator.api.set_smartcontrol = AsyncMock(
+        mock_coordinator.client.set_smartcontrol = AsyncMock(
             return_value={"heatpump_status": "APPLIED"}
         )
 
@@ -221,7 +221,7 @@ class TestQvantumSelectEntity:
         initial_dhw_mode = mock_coordinator.data["values"]["smart_dhw_mode"]
 
         # Mock failed API response
-        mock_coordinator.api.set_smartcontrol = AsyncMock(
+        mock_coordinator.client.set_smartcontrol = AsyncMock(
             return_value={"status": "FAILED"}
         )
 
@@ -242,7 +242,7 @@ class TestQvantumSelectEntity:
         initial_dhw_mode = mock_coordinator.data["values"]["smart_dhw_mode"]
 
         # Mock successful API response
-        mock_coordinator.api.set_smartcontrol = AsyncMock(
+        mock_coordinator.client.set_smartcontrol = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
@@ -263,7 +263,7 @@ class TestQvantumSelectEntity:
         initial_dhw_mode = mock_coordinator.data["values"]["smart_dhw_mode"]
 
         # Mock None response
-        mock_coordinator.api.set_smartcontrol = AsyncMock(return_value=None)
+        mock_coordinator.client.set_smartcontrol = AsyncMock(return_value=None)
 
         # Test selecting Balanced (option "1")
         await entity.async_select_option("1")
@@ -357,17 +357,17 @@ class TestQvantumSelectEntityOperationSensor:
             mock_coordinator, "use_operation_sensor", mock_device
         )
 
-        mock_coordinator.api.write_holding_register = AsyncMock(
+        mock_coordinator.client.write_metric = AsyncMock(
             return_value={"status": "APPLIED"}
         )
         mock_coordinator.data["values"]["sensor_mode"] = 0
 
         for mode in SensorMode:
             opt = str(mode.value)
-            mock_coordinator.api.write_holding_register.reset_mock()
+            mock_coordinator.client.write_metric.reset_mock()
             await entity.async_select_option(opt)
-            mock_coordinator.api.write_holding_register.assert_called_once_with(
-                "test_device_123", 9, mode.value
+            mock_coordinator.client.write_metric.assert_called_once_with(
+                "test_device_123", "sensor_mode", mode.value
             )
             assert mock_coordinator.data["values"]["sensor_mode"] == mode.value
 

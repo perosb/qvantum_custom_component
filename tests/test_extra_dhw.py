@@ -4,17 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.qvantum.api import QvantumAPI
 from custom_components.qvantum.extra_dhw import ExtraDhwTimer
-
-
-def test_http_mode_does_not_construct_extra_dhw_timer(mock_session):
-    api = QvantumAPI(
-        "test@example.com", "password", "test-agent", session=mock_session
-    )
-    assert api._extra_dhw is None
-    api._cancel_extra_dhw_timer()
-    assert api._extra_dhw_restore_at is None
 
 
 def _timer():

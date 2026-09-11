@@ -364,12 +364,18 @@ class QvantumCloudClient:
         self, device_id: str, enabled_metrics: list[str] | None = None
     ) -> dict[str, Any]:
         self._ensure_open()
-        names = enabled_metrics or []
         http_values, etag, total_latency = await self._get_http_values(
-            device_id, names, etag_header=self._metrics_etag
+            device_id,
+            enabled_metrics or [],
+            etag_header=self._metrics_etag,
         )
         if http_values is not None:
             metrics: dict = {"hpid": device_id, "latency": total_latency}
+            names = (
+                enabled_metrics
+                if enabled_metrics is not None
+                else list(http_values.keys())
+            )
             for metric_name in names:
                 if metric_name in http_values:
                     metrics[metric_name] = http_values[metric_name]
