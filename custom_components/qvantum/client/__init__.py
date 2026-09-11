@@ -32,6 +32,7 @@ from .exceptions import (
     RateLimitError,
 )
 from .models import ApplyResult, Device, MetricsPayload, SettingsPayload
+from .cloud import QvantumCloudClient
 from .modbus import (
     IdentityProbeError,
     QvantumModbusClient,
@@ -63,6 +64,7 @@ __all__ = [
     "IdentityProbeError",
     "MetricsPayload",
     "QvantumClient",
+    "QvantumCloudClient",
     "QvantumModbusClient",
     "QvantumModbusDevice",
     "async_probe_identity",
