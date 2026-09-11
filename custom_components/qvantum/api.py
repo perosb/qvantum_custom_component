@@ -2,9 +2,7 @@
 
 import aiohttp
 import asyncio
-import json
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 import logging
 from typing import Any, Optional
 
@@ -27,22 +25,12 @@ from .client.exceptions import (
     APIRateLimitError,
 )
 from .client.cloud import QvantumCloudClient
-from .client.cloud.endpoints import (
-    API_INTERNAL_URL,
-    API_URL,
-    AUTH_URL,
-    DEFAULT_TOKEN_BUFFER_SECONDS,
-    DEFAULT_TOKEN_EXPIRY_SECONDS,
-    FIREBASE_API_KEY,
-    METRICS_TIMEOUT_SECONDS,
-    TOKEN_URL,
-    VENTILATION_BOOST_MINUTES,
-)
 from .client.modbus import QvantumModbusClient
 from .const import (
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
 )
+from .extra_dhw import ExtraDhwTimer
 from .modbus import MODBUS_HOLDING_REGISTER_MAP, MODBUS_HOLDING_TO_SETTINGS_MAP
 from .modbus_device import QvantumModbusDevice
 
@@ -110,10 +98,9 @@ class QvantumAPI:
         )
         self._fallback_lock = asyncio.Lock()
         self._closed = False
-        self._extra_dhw_unsub = None
-        self._extra_dhw_restore_at: float | None = None
-        self._extra_dhw_armed_at: float | None = None
-        self._extra_dhw_store = None
+        self._extra_dhw = (
+            ExtraDhwTimer(self._write_dhw_normal) if modbus_tcp else None
+        )
         if modbus_tcp:
             self._session = None
             self._session_owner = False
@@ -274,19 +261,7 @@ class QvantumAPI:
         if self._modbus_client is None:
             raise APIConnectionError(None, "Modbus client not initialized")
         self._sync_modbus_unit()
-
-        async def _update(device: QvantumModbusDevice):
-            await device.async_update_inputs()
-            payload = device.metrics_payload(device_id, enabled_metrics)
-            _LOGGER.debug(
-                "Raw Modbus metrics read: %s",
-                sorted(payload.get("metrics", {}).items()),
-            )
-            return payload
-
-        return await self._modbus_client._run(
-            _update, error_label="reading input registers"
-        )
+        return await self._modbus_client.get_metrics(device_id, enabled_metrics)
 
     async def _read_modbus_settings(self, device_id: str, enabled_settings: list[str]):
         """Read settings from Modbus TCP holding registers."""
@@ -294,14 +269,7 @@ class QvantumAPI:
         if self._modbus_client is None:
             raise APIConnectionError(None, "Modbus client not initialized")
         self._sync_modbus_unit()
-
-        async def _update(device: QvantumModbusDevice):
-            await device.async_update_settings()
-            return device.settings_payload(enabled_settings)
-
-        return await self._modbus_client._run(
-            _update, error_label="reading holding registers"
-        )
+        return await self._modbus_client.get_settings(device_id, enabled_settings)
 
     async def _handle_response(self, response: aiohttp.ClientResponse):
         """Handle API response, raising exceptions for errors."""
@@ -368,143 +336,108 @@ class QvantumAPI:
         """Get request headers for API calls."""
         return self._require_cloud()._request_headers()
 
+    @property
+    def _extra_dhw_restore_at(self) -> float | None:
+        timer = self._extra_dhw
+        return None if timer is None else timer.restore_at
+
+    @_extra_dhw_restore_at.setter
+    def _extra_dhw_restore_at(self, value: float | None) -> None:
+        if self._extra_dhw is not None:
+            self._extra_dhw.restore_at = value
+
+    @property
+    def _extra_dhw_armed_at(self) -> float | None:
+        timer = self._extra_dhw
+        return None if timer is None else timer.armed_at
+
+    @_extra_dhw_armed_at.setter
+    def _extra_dhw_armed_at(self, value: float | None) -> None:
+        if self._extra_dhw is not None:
+            self._extra_dhw.armed_at = value
+
+    @property
+    def _extra_dhw_unsub(self):
+        timer = self._extra_dhw
+        return None if timer is None else timer.unsub
+
+    @_extra_dhw_unsub.setter
+    def _extra_dhw_unsub(self, value) -> None:
+        if self._extra_dhw is not None:
+            self._extra_dhw.unsub = value
+
+    @property
+    def _extra_dhw_store(self):
+        timer = self._extra_dhw
+        return None if timer is None else timer.store
+
+    @_extra_dhw_store.setter
+    def _extra_dhw_store(self, value) -> None:
+        if self._extra_dhw is not None:
+            self._extra_dhw.store = value
+
+    def _sync_extra_dhw_hass(self) -> ExtraDhwTimer | None:
+        timer = self._extra_dhw
+        if timer is None:
+            return None
+        timer.hass = self.hass
+        return timer
+
+    async def _write_dhw_normal(self, device_id: str) -> dict:
+        return await self.write_holding_register_for_metric(
+            device_id, "extra_tap_water", DHW_MODE_NORMAL
+        )
+
     def _cancel_extra_dhw_timer(self, *, clear_store: bool = False) -> None:
         """Cancel a pending extra-DHW restore callback."""
-        unsub = self._extra_dhw_unsub
-        self._extra_dhw_unsub = None
-        self._extra_dhw_armed_at = None
-        if unsub:
-            unsub()
-        if clear_store:
-            self._extra_dhw_restore_at = None
-            self._persist_extra_dhw(None)
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
+            return
+        timer.cancel(clear_store=clear_store)
 
     async def async_clear_extra_dhw_timer(self) -> None:
         """Stop a pending extra-DHW restore because extra DHW is no longer active."""
-        self._cancel_extra_dhw_timer(clear_store=False)
-        self._extra_dhw_restore_at = None
-        await self.async_persist_extra_dhw(None)
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
+            return
+        await timer.async_clear()
 
     async def async_persist_extra_dhw(self, payload: dict | None) -> None:
         """Save or clear the extra-DHW restore deadline."""
-        store = self._extra_dhw_store
-        if store is None:
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
             return
-        try:
-            if payload is None:
-                await store.async_remove()
-            else:
-                await store.async_save(payload)
-        except Exception:
-            if payload is None:
-                _LOGGER.debug("Failed to clear extra DHW timer", exc_info=True)
-            else:
-                _LOGGER.debug("Failed to persist extra DHW timer", exc_info=True)
+        await timer.async_persist(payload)
 
     def _persist_extra_dhw(self, payload: dict | None) -> None:
         """Fire-and-forget persist for sync callers (options listener)."""
-        hass = self.hass
-        if self._extra_dhw_store is None or hass is None:
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
             return
-        create_task = getattr(hass, "async_create_task", None)
-        if callable(create_task):
-            coro = self.async_persist_extra_dhw(payload)
-            try:
-                create_task(coro, name="qvantum_persist_extra_dhw")
-            except TypeError:
-                create_task(coro)
+        timer._persist(payload)
 
     async def _schedule_extra_dhw_restore(self, device_id: str, minutes: int) -> None:
         """After *minutes*, write DHW mode back to Normal."""
-        if minutes <= 0:
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
             return
-        restore_at = datetime.now(timezone.utc).timestamp() + minutes * 60
-        await self._schedule_extra_dhw_at(device_id, restore_at, persist=True)
+        await timer.async_schedule(device_id, minutes)
 
     async def _schedule_extra_dhw_at(
         self, device_id: str, restore_at: float, *, persist: bool
     ) -> None:
         """Schedule restore at an absolute UTC epoch; persist when requested."""
-        self._cancel_extra_dhw_timer(clear_store=False)
-        remaining = restore_at - datetime.now(timezone.utc).timestamp()
-        if not self.hass:
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
             return
-        self._extra_dhw_restore_at = restore_at
-        self._extra_dhw_armed_at = time.monotonic()
-        if persist:
-            await self.async_persist_extra_dhw(
-                {"device_id": str(device_id), "restore_at": restore_at}
-            )
-        from homeassistant.helpers.event import async_call_later
-
-        async def _restore(_now) -> None:
-            self._extra_dhw_unsub = None
-            try:
-                await self.write_holding_register_for_metric(
-                    device_id, "extra_tap_water", DHW_MODE_NORMAL
-                )
-            except Exception as err:
-                _LOGGER.warning(
-                    "Failed to restore DHW mode after extra hot water timer: %s", err
-                )
-                return
-            self._extra_dhw_restore_at = None
-            self._extra_dhw_armed_at = None
-            try:
-                await self.async_persist_extra_dhw(None)
-            except Exception:
-                _LOGGER.debug("Failed to clear extra DHW timer", exc_info=True)
-
-        delay = max(remaining, 0)
-        self._extra_dhw_unsub = async_call_later(self.hass, delay, _restore)
+        await timer.async_schedule_at(device_id, restore_at, persist=persist)
 
     async def async_restore_extra_dhw_timer(self) -> None:
         """Resume a persisted extra-DHW restore after Home Assistant restart."""
-        if not self._modbus_tcp:
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
             return
-        if not self._modbus_write:
-            # Writes off: do not reschedule, and drop any saved deadline.
-            await self.async_persist_extra_dhw(None)
-            return
-        store = self._extra_dhw_store
-        if store is None:
-            return
-        try:
-            data = await store.async_load()
-        except Exception:
-            _LOGGER.debug("Failed to load extra DHW timer", exc_info=True)
-            return
-        if not isinstance(data, dict):
-            return
-        device_id = data.get("device_id")
-        restore_at = data.get("restore_at")
-        if not device_id or not isinstance(restore_at, (int, float)):
-            return
-        remaining = float(restore_at) - datetime.now(timezone.utc).timestamp()
-        if remaining <= 0:
-            self._extra_dhw_restore_at = float(restore_at)
-            try:
-                await self.write_holding_register_for_metric(
-                    device_id, "extra_tap_water", DHW_MODE_NORMAL
-                )
-            except Exception as err:
-                _LOGGER.warning(
-                    "Failed to restore DHW mode after extra hot water timer: %s", err
-                )
-                return
-            self._extra_dhw_restore_at = None
-            self._extra_dhw_armed_at = None
-            try:
-                await self.async_persist_extra_dhw(None)
-            except Exception:
-                _LOGGER.debug("Failed to clear extra DHW timer", exc_info=True)
-            return
-        await self._schedule_extra_dhw_at(str(device_id), float(restore_at), persist=False)
-
-    def _ensure_modbus_write_allowed(self) -> None:
-        """Raise when Modbus TCP is on but holding-register writes are disabled."""
-        if self._modbus_tcp and not self._modbus_write:
-            raise APIConnectionError(None, "Modbus writing is disabled")
+        await timer.async_restore(writable=self._modbus_write)
 
     async def update_setting(self, device_id: str, name: str, value: Any):
         """Update one setting."""
@@ -515,16 +448,11 @@ class QvantumAPI:
                 device_id, name, value
             )
 
-        payload = {"update_settings": {name: value}}
-
-        return await self._send_command(device_id, payload)
+        return await self._require_cloud().update_setting(device_id, name, value)
 
     async def update_settings(self, device_id: str, settings: dict):
         """Update multiple settings from a dictionary."""
-
-        payload = {"update_settings": settings}
-
-        return await self._send_command(device_id, payload)
+        return await self._require_cloud().update_settings(device_id, settings)
 
     async def write_holding_register(
         self, device_id: str, register_address: int, value: int
@@ -579,20 +507,7 @@ class QvantumAPI:
 
     async def set_smartcontrol(self, device_id: str, sh: int, dhw: int):
         """Update smartcontrol setting."""
-
-        use_adaptive = sh != -1 and dhw != -1
-        if not use_adaptive:
-            payload = {
-                "use_adaptive": False,
-            }
-        else:
-            payload = {
-                "use_adaptive": use_adaptive,
-                "smart_sh_mode": sh,
-                "smart_dhw_mode": dhw,
-            }
-
-        return await self.update_settings(device_id, payload)
+        return await self._require_cloud().set_smartcontrol(device_id, sh, dhw)
 
     async def set_extra_tap_water(self, device_id: str, minutes: int):
         """Update extra_tap_water setting."""
@@ -616,34 +531,7 @@ class QvantumAPI:
             await self.async_clear_extra_dhw_timer()
             return result
 
-        # Capture current time once to ensure consistency across all code paths
-        current_time = datetime.now()
-
-        if minutes == 0:
-            # Cancel extra tap water
-            stop_time = int(current_time.timestamp())
-            indefinite = False
-            cancel = True
-        elif minutes > 0:
-            # Set specific duration
-            stop_time = int((current_time + timedelta(minutes=minutes)).timestamp())
-            indefinite = False
-            cancel = False
-        else:
-            # Set indefinite (always on)
-            stop_time = -1
-            indefinite = True
-            cancel = False
-
-        payload = {
-            "set_additional_hot_water": {
-                "stopTime": stop_time,
-                "indefinite": indefinite,
-                "cancel": cancel,
-            }
-        }
-
-        return await self._send_command(device_id, payload)
+        return await self._require_cloud().set_extra_tap_water(device_id, minutes)
 
     async def set_indoor_temperature_offset(self, device_id: str, value: int):
         """Update indoor_temperature_offset setting."""
@@ -652,9 +540,9 @@ class QvantumAPI:
                 device_id, "indoor_temperature_offset", value
             )
 
-        payload = {"settings": [{"name": "indoor_temperature_offset", "value": value}]}
-
-        return await self._update_settings(device_id, payload)
+        return await self._require_cloud().set_indoor_temperature_offset(
+            device_id, value
+        )
 
     async def set_fanspeedselector(self, device_id: str, preset_mode: str):
         """Update set_fanspeedselector setting."""
@@ -670,42 +558,11 @@ class QvantumAPI:
                 device_id, "fanspeedselector", presets[preset_mode]
             )
 
-        # Capture current time once to ensure consistency across all code paths
-        current_time = datetime.now()
-
-        match preset_mode:
-            case "off":
-                payload = {"set_fan_mode": {"mode": 0}}
-            case "normal":
-                stop_time = int(current_time.timestamp())
-                indefinite = False
-                payload = {
-                    "set_fan_mode": {"stopTime": stop_time, "indefinite": indefinite}
-                }
-            case "extra":
-                stop_time = int(
-                    (
-                        current_time + timedelta(minutes=VENTILATION_BOOST_MINUTES)
-                    ).timestamp()
-                )
-                indefinite = False
-                payload = {
-                    "set_fan_mode": {"stopTime": stop_time, "indefinite": indefinite}
-                }
-            case _:
-                raise ValueError(f"Invalid preset_mode: {preset_mode}")
-
-        return await self._send_command(device_id, payload)
+        return await self._require_cloud().set_fanspeedselector(device_id, preset_mode)
 
     async def set_tap_water_capacity_target(self, device_id: str, capacity: int):
         """Update tap_water_capacity_target setting."""
-
-        # Capacities 1, 6, and 7 are "custom" levels that the API does not accept
-        # directly — they must be set by writing the corresponding stop/start temperatures.
-        # Modbus has no capacity register; always write the start/stop pair.
-        _CUSTOM_CAPACITIES = {1, 6, 7}
-
-        if self._modbus_tcp or capacity in _CUSTOM_CAPACITIES:
+        if self._modbus_tcp:
             capacity_to_stop_start = {
                 v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()
             }
@@ -718,12 +575,9 @@ class QvantumAPI:
             )
             return await self.set_tap_water(device_id, start=start, stop=stop)
 
-        payload = {
-            "settings": [{"name": "tap_water_capacity_target", "value": capacity}]
-        }
-
-        _LOGGER.debug("Setting tap water capacity target to %s.", capacity)
-        return await self._update_settings(device_id, payload)
+        return await self._require_cloud().set_tap_water_capacity_target(
+            device_id, capacity
+        )
 
     async def set_tap_water(self, device_id: str, start: int = 0, stop: int = 0):
         """Update tap_water_start and tap_water_stop settings."""
@@ -743,14 +597,9 @@ class QvantumAPI:
                 )
             return {"status": "APPLIED"}
 
-        payload = {"settings": []}
-
-        if stop:
-            payload["settings"].append({"name": "tap_water_stop", "value": stop})
-        if start:
-            payload["settings"].append({"name": "tap_water_start", "value": start})
-
-        return await self._update_settings(device_id, payload)
+        return await self._require_cloud().set_tap_water(
+            device_id, start=start, stop=stop
+        )
 
     async def set_indoor_temperature_target(self, device_id: str, temperature: float):
         """Update indoor_temperature_target setting."""
@@ -759,11 +608,9 @@ class QvantumAPI:
                 device_id, "indoor_temperature_target", temperature
             )
 
-        payload = {
-            "settings": [{"name": "indoor_temperature_target", "value": temperature}]
-        }
-
-        return await self._update_settings(device_id, payload)
+        return await self._require_cloud().set_indoor_temperature_target(
+            device_id, temperature
+        )
 
     async def get_device_metadata(self, device_id: str):
         """Fetch data from the API with authentication."""

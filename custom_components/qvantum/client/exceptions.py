@@ -23,7 +23,7 @@ class AuthError(Exception):
             super().__init__(message)
 
 
-class ConnectionError(Exception):
+class TransportError(Exception):
     """Transport or remote API failure."""
 
     def __init__(
@@ -55,5 +55,5 @@ class RateLimitError(Exception):
 
 # Compatibility aliases used by the Home Assistant integration and tests.
 APIAuthError = AuthError
-APIConnectionError = ConnectionError
+APIConnectionError = TransportError
 APIRateLimitError = RateLimitError

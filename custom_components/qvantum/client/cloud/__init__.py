@@ -1,6 +1,5 @@
 """Qvantum cloud HTTP client."""
 
-from . import auth as _auth  # noqa: F401
 from .client import QvantumCloudClient
 from .endpoints import (
     API_INTERNAL_URL,

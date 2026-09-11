@@ -2,6 +2,10 @@
 
 This package must not import Home Assistant. It is the seed of a future
 standalone ``qvantum-client`` distribution.
+
+Transport implementations live in ``client.cloud`` and ``client.modbus`` and
+are imported from those subpackages so ``from .client.constants`` (used by
+HA ``const.py``) does not pull aiohttp or ``modbus_connection``.
 """
 
 from .constants import (
@@ -28,18 +32,10 @@ from .exceptions import (
     APIConnectionError,
     APIRateLimitError,
     AuthError,
-    ConnectionError,
     RateLimitError,
+    TransportError,
 )
 from .models import ApplyResult, Device, MetricsPayload, SettingsPayload
-from .cloud import QvantumCloudClient
-from .modbus import (
-    IdentityProbeError,
-    QvantumModbusClient,
-    QvantumModbusDevice,
-    async_probe_identity,
-    holding_field_for_metric,
-)
 from .protocol import QvantumClient
 
 __all__ = [
@@ -49,7 +45,6 @@ __all__ = [
     "ApplyResult",
     "AuthError",
     "BASE_SYSTEM_POWER_W",
-    "ConnectionError",
     "DHW_MODE_ECO",
     "DHW_MODE_EXTRA",
     "DHW_MODE_NORMAL",
@@ -61,14 +56,8 @@ __all__ = [
     "FAN_SPEED_VALUE_EXTRA",
     "FAN_SPEED_VALUE_NORMAL",
     "FAN_SPEED_VALUE_OFF",
-    "IdentityProbeError",
     "MetricsPayload",
     "QvantumClient",
-    "QvantumCloudClient",
-    "QvantumModbusClient",
-    "QvantumModbusDevice",
-    "async_probe_identity",
-    "holding_field_for_metric",
     "RELAY_HEAT_L1_POWER_W",
     "RELAY_HEAT_L2_POWER_W",
     "RELAY_HEAT_L3_POWER_W",
@@ -77,4 +66,5 @@ __all__ = [
     "SETTING_UPDATE_APPLIED",
     "SettingsPayload",
     "TAP_WATER_CAPACITY_MAPPINGS",
+    "TransportError",
 ]

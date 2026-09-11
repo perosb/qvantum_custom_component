@@ -8,8 +8,8 @@ from custom_components.qvantum.client.exceptions import (
     APIConnectionError,
     APIRateLimitError,
     AuthError,
-    ConnectionError,
     RateLimitError,
+    TransportError,
 )
 from custom_components.qvantum.const import (
     BASE_SYSTEM_POWER_W,
@@ -21,6 +21,12 @@ from custom_components.qvantum.const import (
 )
 from custom_components.qvantum import client as qvantum_client
 from custom_components.qvantum.client import constants as client_constants
+from custom_components.qvantum import modbus as modbus_shim
+from custom_components.qvantum import modbus_device as modbus_device_shim
+from custom_components.qvantum import modbus_model as modbus_model_shim
+from custom_components.qvantum.client.modbus import device as modbus_device
+from custom_components.qvantum.client.modbus import maps as modbus_maps
+from custom_components.qvantum.client.modbus import model as modbus_model
 
 
 CLIENT_ROOT = (
@@ -28,32 +34,45 @@ CLIENT_ROOT = (
 )
 
 
-def _imported_modules(path: Path) -> list[str]:
+def _is_forbidden_absolute(name: str) -> bool:
+    return name == "homeassistant" or name.startswith("homeassistant.") or name == "custom_components" or name.startswith(
+        "custom_components."
+    )
+
+
+def _import_leaks(path: Path) -> list[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    names: list[str] = []
+    depth = len(path.relative_to(CLIENT_ROOT).parts) - 1
+    max_relative_level = depth + 1
+    leaks: list[str] = []
+    rel = path.relative_to(CLIENT_ROOT.parent)
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            names.extend(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            names.append(node.module)
-    return names
+            for alias in node.names:
+                if _is_forbidden_absolute(alias.name):
+                    leaks.append(f"{rel}:{alias.name}")
+        elif isinstance(node, ast.ImportFrom):
+            if node.level > max_relative_level:
+                leaks.append(f"{rel}:relative-level-{node.level}")
+            module = node.module or ""
+            if module and _is_forbidden_absolute(module):
+                leaks.append(f"{rel}:{module}")
+    return leaks
 
 
 def test_client_package_does_not_import_homeassistant():
-    """The vendored library must stay free of Home Assistant imports."""
+    """The vendored library must stay free of Home Assistant and parent packages."""
     py_files = sorted(CLIENT_ROOT.rglob("*.py"))
     assert py_files, f"no Python files under {CLIENT_ROOT}"
     leaks: list[str] = []
     for path in py_files:
-        for name in _imported_modules(path):
-            if name == "homeassistant" or name.startswith("homeassistant."):
-                leaks.append(f"{path.relative_to(CLIENT_ROOT.parent)}:{name}")
+        leaks.extend(_import_leaks(path))
     assert leaks == []
 
 
 def test_exception_aliases_match_canonical_types():
     assert APIAuthError is AuthError
-    assert APIConnectionError is ConnectionError
+    assert APIConnectionError is TransportError
     assert APIRateLimitError is RateLimitError
 
 
@@ -63,8 +82,8 @@ def test_auth_error_without_status_keeps_message():
     assert str(err) == "Invalid credentials"
 
 
-def test_connection_error_with_status_appends_code():
-    err = ConnectionError(500, "API request failed")
+def test_transport_error_with_status_appends_code():
+    err = TransportError(500, "API request failed")
     assert err.status == 500
     assert str(err) == "API request failed: 500"
 
@@ -87,3 +106,11 @@ def test_const_reexports_client_protocol_constants():
 def test_client_package_exports_protocol():
     assert hasattr(qvantum_client, "QvantumClient")
     assert hasattr(qvantum_client, "MetricsPayload")
+    assert not hasattr(qvantum_client, "QvantumModbusClient")
+    assert not hasattr(qvantum_client, "QvantumCloudClient")
+
+
+def test_modbus_shims_are_identity_reexports():
+    assert modbus_shim.MODBUS_INPUT_REGISTER_MAP is modbus_maps.MODBUS_INPUT_REGISTER_MAP
+    assert modbus_device_shim.QvantumModbusDevice is modbus_device.QvantumModbusDevice
+    assert modbus_model_shim.QvantumInputs is modbus_model.QvantumInputs

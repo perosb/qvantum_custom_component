@@ -11,7 +11,7 @@ from typing import Any, Optional
 import aiohttp
 
 from ..constants import TAP_WATER_CAPACITY_MAPPINGS
-from ..exceptions import AuthError, ConnectionError, RateLimitError
+from ..exceptions import AuthError, RateLimitError, TransportError
 from .endpoints import (
     API_INTERNAL_URL,
     API_URL,
@@ -77,7 +77,7 @@ class QvantumCloudClient:
 
     def _ensure_open(self) -> None:
         if self._closed:
-            raise ConnectionError(None, "API client is closed")
+            raise TransportError(None, "Cloud client is closed")
 
     async def close(self) -> None:
         """Close an owned HTTP session. Injected sessions are left to the owner."""
@@ -103,7 +103,7 @@ class QvantumCloudClient:
                 raise AuthError(response.status)
             if response.status == 429:
                 raise RateLimitError(response.status)
-            raise ConnectionError(response.status)
+            raise TransportError(response.status)
 
     def _request_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}
@@ -351,7 +351,7 @@ class QvantumCloudClient:
                     _LOGGER.debug("Device metadata not modified, using cached data.")
                 case 500:
                     _LOGGER.error("Internal server error, clearing data...")
-                    raise ConnectionError(response.status)
+                    raise TransportError(response.status)
                 case _:
                     _LOGGER.error(
                         "Failed to fetch device metadata, status: %s", response.status
@@ -428,7 +428,7 @@ class QvantumCloudClient:
                     return None, None, None
                 case 500:
                     _LOGGER.error("Internal server error: %s", response.status)
-                    raise ConnectionError(response.status)
+                    raise TransportError(response.status)
                 case _:
                     _LOGGER.error(
                         "Failed to fetch HTTP values, status: %s", response.status
@@ -457,7 +457,7 @@ class QvantumCloudClient:
                     _LOGGER.debug("HTTP Settings not modified, using cached data.")
                 case 500:
                     _LOGGER.error("Internal server error, clearing data...")
-                    raise ConnectionError(response.status)
+                    raise TransportError(response.status)
                 case _:
                     _LOGGER.error(
                         "Failed to fetch HTTP settings, status: %s", response.status
@@ -484,7 +484,7 @@ class QvantumCloudClient:
                     _LOGGER.error(
                         "Failed to fetch devices, status: %s", response.status
                     )
-                    raise ConnectionError(response.status, "Failed to fetch devices")
+                    raise TransportError(response.status, "Failed to fetch devices")
 
     async def get_primary_device(self) -> dict[str, Any] | None:
         devices = await self.get_devices()

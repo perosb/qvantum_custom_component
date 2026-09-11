@@ -7,7 +7,7 @@ from custom_components.qvantum.client.constants import (
     DHW_MODE_EXTRA,
     DHW_MODE_NORMAL,
 )
-from custom_components.qvantum.client.exceptions import ConnectionError
+from custom_components.qvantum.client.exceptions import TransportError
 from custom_components.qvantum.client.modbus import QvantumModbusClient
 
 
@@ -18,7 +18,7 @@ def _client(*, writable: bool = True) -> tuple[MockModbusConnection, QvantumModb
 
 
 @pytest.mark.asyncio
-async def test_get_metrics_decodes_scaled_input_and_sets_latency():
+async def test_get_metrics_decodes_scaled_input_without_latency():
     _connection, client = _client()
     client.unit.input[0] = 256  # bt1, scale 0.1
 
@@ -26,14 +26,14 @@ async def test_get_metrics_decodes_scaled_input_and_sets_latency():
 
     assert payload["metrics"]["bt1"] == 25.6
     assert payload["metrics"]["hpid"] == "dev1"
-    assert isinstance(payload["metrics"]["latency"], int)
+    assert "latency" not in payload["metrics"]
 
 
 @pytest.mark.asyncio
 async def test_write_metric_rejected_when_not_writable():
     _connection, client = _client(writable=False)
 
-    with pytest.raises(ConnectionError, match="Modbus writing is disabled"):
+    with pytest.raises(TransportError, match="Modbus writing is disabled"):
         await client.write_metric("dev1", "indoor_temperature_target", 21.5)
 
 
@@ -101,5 +101,5 @@ async def test_set_fanspeedselector_and_tap_water():
 async def test_get_metrics_after_close_raises():
     _connection, client = _client()
     await client.close()
-    with pytest.raises(ConnectionError, match="API client is closed"):
+    with pytest.raises(TransportError, match="Modbus client is closed"):
         await client.get_metrics("dev1", ["bt1"])
