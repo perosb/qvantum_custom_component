@@ -24,7 +24,7 @@ from ..constants import (
     SETTING_UPDATE_APPLIED,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
-from ..exceptions import ConnectionError
+from ..exceptions import TransportError
 from .device import IdentityProbeError, QvantumModbusDevice, holding_field_for_metric
 from .maps import MODBUS_HOLDING_REGISTER_MAP, MODBUS_HOLDING_TO_SETTINGS_MAP
 
@@ -36,6 +36,8 @@ _FAN_PRESETS = {
     FAN_SPEED_STATE_NORMAL: FAN_SPEED_VALUE_NORMAL,
     FAN_SPEED_STATE_EXTRA: FAN_SPEED_VALUE_EXTRA,
 }
+
+
 class QvantumModbusClient:
     """Qvantum heat pump reached over an injected ``ModbusUnit``."""
 
@@ -80,7 +82,7 @@ class QvantumModbusClient:
 
     def _ensure_open(self) -> None:
         if self._closed:
-            raise ConnectionError(None, "API client is closed")
+            raise TransportError(None, "Modbus client is closed")
 
     def _ensure_device(self) -> QvantumModbusDevice | None:
         if self._closed:
@@ -93,7 +95,7 @@ class QvantumModbusClient:
 
     def _ensure_writable(self) -> None:
         if not self._writable:
-            raise ConnectionError(None, "Modbus writing is disabled")
+            raise TransportError(None, "Modbus writing is disabled")
 
     async def close(self) -> None:
         """Drop the device wrapper. Does not close the injected TCP unit."""
@@ -117,21 +119,21 @@ class QvantumModbusClient:
             self._ensure_open()
             device = self._ensure_device()
             if not device:
-                raise ConnectionError(None, missing_client_message)
+                raise TransportError(None, missing_client_message)
             try:
                 return await operation(device)
             except asyncio.CancelledError:
                 raise
             except ModbusError as err:
                 _LOGGER.error("Modbus error %s: %s", error_label, err)
-                raise ConnectionError(None, f"{failure_prefix}: {err}") from err
-            except (ConnectionError, ValueError, IdentityProbeError):
+                raise TransportError(None, f"{failure_prefix}: {err}") from err
+            except (TransportError, ValueError, IdentityProbeError):
                 raise
             except Exception as err:
                 _LOGGER.error(
                     "Unexpected error %s: %s", error_label, err, exc_info=True
                 )
-                raise ConnectionError(None, f"{failure_prefix}: {err}") from err
+                raise TransportError(None, f"{failure_prefix}: {err}") from err
 
     async def get_metrics(
         self, device_id: str, enabled_metrics: list[str] | None = None
@@ -147,16 +149,13 @@ class QvantumModbusClient:
             )
             return payload
 
-        start = asyncio.get_running_loop().time()
-        payload = await self._run(_update, error_label="reading input registers")
-        latency = int((asyncio.get_running_loop().time() - start) * 1000)
-        if isinstance(payload, dict) and "metrics" in payload:
-            payload["metrics"]["latency"] = latency
-        return payload
+        return await self._run(_update, error_label="reading input registers")
 
-    async def get_settings(self, device_id: str) -> dict[str, Any]:
+    async def get_settings(
+        self, device_id: str, enabled_settings: list[str] | None = None
+    ) -> dict[str, Any]:
         """Read holding registers exposed as HTTP-shaped settings."""
-        enabled = [
+        enabled = enabled_settings or [
             key
             for key in MODBUS_HOLDING_TO_SETTINGS_MAP
             if key in MODBUS_HOLDING_REGISTER_MAP
@@ -245,7 +244,7 @@ class QvantumModbusClient:
     ) -> dict[str, str] | None:
         if stop == 0 and start == 0:
             _LOGGER.debug("No tap water settings to update, both stop and start are 0.")
-            return None
+            return dict(_APPLIED)
         if stop:
             await self.write_metric(device_id, "tap_water_stop", stop)
         if start:

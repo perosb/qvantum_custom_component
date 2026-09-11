@@ -2,9 +2,7 @@
 
 import aiohttp
 import asyncio
-import json
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 import logging
 from typing import Any, Optional
 
@@ -27,17 +25,6 @@ from .client.exceptions import (
     APIRateLimitError,
 )
 from .client.cloud import QvantumCloudClient
-from .client.cloud.endpoints import (
-    API_INTERNAL_URL,
-    API_URL,
-    AUTH_URL,
-    DEFAULT_TOKEN_BUFFER_SECONDS,
-    DEFAULT_TOKEN_EXPIRY_SECONDS,
-    FIREBASE_API_KEY,
-    METRICS_TIMEOUT_SECONDS,
-    TOKEN_URL,
-    VENTILATION_BOOST_MINUTES,
-)
 from .client.modbus import QvantumModbusClient
 from .const import (
     DEFAULT_ENABLED_HTTP_METRICS,
@@ -272,19 +259,7 @@ class QvantumAPI:
         if self._modbus_client is None:
             raise APIConnectionError(None, "Modbus client not initialized")
         self._sync_modbus_unit()
-
-        async def _update(device: QvantumModbusDevice):
-            await device.async_update_inputs()
-            payload = device.metrics_payload(device_id, enabled_metrics)
-            _LOGGER.debug(
-                "Raw Modbus metrics read: %s",
-                sorted(payload.get("metrics", {}).items()),
-            )
-            return payload
-
-        return await self._modbus_client._run(
-            _update, error_label="reading input registers"
-        )
+        return await self._modbus_client.get_metrics(device_id, enabled_metrics)
 
     async def _read_modbus_settings(self, device_id: str, enabled_settings: list[str]):
         """Read settings from Modbus TCP holding registers."""
@@ -292,14 +267,7 @@ class QvantumAPI:
         if self._modbus_client is None:
             raise APIConnectionError(None, "Modbus client not initialized")
         self._sync_modbus_unit()
-
-        async def _update(device: QvantumModbusDevice):
-            await device.async_update_settings()
-            return device.settings_payload(enabled_settings)
-
-        return await self._modbus_client._run(
-            _update, error_label="reading holding registers"
-        )
+        return await self._modbus_client.get_settings(device_id, enabled_settings)
 
     async def _handle_response(self, response: aiohttp.ClientResponse):
         """Handle API response, raising exceptions for errors."""
@@ -441,11 +409,6 @@ class QvantumAPI:
             return
         await self._sync_extra_dhw_hass().async_restore(writable=self._modbus_write)
 
-    def _ensure_modbus_write_allowed(self) -> None:
-        """Raise when Modbus TCP is on but holding-register writes are disabled."""
-        if self._modbus_tcp and not self._modbus_write:
-            raise APIConnectionError(None, "Modbus writing is disabled")
-
     async def update_setting(self, device_id: str, name: str, value: Any):
         """Update one setting."""
         if self._modbus_tcp:
@@ -455,9 +418,7 @@ class QvantumAPI:
                 device_id, name, value
             )
 
-        payload = {"update_settings": {name: value}}
-
-        return await self._send_command(device_id, payload)
+        return await self._require_cloud().update_setting(device_id, name, value)
 
     async def update_settings(self, device_id: str, settings: dict):
         """Update multiple settings from a dictionary."""
@@ -519,20 +480,7 @@ class QvantumAPI:
 
     async def set_smartcontrol(self, device_id: str, sh: int, dhw: int):
         """Update smartcontrol setting."""
-
-        use_adaptive = sh != -1 and dhw != -1
-        if not use_adaptive:
-            payload = {
-                "use_adaptive": False,
-            }
-        else:
-            payload = {
-                "use_adaptive": use_adaptive,
-                "smart_sh_mode": sh,
-                "smart_dhw_mode": dhw,
-            }
-
-        return await self.update_settings(device_id, payload)
+        return await self._require_cloud().set_smartcontrol(device_id, sh, dhw)
 
     async def set_extra_tap_water(self, device_id: str, minutes: int):
         """Update extra_tap_water setting."""
@@ -556,34 +504,7 @@ class QvantumAPI:
             await self.async_clear_extra_dhw_timer()
             return result
 
-        # Capture current time once to ensure consistency across all code paths
-        current_time = datetime.now()
-
-        if minutes == 0:
-            # Cancel extra tap water
-            stop_time = int(current_time.timestamp())
-            indefinite = False
-            cancel = True
-        elif minutes > 0:
-            # Set specific duration
-            stop_time = int((current_time + timedelta(minutes=minutes)).timestamp())
-            indefinite = False
-            cancel = False
-        else:
-            # Set indefinite (always on)
-            stop_time = -1
-            indefinite = True
-            cancel = False
-
-        payload = {
-            "set_additional_hot_water": {
-                "stopTime": stop_time,
-                "indefinite": indefinite,
-                "cancel": cancel,
-            }
-        }
-
-        return await self._send_command(device_id, payload)
+        return await self._require_cloud().set_extra_tap_water(device_id, minutes)
 
     async def set_indoor_temperature_offset(self, device_id: str, value: int):
         """Update indoor_temperature_offset setting."""
@@ -592,9 +513,9 @@ class QvantumAPI:
                 device_id, "indoor_temperature_offset", value
             )
 
-        payload = {"settings": [{"name": "indoor_temperature_offset", "value": value}]}
-
-        return await self._update_settings(device_id, payload)
+        return await self._require_cloud().set_indoor_temperature_offset(
+            device_id, value
+        )
 
     async def set_fanspeedselector(self, device_id: str, preset_mode: str):
         """Update set_fanspeedselector setting."""
@@ -610,42 +531,11 @@ class QvantumAPI:
                 device_id, "fanspeedselector", presets[preset_mode]
             )
 
-        # Capture current time once to ensure consistency across all code paths
-        current_time = datetime.now()
-
-        match preset_mode:
-            case "off":
-                payload = {"set_fan_mode": {"mode": 0}}
-            case "normal":
-                stop_time = int(current_time.timestamp())
-                indefinite = False
-                payload = {
-                    "set_fan_mode": {"stopTime": stop_time, "indefinite": indefinite}
-                }
-            case "extra":
-                stop_time = int(
-                    (
-                        current_time + timedelta(minutes=VENTILATION_BOOST_MINUTES)
-                    ).timestamp()
-                )
-                indefinite = False
-                payload = {
-                    "set_fan_mode": {"stopTime": stop_time, "indefinite": indefinite}
-                }
-            case _:
-                raise ValueError(f"Invalid preset_mode: {preset_mode}")
-
-        return await self._send_command(device_id, payload)
+        return await self._require_cloud().set_fanspeedselector(device_id, preset_mode)
 
     async def set_tap_water_capacity_target(self, device_id: str, capacity: int):
         """Update tap_water_capacity_target setting."""
-
-        # Capacities 1, 6, and 7 are "custom" levels that the API does not accept
-        # directly — they must be set by writing the corresponding stop/start temperatures.
-        # Modbus has no capacity register; always write the start/stop pair.
-        _CUSTOM_CAPACITIES = {1, 6, 7}
-
-        if self._modbus_tcp or capacity in _CUSTOM_CAPACITIES:
+        if self._modbus_tcp:
             capacity_to_stop_start = {
                 v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()
             }
@@ -658,12 +548,9 @@ class QvantumAPI:
             )
             return await self.set_tap_water(device_id, start=start, stop=stop)
 
-        payload = {
-            "settings": [{"name": "tap_water_capacity_target", "value": capacity}]
-        }
-
-        _LOGGER.debug("Setting tap water capacity target to %s.", capacity)
-        return await self._update_settings(device_id, payload)
+        return await self._require_cloud().set_tap_water_capacity_target(
+            device_id, capacity
+        )
 
     async def set_tap_water(self, device_id: str, start: int = 0, stop: int = 0):
         """Update tap_water_start and tap_water_stop settings."""
@@ -683,14 +570,9 @@ class QvantumAPI:
                 )
             return {"status": "APPLIED"}
 
-        payload = {"settings": []}
-
-        if stop:
-            payload["settings"].append({"name": "tap_water_stop", "value": stop})
-        if start:
-            payload["settings"].append({"name": "tap_water_start", "value": start})
-
-        return await self._update_settings(device_id, payload)
+        return await self._require_cloud().set_tap_water(
+            device_id, start=start, stop=stop
+        )
 
     async def set_indoor_temperature_target(self, device_id: str, temperature: float):
         """Update indoor_temperature_target setting."""
@@ -699,11 +581,9 @@ class QvantumAPI:
                 device_id, "indoor_temperature_target", temperature
             )
 
-        payload = {
-            "settings": [{"name": "indoor_temperature_target", "value": temperature}]
-        }
-
-        return await self._update_settings(device_id, payload)
+        return await self._require_cloud().set_indoor_temperature_target(
+            device_id, temperature
+        )
 
     async def get_device_metadata(self, device_id: str):
         """Fetch data from the API with authentication."""
