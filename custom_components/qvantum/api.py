@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 from typing import Any, Optional
 
-from modbus_connection import ModbusError, ModbusUnit
+from modbus_connection import ModbusUnit
 
 from .client.constants import (
     DHW_MODE_EXTRA,
@@ -26,16 +26,13 @@ from .client.exceptions import (
     APIConnectionError,
     APIRateLimitError,
 )
+from .client.modbus import QvantumModbusClient
 from .const import (
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
 )
 from .modbus import MODBUS_HOLDING_REGISTER_MAP, MODBUS_HOLDING_TO_SETTINGS_MAP
-from .modbus_device import (
-    IdentityProbeError,
-    QvantumModbusDevice,
-    holding_field_for_metric,
-)
+from .modbus_device import QvantumModbusDevice
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -85,9 +82,13 @@ class QvantumAPI:
         self._modbus_port = modbus_port
         self._modbus_unit_id = modbus_unit_id
         self._modbus_unit = modbus_unit
-        self._modbus_write = bool(modbus_write)
-        self._modbus_device: QvantumModbusDevice | None = None
-        self._modbus_lock = asyncio.Lock()
+        self._modbus_write_flag = bool(modbus_write)
+        self._modbus_client = (
+            QvantumModbusClient(modbus_unit, writable=self._modbus_write_flag)
+            if modbus_tcp
+            else None
+        )
+        self._fallback_lock = asyncio.Lock()
         self._closed = False
         self._extra_dhw_unsub = None
         self._extra_dhw_restore_at: float | None = None
@@ -123,22 +124,53 @@ class QvantumAPI:
         self._device_metadata = {}
         self._device_metadata_etag = None
 
+    @property
+    def _modbus_write(self) -> bool:
+        return self._modbus_write_flag
+
+    @_modbus_write.setter
+    def _modbus_write(self, value: bool) -> None:
+        self._modbus_write_flag = bool(value)
+        if self._modbus_client is not None:
+            self._modbus_client.writable = self._modbus_write_flag
+
+    @property
+    def _modbus_lock(self) -> asyncio.Lock:
+        if self._modbus_client is not None:
+            return self._modbus_client._lock
+        return self._fallback_lock
+
+    @property
+    def _modbus_device(self) -> QvantumModbusDevice | None:
+        if self._modbus_client is None:
+            return None
+        return self._modbus_client.device
+
+    @_modbus_device.setter
+    def _modbus_device(self, value: QvantumModbusDevice | None) -> None:
+        if self._modbus_client is not None:
+            self._modbus_client._device = value
+
     def _ensure_open(self) -> None:
         """Raise if the API client has been closed (e.g. during config reload)."""
         if self._closed:
             raise APIConnectionError(None, "API client is closed")
 
+    def _sync_modbus_unit(self) -> None:
+        """Attach a unit assigned after construct (tests) onto the client."""
+        client = self._modbus_client
+        if client is None or client.device is not None:
+            return
+        if self._modbus_unit is None:
+            return
+        client.attach_unit(self._modbus_unit)
+
     def _ensure_modbus_device(self) -> QvantumModbusDevice | None:
         """Return the device wrapper for the Home Assistant-owned Modbus unit."""
-        if self._closed:
+        if self._closed or self._modbus_client is None:
             return None
-        if not self._modbus_tcp:
-            return None
-        if self._modbus_device is None:
-            if self._modbus_unit is None:
-                return None
-            self._modbus_device = QvantumModbusDevice(self._modbus_unit)
-        return self._modbus_device
+        self._sync_modbus_unit()
+        return self._modbus_client._ensure_device()
 
     async def _reset_modbus_client(self):
         """Drop the device wrapper. The shared connection is owned by ``modbus``.
@@ -160,9 +192,8 @@ class QvantumAPI:
         self._closed = True
         self._cancel_extra_dhw_timer()
 
-        # Wait for any in-flight Modbus operation, then drop the wrapper.
-        async with self._modbus_lock:
-            await self._reset_modbus_client()
+        if self._modbus_client is not None:
+            await self._modbus_client.close()
 
         # Only close the session if we created it; externally-provided sessions
         # should be closed by their owner.
@@ -186,30 +217,22 @@ class QvantumAPI:
     ):
         """Run a Modbus device operation under the lock, mapping errors."""
         self._ensure_open()
-        async with self._modbus_lock:
-            self._ensure_open()
-            device = self._ensure_modbus_device()
-            if not device:
-                raise APIConnectionError(None, missing_client_message)
-            try:
-                return await operation(device)
-            except asyncio.CancelledError:
-                # Reload/unload cancels in-flight polls. Do not close or
-                # disconnect the shared connection; other consumers may hold it.
-                raise
-            except ModbusError as err:
-                _LOGGER.error("Modbus error %s: %s", error_label, err)
-                raise APIConnectionError(None, f"{failure_prefix}: {err}") from err
-            except (APIConnectionError, ValueError, IdentityProbeError):
-                raise
-            except Exception as err:
-                _LOGGER.error(
-                    "Unexpected error %s: %s", error_label, err, exc_info=True
-                )
-                raise APIConnectionError(None, f"{failure_prefix}: {err}") from err
+        if self._modbus_client is None:
+            raise APIConnectionError(None, missing_client_message)
+        self._sync_modbus_unit()
+        return await self._modbus_client._run(
+            operation,
+            error_label=error_label,
+            missing_client_message=missing_client_message,
+            failure_prefix=failure_prefix,
+        )
 
     async def _read_modbus_metrics(self, device_id: str, enabled_metrics: list[str]):
-        """Read metrics from Modbus TCP."""
+        """Read metrics from Modbus TCP without injecting poll latency."""
+        self._ensure_open()
+        if self._modbus_client is None:
+            raise APIConnectionError(None, "Modbus client not initialized")
+        self._sync_modbus_unit()
 
         async def _update(device: QvantumModbusDevice):
             await device.async_update_inputs()
@@ -220,16 +243,24 @@ class QvantumAPI:
             )
             return payload
 
-        return await self._run_modbus(_update, error_label="reading input registers")
+        return await self._modbus_client._run(
+            _update, error_label="reading input registers"
+        )
 
     async def _read_modbus_settings(self, device_id: str, enabled_settings: list[str]):
         """Read settings from Modbus TCP holding registers."""
+        self._ensure_open()
+        if self._modbus_client is None:
+            raise APIConnectionError(None, "Modbus client not initialized")
+        self._sync_modbus_unit()
 
         async def _update(device: QvantumModbusDevice):
             await device.async_update_settings()
             return device.settings_payload(enabled_settings)
 
-        return await self._run_modbus(_update, error_label="reading holding registers")
+        return await self._modbus_client._run(
+            _update, error_label="reading holding registers"
+        )
 
     async def _handle_response(self, response: aiohttp.ClientResponse):
         """Handle API response, raising exceptions for errors."""
@@ -343,20 +374,11 @@ class QvantumAPI:
 
     async def async_probe_identity(self) -> dict[str, Any]:
         """Read serial and firmware from the heat pump over Modbus."""
-
-        async def _probe(device: QvantumModbusDevice):
-            await device.async_update_identity()
-            serial = device.serial_number
-            if not serial:
-                raise IdentityProbeError("Heat pump did not return a serial number")
-            return {
-                "id": serial,
-                "serial": serial,
-                "vendor": "Qvantum",
-                "sw_version": device.sw_version,
-            }
-
-        return await self._run_modbus(_probe, error_label="probing identity")
+        self._ensure_open()
+        if self._modbus_client is None:
+            raise APIConnectionError(None, "Modbus client not initialized")
+        self._sync_modbus_unit()
+        return await self._modbus_client.probe_identity()
 
     async def _ensure_valid_token(self):
         """Ensure a valid token is available, refreshing if expired."""
@@ -545,36 +567,27 @@ class QvantumAPI:
         self, device_id: str, register_address: int, value: int
     ) -> dict:
         """Write a single Modbus holding register and return a status dict."""
-        self._ensure_modbus_write_allowed()
-
-        async def _write(device: QvantumModbusDevice):
-            await device.write_holding_register(register_address, int(value))
-            return {"status": "APPLIED"}
-
-        return await self._run_modbus(
-            _write,
-            error_label=f"writing holding register {register_address} for device {device_id}",
-            missing_client_message=f"Modbus client not initialized for device {device_id}",
-            failure_prefix="Modbus write failed",
+        self._ensure_open()
+        if self._modbus_client is None:
+            raise APIConnectionError(
+                None, f"Modbus client not initialized for device {device_id}"
+            )
+        self._sync_modbus_unit()
+        return await self._modbus_client.write_holding_register(
+            device_id, register_address, value
         )
 
     async def write_holding_register_for_metric(
         self, device_id: str, metric_key: str, value: float
     ) -> dict:
         """Write a Modbus holding register looked up by metric key."""
-        self._ensure_modbus_write_allowed()
-        holding_field_for_metric(metric_key)
-
-        async def _write(device: QvantumModbusDevice):
-            await device.write_metric(metric_key, value)
-            return {"status": "APPLIED"}
-
-        return await self._run_modbus(
-            _write,
-            error_label=f"writing metric {metric_key} for device {device_id}",
-            missing_client_message=f"Modbus client not initialized for device {device_id}",
-            failure_prefix="Modbus write failed",
-        )
+        self._ensure_open()
+        if self._modbus_client is None:
+            raise APIConnectionError(
+                None, f"Modbus client not initialized for device {device_id}"
+            )
+        self._sync_modbus_unit()
+        return await self._modbus_client.write_metric(device_id, metric_key, value)
 
     async def _update_settings(self, device_id: str, payload: dict):
         """Update one or several settings."""
@@ -1069,7 +1082,7 @@ class QvantumAPI:
         if self._modbus_tcp:
             settings_to_read = [
                 setting_key
-                for setting_key in MODBUS_HOLDING_TO_SETTINGS_MAP.keys()
+                for setting_key in MODBUS_HOLDING_TO_SETTINGS_MAP
                 if setting_key in MODBUS_HOLDING_REGISTER_MAP
             ]
             return await self._read_modbus_settings(device_id, settings_to_read)
