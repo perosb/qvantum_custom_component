@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from custom_components.qvantum.client.cloud import QvantumCloudClient
+from custom_components.qvantum.client.cloud.endpoints import HTTP_TIMEOUT
 from custom_components.qvantum.client.exceptions import AuthError, TransportError
 
 
@@ -86,3 +87,24 @@ async def test_set_indoor_temperature_target_patches(mock_session):
     result = await client.set_indoor_temperature_target("test_device", 22.5)
     assert result == update_data
     mock_session.patch.assert_called_once()
+    patch_kwargs = mock_session.patch.call_args.kwargs
+    assert patch_kwargs["timeout"] is HTTP_TIMEOUT
+    assert patch_kwargs["headers"]["User-Agent"] == "test-agent"
+    assert patch_kwargs["headers"]["Authorization"] == "Bearer test_token"
+
+
+@pytest.mark.asyncio
+async def test_injected_session_authenticate_uses_timeout_and_user_agent(mock_session):
+    """HA-injected sessions must still send User-Agent and HTTP_TIMEOUT."""
+    auth_data = load_test_data("auth_signin.json")
+    cm, _ = mock_session.make_cm_response(status=200, json_data=auth_data)
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    assert await client.authenticate() is True
+    post_kwargs = mock_session.post.call_args.kwargs
+    assert post_kwargs["timeout"] is HTTP_TIMEOUT
+    assert post_kwargs["headers"]["User-Agent"] == "test-agent"
+    assert "Authorization" not in post_kwargs["headers"]

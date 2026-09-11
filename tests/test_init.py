@@ -357,6 +357,38 @@ class TestIntegrationSetup:
         mock_api.close.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_async_unload_entry_cancels_extra_dhw_before_client_close(
+        self, hass, mock_config_entry
+    ):
+        """Pending extra-DHW restore must not write after the client is closed."""
+        hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+        mock_api = MagicMock()
+        extra_dhw = MagicMock()
+        call_order: list[str] = []
+
+        async def close_api():
+            call_order.append("api_close")
+
+        def cancel_timer(**kwargs):
+            call_order.append("extra_dhw_cancel")
+
+        mock_api.close = AsyncMock(side_effect=close_api)
+        extra_dhw.cancel.side_effect = cancel_timer
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = None
+        mock_config_entry.runtime_data.maintenance_coordinator = None
+        mock_config_entry.runtime_data.client = mock_api
+        mock_config_entry.runtime_data.extra_dhw = extra_dhw
+
+        result = await async_unload_entry(hass, mock_config_entry)
+
+        assert result is True
+        assert call_order == ["extra_dhw_cancel", "api_close"]
+        extra_dhw.cancel.assert_called_once_with(clear_store=False)
+        mock_api.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_async_unload_entry_with_firmware_notifications(
         self, hass, mock_config_entry
     ):

@@ -608,9 +608,11 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
 
     Shut down coordinators before closing the HTTP API client so in-flight
     polls are cancelled first. Otherwise a cancelled Modbus poll can fall
-    back to HTTP against a session that is already closing. The shared
-    Modbus TCP connection is released by Home Assistant when this config
-    entry unloads; this integration never closes it.
+    back to HTTP against a session that is already closing. Cancel the
+    extra-DHW restore timer before client.close() so a pending callback
+    cannot write_metric on a closed client. The shared Modbus TCP
+    connection is released by Home Assistant when this config entry
+    unloads; this integration never closes it.
     """
     runtime = getattr(config_entry, "runtime_data", None)
 
@@ -645,6 +647,9 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
             hass, skip_entry_id=config_entry.entry_id
         )
 
+    extra_dhw = getattr(runtime, "extra_dhw", None) if runtime is not None else None
+    if extra_dhw is not None:
+        extra_dhw.cancel(clear_store=False)
     client = getattr(runtime, "client", None) if runtime is not None else None
     if client is not None:
         try:
@@ -653,9 +658,6 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
             raise
         except Exception as err:
             _LOGGER.debug("Failed closing Qvantum client on unload: %s", err)
-    extra_dhw = getattr(runtime, "extra_dhw", None) if runtime is not None else None
-    if extra_dhw is not None:
-        extra_dhw.cancel(clear_store=False)
     hass.data.pop(DOMAIN, None)
 
     if unload_ok and device_id:
