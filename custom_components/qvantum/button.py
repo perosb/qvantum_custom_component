@@ -13,7 +13,11 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import MyConfigEntry
-from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .coordinator import (
+    QvantumDataUpdateCoordinator,
+    as_cloud_client,
+    handle_setting_update_response,
+)
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .entity import QvantumEntity
 
@@ -93,8 +97,14 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
                         "elevate_access is cloud-only; ignoring press in Modbus mode"
                     )
                     return
+                client = as_cloud_client(self.coordinator.client)
+                if client is None:
+                    _LOGGER.debug(
+                        "elevate_access is cloud-only; ignoring press in Modbus mode"
+                    )
+                    return
                 # Elevate access level for the device
-                response = await self.coordinator.client.elevate_access(self._hpid)
+                response = await client.elevate_access(self._hpid)
 
                 if response is None:
                     _LOGGER.error("Failed to elevate access")

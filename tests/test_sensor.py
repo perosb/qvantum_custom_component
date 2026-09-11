@@ -392,8 +392,7 @@ class TestSensorSetup:
 
         config_entry = MagicMock(spec=ConfigEntry)
         config_entry.runtime_data = RuntimeData(
-            coordinator=mock_coordinator, device=mock_device
-        )
+            coordinator=mock_coordinator, device=mock_device, client=MagicMock())
         return config_entry
 
     @pytest.fixture

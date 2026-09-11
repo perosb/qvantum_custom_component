@@ -49,7 +49,7 @@ from .const import (
     DEFAULT_MODBUS_UNIT_ID,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
 )
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, as_modbus_client
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
@@ -205,9 +205,9 @@ class RuntimeData:
     """Per-entry runtime: transport client, coordinators, extra-DHW timer."""
 
     coordinator: QvantumDataUpdateCoordinator
+    client: QvantumCloudClient | QvantumModbusClient
     maintenance_coordinator: QvantumMaintenanceCoordinator | None = None
     device: DeviceInfo | None = None
-    client: QvantumCloudClient | QvantumModbusClient | None = None
     extra_dhw: ExtraDhwTimer | None = None
     modbus_host: str = DEFAULT_MODBUS_HOST
     modbus_port: int = DEFAULT_MODBUS_PORT
@@ -325,9 +325,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     config_entry.runtime_data = RuntimeData(
         coordinator,
+        client,
         maintenance_coordinator,
         device,
-        client=client,
         extra_dhw=extra_dhw,
         modbus_host=modbus_host,
         modbus_port=modbus_port,
@@ -344,18 +344,14 @@ def _modbus_transport_changed(
     """Return True when Modbus enablement or host requires a full reload."""
     new_enabled, new_host, new_port, new_unit_id = _modbus_link_settings(config_entry)
 
-    coordinator = getattr(runtime, "coordinator", None)
-    if coordinator is None:
+    if new_enabled != bool(runtime.coordinator.modbus_enabled):
         return True
 
-    if new_enabled != bool(getattr(coordinator, "modbus_enabled", False)):
+    if new_host != runtime.modbus_host:
         return True
-
-    if new_host != str(getattr(runtime, "modbus_host", DEFAULT_MODBUS_HOST)):
+    if new_port != runtime.modbus_port:
         return True
-    if new_port != int(getattr(runtime, "modbus_port", DEFAULT_MODBUS_PORT)):
-        return True
-    if new_unit_id != int(getattr(runtime, "modbus_unit_id", DEFAULT_MODBUS_UNIT_ID)):
+    if new_unit_id != runtime.modbus_unit_id:
         return True
 
     return False
@@ -369,7 +365,7 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
     host still requires a full reload (different entity set / client).
     """
     runtime = getattr(config_entry, "runtime_data", None)
-    if runtime is None or getattr(runtime, "coordinator", None) is None:
+    if runtime is None:
         await hass.config_entries.async_reload(config_entry.entry_id)
         return
 
@@ -381,13 +377,13 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
         await hass.config_entries.async_reload(config_entry.entry_id)
         return
 
-    client = getattr(runtime, "client", None)
-    extra_dhw = getattr(runtime, "extra_dhw", None)
-    if extra_dhw is not None and client is not None:
+    extra_dhw = runtime.extra_dhw
+    modbus = as_modbus_client(runtime.client)
+    if extra_dhw is not None and modbus is not None:
         write_enabled = _modbus_write_enabled(config_entry)
-        if getattr(client, "writable", False) and not write_enabled:
+        if modbus.writable and not write_enabled:
             extra_dhw.cancel(clear_store=True)
-        client.writable = write_enabled
+        modbus.writable = write_enabled
 
     changed = runtime.coordinator.apply_poll_interval(config_entry)
     if changed:
@@ -647,18 +643,15 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
             hass, skip_entry_id=config_entry.entry_id
         )
 
-    extra_dhw = getattr(runtime, "extra_dhw", None) if runtime is not None else None
-    if extra_dhw is not None:
-        extra_dhw.cancel(clear_store=False)
-    client = getattr(runtime, "client", None) if runtime is not None else None
-    if client is not None:
+    if runtime is not None:
+        if runtime.extra_dhw is not None:
+            runtime.extra_dhw.cancel(clear_store=False)
         try:
-            await client.close()
+            await runtime.client.close()
         except asyncio.CancelledError:
             raise
         except Exception as err:
             _LOGGER.debug("Failed closing Qvantum client on unload: %s", err)
-    hass.data.pop(DOMAIN, None)
 
     if unload_ok and device_id:
         # Clear notifications for all firmware components

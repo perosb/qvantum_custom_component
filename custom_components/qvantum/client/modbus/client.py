@@ -184,10 +184,6 @@ class QvantumModbusClient:
 
         return await self._run(_probe, error_label="probing identity")
 
-    async def async_probe_identity(self) -> dict[str, Any]:
-        """Compatibility alias for ``probe_identity``."""
-        return await self.probe_identity()
-
     async def write_holding_register(
         self, device_id: str, register_address: int, value: int
     ) -> dict[str, str]:
@@ -222,12 +218,6 @@ class QvantumModbusClient:
             missing_client_message=f"Modbus client not initialized for device {device_id}",
             failure_prefix="Modbus write failed",
         )
-
-    async def write_holding_register_for_metric(
-        self, device_id: str, metric_key: str, value: float
-    ) -> dict[str, str]:
-        """Compatibility alias for ``write_metric``."""
-        return await self.write_metric(device_id, metric_key, value)
 
     async def update_setting(
         self, device_id: str, name: str, value: Any

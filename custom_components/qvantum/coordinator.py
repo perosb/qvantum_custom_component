@@ -16,7 +16,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
 
+from .client.cloud import QvantumCloudClient
 from .client.exceptions import AuthError as APIAuthError
+from .client.modbus import QvantumModbusClient
+from .client.protocol import QvantumClient
 from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
 from .calculations import QvantumCalculationsMixin
 from .const import (
@@ -45,6 +48,24 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def as_modbus_client(client: QvantumClient) -> QvantumModbusClient | None:
+    """Narrow to Modbus. Test doubles that are neither Cloud nor Modbus pass through."""
+    if isinstance(client, QvantumModbusClient):
+        return client
+    if isinstance(client, QvantumCloudClient):
+        return None
+    return client  # type: ignore[return-value]
+
+
+def as_cloud_client(client: QvantumClient) -> QvantumCloudClient | None:
+    """Narrow to Cloud. Test doubles that are neither Cloud nor Modbus pass through."""
+    if isinstance(client, QvantumCloudClient):
+        return client
+    if isinstance(client, QvantumModbusClient):
+        return None
+    return client  # type: ignore[return-value]
 
 
 
@@ -158,7 +179,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         hass: HomeAssistant,
         config_entry: ConfigEntry,
         *,
-        client=None,
+        client: QvantumClient,
         extra_dhw: ExtraDhwTimer | None = None,
     ) -> None:
         """Initialize coordinator."""
@@ -166,7 +187,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             config_entry
         )
 
-        self.client = client
+        self.client: QvantumClient = client
         self.extra_dhw = extra_dhw
         self._config_entry = config_entry
         self._device = None
@@ -408,8 +429,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             return
 
         if self.modbus_enabled:
+            modbus = as_modbus_client(self.client)
+            if modbus is None:
+                raise UpdateFailed("Modbus identity probe requires a Modbus client")
             try:
-                probed = await self.client.probe_identity()
+                probed = await modbus.probe_identity()
             except asyncio.CancelledError:
                 raise
             except Exception as err:
@@ -434,9 +458,12 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 )
             raise UpdateFailed("No device identity from Modbus or device registry")
 
+        cloud = as_cloud_client(self.client)
+        if cloud is None:
+            raise UpdateFailed("Cloud device lookup requires a cloud client")
         try:
             device = await asyncio.wait_for(
-                self.client.get_primary_device(),
+                cloud.get_primary_device(),
                 timeout=HTTP_CLOUD_LOOKUP_TIMEOUT,
             )
             if isinstance(device, dict) and device.get("id"):

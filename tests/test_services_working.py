@@ -51,7 +51,7 @@ def mock_hass():
 def mock_api():
     """Create a mock API."""
     api = MagicMock()
-    api.set_extra_tap_water = AsyncMock(return_value={"status": "success"})
+    api.async_set_extra_tap_water = AsyncMock(return_value={"status": "success"})
     return api
 
 
@@ -62,8 +62,7 @@ class TestQvantumServices:
     async def test_async_setup_services(self, mock_hass, mock_api):
         """Test service setup."""
         entry = MagicMock()
-        entry.runtime_data.client = mock_api
-        entry.runtime_data.extra_dhw = None
+        entry.runtime_data.coordinator = mock_api
         mock_hass.config_entries.async_entries.return_value = [entry]
 
         await async_setup_services(mock_hass)
@@ -82,8 +81,7 @@ class TestQvantumServices:
     async def test_extra_hot_water_service_success(self, mock_hass, mock_api):
         """Test the extra_hot_water service with successful API call."""
         entry = MagicMock()
-        entry.runtime_data.client = mock_api
-        entry.runtime_data.extra_dhw = None
+        entry.runtime_data.coordinator = mock_api
         mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Set up the service
@@ -102,7 +100,7 @@ class TestQvantumServices:
         result = await service_func(service_call)
 
         # Verify API was called correctly
-        mock_api.set_extra_tap_water.assert_called_once_with(123, 60)
+        mock_api.async_set_extra_tap_water.assert_called_once_with(123, 60)
 
         # Verify response
         assert result == {"qvantum": [{"status": "success"}]}
@@ -111,12 +109,11 @@ class TestQvantumServices:
     async def test_extra_hot_water_service_with_exception(self, mock_hass, mock_api):
         """Test the extra_hot_water service with API exception."""
         entry = MagicMock()
-        entry.runtime_data.client = mock_api
-        entry.runtime_data.extra_dhw = None
+        entry.runtime_data.coordinator = mock_api
         mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Make the API call raise an exception
-        mock_api.set_extra_tap_water.side_effect = Exception("API error")
+        mock_api.async_set_extra_tap_water.side_effect = Exception("API error")
 
         # Set up the service
         await async_setup_services(mock_hass)
@@ -134,7 +131,7 @@ class TestQvantumServices:
         result = await service_func(service_call)
 
         # Verify API was called
-        mock_api.set_extra_tap_water.assert_called_once_with(123, 60)
+        mock_api.async_set_extra_tap_water.assert_called_once_with(123, 60)
 
         # Verify exception response
         assert result == {
@@ -145,8 +142,7 @@ class TestQvantumServices:
     async def test_extra_hot_water_service_different_device(self, mock_hass, mock_api):
         """Test the extra_hot_water service with a different device ID."""
         entry = MagicMock()
-        entry.runtime_data.client = mock_api
-        entry.runtime_data.extra_dhw = None
+        entry.runtime_data.coordinator = mock_api
         mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Set up the service
@@ -168,7 +164,7 @@ class TestQvantumServices:
         result = await service_func(service_call)
 
         # Verify API was called with default minutes (120)
-        mock_api.set_extra_tap_water.assert_called_once_with(456, 120)
+        mock_api.async_set_extra_tap_water.assert_called_once_with(456, 120)
 
         # Verify response
         assert result == {"qvantum": [{"status": "success"}]}
@@ -179,12 +175,11 @@ class TestQvantumServices:
         from custom_components.qvantum.client.exceptions import APIAuthError
 
         entry = MagicMock()
-        entry.runtime_data.client = mock_api
-        entry.runtime_data.extra_dhw = None
+        entry.runtime_data.coordinator = mock_api
         mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Make the API call raise an authentication error
-        mock_api.set_extra_tap_water.side_effect = APIAuthError(
+        mock_api.async_set_extra_tap_water.side_effect = APIAuthError(
             None, "Invalid credentials"
         )
 
@@ -204,7 +199,7 @@ class TestQvantumServices:
         result = await service_func(service_call)
 
         # Verify API was called
-        mock_api.set_extra_tap_water.assert_called_once_with(123, 60)
+        mock_api.async_set_extra_tap_water.assert_called_once_with(123, 60)
 
         # Verify authentication error response
         assert result == {
@@ -220,12 +215,11 @@ class TestQvantumServices:
         from custom_components.qvantum.client.exceptions import APIConnectionError
 
         entry = MagicMock()
-        entry.runtime_data.client = mock_api
-        entry.runtime_data.extra_dhw = None
+        entry.runtime_data.coordinator = mock_api
         mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Make the API call raise a connection error
-        mock_api.set_extra_tap_water.side_effect = APIConnectionError(
+        mock_api.async_set_extra_tap_water.side_effect = APIConnectionError(
             None, "Connection timeout"
         )
 
@@ -245,7 +239,7 @@ class TestQvantumServices:
         result = await service_func(service_call)
 
         # Verify API was called
-        mock_api.set_extra_tap_water.assert_called_once_with(123, 60)
+        mock_api.async_set_extra_tap_water.assert_called_once_with(123, 60)
 
         # Verify connection error response
         assert result == {
@@ -261,12 +255,11 @@ class TestQvantumServices:
         from custom_components.qvantum.client.exceptions import APIRateLimitError
 
         entry = MagicMock()
-        entry.runtime_data.client = mock_api
-        entry.runtime_data.extra_dhw = None
+        entry.runtime_data.coordinator = mock_api
         mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Make the API call raise a rate limit error
-        mock_api.set_extra_tap_water.side_effect = APIRateLimitError(
+        mock_api.async_set_extra_tap_water.side_effect = APIRateLimitError(
             None, "Too many requests"
         )
 
@@ -286,7 +279,7 @@ class TestQvantumServices:
         result = await service_func(service_call)
 
         # Verify API was called
-        mock_api.set_extra_tap_water.assert_called_once_with(123, 60)
+        mock_api.async_set_extra_tap_water.assert_called_once_with(123, 60)
 
         # Verify rate limit error response
         assert result == {

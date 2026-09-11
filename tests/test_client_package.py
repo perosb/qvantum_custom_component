@@ -21,12 +21,6 @@ from custom_components.qvantum.const import (
 )
 from custom_components.qvantum import client as qvantum_client
 from custom_components.qvantum.client import constants as client_constants
-from custom_components.qvantum import modbus as modbus_shim
-from custom_components.qvantum import modbus_device as modbus_device_shim
-from custom_components.qvantum import modbus_model as modbus_model_shim
-from custom_components.qvantum.client.modbus import device as modbus_device
-from custom_components.qvantum.client.modbus import maps as modbus_maps
-from custom_components.qvantum.client.modbus import model as modbus_model
 
 
 CLIENT_ROOT = (
@@ -110,7 +104,7 @@ def test_client_package_exports_protocol():
     assert not hasattr(qvantum_client, "QvantumCloudClient")
 
 
-def test_modbus_shims_are_identity_reexports():
-    assert modbus_shim.MODBUS_INPUT_REGISTER_MAP is modbus_maps.MODBUS_INPUT_REGISTER_MAP
-    assert modbus_device_shim.QvantumModbusDevice is modbus_device.QvantumModbusDevice
-    assert modbus_model_shim.QvantumInputs is modbus_model.QvantumInputs
+def test_modbus_shims_removed():
+    root = CLIENT_ROOT.parent
+    for name in ("modbus.py", "modbus_device.py", "modbus_model.py"):
+        assert not (root / name).exists(), f"{name} compatibility shim should be gone"

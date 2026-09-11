@@ -211,7 +211,7 @@ class TestQvantumButtonEntity:
             coordinator=mock_coordinator,
             device=mock_device,
             maintenance_coordinator=mock_maintenance_coordinator,
-        )
+            client=MagicMock(),)
 
         async_add_entities = MagicMock()
 
@@ -248,7 +248,7 @@ class TestQvantumButtonEntity:
             coordinator=mock_coordinator,
             device=mock_device,
             maintenance_coordinator=mock_maintenance_coordinator,
-        )
+            client=MagicMock(),)
         async_add_entities = MagicMock()
 
         with patch(

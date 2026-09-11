@@ -12,13 +12,15 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from typing import Any
 
+from .client.protocol import QvantumClient
+
 _LOGGER = logging.getLogger(__name__)
 
 WriteNormal = Callable[[str], Awaitable[Any]]
 
 
 async def async_apply_extra_tap_water(
-    client: Any,
+    client: QvantumClient,
     timer: ExtraDhwTimer | None,
     device_id: str | int,
     minutes: int,

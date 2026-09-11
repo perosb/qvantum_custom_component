@@ -583,8 +583,7 @@ class TestNumberSetup:
         mock_coordinator.modbus_enabled = False
 
         mock_config_entry.runtime_data = RuntimeData(
-            coordinator=mock_coordinator, device=mock_device
-        )
+            coordinator=mock_coordinator, device=mock_device, client=MagicMock())
 
         async_add_entities = MagicMock()
 
@@ -875,8 +874,7 @@ class TestStopHeating:
         mock_coordinator.modbus_enabled = False
         mock_coordinator.data["values"]["stop_heating"] = 18
         mock_config_entry.runtime_data = RuntimeData(
-            coordinator=mock_coordinator, device=mock_device
-        )
+            coordinator=mock_coordinator, device=mock_device, client=MagicMock())
 
         async_add_entities = MagicMock()
         await async_setup_entry(hass, mock_config_entry, async_add_entities)

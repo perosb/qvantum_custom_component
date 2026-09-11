@@ -11,7 +11,6 @@ from .client.exceptions import (
     APIRateLimitError,
 )
 from .const import DOMAIN
-from .extra_dhw import async_apply_extra_tap_water
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,13 +29,13 @@ async def async_setup_services(hass: HomeAssistant):
 
     async def extra_hot_water(service_call: ServiceCall) -> Any:
         data = service_call.data
-        entries = service_call.hass.config_entries.async_entries(DOMAIN)
-        runtime = None
-        for entry in entries:
+        coordinator = None
+        for entry in service_call.hass.config_entries.async_entries(DOMAIN):
             runtime = getattr(entry, "runtime_data", None)
-            if runtime is not None and getattr(runtime, "client", None) is not None:
+            if runtime is not None:
+                coordinator = runtime.coordinator
                 break
-        if runtime is None or getattr(runtime, "client", None) is None:
+        if coordinator is None:
             return {
                 "qvantum": {
                     "exception": "unknown_error",
@@ -47,9 +46,7 @@ async def async_setup_services(hass: HomeAssistant):
         device_id = data["device_id"]
         minutes = data["minutes"]
         try:
-            response = await async_apply_extra_tap_water(
-                runtime.client, runtime.extra_dhw, device_id, minutes
-            )
+            response = await coordinator.async_set_extra_tap_water(device_id, minutes)
             return {"qvantum": [response]}
         except APIAuthError as err:
             _LOGGER.error(

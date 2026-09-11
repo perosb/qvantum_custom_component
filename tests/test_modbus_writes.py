@@ -3,219 +3,81 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from modbus_connection.mock import MockModbusConnection
 
-from custom_components.qvantum.client.constants import (
-    FAN_SPEED_STATE_EXTRA,
-    FAN_SPEED_STATE_NORMAL,
-    FAN_SPEED_STATE_OFF,
-    FAN_SPEED_VALUE_EXTRA,
-    FAN_SPEED_VALUE_NORMAL,
-    FAN_SPEED_VALUE_OFF,
-    TAP_WATER_CAPACITY_MAPPINGS,
-)
+from custom_components.qvantum.client.exceptions import APIConnectionError
+from custom_components.qvantum.client.modbus import QvantumModbusClient
 from custom_components.qvantum.const import DHW_MODE_EXTRA, DHW_MODE_NORMAL
-from custom_components.qvantum.extra_dhw import ExtraDhwTimer
-from tests.test_api import QvantumAPI, attach_mock_modbus
-
-_FAN_PRESETS = {
-    FAN_SPEED_STATE_OFF: FAN_SPEED_VALUE_OFF,
-    FAN_SPEED_STATE_NORMAL: FAN_SPEED_VALUE_NORMAL,
-    FAN_SPEED_STATE_EXTRA: FAN_SPEED_VALUE_EXTRA,
-}
-
-_TIMER_ATTRS = {
-    "_extra_dhw_restore_at": "restore_at",
-    "_extra_dhw_armed_at": "armed_at",
-    "_extra_dhw_unsub": "unsub",
-    "_extra_dhw_store": "store",
-}
+from custom_components.qvantum.extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
 
 
-class _ModbusApi:
-    """Client + extra-DHW timer, matching the old QvantumAPI extra-DHW surface."""
-
-    def __init__(self, client, timer):
-        object.__setattr__(self, "_client", client)
-        object.__setattr__(self, "_timer", timer)
-
-    def __getattr__(self, name):
-        if name == "hass":
-            return object.__getattribute__(self, "_timer").hass
-        if name in _TIMER_ATTRS:
-            return getattr(object.__getattribute__(self, "_timer"), _TIMER_ATTRS[name])
-        return getattr(object.__getattribute__(self, "_client"), name)
-
-    def __setattr__(self, name, value):
-        if name in ("_client", "_timer") or name in type(self).__dict__:
-            object.__setattr__(self, name, value)
-            return
-        if name in _TIMER_ATTRS:
-            setattr(object.__getattribute__(self, "_timer"), _TIMER_ATTRS[name], value)
-            return
-        if name == "hass":
-            object.__getattribute__(self, "_timer").hass = value
-            return
-        setattr(object.__getattribute__(self, "_client"), name, value)
-
-    async def set_extra_tap_water(self, device_id, minutes):
-        if minutes == 0:
-            result = await self.write_holding_register_for_metric(
-                device_id, "extra_tap_water", DHW_MODE_NORMAL
-            )
-            await self.async_clear_extra_dhw_timer()
-            return result
-        result = await self.write_holding_register_for_metric(
-            device_id, "extra_tap_water", DHW_MODE_EXTRA
-        )
-        if minutes > 0:
-            await self._schedule_extra_dhw_restore(device_id, minutes)
-        else:
-            await self.async_clear_extra_dhw_timer()
-        return result
-
-    def _cancel_extra_dhw_timer(self, *, clear_store=False):
-        self._timer.cancel(clear_store=clear_store)
-
-    async def async_clear_extra_dhw_timer(self):
-        await self._timer.async_clear()
-
-    async def async_persist_extra_dhw(self, payload):
-        await self._timer.async_persist(payload)
-
-    def _persist_extra_dhw(self, payload):
-        self._timer._persist(payload)
-
-    async def _schedule_extra_dhw_restore(self, device_id, minutes):
-        await self._timer.async_schedule(str(device_id), minutes)
-
-    async def _schedule_extra_dhw_at(self, device_id, restore_at, *, persist):
-        await self._timer.async_schedule_at(str(device_id), restore_at, persist=persist)
-
-    async def async_restore_extra_dhw_timer(self):
-        await self._timer.async_restore(writable=self._client.writable)
-
-    async def write_holding_register_for_metric(self, *args, **kwargs):
-        return await self._client.write_holding_register_for_metric(*args, **kwargs)
-
-    async def update_setting(self, device_id, name, value):
-        if isinstance(value, bool):
-            value = int(value)
-        return await self.write_holding_register_for_metric(device_id, name, value)
-
-    async def set_indoor_temperature_target(self, device_id, temperature):
-        return await self.write_holding_register_for_metric(
-            device_id, "indoor_temperature_target", temperature
-        )
-
-    async def set_indoor_temperature_offset(self, device_id, value):
-        return await self.write_holding_register_for_metric(
-            device_id, "indoor_temperature_offset", value
-        )
-
-    async def set_tap_water(self, device_id, start=0, stop=0):
-        if stop:
-            await self.write_holding_register_for_metric(
-                device_id, "tap_water_stop", stop
-            )
-        if start:
-            await self.write_holding_register_for_metric(
-                device_id, "tap_water_start", start
-            )
-        return {"status": "APPLIED"}
-
-    async def set_tap_water_capacity_target(self, device_id, capacity):
-        capacity_to_stop_start = {v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()}
-        start, stop = capacity_to_stop_start[capacity]
-        return await self.set_tap_water(device_id, start=start, stop=stop)
-
-    async def set_fanspeedselector(self, device_id, preset_mode):
-        if preset_mode not in _FAN_PRESETS:
-            raise ValueError(f"Invalid preset_mode: {preset_mode}")
-        return await self.write_holding_register_for_metric(
-            device_id, "fanspeedselector", _FAN_PRESETS[preset_mode]
-        )
-
-    async def close(self):
-        self._timer.cancel(clear_store=False)
-        close = getattr(self._client, "close", None)
-        if close is not None:
-            result = close()
-            if hasattr(result, "__await__"):
-                await result
-
-
-def _modbus_api(*, modbus_write: bool = True):
-    client = QvantumAPI(
-        modbus_tcp=True, user_agent="test-agent", modbus_write=modbus_write
-    )
-    attach_mock_modbus(client)
-    api_box: list[_ModbusApi] = []
+def _modbus(*, writable: bool = True):
+    connection = MockModbusConnection()
+    client = QvantumModbusClient(connection.for_unit(1), writable=writable)
 
     async def write_normal(device_id: str):
-        return await api_box[0].write_holding_register_for_metric(
+        return await client.write_metric(
             device_id, "extra_tap_water", DHW_MODE_NORMAL
         )
 
-    api = _ModbusApi(client, ExtraDhwTimer(write_normal))
-    api_box.append(api)
-    return api
+    return client, ExtraDhwTimer(write_normal)
 
 
 class TestModbusSettingWrites:
     @pytest.mark.asyncio
     async def test_update_setting_writes_holding_register(self):
-        api = _modbus_api()
+        client, _timer = _modbus()
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(return_value={"status": "APPLIED"}),
         ) as write:
-            result = await api.update_setting("dev1", "op_mode", 1)
+            result = await client.update_setting("dev1", "op_mode", 1)
         write.assert_awaited_once_with("dev1", "op_mode", 1)
         assert result == {"status": "APPLIED"}
 
     @pytest.mark.asyncio
     async def test_update_setting_coerces_bool(self):
-        api = _modbus_api()
+        client, _timer = _modbus()
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(return_value={"status": "APPLIED"}),
         ) as write:
-            await api.update_setting("dev1", "man_mode", True)
+            await client.update_setting("dev1", "man_mode", True)
         write.assert_awaited_once_with("dev1", "man_mode", 1)
 
     @pytest.mark.asyncio
     async def test_indoor_temperature_target_writes_metric(self):
-        api = _modbus_api()
+        client, _timer = _modbus()
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(return_value={"status": "APPLIED"}),
         ) as write:
-            await api.set_indoor_temperature_target("dev1", 21.5)
+            await client.set_indoor_temperature_target("dev1", 21.5)
         write.assert_awaited_once_with("dev1", "indoor_temperature_target", 21.5)
 
     @pytest.mark.asyncio
     async def test_indoor_offset_writes_metric(self):
-        api = _modbus_api()
+        client, _timer = _modbus()
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(return_value={"status": "APPLIED"}),
         ) as write:
-            await api.set_indoor_temperature_offset("dev1", -2)
+            await client.set_indoor_temperature_offset("dev1", -2)
         write.assert_awaited_once_with("dev1", "indoor_temperature_offset", -2)
 
     @pytest.mark.asyncio
     async def test_tap_water_writes_start_and_stop(self):
-        api = _modbus_api()
+        client, _timer = _modbus()
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(return_value={"status": "APPLIED"}),
         ) as write:
-            result = await api.set_tap_water("dev1", start=52, stop=62)
+            result = await client.set_tap_water("dev1", start=52, stop=62)
         assert write.await_count == 2
         write.assert_any_await("dev1", "tap_water_stop", 62)
         write.assert_any_await("dev1", "tap_water_start", 52)
@@ -223,124 +85,125 @@ class TestModbusSettingWrites:
 
     @pytest.mark.asyncio
     async def test_capacity_writes_mapped_start_stop(self):
-        api = _modbus_api()
+        client, _timer = _modbus()
         with patch.object(
-            api, "set_tap_water", AsyncMock(return_value={"status": "APPLIED"})
+            client, "set_tap_water", AsyncMock(return_value={"status": "APPLIED"})
         ) as set_tap:
-            await api.set_tap_water_capacity_target("dev1", 2)
+            await client.set_tap_water_capacity_target("dev1", 2)
         set_tap.assert_awaited_once_with("dev1", start=52, stop=62)
 
     @pytest.mark.asyncio
     async def test_fan_preset_writes_ventilation_state(self):
-        api = _modbus_api()
+        client, _timer = _modbus()
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(return_value={"status": "APPLIED"}),
         ) as write:
-            await api.set_fanspeedselector("dev1", "extra")
+            await client.set_fanspeedselector("dev1", "extra")
         write.assert_awaited_once_with("dev1", "fanspeedselector", 2)
 
     @pytest.mark.asyncio
     async def test_fan_invalid_preset_raises(self):
-        api = _modbus_api()
+        client, _timer = _modbus()
         with pytest.raises(ValueError, match="Invalid preset_mode"):
-            await api.set_fanspeedselector("dev1", "turbo")
+            await client.set_fanspeedselector("dev1", "turbo")
 
 
 class TestExtraTapWaterModbus:
     @pytest.mark.asyncio
     async def test_indefinite_writes_extra_mode(self):
-        api = _modbus_api()
+        client, timer = _modbus()
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(return_value={"status": "APPLIED"}),
         ) as write:
-            await api.set_extra_tap_water("dev1", -1)
+            await async_apply_extra_tap_water(client, timer, "dev1", -1)
         write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_EXTRA)
-        assert api._extra_dhw_unsub is None
+        assert timer.unsub is None
 
     @pytest.mark.asyncio
     async def test_off_writes_normal_mode(self):
-        api = _modbus_api()
+        client, timer = _modbus()
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(return_value={"status": "APPLIED"}),
         ) as write:
-            await api.set_extra_tap_water("dev1", 0)
+            await async_apply_extra_tap_water(client, timer, "dev1", 0)
         write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_NORMAL)
 
     @pytest.mark.asyncio
     async def test_timed_extra_schedules_restore(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
         unsub = MagicMock()
         with (
             patch.object(
-                api,
-                "write_holding_register_for_metric",
+                client,
+                "write_metric",
                 AsyncMock(return_value={"status": "APPLIED"}),
             ) as write,
             patch(
                 "homeassistant.helpers.event.async_call_later", return_value=unsub
             ) as later,
         ):
-            await api.set_extra_tap_water("dev1", 60)
+            await async_apply_extra_tap_water(client, timer, "dev1", 60)
         write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_EXTRA)
         later.assert_called_once()
         assert later.call_args.args[1] == pytest.approx(3600, abs=1)
-        assert api._extra_dhw_unsub is unsub
-        assert api._extra_dhw_armed_at is not None
+        assert timer.unsub is unsub
+        assert timer.armed_at is not None
 
     @pytest.mark.asyncio
     async def test_off_cancels_pending_timer(self):
-        api = _modbus_api()
+        client, timer = _modbus()
         unsub = MagicMock()
-        api._extra_dhw_unsub = unsub
+        timer.unsub = unsub
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(return_value={"status": "APPLIED"}),
         ):
-            await api.set_extra_tap_water("dev1", 0)
+            await async_apply_extra_tap_water(client, timer, "dev1", 0)
         unsub.assert_called_once()
-        assert api._extra_dhw_unsub is None
-        assert api._extra_dhw_armed_at is None
+        assert timer.unsub is None
+        assert timer.armed_at is None
 
     @pytest.mark.asyncio
     async def test_clear_extra_dhw_timer_drops_deadline(self):
-        api = _modbus_api()
+        _client, timer = _modbus()
         store = MagicMock()
         store.async_remove = AsyncMock()
-        api._extra_dhw_store = store
+        timer.store = store
         unsub = MagicMock()
-        api._extra_dhw_unsub = unsub
-        api._extra_dhw_restore_at = 123.0
-        api._extra_dhw_armed_at = 1.0
+        timer.unsub = unsub
+        timer.restore_at = 123.0
+        timer.armed_at = 1.0
 
-        await api.async_clear_extra_dhw_timer()
+        await timer.async_clear()
 
         unsub.assert_called_once()
         store.async_remove.assert_awaited_once()
-        assert api._extra_dhw_unsub is None
-        assert api._extra_dhw_restore_at is None
-        assert api._extra_dhw_armed_at is None
+        assert timer.unsub is None
+        assert timer.restore_at is None
+        assert timer.armed_at is None
 
     @pytest.mark.asyncio
     async def test_close_cancels_timer(self):
-        api = _modbus_api()
+        client, timer = _modbus()
         unsub = MagicMock()
-        api._extra_dhw_unsub = unsub
-        await api.close()
+        timer.unsub = unsub
+        timer.cancel(clear_store=False)
+        await client.close()
         unsub.assert_called_once()
-        assert api._extra_dhw_unsub is None
+        assert timer.unsub is None
 
     @pytest.mark.asyncio
     async def test_restore_callback_writes_normal(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
         captured = {}
 
         def fake_later(_hass, _seconds, callback):
@@ -349,141 +212,142 @@ class TestExtraTapWaterModbus:
 
         with (
             patch.object(
-                api,
-                "write_holding_register_for_metric",
+                client,
+                "write_metric",
                 AsyncMock(return_value={"status": "APPLIED"}),
             ) as write,
             patch("homeassistant.helpers.event.async_call_later", side_effect=fake_later),
         ):
-            await api.set_extra_tap_water("dev1", 60)
+            await async_apply_extra_tap_water(client, timer, "dev1", 60)
             write.reset_mock()
             await captured["cb"](None)
         write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_NORMAL)
 
     @pytest.mark.asyncio
     async def test_timed_extra_persists_restore_deadline(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
-        api.hass.async_create_task = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
+        timer.hass.async_create_task = MagicMock()
         store = MagicMock()
         store.async_save = AsyncMock()
         store.async_remove = AsyncMock()
-        api._extra_dhw_store = store
+        timer.store = store
         with (
             patch.object(
-                api,
-                "write_holding_register_for_metric",
+                client,
+                "write_metric",
                 AsyncMock(return_value={"status": "APPLIED"}),
             ),
             patch("homeassistant.helpers.event.async_call_later", return_value=MagicMock()),
         ):
-            await api.set_extra_tap_water("dev1", 60)
+            await async_apply_extra_tap_water(client, timer, "dev1", 60)
         store.async_save.assert_awaited_once()
         store.async_remove.assert_not_called()
-        api.hass.async_create_task.assert_not_called()
+        timer.hass.async_create_task.assert_not_called()
         payload = store.async_save.call_args.args[0]
         assert payload["device_id"] == "dev1"
         assert payload["restore_at"] > 0
-        assert api._extra_dhw_restore_at == payload["restore_at"]
+        assert timer.restore_at == payload["restore_at"]
 
     @pytest.mark.asyncio
     async def test_off_clears_persisted_timer(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
-        api.hass.async_create_task = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
+        timer.hass.async_create_task = MagicMock()
         store = MagicMock()
         store.async_remove = AsyncMock()
-        api._extra_dhw_store = store
-        api._extra_dhw_restore_at = 123.0
+        timer.store = store
+        timer.restore_at = 123.0
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(return_value={"status": "APPLIED"}),
         ):
-            await api.set_extra_tap_water("dev1", 0)
+            await async_apply_extra_tap_water(client, timer, "dev1", 0)
         store.async_remove.assert_awaited()
-        api.hass.async_create_task.assert_not_called()
-        assert api._extra_dhw_restore_at is None
+        timer.hass.async_create_task.assert_not_called()
+        assert timer.restore_at is None
 
     @pytest.mark.asyncio
     async def test_off_keeps_persisted_timer_when_write_fails(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
         store = MagicMock()
         store.async_remove = AsyncMock()
-        api._extra_dhw_store = store
-        api._extra_dhw_restore_at = 123.0
+        timer.store = store
+        timer.restore_at = 123.0
         unsub = MagicMock()
-        api._extra_dhw_unsub = unsub
+        timer.unsub = unsub
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(side_effect=RuntimeError("modbus down")),
         ):
             with pytest.raises(RuntimeError, match="modbus down"):
-                await api.set_extra_tap_water("dev1", 0)
+                await async_apply_extra_tap_water(client, timer, "dev1", 0)
         store.async_remove.assert_not_called()
         unsub.assert_not_called()
-        assert api._extra_dhw_unsub is unsub
-        assert api._extra_dhw_restore_at == 123.0
+        assert timer.unsub is unsub
+        assert timer.restore_at == 123.0
 
     @pytest.mark.asyncio
     async def test_close_keeps_persisted_timer(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
-        api.hass.async_create_task = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
+        timer.hass.async_create_task = MagicMock()
         store = MagicMock()
         store.async_remove = AsyncMock()
-        api._extra_dhw_store = store
-        api._extra_dhw_restore_at = 123.0
+        timer.store = store
+        timer.restore_at = 123.0
         unsub = MagicMock()
-        api._extra_dhw_unsub = unsub
-        await api.close()
+        timer.unsub = unsub
+        timer.cancel(clear_store=False)
+        await client.close()
         unsub.assert_called_once()
         store.async_remove.assert_not_called()
-        assert api._extra_dhw_restore_at == 123.0
+        assert timer.restore_at == 123.0
 
     @pytest.mark.asyncio
     async def test_restore_timer_clears_store_when_writes_disabled(self):
-        api = _modbus_api(modbus_write=False)
-        api.hass = MagicMock()
+        _client, timer = _modbus(writable=False)
+        timer.hass = MagicMock()
         store = MagicMock()
         store.async_load = AsyncMock(
             return_value={"device_id": "dev1", "restore_at": 9999999999.0}
         )
         store.async_remove = AsyncMock()
-        api._extra_dhw_store = store
+        timer.store = store
         with patch(
             "homeassistant.helpers.event.async_call_later", return_value=MagicMock()
         ) as later:
-            await api.async_restore_extra_dhw_timer()
+            await timer.async_restore(writable=False)
         later.assert_not_called()
         store.async_load.assert_not_called()
         store.async_remove.assert_awaited_once()
-        assert api._extra_dhw_restore_at is None
+        assert timer.restore_at is None
 
     @pytest.mark.asyncio
     async def test_restore_timer_reschedules_remaining(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
+        _client, timer = _modbus()
+        timer.hass = MagicMock()
         restore_at = __import__("time").time() + 120
         store = MagicMock()
         store.async_load = AsyncMock(
             return_value={"device_id": "dev1", "restore_at": restore_at}
         )
-        api._extra_dhw_store = store
+        timer.store = store
         with patch(
             "homeassistant.helpers.event.async_call_later", return_value=MagicMock()
         ) as later:
-            await api.async_restore_extra_dhw_timer()
+            await timer.async_restore(writable=True)
         later.assert_called_once()
         assert later.call_args.args[1] == pytest.approx(120, abs=2)
-        assert api._extra_dhw_restore_at == restore_at
+        assert timer.restore_at == restore_at
 
     @pytest.mark.asyncio
     async def test_restore_timer_writes_normal_when_expired(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
         store = MagicMock()
         store.async_load = AsyncMock(
             return_value={"device_id": "dev1", "restore_at": 1.0}
@@ -498,42 +362,42 @@ class TestExtraTapWaterModbus:
             order.append("remove")
 
         store.async_remove = AsyncMock(side_effect=remove_store)
-        api._extra_dhw_store = store
+        timer.store = store
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(side_effect=write_normal),
         ) as write:
-            await api.async_restore_extra_dhw_timer()
+            await timer.async_restore(writable=True)
         write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_NORMAL)
         store.async_remove.assert_awaited()
         assert order == ["write", "remove"]
-        assert api._extra_dhw_restore_at is None
-        assert api._extra_dhw_armed_at is None
+        assert timer.restore_at is None
+        assert timer.armed_at is None
 
     @pytest.mark.asyncio
     async def test_restore_timer_keeps_deadline_when_expired_write_fails(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
         store = MagicMock()
         store.async_load = AsyncMock(
             return_value={"device_id": "dev1", "restore_at": 1.0}
         )
         store.async_remove = AsyncMock()
-        api._extra_dhw_store = store
+        timer.store = store
         with patch.object(
-            api,
-            "write_holding_register_for_metric",
+            client,
+            "write_metric",
             AsyncMock(side_effect=RuntimeError("modbus down")),
         ):
-            await api.async_restore_extra_dhw_timer()
+            await timer.async_restore(writable=True)
         store.async_remove.assert_not_called()
-        assert api._extra_dhw_restore_at == 1.0
+        assert timer.restore_at == 1.0
 
     @pytest.mark.asyncio
     async def test_restore_callback_clears_store_after_write(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
         store = MagicMock()
         order: list[str] = []
 
@@ -546,7 +410,7 @@ class TestExtraTapWaterModbus:
 
         store.async_save = AsyncMock()
         store.async_remove = AsyncMock(side_effect=remove_store)
-        api._extra_dhw_store = store
+        timer.store = store
         captured = {}
 
         def fake_later(_hass, _seconds, callback):
@@ -555,30 +419,30 @@ class TestExtraTapWaterModbus:
 
         with (
             patch.object(
-                api,
-                "write_holding_register_for_metric",
+                client,
+                "write_metric",
                 AsyncMock(side_effect=write_normal),
             ) as write,
             patch("homeassistant.helpers.event.async_call_later", side_effect=fake_later),
         ):
-            await api.set_extra_tap_water("dev1", 60)
+            await async_apply_extra_tap_water(client, timer, "dev1", 60)
             write.reset_mock()
             order.clear()
             await captured["cb"](None)
         write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_NORMAL)
         store.async_remove.assert_awaited()
         assert order == ["write", "remove"]
-        assert api._extra_dhw_restore_at is None
-        assert api._extra_dhw_armed_at is None
+        assert timer.restore_at is None
+        assert timer.armed_at is None
 
     @pytest.mark.asyncio
     async def test_restore_callback_keeps_store_when_write_fails(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
         store = MagicMock()
         store.async_save = AsyncMock()
         store.async_remove = AsyncMock()
-        api._extra_dhw_store = store
+        timer.store = store
         captured = {}
 
         def fake_later(_hass, _seconds, callback):
@@ -587,53 +451,53 @@ class TestExtraTapWaterModbus:
 
         with (
             patch.object(
-                api,
-                "write_holding_register_for_metric",
+                client,
+                "write_metric",
                 AsyncMock(return_value={"status": "APPLIED"}),
             ),
             patch("homeassistant.helpers.event.async_call_later", side_effect=fake_later),
         ):
-            await api.set_extra_tap_water("dev1", 60)
-            deadline = api._extra_dhw_restore_at
+            await async_apply_extra_tap_water(client, timer, "dev1", 60)
+            deadline = timer.restore_at
             with patch.object(
-                api,
-                "write_holding_register_for_metric",
+                client,
+                "write_metric",
                 AsyncMock(side_effect=RuntimeError("modbus down")),
             ):
                 await captured["cb"](None)
         store.async_remove.assert_not_called()
-        assert api._extra_dhw_restore_at == deadline
+        assert timer.restore_at == deadline
 
     @pytest.mark.asyncio
     async def test_persist_extra_dhw_swallows_store_errors(self):
-        api = _modbus_api()
+        _client, timer = _modbus()
         store = MagicMock()
         store.async_save = AsyncMock(side_effect=OSError("disk full"))
         store.async_remove = AsyncMock(side_effect=OSError("disk full"))
-        api._extra_dhw_store = store
-        await api.async_persist_extra_dhw({"device_id": "dev1", "restore_at": 1.0})
-        await api.async_persist_extra_dhw(None)
+        timer.store = store
+        await timer.async_persist({"device_id": "dev1", "restore_at": 1.0})
+        await timer.async_persist(None)
         store.async_save.assert_awaited_once()
         store.async_remove.assert_awaited_once()
 
     def test_persist_extra_dhw_schedules_named_task(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
-        api._extra_dhw_store = MagicMock()
+        _client, timer = _modbus()
+        timer.hass = MagicMock()
+        timer.store = MagicMock()
         calls = []
 
         def create_task(coro, name=None):
             calls.append({"name": name})
             coro.close()
 
-        api.hass.async_create_task = create_task
-        api._persist_extra_dhw(None)
+        timer.hass.async_create_task = create_task
+        timer._persist(None)
         assert calls == [{"name": "qvantum_persist_extra_dhw"}]
 
     def test_persist_extra_dhw_retries_without_name(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
-        api._extra_dhw_store = MagicMock()
+        _client, timer = _modbus()
+        timer.hass = MagicMock()
+        timer.store = MagicMock()
         seen = []
 
         def create_task(coro, name=None):
@@ -642,8 +506,8 @@ class TestExtraTapWaterModbus:
                 raise TypeError("unexpected keyword argument 'name'")
             coro.close()
 
-        api.hass.async_create_task = create_task
-        api._persist_extra_dhw(None)
+        timer.hass.async_create_task = create_task
+        timer._persist(None)
         assert len(seen) == 2
         assert seen[0][0] is seen[1][0]
         assert seen[0][1] == "qvantum_persist_extra_dhw"
@@ -651,8 +515,8 @@ class TestExtraTapWaterModbus:
 
     @pytest.mark.asyncio
     async def test_schedule_expired_deadline_still_restores(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
+        client, timer = _modbus()
+        timer.hass = MagicMock()
         captured = {}
 
         def fake_later(_hass, seconds, callback):
@@ -662,25 +526,25 @@ class TestExtraTapWaterModbus:
 
         with (
             patch.object(
-                api,
-                "write_holding_register_for_metric",
+                client,
+                "write_metric",
                 AsyncMock(return_value={"status": "APPLIED"}),
             ) as write,
             patch("homeassistant.helpers.event.async_call_later", side_effect=fake_later),
         ):
-            await api._schedule_extra_dhw_at("dev1", 1.0, persist=False)
+            await timer.async_schedule_at("dev1", 1.0, persist=False)
             assert captured["delay"] == 0
             await captured["cb"](None)
         write.assert_awaited_once_with("dev1", "extra_tap_water", DHW_MODE_NORMAL)
 
     @pytest.mark.asyncio
     async def test_schedule_clamps_negative_delay(self):
-        api = _modbus_api()
-        api.hass = MagicMock()
+        _client, timer = _modbus()
+        timer.hass = MagicMock()
         with patch(
             "homeassistant.helpers.event.async_call_later", return_value=MagicMock()
         ) as later:
-            await api._schedule_extra_dhw_at("dev1", 1.0, persist=False)
+            await timer.async_schedule_at("dev1", 1.0, persist=False)
         later.assert_called_once()
         assert later.call_args.args[1] >= 0
 
@@ -688,16 +552,12 @@ class TestExtraTapWaterModbus:
 class TestModbusWriteOptionGate:
     @pytest.mark.asyncio
     async def test_extra_tap_water_rejected_when_writes_disabled(self):
-        from custom_components.qvantum.client.exceptions import APIConnectionError
-
-        api = _modbus_api(modbus_write=False)
+        client, timer = _modbus(writable=False)
         with pytest.raises(APIConnectionError, match="Modbus writing is disabled"):
-            await api.set_extra_tap_water("dev1", 60)
+            await async_apply_extra_tap_water(client, timer, "dev1", 60)
 
     @pytest.mark.asyncio
     async def test_update_setting_rejected_when_writes_disabled(self):
-        from custom_components.qvantum.client.exceptions import APIConnectionError
-
-        api = _modbus_api(modbus_write=False)
+        client, _timer = _modbus(writable=False)
         with pytest.raises(APIConnectionError, match="Modbus writing is disabled"):
-            await api.update_setting("dev1", "op_mode", 1)
+            await client.update_setting("dev1", "op_mode", 1)
