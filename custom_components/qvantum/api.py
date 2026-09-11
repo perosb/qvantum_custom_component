@@ -98,7 +98,9 @@ class QvantumAPI:
         )
         self._fallback_lock = asyncio.Lock()
         self._closed = False
-        self._extra_dhw = ExtraDhwTimer(self._write_dhw_normal)
+        self._extra_dhw = (
+            ExtraDhwTimer(self._write_dhw_normal) if modbus_tcp else None
+        )
         if modbus_tcp:
             self._session = None
             self._session_owner = False
@@ -336,39 +338,50 @@ class QvantumAPI:
 
     @property
     def _extra_dhw_restore_at(self) -> float | None:
-        return self._extra_dhw.restore_at
+        timer = self._extra_dhw
+        return None if timer is None else timer.restore_at
 
     @_extra_dhw_restore_at.setter
     def _extra_dhw_restore_at(self, value: float | None) -> None:
-        self._extra_dhw.restore_at = value
+        if self._extra_dhw is not None:
+            self._extra_dhw.restore_at = value
 
     @property
     def _extra_dhw_armed_at(self) -> float | None:
-        return self._extra_dhw.armed_at
+        timer = self._extra_dhw
+        return None if timer is None else timer.armed_at
 
     @_extra_dhw_armed_at.setter
     def _extra_dhw_armed_at(self, value: float | None) -> None:
-        self._extra_dhw.armed_at = value
+        if self._extra_dhw is not None:
+            self._extra_dhw.armed_at = value
 
     @property
     def _extra_dhw_unsub(self):
-        return self._extra_dhw.unsub
+        timer = self._extra_dhw
+        return None if timer is None else timer.unsub
 
     @_extra_dhw_unsub.setter
     def _extra_dhw_unsub(self, value) -> None:
-        self._extra_dhw.unsub = value
+        if self._extra_dhw is not None:
+            self._extra_dhw.unsub = value
 
     @property
     def _extra_dhw_store(self):
-        return self._extra_dhw.store
+        timer = self._extra_dhw
+        return None if timer is None else timer.store
 
     @_extra_dhw_store.setter
     def _extra_dhw_store(self, value) -> None:
-        self._extra_dhw.store = value
+        if self._extra_dhw is not None:
+            self._extra_dhw.store = value
 
-    def _sync_extra_dhw_hass(self) -> ExtraDhwTimer:
-        self._extra_dhw.hass = self.hass
-        return self._extra_dhw
+    def _sync_extra_dhw_hass(self) -> ExtraDhwTimer | None:
+        timer = self._extra_dhw
+        if timer is None:
+            return None
+        timer.hass = self.hass
+        return timer
 
     async def _write_dhw_normal(self, device_id: str) -> dict:
         return await self.write_holding_register_for_metric(
@@ -377,37 +390,54 @@ class QvantumAPI:
 
     def _cancel_extra_dhw_timer(self, *, clear_store: bool = False) -> None:
         """Cancel a pending extra-DHW restore callback."""
-        self._sync_extra_dhw_hass().cancel(clear_store=clear_store)
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
+            return
+        timer.cancel(clear_store=clear_store)
 
     async def async_clear_extra_dhw_timer(self) -> None:
         """Stop a pending extra-DHW restore because extra DHW is no longer active."""
-        await self._sync_extra_dhw_hass().async_clear()
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
+            return
+        await timer.async_clear()
 
     async def async_persist_extra_dhw(self, payload: dict | None) -> None:
         """Save or clear the extra-DHW restore deadline."""
-        await self._sync_extra_dhw_hass().async_persist(payload)
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
+            return
+        await timer.async_persist(payload)
 
     def _persist_extra_dhw(self, payload: dict | None) -> None:
         """Fire-and-forget persist for sync callers (options listener)."""
-        self._sync_extra_dhw_hass()._persist(payload)
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
+            return
+        timer._persist(payload)
 
     async def _schedule_extra_dhw_restore(self, device_id: str, minutes: int) -> None:
         """After *minutes*, write DHW mode back to Normal."""
-        await self._sync_extra_dhw_hass().async_schedule(device_id, minutes)
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
+            return
+        await timer.async_schedule(device_id, minutes)
 
     async def _schedule_extra_dhw_at(
         self, device_id: str, restore_at: float, *, persist: bool
     ) -> None:
         """Schedule restore at an absolute UTC epoch; persist when requested."""
-        await self._sync_extra_dhw_hass().async_schedule_at(
-            device_id, restore_at, persist=persist
-        )
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
+            return
+        await timer.async_schedule_at(device_id, restore_at, persist=persist)
 
     async def async_restore_extra_dhw_timer(self) -> None:
         """Resume a persisted extra-DHW restore after Home Assistant restart."""
-        if not self._modbus_tcp:
+        timer = self._sync_extra_dhw_hass()
+        if timer is None:
             return
-        await self._sync_extra_dhw_hass().async_restore(writable=self._modbus_write)
+        await timer.async_restore(writable=self._modbus_write)
 
     async def update_setting(self, device_id: str, name: str, value: Any):
         """Update one setting."""
@@ -422,10 +452,7 @@ class QvantumAPI:
 
     async def update_settings(self, device_id: str, settings: dict):
         """Update multiple settings from a dictionary."""
-
-        payload = {"update_settings": settings}
-
-        return await self._send_command(device_id, payload)
+        return await self._require_cloud().update_settings(device_id, settings)
 
     async def write_holding_register(
         self, device_id: str, register_address: int, value: int
