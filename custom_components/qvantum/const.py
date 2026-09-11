@@ -2,13 +2,32 @@
 
 from enum import IntEnum
 
+from .client.constants import (
+    BASE_SYSTEM_POWER_W,
+    DHW_MODE_ECO,
+    DHW_MODE_EXTRA,
+    DHW_MODE_NORMAL,
+    DHW_MODE_SMART,
+    FAN_SPEED_STATE_EXTRA,
+    FAN_SPEED_STATE_NORMAL,
+    FAN_SPEED_STATE_OFF,
+    FAN_SPEED_VALUE_EXTRA,
+    FAN_SPEED_VALUE_NORMAL,
+    FAN_SPEED_VALUE_OFF,
+    RELAY_HEAT_L1_POWER_W,
+    RELAY_HEAT_L2_POWER_W,
+    RELAY_HEAT_L3_POWER_W,
+    RELAY_STAGE_POWER_MAP,
+    SETTING_UPDATE_APPLIED,
+    TAP_WATER_CAPACITY_MAPPINGS,
+)
+
 DOMAIN = "qvantum"
 DEFAULT_SCAN_INTERVAL = 120
 MIN_SCAN_INTERVAL = 60
 # Modbus poll interval. Default matches the previous hard cap.
 DEFAULT_MODBUS_SCAN_INTERVAL = 15
 MIN_MODBUS_SCAN_INTERVAL = 5
-SETTING_UPDATE_APPLIED = "APPLIED"
 
 # Heat pump status values (hp_status metric)
 HP_STATUS_IDLE = 0
@@ -16,17 +35,6 @@ HP_STATUS_DEFROSTING = 1
 HP_STATUS_HOT_WATER = 2
 HP_STATUS_HEATING = 3
 HP_STATUS_COOLING = 4
-FAN_SPEED_STATE_OFF = "off"
-FAN_SPEED_STATE_NORMAL = "normal"
-FAN_SPEED_STATE_EXTRA = "extra"
-FAN_SPEED_VALUE_OFF = 0
-FAN_SPEED_VALUE_NORMAL = 1
-FAN_SPEED_VALUE_EXTRA = 2
-# QAD EN 2609-AXC holding 53 (DHW Mode).
-DHW_MODE_ECO = 0
-DHW_MODE_NORMAL = 1
-DHW_MODE_EXTRA = 2
-DHW_MODE_SMART = 3
 
 # Cloud/HTTP `sensor_mode` setting names (same meanings as SensorMode).
 SENSOR_MODE_HTTP_BT2 = "bt2"
@@ -348,34 +356,6 @@ DHW_MAX_SHOWER_HISTORY_SIZE = (
 DHW_EMA_ALPHA = (
     0.3  # EMA smoothing factor for tap_water_cap (0=no change, 1=no smoothing)
 )
-
-# Tap water capacity mappings (start, stop) -> capacity
-TAP_WATER_CAPACITY_MAPPINGS = {
-    (52, 58): 1,  # Capacity 1
-    (52, 62): 2,  # Capacity 2
-    (55, 69): 3,  # Capacity 3
-    (55, 70): 4,  # Capacity 4
-    (55, 71): 5,  # Capacity 5
-    (55, 74): 6,  # Capacity 6
-    (55, 76): 7,  # Capacity 7
-}
-
-# Relay power constants (watts) used to compute total power from relay stages.
-# NOTE:
-# The base system power is an estimate of the constant power draw of the heat pump system when no relays are active.
-# This includes circulation pumps, controls and other auxiliary loads that are always on when the system is running.
-# The relay heat stage power values are actual ratings for the heater stages.
-BASE_SYSTEM_POWER_W = 160.0  # Base system consumption when relays are off (W)
-RELAY_HEAT_L1_POWER_W = 2000.0  # Heater stage L1 rating (W)
-RELAY_HEAT_L2_POWER_W = 2000.0  # Heater stage L2 rating (W)
-RELAY_HEAT_L3_POWER_W = 1000.0  # Heater stage L3 rating (W)
-
-# Relay stage wattage map used in Modbus metrics translation
-RELAY_STAGE_POWER_MAP = {
-    "picpin_relay_heat_l1": RELAY_HEAT_L1_POWER_W,
-    "picpin_relay_heat_l2": RELAY_HEAT_L2_POWER_W,
-    "picpin_relay_heat_l3": RELAY_HEAT_L3_POWER_W,
-}
 
 # Binary sensor names
 BINARY_SENSOR_NAMES = [
