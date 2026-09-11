@@ -12,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .client.cloud import QvantumCloudClient
 from .client.exceptions import AuthError as APIAuthError
 from .const import DOMAIN, FIRMWARE_KEYS
 import traceback
@@ -44,7 +45,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
 
     async def async_check_firmware_updates(self):
         """Check for firmware updates by fetching device metadata and comparing versions."""
-        if getattr(self.main_coordinator, "modbus_enabled", False):
+        if not isinstance(self.client, QvantumCloudClient):
             return {}
         try:
             # Get the device from the main coordinator

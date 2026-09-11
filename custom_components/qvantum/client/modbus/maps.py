@@ -156,7 +156,7 @@ RELAY_BIT_MAP = {
 
 # Map from Modbus holding register keys to the canonical settings names used by
 # the API/settings layer. Also used in reverse (settings name -> holding key) by
-# write_holding_register_for_metric() to resolve a metric key to its register address.
+# write_metric() to resolve a metric key to its register address.
 MODBUS_HOLDING_TO_SETTINGS_MAP = {
     "start_cooling_temp": "start_cooling_temp",
     "dhw_start_normal": "tap_water_start",

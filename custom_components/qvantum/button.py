@@ -88,13 +88,7 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
                     "Extra tap water activated for 60 minutes via button press"
                 )
             case "elevate_access":
-                if getattr(self.coordinator, "modbus_enabled", False):
-                    _LOGGER.debug(
-                        "elevate_access is cloud-only; ignoring press in Modbus mode"
-                    )
-                    return
-                # Elevate access level for the device
-                response = await self.coordinator.client.elevate_access(self._hpid)
+                response = await self.coordinator.async_elevate_access(self._hpid)
 
                 if response is None:
                     _LOGGER.error("Failed to elevate access")

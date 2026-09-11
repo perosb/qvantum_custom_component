@@ -175,7 +175,7 @@ async def test_async_setup_entry(
     mock_config_entry.runtime_data = RuntimeData(
         coordinator=mock_coordinator,
         device=mock_device,
-    )
+            client=MagicMock(),)
     # HTTP path: MagicMock would otherwise make modbus_enabled truthy.
     mock_coordinator.modbus_enabled = False
 
@@ -244,7 +244,7 @@ async def test_async_setup_entry_modbus_includes_pump_relay(
     mock_config_entry.runtime_data = RuntimeData(
         coordinator=mock_coordinator,
         device=mock_device,
-    )
+            client=MagicMock(),)
     mock_coordinator.modbus_enabled = True
     mock_coordinator.data["values"]["picpin_relay_pump"] = 1
     mock_coordinator.data["values"]["vacation_mode"] = 0

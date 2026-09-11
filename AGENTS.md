@@ -25,7 +25,6 @@ custom_components/qvantum/
     models.py
     cloud/                    # QvantumCloudClient (Firebase + REST)
     modbus/                   # QvantumModbusClient, device, maps, model
-  modbus.py, modbus_device.py, modbus_model.py  # thin re-exports of client.modbus
   translations/               # cs, da, de, en, es, fi, fr, hu, nl, pl, sv
   test_data/                  # recorded HTTP fixtures
 tests/                        # unit tests (pytest)
@@ -34,9 +33,10 @@ tests/                        # unit tests (pytest)
 `config_entry.runtime_data` is a `RuntimeData` dataclass: `coordinator`,
 `maintenance_coordinator`, `device`, `client`, `extra_dhw` (Modbus only), and
 Modbus host/port/unit. Platforms read `config_entry.runtime_data.coordinator`
-and `device`; writes go through `coordinator.client`. Extra DHW uses
-`coordinator.async_set_extra_tap_water` / `async_apply_extra_tap_water` so the
-HA timer stays in the loop.
+and `device`. Shared writes go through `QvantumClient` on `coordinator.client`.
+Cloud-only and Modbus-only writes go through coordinator helpers
+(`async_set_extra_tap_water`, `async_write_metric`, `async_set_smartcontrol`,
+`async_elevate_access`) so platforms stay protocol-blind.
 
 ## Client vs Home Assistant
 
@@ -61,14 +61,13 @@ HA timer stays in the loop.
   Modbus borrows HA 2026.9 `async_get_unit`; the client never opens or closes TCP.
 - Prefer named setters (`set_indoor_temperature_target`, `update_setting`, …).
   `write_metric` is Modbus (holding field by canonical name). Cloud has
-  `set_smartcontrol` / `update_settings`; those are cloud-only.
+  `set_smartcontrol` / `update_settings`; those are cloud-only. Entities call
+  coordinator helpers for those, not `isinstance` on the transport.
+- Import maps and device types from `client.modbus`.
 
 Exceptions: `AuthError`, `TransportError`, `RateLimitError`. HA and tests still
 use aliases `APIAuthError`, `APIConnectionError`, `APIRateLimitError`. Do not
 name a class `ConnectionError` (shadows the builtin).
-
-Compatibility shims `modbus.py` / `modbus_device.py` / `modbus_model.py` re-export
-maps and device types. New code should import from `client.modbus`.
 
 ## Git workflow
 
@@ -83,13 +82,23 @@ Do not ask for permission for these steps. Do not merge unless asked.
 
 ## Commits and PRs
 
-**Commits** — conventional prefix when it fits (`feat:`, `fix:`, `refactor:`,
-`test:`, `chore:`, `docs:`), imperative subject, optional body that says *why*.
-Release automation commits `Update for new version <tag>` — leave that to CI.
+**Commits and PR titles** always start with a conventional prefix, then an
+imperative subject. Use a body that says *why* when the subject is not enough.
 
-**PR title** — same as a good commit subject. User-facing bugfixes often use
-`fix: …`. Larger extractions may omit the prefix (`Cut over HA to Cloud XOR
-Modbus clients and drop QvantumAPI`).
+| Prefix | Use for |
+|---|---|
+| `feat:` | New behavior or a user-visible capability |
+| `fix:` | Bug fix |
+| `refactor:` | Structure change with no intended behavior change |
+| `test:` | Tests only |
+| `docs:` | Documentation only |
+| `chore:` | Tooling, CI, dependencies, housekeeping |
+
+Examples: `feat: Cut over HA to Cloud XOR Modbus clients`,
+`refactor: Drop leftover QvantumAPI facades`, `fix: Cancel extra-DHW before close`.
+
+Do not omit the prefix for large work. Release automation commits
+`Update for new version <tag>` — leave that to CI.
 
 **PR body** — keep this shape:
 

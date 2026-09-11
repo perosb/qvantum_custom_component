@@ -253,7 +253,7 @@ class TestQvantumFanEntity:
             coordinator=mock_coordinator,
             device=mock_device,
             maintenance_coordinator=None,
-        )
+            client=MagicMock(),)
 
         async_add_entities = MagicMock()
 
@@ -277,7 +277,7 @@ class TestQvantumFanEntity:
             coordinator=mock_coordinator,
             device=mock_device,
             maintenance_coordinator=None,
-        )
+            client=MagicMock(),)
 
         async_add_entities = MagicMock()
 

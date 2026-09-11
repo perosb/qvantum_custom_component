@@ -52,8 +52,7 @@ async def test_cloud_setup_creates_smartcontrol_entities(
 ):
     coordinator = _coordinator(modbus=False)
     mock_config_entry.runtime_data = RuntimeData(
-        coordinator=coordinator, device=mock_device
-    )
+        coordinator=coordinator, device=mock_device, client=MagicMock())
 
     added = MagicMock()
     with patch("custom_components.qvantum.entity.cleanup_disabled_entities") as cleanup:
@@ -82,8 +81,7 @@ async def test_modbus_setup_omits_smartcontrol_entities(
 ):
     coordinator = _coordinator(modbus=True)
     mock_config_entry.runtime_data = RuntimeData(
-        coordinator=coordinator, device=mock_device
-    )
+        coordinator=coordinator, device=mock_device, client=MagicMock())
 
     added = MagicMock()
     with patch("custom_components.qvantum.entity.cleanup_disabled_entities") as cleanup:

@@ -9,6 +9,7 @@ from custom_components.qvantum.client.exceptions import APIAuthError
 from custom_components.qvantum.maintenance_coordinator import (
     QvantumMaintenanceCoordinator,
 )
+from tests.conftest import make_client_mock
 
 
 class TestQvantumMaintenanceCoordinator:
@@ -41,7 +42,7 @@ class TestQvantumMaintenanceCoordinator:
         }
         coordinator._device = coordinator.data["device"]
         coordinator.modbus_enabled = False
-        coordinator.client = MagicMock()
+        coordinator.client = make_client_mock()
         return coordinator
 
     @pytest_asyncio.fixture
@@ -52,7 +53,7 @@ class TestQvantumMaintenanceCoordinator:
         # Set up hass.data with API instance
         from custom_components.qvantum.const import DOMAIN
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock()
         mock_main_coordinator.client = mock_api
 
         # Patch frame.report_usage to avoid frame helper issues in tests
@@ -70,7 +71,7 @@ class TestQvantumMaintenanceCoordinator:
         """Parent DataUpdateCoordinator must receive config_entry explicitly."""
         from custom_components.qvantum.const import DOMAIN
 
-        mock_main_coordinator.client = MagicMock()
+        mock_main_coordinator.client = make_client_mock()
         coordinator = QvantumMaintenanceCoordinator(
             hass=hass,
             config_entry=mock_config_entry,
@@ -106,6 +107,7 @@ class TestQvantumMaintenanceCoordinator:
     ):
         """Modbus mode must not call the cloud firmware/access APIs."""
         mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.client = make_client_mock(modbus=True)
         maintenance_coordinator.client.get_device_metadata = AsyncMock()
         maintenance_coordinator.client.get_access_level = AsyncMock()
 
@@ -230,6 +232,7 @@ class TestQvantumMaintenanceCoordinator:
     ):
         """Modbus mode must not fail firmware check when the HTTP API is down."""
         mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.client = make_client_mock(modbus=True)
         maintenance_coordinator.client.get_device_metadata = AsyncMock(
             side_effect=Exception("HTTP API down")
         )
@@ -245,6 +248,7 @@ class TestQvantumMaintenanceCoordinator:
     ):
         """Modbus mode does not keep cloud access_level; it never fetches it."""
         mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.client = make_client_mock(modbus=True)
         maintenance_coordinator.data = {
             "firmware_versions": {"display_fw_version": "1.3.6"},
             "access_level": {"writeAccessLevel": 20},
@@ -262,6 +266,7 @@ class TestQvantumMaintenanceCoordinator:
     ):
         """Modbus mode does not call the cloud, so auth errors cannot occur."""
         mock_main_coordinator.modbus_enabled = True
+        maintenance_coordinator.client = make_client_mock(modbus=True)
         maintenance_coordinator.data = {
             "firmware_versions": {"display_fw_version": "1.3.6"},
             "access_level": {"writeAccessLevel": 20},

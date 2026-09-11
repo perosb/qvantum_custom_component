@@ -7,13 +7,13 @@ from custom_components.qvantum.const import (
     BINARY_SENSOR_NAMES,
     MODBUS_ONLY_BINARY_SENSORS,
 )
-from custom_components.qvantum.modbus import (
+from custom_components.qvantum.client.modbus.maps import (
     MODBUS_HOLDING_REGISTER_MAP,
     MODBUS_IDENTITY_REGISTER_MAP,
     MODBUS_INPUT_REGISTER_MAP,
     RELAY_BIT_MAP,
 )
-from custom_components.qvantum.modbus_device import (
+from custom_components.qvantum.client.modbus.device import (
     IdentityProbeError,
     QvantumModbusDevice,
     async_probe_identity,
@@ -22,7 +22,7 @@ from custom_components.qvantum.modbus_device import (
     component_values,
     holding_field_for_metric,
 )
-from custom_components.qvantum.modbus_model import (
+from custom_components.qvantum.client.modbus.model import (
     QvantumIdentity,
     QvantumInputs,
     QvantumSettings,

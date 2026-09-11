@@ -132,25 +132,11 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                     self._hpid, self._metric_key, coordinator_update_value
                 )
 
-            case "dhw_stop_extra":
-                # dhw_stop_extra has no update_setting HTTP endpoint; write via Modbus holding register.
-                if not self._is_modbus_write_allowed():
-                    raise HomeAssistantError(
-                        "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
-                    )
-                coordinator_update_value = int(value)
-                response = await self.coordinator.client.write_metric(
-                    self._hpid, self._metric_key, coordinator_update_value
+            case "dhw_stop_extra" | "room_temp_external":
+                coordinator_update_value = (
+                    int(value) if self._metric_key == "dhw_stop_extra" else value
                 )
-
-            case "room_temp_external":
-                # room_temp_external writes to Modbus holding register 14 (scale 0.1)
-                if not self._is_modbus_write_allowed():
-                    raise HomeAssistantError(
-                        "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
-                    )
-                coordinator_update_value = value
-                response = await self.coordinator.client.write_metric(
+                response = await self.coordinator.async_write_metric(
                     self._hpid, self._metric_key, coordinator_update_value
                 )
             case _:

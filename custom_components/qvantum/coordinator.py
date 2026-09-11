@@ -13,10 +13,14 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
 
+from .client.cloud import QvantumCloudClient
 from .client.exceptions import AuthError as APIAuthError
+from .client.modbus import QvantumModbusClient
+from .client.protocol import QvantumClient
 from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
 from .calculations import QvantumCalculationsMixin
 from .const import (
@@ -45,8 +49,6 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-
 
 _COMPRESSOR_TO_HP_STATUS_MAP = {
     2: HP_STATUS_HEATING,   # Heating → Heating
@@ -158,7 +160,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         hass: HomeAssistant,
         config_entry: ConfigEntry,
         *,
-        client=None,
+        client: QvantumClient,
         extra_dhw: ExtraDhwTimer | None = None,
     ) -> None:
         """Initialize coordinator."""
@@ -166,7 +168,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             config_entry
         )
 
-        self.client = client
+        self.client: QvantumClient = client
         self.extra_dhw = extra_dhw
         self._config_entry = config_entry
         self._device = None
@@ -248,6 +250,30 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         return await async_apply_extra_tap_water(
             self.client, self.extra_dhw, device_id, minutes
         )
+
+    async def async_write_metric(self, device_id: str, metric_key: str, value: Any):
+        """Write a holding field by canonical name (Modbus only)."""
+        if not isinstance(self.client, QvantumModbusClient):
+            raise HomeAssistantError(
+                f"{metric_key} writes require a Modbus client"
+            )
+        if not self.client.writable:
+            raise HomeAssistantError(
+                "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
+            )
+        return await self.client.write_metric(device_id, metric_key, value)
+
+    async def async_set_smartcontrol(self, device_id: str, sh: int, dhw: int):
+        """Write SmartControl modes (cloud only)."""
+        if not isinstance(self.client, QvantumCloudClient):
+            raise HomeAssistantError("use_adaptive writes require a cloud client")
+        return await self.client.set_smartcontrol(device_id, sh, dhw)
+
+    async def async_elevate_access(self, device_id: str):
+        """Elevate cloud write access. No-op when the transport is Modbus."""
+        if not isinstance(self.client, QvantumCloudClient):
+            return None
+        return await self.client.elevate_access(device_id)
 
     async def async_restore_dhw_state(self) -> None:
         """Restore DHW EMA snapshot from persistent storage after a restart.
@@ -408,6 +434,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             return
 
         if self.modbus_enabled:
+            if not isinstance(self.client, QvantumModbusClient):
+                raise UpdateFailed("Modbus identity probe requires a Modbus client")
             try:
                 probed = await self.client.probe_identity()
             except asyncio.CancelledError:
@@ -434,6 +462,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 )
             raise UpdateFailed("No device identity from Modbus or device registry")
 
+        if not isinstance(self.client, QvantumCloudClient):
+            raise UpdateFailed("Cloud device lookup requires a cloud client")
         try:
             device = await asyncio.wait_for(
                 self.client.get_primary_device(),

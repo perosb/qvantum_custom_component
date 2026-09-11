@@ -525,9 +525,11 @@ class TestIntegrationSetup:
         self, hass, mock_config_entry
     ):
         """Turning off Modbus writing must cancel a pending extra-DHW restore."""
+        from tests.conftest import make_client_mock
+
         hass.config_entries.async_reload = AsyncMock()
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock(modbus=True)
         mock_api._modbus_tcp = True
         mock_api._modbus_write = True
         mock_api._modbus_host = "Qvantum-HP"
