@@ -10,9 +10,7 @@ from typing import Any, Optional
 
 from modbus_connection import ModbusError, ModbusUnit
 
-from .const import (
-    DEFAULT_ENABLED_HTTP_METRICS,
-    DEFAULT_ENABLED_MODBUS_METRICS,
+from .client.constants import (
     DHW_MODE_EXTRA,
     DHW_MODE_NORMAL,
     FAN_SPEED_STATE_EXTRA,
@@ -22,6 +20,15 @@ from .const import (
     FAN_SPEED_VALUE_NORMAL,
     FAN_SPEED_VALUE_OFF,
     TAP_WATER_CAPACITY_MAPPINGS,
+)
+from .client.exceptions import (
+    APIAuthError,
+    APIConnectionError,
+    APIRateLimitError,
+)
+from .const import (
+    DEFAULT_ENABLED_HTTP_METRICS,
+    DEFAULT_ENABLED_MODBUS_METRICS,
 )
 from .modbus import MODBUS_HOLDING_REGISTER_MAP, MODBUS_HOLDING_TO_SETTINGS_MAP
 from .modbus_device import (
@@ -228,11 +235,11 @@ class QvantumAPI:
         """Handle API response, raising exceptions for errors."""
         if not response.ok:
             if response.status == 401:
-                raise APIAuthError(response)
+                raise APIAuthError(response.status)
             elif response.status == 429:
-                raise APIRateLimitError(response)
+                raise APIRateLimitError(response.status)
             else:
-                raise APIConnectionError(response)
+                raise APIConnectionError(response.status)
 
     async def unauthenticate(self):
         """Unauthenticate from the API."""
@@ -294,7 +301,7 @@ class QvantumAPI:
                     return True
                 case _:
                     _LOGGER.error("Authentication failed: %s", response.status)
-                    raise APIAuthError(response)
+                    raise APIAuthError(response.status)
 
     async def _refresh_authentication_token(self):
         """Refresh the authentication token."""
@@ -931,12 +938,12 @@ class QvantumAPI:
                     self._device_metadata_etag = response.headers.get("ETag")
                 case 403:
                     await self.unauthenticate()
-                    raise APIAuthError(response)
+                    raise APIAuthError(response.status)
                 case 304:
                     _LOGGER.debug("Device metadata not modified, using cached data.")
                 case 500:
                     _LOGGER.error("Internal server error, clearing data...")
-                    raise APIConnectionError(response)
+                    raise APIConnectionError(response.status)
                 case _:
                     _LOGGER.error(
                         f"Failed to fetch device metadata, status: {response.status}"
@@ -1042,13 +1049,13 @@ class QvantumAPI:
                 case 403:
                     _LOGGER.error("Authentication failure: %s", response.status)
                     await self.unauthenticate()
-                    raise APIAuthError(response)
+                    raise APIAuthError(response.status)
                 case 304:
                     _LOGGER.debug("HTTP values not modified, using cached data.")
                     return None, None, None
                 case 500:
                     _LOGGER.error("Internal server error: %s", response.status)
-                    raise APIConnectionError(response)
+                    raise APIConnectionError(response.status)
                 case _:
                     _LOGGER.error(
                         "Failed to fetch HTTP values, status: %s", response.status
@@ -1084,12 +1091,12 @@ class QvantumAPI:
                     _LOGGER.debug("HTTP Settings fetched: %s", self._settings_data)
                 case 403:
                     await self.unauthenticate()
-                    raise APIAuthError(response)
+                    raise APIAuthError(response.status)
                 case 304:
                     _LOGGER.debug("HTTP Settings not modified, using cached data.")
                 case 500:
                     _LOGGER.error("Internal server error, clearing data...")
-                    raise APIConnectionError(response)
+                    raise APIConnectionError(response.status)
                 case _:
                     _LOGGER.error(
                         "Failed to fetch HTTP settings, status: %s", response.status
@@ -1133,65 +1140,11 @@ class QvantumAPI:
                     return devices_data.get("devices") if devices_data else None
                 case 403:
                     await self.unauthenticate()
-                    raise APIAuthError(response)
+                    raise APIAuthError(response.status)
                 case _:
                     _LOGGER.error(
                         "Failed to fetch devices, status: %s", response.status
                     )
                     raise APIConnectionError(
-                        response=response, message="Failed to fetch devices"
+                        response.status, "Failed to fetch devices"
                     )
-
-
-class APIAuthError(Exception):
-    """Exception raised for authentication errors."""
-
-    def __init__(
-        self,
-        response: Optional[aiohttp.ClientResponse],
-        message: str = "Authentication failed",
-    ):
-        if response is not None:
-            self.response = response
-            self.status = response.status
-            super().__init__(f"{message}: {response.status}")
-        else:
-            self.response = None
-            self.status = None
-            super().__init__(message)
-
-
-class APIConnectionError(Exception):
-    """Exception raised for connection/API errors."""
-
-    def __init__(
-        self,
-        response: Optional[aiohttp.ClientResponse],
-        message: str = "API request failed",
-    ):
-        if response is not None:
-            self.response = response
-            self.status = response.status
-            super().__init__(f"{message}: {response.status}")
-        else:
-            self.response = None
-            self.status = None
-            super().__init__(message)
-
-
-class APIRateLimitError(Exception):
-    """Exception raised for rate limiting."""
-
-    def __init__(
-        self,
-        response: Optional[aiohttp.ClientResponse],
-        message: str = "Rate limit exceeded",
-    ):
-        if response is not None:
-            self.response = response
-            self.status = response.status
-            super().__init__(f"{message}: {response.status}")
-        else:
-            self.response = None
-            self.status = None
-            super().__init__(message)
