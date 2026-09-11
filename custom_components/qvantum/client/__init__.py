@@ -32,6 +32,12 @@ from .exceptions import (
     RateLimitError,
 )
 from .models import ApplyResult, Device, MetricsPayload, SettingsPayload
+from .modbus import (
+    IdentityProbeError,
+    QvantumModbusDevice,
+    async_probe_identity,
+    holding_field_for_metric,
+)
 from .protocol import QvantumClient
 
 __all__ = [
@@ -53,8 +59,12 @@ __all__ = [
     "FAN_SPEED_VALUE_EXTRA",
     "FAN_SPEED_VALUE_NORMAL",
     "FAN_SPEED_VALUE_OFF",
+    "IdentityProbeError",
     "MetricsPayload",
     "QvantumClient",
+    "QvantumModbusDevice",
+    "async_probe_identity",
+    "holding_field_for_metric",
     "RELAY_HEAT_L1_POWER_W",
     "RELAY_HEAT_L2_POWER_W",
     "RELAY_HEAT_L3_POWER_W",
