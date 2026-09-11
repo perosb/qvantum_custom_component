@@ -16,7 +16,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
 
-from .api import APIAuthError
+from .client.exceptions import AuthError as APIAuthError
+from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
 from .calculations import QvantumCalculationsMixin
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
@@ -102,7 +103,7 @@ def _apply_extra_dhw_tap_stop(coordinator: Any, section: Any, extra_value: Any) 
         return
     if not _is_extra_dhw_on(extra_value):
         return
-    restore_at = getattr(getattr(coordinator, "api", None), "_extra_dhw_restore_at", None)
+    restore_at = getattr(getattr(coordinator, "extra_dhw", None), "restore_at", None)
     if isinstance(restore_at, (int, float)):
         section["tap_stop"] = int(restore_at)
     elif restore_at is None:
@@ -152,13 +153,21 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             modbus_interval = DEFAULT_MODBUS_SCAN_INTERVAL
         return True, max(modbus_interval, MIN_MODBUS_SCAN_INTERVAL)
 
-    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        *,
+        client=None,
+        extra_dhw: ExtraDhwTimer | None = None,
+    ) -> None:
         """Initialize coordinator."""
         self.modbus_enabled, self.poll_interval = self.resolve_poll_interval(
             config_entry
         )
 
-        self.api = hass.data[DOMAIN]
+        self.client = client
+        self.extra_dhw = extra_dhw
         self._config_entry = config_entry
         self._device = None
         self._last_heatingenergy: float | None = None
@@ -233,6 +242,12 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             self.name,
         )
         return True
+
+    async def async_set_extra_tap_water(self, device_id: str | int, minutes: int):
+        """Write extra DHW and arm or clear the local restore timer."""
+        return await async_apply_extra_tap_water(
+            self.client, self.extra_dhw, device_id, minutes
+        )
 
     async def async_restore_dhw_state(self) -> None:
         """Restore DHW EMA snapshot from persistent storage after a restart.
@@ -394,7 +409,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
         if self.modbus_enabled:
             try:
-                probed = await self.api.async_probe_identity()
+                probed = await self.client.probe_identity()
             except asyncio.CancelledError:
                 raise
             except Exception as err:
@@ -421,7 +436,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
         try:
             device = await asyncio.wait_for(
-                self.api.get_primary_device(),
+                self.client.get_primary_device(),
                 timeout=HTTP_CLOUD_LOOKUP_TIMEOUT,
             )
             if isinstance(device, dict) and device.get("id"):
@@ -651,18 +666,19 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         A poll that started before Extra was written must not cancel the timer
         just scheduled for that write.
         """
-        restore_at = getattr(self.api, "_extra_dhw_restore_at", None)
+        timer = self.extra_dhw
+        restore_at = getattr(timer, "restore_at", None)
         if not isinstance(restore_at, (int, float)):
             return
         extra = values.get("extra_tap_water")
         if extra is None or _is_extra_dhw_on(extra):
             values["tap_stop"] = int(restore_at)
             return
-        armed_at = getattr(self.api, "_extra_dhw_armed_at", None)
+        armed_at = getattr(timer, "armed_at", None)
         if isinstance(armed_at, (int, float)) and armed_at > poll_started:
             values["tap_stop"] = int(restore_at)
             return
-        await self.api.async_clear_extra_dhw_timer()
+        await timer.async_clear()
         values.pop("tap_stop", None)
         _LOGGER.debug("Cleared extra-DHW restore timer; extra DHW is off")
 
@@ -690,12 +706,20 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
             # Fetch metrics and settings concurrently for better performance
             poll_started = time.monotonic()
-            metrics_task = self.api.get_metrics(
+            metrics_task = self.client.get_metrics(
                 device_id, enabled_metrics=enabled_metrics
             )
-            settings_task = self.api.get_settings(device_id)
+            settings_task = self.client.get_settings(device_id)
 
             data, settings = await asyncio.gather(metrics_task, settings_task)
+            if (
+                self.modbus_enabled
+                and isinstance(data, dict)
+                and isinstance(data.get("metrics"), dict)
+            ):
+                data["metrics"]["latency"] = int(
+                    (time.monotonic() - poll_started) * 1000
+                )
 
             # Validate response data
             if not isinstance(data, dict):

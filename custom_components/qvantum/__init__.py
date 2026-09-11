@@ -29,7 +29,11 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_USERNAME,
 )
-from .api import QvantumAPI
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from .client.cloud import QvantumCloudClient
+from .client.constants import DHW_MODE_NORMAL
+from .client.modbus import QvantumModbusClient
 from .const import (
     DOMAIN,
     VERSION,
@@ -46,6 +50,7 @@ from .const import (
     HTTP_CLOUD_LOOKUP_TIMEOUT,
 )
 from .coordinator import QvantumDataUpdateCoordinator
+from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
 
@@ -197,11 +202,16 @@ def _device_sw_version(device_metadata: dict) -> str | None:
 
 @dataclass
 class RuntimeData:
-    """Class to hold your data."""
+    """Per-entry runtime: transport client, coordinators, extra-DHW timer."""
 
     coordinator: QvantumDataUpdateCoordinator
     maintenance_coordinator: QvantumMaintenanceCoordinator | None = None
     device: DeviceInfo | None = None
+    client: QvantumCloudClient | QvantumModbusClient | None = None
+    extra_dhw: ExtraDhwTimer | None = None
+    modbus_host: str = DEFAULT_MODBUS_HOST
+    modbus_port: int = DEFAULT_MODBUS_PORT
+    modbus_unit_id: int = DEFAULT_MODBUS_UNIT_ID
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
@@ -226,33 +236,36 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
             f"with different link settings: {err}"
         ) from err
 
-    hass.data[DOMAIN] = QvantumAPI(
-        username=None if modbus_enabled else username,
-        password=None if modbus_enabled else password,
-        user_agent=user_agent,
-        modbus_tcp=modbus_enabled,
-        modbus_host=modbus_host,
-        modbus_port=modbus_port,
-        modbus_unit_id=modbus_unit_id,
-        modbus_unit=modbus_unit,
-        modbus_write=modbus_enabled and _modbus_write_enabled(config_entry),
-    )
-    hass.data[DOMAIN].hass = hass
+    extra_dhw: ExtraDhwTimer | None = None
     if modbus_enabled:
+        client: QvantumCloudClient | QvantumModbusClient = QvantumModbusClient(
+            modbus_unit,
+            writable=_modbus_write_enabled(config_entry),
+        )
+
+        async def _write_dhw_normal(device_id: str) -> None:
+            await client.write_metric(device_id, "extra_tap_water", DHW_MODE_NORMAL)
+
+        extra_dhw = ExtraDhwTimer(_write_dhw_normal)
+        extra_dhw.hass = hass
         if isinstance(getattr(getattr(hass, "config", None), "config_dir", None), str):
             from homeassistant.helpers.storage import Store
 
-            api = hass.data[DOMAIN]
-            api._extra_dhw_store = Store(
+            extra_dhw.store = Store(
                 hass, 1, f"{DOMAIN}.extra_dhw.{config_entry.entry_id}"
             )
-            restore = getattr(api, "async_restore_extra_dhw_timer", None)
-            if callable(restore):
-                restore_result = restore()
-                if inspect.isawaitable(restore_result):
-                    await restore_result
+            await extra_dhw.async_restore(writable=client.writable)
+    else:
+        client = QvantumCloudClient(
+            username,
+            password,
+            user_agent=user_agent,
+            session=async_get_clientsession(hass),
+        )
 
-    coordinator = QvantumDataUpdateCoordinator(hass, config_entry)
+    coordinator = QvantumDataUpdateCoordinator(
+        hass, config_entry, client=client, extra_dhw=extra_dhw
+    )
     await coordinator.async_restore_dhw_state()
     await coordinator.async_config_entry_first_refresh()
 
@@ -311,7 +324,14 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     config_entry.async_on_unload(remove_listener)
 
     config_entry.runtime_data = RuntimeData(
-        coordinator, maintenance_coordinator, device
+        coordinator,
+        maintenance_coordinator,
+        device,
+        client=client,
+        extra_dhw=extra_dhw,
+        modbus_host=modbus_host,
+        modbus_port=modbus_port,
+        modbus_unit_id=modbus_unit_id,
     )
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
@@ -331,18 +351,12 @@ def _modbus_transport_changed(
     if new_enabled != bool(getattr(coordinator, "modbus_enabled", False)):
         return True
 
-    api = getattr(coordinator, "api", None)
-    if api is not None:
-        if new_host != str(getattr(api, "_modbus_host", DEFAULT_MODBUS_HOST)):
-            return True
-        if new_port != int(getattr(api, "_modbus_port", DEFAULT_MODBUS_PORT)):
-            return True
-        if new_unit_id != int(
-            getattr(api, "_modbus_unit_id", DEFAULT_MODBUS_UNIT_ID)
-        ):
-            return True
-        if new_enabled != bool(getattr(api, "_modbus_tcp", coordinator.modbus_enabled)):
-            return True
+    if new_host != str(getattr(runtime, "modbus_host", DEFAULT_MODBUS_HOST)):
+        return True
+    if new_port != int(getattr(runtime, "modbus_port", DEFAULT_MODBUS_PORT)):
+        return True
+    if new_unit_id != int(getattr(runtime, "modbus_unit_id", DEFAULT_MODBUS_UNIT_ID)):
+        return True
 
     return False
 
@@ -367,17 +381,13 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
         await hass.config_entries.async_reload(config_entry.entry_id)
         return
 
-    api = getattr(runtime.coordinator, "api", None)
-    if api is not None:
-        write_enabled = bool(
-            getattr(api, "_modbus_tcp", False)
-            and _modbus_write_enabled(config_entry)
-        )
-        if getattr(api, "_modbus_write", False) and not write_enabled:
-            cancel = getattr(api, "_cancel_extra_dhw_timer", None)
-            if callable(cancel):
-                cancel(clear_store=True)
-        api._modbus_write = write_enabled
+    client = getattr(runtime, "client", None)
+    extra_dhw = getattr(runtime, "extra_dhw", None)
+    if extra_dhw is not None and client is not None:
+        write_enabled = _modbus_write_enabled(config_entry)
+        if getattr(client, "writable", False) and not write_enabled:
+            extra_dhw.cancel(clear_store=True)
+        client.writable = write_enabled
 
     changed = runtime.coordinator.apply_poll_interval(config_entry)
     if changed:
@@ -598,9 +608,11 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
 
     Shut down coordinators before closing the HTTP API client so in-flight
     polls are cancelled first. Otherwise a cancelled Modbus poll can fall
-    back to HTTP against a session that is already closing. The shared
-    Modbus TCP connection is released by Home Assistant when this config
-    entry unloads; this integration never closes it.
+    back to HTTP against a session that is already closing. Cancel the
+    extra-DHW restore timer before client.close() so a pending callback
+    cannot write_metric on a closed client. The shared Modbus TCP
+    connection is released by Home Assistant when this config entry
+    unloads; this integration never closes it.
     """
     runtime = getattr(config_entry, "runtime_data", None)
 
@@ -635,15 +647,18 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
             hass, skip_entry_id=config_entry.entry_id
         )
 
-    if hass.data.get(DOMAIN) is not None:
+    extra_dhw = getattr(runtime, "extra_dhw", None) if runtime is not None else None
+    if extra_dhw is not None:
+        extra_dhw.cancel(clear_store=False)
+    client = getattr(runtime, "client", None) if runtime is not None else None
+    if client is not None:
         try:
-            await hass.data[DOMAIN].close()
+            await client.close()
         except asyncio.CancelledError:
-            hass.data.pop(DOMAIN, None)
             raise
         except Exception as err:
-            _LOGGER.debug("Failed closing Qvantum API session on unload: %s", err)
-        hass.data.pop(DOMAIN, None)
+            _LOGGER.debug("Failed closing Qvantum client on unload: %s", err)
+    hass.data.pop(DOMAIN, None)
 
     if unload_ok and device_id:
         # Clear notifications for all firmware components

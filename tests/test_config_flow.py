@@ -24,7 +24,7 @@ class TestValidateInput:
     async def test_validate_input_success(self, hass):
         """Test validate_input with successful authentication."""
         with patch(
-            "custom_components.qvantum.config_flow.QvantumAPI"
+            "custom_components.qvantum.config_flow.QvantumCloudClient"
         ) as mock_api_class:
             mock_api = MagicMock()
             mock_api_class.return_value = mock_api
@@ -47,7 +47,7 @@ class TestValidateInput:
     async def test_validate_input_omits_missing_serial_from_title(self, hass):
         """Title should not include (None) when the device has no serial."""
         with patch(
-            "custom_components.qvantum.config_flow.QvantumAPI"
+            "custom_components.qvantum.config_flow.QvantumCloudClient"
         ) as mock_api_class:
             mock_api = MagicMock()
             mock_api_class.return_value = mock_api
@@ -67,7 +67,7 @@ class TestValidateInput:
     async def test_validate_input_defaults_vendor_model_without_serial(self, hass):
         """Missing vendor/model/serial should fall back to a plain Qvantum title."""
         with patch(
-            "custom_components.qvantum.config_flow.QvantumAPI"
+            "custom_components.qvantum.config_flow.QvantumCloudClient"
         ) as mock_api_class:
             mock_api = MagicMock()
             mock_api_class.return_value = mock_api
@@ -86,10 +86,10 @@ class TestValidateInput:
     @pytest.mark.asyncio
     async def test_validate_input_auth_error(self, hass):
         """Test validate_input with authentication error."""
-        from custom_components.qvantum.api import APIAuthError
+        from custom_components.qvantum.client.exceptions import APIAuthError
 
         with patch(
-            "custom_components.qvantum.config_flow.QvantumAPI"
+            "custom_components.qvantum.config_flow.QvantumCloudClient"
         ) as mock_api_class:
             mock_api = MagicMock()
             mock_api_class.return_value = mock_api
@@ -108,10 +108,10 @@ class TestValidateInput:
     @pytest.mark.asyncio
     async def test_validate_input_connection_error(self, hass):
         """Test validate_input with connection error."""
-        from custom_components.qvantum.api import APIConnectionError
+        from custom_components.qvantum.client.exceptions import APIConnectionError
 
         with patch(
-            "custom_components.qvantum.config_flow.QvantumAPI"
+            "custom_components.qvantum.config_flow.QvantumCloudClient"
         ) as mock_api_class:
             mock_api = MagicMock()
             mock_api_class.return_value = mock_api

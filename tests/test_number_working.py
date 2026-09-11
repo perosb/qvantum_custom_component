@@ -54,7 +54,7 @@ def mock_coordinator():
             "fan_speed_2": 25,
         },
     }
-    coordinator.api = MagicMock()
+    coordinator.client = MagicMock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 
@@ -306,13 +306,13 @@ class TestQvantumNumberEntity:
         )
 
         # Mock the API response
-        mock_coordinator.api.set_tap_water_capacity_target = AsyncMock(
+        mock_coordinator.client.set_tap_water_capacity_target = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(5.0)
 
-        mock_coordinator.api.set_tap_water_capacity_target.assert_called_once_with(
+        mock_coordinator.client.set_tap_water_capacity_target.assert_called_once_with(
             "test_device_123", 5
         )
         # Note: async_set_updated_data would be called if the API response status was correct
@@ -327,13 +327,13 @@ class TestQvantumNumberEntity:
         )
 
         # Mock the API response
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(3.5)
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "room_comp_factor", 3
         )
         # Note: async_set_updated_data would be called if the API response status was correct
@@ -348,13 +348,13 @@ class TestQvantumNumberEntity:
         )
 
         # Mock the API response
-        mock_coordinator.api.set_indoor_temperature_offset = AsyncMock(
+        mock_coordinator.client.set_indoor_temperature_offset = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(-3.0)
 
-        mock_coordinator.api.set_indoor_temperature_offset.assert_called_once_with(
+        mock_coordinator.client.set_indoor_temperature_offset.assert_called_once_with(
             "test_device_123", -3
         )
         # Note: async_set_updated_data would be called if the API response status was correct
@@ -369,13 +369,13 @@ class TestQvantumNumberEntity:
         )
 
         # Mock the API response
-        mock_coordinator.api.set_tap_water = AsyncMock(
+        mock_coordinator.client.set_tap_water = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(80.0)
 
-        mock_coordinator.api.set_tap_water.assert_called_once_with(
+        mock_coordinator.client.set_tap_water.assert_called_once_with(
             "test_device_123", stop=80
         )
         # Note: async_set_updated_data would be called if the API response status was correct
@@ -390,13 +390,13 @@ class TestQvantumNumberEntity:
         )
 
         # Mock the API response
-        mock_coordinator.api.set_tap_water = AsyncMock(
+        mock_coordinator.client.set_tap_water = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(58.0)
 
-        mock_coordinator.api.set_tap_water.assert_called_once_with(
+        mock_coordinator.client.set_tap_water.assert_called_once_with(
             "test_device_123", start=58
         )
         # Note: async_set_updated_data would be called if the API response status was correct
@@ -411,13 +411,13 @@ class TestQvantumNumberEntity:
         )
 
         # Mock the API response
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(75.0)
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "fan_normal", 75
         )
         # Note: async_set_updated_data would be called if the API response status was correct
@@ -432,13 +432,13 @@ class TestQvantumNumberEntity:
         )
 
         # Mock the API response
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(40.0)
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "fan_speed_2", 40
         )
         # Note: async_set_updated_data would be called if the API response status was correct
@@ -457,20 +457,20 @@ class TestQvantumNumberEntity:
             mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
         )
 
-        mock_coordinator.api.write_holding_register_for_metric = AsyncMock(
+        mock_coordinator.client.write_metric = AsyncMock(
             return_value={"status": "APPLIED"}
         )
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(75.0)
 
-        mock_coordinator.api.write_holding_register_for_metric.assert_called_once_with(
+        mock_coordinator.client.write_metric.assert_called_once_with(
             "test_device_123", "dhw_stop_extra", 75
         )
         # update_setting must NOT be called for dhw_stop_extra
-        mock_coordinator.api.update_setting.assert_not_called()
+        mock_coordinator.client.update_setting.assert_not_called()
         # Coordinator cache should be updated with the new value
         assert mock_coordinator.data["values"]["dhw_stop_extra"] == 75
 
@@ -487,12 +487,12 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
         )
-        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
+        mock_coordinator.client.write_metric = AsyncMock()
 
         with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
             await entity.async_set_native_value(75.0)
 
-        mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
+        mock_coordinator.client.write_metric.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_set_native_value_dhw_stop_extra_raises_when_modbus_tcp_disabled(
@@ -510,12 +510,12 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
         )
-        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
+        mock_coordinator.client.write_metric = AsyncMock()
 
         with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
             await entity.async_set_native_value(75.0)
 
-        mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
+        mock_coordinator.client.write_metric.assert_not_called()
 
     def test_available_dhw_stop_extra_modbus_write_disabled(
         self, mock_coordinator, mock_device
@@ -703,19 +703,19 @@ class TestRoomTempExternal:
             mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
 
-        mock_coordinator.api.write_holding_register_for_metric = AsyncMock(
+        mock_coordinator.client.write_metric = AsyncMock(
             return_value={"status": "APPLIED"}
         )
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_native_value(21.5)
 
-        mock_coordinator.api.write_holding_register_for_metric.assert_called_once_with(
+        mock_coordinator.client.write_metric.assert_called_once_with(
             "test_device_123", "room_temp_external", 21.5
         )
-        mock_coordinator.api.update_setting.assert_not_called()
+        mock_coordinator.client.update_setting.assert_not_called()
         assert mock_coordinator.data["values"]["room_temp_external"] == 21.5
         assert isinstance(mock_coordinator.data["values"]["room_temp_external"], float)
 
@@ -733,12 +733,12 @@ class TestRoomTempExternal:
         entity = QvantumNumberEntity(
             mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
-        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
+        mock_coordinator.client.write_metric = AsyncMock()
 
         with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
             await entity.async_set_native_value(21.5)
 
-        mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
+        mock_coordinator.client.write_metric.assert_not_called()
 
 
 class TestStopHeating:
@@ -824,17 +824,17 @@ class TestStopHeating:
             mock_coordinator, "stop_heating", -30, 30, 1, mock_device
         )
 
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
-        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
+        mock_coordinator.client.write_metric = AsyncMock()
 
         await entity.async_set_native_value(-5.0)
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "stop_heating", -5
         )
-        mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
+        mock_coordinator.client.write_metric.assert_not_called()
         assert mock_coordinator.data["values"]["stop_heating"] == -5
 
     @pytest.mark.asyncio
@@ -852,17 +852,17 @@ class TestStopHeating:
             mock_coordinator, "stop_heating", -30, 30, 1, mock_device
         )
 
-        mock_coordinator.api.update_setting = AsyncMock(
+        mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
-        mock_coordinator.api.write_holding_register_for_metric = AsyncMock()
+        mock_coordinator.client.write_metric = AsyncMock()
 
         await entity.async_set_native_value(-5.0)
 
-        mock_coordinator.api.update_setting.assert_called_once_with(
+        mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "stop_heating", -5
         )
-        mock_coordinator.api.write_holding_register_for_metric.assert_not_called()
+        mock_coordinator.client.write_metric.assert_not_called()
         assert mock_coordinator.data["values"]["stop_heating"] == -5
 
     @pytest.mark.asyncio

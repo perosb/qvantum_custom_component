@@ -108,27 +108,27 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         match self._metric_key:
             case "tap_water_capacity_target":
                 coordinator_update_value = int(value)
-                response = await self.coordinator.api.set_tap_water_capacity_target(
+                response = await self.coordinator.client.set_tap_water_capacity_target(
                     self._hpid, coordinator_update_value
                 )
             case "indoor_temperature_offset":
                 coordinator_update_value = int(value)
-                response = await self.coordinator.api.set_indoor_temperature_offset(
+                response = await self.coordinator.client.set_indoor_temperature_offset(
                     self._hpid, coordinator_update_value
                 )
             case "tap_water_stop":
                 coordinator_update_value = int(value)
-                response = await self.coordinator.api.set_tap_water(
+                response = await self.coordinator.client.set_tap_water(
                     self._hpid, stop=coordinator_update_value
                 )
             case "tap_water_start":
                 coordinator_update_value = int(value)
-                response = await self.coordinator.api.set_tap_water(
+                response = await self.coordinator.client.set_tap_water(
                     self._hpid, start=coordinator_update_value
                 )
             case "room_comp_factor" | "fan_normal" | "fan_speed_2" | "stop_heating":
                 coordinator_update_value = int(value)
-                response = await self.coordinator.api.update_setting(
+                response = await self.coordinator.client.update_setting(
                     self._hpid, self._metric_key, coordinator_update_value
                 )
 
@@ -139,7 +139,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                         "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
                     )
                 coordinator_update_value = int(value)
-                response = await self.coordinator.api.write_holding_register_for_metric(
+                response = await self.coordinator.client.write_metric(
                     self._hpid, self._metric_key, coordinator_update_value
                 )
 
@@ -150,7 +150,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                         "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
                     )
                 coordinator_update_value = value
-                response = await self.coordinator.api.write_holding_register_for_metric(
+                response = await self.coordinator.client.write_metric(
                     self._hpid, self._metric_key, coordinator_update_value
                 )
             case _:

@@ -22,9 +22,9 @@ def mock_coordinator():
     }
     coordinator.async_refresh = AsyncMock()
     coordinator.async_set_updated_data = AsyncMock()
-    coordinator.api = MagicMock()
-    coordinator.api.set_extra_tap_water = AsyncMock(return_value={"status": "APPLIED"})
-    coordinator.api.elevate_access = AsyncMock(return_value={"writeAccessLevel": 30})
+    coordinator.client = MagicMock()
+    coordinator.async_set_extra_tap_water = AsyncMock(return_value={"status": "APPLIED"})
+    coordinator.client.elevate_access = AsyncMock(return_value={"writeAccessLevel": 30})
     coordinator.modbus_enabled = False
 
     # Mock config_entry and runtime_data for access level check
@@ -101,7 +101,7 @@ class TestQvantumButtonEntity:
 
         await button.async_press()
 
-        mock_coordinator.api.set_extra_tap_water.assert_called_once_with(
+        mock_coordinator.async_set_extra_tap_water.assert_called_once_with(
             "test_device_123", 60
         )
         # Data is updated when response comes back
@@ -122,7 +122,7 @@ class TestQvantumButtonEntity:
 
         await button.async_press()
 
-        mock_coordinator.api.elevate_access.assert_called_once_with(
+        mock_coordinator.client.elevate_access.assert_called_once_with(
             "test_device_123"
         )
         # Verify maintenance coordinator is refreshed after elevating access
@@ -134,7 +134,7 @@ class TestQvantumButtonEntity:
     ):
         """Test pressing the elevate access button when elevation fails."""
         # Mock the API to return None (failure)
-        mock_coordinator.api.elevate_access = AsyncMock(return_value=None)
+        mock_coordinator.client.elevate_access = AsyncMock(return_value=None)
 
         button = QvantumButtonEntity(
             mock_coordinator,
@@ -145,7 +145,7 @@ class TestQvantumButtonEntity:
 
         await button.async_press()
 
-        mock_coordinator.api.elevate_access.assert_called_once_with("test_device_123")
+        mock_coordinator.client.elevate_access.assert_called_once_with("test_device_123")
 
         # Verify error is logged
         assert "Failed to elevate access" in caplog.text
@@ -167,7 +167,7 @@ class TestQvantumButtonEntity:
 
         await button.async_press()
 
-        mock_coordinator.api.elevate_access.assert_not_called()
+        mock_coordinator.client.elevate_access.assert_not_called()
         mock_maintenance_coordinator.async_refresh.assert_not_called()
         mock_coordinator.async_refresh.assert_not_called()
 
@@ -187,15 +187,15 @@ class TestQvantumButtonEntity:
             "device": {"id": "test_device_123"},
             "values": {},
         }
-        coordinator.api = MagicMock()
-        coordinator.api.set_extra_tap_water = AsyncMock()
+        coordinator.client = MagicMock()
+        coordinator.async_set_extra_tap_water = AsyncMock()
         button = QvantumButtonEntity(
             coordinator, "extra_tap_water_60min", mock_device
         )
 
         await button.async_press()
 
-        coordinator.api.set_extra_tap_water.assert_not_called()
+        coordinator.async_set_extra_tap_water.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_setup_entry(

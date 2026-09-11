@@ -100,8 +100,9 @@ class TestHandleSettingUpdateResponse:
             "values": {"extra_tap_water": "on", "tap_stop": 1712232000}
         }
         coordinator.async_set_updated_data = MagicMock()
-        coordinator.api = MagicMock()
-        coordinator.api._extra_dhw_restore_at = 1712232000.0
+        coordinator.client = MagicMock()
+        coordinator.extra_dhw = MagicMock()
+        coordinator.extra_dhw.restore_at = 1712232000.0
 
         result = await handle_setting_update_response(
             {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", "off"
@@ -117,8 +118,9 @@ class TestHandleSettingUpdateResponse:
         coordinator = MagicMock()
         coordinator.data = {"values": {"extra_tap_water": "off"}}
         coordinator.async_set_updated_data = MagicMock()
-        coordinator.api = MagicMock()
-        coordinator.api._extra_dhw_restore_at = 1712232000.7
+        coordinator.client = MagicMock()
+        coordinator.extra_dhw = MagicMock()
+        coordinator.extra_dhw.restore_at = 1712232000.7
 
         result = await handle_setting_update_response(
             {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", "on"
@@ -135,8 +137,9 @@ class TestHandleSettingUpdateResponse:
             "values": {"extra_tap_water": "off", "tap_stop": 1712232000}
         }
         coordinator.async_set_updated_data = MagicMock()
-        coordinator.api = MagicMock()
-        coordinator.api._extra_dhw_restore_at = None
+        coordinator.client = MagicMock()
+        coordinator.extra_dhw = MagicMock()
+        coordinator.extra_dhw.restore_at = None
 
         result = await handle_setting_update_response(
             {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", "on"
@@ -153,8 +156,9 @@ class TestHandleSettingUpdateResponse:
             "values": {"extra_tap_water": "on", "tap_stop": 1712232000}
         }
         coordinator.async_set_updated_data = MagicMock()
-        coordinator.api = MagicMock()
-        coordinator.api._extra_dhw_restore_at = 1712232000.0
+        coordinator.client = MagicMock()
+        coordinator.extra_dhw = MagicMock()
+        coordinator.extra_dhw.restore_at = 1712232000.0
 
         result = await handle_setting_update_response(
             {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", False
@@ -171,8 +175,9 @@ class TestHandleSettingUpdateResponse:
             "values": {"extra_tap_water": "on", "tap_stop": 1712232000}
         }
         coordinator.async_set_updated_data = MagicMock()
-        coordinator.api = MagicMock()
-        coordinator.api._extra_dhw_restore_at = 1712232000.0
+        coordinator.client = MagicMock()
+        coordinator.extra_dhw = MagicMock()
+        coordinator.extra_dhw.restore_at = 1712232000.0
 
         result = await handle_setting_update_response(
             {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", "unknown"
@@ -692,7 +697,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.unique_id = "test_device_123"
 
         coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
+        coordinator.client = mock_api
         coordinator.hass = mock_hass
         coordinator.modbus_enabled = False
 
@@ -740,7 +745,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.unique_id = "test_device_123"
 
         coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
+        coordinator.client = mock_api
         coordinator.hass = mock_hass
         coordinator.modbus_enabled = False
 
@@ -780,7 +785,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.unique_id = "test_device_123"
 
         coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
+        coordinator.client = mock_api
         coordinator.hass = mock_hass
         coordinator.modbus_enabled = False
 
@@ -797,9 +802,10 @@ class TestQvantumDataUpdateCoordinator:
         mock_super_init.return_value = None
 
         mock_api = MagicMock()
-        mock_api.async_probe_identity = AsyncMock(
+        mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
+        mock_api.probe_identity = mock_api.probe_identity
         mock_api.get_metrics = AsyncMock(
             return_value={
                 "metrics": {
@@ -822,7 +828,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry = MagicMock()
         mock_config_entry.options.get.return_value = 120
         coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
+        coordinator.client = mock_api
         coordinator.hass = mock_hass
 
         result = await coordinator.async_update_data()
@@ -854,9 +860,10 @@ class TestQvantumDataUpdateCoordinator:
         mock_super_init.return_value = None
 
         mock_api = MagicMock()
-        mock_api.async_probe_identity = AsyncMock(
+        mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
+        mock_api.probe_identity = mock_api.probe_identity
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123"}}
         )
@@ -880,7 +887,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.unique_id = "test_device_123"
 
         coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
+        coordinator.client = mock_api
         coordinator.hass = mock_hass
 
         result = await coordinator.async_update_data()
@@ -897,9 +904,10 @@ class TestQvantumDataUpdateCoordinator:
         mock_super_init.return_value = None
 
         mock_api = MagicMock()
-        mock_api.async_probe_identity = AsyncMock(
+        mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
+        mock_api.probe_identity = mock_api.probe_identity
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123"}}
         )
@@ -921,7 +929,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.unique_id = "test_device_123"
 
         coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
+        coordinator.client = mock_api
         coordinator.hass = mock_hass
 
         await coordinator.async_update_data()
@@ -937,9 +945,10 @@ class TestQvantumDataUpdateCoordinator:
         mock_super_init.return_value = None
 
         mock_api = MagicMock()
-        mock_api.async_probe_identity = AsyncMock(
+        mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
+        mock_api.probe_identity = mock_api.probe_identity
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123"}}
         )
@@ -959,7 +968,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.unique_id = "test_device_123"
 
         coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
+        coordinator.client = mock_api
         coordinator.hass = mock_hass
 
         await coordinator.async_update_data()
@@ -974,9 +983,10 @@ class TestModbusExtraDhwTimerSync:
         mock_super_init.return_value = None
 
         mock_api = MagicMock()
-        mock_api.async_probe_identity = AsyncMock(
+        mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
+        mock_api.probe_identity = mock_api.probe_identity
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123"}}
         )
@@ -986,9 +996,10 @@ class TestModbusExtraDhwTimerSync:
             }
         )
         mock_api.get_http_metrics = AsyncMock()
-        mock_api._extra_dhw_restore_at = restore_at
-        mock_api._extra_dhw_armed_at = armed_at
-        mock_api.async_clear_extra_dhw_timer = AsyncMock()
+        extra_dhw = MagicMock()
+        extra_dhw.restore_at = restore_at
+        extra_dhw.armed_at = armed_at
+        extra_dhw.async_clear = AsyncMock()
 
         mock_hass = MagicMock()
         mock_hass.data = {
@@ -1003,7 +1014,8 @@ class TestModbusExtraDhwTimerSync:
         mock_config_entry.unique_id = "test_device_123"
 
         coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
+        coordinator.client = mock_api
+        coordinator.extra_dhw = extra_dhw
         coordinator.hass = mock_hass
         return coordinator, mock_api
 
@@ -1016,7 +1028,7 @@ class TestModbusExtraDhwTimerSync:
 
         result = await coordinator.async_update_data()
 
-        mock_api.async_clear_extra_dhw_timer.assert_not_awaited()
+        coordinator.extra_dhw.async_clear.assert_not_awaited()
         assert result["values"]["tap_stop"] == 1712232000
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
@@ -1028,7 +1040,7 @@ class TestModbusExtraDhwTimerSync:
 
         result = await coordinator.async_update_data()
 
-        mock_api.async_clear_extra_dhw_timer.assert_awaited_once()
+        coordinator.extra_dhw.async_clear.assert_awaited_once()
         assert "tap_stop" not in result["values"]
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
@@ -1043,7 +1055,7 @@ class TestModbusExtraDhwTimerSync:
 
         result = await coordinator.async_update_data()
 
-        mock_api.async_clear_extra_dhw_timer.assert_not_awaited()
+        coordinator.extra_dhw.async_clear.assert_not_awaited()
         assert result["values"]["tap_stop"] == 1712232000
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
@@ -1056,7 +1068,7 @@ class TestModbusExtraDhwTimerSync:
 
         result = await coordinator.async_update_data()
 
-        mock_api.async_clear_extra_dhw_timer.assert_not_awaited()
+        coordinator.extra_dhw.async_clear.assert_not_awaited()
         assert result["values"]["tap_stop"] == 1712232000
 
 
@@ -1067,9 +1079,10 @@ class TestHpStatusPostProcessing:
         mock_super_init.return_value = None
 
         mock_api = MagicMock()
-        mock_api.async_probe_identity = AsyncMock(
+        mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
+        mock_api.probe_identity = mock_api.probe_identity
         mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
         mock_api.get_metrics = AsyncMock(return_value={"metrics": metrics})
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
@@ -1090,7 +1103,7 @@ class TestHpStatusPostProcessing:
         mock_config_entry.unique_id = "test_device_123"
 
         coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
+        coordinator.client = mock_api
         coordinator.hass = mock_hass
         return coordinator
 
@@ -3423,13 +3436,14 @@ class TestDeviceLookupWhenHttpDown:
     def _make_coordinator(self, mock_super_init, *, modbus: bool):
         mock_super_init.return_value = None
         mock_api = MagicMock()
-        mock_api.async_probe_identity = AsyncMock(
+        mock_api.probe_identity = AsyncMock(
             return_value={
                 "id": "test_device_123",
                 "serial": "test_device_123",
                 "vendor": "Qvantum",
             }
         )
+        mock_api.probe_identity = mock_api.probe_identity
         mock_api.get_primary_device = AsyncMock()
         mock_hass = MagicMock()
         mock_hass.data = {
@@ -3446,7 +3460,7 @@ class TestDeviceLookupWhenHttpDown:
         else:
             mock_config_entry.options.get.side_effect = lambda key, default=None: default
         coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry)
-        coordinator.api = mock_api
+        coordinator.client = mock_api
         coordinator.hass = mock_hass
         coordinator._device_store = MagicMock()
         coordinator._device_store.async_load = AsyncMock(return_value=None)
@@ -3483,7 +3497,7 @@ class TestDeviceLookupWhenHttpDown:
     async def test_uses_device_registry_when_http_down(self, mock_super_init):
         """After a restart with no store file, fall back to the device registry."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
-        mock_api.async_probe_identity = AsyncMock(side_effect=Exception("probe failed"))
+        mock_api.probe_identity = AsyncMock(side_effect=Exception("probe failed"))
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123"}}
         )
@@ -3538,7 +3552,7 @@ class TestDeviceLookupWhenHttpDown:
             "vendor": "Qvantum",
             "sw_version": "1.7.22",
         }
-        mock_api.async_probe_identity = AsyncMock(return_value=device)
+        mock_api.probe_identity = AsyncMock(return_value=device)
         mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
 
@@ -3622,14 +3636,14 @@ class TestDeviceLookupWhenHttpDown:
             "serial": "new_device",
             "vendor": "Qvantum",
         }
-        mock_api.async_probe_identity = AsyncMock(return_value=device)
+        mock_api.probe_identity = AsyncMock(return_value=device)
         mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
 
         result = await coordinator.async_update_data()
 
         mock_api.get_primary_device.assert_not_called()
-        mock_api.async_probe_identity.assert_awaited()
+        mock_api.probe_identity.assert_awaited()
         assert result["device"]["id"] == "new_device"
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
@@ -3647,7 +3661,7 @@ class TestDeviceLookupWhenHttpDown:
                 "device": {"id": "old_device", "model": "QE-6"},
             }
         )
-        mock_api.async_probe_identity = AsyncMock(side_effect=Exception("probe failed"))
+        mock_api.probe_identity = AsyncMock(side_effect=Exception("probe failed"))
 
         ha_device = MagicMock()
         ha_device.config_entries = {"test_entry_id"}
@@ -3683,7 +3697,7 @@ class TestDeviceLookupWhenHttpDown:
         coordinator._device_store.async_load = AsyncMock(
             return_value={"id": "test_device_123", "model": "QE-6"}
         )
-        mock_api.async_probe_identity = AsyncMock(side_effect=Exception("probe failed"))
+        mock_api.probe_identity = AsyncMock(side_effect=Exception("probe failed"))
         mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
 
@@ -3744,7 +3758,7 @@ class TestDeviceLookupWhenHttpDown:
     async def test_modbus_identity_probe_propagates_cancellation(self, mock_super_init):
         """Task cancellation during identity probe must abort the update."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
-        mock_api.async_probe_identity = AsyncMock(side_effect=asyncio.CancelledError())
+        mock_api.probe_identity = AsyncMock(side_effect=asyncio.CancelledError())
 
         with pytest.raises(asyncio.CancelledError):
             await coordinator._ensure_device()

@@ -5,7 +5,7 @@ import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
-from custom_components.qvantum.api import APIAuthError
+from custom_components.qvantum.client.exceptions import APIAuthError
 from custom_components.qvantum.maintenance_coordinator import (
     QvantumMaintenanceCoordinator,
 )
@@ -41,6 +41,7 @@ class TestQvantumMaintenanceCoordinator:
         }
         coordinator._device = coordinator.data["device"]
         coordinator.modbus_enabled = False
+        coordinator.client = MagicMock()
         return coordinator
 
     @pytest_asyncio.fixture
@@ -52,7 +53,7 @@ class TestQvantumMaintenanceCoordinator:
         from custom_components.qvantum.const import DOMAIN
 
         mock_api = MagicMock()
-        hass.data[DOMAIN] = mock_api
+        mock_main_coordinator.client = mock_api
 
         # Patch frame.report_usage to avoid frame helper issues in tests
         with patch("homeassistant.helpers.frame.report_usage"):
@@ -69,7 +70,7 @@ class TestQvantumMaintenanceCoordinator:
         """Parent DataUpdateCoordinator must receive config_entry explicitly."""
         from custom_components.qvantum.const import DOMAIN
 
-        hass.data[DOMAIN] = MagicMock()
+        mock_main_coordinator.client = MagicMock()
         coordinator = QvantumMaintenanceCoordinator(
             hass=hass,
             config_entry=mock_config_entry,
@@ -105,14 +106,14 @@ class TestQvantumMaintenanceCoordinator:
     ):
         """Modbus mode must not call the cloud firmware/access APIs."""
         mock_main_coordinator.modbus_enabled = True
-        maintenance_coordinator.api.get_device_metadata = AsyncMock()
-        maintenance_coordinator.api.get_access_level = AsyncMock()
+        maintenance_coordinator.client.get_device_metadata = AsyncMock()
+        maintenance_coordinator.client.get_access_level = AsyncMock()
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
         assert result == {}
-        maintenance_coordinator.api.get_device_metadata.assert_not_called()
-        maintenance_coordinator.api.get_access_level.assert_not_called()
+        maintenance_coordinator.client.get_device_metadata.assert_not_called()
+        maintenance_coordinator.client.get_access_level.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_initial_versions(
@@ -120,7 +121,7 @@ class TestQvantumMaintenanceCoordinator:
     ):
         """Test firmware check with initial version detection."""
         # Mock the API call
-        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+        maintenance_coordinator.client.get_device_metadata = AsyncMock(
             return_value={
                 "device_metadata": {
                     "display_fw_version": "1.3.6",
@@ -129,7 +130,7 @@ class TestQvantumMaintenanceCoordinator:
                 }
             }
         )
-        maintenance_coordinator.api.get_access_level = AsyncMock(
+        maintenance_coordinator.client.get_access_level = AsyncMock(
             return_value={
                 "readAccessLevel": 20,
                 "writeAccessLevel": 20,
@@ -160,7 +161,7 @@ class TestQvantumMaintenanceCoordinator:
         }
 
         # Mock the API call with updated versions
-        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+        maintenance_coordinator.client.get_device_metadata = AsyncMock(
             return_value={
                 "device_metadata": {
                     "display_fw_version": "1.3.6",
@@ -169,7 +170,7 @@ class TestQvantumMaintenanceCoordinator:
                 }
             }
         )
-        maintenance_coordinator.api.get_access_level = AsyncMock(
+        maintenance_coordinator.client.get_access_level = AsyncMock(
             return_value={
                 "readAccessLevel": 20,
                 "writeAccessLevel": 20,
@@ -216,7 +217,7 @@ class TestQvantumMaintenanceCoordinator:
         self, maintenance_coordinator
     ):
         """Test firmware check with API authentication error."""
-        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+        maintenance_coordinator.client.get_device_metadata = AsyncMock(
             side_effect=Exception("API Error")
         )
 
@@ -229,14 +230,14 @@ class TestQvantumMaintenanceCoordinator:
     ):
         """Modbus mode must not fail firmware check when the HTTP API is down."""
         mock_main_coordinator.modbus_enabled = True
-        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+        maintenance_coordinator.client.get_device_metadata = AsyncMock(
             side_effect=Exception("HTTP API down")
         )
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
         assert result == {}
-        maintenance_coordinator.api.get_device_metadata.assert_not_called()
+        maintenance_coordinator.client.get_device_metadata.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_http_down_clears_stale_access(
@@ -248,12 +249,12 @@ class TestQvantumMaintenanceCoordinator:
             "firmware_versions": {"display_fw_version": "1.3.6"},
             "access_level": {"writeAccessLevel": 20},
         }
-        maintenance_coordinator.api.get_device_metadata = AsyncMock()
+        maintenance_coordinator.client.get_device_metadata = AsyncMock()
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
         assert result == {}
-        maintenance_coordinator.api.get_device_metadata.assert_not_called()
+        maintenance_coordinator.client.get_device_metadata.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_auth_error_modbus_clears_access(
@@ -265,14 +266,14 @@ class TestQvantumMaintenanceCoordinator:
             "firmware_versions": {"display_fw_version": "1.3.6"},
             "access_level": {"writeAccessLevel": 20},
         }
-        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+        maintenance_coordinator.client.get_device_metadata = AsyncMock(
             side_effect=APIAuthError(None, "token refresh failed")
         )
 
         result = await maintenance_coordinator.async_check_firmware_updates()
 
         assert result == {}
-        maintenance_coordinator.api.get_device_metadata.assert_not_called()
+        maintenance_coordinator.client.get_device_metadata.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_check_firmware_updates_auth_error_http_still_fails(
@@ -282,7 +283,7 @@ class TestQvantumMaintenanceCoordinator:
         from homeassistant.helpers.update_coordinator import UpdateFailed
 
         mock_main_coordinator.modbus_enabled = False
-        maintenance_coordinator.api.get_device_metadata = AsyncMock(
+        maintenance_coordinator.client.get_device_metadata = AsyncMock(
             side_effect=APIAuthError(None, "token refresh failed")
         )
 

@@ -67,7 +67,7 @@ def mock_coordinator():
             "fanspeedselector": FAN_SPEED_STATE_NORMAL,
         },
     }
-    coordinator.api = MagicMock()
+    coordinator.client = MagicMock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 
@@ -151,13 +151,13 @@ class TestQvantumFanEntity:
         entity = QvantumFanEntity(mock_coordinator, "fanspeedselector", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.set_fanspeedselector = AsyncMock(
+        mock_coordinator.client.set_fanspeedselector = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_set_preset_mode(FAN_SPEED_STATE_EXTRA)
 
-        mock_coordinator.api.set_fanspeedselector.assert_called_once_with(
+        mock_coordinator.client.set_fanspeedselector.assert_called_once_with(
             "test_device_123", FAN_SPEED_STATE_EXTRA
         )
         assert (
@@ -173,13 +173,13 @@ class TestQvantumFanEntity:
         entity = QvantumFanEntity(mock_coordinator, "fanspeedselector", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.set_fanspeedselector = AsyncMock(
+        mock_coordinator.client.set_fanspeedselector = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_on(preset_mode=FAN_SPEED_STATE_EXTRA)
 
-        mock_coordinator.api.set_fanspeedselector.assert_called_once_with(
+        mock_coordinator.client.set_fanspeedselector.assert_called_once_with(
             "test_device_123", FAN_SPEED_STATE_EXTRA
         )
         assert (
@@ -192,13 +192,13 @@ class TestQvantumFanEntity:
         entity = QvantumFanEntity(mock_coordinator, "fanspeedselector", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.set_fanspeedselector = AsyncMock(
+        mock_coordinator.client.set_fanspeedselector = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_on()
 
-        mock_coordinator.api.set_fanspeedselector.assert_called_once_with(
+        mock_coordinator.client.set_fanspeedselector.assert_called_once_with(
             "test_device_123", FAN_SPEED_STATE_NORMAL
         )
         assert (
@@ -212,13 +212,13 @@ class TestQvantumFanEntity:
         entity = QvantumFanEntity(mock_coordinator, "fanspeedselector", mock_device)
 
         # Mock the API response
-        mock_coordinator.api.set_fanspeedselector = AsyncMock(
+        mock_coordinator.client.set_fanspeedselector = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_turn_off()
 
-        mock_coordinator.api.set_fanspeedselector.assert_called_once_with(
+        mock_coordinator.client.set_fanspeedselector.assert_called_once_with(
             "test_device_123", FAN_SPEED_STATE_OFF
         )
         assert (
@@ -231,7 +231,7 @@ class TestQvantumFanEntity:
         entity = QvantumFanEntity(mock_coordinator, "fanspeedselector", mock_device)
 
         # Mock the API response with failure
-        mock_coordinator.api.set_fanspeedselector = AsyncMock(
+        mock_coordinator.client.set_fanspeedselector = AsyncMock(
             return_value={"status": "FAILED"}
         )
 

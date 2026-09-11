@@ -72,7 +72,7 @@ def mock_session():
 @pytest.fixture
 def api_with_session(mock_session):
     """Create a QvantumAPI instance with a mocked session and authentication."""
-    from custom_components.qvantum.api import QvantumAPI
+    from tests.test_api import QvantumAPI
     
     api = QvantumAPI("test@example.com", "password", "test-agent", session=mock_session)
     api._token = "test_token"
@@ -161,7 +161,7 @@ def mock_coordinator():
 @pytest_asyncio.fixture
 async def authenticated_api():
     """Authenticated API fixture with mocked session."""
-    from custom_components.qvantum.api import QvantumAPI
+    from tests.test_api import QvantumAPI
 
     # Create real API instance
     api = QvantumAPI("test@example.com", "password", "test-agent")

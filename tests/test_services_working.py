@@ -43,6 +43,7 @@ def mock_hass():
     hass = MagicMock()
     hass.data = {DOMAIN: MagicMock()}
     hass.services = MagicMock()
+    hass.config_entries.async_entries.return_value = []
     return hass
 
 
@@ -60,7 +61,10 @@ class TestQvantumServices:
     @pytest.mark.asyncio
     async def test_async_setup_services(self, mock_hass, mock_api):
         """Test service setup."""
-        mock_hass.data[DOMAIN] = mock_api
+        entry = MagicMock()
+        entry.runtime_data.client = mock_api
+        entry.runtime_data.extra_dhw = None
+        mock_hass.config_entries.async_entries.return_value = [entry]
 
         await async_setup_services(mock_hass)
 
@@ -77,7 +81,10 @@ class TestQvantumServices:
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_success(self, mock_hass, mock_api):
         """Test the extra_hot_water service with successful API call."""
-        mock_hass.data[DOMAIN] = mock_api
+        entry = MagicMock()
+        entry.runtime_data.client = mock_api
+        entry.runtime_data.extra_dhw = None
+        mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Set up the service
         await async_setup_services(mock_hass)
@@ -103,7 +110,10 @@ class TestQvantumServices:
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_with_exception(self, mock_hass, mock_api):
         """Test the extra_hot_water service with API exception."""
-        mock_hass.data[DOMAIN] = mock_api
+        entry = MagicMock()
+        entry.runtime_data.client = mock_api
+        entry.runtime_data.extra_dhw = None
+        mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Make the API call raise an exception
         mock_api.set_extra_tap_water.side_effect = Exception("API error")
@@ -134,7 +144,10 @@ class TestQvantumServices:
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_different_device(self, mock_hass, mock_api):
         """Test the extra_hot_water service with a different device ID."""
-        mock_hass.data[DOMAIN] = mock_api
+        entry = MagicMock()
+        entry.runtime_data.client = mock_api
+        entry.runtime_data.extra_dhw = None
+        mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Set up the service
         await async_setup_services(mock_hass)
@@ -163,9 +176,12 @@ class TestQvantumServices:
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_auth_error(self, mock_hass, mock_api):
         """Test the extra_hot_water service with authentication error."""
-        from custom_components.qvantum.api import APIAuthError
+        from custom_components.qvantum.client.exceptions import APIAuthError
 
-        mock_hass.data[DOMAIN] = mock_api
+        entry = MagicMock()
+        entry.runtime_data.client = mock_api
+        entry.runtime_data.extra_dhw = None
+        mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Make the API call raise an authentication error
         mock_api.set_extra_tap_water.side_effect = APIAuthError(
@@ -201,9 +217,12 @@ class TestQvantumServices:
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_connection_error(self, mock_hass, mock_api):
         """Test the extra_hot_water service with connection error."""
-        from custom_components.qvantum.api import APIConnectionError
+        from custom_components.qvantum.client.exceptions import APIConnectionError
 
-        mock_hass.data[DOMAIN] = mock_api
+        entry = MagicMock()
+        entry.runtime_data.client = mock_api
+        entry.runtime_data.extra_dhw = None
+        mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Make the API call raise a connection error
         mock_api.set_extra_tap_water.side_effect = APIConnectionError(
@@ -239,9 +258,12 @@ class TestQvantumServices:
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_rate_limit_error(self, mock_hass, mock_api):
         """Test the extra_hot_water service with rate limit error."""
-        from custom_components.qvantum.api import APIRateLimitError
+        from custom_components.qvantum.client.exceptions import APIRateLimitError
 
-        mock_hass.data[DOMAIN] = mock_api
+        entry = MagicMock()
+        entry.runtime_data.client = mock_api
+        entry.runtime_data.extra_dhw = None
+        mock_hass.config_entries.async_entries.return_value = [entry]
 
         # Make the API call raise a rate limit error
         mock_api.set_extra_tap_water.side_effect = APIRateLimitError(

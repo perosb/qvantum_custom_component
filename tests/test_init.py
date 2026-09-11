@@ -232,7 +232,7 @@ class TestIntegrationSetup:
         mock_config_entry.add_update_listener = MagicMock()
 
         with (
-            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
                 return_value=mock_coordinator,
@@ -260,7 +260,7 @@ class TestIntegrationSetup:
     ):
         """Test setup failure when no device data is available."""
         with (
-            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
                 return_value=mock_coordinator,
@@ -286,8 +286,11 @@ class TestIntegrationSetup:
         # Setup hass.data as API object
         mock_api = MagicMock()
         mock_api.close = AsyncMock()
-        hass.data["qvantum"] = mock_api
-        mock_config_entry.runtime_data = None
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = None
+        mock_config_entry.runtime_data.maintenance_coordinator = None
+        mock_config_entry.runtime_data.client = mock_api
+        mock_config_entry.runtime_data.extra_dhw = None
 
         result = await async_unload_entry(hass, mock_config_entry)
 
@@ -318,7 +321,6 @@ class TestIntegrationSetup:
         hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
         mock_api = MagicMock()
         mock_api.close = AsyncMock()
-        hass.data["qvantum"] = mock_api
 
         call_order: list[str] = []
 
@@ -342,6 +344,8 @@ class TestIntegrationSetup:
         mock_config_entry.runtime_data = MagicMock()
         mock_config_entry.runtime_data.coordinator = mock_main_coordinator
         mock_config_entry.runtime_data.maintenance_coordinator = mock_maint_coordinator
+        mock_config_entry.runtime_data.client = mock_api
+        mock_config_entry.runtime_data.extra_dhw = None
 
         with patch("custom_components.qvantum.async_dismiss", new_callable=AsyncMock):
             result = await async_unload_entry(hass, mock_config_entry)
@@ -350,6 +354,38 @@ class TestIntegrationSetup:
         assert call_order == ["maint_shutdown", "main_shutdown", "api_close"]
         mock_main_coordinator.async_shutdown.assert_awaited_once()
         mock_maint_coordinator.async_shutdown.assert_awaited_once()
+        mock_api.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_async_unload_entry_cancels_extra_dhw_before_client_close(
+        self, hass, mock_config_entry
+    ):
+        """Pending extra-DHW restore must not write after the client is closed."""
+        hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+        mock_api = MagicMock()
+        extra_dhw = MagicMock()
+        call_order: list[str] = []
+
+        async def close_api():
+            call_order.append("api_close")
+
+        def cancel_timer(**kwargs):
+            call_order.append("extra_dhw_cancel")
+
+        mock_api.close = AsyncMock(side_effect=close_api)
+        extra_dhw.cancel.side_effect = cancel_timer
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = None
+        mock_config_entry.runtime_data.maintenance_coordinator = None
+        mock_config_entry.runtime_data.client = mock_api
+        mock_config_entry.runtime_data.extra_dhw = extra_dhw
+
+        result = await async_unload_entry(hass, mock_config_entry)
+
+        assert result is True
+        assert call_order == ["extra_dhw_cancel", "api_close"]
+        extra_dhw.cancel.assert_called_once_with(clear_store=False)
         mock_api.close.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -376,6 +412,8 @@ class TestIntegrationSetup:
         mock_config_entry.runtime_data.maintenance_coordinator = (
             mock_firmware_coordinator
         )
+        mock_config_entry.runtime_data.client = mock_api
+        mock_config_entry.runtime_data.extra_dhw = None
 
         with patch(
             "custom_components.qvantum.async_dismiss", new_callable=AsyncMock
@@ -455,12 +493,18 @@ class TestIntegrationSetup:
 
         mock_coordinator = MagicMock()
         mock_coordinator.modbus_enabled = True
-        mock_coordinator.api = mock_api
+        mock_coordinator.client = mock_api
         mock_coordinator.poll_interval = 15
         mock_coordinator.apply_poll_interval = MagicMock(return_value=True)
 
         mock_config_entry.runtime_data = MagicMock()
         mock_config_entry.runtime_data.coordinator = mock_coordinator
+        mock_config_entry.runtime_data.client = mock_api
+        mock_config_entry.runtime_data.extra_dhw = None
+        mock_config_entry.runtime_data.modbus_host = "Qvantum-HP"
+        mock_config_entry.runtime_data.modbus_port = 502
+        mock_config_entry.runtime_data.modbus_unit_id = 1
+        mock_api.writable = True
         mock_config_entry.options = {
             "modbus_tcp": True,
             "modbus_host": "Qvantum-HP",
@@ -474,7 +518,7 @@ class TestIntegrationSetup:
 
         hass.config_entries.async_reload.assert_not_called()
         mock_coordinator.apply_poll_interval.assert_called_once_with(mock_config_entry)
-        assert mock_api._modbus_write is True
+        assert mock_api.writable is True
 
     @pytest.mark.asyncio
     async def test_async_update_listener_cancels_extra_dhw_timer_when_writes_disabled(
@@ -493,11 +537,18 @@ class TestIntegrationSetup:
 
         mock_coordinator = MagicMock()
         mock_coordinator.modbus_enabled = True
-        mock_coordinator.api = mock_api
+        mock_coordinator.client = mock_api
         mock_coordinator.apply_poll_interval = MagicMock(return_value=False)
 
         mock_config_entry.runtime_data = MagicMock()
         mock_config_entry.runtime_data.coordinator = mock_coordinator
+        mock_config_entry.runtime_data.client = mock_api
+        extra_dhw = MagicMock()
+        mock_config_entry.runtime_data.extra_dhw = extra_dhw
+        mock_config_entry.runtime_data.modbus_host = "Qvantum-HP"
+        mock_config_entry.runtime_data.modbus_port = 502
+        mock_config_entry.runtime_data.modbus_unit_id = 1
+        mock_api.writable = True
         mock_config_entry.options = {
             "modbus_tcp": True,
             "modbus_host": "Qvantum-HP",
@@ -509,8 +560,8 @@ class TestIntegrationSetup:
         await _async_update_listener(hass, mock_config_entry)
 
         hass.config_entries.async_reload.assert_not_called()
-        mock_api._cancel_extra_dhw_timer.assert_called_once()
-        assert mock_api._modbus_write is False
+        extra_dhw.cancel.assert_called_once_with(clear_store=True)
+        assert mock_api.writable is False
 
     @pytest.mark.asyncio
     async def test_async_update_listener_reloads_on_modbus_host_change(
@@ -527,7 +578,7 @@ class TestIntegrationSetup:
 
         mock_coordinator = MagicMock()
         mock_coordinator.modbus_enabled = True
-        mock_coordinator.api = mock_api
+        mock_coordinator.client = mock_api
         mock_coordinator.apply_poll_interval = MagicMock()
 
         mock_config_entry.runtime_data = MagicMock()
@@ -561,7 +612,7 @@ class TestIntegrationSetup:
 
         mock_coordinator = MagicMock()
         mock_coordinator.modbus_enabled = False
-        mock_coordinator.api = mock_api
+        mock_coordinator.client = mock_api
         mock_coordinator.apply_poll_interval = MagicMock()
 
         mock_config_entry.runtime_data = MagicMock()
@@ -594,7 +645,7 @@ class TestIntegrationSetup:
 
         mock_coordinator = MagicMock()
         mock_coordinator.modbus_enabled = True
-        mock_coordinator.api = mock_api
+        mock_coordinator.client = mock_api
         mock_coordinator.apply_poll_interval = MagicMock()
 
         mock_config_entry.runtime_data = MagicMock()
@@ -638,7 +689,7 @@ class TestIntegrationSetup:
             patch(
                 "custom_components.qvantum._async_modbus_unit", return_value=MagicMock()
             ),
-            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
                 return_value=mock_coordinator,
@@ -684,7 +735,7 @@ class TestIntegrationSetup:
             patch(
                 "custom_components.qvantum._async_modbus_unit", return_value=MagicMock()
             ),
-            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
                 return_value=mock_coordinator,
@@ -727,7 +778,7 @@ class TestIntegrationSetup:
             patch(
                 "custom_components.qvantum._async_modbus_unit", return_value=MagicMock()
             ),
-            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
                 return_value=mock_coordinator,
@@ -768,7 +819,7 @@ class TestIntegrationSetup:
             patch(
                 "custom_components.qvantum._async_modbus_unit", return_value=unit
             ) as get_unit,
-            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api) as api_ctor,
+            patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api) as api_ctor,
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
                 return_value=mock_coordinator,
@@ -783,9 +834,8 @@ class TestIntegrationSetup:
 
         assert result is True
         get_unit.assert_called_once_with(hass, mock_config_entry)
-        assert api_ctor.call_args.kwargs["modbus_unit"] is unit
-        assert api_ctor.call_args.kwargs["modbus_tcp"] is True
-        assert api_ctor.call_args.kwargs["modbus_host"] == "hp.local"
+        assert api_ctor.call_args.args[0] is unit
+        assert api_ctor.call_args.kwargs.get("writable") is False
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_modbus_conflict_raises_not_ready(
@@ -829,7 +879,7 @@ class TestIntegrationSetup:
         )
 
         with (
-            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
                 return_value=mock_coordinator,
@@ -869,7 +919,7 @@ class TestIntegrationSetup:
         )
 
         with (
-            patch("custom_components.qvantum.QvantumAPI", return_value=mock_api),
+            patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api),
             patch(
                 "custom_components.qvantum.QvantumDataUpdateCoordinator",
                 return_value=mock_coordinator,
@@ -893,7 +943,7 @@ class TestIntegrationSetup:
         mock_coordinator.async_config_entry_first_refresh = AsyncMock(side_effect=[None, None])
         mock_coordinator.async_restore_dhw_state = AsyncMock()
 
-        with patch("custom_components.qvantum.QvantumAPI", return_value=mock_api), \
+        with patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api), \
             patch("custom_components.qvantum.QvantumDataUpdateCoordinator", return_value=mock_coordinator), \
             patch("custom_components.qvantum.QvantumMaintenanceCoordinator", return_value=MagicMock()), \
             patch("custom_components.qvantum.services.async_setup_services"):

@@ -17,6 +17,26 @@ _LOGGER = logging.getLogger(__name__)
 WriteNormal = Callable[[str], Awaitable[Any]]
 
 
+async def async_apply_extra_tap_water(
+    client: Any,
+    timer: ExtraDhwTimer | None,
+    device_id: str | int,
+    minutes: int,
+) -> Any:
+    """Write extra DHW on the transport, then arm or clear the HA restore timer.
+
+    Cloud encodes duration on the wire. Modbus only writes Extra/Normal; the
+    timer is what restores Normal after *minutes*.
+    """
+    result = await client.set_extra_tap_water(device_id, minutes)
+    if timer is not None:
+        if minutes > 0:
+            await timer.async_schedule(str(device_id), minutes)
+        else:
+            await timer.async_clear()
+    return result
+
+
 class ExtraDhwTimer:
     """Schedule restoring DHW mode to Normal after extra hot water."""
 

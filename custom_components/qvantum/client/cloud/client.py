@@ -108,6 +108,26 @@ class QvantumCloudClient:
     def _request_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}
 
+    def _http_kwargs(
+        self,
+        *,
+        headers: dict[str, str] | None = None,
+        include_auth: bool = True,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Timeout and User-Agent for owned and injected sessions."""
+        merged: dict[str, str] = {
+            "Content-Type": "application/json",
+            "User-Agent": self._user_agent,
+        }
+        if include_auth:
+            merged.update(self._request_headers())
+        if headers:
+            merged.update(headers)
+        result: dict[str, Any] = {"headers": merged, "timeout": HTTP_TIMEOUT}
+        result.update(kwargs)
+        return result
+
     async def authenticate(self) -> bool:
         """Sign in with email/password and store tokens."""
         self._ensure_open()
@@ -119,7 +139,7 @@ class QvantumCloudClient:
         }
         async with self._session.post(
             f"{self._auth_url}/v1/accounts:signInWithPassword?key={self._firebase_api_key}",
-            json=payload,
+            **self._http_kwargs(include_auth=False, json=payload),
         ) as response:
             match response.status:
                 case 200:
@@ -146,7 +166,7 @@ class QvantumCloudClient:
         self._token = None
         async with self._session.post(
             f"{self._token_url}/v1/token?key={self._firebase_api_key}",
-            json=payload,
+            **self._http_kwargs(include_auth=False, json=payload),
         ) as response:
             match response.status:
                 case 200:
@@ -186,7 +206,7 @@ class QvantumCloudClient:
     ) -> dict[str, Any]:
         await self._ensure_valid_token()
         request = getattr(self._session, method)
-        kwargs: dict[str, Any] = {"headers": self._request_headers()}
+        kwargs: dict[str, Any] = self._http_kwargs()
         if payload is not None:
             kwargs["json"] = payload
         async with request(url, **kwargs) as response:
@@ -333,12 +353,12 @@ class QvantumCloudClient:
 
     async def get_device_metadata(self, device_id: str) -> dict[str, Any]:
         await self._ensure_valid_token()
-        headers = self._request_headers()
+        extra: dict[str, str] = {}
         if self._device_metadata_etag:
-            headers["If-None-Match"] = self._device_metadata_etag
+            extra["If-None-Match"] = self._device_metadata_etag
         async with self._session.get(
             f"{self._api_url}/api/device-info/v1/devices/{device_id}/status",
-            headers=headers,
+            **self._http_kwargs(headers=extra),
         ) as response:
             match response.status:
                 case 200:
@@ -364,12 +384,18 @@ class QvantumCloudClient:
         self, device_id: str, enabled_metrics: list[str] | None = None
     ) -> dict[str, Any]:
         self._ensure_open()
-        names = enabled_metrics or []
         http_values, etag, total_latency = await self._get_http_values(
-            device_id, names, etag_header=self._metrics_etag
+            device_id,
+            enabled_metrics or [],
+            etag_header=self._metrics_etag,
         )
         if http_values is not None:
             metrics: dict = {"hpid": device_id, "latency": total_latency}
+            names = (
+                enabled_metrics
+                if enabled_metrics is not None
+                else list(http_values.keys())
+            )
             for metric_name in names:
                 if metric_name in http_values:
                     metrics[metric_name] = http_values[metric_name]
@@ -401,14 +427,14 @@ class QvantumCloudClient:
     ) -> tuple[dict | None, str | None, int | None]:
         self._ensure_open()
         await self._ensure_valid_token()
-        headers = self._request_headers()
+        extra: dict[str, str] = {}
         if etag_header:
-            headers["If-None-Match"] = etag_header
+            extra["If-None-Match"] = etag_header
         names_list = "".join(f"&names[]={name}" for name in metric_names)
         async with self._session.get(
             f"{API_INTERNAL_URL}/api/internal/v1/devices/{device_id}/values"
             f"?use_internal_names=true&timeout={METRICS_TIMEOUT_SECONDS}{names_list}",
-            headers=headers,
+            **self._http_kwargs(headers=extra),
         ) as response:
             match response.status:
                 case 200:
@@ -438,12 +464,12 @@ class QvantumCloudClient:
     async def get_settings(self, device_id: str) -> dict[str, Any]:
         self._ensure_open()
         await self._ensure_valid_token()
-        headers = self._request_headers()
+        extra: dict[str, str] = {}
         if self._settings_etag:
-            headers["If-None-Match"] = self._settings_etag
+            extra["If-None-Match"] = self._settings_etag
         async with self._session.get(
             f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings",
-            headers=headers,
+            **self._http_kwargs(headers=extra),
         ) as response:
             match response.status:
                 case 200:
@@ -470,7 +496,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._session.get(
             f"{self._api_url}/api/inventory/v1/users/me/devices",
-            headers=self._request_headers(),
+            **self._http_kwargs(),
         ) as response:
             match response.status:
                 case 200:
@@ -502,7 +528,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._session.get(
             f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
-            headers=self._request_headers(),
+            **self._http_kwargs(),
         ) as response:
             await self._handle_response(response)
             data = await response.json()
@@ -515,7 +541,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._session.post(
             f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/generate-access-code?use_internal_names=true",
-            headers=self._request_headers(),
+            **self._http_kwargs(),
         ) as response:
             if response.ok:
                 data = await response.json()
@@ -535,7 +561,7 @@ class QvantumCloudClient:
         )
         async with self._session.post(
             f"{API_INTERNAL_URL}/api/internal/v1/auth/device/claim-grant?access_code={access_code}&use_internal_names=true",
-            headers=self._request_headers(),
+            **self._http_kwargs(),
         ) as response:
             if response.ok:
                 data = await response.json()
@@ -552,7 +578,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._session.post(
             f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/access-grants?access_code={access_code}&approve=true&use_internal_names=true",
-            headers=self._request_headers(),
+            **self._http_kwargs(),
         ) as response:
             if response.ok:
                 _LOGGER.debug("Access approved for device %s.", device_id)
@@ -568,7 +594,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._session.get(
             f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
-            headers=self._request_headers(),
+            **self._http_kwargs(),
         ) as response:
             await self._handle_response(response)
             data = await response.json()
@@ -598,7 +624,7 @@ class QvantumCloudClient:
                 return None
             async with self._session.get(
                 f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
-                headers=self._request_headers(),
+                **self._http_kwargs(),
             ) as response:
                 await self._handle_response(response)
                 data = await response.json()
