@@ -1,0 +1,31 @@
+name: Grok PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: grok-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: 0xr3ngar/grok-build-review-action@v1
+        with:
+          grok_auth_json: ${{ secrets.GROK_AUTH_JSON }}
+          roast_level: professional
+          custom_instructions: |
+            Follow AGENTS.md. client/ must not import homeassistant or custom_components.
+            One config entry, Cloud XOR Modbus. Prefer coordinator helpers over transport isinstance.
+            Do not invent cloud endpoints or Modbus registers.
