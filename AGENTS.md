@@ -82,13 +82,23 @@ Do not ask for permission for these steps. Do not merge unless asked.
 
 ## Commits and PRs
 
-**Commits** — conventional prefix when it fits (`feat:`, `fix:`, `refactor:`,
-`test:`, `chore:`, `docs:`), imperative subject, optional body that says *why*.
-Release automation commits `Update for new version <tag>` — leave that to CI.
+**Commits and PR titles** always start with a conventional prefix, then an
+imperative subject. Use a body that says *why* when the subject is not enough.
 
-**PR title** — same as a good commit subject. User-facing bugfixes often use
-`fix: …`. Larger extractions may omit the prefix (`Cut over HA to Cloud XOR
-Modbus clients and drop QvantumAPI`).
+| Prefix | Use for |
+|---|---|
+| `feat:` | New behavior or a user-visible capability |
+| `fix:` | Bug fix |
+| `refactor:` | Structure change with no intended behavior change |
+| `test:` | Tests only |
+| `docs:` | Documentation only |
+| `chore:` | Tooling, CI, dependencies, housekeeping |
+
+Examples: `feat: Cut over HA to Cloud XOR Modbus clients`,
+`refactor: Drop leftover QvantumAPI facades`, `fix: Cancel extra-DHW before close`.
+
+Do not omit the prefix for large work. Release automation commits
+`Update for new version <tag>` — leave that to CI.
 
 **PR body** — keep this shape:
 
