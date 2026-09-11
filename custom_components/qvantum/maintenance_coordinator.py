@@ -12,8 +12,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .client.cloud import QvantumCloudClient
 from .client.exceptions import AuthError as APIAuthError
-from .coordinator import as_cloud_client
 from .const import DOMAIN, FIRMWARE_KEYS
 import traceback
 
@@ -45,10 +45,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
 
     async def async_check_firmware_updates(self):
         """Check for firmware updates by fetching device metadata and comparing versions."""
-        if getattr(self.main_coordinator, "modbus_enabled", False):
-            return {}
-        cloud = as_cloud_client(self.client)
-        if cloud is None:
+        if not isinstance(self.client, QvantumCloudClient):
             return {}
         try:
             # Get the device from the main coordinator
@@ -63,14 +60,14 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
                 return {}
 
             # Fetch fresh device metadata
-            metadata = await cloud.get_device_metadata(device_id)
+            metadata = await self.client.get_device_metadata(device_id)
 
             if not metadata or "device_metadata" not in metadata:
                 _LOGGER.debug("No device metadata available for firmware check")
                 return {}
 
             # Fetch access level
-            access_level = await cloud.get_access_level(device_id)
+            access_level = await self.client.get_access_level(device_id)
 
             current_versions = metadata["device_metadata"]
             firmware_changed = False

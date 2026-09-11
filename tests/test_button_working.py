@@ -24,7 +24,7 @@ def mock_coordinator():
     coordinator.async_set_updated_data = AsyncMock()
     coordinator.client = MagicMock()
     coordinator.async_set_extra_tap_water = AsyncMock(return_value={"status": "APPLIED"})
-    coordinator.client.elevate_access = AsyncMock(return_value={"writeAccessLevel": 30})
+    coordinator.async_elevate_access = AsyncMock(return_value={"writeAccessLevel": 30})
     coordinator.modbus_enabled = False
 
     # Mock config_entry and runtime_data for access level check
@@ -122,7 +122,7 @@ class TestQvantumButtonEntity:
 
         await button.async_press()
 
-        mock_coordinator.client.elevate_access.assert_called_once_with(
+        mock_coordinator.async_elevate_access.assert_called_once_with(
             "test_device_123"
         )
         # Verify maintenance coordinator is refreshed after elevating access
@@ -134,7 +134,7 @@ class TestQvantumButtonEntity:
     ):
         """Test pressing the elevate access button when elevation fails."""
         # Mock the API to return None (failure)
-        mock_coordinator.client.elevate_access = AsyncMock(return_value=None)
+        mock_coordinator.async_elevate_access = AsyncMock(return_value=None)
 
         button = QvantumButtonEntity(
             mock_coordinator,
@@ -145,7 +145,7 @@ class TestQvantumButtonEntity:
 
         await button.async_press()
 
-        mock_coordinator.client.elevate_access.assert_called_once_with("test_device_123")
+        mock_coordinator.async_elevate_access.assert_called_once_with("test_device_123")
 
         # Verify error is logged
         assert "Failed to elevate access" in caplog.text
@@ -156,8 +156,8 @@ class TestQvantumButtonEntity:
     async def test_async_press_elevate_access_noop_in_modbus_mode(
         self, mock_coordinator, mock_device, mock_maintenance_coordinator
     ):
-        """Service press of elevate_access must not call HTTP in Modbus mode."""
-        mock_coordinator.modbus_enabled = True
+        """Service press of elevate_access is a no-op when the coordinator has no cloud client."""
+        mock_coordinator.async_elevate_access = AsyncMock(return_value=None)
         button = QvantumButtonEntity(
             mock_coordinator,
             "elevate_access",
@@ -167,7 +167,9 @@ class TestQvantumButtonEntity:
 
         await button.async_press()
 
-        mock_coordinator.client.elevate_access.assert_not_called()
+        mock_coordinator.async_elevate_access.assert_awaited_once_with(
+            "test_device_123"
+        )
         mock_maintenance_coordinator.async_refresh.assert_not_called()
         mock_coordinator.async_refresh.assert_not_called()
 

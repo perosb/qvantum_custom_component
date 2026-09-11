@@ -6,13 +6,26 @@ for integration-specific functionality.
 """
 
 import datetime
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 import pytest_asyncio
 
 # Ensure the pytest-homeassistant-custom-component plugin is loaded
 pytest_plugins = ["pytest_homeassistant_custom_component"]
+
+
+def make_client_mock(*, modbus: bool = False) -> MagicMock:
+    """Transport mock that passes strict ``isinstance`` checks in production."""
+    if modbus:
+        from custom_components.qvantum.client.modbus import QvantumModbusClient
+
+        mock = MagicMock(spec=QvantumModbusClient)
+        mock.writable = True
+        return mock
+    from custom_components.qvantum.client.cloud import QvantumCloudClient
+
+    return MagicMock(spec=QvantumCloudClient)
 
 
 @pytest.fixture(autouse=True)

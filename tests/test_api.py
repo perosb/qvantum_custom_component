@@ -160,32 +160,6 @@ class TestQvantumAPI:
         mock_session.get.assert_not_called()
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Poll latency is stamped on the coordinator, not the client")
-    async def test_get_metrics_modbus_sets_latency_ms(self, mock_session):
-        """When Modbus succeeds, latency should be an integer millisecond measurement."""
-        api = QvantumAPI(
-            "test@example.com",
-            "password",
-            "test-agent",
-            session=mock_session,
-            modbus_tcp=True,
-        )
-
-        fake_metrics = {"metrics": {"bt1": 21, "powertotal": 100}}
-
-        with patch.object(
-            api,
-            "get_metrics",
-            AsyncMock(return_value=fake_metrics),
-        ):
-            result = await api.get_metrics("test_device_123", enabled_metrics=["bt1"])
-
-        assert "metrics" in result
-        latency = result["metrics"]["latency"]
-        assert isinstance(latency, int)
-        assert latency >= 0
-
-    @pytest.mark.asyncio
     async def test_get_metrics_modbus_no_latency_placeholder_in_registers(
         self, mock_session
     ):
@@ -287,31 +261,6 @@ class TestQvantumAPI:
         # Since session was provided externally, the API shouldn't close it.
         mock_session.close.assert_not_called()
         assert api._closed is True
-
-    @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Cutover: HTTP session and Modbus client are exclusive")
-    async def test_close_owned_session_and_modbus_client(self):
-        """Owned HTTP session is closed; the borrowed Modbus connection is not."""
-        api = QvantumAPI("test@example.com", "password", "test-agent", modbus_tcp=True)
-        mock_session = MagicMock()
-        mock_session.close = AsyncMock()
-        api._session = mock_session
-        api._session_owner = True
-
-        connection, _device = attach_mock_modbus(api)
-        connection.close = AsyncMock()
-
-        await api.close()
-
-        mock_session.close.assert_awaited_once()
-        connection.close.assert_not_called()
-        assert api._session is None
-        assert api.device is None
-        assert api._closed is True
-
-        # Second close is a no-op
-        await api.close()
-        mock_session.close.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_get_metrics_after_close_raises(self, mock_session):
@@ -1311,22 +1260,6 @@ class TestQvantumAPI:
         assert api._ensure_device() is None
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Cutover: HTTP client has no Modbus internals")
-    async def testget_metrics_raises_when_no_client(self, mock_session):
-        from custom_components.qvantum.client.exceptions import APIConnectionError
-
-        api = QvantumAPI(
-            "test@example.com",
-            "password",
-            "test-agent",
-            session=mock_session,
-            modbus_tcp=False,
-        )
-
-        with pytest.raises(APIConnectionError, match="Modbus client not initialized"):
-            await api.get_metrics("test_device", ["bt1"])
-
-    @pytest.mark.asyncio
     async def test_handle_response_rate_limits_and_auth_error(self):
         from custom_components.qvantum.client.exceptions import APIAuthError, APIRateLimitError
 
@@ -1361,20 +1294,6 @@ class TestQvantumAPI:
         assert result_on == {"command": {}}
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Cutover: HTTP client has no Modbus internals")
-    async def test_reset_modbus_client_drops_device_wrapper(self, mock_session):
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-        api.device = MagicMock()
-        api._modbus_unit = MagicMock()
-
-        await api._reset_modbus_client()
-
-        assert api.device is None
-        assert api._modbus_unit is not None
-
-    @pytest.mark.asyncio
     async def test_close_closes_owned_session(self, mock_session):
         api = QvantumAPI(
             "test@example.com", "password", "test-agent", session=mock_session
@@ -1387,7 +1306,7 @@ class TestQvantumAPI:
         mock_session.close.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def testget_metrics_device_error_raises(self, mock_session):
+    async def test_get_metrics_device_error_raises(self, mock_session):
         from custom_components.qvantum.client.exceptions import APIConnectionError
 
         api = QvantumAPI(
@@ -1404,7 +1323,7 @@ class TestQvantumAPI:
             await api.get_metrics("test_device", ["bt1"])
 
     @pytest.mark.asyncio
-    async def testget_metrics_ensures_use_adaptive(self, mock_session):
+    async def test_get_metrics_ensures_use_adaptive(self, mock_session):
         api = QvantumAPI(
             "test@example.com",
             "password",
@@ -1421,7 +1340,7 @@ class TestQvantumAPI:
         assert result["metrics"]["smart_sh_mode"] == 1
 
     @pytest.mark.asyncio
-    async def testget_settings_fan_and_extra_tap_water(self, mock_session):
+    async def test_get_settings_fan_and_extra_tap_water(self, mock_session):
         api = QvantumAPI(
             "test@example.com",
             "password",
@@ -2108,19 +2027,6 @@ class TestWriteHoldingRegister:
 
         assert result == {"status": "APPLIED"}
         assert device.unit.holding[59] == 75
-
-    @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Cutover: HTTP client has no Modbus writes")
-    async def test_write_holding_register_raises_when_no_client(self, mock_session):
-        """Raises APIConnectionError when Modbus is not enabled (no client)."""
-        from custom_components.qvantum.client.exceptions import APIConnectionError
-
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-
-        with pytest.raises(APIConnectionError, match="Modbus client not initialized"):
-            await api.write_holding_register("dev1", 59, 75)
 
     @pytest.mark.asyncio
     async def test_write_holding_register_raises_on_device_error(self, mock_session):

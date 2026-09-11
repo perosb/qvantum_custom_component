@@ -4,7 +4,6 @@ import logging
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -12,12 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from custom_components.qvantum.const import SETTING_UPDATE_APPLIED, SensorMode
 
 from . import MyConfigEntry
-from .coordinator import (
-    QvantumDataUpdateCoordinator,
-    as_cloud_client,
-    as_modbus_client,
-    handle_setting_update_response,
-)
+from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -99,17 +93,8 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Update the current value."""
         if self._metric_key == "use_operation_sensor":
-            if not self._is_modbus_write_allowed():
-                raise HomeAssistantError(
-                    "Modbus writing is disabled. Turn on writing via Modbus in the integration options."
-                )
             option_value = int(option)
-            client = as_modbus_client(self.coordinator.client)
-            if client is None:
-                raise HomeAssistantError(
-                    "sensor_mode writes require a Modbus client"
-                )
-            response = await client.write_metric(
+            response = await self.coordinator.async_write_metric(
                 self._hpid, "sensor_mode", option_value
             )
             if response and (
@@ -130,10 +115,9 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
         sh_mode = mode_value
         dhw_mode = mode_value
 
-        client = as_cloud_client(self.coordinator.client)
-        if client is None:
-            raise HomeAssistantError("use_adaptive writes require a cloud client")
-        response = await client.set_smartcontrol(self._hpid, sh_mode, dhw_mode)
+        response = await self.coordinator.async_set_smartcontrol(
+            self._hpid, sh_mode, dhw_mode
+        )
         # Handle response
         use_adaptive_value = option != "off"
 

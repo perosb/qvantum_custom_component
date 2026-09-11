@@ -11,6 +11,7 @@ from custom_components.qvantum.coordinator import (
     QvantumDataUpdateCoordinator,
     _firmware_metadata_from_sw_version,
 )
+from tests.conftest import make_client_mock
 from custom_components.qvantum.const import (
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
@@ -235,7 +236,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry.unique_id = "test_device"
         config_entry.entry_id = "test_entry_id"
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
 
         mock_super_init.assert_called_once()
         assert mock_super_init.call_args.kwargs["config_entry"] is config_entry
@@ -248,7 +249,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_hass = MagicMock()
         mock_device_registry = MagicMock()
         mock_entity_registry = MagicMock()
-        mock_api = MagicMock()
+        mock_api = make_client_mock()
 
         # Mock device
         mock_device = MagicMock()
@@ -289,7 +290,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry = MagicMock()
         config_entry.options.get.return_value = 30  # Mock scan interval
         config_entry.unique_id = "test_device"
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
         coordinator.hass = mock_hass
 
         result = coordinator._get_enabled_metrics("test_device")
@@ -311,7 +312,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_hass = MagicMock()
         mock_device_registry = MagicMock()
         mock_entity_registry = MagicMock()
-        mock_api = MagicMock()
+        mock_api = make_client_mock()
 
         mock_device = MagicMock()
         mock_device.id = "device_id_123"
@@ -338,7 +339,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry = MagicMock()
         config_entry.options.get.side_effect = lambda key, default=None: False if key == CONF_MODBUS_TCP else 30
         config_entry.unique_id = "test_device"
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
         coordinator.hass = mock_hass
 
         result = coordinator._get_enabled_metrics("test_device")
@@ -353,7 +354,7 @@ class TestQvantumDataUpdateCoordinator:
         # Create mock hass with empty registries
         mock_hass = MagicMock()
         mock_device_registry = MagicMock()
-        mock_api = MagicMock()
+        mock_api = make_client_mock()
         mock_device_registry.async_get_device_by_identifier.return_value = None
 
         mock_hass.data = {DOMAIN: mock_api, "device_registry": mock_device_registry}
@@ -364,7 +365,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry.options.get.side_effect = lambda key, default=None: 30 if key == CONF_SCAN_INTERVAL else default
         config_entry.data.get.return_value = False  # Mock data.get to return False for modbus
         config_entry.unique_id = "test_device"
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
         coordinator.hass = mock_hass
 
         result = coordinator._get_enabled_metrics("test_device")
@@ -387,7 +388,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_hass = MagicMock()
         mock_device_registry = MagicMock()
         mock_entity_registry = MagicMock()
-        mock_api = MagicMock()
+        mock_api = make_client_mock()
 
         # Mock device
         mock_device = MagicMock()
@@ -417,7 +418,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry.options.get.side_effect = lambda key, default=None: 30 if key == CONF_SCAN_INTERVAL else default
         config_entry.data.get.return_value = False  # Mock data.get to return False for modbus
         config_entry.unique_id = "test_device"
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
         coordinator.hass = mock_hass
 
         result = coordinator._get_enabled_metrics("test_device")
@@ -432,7 +433,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_hass = MagicMock()
         mock_device_registry = MagicMock()
         mock_entity_registry = MagicMock()
-        mock_api = MagicMock()
+        mock_api = make_client_mock()
 
         mock_device = MagicMock()
         mock_device.id = "device_id_123"
@@ -458,7 +459,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry = MagicMock()
         config_entry.options.get.return_value = 30
         config_entry.unique_id = "test_device"
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
         coordinator.hass = mock_hass
 
         result = coordinator._get_enabled_metrics("test_device")
@@ -501,7 +502,7 @@ class TestQvantumDataUpdateCoordinator:
             False if key == CONF_MODBUS_TCP else 30
         )
         config_entry.unique_id = "test_device"
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
         coordinator.hass = mock_hass
 
         with (
@@ -556,7 +557,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry.data = {}
         config_entry.unique_id = "test_device"
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
         coordinator.hass = mock_hass
 
         result = coordinator._get_enabled_metrics("test_device")
@@ -574,7 +575,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry.options = {}
         config_entry.data = {CONF_MODBUS_TCP: True}
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
 
         assert coordinator.modbus_enabled is True
         assert coordinator.poll_interval == DEFAULT_MODBUS_SCAN_INTERVAL
@@ -597,7 +598,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry.options.get.side_effect = options_get
         config_entry.data = {}
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
 
         assert coordinator.poll_interval == MIN_MODBUS_SCAN_INTERVAL
 
@@ -619,7 +620,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry.options.get.side_effect = options_get
         config_entry.data = {}
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
 
         assert coordinator.poll_interval == MIN_MODBUS_SCAN_INTERVAL
 
@@ -641,7 +642,7 @@ class TestQvantumDataUpdateCoordinator:
         config_entry.options.get.side_effect = options_get
         config_entry.data = {}
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
         coordinator.name = "qvantum"
         assert coordinator.poll_interval == 15
 
@@ -670,7 +671,7 @@ class TestQvantumDataUpdateCoordinator:
         """HTTP mode should request and surface tap_stop for the timer sensor."""
         mock_super_init.return_value = None
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock()
         mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
         mock_api.get_metrics = AsyncMock(
             return_value={
@@ -696,7 +697,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.data = {}
         mock_config_entry.unique_id = "test_device_123"
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
         coordinator.client = mock_api
         coordinator.hass = mock_hass
         coordinator.modbus_enabled = False
@@ -716,7 +717,7 @@ class TestQvantumDataUpdateCoordinator:
         """HTTP tap_water_start/stop come from settings, not the metrics query."""
         mock_super_init.return_value = None
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock()
         mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123"}}
@@ -744,7 +745,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.data = {}
         mock_config_entry.unique_id = "test_device_123"
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
         coordinator.client = mock_api
         coordinator.hass = mock_hass
         coordinator.modbus_enabled = False
@@ -763,7 +764,7 @@ class TestQvantumDataUpdateCoordinator:
         """HTTP stop_heating is requested in metrics and populated into values."""
         mock_super_init.return_value = None
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock()
         mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
         mock_api.get_metrics = AsyncMock(
             return_value={"metrics": {"hpid": "test_device_123", "stop_heating": 16}}
@@ -784,7 +785,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.data = {}
         mock_config_entry.unique_id = "test_device_123"
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
         coordinator.client = mock_api
         coordinator.hass = mock_hass
         coordinator.modbus_enabled = False
@@ -801,7 +802,7 @@ class TestQvantumDataUpdateCoordinator:
         """Test modbus dhw_normal_* keys are mapped to tap_water_* and tap_stop."""
         mock_super_init.return_value = None
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock(modbus=True)
         mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
@@ -827,7 +828,7 @@ class TestQvantumDataUpdateCoordinator:
 
         mock_config_entry = MagicMock()
         mock_config_entry.options.get.return_value = 120
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
         coordinator.client = mock_api
         coordinator.hass = mock_hass
 
@@ -859,7 +860,7 @@ class TestQvantumDataUpdateCoordinator:
         """Modbus mode must not poll tap_stop over HTTP."""
         mock_super_init.return_value = None
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock(modbus=True)
         mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
@@ -886,7 +887,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.data = {}
         mock_config_entry.unique_id = "test_device_123"
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
         coordinator.client = mock_api
         coordinator.hass = mock_hass
 
@@ -903,7 +904,7 @@ class TestQvantumDataUpdateCoordinator:
         """Test that tap_stop is NOT fetched via HTTP when extra_tap_water is off in Modbus mode."""
         mock_super_init.return_value = None
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock(modbus=True)
         mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
@@ -928,7 +929,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.data = {}
         mock_config_entry.unique_id = "test_device_123"
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
         coordinator.client = mock_api
         coordinator.hass = mock_hass
 
@@ -944,7 +945,7 @@ class TestQvantumDataUpdateCoordinator:
         """Test that tap_stop is NOT fetched via HTTP when extra_tap_water is absent in Modbus mode."""
         mock_super_init.return_value = None
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock(modbus=True)
         mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
@@ -967,7 +968,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_config_entry.data = {}
         mock_config_entry.unique_id = "test_device_123"
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
         coordinator.client = mock_api
         coordinator.hass = mock_hass
 
@@ -982,7 +983,7 @@ class TestModbusExtraDhwTimerSync:
     def _make_coordinator(self, mock_super_init, extra_tap_water, restore_at, armed_at):
         mock_super_init.return_value = None
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock(modbus=True)
         mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
@@ -1013,7 +1014,7 @@ class TestModbusExtraDhwTimerSync:
         mock_config_entry.data = {}
         mock_config_entry.unique_id = "test_device_123"
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
         coordinator.client = mock_api
         coordinator.extra_dhw = extra_dhw
         coordinator.hass = mock_hass
@@ -1078,7 +1079,7 @@ class TestHpStatusPostProcessing:
     def _make_coordinator(self, mock_super_init, metrics, modbus=True):
         mock_super_init.return_value = None
 
-        mock_api = MagicMock()
+        mock_api = make_client_mock(modbus=modbus)
         mock_api.probe_identity = AsyncMock(
             return_value={"id": "test_device_123"}
         )
@@ -1102,7 +1103,7 @@ class TestHpStatusPostProcessing:
         mock_config_entry.data = {}
         mock_config_entry.unique_id = "test_device_123"
 
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
         coordinator.client = mock_api
         coordinator.hass = mock_hass
         return coordinator
@@ -1192,7 +1193,7 @@ class TestDeriveTapWaterCapacity:
             )
             mock_config_entry.data = {}
             mock_config_entry.unique_id = "test_device_123"
-            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
         return coordinator
 
     def test_known_mapping_sets_capacity(self):
@@ -1302,7 +1303,7 @@ class TestCalculateHeatingPower:
             mock_config_entry.options.get.side_effect = lambda key, default=None: default
             mock_config_entry.data = {}
             mock_config_entry.unique_id = "test_device_123"
-            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
             coordinator.data = None  # simulate no prior poll
         return coordinator
 
@@ -1478,7 +1479,7 @@ class TestCalculateDhwPower:
             )
             mock_config_entry.data = {}
             mock_config_entry.unique_id = "test_device_123"
-            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
             coordinator.data = None  # simulate no prior poll
         return coordinator
 
@@ -1579,7 +1580,7 @@ class TestCalculateTapWaterCap:
             mock_config_entry.options.get.side_effect = lambda key, default=None: default
             mock_config_entry.data = {}
             mock_config_entry.unique_id = "test_device_123"
-            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+            coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
             coordinator.data = None
         return coordinator
 
@@ -3435,7 +3436,7 @@ class TestDeviceLookupWhenHttpDown:
 
     def _make_coordinator(self, mock_super_init, *, modbus: bool):
         mock_super_init.return_value = None
-        mock_api = MagicMock()
+        mock_api = make_client_mock(modbus=modbus)
         mock_api.probe_identity = AsyncMock(
             return_value={
                 "id": "test_device_123",
@@ -3443,7 +3444,6 @@ class TestDeviceLookupWhenHttpDown:
                 "vendor": "Qvantum",
             }
         )
-        mock_api.probe_identity = mock_api.probe_identity
         mock_api.get_primary_device = AsyncMock()
         mock_hass = MagicMock()
         mock_hass.data = {
@@ -3459,7 +3459,9 @@ class TestDeviceLookupWhenHttpDown:
             mock_config_entry.options.get.side_effect = _modbus_options_get
         else:
             mock_config_entry.options.get.side_effect = lambda key, default=None: default
-        coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=MagicMock())
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, mock_config_entry, client=mock_api
+        )
         coordinator.client = mock_api
         coordinator.hass = mock_hass
         coordinator._device_store = MagicMock()

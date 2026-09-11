@@ -49,7 +49,7 @@ from .const import (
     DEFAULT_MODBUS_UNIT_ID,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
 )
-from .coordinator import QvantumDataUpdateCoordinator, as_modbus_client
+from .coordinator import QvantumDataUpdateCoordinator
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
@@ -378,12 +378,12 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
         return
 
     extra_dhw = runtime.extra_dhw
-    modbus = as_modbus_client(runtime.client)
-    if extra_dhw is not None and modbus is not None:
+    client = runtime.client
+    if extra_dhw is not None and isinstance(client, QvantumModbusClient):
         write_enabled = _modbus_write_enabled(config_entry)
-        if modbus.writable and not write_enabled:
+        if client.writable and not write_enabled:
             extra_dhw.cancel(clear_store=True)
-        modbus.writable = write_enabled
+        client.writable = write_enabled
 
     changed = runtime.coordinator.apply_poll_interval(config_entry)
     if changed:

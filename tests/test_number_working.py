@@ -457,7 +457,7 @@ class TestQvantumNumberEntity:
             mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
         )
 
-        mock_coordinator.client.write_metric = AsyncMock(
+        mock_coordinator.async_write_metric = AsyncMock(
             return_value={"status": "APPLIED"}
         )
         mock_coordinator.client.update_setting = AsyncMock(
@@ -466,7 +466,7 @@ class TestQvantumNumberEntity:
 
         await entity.async_set_native_value(75.0)
 
-        mock_coordinator.client.write_metric.assert_called_once_with(
+        mock_coordinator.async_write_metric.assert_called_once_with(
             "test_device_123", "dhw_stop_extra", 75
         )
         # update_setting must NOT be called for dhw_stop_extra
@@ -487,12 +487,14 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
         )
-        mock_coordinator.client.write_metric = AsyncMock()
+        mock_coordinator.async_write_metric = AsyncMock(
+            side_effect=HomeAssistantError("Modbus writing is disabled")
+        )
 
         with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
             await entity.async_set_native_value(75.0)
 
-        mock_coordinator.client.write_metric.assert_not_called()
+        mock_coordinator.async_write_metric.assert_awaited()
 
     @pytest.mark.asyncio
     async def test_async_set_native_value_dhw_stop_extra_raises_when_modbus_tcp_disabled(
@@ -510,12 +512,14 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             mock_coordinator, "dhw_stop_extra", 60, 85, 5, mock_device
         )
-        mock_coordinator.client.write_metric = AsyncMock()
+        mock_coordinator.async_write_metric = AsyncMock(
+            side_effect=HomeAssistantError("Modbus writing is disabled")
+        )
 
         with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
             await entity.async_set_native_value(75.0)
 
-        mock_coordinator.client.write_metric.assert_not_called()
+        mock_coordinator.async_write_metric.assert_awaited()
 
     def test_available_dhw_stop_extra_modbus_write_disabled(
         self, mock_coordinator, mock_device
@@ -702,7 +706,7 @@ class TestRoomTempExternal:
             mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
 
-        mock_coordinator.client.write_metric = AsyncMock(
+        mock_coordinator.async_write_metric = AsyncMock(
             return_value={"status": "APPLIED"}
         )
         mock_coordinator.client.update_setting = AsyncMock(
@@ -711,7 +715,7 @@ class TestRoomTempExternal:
 
         await entity.async_set_native_value(21.5)
 
-        mock_coordinator.client.write_metric.assert_called_once_with(
+        mock_coordinator.async_write_metric.assert_called_once_with(
             "test_device_123", "room_temp_external", 21.5
         )
         mock_coordinator.client.update_setting.assert_not_called()
@@ -732,12 +736,14 @@ class TestRoomTempExternal:
         entity = QvantumNumberEntity(
             mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
-        mock_coordinator.client.write_metric = AsyncMock()
+        mock_coordinator.async_write_metric = AsyncMock(
+            side_effect=HomeAssistantError("Modbus writing is disabled")
+        )
 
         with pytest.raises(HomeAssistantError, match="Modbus writing is disabled"):
             await entity.async_set_native_value(21.5)
 
-        mock_coordinator.client.write_metric.assert_not_called()
+        mock_coordinator.async_write_metric.assert_awaited()
 
 
 class TestStopHeating:
@@ -826,14 +832,14 @@ class TestStopHeating:
         mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
-        mock_coordinator.client.write_metric = AsyncMock()
+        mock_coordinator.async_write_metric = AsyncMock()
 
         await entity.async_set_native_value(-5.0)
 
         mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "stop_heating", -5
         )
-        mock_coordinator.client.write_metric.assert_not_called()
+        mock_coordinator.async_write_metric.assert_not_called()
         assert mock_coordinator.data["values"]["stop_heating"] == -5
 
     @pytest.mark.asyncio
@@ -854,14 +860,14 @@ class TestStopHeating:
         mock_coordinator.client.update_setting = AsyncMock(
             return_value={"status": "APPLIED"}
         )
-        mock_coordinator.client.write_metric = AsyncMock()
+        mock_coordinator.async_write_metric = AsyncMock()
 
         await entity.async_set_native_value(-5.0)
 
         mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "stop_heating", -5
         )
-        mock_coordinator.client.write_metric.assert_not_called()
+        mock_coordinator.async_write_metric.assert_not_called()
         assert mock_coordinator.data["values"]["stop_heating"] == -5
 
     @pytest.mark.asyncio
