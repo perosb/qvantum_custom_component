@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
       - uses: pgup-ai/jbot-review-action@v0 # latest v0.x.y
         with:
-          model: grok
+          model: grok/grok-4.6
           grok-auth: ${{ secrets.GROK_AUTH_JSON }}
           review-passes: '1'
           verify-findings: 'true'
