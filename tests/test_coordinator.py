@@ -3562,6 +3562,25 @@ class TestDeviceLookupWhenHttpDown:
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
+    async def test_async_update_data_api_connection_error_raises_update_failed(
+        self, mock_super_init
+    ):
+        """APIConnectionError during poll raises UpdateFailed without unexpected error trace."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+        from custom_components.qvantum.client.exceptions import TransportError
+
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=False)
+        coordinator._device = {"id": "test_device", "model": "QE-6"}
+        mock_api.get_metrics = AsyncMock(
+            side_effect=TransportError(503, "503 Service Unavailable")
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        with pytest.raises(UpdateFailed, match="Error communicating with API"):
+            await coordinator.async_update_data()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
     async def test_persists_device_after_successful_probe(self, mock_super_init):
         """A successful Modbus identity probe is stored for later startups."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)

@@ -369,8 +369,10 @@ class QvantumCloudClient:
                     raise AuthError(response.status)
                 case 304:
                     _LOGGER.debug("Device metadata not modified, using cached data.")
-                case 500:
-                    _LOGGER.error("Internal server error, clearing data...")
+                case status if status >= 500:
+                    _LOGGER.error(
+                        "Server error fetching device metadata, status: %s", status
+                    )
                     raise TransportError(response.status)
                 case _:
                     _LOGGER.error(
@@ -452,8 +454,8 @@ class QvantumCloudClient:
                 case 304:
                     _LOGGER.debug("HTTP values not modified, using cached data.")
                     return None, None, None
-                case 500:
-                    _LOGGER.error("Internal server error: %s", response.status)
+                case status if status >= 500:
+                    _LOGGER.error("Server error fetching HTTP values: %s", status)
                     raise TransportError(response.status)
                 case _:
                     _LOGGER.error(
@@ -481,8 +483,10 @@ class QvantumCloudClient:
                     raise AuthError(response.status)
                 case 304:
                     _LOGGER.debug("HTTP Settings not modified, using cached data.")
-                case 500:
-                    _LOGGER.error("Internal server error, clearing data...")
+                case status if status >= 500:
+                    _LOGGER.error(
+                        "Server error fetching HTTP settings, status: %s", status
+                    )
                     raise TransportError(response.status)
                 case _:
                     _LOGGER.error(

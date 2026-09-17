@@ -18,7 +18,10 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.helpers.storage import Store
 
 from .client.cloud import QvantumCloudClient
-from .client.exceptions import AuthError as APIAuthError
+from .client.exceptions import (
+    AuthError as APIAuthError,
+    TransportError as APIConnectionError,
+)
 from .client.modbus import QvantumModbusClient
 from .client.protocol import QvantumClient
 from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
@@ -825,6 +828,13 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 err,
             )
             raise UpdateFailed(f"Authentication failed: {err}") from err
+        except APIConnectionError as err:
+            _LOGGER.error(
+                "Error communicating with API for device %s: %s",
+                self._logged_device_id(),
+                err,
+            )
+            raise UpdateFailed(f"Error communicating with API: {err}") from err
         except asyncio.TimeoutError as err:
             _LOGGER.error(
                 "Timeout fetching data for device %s",

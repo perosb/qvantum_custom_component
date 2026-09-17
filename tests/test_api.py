@@ -634,6 +634,98 @@ class TestQvantumAPI:
         assert result == settings_data
 
     @pytest.mark.asyncio
+    async def test_get_settings_304(self, mock_session):
+        """Test getting settings with 304 Not Modified returns cached settings."""
+        cached_data = {"settings": [{"name": "stop_heating", "value": 14}]}
+        cm, mock_response = mock_session.make_cm_response(status=304)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._settings_data = cached_data
+
+        result = await api.get_settings("test_device")
+
+        assert result == cached_data
+
+    @pytest.mark.asyncio
+    async def test_get_settings_403_error(self, mock_session):
+        """Test getting settings with 403 error raises APIAuthError."""
+        cm, mock_response = mock_session.make_cm_response(status=403)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        with pytest.raises(APIAuthError):
+            await api.get_settings("test_device")
+
+    @pytest.mark.asyncio
+    async def test_get_settings_500_error(self, mock_session):
+        """Test getting settings with 500 error raises APIConnectionError and preserves cache."""
+        cached_data = {"settings": [{"name": "stop_heating", "value": 14}]}
+        cm, mock_response = mock_session.make_cm_response(status=500)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._settings_data = cached_data
+
+        with pytest.raises(APIConnectionError):
+            await api.get_settings("test_device")
+
+        # Verify cached data was not cleared on server error
+        assert api._settings_data == cached_data
+
+    @pytest.mark.asyncio
+    async def test_get_settings_503_error(self, mock_session):
+        """Test getting settings with 503 error raises APIConnectionError and preserves cache."""
+        cached_data = {"settings": [{"name": "stop_heating", "value": 14}]}
+        cm, mock_response = mock_session.make_cm_response(status=503)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._settings_data = cached_data
+
+        with pytest.raises(APIConnectionError):
+            await api.get_settings("test_device")
+
+        # Verify cached data was not cleared on server error
+        assert api._settings_data == cached_data
+
+    @pytest.mark.asyncio
+    async def test_get_settings_404_error(self, mock_session):
+        """Test getting settings with 404 error clears cache and returns empty dict."""
+        cached_data = {"settings": [{"name": "stop_heating", "value": 14}]}
+        cm, mock_response = mock_session.make_cm_response(status=404)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._settings_data = cached_data
+
+        result = await api.get_settings("test_device")
+
+        assert result == {}
+        assert api._settings_data == {}
+
+    @pytest.mark.asyncio
     async def test_set_extra_tap_water(self, mock_session):
         """Test setting extra tap water with positive minutes (duration)."""
         update_data = load_test_data("settings_update_test_device.json")
@@ -1034,7 +1126,8 @@ class TestQvantumAPI:
 
     @pytest.mark.asyncio
     async def test_get_device_metadata_500_error(self, mock_session):
-        """Test getting device metadata with 500 error."""
+        """Test getting device metadata with 500 error raises APIConnectionError and preserves cache."""
+        cached_data = {"id": "test_device", "model": "QE-6"}
         cm, mock_response = mock_session.make_cm_response(status=500)
         mock_session.get.return_value = cm
 
@@ -1043,9 +1136,31 @@ class TestQvantumAPI:
         )
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._device_metadata = cached_data
 
-        with pytest.raises(Exception):  # APIConnectionError
+        with pytest.raises(APIConnectionError):
             await api.get_device_metadata("test_device")
+
+        assert api._device_metadata == cached_data
+
+    @pytest.mark.asyncio
+    async def test_get_device_metadata_503_error(self, mock_session):
+        """Test getting device metadata with 503 error raises APIConnectionError and preserves cache."""
+        cached_data = {"id": "test_device", "model": "QE-6"}
+        cm, mock_response = mock_session.make_cm_response(status=503)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._device_metadata = cached_data
+
+        with pytest.raises(APIConnectionError):
+            await api.get_device_metadata("test_device")
+
+        assert api._device_metadata == cached_data
 
     @pytest.mark.asyncio
     async def test_get_device_metadata_404_error(self, mock_session):
@@ -1075,7 +1190,22 @@ class TestQvantumAPI:
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
 
-        with pytest.raises(Exception):  # APIConnectionError
+        with pytest.raises(APIConnectionError):
+            await api.get_metrics("test_device")
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_503_error(self, mock_session):
+        """Test getting metrics with 503 error."""
+        cm, mock_response = mock_session.make_cm_response(status=503)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        with pytest.raises(APIConnectionError):
             await api.get_metrics("test_device")
 
     @pytest.mark.asyncio
