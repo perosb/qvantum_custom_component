@@ -4,6 +4,24 @@
       "name": "Qvantum"
     }
   },
+  "device_automation": {
+    "trigger_type": {
+      "defrosting": "{entity_name} började avfrosta",
+      "compressor_blocked": "{entity_name} blev blockerad",
+      "freeze_protection_active": "{entity_name} frysskydd aktiverat",
+      "wifi_disconnected": "{entity_name} Wi-Fi frånkopplad",
+      "cloud_disconnected": "{entity_name} moln frånkopplat",
+      "filter_soon_due": "{entity_name} filter ska bytas inom 48 timmar"
+    },
+    "condition_type": {
+      "is_defrosting": "{entity_name} avfrostas",
+      "is_compressor_blocked": "{entity_name} är blockerad",
+      "is_freeze_protection_active": "{entity_name} frysskydd är aktivt",
+      "is_wifi_disconnected": "{entity_name} Wi-Fi är frånkopplad",
+      "is_cloud_disconnected": "{entity_name} moln är frånkopplat",
+      "is_filter_soon_due": "{entity_name} filter ska bytas inom 48 timmar"
+    }
+  },
   "entity": {
     "select": {
       "use_adaptive": {

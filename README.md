@@ -125,6 +125,29 @@ action:
       value: "{{ states('sensor.some_external_room_temperature') | float }}"
 ```
 
+
+### Device automations
+
+Device triggers and conditions are available on the Qvantum heat pump device (when the related entities exist):
+
+**Triggers**
+- Defrosting started
+- Compressor blocked
+- Freeze protection activated
+- Wi-Fi disconnected
+- Cloud disconnected
+- Ventilation filter soon due (hours remaining fall below **48**)
+
+**Conditions**
+- Is defrosting
+- Is compressor blocked
+- Is freeze protection active
+- Is Wi-Fi disconnected
+- Is cloud disconnected
+- Is ventilation filter soon due (below **48** hours remaining)
+
+The filter threshold is `FILTER_SOON_DUE_HOURS = 48` in the integration.
+
 ### Services
 
 The integration provides the following services for advanced control and testing:

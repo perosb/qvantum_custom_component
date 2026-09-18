@@ -23,6 +23,10 @@ from .client.constants import (
 )
 
 DOMAIN = "qvantum"
+
+# Device automation: ventilation filter is "soon due" when hours remaining
+# fall below this threshold (see device_trigger / device_condition).
+FILTER_SOON_DUE_HOURS = 48
 DEFAULT_SCAN_INTERVAL = 120
 MIN_SCAN_INTERVAL = 60
 # Modbus poll interval. Default matches the previous hard cap.
