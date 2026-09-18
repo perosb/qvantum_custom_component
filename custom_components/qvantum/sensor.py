@@ -241,7 +241,11 @@ class QvantumTemperatureEntity(QvantumBaseSensorEntity):
 
 
 class QvantumEnergyEntity(QvantumBaseSensorEntity):
-    """Sensor for energy measurements."""
+    """Cumulative energy (kWh) for Energy Dashboard one-click (ENERGY + TOTAL_INCREASING).
+
+    Assigned when the metric name contains ENERGY_METRICS ("energy"): compressorenergy,
+    heatingenergy, dhwenergy, additionalenergy, coolingenergy (if present).
+    """
 
     def __init__(
         self,
@@ -257,7 +261,10 @@ class QvantumEnergyEntity(QvantumBaseSensorEntity):
 
 
 class QvantumPowerEntity(QvantumBaseSensorEntity):
-    """Sensor for power measurements."""
+    """Instantaneous power in WATTS (POWER + MEASUREMENT); not kW.
+
+    POWER_METRICS: powertotal, heatingpower, dhwpower (derived W in calculations.py).
+    """
 
     def __init__(
         self,
@@ -305,7 +312,7 @@ class QvantumPressureEntity(QvantumBaseSensorEntity):
 
 
 class QvantumTotalEnergyEntity(QvantumEnergyEntity):
-    """Sensor for energy measurements."""
+    """compressorenergy + additionalenergy; inherits Energy Dashboard ENERGY + kWh classes."""
 
     def __init__(
         self,
@@ -437,7 +444,7 @@ def _should_exclude_metric(metric: str) -> bool:
 
 
 def _get_sensor_type(metric: str) -> Type[QvantumBaseSensorEntity]:
-    """Determine the appropriate sensor type for a metric."""
+    """Map a metric name to a sensor class (ENERGY_METRICS before POWER_METRICS)."""
     if any(pattern in metric for pattern in TEMPERATURE_METRICS):
         return QvantumTemperatureEntity
     elif any(pattern in metric for pattern in ENERGY_METRICS):

@@ -298,7 +298,10 @@ REQUIRED_MODBUS_METRICS = [
     "bf1_l_min",  # DHW flow rate
 ]
 
-# Sensor type classification
+# Sensor type classification (substring match in _get_sensor_type).
+# Energy Dashboard one-click: ENERGY_METRICS ("energy") → ENERGY + TOTAL_INCREASING + kWh
+# (compressorenergy, heatingenergy, dhwenergy, additionalenergy, totalenergy, coolingenergy).
+# POWER_METRICS are instantaneous power in WATTS (not kW): powertotal, heatingpower, dhwpower.
 TEMPERATURE_METRICS = [
     "temp",
     "bt",
