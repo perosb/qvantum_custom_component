@@ -58,11 +58,13 @@ def mock_coordinator():
         "values": {
             "hpid": "test_device_123",
             "bt1": 20.5,  # Temperature
-            "compressorenergy": 100.0,  # Energy
-            "additionalenergy": 50.0,  # Additional energy
-            "powertotal": 1500.0,  # Power
-            "heatingpower": 2.5,  # Heating power in kW
-            "dhwpower": 1.8,  # DHW power in kW
+            "compressorenergy": 100.0,  # Energy kWh
+            "heatingenergy": 80.0,  # Energy kWh
+            "dhwenergy": 30.0,  # Energy kWh
+            "additionalenergy": 50.0,  # Additional energy kWh
+            "powertotal": 1500.0,  # Power W
+            "heatingpower": 2500.0,  # Heating power W (derived; not kW)
+            "dhwpower": 1800.0,  # DHW power W (derived; not kW)
             "bp1_pressure": 2.1,  # Pressure
             "inputcurrent1": 5.2,  # Current
             "tap_water_cap": 4,  # Capacity (should be divided by 2)
@@ -182,16 +184,23 @@ class TestQvantumTemperatureEntity:
 class TestQvantumEnergyEntity:
     """Test the QvantumEnergyEntity class."""
 
-    def test_init(self, mock_coordinator, mock_device):
-        """Test energy entity initialization."""
-        entity = QvantumEnergyEntity(
-            mock_coordinator, "compressorenergy", mock_device, True
-        )
+    @pytest.mark.parametrize(
+        "metric_key,expected_state",
+        [
+            ("compressorenergy", 100.0),
+            ("heatingenergy", 80.0),
+            ("dhwenergy", 30.0),
+            ("additionalenergy", 50.0),
+        ],
+    )
+    def test_init(self, mock_coordinator, mock_device, metric_key, expected_state):
+        """Energy sensors are Energy Dashboard compatible (ENERGY + TOTAL_INCREASING + kWh)."""
+        entity = QvantumEnergyEntity(mock_coordinator, metric_key, mock_device, True)
 
         assert entity._attr_device_class == SensorDeviceClass.ENERGY
         assert entity._attr_native_unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
         assert entity._attr_state_class == SensorStateClass.TOTAL_INCREASING
-        assert entity.state == 100.0
+        assert entity.state == expected_state
 
     def test_available_with_positive_value(self, mock_coordinator, mock_device):
         """Test availability when energy value is positive."""
@@ -213,17 +222,23 @@ class TestQvantumEnergyEntity:
 class TestQvantumPowerEntity:
     """Test the QvantumPowerEntity class."""
 
-    def test_init(self, mock_coordinator, mock_device):
-        """Test power entity initialization."""
-        entity = QvantumPowerEntity(mock_coordinator, "powertotal", mock_device, True)
+    @pytest.mark.parametrize(
+        "metric_key,expected_state",
+        [
+            ("powertotal", 1500.0),
+            ("heatingpower", 2500.0),
+            ("dhwpower", 1800.0),
+        ],
+    )
+    def test_init(self, mock_coordinator, mock_device, metric_key, expected_state):
+        """Power sensors are POWER + MEASUREMENT + W (heatingpower/dhwpower are W, not kW)."""
+        entity = QvantumPowerEntity(mock_coordinator, metric_key, mock_device, True)
 
         assert entity._attr_device_class == SensorDeviceClass.POWER
         assert entity._attr_native_unit_of_measurement == UnitOfPower.WATT
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
         assert not hasattr(entity, "_attr_suggested_display_precision")
-        assert entity.state == 1500.0
-
-    # heatingpower and dhwpower metrics are removed; powertotal remains as main power metric.
+        assert entity.state == expected_state
 
 
 class TestQvantumPressureEntity:
@@ -284,6 +299,9 @@ class TestQvantumTotalEnergyEntity:
         entity = QvantumTotalEnergyEntity(
             mock_coordinator, "totalenergy", mock_device, True
         )
+        assert entity._attr_device_class == SensorDeviceClass.ENERGY
+        assert entity._attr_native_unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
+        assert entity._attr_state_class == SensorStateClass.TOTAL_INCREASING
         assert entity.state == 150  # 100 + 50
 
     def test_available_with_data(self, mock_coordinator, mock_device):
@@ -356,13 +374,18 @@ class TestGetSensorType:
         assert _get_sensor_type("tap_water_stop") == QvantumTemperatureEntity
 
     def test_energy_metrics(self):
-        """Test energy metric classification."""
+        """Test energy metric classification (substring 'energy')."""
         assert _get_sensor_type("compressorenergy") == QvantumEnergyEntity
+        assert _get_sensor_type("heatingenergy") == QvantumEnergyEntity
+        assert _get_sensor_type("dhwenergy") == QvantumEnergyEntity
         assert _get_sensor_type("additionalenergy") == QvantumEnergyEntity
+        assert _get_sensor_type("coolingenergy") == QvantumEnergyEntity
 
     def test_power_metrics(self):
-        """Test power metric classification."""
+        """Test power metric classification (WATTS)."""
         assert _get_sensor_type("powertotal") == QvantumPowerEntity
+        assert _get_sensor_type("heatingpower") == QvantumPowerEntity
+        assert _get_sensor_type("dhwpower") == QvantumPowerEntity
 
     def test_current_metrics(self):
         """Test current metric classification."""

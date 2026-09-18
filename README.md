@@ -83,6 +83,7 @@ Cloud-only sensors (firmware boards and access expiry) are not created in this m
 - **System Control**: Adjust operation modes, set temperatures, toggle vacation mode, control ventilation
 - **Hot water (`water_heater`)**: Tank temperature, DHW stop target, Eco/Normal/Extra/Smart/Off modes wrapping existing DHW APIs (additive; existing number/switch/button for VV remain)
 - **Energy Analytics**: Daily and total energy usage tracking
+- **Energy Dashboard**: Compressor/heating/DHW/additional/total energy sensors are one-click compatible (`ENERGY`, `TOTAL_INCREASING`, kWh); `powertotal`/`heatingpower`/`dhwpower` are `POWER` in W
 - **Smart Status**: Heat pump status, defrost cycles, priority modes
 - **Comprehensive Coverage**: Supports all major Qvantum heat pump parameters
 
