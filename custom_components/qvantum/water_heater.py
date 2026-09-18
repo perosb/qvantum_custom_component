@@ -161,6 +161,13 @@ class QvantumWaterHeaterEntity(
             stop,
         )
 
+
+    async def _async_clear_extra_dhw_timer(self) -> None:
+        """Stop a pending Extra→Normal restore (Modbus HA timer)."""
+        timer = getattr(self.coordinator, "extra_dhw", None)
+        if timer is not None:
+            await timer.async_clear()
+
     async def async_set_operation_mode(self, operation_mode: str) -> None:
         """Map HA operation mode onto existing DHW write helpers."""
         if operation_mode not in self.operation_list:
@@ -171,6 +178,7 @@ class QvantumWaterHeaterEntity(
         values = self._values
 
         if operation_mode == OPERATION_OFF:
+            await self._async_clear_extra_dhw_timer()
             await self._async_set_op_man_dhw(0)
             return
 
@@ -202,6 +210,9 @@ class QvantumWaterHeaterEntity(
             raise HomeAssistantError(
                 f"DHW mode '{operation_mode}' requires Modbus (dhw_mode holding)"
             )
+
+        # Clear timed Extra restore so it cannot snap mode back to Normal.
+        await self._async_clear_extra_dhw_timer()
 
         dhw_mode = OPERATION_TO_DHW_MODE[operation_mode]
         response = await self.coordinator.async_write_metric(

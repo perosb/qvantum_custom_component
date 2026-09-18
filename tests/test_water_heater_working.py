@@ -78,6 +78,8 @@ def mock_coordinator():
     coordinator.async_set_extra_tap_water = AsyncMock(return_value=_applied())
     coordinator.async_write_metric = AsyncMock(return_value=_applied())
     coordinator.async_set_updated_data = MagicMock()
+    coordinator.extra_dhw = MagicMock()
+    coordinator.extra_dhw.async_clear = AsyncMock()
     coordinator.modbus_enabled = False
 
     config_entry = MagicMock()
@@ -232,6 +234,7 @@ class TestQvantumWaterHeaterEntity:
     async def test_set_operation_off(self, mock_coordinator, mock_device):
         entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
         await entity.async_set_operation_mode(OPERATION_OFF)
+        mock_coordinator.extra_dhw.async_clear.assert_awaited_once()
         mock_coordinator.client.update_setting.assert_awaited_once_with(
             "test_device_123", "op_man_dhw", 0
         )
@@ -240,10 +243,23 @@ class TestQvantumWaterHeaterEntity:
     async def test_set_operation_eco_modbus(self, mock_modbus_coordinator, mock_device):
         entity = QvantumWaterHeaterEntity(mock_modbus_coordinator, mock_device)
         await entity.async_set_operation_mode(OPERATION_ECO)
+        mock_modbus_coordinator.extra_dhw.async_clear.assert_awaited_once()
         mock_modbus_coordinator.async_write_metric.assert_awaited_once_with(
             "test_device_123", "extra_tap_water", DHW_MODE_ECO
         )
         assert mock_modbus_coordinator.data["values"]["dhw_mode"] == DHW_MODE_ECO
+
+    @pytest.mark.asyncio
+    async def test_set_operation_smart_modbus_clears_extra_timer(
+        self, mock_modbus_coordinator, mock_device
+    ):
+        """Timed Extra must not snap Smart back to Normal."""
+        entity = QvantumWaterHeaterEntity(mock_modbus_coordinator, mock_device)
+        await entity.async_set_operation_mode(OPERATION_SMART)
+        mock_modbus_coordinator.extra_dhw.async_clear.assert_awaited_once()
+        mock_modbus_coordinator.async_write_metric.assert_awaited_once_with(
+            "test_device_123", "extra_tap_water", DHW_MODE_SMART
+        )
 
     @pytest.mark.asyncio
     async def test_set_operation_eco_cloud_raises(self, mock_coordinator, mock_device):
