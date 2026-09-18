@@ -4,6 +4,24 @@
       "name": "Qvantum"
     }
   },
+  "device_automation": {
+    "trigger_type": {
+      "defrosting": "{entity_name} elkezdte a leolvasztást",
+      "compressor_blocked": "{entity_name} blokkolttá vált",
+      "freeze_protection_active": "{entity_name} fagyvédelme aktiválódott",
+      "wifi_disconnected": "{entity_name} Wi-Fi-kapcsolata megszakadt",
+      "cloud_disconnected": "{entity_name} felhőkapcsolata megszakadt",
+      "filter_soon_due": "{entity_name} szűrője hamarosan cserére szorul"
+    },
+    "condition_type": {
+      "is_defrosting": "{entity_name} leolvasztást végez",
+      "is_compressor_blocked": "{entity_name} blokkolva van",
+      "is_freeze_protection_active": "{entity_name} fagyvédelme aktív",
+      "is_wifi_disconnected": "{entity_name} Wi-Fi-kapcsolata megszakadt",
+      "is_cloud_disconnected": "{entity_name} felhőkapcsolata megszakadt",
+      "is_filter_soon_due": "{entity_name} szűrője hamarosan cserére szorul"
+    }
+  },
   "entity": {
     "switch": {
       "extra_tap_water": {

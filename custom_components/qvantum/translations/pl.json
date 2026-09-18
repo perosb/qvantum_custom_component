@@ -4,6 +4,24 @@
       "name": "Qvantum"
     }
   },
+  "device_automation": {
+    "trigger_type": {
+      "defrosting": "{entity_name} rozpoczęło odszranianie",
+      "compressor_blocked": "{entity_name} zostało zablokowane",
+      "freeze_protection_active": "{entity_name} aktywowano ochronę przed zamarzaniem",
+      "wifi_disconnected": "{entity_name} utraciło połączenie z Wi-Fi",
+      "cloud_disconnected": "{entity_name} utraciło połączenie z chmurą",
+      "filter_soon_due": "{entity_name} filtr wkrótce wymaga wymiany"
+    },
+    "condition_type": {
+      "is_defrosting": "{entity_name} odszrania się",
+      "is_compressor_blocked": "{entity_name} jest zablokowane",
+      "is_freeze_protection_active": "{entity_name} ochrona przed zamarzaniem jest aktywna",
+      "is_wifi_disconnected": "{entity_name} jest odłączone od Wi-Fi",
+      "is_cloud_disconnected": "{entity_name} jest odłączone od chmury",
+      "is_filter_soon_due": "{entity_name} filtr wkrótce wymaga wymiany"
+    }
+  },
   "entity": {
     "switch": {
       "extra_tap_water": {

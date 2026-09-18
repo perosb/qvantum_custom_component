@@ -4,6 +4,24 @@
       "name": "Qvantum"
     }
   },
+  "device_automation": {
+    "trigger_type": {
+      "defrosting": "{entity_name} zahájil odmrazování",
+      "compressor_blocked": "{entity_name} se zablokoval",
+      "freeze_protection_active": "{entity_name} aktivoval ochranu proti zamrznutí",
+      "wifi_disconnected": "{entity_name} se odpojil od Wi-Fi",
+      "cloud_disconnected": "{entity_name} se odpojil od cloudu",
+      "filter_soon_due": "{entity_name} filtr bude brzy nutné vyměnit"
+    },
+    "condition_type": {
+      "is_defrosting": "{entity_name} odmrazuje",
+      "is_compressor_blocked": "{entity_name} je zablokovaný",
+      "is_freeze_protection_active": "{entity_name} má aktivní ochranu proti zamrznutí",
+      "is_wifi_disconnected": "{entity_name} je odpojený od Wi-Fi",
+      "is_cloud_disconnected": "{entity_name} je odpojený od cloudu",
+      "is_filter_soon_due": "{entity_name} filtr bude brzy nutné vyměnit"
+    }
+  },
   "entity": {
     "switch": {
       "extra_tap_water": {
