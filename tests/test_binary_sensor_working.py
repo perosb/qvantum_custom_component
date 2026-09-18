@@ -161,6 +161,15 @@ class TestQvantumBaseBinaryEntity:
             "additionreleased",
             "freeze_protection_active",
             "compressor_blocked",
+            "picpin_relay_heat_l1",
+            "picpin_relay_heat_l2",
+            "picpin_relay_heat_l3",
+            "picpin_relay_gp10",
+            "picpin_relay_qm10",
+            "picpin_relay_qn8_1",
+            "picpin_relay_qn8_2",
+            "picpin_relay_gp3",
+            "picpin_relay_ha12",
             "picpin_relay_pump",
         ):
             entity = QvantumBaseBinaryEntity(mock_coordinator, key, mock_device, True)

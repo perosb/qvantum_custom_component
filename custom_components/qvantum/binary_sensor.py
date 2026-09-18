@@ -34,7 +34,17 @@ _DIAGNOSTIC_BINARY_SENSORS = frozenset(
         "additionreleased",
         "freeze_protection_active",
         "compressor_blocked",
-        "picpin_relay_pump",  # Modbus-only hardware status (not vacation/comfort)
+        # All picpin relay status bits (HTTP + Modbus-only pump)
+        "picpin_relay_heat_l1",
+        "picpin_relay_heat_l2",
+        "picpin_relay_heat_l3",
+        "picpin_relay_gp10",
+        "picpin_relay_qm10",
+        "picpin_relay_qn8_1",
+        "picpin_relay_qn8_2",
+        "picpin_relay_gp3",
+        "picpin_relay_ha12",
+        "picpin_relay_pump",
     }
 )
 
