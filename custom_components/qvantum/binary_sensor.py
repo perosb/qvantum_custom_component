@@ -25,6 +25,19 @@ _LOGGER = logging.getLogger(__name__)
 
 _CONNECTIVITY_BINARY_SENSORS = frozenset({"wifi_connected", "cloud_connected"})
 
+# Status / release / protection flags — Diagnostics section, not main UI.
+_DIAGNOSTIC_BINARY_SENSORS = frozenset(
+    {
+        "heatingreleased",
+        "coolingreleased",
+        "compressorreleased",
+        "additionreleased",
+        "freeze_protection_active",
+        "compressor_blocked",
+        "picpin_relay_pump",  # Modbus-only hardware status (not vacation/comfort)
+    }
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -89,6 +102,8 @@ class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
         if metric_key in _CONNECTIVITY_BINARY_SENSORS:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+        elif metric_key in _DIAGNOSTIC_BINARY_SENSORS:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def is_on(self):

@@ -148,8 +148,29 @@ class TestQvantumBaseBinaryEntity:
         assert wifi._attr_device_class.name == "CONNECTIVITY"
         assert cloud._attr_entity_category.name == "DIAGNOSTIC"
         assert cloud._attr_device_class.name == "CONNECTIVITY"
-        assert getattr(heating, "_attr_entity_category", None) is None
+        # Status flags are diagnostic but not connectivity device class
+        assert heating._attr_entity_category.name == "DIAGNOSTIC"
         assert getattr(heating, "_attr_device_class", None) is None
+
+    def test_status_binary_sensors_are_diagnostic(self, mock_coordinator, mock_device):
+        """Release / protection / pump status flags use the diagnostics category."""
+        for key in (
+            "heatingreleased",
+            "coolingreleased",
+            "compressorreleased",
+            "additionreleased",
+            "freeze_protection_active",
+            "compressor_blocked",
+            "picpin_relay_pump",
+        ):
+            entity = QvantumBaseBinaryEntity(mock_coordinator, key, mock_device, True)
+            assert entity._attr_entity_category.name == "DIAGNOSTIC", key
+            assert getattr(entity, "_attr_device_class", None) is None, key
+
+        demand = QvantumBaseBinaryEntity(
+            mock_coordinator, "heatingdemand", mock_device, True
+        )
+        assert getattr(demand, "_attr_entity_category", None) is None
 
 
 @pytest.mark.asyncio

@@ -152,6 +152,7 @@ class TestQvantumBaseSensorEntity:
         )
         assert entity._attr_native_unit_of_measurement == UnitOfTime.SECONDS
         assert entity._attr_device_class == SensorDeviceClass.DURATION
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
 
     def test_ventilation_filter_time_left_unit_assignment(
         self, mock_coordinator, mock_device
@@ -162,6 +163,7 @@ class TestQvantumBaseSensorEntity:
         )
         assert entity._attr_native_unit_of_measurement == UnitOfTime.HOURS
         assert entity._attr_device_class == SensorDeviceClass.DURATION
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
 
 
 class TestQvantumTemperatureEntity:

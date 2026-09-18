@@ -43,6 +43,11 @@ from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+# Countdown / remaining-life metrics belong under Diagnostics.
+_DIAGNOSTIC_SENSORS = frozenset(
+    {"ventilation_filter_time_left", "compressor_blocked_sec"}
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -177,6 +182,8 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
 
         # Set units based on metric patterns
         self._set_units_from_metric(metric_key)
+        if metric_key in _DIAGNOSTIC_SENSORS:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def _set_units_from_metric(self, metric_key: str) -> None:
         """Set appropriate units based on metric key patterns."""
