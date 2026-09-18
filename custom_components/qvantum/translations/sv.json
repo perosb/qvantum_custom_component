@@ -572,6 +572,18 @@
           }
         }
       }
+    },
+    "water_heater": {
+      "dhw": {
+        "name": "Varmvatten",
+        "state": {
+          "eco": "Eco",
+          "normal": "Normal",
+          "extra": "Extra",
+          "smart": "Smart",
+          "off": "Av"
+        }
+      }
     }
   },
   "config": {

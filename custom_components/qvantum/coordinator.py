@@ -32,6 +32,7 @@ from .const import (
     DEFAULT_MODBUS_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DHW_MODE_EXTRA,
+    DHW_MODE_NORMAL,
     DOMAIN,
     FIRMWARE_KEYS,
     HP_STATUS_COOLING,
@@ -85,9 +86,16 @@ async def handle_setting_update_response(
         )
     )
     if success and data_section and key is not None:
-        coordinator.data.get(data_section)[key] = value
+        section = coordinator.data.get(data_section)
+        section[key] = value
         if key == "extra_tap_water":
-            _apply_extra_dhw_tap_stop(coordinator, coordinator.data.get(data_section), value)
+            _apply_extra_dhw_tap_stop(coordinator, section, value)
+            # map_operation_mode prefers dhw_mode; keep it aligned with Extra on/off
+            # so water_heater updates immediately (button/switch writers).
+            if isinstance(section, dict) and "dhw_mode" in section:
+                section["dhw_mode"] = (
+                    DHW_MODE_EXTRA if _is_extra_dhw_on(value) else DHW_MODE_NORMAL
+                )
         # async_set_updated_data is a synchronous method despite the name
         coordinator.async_set_updated_data(coordinator.data)
         return True

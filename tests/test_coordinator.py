@@ -13,6 +13,8 @@ from custom_components.qvantum.coordinator import (
 )
 from tests.conftest import make_client_mock
 from custom_components.qvantum.const import (
+    DHW_MODE_EXTRA,
+    DHW_MODE_NORMAL,
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     DEFAULT_ENABLED_HTTP_METRICS,
@@ -112,6 +114,34 @@ class TestHandleSettingUpdateResponse:
         assert result is True
         assert coordinator.data["values"]["extra_tap_water"] == "off"
         assert "tap_stop" not in coordinator.data["values"]
+
+    @pytest.mark.asyncio
+    async def test_extra_tap_water_syncs_dhw_mode(self):
+        """Button/switch Extra must update dhw_mode so water_heater maps immediately."""
+        coordinator = MagicMock()
+        coordinator.data = {
+            "values": {
+                "extra_tap_water": "off",
+                "dhw_mode": DHW_MODE_NORMAL,
+            }
+        }
+        coordinator.async_set_updated_data = MagicMock()
+        coordinator.extra_dhw = MagicMock()
+        coordinator.extra_dhw.restore_at = None
+
+        result = await handle_setting_update_response(
+            {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", "on"
+        )
+        assert result is True
+        assert coordinator.data["values"]["extra_tap_water"] == "on"
+        assert coordinator.data["values"]["dhw_mode"] == DHW_MODE_EXTRA
+
+        result = await handle_setting_update_response(
+            {"status": "APPLIED"}, coordinator, "values", "extra_tap_water", "off"
+        )
+        assert result is True
+        assert coordinator.data["values"]["extra_tap_water"] == "off"
+        assert coordinator.data["values"]["dhw_mode"] == DHW_MODE_NORMAL
 
     @pytest.mark.asyncio
     async def test_extra_tap_water_on_sets_tap_stop_from_restore(self):

@@ -16,7 +16,7 @@ custom_components/qvantum/
   entity.py                   # QvantumEntity, icons, write-access mixin
   config_flow.py              # cloud login or Modbus host/port/unit probe
   const.py                    # HA config keys, enabled-metric lists; re-exports client constants
-  sensor.py, binary_sensor.py, climate.py, number.py, switch.py, button.py, select.py, fan.py
+  sensor.py, binary_sensor.py, climate.py, number.py, switch.py, button.py, select.py, fan.py, water_heater.py
   services.py / services.yaml # extra_hot_water
   client/                     # vendored comms library — no Home Assistant imports
     protocol.py               # QvantumClient Protocol
