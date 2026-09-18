@@ -61,8 +61,9 @@ async def async_setup_entry(
     }
 
     # Only create number entities for metrics present in the coordinator's current data.
-    # This ensures HTTP-only number metrics (e.g., tap_water_capacity_target) are not
-    # created as permanently unavailable entities when in Modbus mode.
+    # tap_water_capacity_target exists in both cloud and Modbus (derived from
+    # start/stop via ModbusClient.set_tap_water_capacity_target); skip keys absent
+    # from the current payload so entities are not permanently unavailable.
     sensors = []
     for metric, (min_val, max_val, step_val) in NUMBER_CONFIG.items():
         if metric in coordinator.data.get("values", {}):
