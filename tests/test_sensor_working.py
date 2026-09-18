@@ -184,6 +184,15 @@ class TestQvantumBaseSensorEntity:
         )
         assert entity._attr_native_unit_of_measurement in {"dm", "°min"}
 
+    def test_diagnostic_countdown_sensors(self, mock_coordinator, mock_device):
+        """Filter life and compressor-blocked countdown are diagnostics."""
+        for key in ("ventilation_filter_time_left", "compressor_blocked_sec"):
+            entity = QvantumBaseSensorEntity(mock_coordinator, key, mock_device, True)
+            assert entity._attr_entity_category.name == "DIAGNOSTIC", key
+
+        other = QvantumBaseSensorEntity(mock_coordinator, "bt1", mock_device, True)
+        assert getattr(other, "_attr_entity_category", None) is None
+
 
 class TestQvantumTemperatureEntity:
     """Test the QvantumTemperatureEntity class."""
