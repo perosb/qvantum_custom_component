@@ -410,6 +410,10 @@ class TestQvantumDataUpdateCoordinator:
         # tap_water_start/stop come from the settings endpoint, not HTTP /values
         assert "tap_water_start" not in result
         assert "tap_water_stop" not in result
+        # Heating-curve controls are fetched as HTTP /values (internal names)
+        assert "curve_type_heating" in result
+        assert "ud_curve_minus30" in result
+        assert "ud_curve_30" in result
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_no_matching_entities(self, mock_super_init):
@@ -883,6 +887,24 @@ class TestQvantumDataUpdateCoordinator:
         result = QvantumDataUpdateCoordinator._process_settings_data(None, data)
 
         assert result == {"a": 1}
+
+    def test_process_settings_data_aliases_cloud_heating_curve_points(self):
+        data = {
+            "settings": [
+                {"name": "curve_type_heating", "value": 1},
+                {"name": "ud_curve_minus30", "value": 59},
+                {"name": "ud_curve_0", "value": 41},
+                {"name": "ud_curve_30", "value": 20},
+            ]
+        }
+
+        result = QvantumDataUpdateCoordinator._process_settings_data(None, data)
+
+        assert result["curve_type_heating"] == 1
+        assert result["ud_curve_minus30"] == 59
+        assert result["curve_minus_30"] == 59
+        assert result["curve_0"] == 41
+        assert result["curve_30"] == 20
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio

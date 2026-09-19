@@ -4,6 +4,7 @@ from enum import IntEnum
 
 from .client.constants import (
     BASE_SYSTEM_POWER_W,
+    HEATING_CURVE_HTTP_KEYS,
     DHW_MODE_ECO,
     DHW_MODE_EXTRA,
     DHW_MODE_NORMAL,
@@ -46,7 +47,7 @@ SENSOR_MODE_HTTP_EXT_ROOM_SENSOR = "ext_room_sensor"
 
 
 class HeatingCurveType(IntEnum):
-    """Heating curve source. Modbus holding 22 (`curve_type_heating`)."""
+    """Heating curve source. Holding 22 / cloud ``curve_type_heating``."""
 
     AUTO = 0
     USER_DEFINED = 1
@@ -263,8 +264,11 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
 ]
 
 # Metrics that must always be fetched regardless of entity enablement (HTTP and Modbus).
-# tap_water_start/stop are settings (HTTP settings API / Modbus holdings), not /values
-# metrics. Requesting them as HTTP metrics logs "Metric X not found in response data".
+# HA *controls* (number/select/switch/fan/climate writes) that live on HTTP /values
+# must be listed here so they exist in coordinator data on first setup; otherwise
+# platforms skip creating the entity. tap_water_start/stop are settings (HTTP
+# settings API / Modbus holdings), not /values — requesting them as HTTP metrics
+# logs "Metric X not found in response data".
 REQUIRED_METRICS = [
     "bt2",  # Required by climate when sensor_mode is BT2
     "room_temp_ext",  # Required by climate when sensor_mode is external (HTTP)
@@ -287,6 +291,8 @@ REQUIRED_METRICS = [
     "dhwenergy",
     "powertotal",
     "fanspeedselector",
+    "curve_type_heating",
+    *HEATING_CURVE_HTTP_KEYS.values(),
 ]
 
 # Modbus-only intermediate metrics required to compute derived values (e.g. energy totals

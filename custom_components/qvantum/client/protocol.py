@@ -44,6 +44,18 @@ class QvantumClient(Protocol):
         """Write the indoor temperature offset."""
         ...
 
+    async def set_curve_type_heating(
+        self, device_id: str, value: int
+    ) -> ApplyResult:
+        """Write Auto (0) / User defined (1) heating-curve source."""
+        ...
+
+    async def set_heating_curve_point(
+        self, device_id: str, metric_key: str, value: int
+    ) -> ApplyResult:
+        """Write one user-defined heating-curve supply point (canonical name)."""
+        ...
+
     async def set_tap_water(
         self, device_id: str, start: int = 0, stop: int = 0
     ) -> ApplyResult:
