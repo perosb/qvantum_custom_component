@@ -98,6 +98,17 @@ async def test_set_fanspeedselector_and_tap_water():
 
 
 @pytest.mark.asyncio
+async def test_set_heating_curve_point_writes_holding():
+    _connection, client = _client(writable=True)
+    result = await client.set_heating_curve_point("dev1", "curve_minus_30", 59)
+    assert result == {"status": "APPLIED"}
+    assert client.unit.holding[24] == 59
+
+    await client.set_curve_type_heating("dev1", 1)
+    assert client.unit.holding[22] == 1
+
+
+@pytest.mark.asyncio
 async def test_get_settings_includes_heating_curve():
     _connection, client = _client()
     client.unit.holding[22] = 1

@@ -23,8 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 MODBUS_WRITE_METRICS = {
     "dhw_stop_extra",
     "room_temp_external",  # Written via Modbus and only relevant when the external room sensor mode is enabled.
-    "temp_compensation_curve",
-    *HEATING_CURVE_OUTDOOR_TEMPS,
+    "temp_compensation_curve",  # Holding 23; cloud Auto uses DUT fields instead.
 }
 
 # Number metrics that represent temperatures (°C).
@@ -163,9 +162,14 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 response = await self.coordinator.async_write_metric(
                     self._hpid, self._metric_key, coordinator_update_value
                 )
-            case _ if self._metric_key in MODBUS_WRITE_METRICS:
+            case "temp_compensation_curve":
                 coordinator_update_value = int(value)
                 response = await self.coordinator.async_write_metric(
+                    self._hpid, self._metric_key, coordinator_update_value
+                )
+            case _ if self._metric_key in HEATING_CURVE_OUTDOOR_TEMPS:
+                coordinator_update_value = int(value)
+                response = await self.coordinator.client.set_heating_curve_point(
                     self._hpid, self._metric_key, coordinator_update_value
                 )
             case _:

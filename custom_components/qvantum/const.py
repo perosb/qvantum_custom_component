@@ -46,7 +46,7 @@ SENSOR_MODE_HTTP_EXT_ROOM_SENSOR = "ext_room_sensor"
 
 
 class HeatingCurveType(IntEnum):
-    """Heating curve source. Modbus holding 22 (`curve_type_heating`)."""
+    """Heating curve source. Holding 22 / cloud ``curve_type_heating``."""
 
     AUTO = 0
     USER_DEFINED = 1

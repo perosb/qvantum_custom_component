@@ -504,14 +504,14 @@ class TestHeatingCurveTypeSelect:
     @pytest.mark.asyncio
     async def test_async_select_option(self, mock_coordinator, mock_device):
         entity = self._entity(mock_coordinator, mock_device)
-        mock_coordinator.async_write_metric = AsyncMock(
+        mock_coordinator.client.set_curve_type_heating = AsyncMock(
             return_value={"status": "APPLIED"}
         )
 
         await entity.async_select_option("1")
 
-        mock_coordinator.async_write_metric.assert_called_once_with(
-            "test_device_123", "curve_type_heating", 1
+        mock_coordinator.client.set_curve_type_heating.assert_called_once_with(
+            "test_device_123", 1
         )
         assert mock_coordinator.data["values"]["curve_type_heating"] == 1
 
@@ -524,6 +524,13 @@ class TestHeatingCurveTypeSelect:
         mock_coordinator.config_entry.options = {}
         mock_coordinator.config_entry.data = {}
         assert entity.available is False
+
+    def test_available_in_cloud(self, mock_coordinator, mock_device):
+        entity = self._entity(mock_coordinator, mock_device)
+        mock_coordinator.modbus_enabled = False
+        mock_coordinator.config_entry.options = {}
+        mock_coordinator.config_entry.data = {}
+        assert entity.available is True
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_creates_curve_type(
@@ -547,7 +554,7 @@ class TestHeatingCurveTypeSelect:
         assert "curve_type_heating" in keys
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry_cloud_omits_curve_type(
+    async def test_async_setup_entry_cloud_creates_curve_type(
         self, hass, mock_config_entry, mock_coordinator, mock_device
     ):
         from custom_components.qvantum import RuntimeData
@@ -566,5 +573,5 @@ class TestHeatingCurveTypeSelect:
             await async_setup_entry(hass, mock_config_entry, async_add_entities)
 
         keys = [entity._metric_key for entity in async_add_entities.call_args[0][0]]
-        assert "curve_type_heating" not in keys
+        assert "curve_type_heating" in keys
         assert "use_adaptive" in keys

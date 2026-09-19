@@ -1,7 +1,8 @@
-# Heating curve (Modbus)
+# Heating curve
 
-How Qvantum Auto vs User defined heating curves map to holding registers,
-what the official app does, and what this integration exposes.
+How Qvantum Auto vs User defined heating curves map to Modbus holdings and
+the cloud HTTP `update_settings` command, what the official app does, and
+what this integration exposes.
 
 Source for register names and ranges: *Modbus Communication* addendum
 QAD EN 2609-AXC (D100041). Behaviour below is from live dumps on one
@@ -113,22 +114,37 @@ the 7-point cache **is** that generated curve. Auto control still uses
 
 The coldest point often sits on max supply (holding 19, 60 °C here).
 
+## Cloud HTTP
+
+The app `update_settings` payload includes `curve_type_heating`,
+`ud_curve_minus30` … `ud_curve_30`, plus Auto-only fields we do **not**
+write yet (`guide_tdot` DUT, `guide_sdot` supply-at-DUT, `p_heating`,
+`min_supply`, `max_supply`, `guide_he`).
+
+This integration sends **`curve_type_heating` and `ud_curve*`** only.
+Poll aliases `ud_curve_minus30` → canonical `curve_minus_30` so the same
+entities work in cloud and Modbus.
+
+Cloud Auto still cannot set DUT; switching 22 to Auto uses whatever
+family/DUT the pump already has. User defined writes the seven points
+with the app key names (`ud_curve_minus10`, no underscore before the
+number).
+
 ## What this integration does
 
-- **Select 22** — real Auto / User defined switch (writes that holding).
-- **Number 23** — Auto family 1–50. This is **not** DUT. Only
-  **available** when 22 is Auto (writing it is a no-op for `cal_heat_temp`
-  in User defined).
+- **Select `curve_type_heating`** — Auto / User defined. Modbus writes
+  holding 22; cloud sends `curve_type_heating`.
+- **Number 23** (`temp_compensation_curve`) — Auto family 1–50, **Modbus
+  only**. Not DUT. Only **available** when 22 is Auto.
 - **Numbers 24–30** — named `Heating curve N: T°C` in outdoor-temp order
   matching the app list (+30 °C down to −30 °C). Only **available** when
-  22 is User defined. `curve_type_heating` exposes `points: [[outdoor,
-  supply], …]` for Lovelace charts.
-- DUT and “Framledning vid DUT” are **not** entities. There is nothing
-  on the bus to read or write.
+  22 is User defined. Cloud writes `ud_curve*`. The type select exposes
+  `points: [[outdoor, supply], …]` for Lovelace charts.
+- DUT and “Framledning vid DUT” are **not** entities.
 
-Writing 23 from HA **does** change Auto `cal_heat_temp`. It is not the
-same as the app’s DUT fields: those pick a 1–50 family **and** refresh
-the 24–30 cache. HA cannot reproduce the DUT generator.
+Writing 23 from HA **does** change Auto `cal_heat_temp` on Modbus. It is
+not the same as the app’s DUT fields. HA cannot reproduce the DUT
+generator.
 
 ## Practical notes
 
