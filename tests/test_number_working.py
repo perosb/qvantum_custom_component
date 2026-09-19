@@ -1013,6 +1013,16 @@ class TestHeatingCurveNumbers:
         mock_coordinator.config_entry.data = {}
         assert entity.available is True
 
+    def test_curve_point_unavailable_in_modbus_when_write_disabled(
+        self, mock_coordinator, mock_device
+    ):
+        """Test Modbus curve points require the Modbus write option."""
+        mock_coordinator.modbus_enabled = True
+        entity = self._entity(mock_coordinator, mock_device)
+        mock_coordinator.config_entry.options = {}
+        mock_coordinator.config_entry.data = {}
+        assert entity.available is False
+
     @pytest.mark.asyncio
     async def test_async_setup_entry_creates_curve_entities(
         self, hass, mock_config_entry, mock_coordinator, mock_device

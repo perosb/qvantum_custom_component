@@ -220,6 +220,13 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 == HeatingCurveType.USER_DEFINED
             )
             and (
+                # Curve points are cloud-writable, but require Modbus write access
+                # when the coordinator is using the Modbus transport.
+                self._metric_key not in HEATING_CURVE_OUTDOOR_TEMPS
+                or not getattr(self.coordinator, "modbus_enabled", False)
+                or self._is_modbus_write_allowed()
+            )
+            and (
                 # Holding 23 (Auto family 1-50) is ignored in User defined.
                 self._metric_key != "temp_compensation_curve"
                 or self._values.get("curve_type_heating") == HeatingCurveType.AUTO
