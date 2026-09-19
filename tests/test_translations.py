@@ -106,16 +106,16 @@ def test_heating_curve_translations_exist_in_all_locales():
         "curve_20",
         "curve_30",
     )
-    # Language-independent numeric prefixes so HA's numeric collation
-    # lists points as -30 … +30 instead of -10, -20, -30.
-    curve_point_prefixes = {
-        "curve_minus_30": "1. ",
-        "curve_minus_20": "2. ",
-        "curve_minus_10": "3. ",
-        "curve_0": "4. ",
-        "curve_10": "5. ",
-        "curve_20": "6. ",
-        "curve_30": "7. ",
+    # "{Heating curve} N: temp" so points sort with the Auto curve name,
+    # and N keeps outdoor-temp order under HA's numeric collation.
+    curve_point_suffixes = {
+        "curve_minus_30": " 1: -30",
+        "curve_minus_20": " 2: -20",
+        "curve_minus_10": " 3: -10",
+        "curve_0": " 4: 0",
+        "curve_10": " 5: 10",
+        "curve_20": " 6: 20",
+        "curve_30": " 7: 30",
     }
     for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -126,9 +126,10 @@ def test_heating_curve_translations_exist_in_all_locales():
         numbers = data["entity"]["number"]
         for key in keys_number:
             assert numbers[key]["name"], f"{path.name} missing {key}"
-        for key, prefix in curve_point_prefixes.items():
-            assert numbers[key]["name"].startswith(prefix), (
-                f"{path.name} {key} should start with {prefix!r}"
+        base = numbers["temp_compensation_curve"]["name"]
+        for key, suffix in curve_point_suffixes.items():
+            assert numbers[key]["name"] == f"{base}{suffix}", (
+                f"{path.name} {key} should be {base}{suffix!r}"
             )
 
 

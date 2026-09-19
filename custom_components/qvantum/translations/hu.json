@@ -588,25 +588,25 @@
         "name": "Fűtési görbe"
       },
       "curve_minus_30": {
-        "name": "1. Fűtési görbe -30 °C-nál"
+        "name": "Fűtési görbe 1: -30"
       },
       "curve_minus_20": {
-        "name": "2. Fűtési görbe -20 °C-nál"
+        "name": "Fűtési görbe 2: -20"
       },
       "curve_minus_10": {
-        "name": "3. Fűtési görbe -10 °C-nál"
+        "name": "Fűtési görbe 3: -10"
       },
       "curve_0": {
-        "name": "4. Fűtési görbe 0 °C-nál"
+        "name": "Fűtési görbe 4: 0"
       },
       "curve_10": {
-        "name": "5. Fűtési görbe 10 °C-nál"
+        "name": "Fűtési görbe 5: 10"
       },
       "curve_20": {
-        "name": "6. Fűtési görbe 20 °C-nál"
+        "name": "Fűtési görbe 6: 20"
       },
       "curve_30": {
-        "name": "7. Fűtési görbe 30 °C-nál"
+        "name": "Fűtési görbe 7: 30"
       }
     },
     "climate": {

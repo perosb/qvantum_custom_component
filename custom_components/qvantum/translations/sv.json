@@ -591,25 +591,25 @@
         "name": "Värmekurva"
       },
       "curve_minus_30": {
-        "name": "1. Värmekurva vid -30 °C"
+        "name": "Värmekurva 1: -30"
       },
       "curve_minus_20": {
-        "name": "2. Värmekurva vid -20 °C"
+        "name": "Värmekurva 2: -20"
       },
       "curve_minus_10": {
-        "name": "3. Värmekurva vid -10 °C"
+        "name": "Värmekurva 3: -10"
       },
       "curve_0": {
-        "name": "4. Värmekurva vid 0 °C"
+        "name": "Värmekurva 4: 0"
       },
       "curve_10": {
-        "name": "5. Värmekurva vid 10 °C"
+        "name": "Värmekurva 5: 10"
       },
       "curve_20": {
-        "name": "6. Värmekurva vid 20 °C"
+        "name": "Värmekurva 6: 20"
       },
       "curve_30": {
-        "name": "7. Värmekurva vid 30 °C"
+        "name": "Värmekurva 7: 30"
       }
     },
     "climate": {

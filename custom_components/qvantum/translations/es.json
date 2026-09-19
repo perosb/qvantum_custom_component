@@ -588,25 +588,25 @@
         "name": "Curva de calefacción"
       },
       "curve_minus_30": {
-        "name": "1. Curva de calefacción a -30 °C"
+        "name": "Curva de calefacción 1: -30"
       },
       "curve_minus_20": {
-        "name": "2. Curva de calefacción a -20 °C"
+        "name": "Curva de calefacción 2: -20"
       },
       "curve_minus_10": {
-        "name": "3. Curva de calefacción a -10 °C"
+        "name": "Curva de calefacción 3: -10"
       },
       "curve_0": {
-        "name": "4. Curva de calefacción a 0 °C"
+        "name": "Curva de calefacción 4: 0"
       },
       "curve_10": {
-        "name": "5. Curva de calefacción a 10 °C"
+        "name": "Curva de calefacción 5: 10"
       },
       "curve_20": {
-        "name": "6. Curva de calefacción a 20 °C"
+        "name": "Curva de calefacción 6: 20"
       },
       "curve_30": {
-        "name": "7. Curva de calefacción a 30 °C"
+        "name": "Curva de calefacción 7: 30"
       }
     },
     "climate": {
