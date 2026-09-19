@@ -535,6 +535,15 @@
       },
       "ventilation_filter_time_left": {
         "name": "Ventilationsfilter tid tilbage"
+      },
+      "compressor_run_time": {
+        "name": "Kompressorens driftstid"
+      },
+      "compressor_starts": {
+        "name": "Kompressorstarter"
+      },
+      "ventilation_fan_run_time": {
+        "name": "Ventilationsventilatorens driftstid"
       }
     },
     "number": {

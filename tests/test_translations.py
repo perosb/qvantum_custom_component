@@ -52,6 +52,20 @@ def test_danish_and_czech_translations_are_available():
         assert "modbus" in data["config"]["step"]["user"]["menu_options"]
 
 
+def test_runtime_sensor_translations_exist_in_all_locales():
+    """Input registers 88-90 have a sensor name in every locale."""
+    keys = (
+        "compressor_run_time",
+        "compressor_starts",
+        "ventilation_fan_run_time",
+    )
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        sensors = data["entity"]["sensor"]
+        for key in keys:
+            assert sensors[key]["name"], f"{path.name} missing {key}"
+
+
 def test_released_translations_mean_permitted():
     """Released flags mean the function is permitted, not that it is running."""
     en = json.loads((TRANSLATIONS_DIR / "en.json").read_text(encoding="utf-8"))

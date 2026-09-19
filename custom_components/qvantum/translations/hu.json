@@ -535,6 +535,15 @@
       },
       "ventilation_filter_time_left": {
         "name": "Szellőzőszűrő hátralévő ideje"
+      },
+      "compressor_run_time": {
+        "name": "Kompresszor üzemidő"
+      },
+      "compressor_starts": {
+        "name": "Kompresszor indítások"
+      },
+      "ventilation_fan_run_time": {
+        "name": "Szellőzőventilátor üzemidő"
       }
     },
     "number": {

@@ -535,6 +535,15 @@
       },
       "ventilation_filter_time_left": {
         "name": "Temps restant du filtre de ventilation"
+      },
+      "compressor_run_time": {
+        "name": "Temps de fonctionnement du compresseur"
+      },
+      "compressor_starts": {
+        "name": "Démarrages du compresseur"
+      },
+      "ventilation_fan_run_time": {
+        "name": "Temps de fonctionnement du ventilateur"
       }
     },
     "number": {

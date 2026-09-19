@@ -43,9 +43,29 @@ from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Countdown / remaining-life metrics belong under Diagnostics.
+# Countdown / remaining-life and lifetime counters belong under Diagnostics.
 _DIAGNOSTIC_SENSORS = frozenset(
-    {"ventilation_filter_time_left", "compressor_blocked_sec"}
+    {
+        "ventilation_filter_time_left",
+        "compressor_blocked_sec",
+        "compressor_run_time",
+        "compressor_starts",
+        "ventilation_fan_run_time",
+    }
+)
+_DURATION_HOURS_SENSORS = frozenset(
+    {
+        "ventilation_filter_time_left",
+        "compressor_run_time",
+        "ventilation_fan_run_time",
+    }
+)
+_TOTAL_INCREASING_SENSORS = frozenset(
+    {
+        "compressor_run_time",
+        "compressor_starts",
+        "ventilation_fan_run_time",
+    }
 )
 
 
@@ -189,6 +209,12 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
         """Set appropriate units based on metric key patterns."""
         if "rpm" in metric_key or metric_key in ["compressormeasuredspeed"]:
             self._attr_native_unit_of_measurement = "rpm"
+        elif metric_key in _DURATION_HOURS_SENSORS:
+            # Must precede the generic "fan" match so ventilation_fan_run_time
+            # is hours, not percent.
+            self._attr_native_unit_of_measurement = UnitOfTime.HOURS
+            self._attr_device_class = SensorDeviceClass.DURATION
+            self._attr_suggested_display_precision = 0
         elif (
             "fan" in metric_key
             or metric_key.startswith("gp")
@@ -199,9 +225,7 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
             self._attr_device_class = SensorDeviceClass.DURATION
             self._attr_suggested_display_precision = 0
-        elif metric_key == "ventilation_filter_time_left":
-            self._attr_native_unit_of_measurement = UnitOfTime.HOURS
-            self._attr_device_class = SensorDeviceClass.DURATION
+        elif metric_key == "compressor_starts":
             self._attr_suggested_display_precision = 0
         elif "tap_water_cap" == metric_key:
             self._attr_suggested_display_precision = 1
@@ -213,6 +237,8 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             self._attr_native_unit_of_measurement = "l/m"
         elif "degree_minute" == metric_key:
             self._attr_native_unit_of_measurement = "°min"
+        if metric_key in _TOTAL_INCREASING_SENSORS:
+            self._attr_state_class = SensorStateClass.TOTAL_INCREASING
 
     @property
     def state(self):

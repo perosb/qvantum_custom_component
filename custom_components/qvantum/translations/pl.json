@@ -535,6 +535,15 @@
       },
       "ventilation_filter_time_left": {
         "name": "Pozostały czas filtra wentylacji"
+      },
+      "compressor_run_time": {
+        "name": "Czas pracy sprężarki"
+      },
+      "compressor_starts": {
+        "name": "Uruchomienia sprężarki"
+      },
+      "ventilation_fan_run_time": {
+        "name": "Czas pracy wentylatora"
       }
     },
     "number": {
