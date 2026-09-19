@@ -45,6 +45,13 @@ SENSOR_MODE_HTTP_BT2 = "bt2"
 SENSOR_MODE_HTTP_EXT_ROOM_SENSOR = "ext_room_sensor"
 
 
+class HeatingCurveType(IntEnum):
+    """Heating curve source. Modbus holding 22 (`curve_type_heating`)."""
+
+    AUTO = 0
+    USER_DEFINED = 1
+
+
 class SensorMode(IntEnum):
     """Indoor sensor source. Modbus holding 9 (`use_operation_sensor`)."""
 

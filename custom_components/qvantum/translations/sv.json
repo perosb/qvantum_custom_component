@@ -58,6 +58,13 @@
           "3": "AUX",
           "4": "Extern"
         }
+      },
+      "curve_type_heating": {
+        "name": "Typ av värmekurva",
+        "state": {
+          "0": "Auto",
+          "1": "Användardefinierad"
+        }
       }
     },
     "switch": {
@@ -579,6 +586,30 @@
       },
       "stop_heating": {
         "name": "Utomhustemperatur stoppa värme"
+      },
+      "temp_compensation_curve": {
+        "name": "Värmekurva"
+      },
+      "curve_-30": {
+        "name": "Värmekurva vid -30 °C"
+      },
+      "curve_-20": {
+        "name": "Värmekurva vid -20 °C"
+      },
+      "curve_-10": {
+        "name": "Värmekurva vid -10 °C"
+      },
+      "curve_0": {
+        "name": "Värmekurva vid 0 °C"
+      },
+      "curve_10": {
+        "name": "Värmekurva vid 10 °C"
+      },
+      "curve_20": {
+        "name": "Värmekurva vid 20 °C"
+      },
+      "curve_30": {
+        "name": "Värmekurva vid 30 °C"
       }
     },
     "climate": {

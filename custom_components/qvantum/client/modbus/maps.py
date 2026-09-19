@@ -116,6 +116,13 @@ MODBUS_HOLDING_REGISTER_MAP = {
     "min_heating_supply": (20, "uint16", 1.0),
     "curve_type_heating": (22, "uint16", 1.0),
     "temp_compensation_curve": (23, "uint16", 1.0),
+    "curve_-30": (24, "uint16", 1.0),
+    "curve_-20": (25, "uint16", 1.0),
+    "curve_-10": (26, "uint16", 1.0),
+    "curve_0": (27, "uint16", 1.0),
+    "curve_10": (28, "uint16", 1.0),
+    "curve_20": (29, "uint16", 1.0),
+    "curve_30": (30, "uint16", 1.0),
     "cooling_offset": (36, "int16", 1.0),
     "start_cooling_temp": (38, "int16", 1.0),
     "dew_point_protection": (39, "uint16", 1.0),
@@ -179,4 +186,35 @@ MODBUS_HOLDING_TO_SETTINGS_MAP = {
     "dhw_stop_extra": "dhw_stop_extra",
     "room_temp_external": "room_temp_external",
     "stop_heating": "stop_heating",
+    "curve_type_heating": "curve_type_heating",
+    "temp_compensation_curve": "temp_compensation_curve",
+    "curve_-30": "curve_-30",
+    "curve_-20": "curve_-20",
+    "curve_-10": "curve_-10",
+    "curve_0": "curve_0",
+    "curve_10": "curve_10",
+    "curve_20": "curve_20",
+    "curve_30": "curve_30",
 }
+
+# Outdoor temperature (°C) for each user-defined heating-curve holding (24-30).
+HEATING_CURVE_OUTDOOR_TEMPS: dict[str, int] = {
+    "curve_-30": -30,
+    "curve_-20": -20,
+    "curve_-10": -10,
+    "curve_0": 0,
+    "curve_10": 10,
+    "curve_20": 20,
+    "curve_30": 30,
+}
+
+
+def heating_curve_points(values: dict) -> list[list[int]]:
+    """Return ``[outdoor, supply]`` pairs for Lovelace charts (ApexCharts/Plotly)."""
+    points: list[list[int]] = []
+    for key, outdoor in HEATING_CURVE_OUTDOOR_TEMPS.items():
+        supply = values.get(key)
+        if isinstance(supply, bool) or not isinstance(supply, (int, float)):
+            continue
+        points.append([outdoor, int(supply)])
+    return points

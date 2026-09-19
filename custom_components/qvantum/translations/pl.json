@@ -84,6 +84,13 @@
           "3": "AUX",
           "4": "Zewnętrzny"
         }
+      },
+      "curve_type_heating": {
+        "name": "Typ krzywej grzewczej",
+        "state": {
+          "0": "Auto",
+          "1": "Zdefiniowana przez użytkownika"
+        }
       }
     },
     "button": {
@@ -576,6 +583,30 @@
       },
       "stop_heating": {
         "name": "Temperatura zewnętrzna wyłączenia ogrzewania"
+      },
+      "temp_compensation_curve": {
+        "name": "Krzywa grzewcza"
+      },
+      "curve_-30": {
+        "name": "Krzywa grzewcza przy -30 °C"
+      },
+      "curve_-20": {
+        "name": "Krzywa grzewcza przy -20 °C"
+      },
+      "curve_-10": {
+        "name": "Krzywa grzewcza przy -10 °C"
+      },
+      "curve_0": {
+        "name": "Krzywa grzewcza przy 0 °C"
+      },
+      "curve_10": {
+        "name": "Krzywa grzewcza przy 10 °C"
+      },
+      "curve_20": {
+        "name": "Krzywa grzewcza przy 20 °C"
+      },
+      "curve_30": {
+        "name": "Krzywa grzewcza przy 30 °C"
       }
     },
     "climate": {

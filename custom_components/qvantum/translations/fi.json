@@ -84,6 +84,13 @@
           "3": "AUX",
           "4": "Ulkoinen"
         }
+      },
+      "curve_type_heating": {
+        "name": "Lämmityskäyrän tyyppi",
+        "state": {
+          "0": "Auto",
+          "1": "Käyttäjän määrittämä"
+        }
       }
     },
     "button": {
@@ -576,6 +583,30 @@
       },
       "stop_heating": {
         "name": "Ulkolämpötila lämmityksen pysäytys"
+      },
+      "temp_compensation_curve": {
+        "name": "Lämmityskäyrä"
+      },
+      "curve_-30": {
+        "name": "Lämmityskäyrä -30 °C"
+      },
+      "curve_-20": {
+        "name": "Lämmityskäyrä -20 °C"
+      },
+      "curve_-10": {
+        "name": "Lämmityskäyrä -10 °C"
+      },
+      "curve_0": {
+        "name": "Lämmityskäyrä 0 °C"
+      },
+      "curve_10": {
+        "name": "Lämmityskäyrä 10 °C"
+      },
+      "curve_20": {
+        "name": "Lämmityskäyrä 20 °C"
+      },
+      "curve_30": {
+        "name": "Lämmityskäyrä 30 °C"
       }
     },
     "climate": {

@@ -84,6 +84,13 @@
           "3": "AUX",
           "4": "Extern"
         }
+      },
+      "curve_type_heating": {
+        "name": "Heizkurventyp",
+        "state": {
+          "0": "Auto",
+          "1": "Benutzerdefiniert"
+        }
       }
     },
     "button": {
@@ -576,6 +583,30 @@
       },
       "stop_heating": {
         "name": "Außentemperatur Heizstopp"
+      },
+      "temp_compensation_curve": {
+        "name": "Heizkurve"
+      },
+      "curve_-30": {
+        "name": "Heizkurve bei -30 °C"
+      },
+      "curve_-20": {
+        "name": "Heizkurve bei -20 °C"
+      },
+      "curve_-10": {
+        "name": "Heizkurve bei -10 °C"
+      },
+      "curve_0": {
+        "name": "Heizkurve bei 0 °C"
+      },
+      "curve_10": {
+        "name": "Heizkurve bei 10 °C"
+      },
+      "curve_20": {
+        "name": "Heizkurve bei 20 °C"
+      },
+      "curve_30": {
+        "name": "Heizkurve bei 30 °C"
       }
     },
     "climate": {

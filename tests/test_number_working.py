@@ -34,7 +34,7 @@ with patch(
                 QvantumNumberEntity,
                 async_setup_entry,
             )
-            from custom_components.qvantum.const import SensorMode
+            from custom_components.qvantum.const import HeatingCurveType, SensorMode
 
 
 @pytest.fixture
@@ -888,3 +888,107 @@ class TestStopHeating:
         entities = async_add_entities.call_args[0][0]
         entity_keys = [entity._metric_key for entity in entities]
         assert "stop_heating" in entity_keys
+
+
+class TestHeatingCurveNumbers:
+    """User-defined heating curve supply-temperature points (holdings 24-30)."""
+
+    def _entity(self, mock_coordinator, mock_device, metric="curve_-30"):
+        mock_coordinator.data["values"][metric] = 45
+        mock_coordinator.data["values"]["curve_type_heating"] = HeatingCurveType.USER_DEFINED
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        return QvantumNumberEntity(
+            mock_coordinator, metric, 10, 80, 1, mock_device
+        )
+
+    def test_init_curve_point(self, mock_coordinator, mock_device):
+        entity = self._entity(mock_coordinator, mock_device)
+        assert entity._metric_key == "curve_-30"
+        assert entity._attr_unique_id == "qvantum_number_curve_-30_test_device_123"
+        assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
+        assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
+        assert entity._attr_icon == "mdi:thermometer"
+
+    def test_init_temp_compensation_curve_is_not_temperature(
+        self, mock_coordinator, mock_device
+    ):
+        mock_coordinator.data["values"]["temp_compensation_curve"] = 20
+        entity = QvantumNumberEntity(
+            mock_coordinator, "temp_compensation_curve", 1, 50, 1, mock_device
+        )
+        assert getattr(entity, "_attr_native_unit_of_measurement", None) is None
+        assert getattr(entity, "_attr_device_class", None) is None
+        assert entity._attr_icon == "mdi:chart-bell-curve"
+
+    def test_available_when_user_defined(self, mock_coordinator, mock_device):
+        entity = self._entity(mock_coordinator, mock_device)
+        assert entity.available is True
+
+    def test_unavailable_when_auto(self, mock_coordinator, mock_device):
+        entity = self._entity(mock_coordinator, mock_device)
+        mock_coordinator.data["values"]["curve_type_heating"] = HeatingCurveType.AUTO
+        assert entity.available is False
+
+    def test_temp_compensation_available_in_auto(
+        self, mock_coordinator, mock_device
+    ):
+        mock_coordinator.data["values"]["temp_compensation_curve"] = 20
+        mock_coordinator.data["values"]["curve_type_heating"] = HeatingCurveType.AUTO
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        entity = QvantumNumberEntity(
+            mock_coordinator, "temp_compensation_curve", 1, 50, 1, mock_device
+        )
+        assert entity.available is True
+
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_writes_metric(
+        self, mock_coordinator, mock_device
+    ):
+        entity = self._entity(mock_coordinator, mock_device)
+        mock_coordinator.async_write_metric = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        mock_coordinator.client.update_setting = AsyncMock()
+
+        await entity.async_set_native_value(48.0)
+
+        mock_coordinator.async_write_metric.assert_called_once_with(
+            "test_device_123", "curve_-30", 48
+        )
+        mock_coordinator.client.update_setting.assert_not_called()
+        assert mock_coordinator.data["values"]["curve_-30"] == 48
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_creates_curve_entities(
+        self, hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        from custom_components.qvantum import RuntimeData
+
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.data["values"].update(
+            {
+                "temp_compensation_curve": 22,
+                "curve_type_heating": 1,
+                "curve_-30": 45,
+                "curve_0": 32,
+                "curve_30": 20,
+            }
+        )
+        mock_config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator, device=mock_device, client=MagicMock()
+        )
+
+        async_add_entities = MagicMock()
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+        entity_keys = [entity._metric_key for entity in async_add_entities.call_args[0][0]]
+        assert "temp_compensation_curve" in entity_keys
+        assert "curve_-30" in entity_keys
+        assert "curve_0" in entity_keys
+        assert "curve_30" in entity_keys

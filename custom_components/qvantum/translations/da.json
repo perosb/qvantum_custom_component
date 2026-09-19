@@ -84,6 +84,13 @@
           "3": "AUX",
           "4": "Ekstern"
         }
+      },
+      "curve_type_heating": {
+        "name": "Type af varmekurve",
+        "state": {
+          "0": "Auto",
+          "1": "Brugerdefineret"
+        }
       }
     },
     "button": {
@@ -576,6 +583,30 @@
       },
       "stop_heating": {
         "name": "Udetemperatur stop opvarmning"
+      },
+      "temp_compensation_curve": {
+        "name": "Varmekurve"
+      },
+      "curve_-30": {
+        "name": "Varmekurve ved -30 °C"
+      },
+      "curve_-20": {
+        "name": "Varmekurve ved -20 °C"
+      },
+      "curve_-10": {
+        "name": "Varmekurve ved -10 °C"
+      },
+      "curve_0": {
+        "name": "Varmekurve ved 0 °C"
+      },
+      "curve_10": {
+        "name": "Varmekurve ved 10 °C"
+      },
+      "curve_20": {
+        "name": "Varmekurve ved 20 °C"
+      },
+      "curve_30": {
+        "name": "Varmekurve ved 30 °C"
       }
     },
     "climate": {

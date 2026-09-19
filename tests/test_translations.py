@@ -66,6 +66,29 @@ def test_runtime_sensor_translations_exist_in_all_locales():
             assert sensors[key]["name"], f"{path.name} missing {key}"
 
 
+def test_heating_curve_translations_exist_in_all_locales():
+    """Heating curve select/number names exist in every locale."""
+    keys_number = (
+        "temp_compensation_curve",
+        "curve_-30",
+        "curve_-20",
+        "curve_-10",
+        "curve_0",
+        "curve_10",
+        "curve_20",
+        "curve_30",
+    )
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        select = data["entity"]["select"]["curve_type_heating"]
+        assert select["name"], f"{path.name} missing curve_type_heating"
+        assert select["state"]["0"], f"{path.name} missing Auto"
+        assert select["state"]["1"], f"{path.name} missing User defined"
+        numbers = data["entity"]["number"]
+        for key in keys_number:
+            assert numbers[key]["name"], f"{path.name} missing {key}"
+
+
 def test_released_translations_mean_permitted():
     """Released flags mean the function is permitted, not that it is running."""
     en = json.loads((TRANSLATIONS_DIR / "en.json").read_text(encoding="utf-8"))

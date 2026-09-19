@@ -11,7 +11,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
-from .const import SensorMode, TAP_WATER_CAPACITY_MAPPINGS
+from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
+from .const import HeatingCurveType, SensorMode, TAP_WATER_CAPACITY_MAPPINGS
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity
 
@@ -22,6 +23,8 @@ _LOGGER = logging.getLogger(__name__)
 MODBUS_WRITE_METRICS = {
     "dhw_stop_extra",
     "room_temp_external",  # Written via Modbus and only relevant when the external room sensor mode is enabled.
+    "temp_compensation_curve",
+    *HEATING_CURVE_OUTDOOR_TEMPS,
 }
 
 # Number metrics that represent temperatures (°C).
@@ -33,8 +36,11 @@ TEMPERATURE_NUMBER_METRICS = frozenset(
         "tap_water_stop",
         "dhw_stop_extra",
         "room_temp_external",
+        *HEATING_CURVE_OUTDOOR_TEMPS,
     }
 )
+
+_HEATING_CURVE_POINT_RANGE = (10, 80, 1)
 
 
 async def async_setup_entry(
@@ -58,6 +64,8 @@ async def async_setup_entry(
         "fan_speed_2": (0, 100, 5),
         "room_temp_external": (10, 40, 0.1),
         "stop_heating": (-30, 30, 1),
+        "temp_compensation_curve": (1, 50, 1),
+        **{key: _HEATING_CURVE_POINT_RANGE for key in HEATING_CURVE_OUTDOOR_TEMPS},
     }
 
     # Only create number entities for metrics present in the coordinator's current data.
@@ -140,6 +148,11 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 response = await self.coordinator.async_write_metric(
                     self._hpid, self._metric_key, coordinator_update_value
                 )
+            case _ if self._metric_key in MODBUS_WRITE_METRICS:
+                coordinator_update_value = int(value)
+                response = await self.coordinator.async_write_metric(
+                    self._hpid, self._metric_key, coordinator_update_value
+                )
             case _:
                 raise HomeAssistantError(
                     f"Unsupported metric key for number entity: {self._metric_key}"
@@ -180,6 +193,12 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 # configured to use the external operation sensor.
                 self._metric_key != "room_temp_external"
                 or self._values.get("use_operation_sensor") == SensorMode.EXTERNAL
+            )
+            and (
+                # User-defined curve points only apply when holding 22 is User defined.
+                self._metric_key not in HEATING_CURVE_OUTDOOR_TEMPS
+                or self._values.get("curve_type_heating")
+                == HeatingCurveType.USER_DEFINED
             )
         )
 

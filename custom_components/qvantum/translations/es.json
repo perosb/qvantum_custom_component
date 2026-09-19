@@ -84,6 +84,13 @@
           "3": "AUX",
           "4": "Externo"
         }
+      },
+      "curve_type_heating": {
+        "name": "Tipo de curva de calefacción",
+        "state": {
+          "0": "Auto",
+          "1": "Definido por el usuario"
+        }
       }
     },
     "button": {
@@ -576,6 +583,30 @@
       },
       "stop_heating": {
         "name": "Temperatura exterior de parada de calefacción"
+      },
+      "temp_compensation_curve": {
+        "name": "Curva de calefacción"
+      },
+      "curve_-30": {
+        "name": "Curva de calefacción a -30 °C"
+      },
+      "curve_-20": {
+        "name": "Curva de calefacción a -20 °C"
+      },
+      "curve_-10": {
+        "name": "Curva de calefacción a -10 °C"
+      },
+      "curve_0": {
+        "name": "Curva de calefacción a 0 °C"
+      },
+      "curve_10": {
+        "name": "Curva de calefacción a 10 °C"
+      },
+      "curve_20": {
+        "name": "Curva de calefacción a 20 °C"
+      },
+      "curve_30": {
+        "name": "Curva de calefacción a 30 °C"
       }
     },
     "climate": {
