@@ -919,19 +919,19 @@ class TestHeatingCurveNumbers:
         minus = self._entity(mock_coordinator, mock_device, "curve_minus_30")
         plus = self._entity(mock_coordinator, mock_device, "curve_30")
         zero = self._entity(mock_coordinator, mock_device, "curve_0")
-        assert minus.suggested_object_id == "curve_01_minus_30"
-        assert plus.suggested_object_id == "curve_07_30"
+        assert plus.suggested_object_id == "curve_01_30"
         assert zero.suggested_object_id == "curve_04_0"
+        assert minus.suggested_object_id == "curve_07_minus_30"
         object_ids = [
             self._entity(mock_coordinator, mock_device, key).suggested_object_id
             for key in (
-                "curve_minus_30",
-                "curve_minus_20",
-                "curve_minus_10",
-                "curve_0",
-                "curve_10",
-                "curve_20",
                 "curve_30",
+                "curve_20",
+                "curve_10",
+                "curve_0",
+                "curve_minus_10",
+                "curve_minus_20",
+                "curve_minus_30",
             )
         ]
         assert object_ids == sorted(object_ids)

@@ -115,7 +115,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
 
         Slugify drops ``-`` from translated names, so ``-30 °C`` and ``30 °C``
         would collide. A numeric prefix keeps device-page order at
-        -30 … +30 even when the UI sorts by ``entity_id``.
+        +30 … -30 (Qvantum app order) even when the UI sorts by ``entity_id``.
         """
         if self._metric_key not in HEATING_CURVE_OUTDOOR_TEMPS:
             return getattr(super(), "suggested_object_id", None)

@@ -198,19 +198,20 @@ MODBUS_HOLDING_TO_SETTINGS_MAP = {
 }
 
 # Outdoor temperature (°C) for each user-defined heating-curve holding (24-30).
+# Insertion order matches the Qvantum app list: +30 °C down to -30 °C.
 HEATING_CURVE_OUTDOOR_TEMPS: dict[str, int] = {
-    "curve_minus_30": -30,
-    "curve_minus_20": -20,
-    "curve_minus_10": -10,
-    "curve_0": 0,
-    "curve_10": 10,
-    "curve_20": 20,
     "curve_30": 30,
+    "curve_20": 20,
+    "curve_10": 10,
+    "curve_0": 0,
+    "curve_minus_10": -10,
+    "curve_minus_20": -20,
+    "curve_minus_30": -30,
 }
 
 
 def heating_curve_points(values: dict) -> list[list[int]]:
-    """Return ``[outdoor, supply]`` pairs in outdoor-temperature order."""
+    """Return ``[outdoor, supply]`` pairs from +30 °C down to -30 °C."""
     points: list[list[int]] = []
     for key, outdoor in HEATING_CURVE_OUTDOOR_TEMPS.items():
         supply = values.get(key)

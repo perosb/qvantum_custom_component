@@ -588,25 +588,25 @@
         "name": "Varmekurve"
       },
       "curve_minus_30": {
-        "name": "Varmekurve 1: -30°C"
+        "name": "Varmekurve 7: -30°C"
       },
       "curve_minus_20": {
-        "name": "Varmekurve 2: -20°C"
+        "name": "Varmekurve 6: -20°C"
       },
       "curve_minus_10": {
-        "name": "Varmekurve 3: -10°C"
+        "name": "Varmekurve 5: -10°C"
       },
       "curve_0": {
         "name": "Varmekurve 4: 0°C"
       },
       "curve_10": {
-        "name": "Varmekurve 5: 10°C"
+        "name": "Varmekurve 3: 10°C"
       },
       "curve_20": {
-        "name": "Varmekurve 6: 20°C"
+        "name": "Varmekurve 2: 20°C"
       },
       "curve_30": {
-        "name": "Varmekurve 7: 30°C"
+        "name": "Varmekurve 1: 30°C"
       }
     },
     "climate": {

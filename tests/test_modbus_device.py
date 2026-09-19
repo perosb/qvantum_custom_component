@@ -386,13 +386,13 @@ class TestPayloadAdapter:
             "curve_30": 30,
         }
         assert HEATING_CURVE_OUTDOOR_TEMPS == {
-            "curve_minus_30": -30,
-            "curve_minus_20": -20,
-            "curve_minus_10": -10,
-            "curve_0": 0,
-            "curve_10": 10,
-            "curve_20": 20,
             "curve_30": 30,
+            "curve_20": 20,
+            "curve_10": 10,
+            "curve_0": 0,
+            "curve_minus_10": -10,
+            "curve_minus_20": -20,
+            "curve_minus_30": -30,
         }
         for key, address in expected.items():
             assert MODBUS_HOLDING_REGISTER_MAP[key][0] == address
@@ -410,4 +410,4 @@ class TestPayloadAdapter:
         points = heating_curve_points(
             {"curve_minus_30": 45, "curve_0": 32, "curve_10": None, "curve_30": True}
         )
-        assert points == [[-30, 45], [0, 32]]
+        assert points == [[0, 32], [-30, 45]]

@@ -483,13 +483,13 @@ class TestHeatingCurveTypeSelect:
         entity = self._entity(mock_coordinator, mock_device)
         assert entity.extra_state_attributes == {
             "points": [
-                [-30, 45],
-                [-20, 42],
-                [-10, 38],
-                [0, 32],
-                [10, 28],
-                [20, 24],
                 [30, 20],
+                [20, 24],
+                [10, 28],
+                [0, 32],
+                [-10, 38],
+                [-20, 42],
+                [-30, 45],
             ]
         }
 

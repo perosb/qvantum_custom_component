@@ -107,15 +107,15 @@ def test_heating_curve_translations_exist_in_all_locales():
         "curve_30",
     )
     # "{Heating curve} N: temp" so points sort with the Auto curve name,
-    # and N keeps outdoor-temp order under HA's numeric collation.
+    # and N matches the Qvantum app list (+30 °C down to -30 °C).
     curve_point_suffixes = {
-        "curve_minus_30": " 1: -30°C",
-        "curve_minus_20": " 2: -20°C",
-        "curve_minus_10": " 3: -10°C",
+        "curve_30": " 1: 30°C",
+        "curve_20": " 2: 20°C",
+        "curve_10": " 3: 10°C",
         "curve_0": " 4: 0°C",
-        "curve_10": " 5: 10°C",
-        "curve_20": " 6: 20°C",
-        "curve_30": " 7: 30°C",
+        "curve_minus_10": " 5: -10°C",
+        "curve_minus_20": " 6: -20°C",
+        "curve_minus_30": " 7: -30°C",
     }
     for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))

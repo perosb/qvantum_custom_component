@@ -588,25 +588,25 @@
         "name": "Fűtési görbe"
       },
       "curve_minus_30": {
-        "name": "Fűtési görbe 1: -30°C"
+        "name": "Fűtési görbe 7: -30°C"
       },
       "curve_minus_20": {
-        "name": "Fűtési görbe 2: -20°C"
+        "name": "Fűtési görbe 6: -20°C"
       },
       "curve_minus_10": {
-        "name": "Fűtési görbe 3: -10°C"
+        "name": "Fűtési görbe 5: -10°C"
       },
       "curve_0": {
         "name": "Fűtési görbe 4: 0°C"
       },
       "curve_10": {
-        "name": "Fűtési görbe 5: 10°C"
+        "name": "Fűtési görbe 3: 10°C"
       },
       "curve_20": {
-        "name": "Fűtési görbe 6: 20°C"
+        "name": "Fűtési görbe 2: 20°C"
       },
       "curve_30": {
-        "name": "Fűtési görbe 7: 30°C"
+        "name": "Fűtési görbe 1: 30°C"
       }
     },
     "climate": {
