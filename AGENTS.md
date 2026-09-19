@@ -118,6 +118,59 @@ in order. Do not bundle unrelated refactors.
 Labels (`bug` / `enhancement` / `chore`) feed release-drafter. Version lives in
 `manifest.json` and `const.py`; the release workflow rewrites it from the tag.
 
+## Code reviews
+
+When asked to review a PR, **post the review on GitHub**. Do not only summarize
+in chat. `.github/CODEOWNERS` auto-requests `@perosb-bot`; that does not replace
+posting comments when you are asked to review.
+
+**How to comment**
+
+- Inline on the changed line (or a short contiguous range), in the same style
+  as GitHub Copilot: one or two sentences of *why*, then an actionable fix.
+- When the fix is a concrete replacement, include a GitHub suggestion block so
+  the author can apply it in one click. The block must be a drop-in replacement
+  of the commented lines; GitHub rejects comments that are not on a line in the
+  diff.
+- Publish immediately (`gh api …/pulls/<n>/reviews` with `"event": "COMMENT"`)
+  so comments are visible. Leave the review PENDING only if asked. Do not
+  approve unless asked. You cannot approve your own PR. Do not merge unless
+  asked.
+- Review comments are English, matching PR titles and Copilot.
+
+Suggestion block:
+
+````markdown
+Hour-duration metrics including `ventilation_fan_run_time` must be assigned
+before the generic `"fan"` substring match, which otherwise sets unit percent.
+
+```suggestion
+        elif metric_key in _DURATION_HOURS_SENSORS:
+            self._attr_native_unit_of_measurement = UnitOfTime.HOURS
+            self._attr_device_class = SensorDeviceClass.DURATION
+            self._attr_suggested_display_precision = 0
+```
+````
+
+**What to flag**
+
+Correctness first, style second. In this repo that means:
+
+- Wrong Modbus register or cloud endpoint; holding vs input mix-ups (e.g.
+  holding 88 is `sg_enabled`, not a runtime counter).
+- Cloud-only entities created in Modbus mode, or the reverse.
+- `client/` importing `homeassistant*` / `custom_components*`, or HA calling
+  `isinstance` on the transport instead of coordinator helpers.
+- Missing translations, tests, or a coverage drop below 80%.
+
+Do not invent nits to fill space, and do not restate the PR in every inline
+comment. Skip pre-existing problems in untouched lines unless the diff newly
+depends on them. Match surrounding conventions (including existing test
+patterns) rather than “fixing” them in new lines only.
+
+If the diff is clean, still publish a short overview review with an empty
+`comments` array — no inline threads, no approval.
+
 ## Tests
 
 ```bash
