@@ -588,25 +588,25 @@
         "name": "Krzywa grzewcza"
       },
       "curve_minus_30": {
-        "name": "Krzywa grzewcza przy -30 °C"
+        "name": "1. Krzywa grzewcza przy -30 °C"
       },
       "curve_minus_20": {
-        "name": "Krzywa grzewcza przy -20 °C"
+        "name": "2. Krzywa grzewcza przy -20 °C"
       },
       "curve_minus_10": {
-        "name": "Krzywa grzewcza przy -10 °C"
+        "name": "3. Krzywa grzewcza przy -10 °C"
       },
       "curve_0": {
-        "name": "Krzywa grzewcza przy 0 °C"
+        "name": "4. Krzywa grzewcza przy 0 °C"
       },
       "curve_10": {
-        "name": "Krzywa grzewcza przy 10 °C"
+        "name": "5. Krzywa grzewcza przy 10 °C"
       },
       "curve_20": {
-        "name": "Krzywa grzewcza przy 20 °C"
+        "name": "6. Krzywa grzewcza przy 20 °C"
       },
       "curve_30": {
-        "name": "Krzywa grzewcza przy 30 °C"
+        "name": "7. Krzywa grzewcza przy 30 °C"
       }
     },
     "climate": {

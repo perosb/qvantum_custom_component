@@ -588,25 +588,25 @@
         "name": "Topná křivka"
       },
       "curve_minus_30": {
-        "name": "Topná křivka při -30 °C"
+        "name": "1. Topná křivka při -30 °C"
       },
       "curve_minus_20": {
-        "name": "Topná křivka při -20 °C"
+        "name": "2. Topná křivka při -20 °C"
       },
       "curve_minus_10": {
-        "name": "Topná křivka při -10 °C"
+        "name": "3. Topná křivka při -10 °C"
       },
       "curve_0": {
-        "name": "Topná křivka při 0 °C"
+        "name": "4. Topná křivka při 0 °C"
       },
       "curve_10": {
-        "name": "Topná křivka při 10 °C"
+        "name": "5. Topná křivka při 10 °C"
       },
       "curve_20": {
-        "name": "Topná křivka při 20 °C"
+        "name": "6. Topná křivka při 20 °C"
       },
       "curve_30": {
-        "name": "Topná křivka při 30 °C"
+        "name": "7. Topná křivka při 30 °C"
       }
     },
     "climate": {

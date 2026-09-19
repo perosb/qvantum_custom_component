@@ -588,25 +588,25 @@
         "name": "Stooklijn"
       },
       "curve_minus_30": {
-        "name": "Stooklijn bij -30 °C"
+        "name": "1. Stooklijn bij -30 °C"
       },
       "curve_minus_20": {
-        "name": "Stooklijn bij -20 °C"
+        "name": "2. Stooklijn bij -20 °C"
       },
       "curve_minus_10": {
-        "name": "Stooklijn bij -10 °C"
+        "name": "3. Stooklijn bij -10 °C"
       },
       "curve_0": {
-        "name": "Stooklijn bij 0 °C"
+        "name": "4. Stooklijn bij 0 °C"
       },
       "curve_10": {
-        "name": "Stooklijn bij 10 °C"
+        "name": "5. Stooklijn bij 10 °C"
       },
       "curve_20": {
-        "name": "Stooklijn bij 20 °C"
+        "name": "6. Stooklijn bij 20 °C"
       },
       "curve_30": {
-        "name": "Stooklijn bij 30 °C"
+        "name": "7. Stooklijn bij 30 °C"
       }
     },
     "climate": {

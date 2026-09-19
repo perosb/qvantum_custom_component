@@ -588,25 +588,25 @@
         "name": "Lämmityskäyrä"
       },
       "curve_minus_30": {
-        "name": "Lämmityskäyrä -30 °C"
+        "name": "1. Lämmityskäyrä -30 °C"
       },
       "curve_minus_20": {
-        "name": "Lämmityskäyrä -20 °C"
+        "name": "2. Lämmityskäyrä -20 °C"
       },
       "curve_minus_10": {
-        "name": "Lämmityskäyrä -10 °C"
+        "name": "3. Lämmityskäyrä -10 °C"
       },
       "curve_0": {
-        "name": "Lämmityskäyrä 0 °C"
+        "name": "4. Lämmityskäyrä 0 °C"
       },
       "curve_10": {
-        "name": "Lämmityskäyrä 10 °C"
+        "name": "5. Lämmityskäyrä 10 °C"
       },
       "curve_20": {
-        "name": "Lämmityskäyrä 20 °C"
+        "name": "6. Lämmityskäyrä 20 °C"
       },
       "curve_30": {
-        "name": "Lämmityskäyrä 30 °C"
+        "name": "7. Lämmityskäyrä 30 °C"
       }
     },
     "climate": {

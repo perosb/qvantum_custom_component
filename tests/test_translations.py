@@ -106,6 +106,17 @@ def test_heating_curve_translations_exist_in_all_locales():
         "curve_20",
         "curve_30",
     )
+    # Language-independent numeric prefixes so HA's numeric collation
+    # lists points as -30 … +30 instead of -10, -20, -30.
+    curve_point_prefixes = {
+        "curve_minus_30": "1. ",
+        "curve_minus_20": "2. ",
+        "curve_minus_10": "3. ",
+        "curve_0": "4. ",
+        "curve_10": "5. ",
+        "curve_20": "6. ",
+        "curve_30": "7. ",
+    }
     for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
         select = data["entity"]["select"]["curve_type_heating"]
@@ -115,6 +126,10 @@ def test_heating_curve_translations_exist_in_all_locales():
         numbers = data["entity"]["number"]
         for key in keys_number:
             assert numbers[key]["name"], f"{path.name} missing {key}"
+        for key, prefix in curve_point_prefixes.items():
+            assert numbers[key]["name"].startswith(prefix), (
+                f"{path.name} {key} should start with {prefix!r}"
+            )
 
 
 def test_released_translations_mean_permitted():

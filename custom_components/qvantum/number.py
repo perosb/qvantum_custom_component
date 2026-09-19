@@ -111,14 +111,18 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
 
     @property
     def suggested_object_id(self) -> str | None:
-        """Keep the outdoor-temp sign in the object id (`curve_minus_30` vs `curve_30`).
+        """Return a slug- and sort-stable object id for curve points.
 
-        Slugify drops ``-`` from the translated name, so ``-30 °C`` and ``30 °C``
-        would otherwise mint the same entity_id.
+        Slugify drops ``-`` from translated names, so ``-30 °C`` and ``30 °C``
+        would collide. A numeric prefix keeps device-page order at
+        -30 … +30 even when the UI sorts by ``entity_id``.
         """
-        if self._metric_key in HEATING_CURVE_OUTDOOR_TEMPS:
-            return self._metric_key
-        return getattr(super(), "suggested_object_id", None)
+        if self._metric_key not in HEATING_CURVE_OUTDOOR_TEMPS:
+            return getattr(super(), "suggested_object_id", None)
+        index = list(HEATING_CURVE_OUTDOOR_TEMPS).index(self._metric_key) + 1
+        outdoor = HEATING_CURVE_OUTDOOR_TEMPS[self._metric_key]
+        suffix = f"minus_{abs(outdoor)}" if outdoor < 0 else str(outdoor)
+        return f"curve_{index:02d}_{suffix}"
 
     async def async_set_native_value(self, value: float) -> None:
         """Update the current value."""
