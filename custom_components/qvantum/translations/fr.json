@@ -585,7 +585,7 @@
         "name": "Température extérieure d'arrêt du chauffage"
       },
       "temp_compensation_curve": {
-        "name": "Courbe de chauffage"
+        "name": "Courbe de compensation de température"
       },
       "curve_minus_30": {
         "name": "Courbe de chauffage 7: -30°C"

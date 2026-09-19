@@ -585,7 +585,7 @@
         "name": "Kültéri hőmérséklet fűtésleállítás"
       },
       "temp_compensation_curve": {
-        "name": "Fűtési görbe"
+        "name": "Hőmérséklet-kompenzációs görbe"
       },
       "curve_minus_30": {
         "name": "Fűtési görbe 7: -30°C"

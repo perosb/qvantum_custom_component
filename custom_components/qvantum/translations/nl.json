@@ -585,7 +585,7 @@
         "name": "Buitentemperatuur stop verwarming"
       },
       "temp_compensation_curve": {
-        "name": "Stooklijn"
+        "name": "Temperatuurcompensatiecurve"
       },
       "curve_minus_30": {
         "name": "Stooklijn 7: -30°C"

@@ -585,7 +585,7 @@
         "name": "Außentemperatur Heizstopp"
       },
       "temp_compensation_curve": {
-        "name": "Heizkurve"
+        "name": "Temperaturkompensationskurve"
       },
       "curve_minus_30": {
         "name": "Heizkurve 7: -30°C"

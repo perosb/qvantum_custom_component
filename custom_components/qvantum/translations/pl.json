@@ -585,7 +585,7 @@
         "name": "Temperatura zewnętrzna wyłączenia ogrzewania"
       },
       "temp_compensation_curve": {
-        "name": "Krzywa grzewcza"
+        "name": "Krzywa kompensacji temperatury"
       },
       "curve_minus_30": {
         "name": "Krzywa grzewcza 7: -30°C"

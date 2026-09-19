@@ -585,7 +585,7 @@
         "name": "Udetemperatur stop opvarmning"
       },
       "temp_compensation_curve": {
-        "name": "Varmekurve"
+        "name": "Temperaturkompensationskurve"
       },
       "curve_minus_30": {
         "name": "Varmekurve 7: -30°C"

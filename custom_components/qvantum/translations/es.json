@@ -585,7 +585,7 @@
         "name": "Temperatura exterior de parada de calefacción"
       },
       "temp_compensation_curve": {
-        "name": "Curva de calefacción"
+        "name": "Curva de compensación de temperatura"
       },
       "curve_minus_30": {
         "name": "Curva de calefacción 7: -30°C"

@@ -588,7 +588,7 @@
         "name": "Utomhustemperatur stoppa värme"
       },
       "temp_compensation_curve": {
-        "name": "Värmekurva"
+        "name": "Temperaturkompensationskurva"
       },
       "curve_minus_30": {
         "name": "Värmekurva 7: -30°C"

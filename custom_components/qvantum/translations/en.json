@@ -585,7 +585,7 @@
         "name": "Outdoor temperature stop heating"
       },
       "temp_compensation_curve": {
-        "name": "Heating curve"
+        "name": "Temperature compensation curve"
       },
       "curve_minus_30": {
         "name": "Heating curve 7: -30°C"

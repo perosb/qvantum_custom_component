@@ -106,8 +106,35 @@ def test_heating_curve_translations_exist_in_all_locales():
         "curve_20",
         "curve_30",
     )
-    # "{Heating curve} N: temp" so points sort with the Auto curve name,
-    # and N matches the Qvantum app list (+30 °C down to -30 °C).
+    # Holding 23 is the Auto curve number (datasheet: Temperature
+    # compensation curve heating). User-defined points keep a short
+    # "Heating curve N: temp" label in Qvantum app order (+30 … -30).
+    compensation_names = {
+        "en": "Temperature compensation curve",
+        "sv": "Temperaturkompensationskurva",
+        "de": "Temperaturkompensationskurve",
+        "da": "Temperaturkompensationskurve",
+        "fi": "Lämpötilakompensaatiokäyrä",
+        "fr": "Courbe de compensation de température",
+        "es": "Curva de compensación de temperatura",
+        "nl": "Temperatuurcompensatiecurve",
+        "pl": "Krzywa kompensacji temperatury",
+        "cs": "Teplotní kompenzační křivka",
+        "hu": "Hőmérséklet-kompenzációs görbe",
+    }
+    point_bases = {
+        "en": "Heating curve",
+        "sv": "Värmekurva",
+        "de": "Heizkurve",
+        "da": "Varmekurve",
+        "fi": "Lämmityskäyrä",
+        "fr": "Courbe de chauffage",
+        "es": "Curva de calefacción",
+        "nl": "Stooklijn",
+        "pl": "Krzywa grzewcza",
+        "cs": "Topná křivka",
+        "hu": "Fűtési görbe",
+    }
     curve_point_suffixes = {
         "curve_30": " 1: 30°C",
         "curve_20": " 2: 20°C",
@@ -119,6 +146,7 @@ def test_heating_curve_translations_exist_in_all_locales():
     }
     for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
+        locale = path.stem
         select = data["entity"]["select"]["curve_type_heating"]
         assert select["name"], f"{path.name} missing curve_type_heating"
         assert select["state"]["0"], f"{path.name} missing Auto"
@@ -126,7 +154,10 @@ def test_heating_curve_translations_exist_in_all_locales():
         numbers = data["entity"]["number"]
         for key in keys_number:
             assert numbers[key]["name"], f"{path.name} missing {key}"
-        base = numbers["temp_compensation_curve"]["name"]
+        assert numbers["temp_compensation_curve"]["name"] == compensation_names[locale], (
+            f"{path.name} holding 23 name"
+        )
+        base = point_bases[locale]
         for key, suffix in curve_point_suffixes.items():
             assert numbers[key]["name"] == f"{base}{suffix}", (
                 f"{path.name} {key} should be {base}{suffix!r}"

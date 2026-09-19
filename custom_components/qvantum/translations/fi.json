@@ -585,7 +585,7 @@
         "name": "Ulkolämpötila lämmityksen pysäytys"
       },
       "temp_compensation_curve": {
-        "name": "Lämmityskäyrä"
+        "name": "Lämpötilakompensaatiokäyrä"
       },
       "curve_minus_30": {
         "name": "Lämmityskäyrä 7: -30°C"

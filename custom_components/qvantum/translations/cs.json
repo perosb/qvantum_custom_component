@@ -585,7 +585,7 @@
         "name": "Venkovní teplota zastavení topení"
       },
       "temp_compensation_curve": {
-        "name": "Topná křivka"
+        "name": "Teplotní kompenzační křivka"
       },
       "curve_minus_30": {
         "name": "Topná křivka 7: -30°C"
