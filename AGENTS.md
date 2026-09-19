@@ -53,6 +53,9 @@ Cloud-only and Modbus-only writes go through coordinator helpers
 - Coordinators and entities keep **canonical metric/setting names**. Both
   transports return HTTP-shaped payloads (`{"metrics": …}`, `{"settings": …}`).
   Successful writes return `{"status": "APPLIED"}` (`SETTING_UPDATE_APPLIED`).
+- Cloud/HTTP entities that are controls (for example `switch`, `number`, and
+  similar writable entities) must always be included in `REQUIRED_METRICS` so
+  they remain present and writable in the cloud transport.
 - Extra-DHW **duration** and derived calculations stay in HA. Cloud encodes
   minutes on the wire; Modbus only writes Extra/Normal — `ExtraDhwTimer` restores
   Normal. Construct the timer only when Modbus is enabled.
