@@ -588,25 +588,25 @@
         "name": "Krzywa grzewcza"
       },
       "curve_minus_30": {
-        "name": "Krzywa grzewcza 1: -30"
+        "name": "Krzywa grzewcza 1: -30°C"
       },
       "curve_minus_20": {
-        "name": "Krzywa grzewcza 2: -20"
+        "name": "Krzywa grzewcza 2: -20°C"
       },
       "curve_minus_10": {
-        "name": "Krzywa grzewcza 3: -10"
+        "name": "Krzywa grzewcza 3: -10°C"
       },
       "curve_0": {
-        "name": "Krzywa grzewcza 4: 0"
+        "name": "Krzywa grzewcza 4: 0°C"
       },
       "curve_10": {
-        "name": "Krzywa grzewcza 5: 10"
+        "name": "Krzywa grzewcza 5: 10°C"
       },
       "curve_20": {
-        "name": "Krzywa grzewcza 6: 20"
+        "name": "Krzywa grzewcza 6: 20°C"
       },
       "curve_30": {
-        "name": "Krzywa grzewcza 7: 30"
+        "name": "Krzywa grzewcza 7: 30°C"
       }
     },
     "climate": {

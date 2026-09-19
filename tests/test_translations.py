@@ -109,13 +109,13 @@ def test_heating_curve_translations_exist_in_all_locales():
     # "{Heating curve} N: temp" so points sort with the Auto curve name,
     # and N keeps outdoor-temp order under HA's numeric collation.
     curve_point_suffixes = {
-        "curve_minus_30": " 1: -30",
-        "curve_minus_20": " 2: -20",
-        "curve_minus_10": " 3: -10",
-        "curve_0": " 4: 0",
-        "curve_10": " 5: 10",
-        "curve_20": " 6: 20",
-        "curve_30": " 7: 30",
+        "curve_minus_30": " 1: -30°C",
+        "curve_minus_20": " 2: -20°C",
+        "curve_minus_10": " 3: -10°C",
+        "curve_0": " 4: 0°C",
+        "curve_10": " 5: 10°C",
+        "curve_20": " 6: 20°C",
+        "curve_30": " 7: 30°C",
     }
     for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))

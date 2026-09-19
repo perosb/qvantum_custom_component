@@ -588,25 +588,25 @@
         "name": "Courbe de chauffage"
       },
       "curve_minus_30": {
-        "name": "Courbe de chauffage 1: -30"
+        "name": "Courbe de chauffage 1: -30°C"
       },
       "curve_minus_20": {
-        "name": "Courbe de chauffage 2: -20"
+        "name": "Courbe de chauffage 2: -20°C"
       },
       "curve_minus_10": {
-        "name": "Courbe de chauffage 3: -10"
+        "name": "Courbe de chauffage 3: -10°C"
       },
       "curve_0": {
-        "name": "Courbe de chauffage 4: 0"
+        "name": "Courbe de chauffage 4: 0°C"
       },
       "curve_10": {
-        "name": "Courbe de chauffage 5: 10"
+        "name": "Courbe de chauffage 5: 10°C"
       },
       "curve_20": {
-        "name": "Courbe de chauffage 6: 20"
+        "name": "Courbe de chauffage 6: 20°C"
       },
       "curve_30": {
-        "name": "Courbe de chauffage 7: 30"
+        "name": "Courbe de chauffage 7: 30°C"
       }
     },
     "climate": {

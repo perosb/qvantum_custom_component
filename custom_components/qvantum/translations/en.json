@@ -588,25 +588,25 @@
         "name": "Heating curve"
       },
       "curve_minus_30": {
-        "name": "Heating curve 1: -30"
+        "name": "Heating curve 1: -30°C"
       },
       "curve_minus_20": {
-        "name": "Heating curve 2: -20"
+        "name": "Heating curve 2: -20°C"
       },
       "curve_minus_10": {
-        "name": "Heating curve 3: -10"
+        "name": "Heating curve 3: -10°C"
       },
       "curve_0": {
-        "name": "Heating curve 4: 0"
+        "name": "Heating curve 4: 0°C"
       },
       "curve_10": {
-        "name": "Heating curve 5: 10"
+        "name": "Heating curve 5: 10°C"
       },
       "curve_20": {
-        "name": "Heating curve 6: 20"
+        "name": "Heating curve 6: 20°C"
       },
       "curve_30": {
-        "name": "Heating curve 7: 30"
+        "name": "Heating curve 7: 30°C"
       }
     },
     "climate": {
