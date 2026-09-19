@@ -991,18 +991,27 @@ class TestHeatingCurveNumbers:
         self, mock_coordinator, mock_device
     ):
         entity = self._entity(mock_coordinator, mock_device)
-        mock_coordinator.async_write_metric = AsyncMock(
+        mock_coordinator.async_write_metric = AsyncMock()
+        mock_coordinator.client.set_heating_curve_point = AsyncMock(
             return_value={"status": "APPLIED"}
         )
-        mock_coordinator.client.update_setting = AsyncMock()
 
         await entity.async_set_native_value(48.0)
 
-        mock_coordinator.async_write_metric.assert_called_once_with(
+        mock_coordinator.client.set_heating_curve_point.assert_called_once_with(
             "test_device_123", "curve_minus_30", 48
         )
-        mock_coordinator.client.update_setting.assert_not_called()
+        mock_coordinator.async_write_metric.assert_not_called()
         assert mock_coordinator.data["values"]["curve_minus_30"] == 48
+
+    def test_curve_point_available_in_cloud_user_defined(
+        self, mock_coordinator, mock_device
+    ):
+        mock_coordinator.modbus_enabled = False
+        entity = self._entity(mock_coordinator, mock_device)
+        mock_coordinator.config_entry.options = {}
+        mock_coordinator.config_entry.data = {}
+        assert entity.available is True
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_creates_curve_entities(
