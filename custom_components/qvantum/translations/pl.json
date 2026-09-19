@@ -587,13 +587,13 @@
       "temp_compensation_curve": {
         "name": "Krzywa grzewcza"
       },
-      "curve_-30": {
+      "curve_minus_30": {
         "name": "Krzywa grzewcza przy -30 °C"
       },
-      "curve_-20": {
+      "curve_minus_20": {
         "name": "Krzywa grzewcza przy -20 °C"
       },
-      "curve_-10": {
+      "curve_minus_10": {
         "name": "Krzywa grzewcza przy -10 °C"
       },
       "curve_0": {

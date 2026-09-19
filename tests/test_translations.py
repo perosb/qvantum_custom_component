@@ -1,5 +1,10 @@
 import json
+import re
 from pathlib import Path
+
+# Home Assistant hassfest: [a-z0-9-_]+, not starting/ending with - or _,
+# and no empty segments (so not `curve_-30`).
+_TRANSLATION_KEY = re.compile(r"^[a-z0-9]+(?:[_-][a-z0-9]+)*$")
 
 
 TRANSLATIONS_DIR = (
@@ -66,13 +71,36 @@ def test_runtime_sensor_translations_exist_in_all_locales():
             assert sensors[key]["name"], f"{path.name} missing {key}"
 
 
+def _entity_translation_keys(node: object, path: str = "entity") -> list[str]:
+    """Yield translation-key path segments under entity.<domain>."""
+    keys: list[str] = []
+    if not isinstance(node, dict):
+        return keys
+    for key, value in node.items():
+        child = f"{path}.{key}"
+        if path.count(".") >= 1:
+            keys.append(key)
+        keys.extend(_entity_translation_keys(value, child))
+    return keys
+
+
+def test_entity_translation_keys_match_hassfest():
+    """Entity translation keys must be valid hassfest identifiers."""
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for key in _entity_translation_keys(data.get("entity", {})):
+            assert _TRANSLATION_KEY.match(key), (
+                f"{path.name}: invalid translation key {key!r}"
+            )
+
+
 def test_heating_curve_translations_exist_in_all_locales():
     """Heating curve select/number names exist in every locale."""
     keys_number = (
         "temp_compensation_curve",
-        "curve_-30",
-        "curve_-20",
-        "curve_-10",
+        "curve_minus_30",
+        "curve_minus_20",
+        "curve_minus_10",
         "curve_0",
         "curve_10",
         "curve_20",

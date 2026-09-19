@@ -587,13 +587,13 @@
       "temp_compensation_curve": {
         "name": "Heizkurve"
       },
-      "curve_-30": {
+      "curve_minus_30": {
         "name": "Heizkurve bei -30 °C"
       },
-      "curve_-20": {
+      "curve_minus_20": {
         "name": "Heizkurve bei -20 °C"
       },
-      "curve_-10": {
+      "curve_minus_10": {
         "name": "Heizkurve bei -10 °C"
       },
       "curve_0": {

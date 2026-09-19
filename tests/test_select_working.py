@@ -444,9 +444,9 @@ class TestHeatingCurveTypeSelect:
         mock_coordinator.data["values"]["curve_type_heating"] = 0
         mock_coordinator.data["values"].update(
             {
-                "curve_-30": 45,
-                "curve_-20": 42,
-                "curve_-10": 38,
+                "curve_minus_30": 45,
+                "curve_minus_20": 42,
+                "curve_minus_10": 38,
                 "curve_0": 32,
                 "curve_10": 28,
                 "curve_20": 24,

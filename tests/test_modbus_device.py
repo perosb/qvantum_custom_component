@@ -145,7 +145,7 @@ class TestComponentDecode:
 
         assert values["curve_type_heating"] == 1
         assert values["temp_compensation_curve"] == 20
-        assert values["curve_-30"] == 45
+        assert values["curve_minus_30"] == 45
         assert values["curve_0"] == 32
 
     @pytest.mark.asyncio
@@ -203,7 +203,7 @@ class TestComponentDecode:
         await device.write_metric("room_temp_external", 21.5)
         await device.write_metric("dhw_stop_extra", 75)
         await device.write_metric("stop_heating", -15)
-        await device.write_metric("curve_-30", 48)
+        await device.write_metric("curve_minus_30", 48)
 
         assert unit.holding[13] == 25
         assert unit.holding[14] == 215
@@ -372,34 +372,42 @@ class TestPayloadAdapter:
         assert holding_field_for_metric("dhw_stop_extra") == "dhw_stop_extra"
         assert holding_field_for_metric("stop_heating") == "stop_heating"
         assert holding_field_for_metric("curve_type_heating") == "curve_type_heating"
-        assert holding_field_for_metric("curve_-30") == "curve_-30"
+        assert holding_field_for_metric("curve_minus_30") == "curve_minus_30"
 
     def test_heating_curve_point_registers(self):
         """User-defined curve points sit on holdings 24-30 at 10 °C outdoor steps."""
         expected = {
-            "curve_-30": 24,
-            "curve_-20": 25,
-            "curve_-10": 26,
+            "curve_minus_30": 24,
+            "curve_minus_20": 25,
+            "curve_minus_10": 26,
             "curve_0": 27,
             "curve_10": 28,
             "curve_20": 29,
             "curve_30": 30,
         }
+        assert HEATING_CURVE_OUTDOOR_TEMPS == {
+            "curve_minus_30": -30,
+            "curve_minus_20": -20,
+            "curve_minus_10": -10,
+            "curve_0": 0,
+            "curve_10": 10,
+            "curve_20": 20,
+            "curve_30": 30,
+        }
         for key, address in expected.items():
             assert MODBUS_HOLDING_REGISTER_MAP[key][0] == address
-            assert HEATING_CURVE_OUTDOOR_TEMPS[key] == int(key.split("_", 1)[1])
 
     def test_heating_curve_settings_payload(self):
         payload = build_settings_payload(
-            {"curve_type_heating": 1, "curve_-30": 45, "curve_0": 32}
+            {"curve_type_heating": 1, "curve_minus_30": 45, "curve_0": 32}
         )
         settings = {item["name"]: item["value"] for item in payload["settings"]}
         assert settings["curve_type_heating"] == 1
-        assert settings["curve_-30"] == 45
+        assert settings["curve_minus_30"] == 45
         assert settings["curve_0"] == 32
 
     def test_heating_curve_points_skips_missing(self):
         points = heating_curve_points(
-            {"curve_-30": 45, "curve_0": 32, "curve_10": None, "curve_30": True}
+            {"curve_minus_30": 45, "curve_0": 32, "curve_10": None, "curve_30": True}
         )
         assert points == [[-30, 45], [0, 32]]

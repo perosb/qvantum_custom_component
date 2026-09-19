@@ -587,13 +587,13 @@
       "temp_compensation_curve": {
         "name": "Fűtési görbe"
       },
-      "curve_-30": {
+      "curve_minus_30": {
         "name": "Fűtési görbe -30 °C-nál"
       },
-      "curve_-20": {
+      "curve_minus_20": {
         "name": "Fűtési görbe -20 °C-nál"
       },
-      "curve_-10": {
+      "curve_minus_10": {
         "name": "Fűtési görbe -10 °C-nál"
       },
       "curve_0": {

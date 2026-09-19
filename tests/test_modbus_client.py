@@ -108,7 +108,7 @@ async def test_get_settings_includes_heating_curve():
     settings = {item["name"]: item["value"] for item in payload["settings"]}
 
     assert settings["curve_type_heating"] == 1
-    assert settings["curve_-30"] == 45
+    assert settings["curve_minus_30"] == 45
     assert settings["curve_0"] == 32
 
 

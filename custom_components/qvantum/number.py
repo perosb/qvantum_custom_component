@@ -117,7 +117,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         would otherwise mint the same entity_id.
         """
         if self._metric_key in HEATING_CURVE_OUTDOOR_TEMPS:
-            return self._metric_key.replace("-", "minus_")
+            return self._metric_key
         return getattr(super(), "suggested_object_id", None)
 
     async def async_set_native_value(self, value: float) -> None:

@@ -587,13 +587,13 @@
       "temp_compensation_curve": {
         "name": "Stooklijn"
       },
-      "curve_-30": {
+      "curve_minus_30": {
         "name": "Stooklijn bij -30 °C"
       },
-      "curve_-20": {
+      "curve_minus_20": {
         "name": "Stooklijn bij -20 °C"
       },
-      "curve_-10": {
+      "curve_minus_10": {
         "name": "Stooklijn bij -10 °C"
       },
       "curve_0": {

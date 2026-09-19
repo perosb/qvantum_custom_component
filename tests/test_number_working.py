@@ -894,7 +894,7 @@ class TestStopHeating:
 class TestHeatingCurveNumbers:
     """User-defined heating curve supply-temperature points (holdings 24-30)."""
 
-    def _entity(self, mock_coordinator, mock_device, metric="curve_-30"):
+    def _entity(self, mock_coordinator, mock_device, metric="curve_minus_30"):
         mock_coordinator.data["values"][metric] = 45
         mock_coordinator.data["values"]["curve_type_heating"] = HeatingCurveType.USER_DEFINED
         mock_coordinator.config_entry.options = {
@@ -907,8 +907,8 @@ class TestHeatingCurveNumbers:
 
     def test_init_curve_point(self, mock_coordinator, mock_device):
         entity = self._entity(mock_coordinator, mock_device)
-        assert entity._metric_key == "curve_-30"
-        assert entity._attr_unique_id == "qvantum_number_curve_-30_test_device_123"
+        assert entity._metric_key == "curve_minus_30"
+        assert entity._attr_unique_id == "qvantum_number_curve_minus_30_test_device_123"
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
         assert entity._attr_icon == "mdi:thermometer"
@@ -916,7 +916,7 @@ class TestHeatingCurveNumbers:
     def test_suggested_object_id_keeps_minus_sign(
         self, mock_coordinator, mock_device
     ):
-        minus = self._entity(mock_coordinator, mock_device, "curve_-30")
+        minus = self._entity(mock_coordinator, mock_device, "curve_minus_30")
         plus = self._entity(mock_coordinator, mock_device, "curve_30")
         zero = self._entity(mock_coordinator, mock_device, "curve_0")
         assert minus.suggested_object_id == "curve_minus_30"
@@ -971,10 +971,10 @@ class TestHeatingCurveNumbers:
         await entity.async_set_native_value(48.0)
 
         mock_coordinator.async_write_metric.assert_called_once_with(
-            "test_device_123", "curve_-30", 48
+            "test_device_123", "curve_minus_30", 48
         )
         mock_coordinator.client.update_setting.assert_not_called()
-        assert mock_coordinator.data["values"]["curve_-30"] == 48
+        assert mock_coordinator.data["values"]["curve_minus_30"] == 48
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_creates_curve_entities(
@@ -987,7 +987,7 @@ class TestHeatingCurveNumbers:
             {
                 "temp_compensation_curve": 22,
                 "curve_type_heating": 1,
-                "curve_-30": 45,
+                "curve_minus_30": 45,
                 "curve_0": 32,
                 "curve_30": 20,
             }
@@ -1001,6 +1001,6 @@ class TestHeatingCurveNumbers:
 
         entity_keys = [entity._metric_key for entity in async_add_entities.call_args[0][0]]
         assert "temp_compensation_curve" in entity_keys
-        assert "curve_-30" in entity_keys
+        assert "curve_minus_30" in entity_keys
         assert "curve_0" in entity_keys
         assert "curve_30" in entity_keys

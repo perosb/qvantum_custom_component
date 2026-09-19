@@ -2247,7 +2247,7 @@ class TestWriteHoldingRegister:
         api = self._make_api(mock_session)
         _connection, device = attach_mock_modbus(api)
 
-        result = await api.write_metric("dev1", "curve_-30", 48)
+        result = await api.write_metric("dev1", "curve_minus_30", 48)
 
         assert result == {"status": "APPLIED"}
         assert device.unit.holding[24] == 48
