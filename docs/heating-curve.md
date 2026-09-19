@@ -122,8 +122,10 @@ write yet (`guide_tdot` DUT, `guide_sdot` supply-at-DUT, `p_heating`,
 `min_supply`, `max_supply`, `guide_he`).
 
 This integration sends **`curve_type_heating` and `ud_curve*`** only.
-Poll aliases `ud_curve_minus30` → canonical `curve_minus_30` so the same
-entities work in cloud and Modbus.
+Those names are in `REQUIRED_METRICS` so cloud `/values` fetches them on
+every poll (otherwise platforms never create the entities). Poll aliases
+`ud_curve_minus30` → canonical `curve_minus_30` so the same entities work
+in cloud and Modbus.
 
 Cloud Auto still cannot set DUT; switching 22 to Auto uses whatever
 family/DUT the pump already has. User defined writes the seven points

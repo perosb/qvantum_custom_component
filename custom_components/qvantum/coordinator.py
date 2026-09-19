@@ -803,6 +803,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             # Merge metrics and settings into unified values structure
             # Settings take precedence over metrics in case of conflicts
             values = {**metrics_dict, **settings_dict}
+            alias_heating_curve_settings(values)
 
             if self.modbus_enabled:
                 await self._sync_modbus_extra_dhw_timer(values, poll_started=poll_started)

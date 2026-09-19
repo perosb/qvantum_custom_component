@@ -410,6 +410,10 @@ class TestQvantumDataUpdateCoordinator:
         # tap_water_start/stop come from the settings endpoint, not HTTP /values
         assert "tap_water_start" not in result
         assert "tap_water_stop" not in result
+        # Heating-curve controls are fetched as HTTP /values (internal names)
+        assert "curve_type_heating" in result
+        assert "ud_curve_minus30" in result
+        assert "ud_curve_30" in result
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_no_matching_entities(self, mock_super_init):
