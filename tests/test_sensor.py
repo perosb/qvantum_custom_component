@@ -167,6 +167,32 @@ class TestQvantumBaseSensorEntity:
         assert entity._attr_device_class == SensorDeviceClass.DURATION
         assert entity._attr_entity_category.name == "DIAGNOSTIC"
 
+    @pytest.mark.parametrize(
+        "metric_key",
+        ("compressor_run_time", "ventilation_fan_run_time"),
+    )
+    def test_runtime_hours_unit_assignment(
+        self, mock_coordinator, mock_device, metric_key
+    ):
+        """Lifetime run-time counters are diagnostic durations in hours."""
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, metric_key, mock_device, True
+        )
+        assert entity._attr_native_unit_of_measurement == UnitOfTime.HOURS
+        assert entity._attr_device_class == SensorDeviceClass.DURATION
+        assert entity._attr_state_class == SensorStateClass.TOTAL_INCREASING
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+
+    def test_compressor_starts_unit_assignment(self, mock_coordinator, mock_device):
+        """Compressor start count is a diagnostic total-increasing counter."""
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "compressor_starts", mock_device, True
+        )
+        assert getattr(entity, "_attr_native_unit_of_measurement", None) is None
+        assert getattr(entity, "_attr_device_class", None) is None
+        assert entity._attr_state_class == SensorStateClass.TOTAL_INCREASING
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+
 
 class TestQvantumTemperatureEntity:
     """Test the QvantumTemperatureEntity class."""

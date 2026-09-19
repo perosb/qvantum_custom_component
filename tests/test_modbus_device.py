@@ -105,6 +105,9 @@ class TestComponentDecode:
         unit.input[71] = 1  # compressor_blocked
         unit.input[72] = 45
         unit.input[87] = 1  # freeze protection
+        unit.input[88] = 4321  # compressor run time hours
+        unit.input[89] = 876  # compressor starts
+        unit.input[90] = 2100  # ventilation fan run time hours
         unit.input[91] = 120  # filter hours
         unit.input[168] = 1
         unit.input[169] = 0
@@ -119,6 +122,9 @@ class TestComponentDecode:
         assert values["compressor_blocked"] == 1
         assert values["compressor_blocked_sec"] == 45
         assert values["freeze_protection_active"] == 1
+        assert values["compressor_run_time"] == 4321
+        assert values["compressor_starts"] == 876
+        assert values["ventilation_fan_run_time"] == 2100
         assert values["ventilation_filter_time_left"] == 120
         assert values["wifi_connected"] == 1
         assert values["cloud_connected"] == 0

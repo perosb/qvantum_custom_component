@@ -535,6 +535,15 @@
       },
       "ventilation_filter_time_left": {
         "name": "Ilmanvaihtosuodattimen jäljellä oleva aika"
+      },
+      "compressor_run_time": {
+        "name": "Kompressorin käyntiaika"
+      },
+      "compressor_starts": {
+        "name": "Kompressorin käynnistykset"
+      },
+      "ventilation_fan_run_time": {
+        "name": "Tuloilmapuhaltimen käyntiaika"
       }
     },
     "number": {
