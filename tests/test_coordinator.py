@@ -884,24 +884,6 @@ class TestQvantumDataUpdateCoordinator:
 
         assert result == {"a": 1}
 
-    def test_process_settings_data_aliases_cloud_heating_curve_points(self):
-        data = {
-            "settings": [
-                {"name": "curve_type_heating", "value": 1},
-                {"name": "ud_curve_minus30", "value": 59},
-                {"name": "ud_curve_0", "value": 41},
-                {"name": "ud_curve_30", "value": 20},
-            ]
-        }
-
-        result = QvantumDataUpdateCoordinator._process_settings_data(None, data)
-
-        assert result["curve_type_heating"] == 1
-        assert result["ud_curve_minus30"] == 59
-        assert result["curve_minus_30"] == 59
-        assert result["curve_0"] == 41
-        assert result["curve_30"] == 20
-
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
     async def test_modbus_never_fetches_tap_stop_via_http(self, mock_super_init):

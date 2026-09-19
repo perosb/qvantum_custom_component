@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 import aiohttp
 
-from ..constants import HEATING_CURVE_HTTP_KEYS, TAP_WATER_CAPACITY_MAPPINGS
+from ..constants import TAP_WATER_CAPACITY_MAPPINGS
 from ..exceptions import AuthError, RateLimitError, TransportError
 from .endpoints import (
     API_INTERNAL_URL,
@@ -277,19 +277,6 @@ class QvantumCloudClient:
             }
         }
         return await self._send_command(device_id, payload)
-
-    async def set_curve_type_heating(
-        self, device_id: str, value: int
-    ) -> dict[str, Any]:
-        return await self.update_setting(device_id, "curve_type_heating", int(value))
-
-    async def set_heating_curve_point(
-        self, device_id: str, metric_key: str, value: int
-    ) -> dict[str, Any]:
-        http_key = HEATING_CURVE_HTTP_KEYS.get(metric_key)
-        if http_key is None:
-            raise ValueError(f"Unknown heating-curve point: {metric_key}")
-        return await self.update_setting(device_id, http_key, int(value))
 
     async def set_indoor_temperature_offset(
         self, device_id: str, value: int

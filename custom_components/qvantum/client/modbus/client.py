@@ -239,16 +239,6 @@ class QvantumModbusClient:
     ) -> dict[str, str]:
         return await self.write_metric(device_id, "indoor_temperature_offset", value)
 
-    async def set_curve_type_heating(
-        self, device_id: str, value: int
-    ) -> dict[str, str]:
-        return await self.write_metric(device_id, "curve_type_heating", int(value))
-
-    async def set_heating_curve_point(
-        self, device_id: str, metric_key: str, value: int
-    ) -> dict[str, str]:
-        return await self.write_metric(device_id, metric_key, int(value))
-
     async def set_tap_water(
         self, device_id: str, start: int = 0, stop: int = 0
     ) -> dict[str, str] | None:
