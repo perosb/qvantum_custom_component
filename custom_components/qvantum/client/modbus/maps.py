@@ -210,7 +210,7 @@ HEATING_CURVE_OUTDOOR_TEMPS: dict[str, int] = {
 
 
 def heating_curve_points(values: dict) -> list[list[int]]:
-    """Return ``[outdoor, supply]`` pairs for Lovelace charts (ApexCharts/Plotly)."""
+    """Return ``[outdoor, supply]`` pairs in outdoor-temperature order."""
     points: list[list[int]] = []
     for key, outdoor in HEATING_CURVE_OUTDOOR_TEMPS.items():
         supply = values.get(key)
