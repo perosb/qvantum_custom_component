@@ -215,6 +215,11 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 or self._values.get("curve_type_heating")
                 == HeatingCurveType.USER_DEFINED
             )
+            and (
+                # Holding 23 (Auto family 1-50) is ignored in User defined.
+                self._metric_key != "temp_compensation_curve"
+                or self._values.get("curve_type_heating") == HeatingCurveType.AUTO
+            )
         )
 
 

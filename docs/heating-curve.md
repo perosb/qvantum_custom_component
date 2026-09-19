@@ -116,8 +116,9 @@ The coldest point often sits on max supply (holding 19, 60 °C here).
 ## What this integration does
 
 - **Select 22** — real Auto / User defined switch (writes that holding).
-- **Number 23** — Auto family 1–50. This is **not** DUT. Writing it
-  changes `cal_heat_temp` only when 22 is Auto.
+- **Number 23** — Auto family 1–50. This is **not** DUT. Only
+  **available** when 22 is Auto (writing it is a no-op for `cal_heat_temp`
+  in User defined).
 - **Numbers 24–30** — named `Heating curve N: T°C` in outdoor-temp order
   matching the app list (+30 °C down to −30 °C). Only **available** when
   22 is User defined. `curve_type_heating` exposes `points: [[outdoor,

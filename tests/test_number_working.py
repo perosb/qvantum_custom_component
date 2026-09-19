@@ -970,6 +970,22 @@ class TestHeatingCurveNumbers:
         )
         assert entity.available is True
 
+    def test_temp_compensation_unavailable_in_user_defined(
+        self, mock_coordinator, mock_device
+    ):
+        mock_coordinator.data["values"]["temp_compensation_curve"] = 20
+        mock_coordinator.data["values"]["curve_type_heating"] = (
+            HeatingCurveType.USER_DEFINED
+        )
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        entity = QvantumNumberEntity(
+            mock_coordinator, "temp_compensation_curve", 1, 50, 1, mock_device
+        )
+        assert entity.available is False
+
     @pytest.mark.asyncio
     async def test_async_set_native_value_writes_metric(
         self, mock_coordinator, mock_device
