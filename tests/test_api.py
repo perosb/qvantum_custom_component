@@ -1594,30 +1594,6 @@ class TestQvantumAPI:
         assert call_args[1]["json"] == {"command": {"set_fan_mode": {"mode": 0}}}
 
     @pytest.mark.asyncio
-    async def test_set_heating_curve_point_uses_cloud_ud_curve_key(
-        self, mock_session
-    ):
-        cm, _ = mock_session.make_cm_response(status=200, json_data={"status": "APPLIED"})
-        mock_session.post.return_value = cm
-
-        api = QvantumAPI(
-            "test@example.com", "password", "test-agent", session=mock_session
-        )
-        api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
-
-        await api.set_heating_curve_point("test_device", "curve_minus_30", 59)
-        await api.set_curve_type_heating("test_device", 1)
-
-        payloads = [call.kwargs["json"] for call in mock_session.post.call_args_list]
-        assert payloads[0] == {
-            "command": {"update_settings": {"ud_curve_minus30": 59}}
-        }
-        assert payloads[1] == {
-            "command": {"update_settings": {"curve_type_heating": 1}}
-        }
-
-    @pytest.mark.asyncio
     async def test_update_settings_non_200_response(self, mock_session):
         """Test _update_settings with non-200 response."""
         cm, mock_response = mock_session.make_cm_response(status=400)

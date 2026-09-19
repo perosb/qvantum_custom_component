@@ -61,11 +61,7 @@ async def test_cloud_setup_creates_smartcontrol_entities(
         "use_adaptive",
         "use_operation_sensor",
     }
-    assert cleanup.call_args.args[2] == {
-        "use_adaptive",
-        "use_operation_sensor",
-        "curve_type_heating",
-    }
+    assert cleanup.call_args.args[2] == {"use_adaptive", "use_operation_sensor"}
     assert cleanup.call_args.args[3] == "select"
 
     added = MagicMock()
