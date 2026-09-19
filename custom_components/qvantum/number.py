@@ -109,6 +109,17 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
             self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
             self._attr_device_class = NumberDeviceClass.TEMPERATURE
 
+    @property
+    def suggested_object_id(self) -> str | None:
+        """Keep the outdoor-temp sign in the object id (`curve_minus_30` vs `curve_30`).
+
+        Slugify drops ``-`` from the translated name, so ``-30 °C`` and ``30 °C``
+        would otherwise mint the same entity_id.
+        """
+        if self._metric_key in HEATING_CURVE_OUTDOOR_TEMPS:
+            return self._metric_key.replace("-", "minus_")
+        return getattr(super(), "suggested_object_id", None)
+
     async def async_set_native_value(self, value: float) -> None:
         """Update the current value."""
 

@@ -765,6 +765,7 @@ class TestStopHeating:
         assert entity.state == 15
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
+        assert entity.suggested_object_id is None
 
     def test_available_in_cloud_mode(self, mock_coordinator, mock_device):
         """Test entity is available in cloud mode when write access is granted."""
@@ -911,6 +912,17 @@ class TestHeatingCurveNumbers:
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
         assert entity._attr_icon == "mdi:thermometer"
+
+    def test_suggested_object_id_keeps_minus_sign(
+        self, mock_coordinator, mock_device
+    ):
+        minus = self._entity(mock_coordinator, mock_device, "curve_-30")
+        plus = self._entity(mock_coordinator, mock_device, "curve_30")
+        zero = self._entity(mock_coordinator, mock_device, "curve_0")
+        assert minus.suggested_object_id == "curve_minus_30"
+        assert plus.suggested_object_id == "curve_30"
+        assert zero.suggested_object_id == "curve_0"
+        assert minus.suggested_object_id != plus.suggested_object_id
 
     def test_init_temp_compensation_curve_is_not_temperature(
         self, mock_coordinator, mock_device
