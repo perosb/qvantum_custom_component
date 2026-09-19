@@ -71,14 +71,26 @@ name a class `ConnectionError` (shadows the builtin).
 
 ## Git workflow
 
+**Never push to `main`.** Not `git push origin main`, not `--force`, not
+`--force-with-lease`. GitHub blocks force-pushes to `main`; do not try to
+bypass it. Land work only by opening a PR and merging when asked.
+
 When a task is complete:
 
-1. Create a feature branch from latest `main` (never commit directly to `main`).
+1. Create a **new** feature branch from latest `main`. If `HEAD` is already
+   `main` (for example after a merge), still branch first — never commit on
+   `main`.
 2. Commit with a clear message.
-3. Push the branch.
+3. Push **that branch only** (`git push -u origin HEAD`).
 4. Open a PR against the default branch with `gh pr create`.
 
 Do not ask for permission for these steps. Do not merge unless asked.
+
+If a commit was made on `main` by mistake: move it to a feature branch
+(`git branch feat/…` then `git reset --hard origin/main` locally). Do **not**
+push `main`. Open a PR from the feature branch. If the bad commit already
+reached `origin/main`, revert it in a **separate PR** — do not force-push
+`main`.
 
 ## Commits and PRs
 
