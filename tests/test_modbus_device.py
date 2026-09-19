@@ -8,10 +8,12 @@ from custom_components.qvantum.const import (
     MODBUS_ONLY_BINARY_SENSORS,
 )
 from custom_components.qvantum.client.modbus.maps import (
+    HEATING_CURVE_OUTDOOR_TEMPS,
     MODBUS_HOLDING_REGISTER_MAP,
     MODBUS_IDENTITY_REGISTER_MAP,
     MODBUS_INPUT_REGISTER_MAP,
     RELAY_BIT_MAP,
+    heating_curve_points,
 )
 from custom_components.qvantum.client.modbus.device import (
     IdentityProbeError,
@@ -131,6 +133,22 @@ class TestComponentDecode:
         assert values["vacation_mode"] == 1
 
     @pytest.mark.asyncio
+    async def test_decodes_heating_curve_holdings(self):
+        _, unit, device = _device()
+        unit.holding[22] = 1
+        unit.holding[23] = 20
+        unit.holding[24] = 45
+        unit.holding[27] = 32
+
+        await device.async_update_settings()
+        values = component_values(device.settings)
+
+        assert values["curve_type_heating"] == 1
+        assert values["temp_compensation_curve"] == 20
+        assert values["curve_minus_30"] == 45
+        assert values["curve_0"] == 32
+
+    @pytest.mark.asyncio
     async def test_input_poll_uses_few_block_reads(self):
         _, unit, device = _device()
         await device.async_update_inputs()
@@ -185,11 +203,13 @@ class TestComponentDecode:
         await device.write_metric("room_temp_external", 21.5)
         await device.write_metric("dhw_stop_extra", 75)
         await device.write_metric("stop_heating", -15)
+        await device.write_metric("curve_minus_30", 48)
 
         assert unit.holding[13] == 25
         assert unit.holding[14] == 215
         assert unit.holding[59] == 75
         assert unit.holding[18] == 0xFFF1  # int16 -15
+        assert unit.holding[24] == 48
 
     @pytest.mark.asyncio
     async def test_raw_holding_write(self):
@@ -351,3 +371,43 @@ class TestPayloadAdapter:
         assert holding_field_for_metric("room_comp_factor") == "room_compensation"
         assert holding_field_for_metric("dhw_stop_extra") == "dhw_stop_extra"
         assert holding_field_for_metric("stop_heating") == "stop_heating"
+        assert holding_field_for_metric("curve_type_heating") == "curve_type_heating"
+        assert holding_field_for_metric("curve_minus_30") == "curve_minus_30"
+
+    def test_heating_curve_point_registers(self):
+        """User-defined curve points sit on holdings 24-30 at 10 °C outdoor steps."""
+        expected = {
+            "curve_minus_30": 24,
+            "curve_minus_20": 25,
+            "curve_minus_10": 26,
+            "curve_0": 27,
+            "curve_10": 28,
+            "curve_20": 29,
+            "curve_30": 30,
+        }
+        assert HEATING_CURVE_OUTDOOR_TEMPS == {
+            "curve_30": 30,
+            "curve_20": 20,
+            "curve_10": 10,
+            "curve_0": 0,
+            "curve_minus_10": -10,
+            "curve_minus_20": -20,
+            "curve_minus_30": -30,
+        }
+        for key, address in expected.items():
+            assert MODBUS_HOLDING_REGISTER_MAP[key][0] == address
+
+    def test_heating_curve_settings_payload(self):
+        payload = build_settings_payload(
+            {"curve_type_heating": 1, "curve_minus_30": 45, "curve_0": 32}
+        )
+        settings = {item["name"]: item["value"] for item in payload["settings"]}
+        assert settings["curve_type_heating"] == 1
+        assert settings["curve_minus_30"] == 45
+        assert settings["curve_0"] == 32
+
+    def test_heating_curve_points_skips_missing(self):
+        points = heating_curve_points(
+            {"curve_minus_30": 45, "curve_0": 32, "curve_10": None, "curve_30": True}
+        )
+        assert points == [[0, 32], [-30, 45]]

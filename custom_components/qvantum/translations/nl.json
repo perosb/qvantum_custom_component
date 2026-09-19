@@ -84,6 +84,13 @@
           "3": "AUX",
           "4": "Extern"
         }
+      },
+      "curve_type_heating": {
+        "name": "Type stooklijn",
+        "state": {
+          "0": "Auto",
+          "1": "Gebruikergedefinieerd"
+        }
       }
     },
     "button": {
@@ -576,6 +583,30 @@
       },
       "stop_heating": {
         "name": "Buitentemperatuur stop verwarming"
+      },
+      "temp_compensation_curve": {
+        "name": "Temperatuurcompensatiecurve"
+      },
+      "curve_minus_30": {
+        "name": "Stooklijn 7: -30°C"
+      },
+      "curve_minus_20": {
+        "name": "Stooklijn 6: -20°C"
+      },
+      "curve_minus_10": {
+        "name": "Stooklijn 5: -10°C"
+      },
+      "curve_0": {
+        "name": "Stooklijn 4: 0°C"
+      },
+      "curve_10": {
+        "name": "Stooklijn 3: 10°C"
+      },
+      "curve_20": {
+        "name": "Stooklijn 2: 20°C"
+      },
+      "curve_30": {
+        "name": "Stooklijn 1: 30°C"
       }
     },
     "climate": {

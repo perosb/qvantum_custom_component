@@ -6,6 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
+from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
 from .const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE, DOMAIN
 from .coordinator import QvantumDataUpdateCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
@@ -107,6 +108,9 @@ _LOCAL_MODBUS_WRITE_METRICS = {
     "dhw_stop_extra",
     "room_temp_external",
     "use_operation_sensor",
+    "curve_type_heating",
+    "temp_compensation_curve",
+    *HEATING_CURVE_OUTDOOR_TEMPS,
 }
 
 # No holding-register write exists for these; they stay cloud-only.
@@ -171,9 +175,12 @@ _ENTITY_ICONS: dict[str, str] = {
     # Select
     "use_adaptive": "mdi:leaf",
     "use_operation_sensor": "mdi:motion-sensor",
+    "curve_type_heating": "mdi:chart-bell-curve",
     # Number / writable temperature
     "room_temp_external": "mdi:thermometer",
     "stop_heating": "mdi:thermometer-off",
+    "temp_compensation_curve": "mdi:chart-bell-curve",
+    **{key: "mdi:thermometer" for key in HEATING_CURVE_OUTDOOR_TEMPS},
 }
 
 

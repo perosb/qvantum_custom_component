@@ -84,6 +84,13 @@
           "3": "AUX",
           "4": "Externí"
         }
+      },
+      "curve_type_heating": {
+        "name": "Typ topné křivky",
+        "state": {
+          "0": "Auto",
+          "1": "Uživatelsky definovaná"
+        }
       }
     },
     "button": {
@@ -576,6 +583,30 @@
       },
       "stop_heating": {
         "name": "Venkovní teplota zastavení topení"
+      },
+      "temp_compensation_curve": {
+        "name": "Teplotní kompenzační křivka"
+      },
+      "curve_minus_30": {
+        "name": "Topná křivka 7: -30°C"
+      },
+      "curve_minus_20": {
+        "name": "Topná křivka 6: -20°C"
+      },
+      "curve_minus_10": {
+        "name": "Topná křivka 5: -10°C"
+      },
+      "curve_0": {
+        "name": "Topná křivka 4: 0°C"
+      },
+      "curve_10": {
+        "name": "Topná křivka 3: 10°C"
+      },
+      "curve_20": {
+        "name": "Topná křivka 2: 20°C"
+      },
+      "curve_30": {
+        "name": "Topná křivka 1: 30°C"
       }
     },
     "climate": {

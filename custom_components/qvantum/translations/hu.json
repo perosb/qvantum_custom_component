@@ -84,6 +84,13 @@
           "3": "AUX",
           "4": "Külső"
         }
+      },
+      "curve_type_heating": {
+        "name": "Fűtési görbe típusa",
+        "state": {
+          "0": "Auto",
+          "1": "Felhasználó által megadott"
+        }
       }
     },
     "button": {
@@ -576,6 +583,30 @@
       },
       "stop_heating": {
         "name": "Kültéri hőmérséklet fűtésleállítás"
+      },
+      "temp_compensation_curve": {
+        "name": "Hőmérséklet-kompenzációs görbe"
+      },
+      "curve_minus_30": {
+        "name": "Fűtési görbe 7: -30°C"
+      },
+      "curve_minus_20": {
+        "name": "Fűtési görbe 6: -20°C"
+      },
+      "curve_minus_10": {
+        "name": "Fűtési görbe 5: -10°C"
+      },
+      "curve_0": {
+        "name": "Fűtési görbe 4: 0°C"
+      },
+      "curve_10": {
+        "name": "Fűtési görbe 3: 10°C"
+      },
+      "curve_20": {
+        "name": "Fűtési görbe 2: 20°C"
+      },
+      "curve_30": {
+        "name": "Fűtési görbe 1: 30°C"
       }
     },
     "climate": {

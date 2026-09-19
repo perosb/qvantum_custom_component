@@ -84,6 +84,13 @@
           "3": "AUX",
           "4": "Externe"
         }
+      },
+      "curve_type_heating": {
+        "name": "Type de courbe de chauffage",
+        "state": {
+          "0": "Auto",
+          "1": "Défini par l'utilisateur"
+        }
       }
     },
     "button": {
@@ -576,6 +583,30 @@
       },
       "stop_heating": {
         "name": "Température extérieure d'arrêt du chauffage"
+      },
+      "temp_compensation_curve": {
+        "name": "Courbe de compensation de température"
+      },
+      "curve_minus_30": {
+        "name": "Courbe de chauffage 7: -30°C"
+      },
+      "curve_minus_20": {
+        "name": "Courbe de chauffage 6: -20°C"
+      },
+      "curve_minus_10": {
+        "name": "Courbe de chauffage 5: -10°C"
+      },
+      "curve_0": {
+        "name": "Courbe de chauffage 4: 0°C"
+      },
+      "curve_10": {
+        "name": "Courbe de chauffage 3: 10°C"
+      },
+      "curve_20": {
+        "name": "Courbe de chauffage 2: 20°C"
+      },
+      "curve_30": {
+        "name": "Courbe de chauffage 1: 30°C"
       }
     },
     "climate": {

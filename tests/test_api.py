@@ -2238,3 +2238,16 @@ class TestWriteHoldingRegister:
 
         assert result == {"status": "APPLIED"}
         assert device.unit.holding[18] == 0xFFF1
+
+    @pytest.mark.asyncio
+    async def test_write_metric_heating_curve_point(
+        self, mock_session
+    ):
+        """User-defined heating curve @ -30 °C writes uint16 to holding 24."""
+        api = self._make_api(mock_session)
+        _connection, device = attach_mock_modbus(api)
+
+        result = await api.write_metric("dev1", "curve_minus_30", 48)
+
+        assert result == {"status": "APPLIED"}
+        assert device.unit.holding[24] == 48

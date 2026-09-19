@@ -84,6 +84,13 @@
           "3": "AUX",
           "4": "External"
         }
+      },
+      "curve_type_heating": {
+        "name": "Heating curve type",
+        "state": {
+          "0": "Auto",
+          "1": "User defined"
+        }
       }
     },
     "button": {
@@ -576,6 +583,30 @@
       },
       "stop_heating": {
         "name": "Outdoor temperature stop heating"
+      },
+      "temp_compensation_curve": {
+        "name": "Temperature compensation curve"
+      },
+      "curve_minus_30": {
+        "name": "Heating curve 7: -30°C"
+      },
+      "curve_minus_20": {
+        "name": "Heating curve 6: -20°C"
+      },
+      "curve_minus_10": {
+        "name": "Heating curve 5: -10°C"
+      },
+      "curve_0": {
+        "name": "Heating curve 4: 0°C"
+      },
+      "curve_10": {
+        "name": "Heating curve 3: 10°C"
+      },
+      "curve_20": {
+        "name": "Heating curve 2: 20°C"
+      },
+      "curve_30": {
+        "name": "Heating curve 1: 30°C"
       }
     },
     "climate": {

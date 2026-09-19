@@ -1,5 +1,10 @@
 import json
+import re
 from pathlib import Path
+
+# Home Assistant hassfest: [a-z0-9-_]+, not starting/ending with - or _,
+# and no empty segments (so not `curve_-30`).
+_TRANSLATION_KEY = re.compile(r"^[a-z0-9]+(?:[_-][a-z0-9]+)*$")
 
 
 TRANSLATIONS_DIR = (
@@ -64,6 +69,99 @@ def test_runtime_sensor_translations_exist_in_all_locales():
         sensors = data["entity"]["sensor"]
         for key in keys:
             assert sensors[key]["name"], f"{path.name} missing {key}"
+
+
+def _entity_translation_keys(node: object, path: str = "entity") -> list[str]:
+    """Yield translation-key path segments under entity.<domain>."""
+    keys: list[str] = []
+    if not isinstance(node, dict):
+        return keys
+    for key, value in node.items():
+        child = f"{path}.{key}"
+        if path.count(".") >= 1:
+            keys.append(key)
+        keys.extend(_entity_translation_keys(value, child))
+    return keys
+
+
+def test_entity_translation_keys_match_hassfest():
+    """Entity translation keys must be valid hassfest identifiers."""
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for key in _entity_translation_keys(data.get("entity", {})):
+            assert _TRANSLATION_KEY.match(key), (
+                f"{path.name}: invalid translation key {key!r}"
+            )
+
+
+def test_heating_curve_translations_exist_in_all_locales():
+    """Heating curve select/number names exist in every locale."""
+    keys_number = (
+        "temp_compensation_curve",
+        "curve_minus_30",
+        "curve_minus_20",
+        "curve_minus_10",
+        "curve_0",
+        "curve_10",
+        "curve_20",
+        "curve_30",
+    )
+    # Holding 23 is the Auto curve number (datasheet: Temperature
+    # compensation curve heating). User-defined points keep a short
+    # "Heating curve N: temp" label in Qvantum app order (+30 … -30).
+    compensation_names = {
+        "en": "Temperature compensation curve",
+        "sv": "Temperaturkompensationskurva",
+        "de": "Temperaturkompensationskurve",
+        "da": "Temperaturkompensationskurve",
+        "fi": "Lämpötilakompensaatiokäyrä",
+        "fr": "Courbe de compensation de température",
+        "es": "Curva de compensación de temperatura",
+        "nl": "Temperatuurcompensatiecurve",
+        "pl": "Krzywa kompensacji temperatury",
+        "cs": "Teplotní kompenzační křivka",
+        "hu": "Hőmérséklet-kompenzációs görbe",
+    }
+    point_bases = {
+        "en": "Heating curve",
+        "sv": "Värmekurva",
+        "de": "Heizkurve",
+        "da": "Varmekurve",
+        "fi": "Lämmityskäyrä",
+        "fr": "Courbe de chauffage",
+        "es": "Curva de calefacción",
+        "nl": "Stooklijn",
+        "pl": "Krzywa grzewcza",
+        "cs": "Topná křivka",
+        "hu": "Fűtési görbe",
+    }
+    curve_point_suffixes = {
+        "curve_30": " 1: 30°C",
+        "curve_20": " 2: 20°C",
+        "curve_10": " 3: 10°C",
+        "curve_0": " 4: 0°C",
+        "curve_minus_10": " 5: -10°C",
+        "curve_minus_20": " 6: -20°C",
+        "curve_minus_30": " 7: -30°C",
+    }
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        locale = path.stem
+        select = data["entity"]["select"]["curve_type_heating"]
+        assert select["name"], f"{path.name} missing curve_type_heating"
+        assert select["state"]["0"], f"{path.name} missing Auto"
+        assert select["state"]["1"], f"{path.name} missing User defined"
+        numbers = data["entity"]["number"]
+        for key in keys_number:
+            assert numbers[key]["name"], f"{path.name} missing {key}"
+        assert numbers["temp_compensation_curve"]["name"] == compensation_names[locale], (
+            f"{path.name} holding 23 name"
+        )
+        base = point_bases[locale]
+        for key, suffix in curve_point_suffixes.items():
+            assert numbers[key]["name"] == f"{base}{suffix}", (
+                f"{path.name} {key} should be {base}{suffix!r}"
+            )
 
 
 def test_released_translations_mean_permitted():

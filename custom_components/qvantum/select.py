@@ -8,7 +8,12 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.qvantum.const import SETTING_UPDATE_APPLIED, SensorMode
+from custom_components.qvantum.client.modbus.maps import heating_curve_points
+from custom_components.qvantum.const import (
+    SETTING_UPDATE_APPLIED,
+    HeatingCurveType,
+    SensorMode,
+)
 
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
@@ -33,6 +38,12 @@ async def async_setup_entry(
         select_keys.add("use_adaptive")
         if "use_adaptive" in values:
             entities.append(QvantumSelectEntity(coordinator, "use_adaptive", device))
+    else:
+        select_keys.add("curve_type_heating")
+        if "curve_type_heating" in values:
+            entities.append(
+                QvantumSelectEntity(coordinator, "curve_type_heating", device)
+            )
     if "use_operation_sensor" in values:
         entities.append(
             QvantumSelectEntity(coordinator, "use_operation_sensor", device)
@@ -68,6 +79,8 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
                 ]  # Translation keys that will be translated by HA
             case "use_operation_sensor":
                 self._attr_options = [str(mode.value) for mode in SensorMode]
+            case "curve_type_heating":
+                self._attr_options = [str(mode.value) for mode in HeatingCurveType]
 
     def _is_valid_mode(self, mode, valid_modes: set) -> bool:
         """Check if a mode value is valid."""
@@ -92,16 +105,21 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Update the current value."""
-        if self._metric_key == "use_operation_sensor":
+        if self._metric_key in {"use_operation_sensor", "curve_type_heating"}:
             option_value = int(option)
+            write_key = (
+                "sensor_mode"
+                if self._metric_key == "use_operation_sensor"
+                else self._metric_key
+            )
             response = await self.coordinator.async_write_metric(
-                self._hpid, "sensor_mode", option_value
+                self._hpid, write_key, option_value
             )
             if response and (
                 response.get("status") == SETTING_UPDATE_APPLIED
                 or response.get("heatpump_status") == SETTING_UPDATE_APPLIED
             ):
-                self.coordinator.data.get("values", {})["sensor_mode"] = option_value
+                self.coordinator.data.get("values", {})[write_key] = option_value
             await handle_setting_update_response(
                 response, self.coordinator, "values", self._metric_key, option_value
             )
@@ -142,7 +160,7 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
 
         values = self.coordinator.data.get("values", {})
 
-        if self._metric_key == "use_operation_sensor":
+        if self._metric_key in {"use_operation_sensor", "curve_type_heating"}:
             val = values.get(self._metric_key)
             if val is None:
                 return None
@@ -221,6 +239,13 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
         # currently allowed, because selecting an option for this metric
         # depends on Modbus write capability in addition to general write
         # access. Other select entities only require write access.
-        if self._metric_key == "use_operation_sensor":
+        if self._metric_key in {"use_operation_sensor", "curve_type_heating"}:
             return self._metric_key in metrics and self._has_write_access and self._is_modbus_write_allowed()
         return self._metric_key in metrics and self._has_write_access
+
+    @property
+    def extra_state_attributes(self) -> dict[str, list[list[int]]] | None:
+        """Expose heating-curve points for Lovelace charts."""
+        if self._metric_key != "curve_type_heating":
+            return None
+        return {"points": heating_curve_points(self._values)}

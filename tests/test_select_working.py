@@ -35,8 +35,11 @@ with patch(
             ):
                 from homeassistant.helpers.device_registry import DeviceInfo
 
-                from custom_components.qvantum.select import QvantumSelectEntity
-                from custom_components.qvantum.const import SensorMode
+                from custom_components.qvantum.select import (
+                    QvantumSelectEntity,
+                    async_setup_entry,
+                )
+                from custom_components.qvantum.const import HeatingCurveType, SensorMode
 
 
 @pytest.fixture
@@ -431,3 +434,137 @@ class TestQvantumSelectEntityOperationSensor:
             mock_coordinator, "use_operation_sensor", mock_device
         )
         assert entity.available is False
+
+
+class TestHeatingCurveTypeSelect:
+    """Select for holding 22 (Auto / User defined) plus Lovelace points."""
+
+    def _entity(self, mock_coordinator, mock_device):
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.data["values"]["curve_type_heating"] = 0
+        mock_coordinator.data["values"].update(
+            {
+                "curve_minus_30": 45,
+                "curve_minus_20": 42,
+                "curve_minus_10": 38,
+                "curve_0": 32,
+                "curve_10": 28,
+                "curve_20": 24,
+                "curve_30": 20,
+            }
+        )
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        return QvantumSelectEntity(
+            mock_coordinator, "curve_type_heating", mock_device
+        )
+
+    def test_init(self, mock_coordinator, mock_device):
+        entity = self._entity(mock_coordinator, mock_device)
+        assert entity._metric_key == "curve_type_heating"
+        assert entity._attr_unique_id == "qvantum_curve_type_heating_test_device_123"
+        assert entity._attr_options == [
+            str(mode.value) for mode in HeatingCurveType
+        ]
+        assert entity._attr_icon == "mdi:chart-bell-curve"
+
+    def test_current_option(self, mock_coordinator, mock_device):
+        entity = self._entity(mock_coordinator, mock_device)
+        mock_coordinator.data["values"]["curve_type_heating"] = HeatingCurveType.AUTO
+        assert entity.current_option == "0"
+        mock_coordinator.data["values"]["curve_type_heating"] = (
+            HeatingCurveType.USER_DEFINED
+        )
+        assert entity.current_option == "1"
+
+    def test_points_attribute(self, mock_coordinator, mock_device):
+        entity = self._entity(mock_coordinator, mock_device)
+        assert entity.extra_state_attributes == {
+            "points": [
+                [30, 20],
+                [20, 24],
+                [10, 28],
+                [0, 32],
+                [-10, 38],
+                [-20, 42],
+                [-30, 45],
+            ]
+        }
+
+    def test_points_attribute_absent_on_other_selects(
+        self, mock_coordinator, mock_device
+    ):
+        entity = QvantumSelectEntity(
+            mock_coordinator, "use_operation_sensor", mock_device
+        )
+        assert entity.extra_state_attributes is None
+
+    @pytest.mark.asyncio
+    async def test_async_select_option(self, mock_coordinator, mock_device):
+        entity = self._entity(mock_coordinator, mock_device)
+        mock_coordinator.async_write_metric = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_select_option("1")
+
+        mock_coordinator.async_write_metric.assert_called_once_with(
+            "test_device_123", "curve_type_heating", 1
+        )
+        assert mock_coordinator.data["values"]["curve_type_heating"] == 1
+
+    def test_available_modbus_write_enabled(self, mock_coordinator, mock_device):
+        entity = self._entity(mock_coordinator, mock_device)
+        assert entity.available is True
+
+    def test_available_modbus_write_disabled(self, mock_coordinator, mock_device):
+        entity = self._entity(mock_coordinator, mock_device)
+        mock_coordinator.config_entry.options = {}
+        mock_coordinator.config_entry.data = {}
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_creates_curve_type(
+        self, hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        from custom_components.qvantum import RuntimeData
+
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.device_id = "test_device_123"
+        mock_coordinator.data["values"]["curve_type_heating"] = 1
+        mock_config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator, device=mock_device, client=MagicMock()
+        )
+        with patch(
+            "custom_components.qvantum.entity.cleanup_disabled_entities"
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+        keys = [entity._metric_key for entity in async_add_entities.call_args[0][0]]
+        assert "curve_type_heating" in keys
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_cloud_omits_curve_type(
+        self, hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        from custom_components.qvantum import RuntimeData
+
+        mock_coordinator.modbus_enabled = False
+        mock_coordinator.device_id = "test_device_123"
+        mock_coordinator.data["values"]["curve_type_heating"] = 1
+        mock_coordinator.data["values"]["use_adaptive"] = True
+        mock_config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator, device=mock_device, client=MagicMock()
+        )
+        with patch(
+            "custom_components.qvantum.entity.cleanup_disabled_entities"
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+        keys = [entity._metric_key for entity in async_add_entities.call_args[0][0]]
+        assert "curve_type_heating" not in keys
+        assert "use_adaptive" in keys
