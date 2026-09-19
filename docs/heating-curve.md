@@ -83,6 +83,24 @@ Monotonic in 23, about +0.2 °C per step at this outdoor temperature
 (near min supply 20 °C and stop-heating 15 °C). Interpolating the
 cached 24–30 would have given ~25.9 °C in every dump.
 
+### Holding 23 only (User defined, 22 = 1)
+
+Same 24–30 as the Auto-23 test (60, 58, 50, 42, 33, 20, 20). Outdoor
+15.7–15.8 °C.
+
+| 23 | BT1 | `cal_heat_temp` |
+|---|---|---|
+| 15 | 15.8 °C | 23.4 °C |
+| 20 | 15.7 °C | 23.5 °C |
+| 25 | 15.8 °C | 23.4 °C |
+
+No trend with 23 (15 → 25 is 0.0 °C; the 0.1 °C bump is the 0.1 °C
+colder outdoor). Linear interpolation of 24–30 at 15.8 °C, minus total
+offset −2.0 °C, is **23.5 °C** — matches `cal_heat_temp`.
+
+In User defined, **23 is ignored**. Contrast Auto at 15.5 °C, where
+23 = 25 gave 23.5 °C and 23 = 17 gave 21.7 °C.
+
 ### App DUT / supply-at-DUT still rewrite 23 and 24–30
 
 Changing DUT −16 → −18 °C (app Auto): 23 **17 → 16**, and 24–28 dropped
@@ -98,8 +116,8 @@ The coldest point often sits on max supply (holding 19, 60 °C here).
 ## What this integration does
 
 - **Select 22** — real Auto / User defined switch (writes that holding).
-- **Number 23** — Auto family 1–50; available whenever Modbus writes are
-  on. This is **not** DUT.
+- **Number 23** — Auto family 1–50. This is **not** DUT. Writing it
+  changes `cal_heat_temp` only when 22 is Auto.
 - **Numbers 24–30** — named `Heating curve N: T°C` in outdoor-temp order
   matching the app list (+30 °C down to −30 °C). Only **available** when
   22 is User defined. `curve_type_heating` exposes `points: [[outdoor,
