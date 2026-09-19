@@ -84,13 +84,7 @@ When a task is complete:
 3. Push **that branch only** (`git push -u origin HEAD`).
 4. Open a PR against the default branch with `gh pr create`.
 
-Do not ask for permission for these steps. Do not merge unless asked.
-
-If a commit was made on `main` by mistake: move it to a feature branch
-(`git branch feat/…` then `git reset --hard origin/main` locally). Do **not**
-push `main`. Open a PR from the feature branch. If the bad commit already
-reached `origin/main`, revert it in a **separate PR** — do not force-push
-`main`.
+Do not ask for permission for these steps. Do not merge unless asked. If asked, use squash merge.
 
 ## Commits and PRs
 
