@@ -107,3 +107,9 @@ actions:
       entity_id: button.qvantum_hoj_atkomst
     action: button.press
 ```
+
+| Qvantum: Climate | Qvantum: Power |
+|:-------------:|:------:|
+| ![Inomhusklimat](https://github.com/user-attachments/assets/15e56f43-4d3c-41d7-aebc-899d6486586b) | ![Effekt](https://github.com/user-attachments/assets/d150f56f-cabe-44e0-b1b3-8647c1b079c2) |
+
+
