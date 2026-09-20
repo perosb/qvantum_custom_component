@@ -1,3 +1,5 @@
+[![qvantum_custom_component](https://img.shields.io/github/release/perosb/qvantum_custom_component/all.svg?label=current%20release)](https://github.com/perosb/qvantum_custom_component) [![downloads](https://img.shields.io/github/downloads/perosb/qvantum_custom_component/total?label=downloads)](https://github.com/perosb/qvantum_custom_component) [![codecov](https://codecov.io/gh/perosb/qvantum_custom_component/graph/badge.svg)](https://codecov.io/gh/perosb/qvantum_custom_component)
+
 ## Qvantum Heat Pump Integration for Home Assistant
 
 Connect a Qvantum heat pump to Home Assistant using either the Qvantum cloud API or a direct local Modbus TCP connection:
@@ -49,7 +51,7 @@ Available triggers and conditions depend on the entities present. They cover def
 
 #### External room sensor example
 
-When the pump uses an external room sensor (`use_operation_sensor == 4`), enable Modbus writing and mirror the sensor as follows:
+When the pump uses an external room sensor, enable Modbus writing and mirror the sensor as follows:
 
 ```yaml
 alias: "Qvantum: Update external room temperature"
@@ -105,11 +107,3 @@ actions:
       entity_id: button.qvantum_hoj_atkomst
     action: button.press
 ```
-
-[![qvantum_custom_component](https://img.shields.io/github/release/perosb/qvantum_custom_component/all.svg?label=current%20release)](https://github.com/perosb/qvantum_custom_component) [![downloads](https://img.shields.io/github/downloads/perosb/qvantum_custom_component/total?label=downloads)](https://github.com/perosb/qvantum_custom_component) [![codecov](https://codecov.io/gh/perosb/qvantum_custom_component/graph/badge.svg)](https://codecov.io/gh/perosb/qvantum_custom_component)
-
-*Qvantum Controls in Home Assistant:*  
-![image](https://github.com/user-attachments/assets/3b04bf83-3f1a-45d8-9aad-fdcb780abc9b)
-
-*Daily energy usage of Qvantum Heat Pump:*
-![image](https://github.com/user-attachments/assets/4f2f58f8-eae2-4a72-a2e8-b8468f869da4)
