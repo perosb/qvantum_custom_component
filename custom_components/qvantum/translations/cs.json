@@ -11,7 +11,8 @@
       "freeze_protection_active": "{entity_name} aktivoval ochranu proti zamrznutí",
       "wifi_disconnected": "{entity_name} se odpojil od Wi-Fi",
       "cloud_disconnected": "{entity_name} se odpojil od cloudu",
-      "filter_soon_due": "{entity_name} filtr bude brzy nutné vyměnit"
+      "filter_soon_due": "{entity_name} filtr bude brzy nutné vyměnit",
+      "alarm_active": "{entity_name} začal alarmovat"
     },
     "condition_type": {
       "is_defrosting": "{entity_name} odmrazuje",
@@ -19,7 +20,8 @@
       "is_freeze_protection_active": "{entity_name} má aktivní ochranu proti zamrznutí",
       "is_wifi_disconnected": "{entity_name} je odpojený od Wi-Fi",
       "is_cloud_disconnected": "{entity_name} je odpojený od cloudu",
-      "is_filter_soon_due": "{entity_name} filtr bude brzy nutné vyměnit"
+      "is_filter_soon_due": "{entity_name} filtr bude brzy nutné vyměnit",
+      "is_alarm_active": "{entity_name} má aktivní alarm"
     }
   },
   "entity": {
@@ -200,6 +202,9 @@
       },
       "vacation_mode": {
         "name": "Režim dovolené"
+      },
+      "alarm_active": {
+        "name": "Alarm"
       }
     },
     "sensor": {
@@ -551,6 +556,24 @@
       },
       "ventilation_fan_run_time": {
         "name": "Doba chodu ventilátoru"
+      },
+      "active_alarms": {
+        "name": "Aktivní alarmy"
+      },
+      "alarm_1_code": {
+        "name": "Kód alarmu 1"
+      },
+      "alarm_2_code": {
+        "name": "Kód alarmu 2"
+      },
+      "alarm_3_code": {
+        "name": "Kód alarmu 3"
+      },
+      "alarm_4_code": {
+        "name": "Kód alarmu 4"
+      },
+      "alarm_5_code": {
+        "name": "Kód alarmu 5"
       }
     },
     "number": {

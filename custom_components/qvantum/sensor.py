@@ -44,6 +44,9 @@ from .maintenance_coordinator import QvantumMaintenanceCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 # Countdown / remaining-life and lifetime counters belong under Diagnostics.
+_ALARM_CODE_SENSORS = frozenset(
+    {f"alarm_{index}_code" for index in range(1, 6)}
+)
 _DIAGNOSTIC_SENSORS = frozenset(
     {
         "ventilation_filter_time_left",
@@ -51,6 +54,8 @@ _DIAGNOSTIC_SENSORS = frozenset(
         "compressor_run_time",
         "compressor_starts",
         "ventilation_fan_run_time",
+        "active_alarms",
+        *_ALARM_CODE_SENSORS,
     }
 )
 _DURATION_HOURS_SENSORS = frozenset(
@@ -226,6 +231,11 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             self._attr_device_class = SensorDeviceClass.DURATION
             self._attr_suggested_display_precision = 0
         elif metric_key == "compressor_starts":
+            self._attr_suggested_display_precision = 0
+        elif metric_key == "active_alarms":
+            self._attr_state_class = SensorStateClass.MEASUREMENT
+            self._attr_suggested_display_precision = 0
+        elif metric_key in _ALARM_CODE_SENSORS:
             self._attr_suggested_display_precision = 0
         elif "tap_water_cap" == metric_key:
             self._attr_suggested_display_precision = 1

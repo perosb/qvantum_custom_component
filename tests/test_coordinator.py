@@ -1228,6 +1228,33 @@ class TestHpStatusPostProcessing:
         result = await coordinator.async_update_data()
         assert result["values"]["hp_status"] == 0
 
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_alarm_active_derived_from_count(self, mock_super_init):
+        """alarm_active is 1 when active_alarms is greater than zero."""
+        coordinator = self._make_coordinator(
+            mock_super_init, {"active_alarms": 2, "alarm_1_code": 41}
+        )
+        result = await coordinator.async_update_data()
+        assert result["values"]["alarm_active"] == 1
+        assert result["values"]["active_alarms"] == 2
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_alarm_active_off_when_count_zero(self, mock_super_init):
+        """alarm_active is 0 when the pump reports no alarms."""
+        coordinator = self._make_coordinator(mock_super_init, {"active_alarms": 0})
+        result = await coordinator.async_update_data()
+        assert result["values"]["alarm_active"] == 0
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_alarm_active_absent_without_count(self, mock_super_init):
+        """alarm_active is not invented when active_alarms was not polled."""
+        coordinator = self._make_coordinator(mock_super_init, {"hp_status": 0})
+        result = await coordinator.async_update_data()
+        assert "alarm_active" not in result["values"]
+
 
 class TestDeriveTapWaterCapacity:
     """Tests for _derive_tap_water_capacity."""

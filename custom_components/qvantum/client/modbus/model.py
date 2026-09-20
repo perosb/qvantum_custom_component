@@ -41,7 +41,7 @@ def _component_from_map(
     register_ranges: tuple[tuple[int, int], ...] | None = None,
 ) -> type[Component]:
     # max_gap=16 matches a live Qvantum-HP probe: documented holes answer.
-    # register_ranges keep reads off the refused input 105-160 span.
+    # register_ranges keep reads off the refused QGM1/QGM2 span 119-146.
     attrs: dict = {"register_space": register_space, "max_gap": max_gap}
     if register_ranges is not None:
         attrs["register_ranges"] = register_ranges
@@ -65,9 +65,10 @@ QvantumInputs = _component_from_map(
         name: bit(_RELAYS_BITMASK_ADDRESS, index)
         for name, index in RELAY_BIT_MAP.items()
     },
-    # Live probe: 0-104 answers, 105-160 raises 0x04, 161-170 answers
-    # (price registers 165-166 are unread; wifi/cloud/vacation sit at 168-170).
-    register_ranges=((0, 104), (161, 170)),
+    # Live probe: 0-104 answers; QGM1/QGM2 inputs 119-146 raise 0x04;
+    # 150-170 answers (alarms 150-155, smart/wifi/cloud/vacation 161-170).
+    # Price registers 165-166 are unread.
+    register_ranges=((0, 104), (150, 170)),
 )
 
 QvantumSettings = _component_from_map(

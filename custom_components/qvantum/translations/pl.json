@@ -11,7 +11,8 @@
       "freeze_protection_active": "{entity_name} aktywowano ochronę przed zamarzaniem",
       "wifi_disconnected": "{entity_name} utraciło połączenie z Wi-Fi",
       "cloud_disconnected": "{entity_name} utraciło połączenie z chmurą",
-      "filter_soon_due": "{entity_name} filtr wkrótce wymaga wymiany"
+      "filter_soon_due": "{entity_name} filtr wkrótce wymaga wymiany",
+      "alarm_active": "{entity_name} zgłosił alarm"
     },
     "condition_type": {
       "is_defrosting": "{entity_name} odszrania się",
@@ -19,7 +20,8 @@
       "is_freeze_protection_active": "{entity_name} ochrona przed zamarzaniem jest aktywna",
       "is_wifi_disconnected": "{entity_name} jest odłączone od Wi-Fi",
       "is_cloud_disconnected": "{entity_name} jest odłączone od chmury",
-      "is_filter_soon_due": "{entity_name} filtr wkrótce wymaga wymiany"
+      "is_filter_soon_due": "{entity_name} filtr wkrótce wymaga wymiany",
+      "is_alarm_active": "{entity_name} ma aktywny alarm"
     }
   },
   "entity": {
@@ -200,6 +202,9 @@
       },
       "vacation_mode": {
         "name": "Tryb wakacyjny"
+      },
+      "alarm_active": {
+        "name": "Alarm"
       }
     },
     "sensor": {
@@ -551,6 +556,24 @@
       },
       "ventilation_fan_run_time": {
         "name": "Czas pracy wentylatora"
+      },
+      "active_alarms": {
+        "name": "Aktywne alarmy"
+      },
+      "alarm_1_code": {
+        "name": "Kod alarmu 1"
+      },
+      "alarm_2_code": {
+        "name": "Kod alarmu 2"
+      },
+      "alarm_3_code": {
+        "name": "Kod alarmu 3"
+      },
+      "alarm_4_code": {
+        "name": "Kod alarmu 4"
+      },
+      "alarm_5_code": {
+        "name": "Kod alarmu 5"
       }
     },
     "number": {

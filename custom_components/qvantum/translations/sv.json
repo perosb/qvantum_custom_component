@@ -11,7 +11,8 @@
       "freeze_protection_active": "{entity_name} frysskydd aktiverat",
       "wifi_disconnected": "{entity_name} Wi-Fi frånkopplad",
       "cloud_disconnected": "{entity_name} moln frånkopplat",
-      "filter_soon_due": "{entity_name} filter behöver snart bytas"
+      "filter_soon_due": "{entity_name} filter behöver snart bytas",
+      "alarm_active": "{entity_name} larmade"
     },
     "condition_type": {
       "is_defrosting": "{entity_name} avfrostas",
@@ -19,7 +20,8 @@
       "is_freeze_protection_active": "{entity_name} frysskydd är aktivt",
       "is_wifi_disconnected": "{entity_name} Wi-Fi är frånkopplad",
       "is_cloud_disconnected": "{entity_name} moln är frånkopplat",
-      "is_filter_soon_due": "{entity_name} filter behöver snart bytas"
+      "is_filter_soon_due": "{entity_name} filter behöver snart bytas",
+      "is_alarm_active": "{entity_name} har ett aktivt larm"
     }
   },
   "entity": {
@@ -203,6 +205,9 @@
       },
       "vacation_mode": {
         "name": "Semesterläge"
+      },
+      "alarm_active": {
+        "name": "Larm"
       }
     },
     "sensor": {
@@ -554,6 +559,24 @@
       },
       "ventilation_fan_run_time": {
         "name": "Ventilationsfläktens drifttid"
+      },
+      "active_alarms": {
+        "name": "Aktiva larm"
+      },
+      "alarm_1_code": {
+        "name": "Larm 1-kod"
+      },
+      "alarm_2_code": {
+        "name": "Larm 2-kod"
+      },
+      "alarm_3_code": {
+        "name": "Larm 3-kod"
+      },
+      "alarm_4_code": {
+        "name": "Larm 4-kod"
+      },
+      "alarm_5_code": {
+        "name": "Larm 5-kod"
       }
     },
     "number": {

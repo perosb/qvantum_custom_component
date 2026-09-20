@@ -74,13 +74,19 @@ MODBUS_INPUT_REGISTER_MAP = {
     "smart_dhw_control_status": (162, "uint16", 1.0),
     "enable_sc_dhw": (163, "uint16", 1.0),
     "enable_sc_sh": (164, "uint16", 1.0),
+    "active_alarms": (150, "uint16", 1.0),
+    "alarm_1_code": (151, "uint16", 1.0),
+    "alarm_2_code": (152, "uint16", 1.0),
+    "alarm_3_code": (153, "uint16", 1.0),
+    "alarm_4_code": (154, "uint16", 1.0),
+    "alarm_5_code": (155, "uint16", 1.0),
     "wifi_connected": (168, "uint16", 1.0),
     "cloud_connected": (169, "uint16", 1.0),
     "vacation_mode": (170, "uint16", 1.0),
 }
 
 # Device identity (QAD EN 2609-AXC input 180-193). Kept off the metrics map so
-# a refused identity block cannot fail the 0-104 / 161-170 poll.
+# a refused identity block cannot fail the 0-104 / 150-170 poll.
 MODBUS_IDENTITY_REGISTER_MAP = {
     "serial_1": (180, "uint16", 1.0),
     "serial_2": (181, "uint16", 1.0),

@@ -11,7 +11,8 @@
       "freeze_protection_active": "{entity_name} aktivoi jäätymissuojan",
       "wifi_disconnected": "{entity_name} Wi-Fi-yhteys katkesi",
       "cloud_disconnected": "{entity_name} pilviyhteys katkesi",
-      "filter_soon_due": "{entity_name} suodatin on pian vaihdettava"
+      "filter_soon_due": "{entity_name} suodatin on pian vaihdettava",
+      "alarm_active": "{entity_name} meni hälytykseen"
     },
     "condition_type": {
       "is_defrosting": "{entity_name} on sulatustilassa",
@@ -19,7 +20,8 @@
       "is_freeze_protection_active": "{entity_name} jäätymissuoja on aktiivinen",
       "is_wifi_disconnected": "{entity_name} Wi-Fi-yhteys on poikki",
       "is_cloud_disconnected": "{entity_name} pilviyhteys on poikki",
-      "is_filter_soon_due": "{entity_name} suodatin on pian vaihdettava"
+      "is_filter_soon_due": "{entity_name} suodatin on pian vaihdettava",
+      "is_alarm_active": "{entity_name} on aktiivinen hälytys"
     }
   },
   "entity": {
@@ -200,6 +202,9 @@
       },
       "vacation_mode": {
         "name": "Lomatila"
+      },
+      "alarm_active": {
+        "name": "Hälytys"
       }
     },
     "sensor": {
@@ -551,6 +556,24 @@
       },
       "ventilation_fan_run_time": {
         "name": "Tuloilmapuhaltimen käyntiaika"
+      },
+      "active_alarms": {
+        "name": "Aktiiviset hälytykset"
+      },
+      "alarm_1_code": {
+        "name": "Hälytys 1 -koodi"
+      },
+      "alarm_2_code": {
+        "name": "Hälytys 2 -koodi"
+      },
+      "alarm_3_code": {
+        "name": "Hälytys 3 -koodi"
+      },
+      "alarm_4_code": {
+        "name": "Hälytys 4 -koodi"
+      },
+      "alarm_5_code": {
+        "name": "Hälytys 5 -koodi"
       }
     },
     "number": {

@@ -183,6 +183,25 @@ class TestQvantumBaseSensorEntity:
         assert entity._attr_state_class == SensorStateClass.TOTAL_INCREASING
         assert entity._attr_entity_category.name == "DIAGNOSTIC"
 
+    def test_alarm_count_sensor(self, mock_coordinator, mock_device):
+        """Active-alarm count is a diagnostic measurement with integer display."""
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "active_alarms", mock_device, True
+        )
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+        assert entity._attr_state_class == SensorStateClass.MEASUREMENT
+        assert entity._attr_suggested_display_precision == 0
+
+    @pytest.mark.parametrize("metric_key", [f"alarm_{i}_code" for i in range(1, 6)])
+    def test_alarm_code_sensors(self, mock_coordinator, mock_device, metric_key):
+        """Alarm code slots are diagnostic integers without a state class."""
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, metric_key, mock_device, True
+        )
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+        assert entity._attr_suggested_display_precision == 0
+        assert getattr(entity, "_attr_state_class", None) is None
+
     def test_compressor_starts_unit_assignment(self, mock_coordinator, mock_device):
         """Compressor start count is a diagnostic total-increasing counter."""
         entity = QvantumBaseSensorEntity(

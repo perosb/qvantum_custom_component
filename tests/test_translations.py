@@ -71,6 +71,26 @@ def test_runtime_sensor_translations_exist_in_all_locales():
             assert sensors[key]["name"], f"{path.name} missing {key}"
 
 
+def test_alarm_translations_exist_in_all_locales():
+    """Modbus alarm entities have names and device-automation strings."""
+    sensor_keys = (
+        "active_alarms",
+        "alarm_1_code",
+        "alarm_2_code",
+        "alarm_3_code",
+        "alarm_4_code",
+        "alarm_5_code",
+    )
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        sensors = data["entity"]["sensor"]
+        for key in sensor_keys:
+            assert sensors[key]["name"], f"{path.name} missing {key}"
+        assert data["entity"]["binary_sensor"]["alarm_active"]["name"], path.name
+        assert data["device_automation"]["trigger_type"]["alarm_active"], path.name
+        assert data["device_automation"]["condition_type"]["is_alarm_active"], path.name
+
+
 def _entity_translation_keys(node: object, path: str = "entity") -> list[str]:
     """Yield translation-key path segments under entity.<domain>."""
     keys: list[str] = []

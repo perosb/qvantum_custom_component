@@ -41,6 +41,7 @@ def _entry(*, unique_id: str, domain: str, entry_id: str = "uuid-1") -> SimpleNa
 def test_metric_from_unique_id_extracts_status_metrics():
     assert metric_from_unique_id("qvantum_wifi_connected_123") == "wifi_connected"
     assert metric_from_unique_id("qvantum_time_to_defrost_pump-1") == "time_to_defrost"
+    assert metric_from_unique_id("qvantum_alarm_active_123") == "alarm_active"
     assert (
         metric_from_unique_id("qvantum_ventilation_filter_time_left_dev")
         == "ventilation_filter_time_left"
@@ -62,6 +63,12 @@ def test_metric_from_unique_id_rejects_unknown():
 def test_filter_below_hours_matches_const():
     assert filter_below_hours() == float(FILTER_SOON_DUE_HOURS)
     assert FILTER_SOON_DUE_HOURS == 48
+
+
+def test_alarm_code_unique_id_is_not_alarm_active():
+    """alarm_1_code must not resolve as the alarm_active status metric."""
+    assert metric_from_unique_id("qvantum_alarm_1_code_123") is None
+    assert metric_from_unique_id("qvantum_alarm_active_123") == "alarm_active"
 
 
 def test_trigger_schema_accepts_known_types():

@@ -24,6 +24,7 @@ from .entity import QvantumEntity
 _LOGGER = logging.getLogger(__name__)
 
 _CONNECTIVITY_BINARY_SENSORS = frozenset({"wifi_connected", "cloud_connected"})
+_PROBLEM_BINARY_SENSORS = frozenset({"alarm_active"})
 
 # Status / release / protection flags — Diagnostics section, not main UI.
 _DIAGNOSTIC_BINARY_SENSORS = frozenset(
@@ -112,6 +113,8 @@ class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
         if metric_key in _CONNECTIVITY_BINARY_SENSORS:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+        elif metric_key in _PROBLEM_BINARY_SENSORS:
+            self._attr_device_class = BinarySensorDeviceClass.PROBLEM
         elif metric_key in _DIAGNOSTIC_BINARY_SENSORS:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
