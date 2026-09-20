@@ -7,9 +7,6 @@ Connect a Qvantum heat pump to Home Assistant using either the Qvantum cloud API
 - **Cloud mode (HTTP):** Uses your Qvantum account for live metrics, firmware details, SmartControl, and cloud settings.
 - **Local Modbus mode:** Connects directly on your LAN without an account or cloud session, with faster local polling.
 
-> [!CAUTION]
-> Cloud mode uses the same internal API as the Qvantum app. It is experimental and runs at your own risk.
-
 ### Installation
 
 Requires Home Assistant **2026.9** or newer (shared Modbus connection).
@@ -23,6 +20,9 @@ Only one Qvantum instance can be configured. Use **Reconfigure** to switch modes
 #### Cloud setup
 
 Sign in with your Qvantum account email and password. Metrics, firmware, SmartControl, Elevate Access, and most settings use the cloud API.
+
+> [!CAUTION]
+> Cloud mode uses the same internal API as the Qvantum app. It is experimental and runs at your own risk.
 
 #### Local Modbus setup
 
