@@ -11,7 +11,8 @@
       "freeze_protection_active": "{entity_name} activeerde de vorstbeveiliging",
       "wifi_disconnected": "{entity_name} verloor de wifi-verbinding",
       "cloud_disconnected": "{entity_name} verloor de cloudverbinding",
-      "filter_soon_due": "{entity_name} filter moet binnenkort worden vervangen"
+      "filter_soon_due": "{entity_name} filter moet binnenkort worden vervangen",
+      "alarm_active": "{entity_name} ging in alarm"
     },
     "condition_type": {
       "is_defrosting": "{entity_name} is aan het ontdooien",
@@ -19,7 +20,8 @@
       "is_freeze_protection_active": "{entity_name} vorstbeveiliging is actief",
       "is_wifi_disconnected": "{entity_name} wifi is verbroken",
       "is_cloud_disconnected": "{entity_name} cloudverbinding is verbroken",
-      "is_filter_soon_due": "{entity_name} filter moet binnenkort worden vervangen"
+      "is_filter_soon_due": "{entity_name} filter moet binnenkort worden vervangen",
+      "is_alarm_active": "{entity_name} heeft een actief alarm"
     }
   },
   "entity": {
@@ -200,6 +202,9 @@
       },
       "vacation_mode": {
         "name": "Vakantiemodus"
+      },
+      "alarm_active": {
+        "name": "Alarm"
       }
     },
     "sensor": {
@@ -551,6 +556,24 @@
       },
       "ventilation_fan_run_time": {
         "name": "Ventilatieventilator looptijd"
+      },
+      "active_alarms": {
+        "name": "Actieve alarmen"
+      },
+      "alarm_1_code": {
+        "name": "Alarm 1-code"
+      },
+      "alarm_2_code": {
+        "name": "Alarm 2-code"
+      },
+      "alarm_3_code": {
+        "name": "Alarm 3-code"
+      },
+      "alarm_4_code": {
+        "name": "Alarm 4-code"
+      },
+      "alarm_5_code": {
+        "name": "Alarm 5-code"
       }
     },
     "number": {

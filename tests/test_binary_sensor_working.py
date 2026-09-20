@@ -25,6 +25,9 @@ class MockBinarySensorDeviceClass:
     class CONNECTIVITY:
         name = "CONNECTIVITY"
 
+    class PROBLEM:
+        name = "PROBLEM"
+
 
 # Patch the imports before importing the binary_sensor module
 with patch(
@@ -151,6 +154,22 @@ class TestQvantumBaseBinaryEntity:
         # Status flags are diagnostic but not connectivity device class
         assert heating._attr_entity_category.name == "DIAGNOSTIC"
         assert getattr(heating, "_attr_device_class", None) is None
+
+    def test_alarm_active_is_problem_not_diagnostic(
+        self, mock_coordinator, mock_device
+    ):
+        """Active-alarm flag uses PROBLEM and stays on the main device view."""
+        mock_coordinator.data["values"]["alarm_active"] = 1
+        entity = QvantumBaseBinaryEntity(
+            mock_coordinator, "alarm_active", mock_device, True
+        )
+        assert entity._attr_device_class.name == "PROBLEM"
+        assert getattr(entity, "_attr_entity_category", None) is None
+        assert entity.is_on == 1
+        assert entity.available is True
+
+        mock_coordinator.data["values"]["alarm_active"] = 0
+        assert entity.is_on == 0
 
     def test_status_binary_sensors_are_diagnostic(self, mock_coordinator, mock_device):
         """Release / protection / pump status flags use the diagnostics category."""

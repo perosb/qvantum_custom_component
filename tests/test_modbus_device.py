@@ -54,6 +54,21 @@ class TestRegisterMapAlignment:
             assert field.address == bitmask_address
             assert field.start == index
 
+    def test_alarm_register_addresses(self):
+        expected = {
+            "active_alarms": 150,
+            "alarm_1_code": 151,
+            "alarm_2_code": 152,
+            "alarm_3_code": 153,
+            "alarm_4_code": 154,
+            "alarm_5_code": 155,
+        }
+        for name, address in expected.items():
+            assert MODBUS_INPUT_REGISTER_MAP[name] == (address, "uint16", 1.0)
+            field = QvantumInputs.declared_fields[name]
+            assert field.address == address
+            assert field.signed is False
+
     def test_all_relay_bits_are_binary_sensors(self):
         exposed = set(BINARY_SENSOR_NAMES) | set(MODBUS_ONLY_BINARY_SENSORS)
         assert set(RELAY_BIT_MAP) <= exposed
@@ -133,6 +148,26 @@ class TestComponentDecode:
         assert values["vacation_mode"] == 1
 
     @pytest.mark.asyncio
+    async def test_decodes_alarm_inputs(self):
+        _, unit, device = _device()
+        unit.input[150] = 2
+        unit.input[151] = 41
+        unit.input[152] = 7
+        unit.input[153] = 0
+        unit.input[154] = 0
+        unit.input[155] = 0
+
+        await device.async_update_inputs()
+        values = component_values(device.inputs)
+
+        assert values["active_alarms"] == 2
+        assert values["alarm_1_code"] == 41
+        assert values["alarm_2_code"] == 7
+        assert values["alarm_3_code"] == 0
+        assert values["alarm_4_code"] == 0
+        assert values["alarm_5_code"] == 0
+
+    @pytest.mark.asyncio
     async def test_decodes_heating_curve_holdings(self):
         _, unit, device = _device()
         unit.holding[22] = 1
@@ -162,8 +197,11 @@ class TestComponentDecode:
             for event in input_reads
             for addr in range(event.address, event.address + event.count)
         }
-        assert not set(range(105, 161)) & covered
+        assert not set(range(105, 119)) & covered
+        assert not set(range(119, 147)) & covered
+        assert not set(range(147, 150)) & covered
         assert not set(range(180, 194)) & covered
+        assert set(range(150, 156)) <= covered
         assert set(range(161, 171)) <= covered
 
     @pytest.mark.asyncio
@@ -182,7 +220,8 @@ class TestComponentDecode:
             for addr in range(event.address, event.address + event.count)
         }
         assert set(range(180, 194)) <= covered
-        assert not set(range(105, 161)) & covered
+        assert not set(range(119, 147)) & covered
+        assert not set(range(150, 156)) & covered
         assert not set(range(161, 165)) & covered
 
     @pytest.mark.asyncio

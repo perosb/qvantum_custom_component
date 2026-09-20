@@ -11,7 +11,8 @@
       "freeze_protection_active": "{entity_name} fagyvédelme aktiválódott",
       "wifi_disconnected": "{entity_name} Wi-Fi-kapcsolata megszakadt",
       "cloud_disconnected": "{entity_name} felhőkapcsolata megszakadt",
-      "filter_soon_due": "{entity_name} szűrője hamarosan cserére szorul"
+      "filter_soon_due": "{entity_name} szűrője hamarosan cserére szorul",
+      "alarm_active": "{entity_name} riasztást adott"
     },
     "condition_type": {
       "is_defrosting": "{entity_name} leolvasztást végez",
@@ -19,7 +20,8 @@
       "is_freeze_protection_active": "{entity_name} fagyvédelme aktív",
       "is_wifi_disconnected": "{entity_name} Wi-Fi-kapcsolata megszakadt",
       "is_cloud_disconnected": "{entity_name} felhőkapcsolata megszakadt",
-      "is_filter_soon_due": "{entity_name} szűrője hamarosan cserére szorul"
+      "is_filter_soon_due": "{entity_name} szűrője hamarosan cserére szorul",
+      "is_alarm_active": "{entity_name} aktív riasztással rendelkezik"
     }
   },
   "entity": {
@@ -200,6 +202,9 @@
       },
       "vacation_mode": {
         "name": "Szabadság üzemmód"
+      },
+      "alarm_active": {
+        "name": "Riasztás"
       }
     },
     "sensor": {
@@ -551,6 +556,24 @@
       },
       "ventilation_fan_run_time": {
         "name": "Szellőzőventilátor üzemidő"
+      },
+      "active_alarms": {
+        "name": "Aktív riasztások"
+      },
+      "alarm_1_code": {
+        "name": "1. riasztáskód"
+      },
+      "alarm_2_code": {
+        "name": "2. riasztáskód"
+      },
+      "alarm_3_code": {
+        "name": "3. riasztáskód"
+      },
+      "alarm_4_code": {
+        "name": "4. riasztáskód"
+      },
+      "alarm_5_code": {
+        "name": "5. riasztáskód"
       }
     },
     "number": {

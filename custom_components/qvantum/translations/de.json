@@ -11,7 +11,8 @@
       "freeze_protection_active": "{entity_name} hat den Frostschutz aktiviert",
       "wifi_disconnected": "{entity_name} WLAN wurde getrennt",
       "cloud_disconnected": "{entity_name} Cloud wurde getrennt",
-      "filter_soon_due": "{entity_name} Filter muss bald gewechselt werden"
+      "filter_soon_due": "{entity_name} Filter muss bald gewechselt werden",
+      "alarm_active": "{entity_name} hat alarmiert"
     },
     "condition_type": {
       "is_defrosting": "{entity_name} taut ab",
@@ -19,7 +20,8 @@
       "is_freeze_protection_active": "{entity_name} Frostschutz ist aktiv",
       "is_wifi_disconnected": "{entity_name} WLAN ist getrennt",
       "is_cloud_disconnected": "{entity_name} Cloud ist getrennt",
-      "is_filter_soon_due": "{entity_name} Filter muss bald gewechselt werden"
+      "is_filter_soon_due": "{entity_name} Filter muss bald gewechselt werden",
+      "is_alarm_active": "{entity_name} hat einen aktiven Alarm"
     }
   },
   "entity": {
@@ -200,6 +202,9 @@
       },
       "vacation_mode": {
         "name": "Urlaubsmodus"
+      },
+      "alarm_active": {
+        "name": "Alarm"
       }
     },
     "sensor": {
@@ -551,6 +556,24 @@
       },
       "ventilation_fan_run_time": {
         "name": "Lüfter-Laufzeit"
+      },
+      "active_alarms": {
+        "name": "Aktive Alarme"
+      },
+      "alarm_1_code": {
+        "name": "Alarm 1 Code"
+      },
+      "alarm_2_code": {
+        "name": "Alarm 2 Code"
+      },
+      "alarm_3_code": {
+        "name": "Alarm 3 Code"
+      },
+      "alarm_4_code": {
+        "name": "Alarm 4 Code"
+      },
+      "alarm_5_code": {
+        "name": "Alarm 5 Code"
       }
     },
     "number": {

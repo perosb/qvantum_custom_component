@@ -22,6 +22,7 @@ BINARY_STATUS_METRICS: dict[str, str] = {
     "freeze_protection_active": "binary_sensor",
     "wifi_connected": "binary_sensor",
     "cloud_connected": "binary_sensor",
+    "alarm_active": "binary_sensor",
 }
 
 SENSOR_STATUS_METRICS: dict[str, str] = {
@@ -41,6 +42,7 @@ BINARY_TRIGGER_MAP: dict[str, tuple[str, str]] = {
     "freeze_protection_active": ("freeze_protection_active", "on"),
     "wifi_disconnected": ("wifi_connected", "off"),
     "cloud_disconnected": ("cloud_connected", "off"),
+    "alarm_active": ("alarm_active", "on"),
 }
 
 # Condition type -> (metric_key, expected_state) for binary state conditions.
@@ -50,6 +52,7 @@ BINARY_CONDITION_MAP: dict[str, tuple[str, str]] = {
     "is_freeze_protection_active": ("freeze_protection_active", "on"),
     "is_wifi_disconnected": ("wifi_connected", "off"),
     "is_cloud_disconnected": ("cloud_connected", "off"),
+    "is_alarm_active": ("alarm_active", "on"),
 }
 
 TRIGGER_FILTER_SOON_DUE = "filter_soon_due"

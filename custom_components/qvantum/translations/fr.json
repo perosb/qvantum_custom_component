@@ -11,7 +11,8 @@
       "freeze_protection_active": "{entity_name} a activé la protection antigel",
       "wifi_disconnected": "{entity_name} Wi-Fi déconnecté",
       "cloud_disconnected": "{entity_name} cloud déconnecté",
-      "filter_soon_due": "{entity_name} filtre bientôt à remplacer"
+      "filter_soon_due": "{entity_name} filtre bientôt à remplacer",
+      "alarm_active": "{entity_name} est passé en alarme"
     },
     "condition_type": {
       "is_defrosting": "{entity_name} est en dégivrage",
@@ -19,7 +20,8 @@
       "is_freeze_protection_active": "{entity_name} protection antigel active",
       "is_wifi_disconnected": "{entity_name} Wi-Fi est déconnecté",
       "is_cloud_disconnected": "{entity_name} cloud est déconnecté",
-      "is_filter_soon_due": "{entity_name} filtre bientôt à remplacer"
+      "is_filter_soon_due": "{entity_name} filtre bientôt à remplacer",
+      "is_alarm_active": "{entity_name} a une alarme active"
     }
   },
   "entity": {
@@ -200,6 +202,9 @@
       },
       "vacation_mode": {
         "name": "Mode vacances"
+      },
+      "alarm_active": {
+        "name": "Alarme"
       }
     },
     "sensor": {
@@ -551,6 +556,24 @@
       },
       "ventilation_fan_run_time": {
         "name": "Temps de fonctionnement du ventilateur"
+      },
+      "active_alarms": {
+        "name": "Alarmes actives"
+      },
+      "alarm_1_code": {
+        "name": "Code d'alarme 1"
+      },
+      "alarm_2_code": {
+        "name": "Code d'alarme 2"
+      },
+      "alarm_3_code": {
+        "name": "Code d'alarme 3"
+      },
+      "alarm_4_code": {
+        "name": "Code d'alarme 4"
+      },
+      "alarm_5_code": {
+        "name": "Code d'alarme 5"
       }
     },
     "number": {

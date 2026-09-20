@@ -174,6 +174,12 @@ DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "wifi_connected",
     "cloud_connected",
     "vacation_mode",
+    "active_alarms",
+    "alarm_1_code",
+    "alarm_2_code",
+    "alarm_3_code",
+    "alarm_4_code",
+    "alarm_5_code",
 ]
 
 # Holding register keys that should be exposed as sensor entities in Modbus mode
@@ -414,6 +420,7 @@ BINARY_SENSOR_NAMES = [
 MODBUS_ONLY_BINARY_SENSORS = [
     "vacation_mode",
     "picpin_relay_pump",
+    "alarm_active",
 ]
 
 # Sensor filtering: substring patterns vs exact binary-sensor metric names.

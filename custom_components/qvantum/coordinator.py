@@ -785,6 +785,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 comp = metrics_dict["compressor_state"]
                 metrics_dict["hp_status"] = _COMPRESSOR_TO_HP_STATUS_MAP.get(comp, 0)
 
+            if "active_alarms" in metrics_dict:
+                metrics_dict["alarm_active"] = int(
+                    metrics_dict["active_alarms"] > 0
+                )
+
             # Process settings data
             settings_dict = self._process_settings_data(settings)
             _LOGGER.debug("Settings data: %s", settings_dict)
