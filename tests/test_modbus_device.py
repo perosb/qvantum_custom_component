@@ -197,7 +197,9 @@ class TestComponentDecode:
             for event in input_reads
             for addr in range(event.address, event.address + event.count)
         }
+        assert not set(range(105, 119)) & covered
         assert not set(range(119, 147)) & covered
+        assert not set(range(147, 150)) & covered
         assert not set(range(180, 194)) & covered
         assert set(range(150, 156)) <= covered
         assert set(range(161, 171)) <= covered

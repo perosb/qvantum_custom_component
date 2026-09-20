@@ -12,7 +12,7 @@
       "wifi_disconnected": "{entity_name} Wi-Fi disconnected",
       "cloud_disconnected": "{entity_name} cloud disconnected",
       "filter_soon_due": "{entity_name} filter due soon",
-      "alarm_active": "{entity_name} became alarming"
+      "alarm_active": "{entity_name} alarm became active"
     },
     "condition_type": {
       "is_defrosting": "{entity_name} is defrosting",
