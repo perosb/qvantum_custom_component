@@ -2,117 +2,57 @@
 
 ## Qvantum Heat Pump Integration for Home Assistant
 
-This integration supports two connection modes for your Qvantum heat pump:
+Connect a Qvantum heat pump to Home Assistant using either the Qvantum cloud API or a direct local Modbus TCP connection:
 
-- **Cloud mode (HTTP)**: Connects through your Qvantum account and cloud API to read live metrics, firmware details, SmartControl, and cloud-based settings.
-- **Modbus mode (offline/local)**: Connects directly to the heat pump on your local network over Modbus TCP, without requiring a Qvantum account or cloud session.
-
-Choose the mode that matches your setup:
-- Use **Cloud mode** for the full cloud-integrated feature set and account-based controls.
-- Use **Modbus (offline/local)** when you want local, direct access to the heat pump, faster local polling, or to keep everything running without cloud connectivity.
-
-> [!CAUTION]
->Cloud mode uses the same internal API that the Qvantum app uses to fetch live metrics from the heat pump.  
->This is a cloud-based integration and should be considered experimental and at your own risk.  
-
-> [!WARNING]
->Cloud mode only: the Elevate Access feature creates a "Remote Service" access for your user.  
->It effectively grants service/installer-level access to the heat pump.  
->This is required for some advanced cloud-based settings and maintenance actions.  
-
-> [!IMPORTANT]
->Modbus mode is local and offline. It does not use the cloud API.
->When you enable Modbus write mode, you are directly writing values to the heat pump.  
->Only enable writing if you understand the consequences. Incorrect or out-of-range values may affect performance, warranty, and the system lifecycle.  
-
-### Transform Your Home's Energy Efficiency with Qvantum
-
-Discover the power of intelligent home climate control with the Qvantum Heat Pump integration for Home Assistant. Seamlessly monitor and control your Qvantum heat pump directly from your smart home dashboard, giving you unprecedented insight into your energy usage and system performance.
-
-**Why choose this integration?**
-- **Complete Control**: Monitor temperatures, energy consumption, and system status in real-time
-- **Smart Automation**: Create automations based on heat pump data for optimal comfort and efficiency
-- **Energy Insights**: Track daily energy usage and optimize your heating costs
-- **Professional Integration**: Built with reliability and performance in mind for Qvantum systems
-- **Easy Setup**: Install via HACS with just a few clicks
-
-### Energy for all – without compromises
-
-Our needs, lifestyles and ways of working have changed rapidly. Demands on our standard of living have skyrocketed, but how will we make the resources last?
-
-Disrupting the ordinary takes courage, but with experience, deep knowledge and determination, we have the power to change everything. We have to break free from the past with technology for the future. To focus on values and experience. To give access to millions of homes, to be part of the energy transition without sacrificing their livelihood or their comfort.
+- **Cloud mode (HTTP):** Uses your Qvantum account for live metrics, firmware details, SmartControl, and cloud settings.
+- **Local Modbus mode:** Connects directly on your LAN without an account or cloud session, with faster local polling.
 
 ### Installation
 
 Requires Home Assistant **2026.9** or newer (shared Modbus connection).
 
-1. **Install via HACS** (recommended):
-   - Search for "Qvantum Heat Pump" in HACS
-   - Install the Qvantum Heat Pump integration
-   - Restart Home Assistant
+1. **Install via HACS** (recommended): Search for **Qvantum Heat Pump**, install it, and restart Home Assistant.
+2. **Manual installation:** Download the latest release, extract it to `custom_components/qvantum/`, and restart Home Assistant.
+3. **Add the integration:** Go to **Settings → Devices & Services → Add Integration**, search for **Qvantum Heat Pump**, and choose **Qvantum cloud (HTTP)** or **Local Modbus (offline)**.
 
-2. **Manual Installation**:
-   - Download the latest release
-   - Extract to `custom_components/qvantum/`
-   - Restart Home Assistant
+Only one Qvantum instance can be configured. Use **Reconfigure** to switch modes later.
 
-3. **Setup**:
-   - Go to Settings → Devices & Services → Add Integration
-   - Search for "Qvantum Heat Pump"
-   - Choose **Qvantum cloud (HTTP)** or **Local Modbus (offline)**
+#### Cloud setup
 
-Only one Qvantum instance can be configured. Use **reconfigure** to switch between cloud and local later.
+Sign in with your Qvantum account email and password. Metrics, firmware, SmartControl, Elevate Access, and most settings use the cloud API.
 
-#### Qvantum cloud (HTTP)
+> [!CAUTION]
+> Cloud mode uses the same internal API as the Qvantum app. It is experimental and runs at your own risk.
 
-Sign in with your Qvantum account email and password. Metrics, firmware, SmartControl, elevate-access, and most settings use the cloud API.
-
-#### Local Modbus (offline)
-
-Reads the heat pump on your LAN. No login and no cloud session.
+#### Local Modbus setup
 
 1. In the Qvantum app, enable **Modbus external** (Installer → Service mode → Connectivity).
-2. Enter host (default `Qvantum-HP`), port, unit ID, and poll interval (default 15 seconds, minimum 5).
+2. Enter the host (default `Qvantum-HP`), port, unit ID, and poll interval (default 15 seconds, minimum 5).
 3. Home Assistant probes serial and firmware from identity registers 180–193.
 
-Cloud-only sensors (firmware boards and access expiry) are not created in this mode. Extra-DHW `tap_stop` is created from the local restore deadline.
+Cloud-only sensors, including firmware boards and access expiry, are not created locally. Extra-DHW `tap_stop` is created from the local restore deadline.
+
+> [!IMPORTANT]
+> Local Modbus is read-only until **Enable writing via Modbus** is enabled. Incorrect or out-of-range writes may affect performance, warranty, and system lifecycle.
 
 ### Features
 
-- **Real-time Monitoring**: Temperature sensors, pressure readings, energy consumption
-- **System Control**: Adjust operation modes, set temperatures, toggle vacation mode, control ventilation
-- **Hot water (`water_heater`)**: Tank temperature, DHW stop target, Eco/Normal/Extra/Smart/Off modes wrapping existing DHW APIs (additive; existing number/switch/button for VV remain)
-- **Energy Analytics**: Daily and total energy usage tracking
-- **Energy Dashboard**: Compressor/heating/DHW/additional/total energy sensors are one-click compatible (`ENERGY`, `TOTAL_INCREASING`, kWh); `powertotal`/`heatingpower`/`dhwpower` are `POWER` in W
-- **Smart Status**: Heat pump status, defrost cycles, priority modes
-- **Comprehensive Coverage**: Supports all major Qvantum heat pump parameters
+- **Monitoring:** Temperatures, pressure, energy, power, system status, defrost, connectivity, filter time, and other heat-pump metrics.
+- **Control:** Operation modes, target temperatures, vacation mode, ventilation, and supported settings.
+- **Hot water (`water_heater`):** Tank temperature and DHW stop target with Eco, Normal, Extra, Smart, and Off modes.
+- **Energy Dashboard:** Compressor, heating, DHW, additional, and total energy sensors are ready for one-click setup.
+- **Device automations:** Triggers and conditions for defrost, compressor blocking, freeze protection, Wi-Fi/cloud connectivity, and a ventilation filter due in under 48 hours.
+- **External room sensor:** When configured by the pump, a Modbus number entity can mirror an external temperature into the control setpoint.
+- **Modbus writes:** Optional local writes for supported targets, DHW, fan, operation, room compensation, and sensor settings.
 
-### Local Modbus
+#### Device automation details
 
-- **Offline**: no Qvantum account, no HTTP fallback
-- **Faster polling** of live data from the pump’s Modbus interface (default 15 s)
-- **Extra local metrics**: heating/DHW power, tap-water capacity estimate, compressor state, extra demand relays, unit/released/blocked/freeze status, Wi-Fi and cloud connectivity, filter time left, read-only vacation mode
-- **Optional writes** for supported holding-register controls when you enable **Enable writing via Modbus**
+Available triggers and conditions depend on the entities present. They cover defrosting, compressor blocking, freeze protection, Wi-Fi/cloud disconnection, and a ventilation filter with fewer than 48 hours remaining.
 
-> [!IMPORTANT]
-> Local Modbus is **read-only** until you enable writing. Writes never go to the cloud API.
->
-> Supported local writes include indoor target/offset, DHW start/stop, extra DHW, fan preset, operation/manual switches, room compensation, fan speeds, extra-DHW stop, outdoor temperature stop heating (`stop_heating`), external room temperature, and indoor sensor source.
->
-> **SmartControl** (`use_adaptive`, `enable_sc_sh`, `enable_sc_dhw`) and **elevate-access** are not created in local Modbus mode. On local Modbus, **vacation mode** is a read-only binary from input 170; the writable vacation switch remains HTTP-only.
->
-> By enabling Modbus writing you accept full responsibility for values written to the pump. Incorrect or out-of-range values may void the warranty and/or affect lifecycle and performance.
+#### External room sensor example
 
-Extra DHW on local Modbus writes DHW mode Extra/Normal. Use the extra-DHW button (60 minutes) or `qvantum.extra_hot_water` with `minutes` (0–480). Home Assistant restores Normal when the timer ends, including after a restart. The extra-DHW timer entity (`tap_stop`) shows the end time. If extra DHW is stopped on the heat pump or from the extra switch, that timer is cancelled. The extra switch without a duration stays Extra until you turn it off.
+When the pump uses an external room sensor, enable Modbus writing and mirror the sensor as follows:
 
-Fan extra on local Modbus is a sticky preset. Cloud extra ventilation is a timed boost.
-
-### External room sensor support
-
-When the pump is configured to use an external room sensor (`use_operation_sensor == 4`), the integration exposes a `number` entity for `room_temp_external`.
-This allows you to mirror an external temperature sensor into the pump’s control setpoint via Modbus when Modbus writes are enabled.
-
-**Example automation:**
 ```yaml
 alias: "Qvantum: Update external room temperature"
 trigger:
@@ -126,41 +66,12 @@ action:
       value: "{{ states('sensor.some_external_room_temperature') | float }}"
 ```
 
-
-### Device automations
-
-Device triggers and conditions are available on the Qvantum heat pump device (when the related entities exist):
-
-**Triggers**
-- Defrosting started
-- Compressor blocked
-- Freeze protection activated
-- Wi-Fi disconnected
-- Cloud disconnected
-- Ventilation filter soon due (hours remaining fall below **48**)
-
-**Conditions**
-- Is defrosting
-- Is compressor blocked
-- Is freeze protection active
-- Is Wi-Fi disconnected
-- Is cloud disconnected
-- Is ventilation filter soon due (below **48** hours remaining)
-
-The filter threshold is `FILTER_SOON_DUE_HOURS = 48` in the integration.
-
-### Services
-
-The integration provides the following services for advanced control and testing:
+### Services and Elevate Access
 
 #### `qvantum.extra_hot_water`
-Schedule extra hot water production for a specified duration. On cloud this uses the HTTP extra-DHW command. On local Modbus it writes DHW Extra/Normal (requires Modbus writing).
 
-**Parameters:**
-- `device_id` (integer, required): The heat pump id (same as the serial)
-- `minutes` (integer, optional, default: 120): Duration in minutes (0-480)
+Schedule extra hot water production. Cloud mode uses a timed HTTP command; local Modbus writes DHW Extra/Normal and requires Modbus writing. The service accepts `device_id` (the heat pump serial) and `minutes` from 0–480 (default 120).
 
-**Example:**
 ```yaml
 service: qvantum.extra_hot_water
 data:
@@ -168,20 +79,22 @@ data:
   minutes: 60
 ```
 
-### Elevate Access Button
+Cloud extra ventilation is a timed boost; local Modbus fan extra is a sticky preset. The extra-DHW switch and timer are also available, and the service works in both modes.
 
-Cloud HTTP only. The **Elevate Access** button grants temporary elevated permissions to access advanced heat pump settings and maintenance functions. It is not created in local Modbus mode.
+#### Elevate Access
 
-**Features:**
-- Temporarily elevates access level for configuration tasks
-- Automatically expires after a set time period
-- Includes expiration timestamp sensor for monitoring
+Cloud HTTP only: the **Elevate Access** button grants temporary access to advanced settings and maintenance functions; local Modbus does not create these entities.
 
-**Entities:**
-- `button.qvantum_elevate_access_<device_id>` - Press to elevate access
-- `sensor.qvantum_expires_at_<device_id>` - Shows when access expires
+> [!WARNING]
+> Elevate Access creates a Qvantum “Remote Service” access for your user and effectively grants service/installer-level permissions. Use it only when needed.
 
-**Auto-renewal automation:**
+Entities:
+
+- `button.qvantum_elevate_access_<device_id>` — press to elevate access.
+- `sensor.qvantum_expires_at_<device_id>` — access expiration timestamp.
+
+Optional auto-renewal automation:
+
 ```yaml
 alias: "Qvantum: Elevate Access Before Expiration"
 triggers:
@@ -194,9 +107,3 @@ actions:
       entity_id: button.qvantum_hoj_atkomst
     action: button.press
 ```
-
-*Qvantum Controls in Home Assistant:*  
-![image](https://github.com/user-attachments/assets/3b04bf83-3f1a-45d8-9aad-fdcb780abc9b)
-
-*Daily energy usage of Qvantum Heat Pump:*   
-![image](https://github.com/user-attachments/assets/4f2f58f8-eae2-4a72-a2e8-b8468f869da4)
