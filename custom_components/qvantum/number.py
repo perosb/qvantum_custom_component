@@ -3,20 +3,38 @@
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberDeviceClass
-from homeassistant.const import UnitOfEnergy, UnitOfTemperature, EntityCategory
+from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
-from .const import HeatingCurveType, SensorMode, TAP_WATER_CAPACITY_MAPPINGS
+from .const import (
+    HeatingCurveType,
+    SensorMode,
+    TAP_WATER_CAPACITY_MAPPINGS,
+    TAP_WATER_TEMP_MAX,
+    TAP_WATER_TEMP_MIN,
+    TAP_WATER_TEMP_STEP,
+    ensure_tap_water_start_below_stop,
+)
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _as_int(value: object) -> int | None:
+    """Return int(value) or None when missing/unconvertible."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
 
 # Metrics that require writing via Modbus holding registers.
 # Entities for these metrics show as unavailable when "Enable writing via Modbus" is off.
@@ -56,8 +74,8 @@ async def async_setup_entry(
         "tap_water_capacity_target": (1, 7, 1),
         "room_comp_factor": (0, 10, 0.5),
         "indoor_temperature_offset": (-10, 10, 1),
-        "tap_water_stop": (60, 80, 1),
-        "tap_water_start": (50, 65, 1),
+        "tap_water_stop": (TAP_WATER_TEMP_MIN, TAP_WATER_TEMP_MAX, TAP_WATER_TEMP_STEP),
+        "tap_water_start": (TAP_WATER_TEMP_MIN, TAP_WATER_TEMP_MAX, TAP_WATER_TEMP_STEP),
         "dhw_stop_extra": (60, 80, 5),
         "fan_normal": (0, 100, 5),
         "fan_speed_2": (0, 100, 5),
@@ -109,6 +127,30 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
             self._attr_device_class = NumberDeviceClass.TEMPERATURE
 
     @property
+    def native_min_value(self) -> float:
+        """Return min; DHW stop stays above the current start temperature."""
+        min_value = self._attr_native_min_value
+        max_value = self._attr_native_max_value
+        if self._metric_key != "tap_water_stop":
+            return min_value
+        start = _as_int(self._values.get("tap_water_start"))
+        if start is None:
+            return min_value
+        return min(max_value, max(min_value, start + self._attr_native_step))
+
+    @property
+    def native_max_value(self) -> float:
+        """Return max; DHW start stays below the current stop temperature."""
+        min_value = self._attr_native_min_value
+        max_value = self._attr_native_max_value
+        if self._metric_key != "tap_water_start":
+            return max_value
+        stop = _as_int(self._values.get("tap_water_stop"))
+        if stop is None:
+            return max_value
+        return max(min_value, min(max_value, stop - self._attr_native_step))
+
+    @property
     def suggested_object_id(self) -> str | None:
         """Return a slug- and sort-stable object id for curve points.
 
@@ -141,11 +183,17 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 )
             case "tap_water_stop":
                 coordinator_update_value = int(value)
+                ensure_tap_water_start_below_stop(
+                    self._values.get("tap_water_start"), coordinator_update_value
+                )
                 response = await self.coordinator.client.set_tap_water(
                     self._hpid, stop=coordinator_update_value
                 )
             case "tap_water_start":
                 coordinator_update_value = int(value)
+                ensure_tap_water_start_below_stop(
+                    coordinator_update_value, self._values.get("tap_water_stop")
+                )
                 response = await self.coordinator.client.set_tap_water(
                     self._hpid, start=coordinator_update_value
                 )

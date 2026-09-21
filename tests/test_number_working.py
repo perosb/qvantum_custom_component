@@ -14,27 +14,20 @@ class MockNumberEntity:
     pass
 
 
-# Mock EntityCategory
-class MockEntityCategory:
-    class DIAGNOSTIC:
-        name = "DIAGNOSTIC"
-
-
 # Patch the imports before importing the number module
 with patch(
     "homeassistant.helpers.update_coordinator.CoordinatorEntity", MockCoordinatorEntity
 ):
     with patch("homeassistant.components.number.NumberEntity", MockNumberEntity):
-        with patch("homeassistant.const.EntityCategory", MockEntityCategory):
-            from homeassistant.helpers.device_registry import DeviceInfo
-            from homeassistant.const import UnitOfTemperature
-            from homeassistant.components.number import NumberDeviceClass
+        from homeassistant.helpers.device_registry import DeviceInfo
+        from homeassistant.const import UnitOfTemperature
+        from homeassistant.components.number import NumberDeviceClass
 
-            from custom_components.qvantum.number import (
-                QvantumNumberEntity,
-                async_setup_entry,
-            )
-            from custom_components.qvantum.const import HeatingCurveType, SensorMode
+        from custom_components.qvantum.number import (
+            QvantumNumberEntity,
+            async_setup_entry,
+        )
+        from custom_components.qvantum.const import HeatingCurveType, SensorMode
 
 
 @pytest.fixture
@@ -125,12 +118,12 @@ class TestQvantumNumberEntity:
     def test_init_tap_water_stop(self, mock_coordinator, mock_device):
         """Test tap water stop number entity initialization."""
         entity = QvantumNumberEntity(
-            mock_coordinator, "tap_water_stop", 60, 90, 1, mock_device
+            mock_coordinator, "tap_water_stop", 50, 80, 1, mock_device
         )
 
         assert entity._metric_key == "tap_water_stop"
-        assert entity._attr_native_min_value == 60
-        assert entity._attr_native_max_value == 90
+        assert entity._attr_native_min_value == 50
+        assert entity._attr_native_max_value == 80
         assert entity._attr_native_step == 1
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
@@ -138,15 +131,63 @@ class TestQvantumNumberEntity:
     def test_init_tap_water_start(self, mock_coordinator, mock_device):
         """Test tap water start number entity initialization."""
         entity = QvantumNumberEntity(
-            mock_coordinator, "tap_water_start", 50, 65, 1, mock_device
+            mock_coordinator, "tap_water_start", 50, 80, 1, mock_device
         )
 
         assert entity._metric_key == "tap_water_start"
         assert entity._attr_native_min_value == 50
-        assert entity._attr_native_max_value == 65
+        assert entity._attr_native_max_value == 80
         assert entity._attr_native_step == 1
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
+
+    def test_tap_water_stop_min_follows_start(self, mock_coordinator, mock_device):
+        """Stop slider min is start + 1 so stop stays above start."""
+        mock_coordinator.data["values"]["tap_water_start"] = 55
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_stop", 50, 80, 1, mock_device
+        )
+        assert entity.native_min_value == 56
+        assert entity.native_max_value == 80
+
+    def test_tap_water_start_max_follows_stop(self, mock_coordinator, mock_device):
+        """Start slider max is stop - 1 so start stays below stop."""
+        mock_coordinator.data["values"]["tap_water_stop"] = 75
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_start", 50, 80, 1, mock_device
+        )
+        assert entity.native_min_value == 50
+        assert entity.native_max_value == 74
+
+    def test_tap_water_limits_without_counterpart(self, mock_coordinator, mock_device):
+        """Missing counterpart keeps the absolute 50-80 range."""
+        mock_coordinator.data["values"]["tap_water_start"] = None
+        mock_coordinator.data["values"]["tap_water_stop"] = None
+        stop = QvantumNumberEntity(
+            mock_coordinator, "tap_water_stop", 50, 80, 1, mock_device
+        )
+        start = QvantumNumberEntity(
+            mock_coordinator, "tap_water_start", 50, 80, 1, mock_device
+        )
+        assert stop.native_min_value == 50
+        assert stop.native_max_value == 80
+        assert start.native_min_value == 50
+        assert start.native_max_value == 80
+
+    def test_tap_water_limits_ignore_unconvertible_counterpart(
+        self, mock_coordinator, mock_device
+    ):
+        """Non-numeric counterpart keeps the absolute 50-80 range."""
+        mock_coordinator.data["values"]["tap_water_start"] = "hot"
+        mock_coordinator.data["values"]["tap_water_stop"] = object()
+        stop = QvantumNumberEntity(
+            mock_coordinator, "tap_water_stop", 50, 80, 1, mock_device
+        )
+        start = QvantumNumberEntity(
+            mock_coordinator, "tap_water_start", 50, 80, 1, mock_device
+        )
+        assert stop.native_min_value == 50
+        assert start.native_max_value == 80
 
     def test_init_fan_normal(self, mock_coordinator, mock_device):
         """Test fan normal number entity initialization."""
@@ -365,7 +406,7 @@ class TestQvantumNumberEntity:
     ):
         """Test setting tap water stop value."""
         entity = QvantumNumberEntity(
-            mock_coordinator, "tap_water_stop", 60, 90, 1, mock_device
+            mock_coordinator, "tap_water_stop", 50, 80, 1, mock_device
         )
 
         # Mock the API response
@@ -386,7 +427,7 @@ class TestQvantumNumberEntity:
     ):
         """Test setting tap water start value."""
         entity = QvantumNumberEntity(
-            mock_coordinator, "tap_water_start", 50, 65, 1, mock_device
+            mock_coordinator, "tap_water_start", 50, 80, 1, mock_device
         )
 
         # Mock the API response
@@ -400,6 +441,61 @@ class TestQvantumNumberEntity:
             "test_device_123", start=58
         )
         # Note: async_set_updated_data would be called if the API response status was correct
+
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_tap_water_start_rejects_at_or_above_stop(
+        self, mock_coordinator, mock_device
+    ):
+        """Refuse start writes that would meet or exceed stop."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        mock_coordinator.data["values"]["tap_water_stop"] = 75
+        mock_coordinator.client.set_tap_water = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_start", 50, 80, 1, mock_device
+        )
+
+        with pytest.raises(HomeAssistantError, match="must be below stop"):
+            await entity.async_set_native_value(75.0)
+        mock_coordinator.client.set_tap_water.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_tap_water_stop_rejects_at_or_below_start(
+        self, mock_coordinator, mock_device
+    ):
+        """Refuse stop writes that would meet or fall below start."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        mock_coordinator.data["values"]["tap_water_start"] = 55
+        mock_coordinator.client.set_tap_water = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_stop", 50, 80, 1, mock_device
+        )
+
+        with pytest.raises(HomeAssistantError, match="must be below stop"):
+            await entity.async_set_native_value(55.0)
+        mock_coordinator.client.set_tap_water.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_tap_water_start_skips_check_without_stop(
+        self, mock_coordinator, mock_device
+    ):
+        """Missing stop does not block a start write."""
+        mock_coordinator.data["values"]["tap_water_stop"] = None
+        mock_coordinator.client.set_tap_water = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_start", 50, 80, 1, mock_device
+        )
+        await entity.async_set_native_value(60.0)
+        mock_coordinator.client.set_tap_water.assert_called_once_with(
+            "test_device_123", start=60
+        )
 
     @pytest.mark.asyncio
     async def test_async_set_native_value_fan_normal(
@@ -613,6 +709,13 @@ class TestNumberSetup:
             "fan_speed_2",
         ]
         assert entity_keys == expected_keys
+        by_key = {entity._metric_key: entity for entity in entities}
+        assert by_key["tap_water_start"]._attr_native_min_value == 50
+        assert by_key["tap_water_start"]._attr_native_max_value == 80
+        assert by_key["tap_water_start"].native_max_value == 74
+        assert by_key["tap_water_stop"]._attr_native_min_value == 50
+        assert by_key["tap_water_stop"]._attr_native_max_value == 80
+        assert by_key["tap_water_stop"].native_min_value == 56
 
 
 class TestRoomTempExternal:
