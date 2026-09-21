@@ -2,6 +2,8 @@
 
 from enum import IntEnum
 
+from homeassistant.exceptions import HomeAssistantError
+
 from .client.constants import (
     BASE_SYSTEM_POWER_W,
     HEATING_CURVE_HTTP_KEYS,
@@ -351,6 +353,22 @@ DHW_COMPRESSOR_STATE_HOT_WATER = (
 TAP_WATER_TEMP_MIN = 50
 TAP_WATER_TEMP_MAX = 80
 TAP_WATER_TEMP_STEP = 1
+
+
+def ensure_tap_water_start_below_stop(start: object, stop: object) -> None:
+    """Reject writes that would make DHW start >= stop."""
+    if start is None or stop is None:
+        return
+    try:
+        start_int = int(start)
+        stop_int = int(stop)
+    except (TypeError, ValueError):
+        return
+    if start_int >= stop_int:
+        raise HomeAssistantError(
+            f"DHW start temperature ({start_int} °C) must be below stop ({stop_int} °C)"
+        )
+
 
 # DHW capacity calculation defaults
 DHW_SHOWER_TEMP_C = 38.0  # Target shower temperature (°C) — +2°C from Qvantum app

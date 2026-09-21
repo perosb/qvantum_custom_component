@@ -27,6 +27,7 @@ from .const import (
     TAP_WATER_TEMP_MAX,
     TAP_WATER_TEMP_MIN,
     TAP_WATER_TEMP_STEP,
+    ensure_tap_water_start_below_stop,
 )
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumAccessMixin
@@ -168,16 +169,9 @@ class QvantumWaterHeaterEntity(
         if temperature is None:
             return
         stop = int(temperature)
-        start = self._values.get("tap_water_start")
-        if start is not None:
-            try:
-                start_int = int(start)
-            except (TypeError, ValueError):
-                start_int = None
-            if start_int is not None and stop <= start_int:
-                raise HomeAssistantError(
-                    f"DHW start temperature ({start_int} °C) must be below stop ({stop} °C)"
-                )
+        ensure_tap_water_start_below_stop(
+            self._values.get("tap_water_start"), stop
+        )
         response = await self.coordinator.client.set_tap_water(self._hpid, stop=stop)
         await handle_setting_update_response(
             response,

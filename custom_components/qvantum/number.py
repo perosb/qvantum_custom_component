@@ -18,6 +18,7 @@ from .const import (
     TAP_WATER_TEMP_MAX,
     TAP_WATER_TEMP_MIN,
     TAP_WATER_TEMP_STEP,
+    ensure_tap_water_start_below_stop,
 )
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity
@@ -33,18 +34,6 @@ def _as_int(value: object) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def _ensure_tap_water_start_below_stop(start: object, stop: object) -> None:
-    """Reject writes that would make DHW start >= stop."""
-    start_int = _as_int(start)
-    stop_int = _as_int(stop)
-    if start_int is None or stop_int is None:
-        return
-    if start_int >= stop_int:
-        raise HomeAssistantError(
-            f"DHW start temperature ({start_int} °C) must be below stop ({stop_int} °C)"
-        )
 
 
 # Metrics that require writing via Modbus holding registers.
@@ -194,7 +183,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 )
             case "tap_water_stop":
                 coordinator_update_value = int(value)
-                _ensure_tap_water_start_below_stop(
+                ensure_tap_water_start_below_stop(
                     self._values.get("tap_water_start"), coordinator_update_value
                 )
                 response = await self.coordinator.client.set_tap_water(
@@ -202,7 +191,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 )
             case "tap_water_start":
                 coordinator_update_value = int(value)
-                _ensure_tap_water_start_below_stop(
+                ensure_tap_water_start_below_stop(
                     coordinator_update_value, self._values.get("tap_water_stop")
                 )
                 response = await self.coordinator.client.set_tap_water(
