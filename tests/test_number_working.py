@@ -14,27 +14,20 @@ class MockNumberEntity:
     pass
 
 
-# Mock EntityCategory
-class MockEntityCategory:
-    class DIAGNOSTIC:
-        name = "DIAGNOSTIC"
-
-
 # Patch the imports before importing the number module
 with patch(
     "homeassistant.helpers.update_coordinator.CoordinatorEntity", MockCoordinatorEntity
 ):
     with patch("homeassistant.components.number.NumberEntity", MockNumberEntity):
-        with patch("homeassistant.const.EntityCategory", MockEntityCategory):
-            from homeassistant.helpers.device_registry import DeviceInfo
-            from homeassistant.const import UnitOfTemperature
-            from homeassistant.components.number import NumberDeviceClass
+        from homeassistant.helpers.device_registry import DeviceInfo
+        from homeassistant.const import UnitOfTemperature
+        from homeassistant.components.number import NumberDeviceClass
 
-            from custom_components.qvantum.number import (
-                QvantumNumberEntity,
-                async_setup_entry,
-            )
-            from custom_components.qvantum.const import HeatingCurveType, SensorMode
+        from custom_components.qvantum.number import (
+            QvantumNumberEntity,
+            async_setup_entry,
+        )
+        from custom_components.qvantum.const import HeatingCurveType, SensorMode
 
 
 @pytest.fixture

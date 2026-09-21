@@ -3,12 +3,11 @@
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberDeviceClass
-from homeassistant.const import UnitOfEnergy, UnitOfTemperature, EntityCategory
+from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
