@@ -24,6 +24,9 @@ from .const import (
     DHW_MODE_EXTRA,
     DHW_MODE_NORMAL,
     DHW_MODE_SMART,
+    TAP_WATER_TEMP_MAX,
+    TAP_WATER_TEMP_MIN,
+    TAP_WATER_TEMP_STEP,
 )
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumAccessMixin
@@ -48,11 +51,6 @@ OPERATION_TO_DHW_MODE = {v: k for k, v in DHW_MODE_TO_OPERATION.items()}
 
 # Prefer tank top sensor, then other VV tank sensors (not cold inlet bt33).
 CURRENT_TEMPERATURE_KEYS = ("bt30", "bt31", "bt34")
-
-# Match number.tap_water_stop limits.
-TAP_WATER_STOP_MIN = 60
-TAP_WATER_STOP_MAX = 80
-TAP_WATER_STOP_STEP = 1
 
 # Indefinite extra DHW — same as switch.extra_tap_water turn_on.
 EXTRA_DHW_INDEFINITE_MINUTES = -1
@@ -89,9 +87,9 @@ class QvantumWaterHeaterEntity(
         self._attr_unique_id = f"qvantum_water_heater_{self._hpid}"
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_precision = PRECISION_WHOLE
-        self._attr_target_temperature_step = float(TAP_WATER_STOP_STEP)
-        self._attr_min_temp = float(TAP_WATER_STOP_MIN)
-        self._attr_max_temp = float(TAP_WATER_STOP_MAX)
+        self._attr_target_temperature_step = float(TAP_WATER_TEMP_STEP)
+        self._attr_min_temp = float(TAP_WATER_TEMP_MIN)
+        self._attr_max_temp = float(TAP_WATER_TEMP_MAX)
         self._attr_device_info = device
         self._attr_translation_key = "dhw"
         self._attr_has_entity_name = True
@@ -128,6 +126,24 @@ class QvantumWaterHeaterEntity(
         return None
 
     @property
+    def min_temp(self) -> float:
+        """Return min target; stop stays above the current start temperature."""
+        floor = float(TAP_WATER_TEMP_MIN)
+        ceiling = float(TAP_WATER_TEMP_MAX)
+        start = self._values.get("tap_water_start")
+        if start is None:
+            return floor
+        try:
+            return min(ceiling, max(floor, float(start) + TAP_WATER_TEMP_STEP))
+        except (TypeError, ValueError):
+            return floor
+
+    @property
+    def max_temp(self) -> float:
+        """Return max DHW stop temperature."""
+        return float(TAP_WATER_TEMP_MAX)
+
+    @property
     def target_temperature(self) -> float | None:
         """DHW stop temperature (tap_water_stop)."""
         stop = self._values.get("tap_water_stop")
@@ -152,6 +168,16 @@ class QvantumWaterHeaterEntity(
         if temperature is None:
             return
         stop = int(temperature)
+        start = self._values.get("tap_water_start")
+        if start is not None:
+            try:
+                start_int = int(start)
+            except (TypeError, ValueError):
+                start_int = None
+            if start_int is not None and stop <= start_int:
+                raise HomeAssistantError(
+                    f"DHW start temperature ({start_int} °C) must be below stop ({stop} °C)"
+                )
         response = await self.coordinator.client.set_tap_water(self._hpid, stop=stop)
         await handle_setting_update_response(
             response,

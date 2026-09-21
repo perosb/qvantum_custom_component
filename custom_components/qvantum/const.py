@@ -347,6 +347,11 @@ DHW_COMPRESSOR_STATE_HOT_WATER = (
     8  # compressor_state value indicating active DHW heating
 )
 
+# DHW Normal start/stop (holdings 56/57), °C. Start must stay below stop.
+TAP_WATER_TEMP_MIN = 50
+TAP_WATER_TEMP_MAX = 80
+TAP_WATER_TEMP_STEP = 1
+
 # DHW capacity calculation defaults
 DHW_SHOWER_TEMP_C = 38.0  # Target shower temperature (°C) — +2°C from Qvantum app
 DHW_TANK_VOLUME_L = 175  # Hot water tank volume (L) — buffer tank per installer spec

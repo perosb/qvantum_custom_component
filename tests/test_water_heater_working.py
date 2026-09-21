@@ -155,8 +155,10 @@ class TestQvantumWaterHeaterEntity:
         assert entity._hpid == "test_device_123"
         assert entity._attr_unique_id == "qvantum_water_heater_test_device_123"
         assert entity._attr_translation_key == "dhw"
-        assert entity._attr_min_temp == 60
+        assert entity._attr_min_temp == 50
         assert entity._attr_max_temp == 80
+        assert entity.min_temp == 50
+        assert entity.max_temp == 80
 
     def test_current_temperature_prefers_bt30(self, mock_coordinator, mock_device):
         mock_coordinator.data["values"]["bt31"] = 50.0
@@ -172,6 +174,17 @@ class TestQvantumWaterHeaterEntity:
     def test_target_temperature(self, mock_coordinator, mock_device):
         entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
         assert entity.target_temperature == 62.0
+
+    def test_min_temp_follows_start(self, mock_coordinator, mock_device):
+        mock_coordinator.data["values"]["tap_water_start"] = 55
+        entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
+        assert entity.min_temp == 56
+        assert entity.max_temp == 80
+
+    def test_min_temp_ignores_unconvertible_start(self, mock_coordinator, mock_device):
+        mock_coordinator.data["values"]["tap_water_start"] = "hot"
+        entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
+        assert entity.min_temp == 50
 
     def test_current_operation_cloud_normal(self, mock_coordinator, mock_device):
         entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
@@ -212,6 +225,27 @@ class TestQvantumWaterHeaterEntity:
             "test_device_123", stop=70
         )
         assert mock_coordinator.data["values"]["tap_water_stop"] == 70
+
+    @pytest.mark.asyncio
+    async def test_set_temperature_rejects_at_or_below_start(
+        self, mock_coordinator, mock_device
+    ):
+        mock_coordinator.data["values"]["tap_water_start"] = 55
+        entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
+        with pytest.raises(HomeAssistantError, match="must be below stop"):
+            await entity.async_set_temperature(temperature=55)
+        mock_coordinator.client.set_tap_water.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_set_temperature_ignores_unconvertible_start(
+        self, mock_coordinator, mock_device
+    ):
+        mock_coordinator.data["values"]["tap_water_start"] = "hot"
+        entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
+        await entity.async_set_temperature(temperature=70)
+        mock_coordinator.client.set_tap_water.assert_awaited_once_with(
+            "test_device_123", stop=70
+        )
 
     @pytest.mark.asyncio
     async def test_set_operation_extra(self, mock_coordinator, mock_device):
