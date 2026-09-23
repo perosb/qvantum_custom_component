@@ -146,6 +146,9 @@ posting comments when you are asked to review.
   approve unless asked. You cannot approve your own PR. Do not merge unless
   asked.
 - Review comments are English, matching PR titles and Copilot.
+- When you address a review comment and push the fix, resolve the corresponding
+  GitHub review thread (`resolveReviewThread` GraphQL mutation) so only threads
+  that still need work stay open.
 
 Suggestion block:
 
