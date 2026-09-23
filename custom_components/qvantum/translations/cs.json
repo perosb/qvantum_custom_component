@@ -668,7 +668,8 @@
     "title": "Qvantum tepelné čerpadlo",
     "abort": {
       "already_configured": "Zařízení je již nakonfigurováno",
-      "reconfigure_successful": "Znovu nastavení proběhlo úspěšně"
+      "reconfigure_successful": "Znovu nastavení proběhlo úspěšně",
+      "reauth_successful": "Opětovné přihlášení proběhlo úspěšně"
     },
     "error": {
       "cannot_connect": "Nepodařilo se připojit",
@@ -733,6 +734,14 @@
           "modbus_unit_id": "ID jednotky",
           "modbus_scan_interval": "Interval dotazování Modbus (sekundy)",
           "modbus_write": "Povolit zápis přes Modbus"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Qvantum cloud",
+        "description": "Přihlaste se znovu ke svému účtu Qvantum.",
+        "data": {
+          "password": "Heslo",
+          "username": "Uživatelské jméno"
         }
       }
     }

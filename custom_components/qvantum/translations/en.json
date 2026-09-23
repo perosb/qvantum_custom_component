@@ -668,7 +668,8 @@
     "title": "Qvantum Heat pump",
     "abort": {
       "already_configured": "Device is already configured",
-      "reconfigure_successful": "Reconfiguration successful"
+      "reconfigure_successful": "Reconfiguration successful",
+      "reauth_successful": "Reauthentication successful"
     },
     "error": {
       "cannot_connect": "Failed to connect",
@@ -733,6 +734,14 @@
           "modbus_unit_id": "Unit ID",
           "modbus_scan_interval": "Scan interval (seconds)",
           "modbus_write": "Enable writing via Modbus"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Qvantum cloud",
+        "description": "Sign in again with your Qvantum account.",
+        "data": {
+          "password": "Password",
+          "username": "Username"
         }
       }
     }

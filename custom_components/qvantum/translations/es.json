@@ -668,7 +668,8 @@
     "title": "Bomba de calor Qvantum",
     "abort": {
       "already_configured": "El dispositivo ya está configurado",
-      "reconfigure_successful": "Reconfiguración correcta"
+      "reconfigure_successful": "Reconfiguración correcta",
+      "reauth_successful": "Reautenticación correcta"
     },
     "error": {
       "cannot_connect": "Error al conectar",
@@ -733,6 +734,14 @@
           "modbus_unit_id": "ID de unidad",
           "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)",
           "modbus_write": "Activar escritura mediante Modbus"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Nube Qvantum",
+        "description": "Inicia sesión de nuevo con tu cuenta Qvantum.",
+        "data": {
+          "password": "Contraseña",
+          "username": "Nombre de usuario"
         }
       }
     }

@@ -13,7 +13,7 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
 
@@ -843,7 +843,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._logged_device_id(),
                 err,
             )
-            raise UpdateFailed(f"Authentication failed: {err}") from err
+            if self.modbus_enabled:
+                raise UpdateFailed(f"Authentication failed: {err}") from err
+            raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
         except APIConnectionError as err:
             _LOGGER.error(
                 "Error communicating with API for device %s: %s",

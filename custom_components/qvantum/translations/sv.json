@@ -668,7 +668,8 @@
     "title": "Qvantum Frånluftsvärmepump",
     "abort": {
       "already_configured": "Enheten är redan konfigurerad",
-      "reconfigure_successful": "Omkonfiguration lyckades"
+      "reconfigure_successful": "Omkonfiguration lyckades",
+      "reauth_successful": "Återinloggning lyckades"
     },
     "error": {
       "cannot_connect": "Kunde inte ansluta",
@@ -733,6 +734,14 @@
           "modbus_unit_id": "Enhets-ID",
           "modbus_scan_interval": "Modbus-skanningsintervall (sekunder)",
           "modbus_write": "Aktivera skrivning via Modbus"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Qvantum-moln",
+        "description": "Logga in igen med ditt Qvantum-konto.",
+        "data": {
+          "password": "Lösenord",
+          "username": "Användarnamn"
         }
       }
     }

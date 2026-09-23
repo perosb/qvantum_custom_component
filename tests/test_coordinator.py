@@ -12,6 +12,7 @@ from custom_components.qvantum.coordinator import (
     _firmware_metadata_from_sw_version,
 )
 from tests.conftest import make_client_mock
+from custom_components.qvantum.client.exceptions import APIAuthError
 from custom_components.qvantum.const import (
     DHW_MODE_EXTRA,
     DHW_MODE_NORMAL,
@@ -1254,6 +1255,67 @@ class TestHpStatusPostProcessing:
         coordinator = self._make_coordinator(mock_super_init, {"hp_status": 0})
         result = await coordinator.async_update_data()
         assert "alarm_active" not in result["values"]
+
+
+class TestAuthFailureHandling:
+    """Cloud auth failures trigger reauth; Modbus mode keeps polling."""
+
+    def _make_coordinator(self, mock_super_init, *, modbus):
+        mock_super_init.return_value = None
+
+        mock_api = make_client_mock(modbus=modbus)
+        mock_api.probe_identity = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.get_metrics = AsyncMock(
+            side_effect=APIAuthError(None, "token refresh failed")
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+
+        mock_config_entry = MagicMock()
+        if modbus:
+            mock_config_entry.options.get.side_effect = _modbus_options_get
+        else:
+            mock_config_entry.options.get.return_value = None
+        mock_config_entry.data = {}
+        mock_config_entry.unique_id = "test_device_123"
+
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, mock_config_entry, client=make_client_mock()
+        )
+        coordinator.client = mock_api
+        coordinator.hass = mock_hass
+        return coordinator
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_cloud_auth_error_raises_config_entry_auth_failed(
+        self, mock_super_init
+    ):
+        """Cloud mode must start a reauth flow instead of retrying forever."""
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
+        coordinator = self._make_coordinator(mock_super_init, modbus=False)
+
+        with pytest.raises(ConfigEntryAuthFailed):
+            await coordinator.async_update_data()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_modbus_auth_error_stays_update_failed(self, mock_super_init):
+        """Modbus mode must never trigger a cloud reauth flow."""
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        coordinator = self._make_coordinator(mock_super_init, modbus=True)
+
+        with pytest.raises(UpdateFailed):
+            await coordinator.async_update_data()
 
 
 class TestDeriveTapWaterCapacity:

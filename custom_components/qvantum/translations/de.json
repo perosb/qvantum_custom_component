@@ -668,7 +668,8 @@
     "title": "Qvantum Wärmepumpe",
     "abort": {
       "already_configured": "Gerät ist bereits konfiguriert",
-      "reconfigure_successful": "Rekonfiguration erfolgreich"
+      "reconfigure_successful": "Rekonfiguration erfolgreich",
+      "reauth_successful": "Erneute Anmeldung erfolgreich"
     },
     "error": {
       "cannot_connect": "Verbindung fehlgeschlagen",
@@ -733,6 +734,14 @@
           "modbus_unit_id": "Geräte-ID",
           "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)",
           "modbus_write": "Schreiben über Modbus aktivieren"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Qvantum Cloud",
+        "description": "Melden Sie sich erneut mit Ihrem Qvantum-Konto an.",
+        "data": {
+          "password": "Passwort",
+          "username": "Benutzername"
         }
       }
     }

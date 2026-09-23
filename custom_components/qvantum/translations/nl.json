@@ -668,7 +668,8 @@
     "title": "Qvantum Warmtepomp",
     "abort": {
       "already_configured": "Apparaat is al geconfigureerd",
-      "reconfigure_successful": "Herconfiguratie succesvol"
+      "reconfigure_successful": "Herconfiguratie succesvol",
+      "reauth_successful": "Opnieuw aanmelden geslaagd"
     },
     "error": {
       "cannot_connect": "Kan niet verbinden",
@@ -733,6 +734,14 @@
           "modbus_unit_id": "Unit-ID",
           "modbus_scan_interval": "Modbus-scaninterval (seconden)",
           "modbus_write": "Schrijven via Modbus inschakelen"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Qvantum-cloud",
+        "description": "Meld u opnieuw aan met uw Qvantum-account.",
+        "data": {
+          "password": "Wachtwoord",
+          "username": "Gebruikersnaam"
         }
       }
     }

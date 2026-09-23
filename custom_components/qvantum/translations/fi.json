@@ -668,7 +668,8 @@
     "title": "Qvantum lämpöpumppu",
     "abort": {
       "already_configured": "Laite on jo määritetty",
-      "reconfigure_successful": "Uudelleenmääritys onnistui"
+      "reconfigure_successful": "Uudelleenmääritys onnistui",
+      "reauth_successful": "Uudelleenkirjautuminen onnistui"
     },
     "error": {
       "cannot_connect": "Yhdistäminen epäonnistui",
@@ -733,6 +734,14 @@
           "modbus_unit_id": "Yksikkö-ID",
           "modbus_scan_interval": "Modbus-skannausväli (sekuntia)",
           "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Qvantum-pilvi",
+        "description": "Kirjaudu uudelleen Qvantum-tililläsi.",
+        "data": {
+          "password": "Salasana",
+          "username": "Käyttäjätunnus"
         }
       }
     }

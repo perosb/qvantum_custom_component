@@ -284,15 +284,15 @@ class TestQvantumMaintenanceCoordinator:
     async def test_async_check_firmware_updates_auth_error_http_still_fails(
         self, maintenance_coordinator, mock_main_coordinator
     ):
-        """HTTP mode still treats authentication errors as a failed update."""
-        from homeassistant.helpers.update_coordinator import UpdateFailed
+        """HTTP mode turns authentication errors into a reauth flow."""
+        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         mock_main_coordinator.modbus_enabled = False
         maintenance_coordinator.client.get_device_metadata = AsyncMock(
             side_effect=APIAuthError(None, "token refresh failed")
         )
 
-        with pytest.raises(UpdateFailed):
+        with pytest.raises(ConfigEntryAuthFailed):
             await maintenance_coordinator.async_check_firmware_updates()
 
     @pytest.mark.asyncio
