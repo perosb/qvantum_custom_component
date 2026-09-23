@@ -668,7 +668,9 @@
     "title": "Qvantum varmepumpe",
     "abort": {
       "already_configured": "Enheden er allerede konfigureret",
-      "reconfigure_successful": "Genkonfiguration lykkedes"
+      "reconfigure_successful": "Genkonfiguration lykkedes",
+      "reauth_successful": "Log ind igen lykkedes",
+      "wrong_account": "Legitimationsoplysningerne tilhører en anden Qvantum-konto end denne post"
     },
     "error": {
       "cannot_connect": "Kunne ikke oprette forbindelse",
@@ -733,6 +735,14 @@
           "modbus_unit_id": "Enheds-ID",
           "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)",
           "modbus_write": "Aktivér skrivning via Modbus"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Qvantum-sky",
+        "description": "Log ind igen med din Qvantum-konto.",
+        "data": {
+          "password": "Adgangskode",
+          "username": "Brugernavn"
         }
       }
     }

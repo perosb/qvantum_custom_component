@@ -668,7 +668,9 @@
     "title": "Pompe à chaleur Qvantum",
     "abort": {
       "already_configured": "L'appareil est déjà configuré",
-      "reconfigure_successful": "Reconfiguration réussie"
+      "reconfigure_successful": "Reconfiguration réussie",
+      "reauth_successful": "Réauthentification réussie",
+      "wrong_account": "Les identifiants appartiennent à un compte Qvantum différent de cette entrée"
     },
     "error": {
       "cannot_connect": "Échec de connexion",
@@ -733,6 +735,14 @@
           "modbus_unit_id": "ID d'unité",
           "modbus_scan_interval": "Intervalle de scan Modbus (secondes)",
           "modbus_write": "Activer l'écriture via Modbus"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Cloud Qvantum",
+        "description": "Reconnectez-vous avec votre compte Qvantum.",
+        "data": {
+          "password": "Mot de passe",
+          "username": "Nom d'utilisateur"
         }
       }
     }

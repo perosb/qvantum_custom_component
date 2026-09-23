@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.qvantum.client.modbus.device import IdentityProbeError
@@ -678,6 +679,104 @@ class TestQvantumConfigFlow:
         assert defaults["modbus_port"] == 1502
         assert defaults["modbus_unit_id"] == 9
         assert defaults["modbus_write"] is True
+
+    def _prepare_reauth(self, hass, config_flow):
+        from homeassistant.config_entries import SOURCE_REAUTH
+
+        config_entry = MagicMock()
+        config_entry.entry_id = "test_entry_id"
+        config_entry.unique_id = "12345"
+        config_entry.data = {
+            "username": "old@example.com",
+            "password": "oldpass",
+            "modbus_tcp": False,
+            "modbus_write": False,
+        }
+        config_entry.update_listeners = []
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_get_known_entry.return_value = config_entry
+        config_flow.context = {
+            "source": SOURCE_REAUTH,
+            "entry_id": config_entry.entry_id,
+        }
+        return config_entry
+
+    @pytest.mark.asyncio
+    async def test_reauth_step_shows_confirm_form(self, hass, config_flow):
+        self._prepare_reauth(hass, config_flow)
+
+        result = await config_flow.async_step_reauth(
+            {"username": "old@example.com", "password": "oldpass"}
+        )
+
+        assert result["type"] == "form"
+        assert result["step_id"] == "reauth_confirm"
+        assert _schema_defaults(result)["username"] == "old@example.com"
+
+    @pytest.mark.asyncio
+    async def test_reauth_confirm_updates_credentials(self, hass, config_flow):
+        entry = self._prepare_reauth(hass, config_flow)
+
+        with patch(
+            "custom_components.qvantum.config_flow.validate_input",
+            AsyncMock(return_value={"title": "Qvantum", "serial": "12345"}),
+        ):
+            result = await config_flow.async_step_reauth_confirm(
+                {"username": "new@example.com", "password": "newpass"}
+            )
+
+        assert result["type"] == "abort"
+        assert result["reason"] == "reauth_successful"
+        updated = hass.config_entries.async_update_entry.call_args.kwargs["data"]
+        assert updated["username"] == "new@example.com"
+        assert updated["password"] == "newpass"
+        assert updated["modbus_tcp"] is False
+        hass.config_entries.async_schedule_reload.assert_called_once_with(
+            entry.entry_id
+        )
+
+    @pytest.mark.asyncio
+    async def test_reauth_confirm_aborts_on_serial_mismatch(self, hass, config_flow):
+        self._prepare_reauth(hass, config_flow)
+
+        with patch(
+            "custom_components.qvantum.config_flow.validate_input",
+            AsyncMock(return_value={"title": "Qvantum", "serial": "99999"}),
+        ):
+            with pytest.raises(AbortFlow) as exc_info:
+                await config_flow.async_step_reauth_confirm(
+                    {"username": "other@example.com", "password": "otherpass"}
+                )
+
+        assert exc_info.value.reason == "wrong_account"
+        hass.config_entries.async_update_entry.assert_not_called()
+        hass.config_entries.async_schedule_reload.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("error", "expected"),
+        [
+            (CannotConnect(), "cannot_connect"),
+            (InvalidAuth(), "invalid_auth"),
+            (RuntimeError("boom"), "unknown"),
+        ],
+    )
+    async def test_reauth_confirm_error_branches(
+        self, hass, config_flow, error, expected
+    ):
+        self._prepare_reauth(hass, config_flow)
+
+        with patch(
+            "custom_components.qvantum.config_flow.validate_input",
+            AsyncMock(side_effect=error),
+        ):
+            result = await config_flow.async_step_reauth_confirm(
+                {"username": "new@example.com", "password": "newpass"}
+            )
+
+        assert result["type"] == "form"
+        assert result["step_id"] == "reauth_confirm"
+        assert result["errors"]["base"] == expected
 
 
 class TestQvantumOptionsFlow:

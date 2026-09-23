@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from .coordinator import QvantumDataUpdateCoordinator
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .client.cloud import QvantumCloudClient
@@ -129,7 +130,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
             if getattr(self.main_coordinator, "modbus_enabled", False):
                 return self._cloud_unavailable_result(err)
             _LOGGER.error("Authentication error during firmware check: %s", err)
-            raise UpdateFailed(err) from err
+            raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
         except Exception as err:
             if getattr(self.main_coordinator, "modbus_enabled", False):
                 return self._cloud_unavailable_result(err)
