@@ -669,7 +669,8 @@
     "abort": {
       "already_configured": "Zařízení je již nakonfigurováno",
       "reconfigure_successful": "Znovu nastavení proběhlo úspěšně",
-      "reauth_successful": "Opětovné přihlášení proběhlo úspěšně"
+      "reauth_successful": "Opětovné přihlášení proběhlo úspěšně",
+      "wrong_account": "Přihlašovací údaje patří k jinému účtu Qvantum než tento záznam"
     },
     "error": {
       "cannot_connect": "Nepodařilo se připojit",

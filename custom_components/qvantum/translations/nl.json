@@ -669,7 +669,8 @@
     "abort": {
       "already_configured": "Apparaat is al geconfigureerd",
       "reconfigure_successful": "Herconfiguratie succesvol",
-      "reauth_successful": "Opnieuw aanmelden geslaagd"
+      "reauth_successful": "Opnieuw aanmelden geslaagd",
+      "wrong_account": "De inloggegevens horen bij een ander Qvantum-account dan dit item"
     },
     "error": {
       "cannot_connect": "Kan niet verbinden",

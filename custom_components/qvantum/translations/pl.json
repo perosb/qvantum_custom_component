@@ -669,7 +669,8 @@
     "abort": {
       "already_configured": "Urządzenie jest już skonfigurowane",
       "reconfigure_successful": "Rekonfiguracja powiodła się",
-      "reauth_successful": "Ponowne uwierzytelnienie powiodło się"
+      "reauth_successful": "Ponowne uwierzytelnienie powiodło się",
+      "wrong_account": "Dane logowania należą do innego konta Qvantum niż ten wpis"
     },
     "error": {
       "cannot_connect": "Nie udało się połączyć",

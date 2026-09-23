@@ -130,9 +130,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
             if getattr(self.main_coordinator, "modbus_enabled", False):
                 return self._cloud_unavailable_result(err)
             _LOGGER.error("Authentication error during firmware check: %s", err)
-            raise ConfigEntryAuthFailed(
-                f"Authentication failed: {err}"
-            ) from err
+            raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
         except Exception as err:
             if getattr(self.main_coordinator, "modbus_enabled", False):
                 return self._cloud_unavailable_result(err)

@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.qvantum.client.modbus.device import IdentityProbeError
@@ -684,6 +685,7 @@ class TestQvantumConfigFlow:
 
         config_entry = MagicMock()
         config_entry.entry_id = "test_entry_id"
+        config_entry.unique_id = "12345"
         config_entry.data = {
             "username": "old@example.com",
             "password": "oldpass",
@@ -732,6 +734,23 @@ class TestQvantumConfigFlow:
         hass.config_entries.async_schedule_reload.assert_called_once_with(
             entry.entry_id
         )
+
+    @pytest.mark.asyncio
+    async def test_reauth_confirm_aborts_on_serial_mismatch(self, hass, config_flow):
+        self._prepare_reauth(hass, config_flow)
+
+        with patch(
+            "custom_components.qvantum.config_flow.validate_input",
+            AsyncMock(return_value={"title": "Qvantum", "serial": "99999"}),
+        ):
+            with pytest.raises(AbortFlow) as exc_info:
+                await config_flow.async_step_reauth_confirm(
+                    {"username": "other@example.com", "password": "otherpass"}
+                )
+
+        assert exc_info.value.reason == "wrong_account"
+        hass.config_entries.async_update_entry.assert_not_called()
+        hass.config_entries.async_schedule_reload.assert_not_called()
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

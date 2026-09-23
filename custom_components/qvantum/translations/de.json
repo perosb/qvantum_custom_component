@@ -669,7 +669,8 @@
     "abort": {
       "already_configured": "Gerät ist bereits konfiguriert",
       "reconfigure_successful": "Rekonfiguration erfolgreich",
-      "reauth_successful": "Erneute Anmeldung erfolgreich"
+      "reauth_successful": "Erneute Anmeldung erfolgreich",
+      "wrong_account": "Die Zugangsdaten gehören zu einem anderen Qvantum-Konto als diesem Eintrag"
     },
     "error": {
       "cannot_connect": "Verbindung fehlgeschlagen",

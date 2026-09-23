@@ -669,7 +669,8 @@
     "abort": {
       "already_configured": "Az eszköz már konfigurálva van",
       "reconfigure_successful": "Újrakonfigurálás sikeres",
-      "reauth_successful": "Újbóli hitelesítés sikeres"
+      "reauth_successful": "Újbóli hitelesítés sikeres",
+      "wrong_account": "A hitelesítő adatok egy másik Qvantum-fiókhoz tartoznak, mint ez a bejegyzés"
     },
     "error": {
       "cannot_connect": "Sikertelen csatlakozás",

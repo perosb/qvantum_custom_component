@@ -669,7 +669,8 @@
     "abort": {
       "already_configured": "Laite on jo määritetty",
       "reconfigure_successful": "Uudelleenmääritys onnistui",
-      "reauth_successful": "Uudelleenkirjautuminen onnistui"
+      "reauth_successful": "Uudelleenkirjautuminen onnistui",
+      "wrong_account": "Kirjautumistiedot kuuluvat eri Qvantum-tilille kuin tämä merkintä"
     },
     "error": {
       "cannot_connect": "Yhdistäminen epäonnistui",

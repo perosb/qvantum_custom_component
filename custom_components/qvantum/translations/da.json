@@ -669,7 +669,8 @@
     "abort": {
       "already_configured": "Enheden er allerede konfigureret",
       "reconfigure_successful": "Genkonfiguration lykkedes",
-      "reauth_successful": "Log ind igen lykkedes"
+      "reauth_successful": "Log ind igen lykkedes",
+      "wrong_account": "Legitimationsoplysningerne tilhører en anden Qvantum-konto end denne post"
     },
     "error": {
       "cannot_connect": "Kunne ikke oprette forbindelse",
