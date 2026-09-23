@@ -107,7 +107,7 @@ class TestQvantumBaseSensorEntity:
     def test_state(self, mock_coordinator, mock_device):
         """Test getting entity state."""
         entity = QvantumBaseSensorEntity(mock_coordinator, "bt1", mock_device, True)
-        assert entity.state == 20.5
+        assert entity.native_value == 20.5
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test entity availability when data exists."""
@@ -223,7 +223,7 @@ class TestQvantumTemperatureEntity:
         assert entity._attr_device_class == SensorDeviceClass.TEMPERATURE
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
-        assert entity.state == 20.5
+        assert entity.native_value == 20.5
 
 
 class TestQvantumEnergyEntity:
@@ -245,7 +245,7 @@ class TestQvantumEnergyEntity:
         assert entity._attr_device_class == SensorDeviceClass.ENERGY
         assert entity._attr_native_unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
         assert entity._attr_state_class == SensorStateClass.TOTAL_INCREASING
-        assert entity.state == expected_state
+        assert entity.native_value == expected_state
 
     def test_available_with_positive_value(self, mock_coordinator, mock_device):
         """Test availability when energy value is positive."""
@@ -260,7 +260,7 @@ class TestQvantumEnergyEntity:
         entity = QvantumEnergyEntity(
             mock_coordinator, "compressorenergy", mock_device, True
         )
-        assert entity.state == 0
+        assert entity.native_value == 0
         assert entity.available is True
 
 
@@ -283,7 +283,7 @@ class TestQvantumPowerEntity:
         assert entity._attr_native_unit_of_measurement == UnitOfPower.WATT
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
         assert not hasattr(entity, "_attr_suggested_display_precision")
-        assert entity.state == expected_state
+        assert entity.native_value == expected_state
 
 
 class TestQvantumPressureEntity:
@@ -298,7 +298,7 @@ class TestQvantumPressureEntity:
         assert entity._attr_device_class == SensorDeviceClass.PRESSURE
         assert entity._attr_native_unit_of_measurement == UnitOfPressure.BAR
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
-        assert entity.state == 2.1
+        assert entity.native_value == 2.1
 
     def test_available_with_positive_value(self, mock_coordinator, mock_device):
         """Test availability when pressure value is positive."""
@@ -334,7 +334,7 @@ class TestQvantumCurrentEntity:
         assert entity._attr_device_class == SensorDeviceClass.CURRENT
         assert entity._attr_native_unit_of_measurement == UnitOfElectricCurrent.AMPERE
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
-        assert entity.state == 5.2
+        assert entity.native_value == 5.2
 
 class TestQvantumTotalEnergyEntity:
     """Test the QvantumTotalEnergyEntity class."""
@@ -347,7 +347,7 @@ class TestQvantumTotalEnergyEntity:
         assert entity._attr_device_class == SensorDeviceClass.ENERGY
         assert entity._attr_native_unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
         assert entity._attr_state_class == SensorStateClass.TOTAL_INCREASING
-        assert entity.state == 150  # 100 + 50
+        assert entity.native_value == 150  # 100 + 50
 
     def test_available_with_data(self, mock_coordinator, mock_device):
         """Test availability when compressor energy data exists."""
@@ -370,7 +370,7 @@ class TestQvantumTotalEnergyEntity:
         entity = QvantumTotalEnergyEntity(
             mock_coordinator, "totalenergy", mock_device, True
         )
-        assert entity.state is None
+        assert entity.native_value is None
         assert entity.available is False
 
     def test_unavailable_when_both_components_zero(self, mock_coordinator, mock_device):
@@ -380,7 +380,7 @@ class TestQvantumTotalEnergyEntity:
         entity = QvantumTotalEnergyEntity(
             mock_coordinator, "totalenergy", mock_device, True
         )
-        assert entity.state is None
+        assert entity.native_value is None
         assert entity.available is False
 
 

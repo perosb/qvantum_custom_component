@@ -147,7 +147,7 @@ class TestQvantumBaseSensorEntity:
     def test_state(self, mock_coordinator, mock_device):
         """Test getting entity state."""
         entity = QvantumBaseSensorEntity(mock_coordinator, "bt1", mock_device, True)
-        assert entity.state == 20.5
+        assert entity.native_value == 20.5
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test entity availability when data exists."""
@@ -236,7 +236,7 @@ class TestQvantumTemperatureEntity:
         assert entity._attr_device_class == SensorDeviceClass.TEMPERATURE
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
-        assert entity.state == 20.5
+        assert entity.native_value == 20.5
 
 
 class TestQvantumEnergyEntity:
@@ -258,7 +258,7 @@ class TestQvantumEnergyEntity:
         assert entity._attr_device_class == SensorDeviceClass.ENERGY
         assert entity._attr_native_unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
         assert entity._attr_state_class == SensorStateClass.TOTAL_INCREASING
-        assert entity.state == expected_state
+        assert entity.native_value == expected_state
 
     def test_available_with_positive_value(self, mock_coordinator, mock_device):
         """Test availability when energy value is positive."""
@@ -294,7 +294,7 @@ class TestQvantumPowerEntity:
         assert entity._attr_device_class == SensorDeviceClass.POWER
         assert entity._attr_native_unit_of_measurement == UnitOfPower.WATT
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
-        assert entity.state == expected_state
+        assert entity.native_value == expected_state
 
 
 class TestQvantumPressureEntity:
@@ -309,7 +309,7 @@ class TestQvantumPressureEntity:
         assert entity._attr_device_class == SensorDeviceClass.PRESSURE
         assert entity._attr_native_unit_of_measurement == UnitOfPressure.BAR
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
-        assert entity.state == 2.1
+        assert entity.native_value == 2.1
 
     def test_available_with_positive_value(self, mock_coordinator, mock_device):
         """Test availability when pressure value is positive."""
@@ -345,7 +345,7 @@ class TestQvantumCurrentEntity:
         assert entity._attr_device_class == SensorDeviceClass.CURRENT
         assert entity._attr_native_unit_of_measurement == UnitOfElectricCurrent.AMPERE
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
-        assert entity.state == 5.2
+        assert entity.native_value == 5.2
 
 class TestQvantumTotalEnergyEntity:
     """Test the QvantumTotalEnergyEntity class."""
@@ -358,7 +358,7 @@ class TestQvantumTotalEnergyEntity:
         assert entity._attr_device_class == SensorDeviceClass.ENERGY
         assert entity._attr_native_unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
         assert entity._attr_state_class == SensorStateClass.TOTAL_INCREASING
-        assert entity.state == 150  # 100 + 50
+        assert entity.native_value == 150  # 100 + 50
 
     def test_available_with_data(self, mock_coordinator, mock_device):
         """Test availability when compressor energy data exists."""
@@ -382,7 +382,7 @@ class TestQvantumTotalEnergyEntity:
         entity = QvantumTotalEnergyEntity(
             mock_coordinator, "totalenergy", mock_device, True
         )
-        assert entity.state is None
+        assert entity.native_value is None
         assert entity.available is False
 
 
@@ -461,7 +461,7 @@ def test_should_exclude_metric_respects_excluded_patterns():
             mock_firmware_coordinator, "display_fw_version", mock_device, True
         )
 
-        assert entity.state == "1.3.6"
+        assert entity.native_value == "1.3.6"
 
     def test_state_fallback_to_device_metadata(
         self, mock_firmware_coordinator, mock_device
@@ -475,7 +475,7 @@ def test_should_exclude_metric_respects_excluded_patterns():
         )
 
         # The mock_coordinator fixture has device metadata
-        assert entity.state == "1.3.6"  # From device metadata in main coordinator
+        assert entity.native_value == "1.3.6"  # From device metadata in main coordinator
 
     def test_state_none_when_no_data(self, mock_firmware_coordinator, mock_device):
         """Test firmware version returns None when no data available."""
@@ -486,7 +486,7 @@ def test_should_exclude_metric_respects_excluded_patterns():
             mock_firmware_coordinator, "display_fw_version", mock_device, True
         )
 
-        assert entity.state is None
+        assert entity.native_value is None
 
 
 def test_default_metric_creates_entity_for_binary_sensors_not_switches():
@@ -518,7 +518,7 @@ class TestQvantumFirmwareLastCheckSensorEntity:
             mock_firmware_coordinator, "firmware_last_check", mock_device, True
         )
 
-        state = entity.state
+        state = entity.native_value
         assert state is not None
         # Should be a datetime object for TIMESTAMP device class
         assert isinstance(state, datetime)
@@ -540,7 +540,7 @@ class TestQvantumFirmwareLastCheckSensorEntity:
             mock_firmware_coordinator, "firmware_last_check", mock_device, True
         )
 
-        assert entity.state is None
+        assert entity.native_value is None
 
 
 class TestQvantumAccessExpireEntity:
@@ -565,7 +565,7 @@ class TestQvantumAccessExpireEntity:
             mock_firmware_coordinator, "expiresAt", mock_device, True
         )
 
-        state = entity.state
+        state = entity.native_value
         assert isinstance(state, datetime)
         assert state.year == 2026
         assert state.month == 1
@@ -582,7 +582,7 @@ class TestQvantumAccessExpireEntity:
             mock_firmware_coordinator, "expiresAt", mock_device, True
         )
 
-        assert entity.state is None
+        assert entity.native_value is None
 
     def test_state_with_missing_access_level(
         self, mock_firmware_coordinator, mock_device
@@ -594,7 +594,7 @@ class TestQvantumAccessExpireEntity:
             mock_firmware_coordinator, "expiresAt", mock_device, True
         )
 
-        assert entity.state is None
+        assert entity.native_value is None
 
     def test_state_with_missing_expires_at(
         self, mock_firmware_coordinator, mock_device
@@ -611,7 +611,7 @@ class TestQvantumAccessExpireEntity:
             mock_firmware_coordinator, "expiresAt", mock_device, True
         )
 
-        assert entity.state is None
+        assert entity.native_value is None
 
     def test_available_with_data(self, mock_firmware_coordinator, mock_device):
         """Test entity availability when data is present."""
