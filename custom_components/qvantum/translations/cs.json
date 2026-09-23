@@ -650,6 +650,18 @@
           }
         }
       }
+    },
+    "water_heater": {
+      "dhw": {
+        "name": "Teplá voda",
+        "state": {
+          "eco": "Eco",
+          "normal": "Normální",
+          "extra": "Extra",
+          "smart": "Smart",
+          "off": "Vypnuto"
+        }
+      }
     }
   },
   "config": {

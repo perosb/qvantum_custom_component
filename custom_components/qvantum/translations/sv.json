@@ -85,9 +85,6 @@
       "man_mode": {
         "name": "Manuellt Driftläge: Uppvärmning"
       },
-      "use_adaptive": {
-        "name": "SmartControl"
-      },
       "enable_sc_dhw": {
         "name": "SmartControl: Varmvatten"
       },

@@ -458,7 +458,7 @@
           "2": "Confort"
         }
       },
-      "extra_tap_water_stop": {
+      "tap_stop": {
         "name": "Parada agua caliente extra"
       },
       "ventilation_boost_stop": {
@@ -648,6 +648,18 @@
               "extra": "Extra"
             }
           }
+        }
+      }
+    },
+    "water_heater": {
+      "dhw": {
+        "name": "Agua caliente",
+        "state": {
+          "eco": "Eco",
+          "normal": "Normal",
+          "extra": "Extra",
+          "smart": "Smart",
+          "off": "Apagado"
         }
       }
     }

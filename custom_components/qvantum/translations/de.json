@@ -650,6 +650,18 @@
           }
         }
       }
+    },
+    "water_heater": {
+      "dhw": {
+        "name": "Warmwasser",
+        "state": {
+          "eco": "Eco",
+          "normal": "Normal",
+          "extra": "Extra",
+          "smart": "Smart",
+          "off": "Aus"
+        }
+      }
     }
   },
   "config": {
