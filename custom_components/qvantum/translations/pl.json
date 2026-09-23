@@ -650,6 +650,18 @@
           }
         }
       }
+    },
+    "water_heater": {
+      "dhw": {
+        "name": "Ciepła woda",
+        "state": {
+          "eco": "Eco",
+          "normal": "Normalny",
+          "extra": "Extra",
+          "smart": "Smart",
+          "off": "Wył."
+        }
+      }
     }
   },
   "config": {

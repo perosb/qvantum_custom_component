@@ -650,6 +650,18 @@
           }
         }
       }
+    },
+    "water_heater": {
+      "dhw": {
+        "name": "Varmt vand",
+        "state": {
+          "eco": "Eco",
+          "normal": "Normal",
+          "extra": "Ekstra",
+          "smart": "Smart",
+          "off": "Fra"
+        }
+      }
     }
   },
   "config": {

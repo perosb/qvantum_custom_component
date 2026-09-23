@@ -650,6 +650,18 @@
           }
         }
       }
+    },
+    "water_heater": {
+      "dhw": {
+        "name": "Lämmin käyttövesi",
+        "state": {
+          "eco": "Eco",
+          "normal": "Normaali",
+          "extra": "Tehostus",
+          "smart": "Smart",
+          "off": "Pois"
+        }
+      }
     }
   },
   "config": {

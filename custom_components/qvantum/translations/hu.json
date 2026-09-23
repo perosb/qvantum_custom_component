@@ -650,6 +650,18 @@
           }
         }
       }
+    },
+    "water_heater": {
+      "dhw": {
+        "name": "Melegvíz",
+        "state": {
+          "eco": "Takarékos",
+          "normal": "Normál",
+          "extra": "Extra fokozat",
+          "smart": "Smart",
+          "off": "Ki"
+        }
+      }
     }
   },
   "config": {

@@ -15,6 +15,38 @@ TRANSLATIONS_DIR = (
 )
 
 
+def _key_paths(node: object, prefix: str = "") -> set[str]:
+    """Return the dotted path of every key, including intermediate dicts."""
+    paths: set[str] = set()
+    if isinstance(node, dict):
+        for key, value in node.items():
+            path = f"{prefix}.{key}" if prefix else key
+            paths.add(path)
+            paths.update(_key_paths(value, path))
+    return paths
+
+
+def test_translation_key_structure_matches_english():
+    """Every locale must expose the same key structure as English.
+
+    Home Assistant falls back to English for missing keys, so drift is easy
+    to miss until a user sees an untranslated entity. Comparing the full set
+    of key paths catches added, removed, and renamed keys for every locale.
+    """
+    base = json.loads((TRANSLATIONS_DIR / "en.json").read_text(encoding="utf-8"))
+    expected = _key_paths(base)
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        if path.name == "en.json":
+            continue
+        actual = _key_paths(json.loads(path.read_text(encoding="utf-8")))
+        assert not (missing := sorted(expected - actual)), (
+            f"{path.name}: missing keys {missing}"
+        )
+        assert not (extra := sorted(actual - expected)), (
+            f"{path.name}: unexpected keys {extra}"
+        )
+
+
 def test_danish_and_czech_translations_are_available():
     expected_strings = {
         "da": {
