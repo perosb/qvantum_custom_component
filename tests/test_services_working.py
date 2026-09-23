@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
+import voluptuous as vol
 
 
 # Mock the voluptuous imports
@@ -33,7 +34,10 @@ class MockSupportsResponse:
 
 # Patch the imports before importing the services module
 with patch("homeassistant.core.SupportsResponse", MockSupportsResponse):
-    from custom_components.qvantum.services import async_setup_services
+    from custom_components.qvantum.services import (
+        EXTRA_TAP_WATER_SCHEMA,
+        async_setup_services,
+    )
     from custom_components.qvantum.const import DOMAIN
 
 
@@ -288,3 +292,32 @@ class TestQvantumServices:
                 "details": "Too many requests",
             }
         }
+
+
+class TestExtraTapWaterSchema:
+    """Validate the service schema without invoking the service handler."""
+
+    def test_accepts_modbus_serial_device_id(self):
+        """Modbus device ids are serials, not integers."""
+        validated = EXTRA_TAP_WATER_SCHEMA(
+            {"device_id": "12003045006007", "minutes": 60}
+        )
+        assert validated["device_id"] == "12003045006007"
+
+    def test_preserves_leading_zeros(self):
+        """Serials must not be round-tripped through int()."""
+        validated = EXTRA_TAP_WATER_SCHEMA(
+            {"device_id": "0012003045006007", "minutes": 60}
+        )
+        assert validated["device_id"] == "0012003045006007"
+
+    def test_normalizes_integer_device_id(self):
+        """Cloud users may pass a numeric id; normalize it to str."""
+        validated = EXTRA_TAP_WATER_SCHEMA({"device_id": 123, "minutes": 60})
+        assert validated["device_id"] == "123"
+
+    @pytest.mark.parametrize("value", [None, True, "", "   "])
+    def test_rejects_invalid_device_id(self, value):
+        """Empty, boolean, and null ids are rejected."""
+        with pytest.raises(vol.Invalid):
+            EXTRA_TAP_WATER_SCHEMA({"device_id": value, "minutes": 60})

@@ -14,9 +14,27 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _normalize_device_id(value: Any) -> str:
+    """Return a device id string without mangling Modbus serials.
+
+    Cloud device ids are numeric, but Modbus ids are serials that may start
+    with zeros, so the value must never be round-tripped through ``int``.
+    """
+    if isinstance(value, bool) or value is None:
+        raise vol.Invalid("device_id must be a string or integer")
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if text:
+            return text
+    raise vol.Invalid("device_id must be a non-empty string or integer")
+
+
 EXTRA_TAP_WATER_SCHEMA = vol.Schema(
     {
-        vol.Required("device_id"): int,
+        vol.Required("device_id"): _normalize_device_id,
         vol.Required("minutes", default=120): vol.All(
             vol.Coerce(int), vol.Range(min=0, max=480)
         ),
