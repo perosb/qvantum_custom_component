@@ -29,9 +29,6 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 
 1. In the Qvantum app, enable **Modbus external** (Installer → Service mode → Connectivity).
 2. Enter the host (default `Qvantum-HP`), port, unit ID, and poll interval (default 15 seconds, minimum 5).
-3. Home Assistant probes serial and firmware from identity registers 180–193.
-
-Cloud-only sensors, including firmware boards and access expiry, are not created locally. Extra-DHW `tap_stop` is created from the local restore deadline.
 
 > [!IMPORTANT]
 > Local Modbus is read-only until **Enable writing via Modbus** is enabled. Incorrect or out-of-range writes may affect performance, warranty, and system lifecycle.
