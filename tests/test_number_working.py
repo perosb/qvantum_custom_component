@@ -216,7 +216,7 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             mock_coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
         )
-        assert entity.state == 4
+        assert entity.native_value == 4
 
     def test_state_with_mapping_capacity_1(self, mock_device):
         """Test getting entity state when stop/start match capacity 1 mapping."""
@@ -237,7 +237,7 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
         )
-        assert entity.state == 1  # Should return mapped value, not stored value
+        assert entity.native_value == 1  # Should return mapped value, not stored value
 
     def test_state_with_mapping_capacity_6(self, mock_device):
         """Test getting entity state when stop/start match capacity 6 mapping."""
@@ -258,7 +258,7 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
         )
-        assert entity.state == 6  # Should return mapped value
+        assert entity.native_value == 6  # Should return mapped value
 
     def test_state_with_no_mapping(self, mock_device):
         """Test getting entity state when stop/start don't match any mapping."""
@@ -279,7 +279,7 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
         )
-        assert entity.state == 3  # Should return stored value
+        assert entity.native_value == 3  # Should return stored value
 
     def test_state_with_none_stop(self, mock_device):
         """Test getting entity state when tap_water_stop is None."""
@@ -300,7 +300,7 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
         )
-        assert entity.state == 2  # Should return stored value when stop is None
+        assert entity.native_value == 2  # Should return stored value when stop is None
 
     def test_state_with_none_start(self, mock_device):
         """Test getting entity state when tap_water_start is None."""
@@ -321,7 +321,7 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
         )
-        assert entity.state == 2  # Should return stored value when start is None
+        assert entity.native_value == 2  # Should return stored value when start is None
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test entity availability when data exists."""
@@ -865,7 +865,7 @@ class TestStopHeating:
         assert entity._attr_native_max_value == 30
         assert entity._attr_native_step == 1
         assert entity._attr_unique_id == "qvantum_number_stop_heating_test_device_123"
-        assert entity.state == 15
+        assert entity.native_value == 15
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
         assert entity.suggested_object_id is None
