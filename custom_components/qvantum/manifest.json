@@ -6,7 +6,8 @@
     ],
     "config_flow": true,
     "dependencies": [
-        "modbus"
+        "modbus",
+        "persistent_notification"
     ],
     "documentation": "https://github.com/perosb/qvantum_custom_component",
     "iot_class": "cloud_polling",
