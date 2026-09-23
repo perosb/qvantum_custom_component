@@ -186,6 +186,7 @@ class TestValidateInput:
             )
 
             assert result == {"title": "Qvantum QE-6 (12345)", "serial": "12345"}
+            mock_api.close.assert_called_once()
 
 
 class TestNormalizeModbusScanInterval:
