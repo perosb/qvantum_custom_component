@@ -89,6 +89,23 @@ When a task is complete:
 
 Do not ask for permission for these steps. Do not merge unless asked. If asked, use squash merge.
 
+**Never switch branches in the primary checkout.** Another review or session may
+be using it. To review a PR, verify a branch, or start work while the checkout
+sits on an unrelated branch, use a temporary `git worktree` under
+`/tmp/opencode/`:
+
+```bash
+git fetch origin <branch>
+git worktree add --detach /tmp/opencode/qvantum-<n> origin/<branch>
+# inspect and run tests there
+git worktree remove /tmp/opencode/qvantum-<n>
+```
+
+When starting new work, create the worktree from `origin/main` and branch
+inside it. If the worktree becomes the session's primary working directory,
+move the session there (opencode `session_move`) rather than hopping between
+directories.
+
 ## Commits and PRs
 
 **Commits and PR titles** always start with a conventional prefix, then an
@@ -131,7 +148,9 @@ Labels (`bug` / `enhancement` / `chore`) feed release-drafter. Version lives in
 
 When asked to review a PR, **post the review on GitHub**. Do not only summarize
 in chat. `.github/CODEOWNERS` auto-requests `@perosb-bot`; that does not replace
-posting comments when you are asked to review.
+posting comments when you are asked to review. Run the PR branch in a
+`git worktree` when you need to verify a finding — never by switching the
+primary checkout (see Git workflow).
 
 **How to comment**
 
