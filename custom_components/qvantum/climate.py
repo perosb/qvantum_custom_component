@@ -18,7 +18,12 @@ from homeassistant.components.climate.const import ClimateEntityFeature
 from .entity import QvantumAccessMixin
 from .coordinator import QvantumDataUpdateCoordinator
 from .coordinator import handle_setting_update_response
-from .const import SensorMode
+from .const import (
+    HP_STATUS_COOLING,
+    HP_STATUS_DEFROSTING,
+    HP_STATUS_HEATING,
+    SensorMode,
+)
 from . import MyConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -84,12 +89,17 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         return sensor_mode
 
     @property
-    def supported_features(self):
-        """Return the list of supported features."""
+    def supported_features(self) -> ClimateEntityFeature:
+        """Return the supported climate features.
+
+        Always a ``ClimateEntityFeature`` flag (0 when nothing is offered).
+        Home Assistant's climate service does bitwise checks against this
+        value, so returning an empty dict breaks ``set_temperature``.
+        """
         if SensorMode.allows_target_temperature(self._sensor_mode()):
             return ClimateEntityFeature.TARGET_TEMPERATURE
 
-        return {}
+        return ClimateEntityFeature(0)
 
     @property
     def available(self):
@@ -112,16 +122,18 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         return (self.coordinator.data or {}).get("values", {}).get("indoor_temperature_target")
 
     @property
-    def hvac_action(self):
-        """Current HVAC action"""
-        status = (self.coordinator.data or {}).get("values", {}).get("hp_status")
-        if status == 3:
-            return HVACAction.HEATING
-        if status == 0:
-            return HVACAction.IDLE
-        if status == 1:
-            return HVACAction.DEFROSTING
+    def hvac_action(self) -> HVACAction:
+        """Return the current HVAC action.
 
+        Hot water (2) and idle (0) both report idle: neither heats the room.
+        """
+        status = (self.coordinator.data or {}).get("values", {}).get("hp_status")
+        if status == HP_STATUS_HEATING:
+            return HVACAction.HEATING
+        if status == HP_STATUS_COOLING:
+            return HVACAction.COOLING
+        if status == HP_STATUS_DEFROSTING:
+            return HVACAction.DEFROSTING
         return HVACAction.IDLE
 
     @property

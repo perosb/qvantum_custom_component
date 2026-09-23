@@ -1,5 +1,6 @@
 """Tests for Qvantum climate entities (working version that avoids metaclass issues)."""
 
+from enum import IntFlag
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
@@ -14,8 +15,9 @@ class MockClimateEntity:
     pass
 
 
-# Mock ClimateEntityFeature
-class MockClimateEntityFeature:
+# Mock ClimateEntityFeature. An IntFlag so ClimateEntityFeature(0) is
+# constructible, matching the real Home Assistant class.
+class MockClimateEntityFeature(IntFlag):
     TARGET_TEMPERATURE = 1
 
 
@@ -28,6 +30,7 @@ class MockHVACAction:
     HEATING = "heating"
     IDLE = "idle"
     DEFROSTING = "defrosting"
+    COOLING = "cooling"
 
 
 # Mock UnitOfTemperature
@@ -35,18 +38,23 @@ class MockUnitOfTemperature:
     CELSIUS = "°C"
 
 
-# Patch the imports before importing the climate module
+# Patch the imports before importing the climate module. The climate module
+# imports these names from ``homeassistant.components.climate.const``, so the
+# patches must target that module rather than the ``climate`` package
+# re-exports, which the module never reads.
 with patch(
     "homeassistant.helpers.update_coordinator.CoordinatorEntity", MockCoordinatorEntity
 ):
     with patch("homeassistant.components.climate.ClimateEntity", MockClimateEntity):
         with patch(
-            "homeassistant.components.climate.ClimateEntityFeature",
+            "homeassistant.components.climate.const.ClimateEntityFeature",
             MockClimateEntityFeature,
         ):
-            with patch("homeassistant.components.climate.HVACMode", MockHVACMode):
+            with patch(
+                "homeassistant.components.climate.const.HVACMode", MockHVACMode
+            ):
                 with patch(
-                    "homeassistant.components.climate.HVACAction", MockHVACAction
+                    "homeassistant.components.climate.const.HVACAction", MockHVACAction
                 ):
                     with patch(
                         "homeassistant.const.UnitOfTemperature", MockUnitOfTemperature
@@ -256,6 +264,18 @@ class TestQvantumIndoorClimateEntity:
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.hvac_action == "defrosting"
 
+    def test_hvac_action_cooling(self, mock_coordinator, mock_device):
+        """Test HVAC action when cooling."""
+        mock_coordinator.data["values"]["hp_status"] = 4
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.hvac_action == "cooling"
+
+    def test_hvac_action_hot_water_is_idle(self, mock_coordinator, mock_device):
+        """Hot water production does not heat the room; report idle."""
+        mock_coordinator.data["values"]["hp_status"] = 2
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.hvac_action == "idle"
+
     def test_hvac_action_unknown(self, mock_coordinator, mock_device):
         """Test HVAC action for unknown status."""
         mock_coordinator.data["values"]["hp_status"] = 99
@@ -300,7 +320,11 @@ class TestQvantumIndoorClimateEntity:
         """Target temperature is hidden when no indoor room sensor is in use."""
         mock_coordinator.data["values"]["sensor_mode"] = sensor_mode
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
-        assert entity.supported_features == {}
+        features = entity.supported_features
+        # Must be a zero-valued ClimateEntityFeature flag, not an empty dict:
+        # HA's climate service does bitwise checks on supported_features.
+        assert features == 0
+        assert not isinstance(features, dict)
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test entity availability when bt2 data exists."""
