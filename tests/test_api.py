@@ -251,6 +251,61 @@ class TestQvantumCloudClient:
                 await api._ensure_valid_token()
 
     @pytest.mark.asyncio
+    async def test_ensure_valid_token_authenticates_once_on_failure(self):
+        """A rejected sign-in must not be retried within one token check."""
+        with patch("aiohttp.ClientSession"):
+            api = QvantumAPI("test@example.com", "password", "test-agent")
+            api._token = None
+            api._token_expiry = datetime.datetime.now() - datetime.timedelta(seconds=1)
+            api._refreshtoken = "refresh_token"
+            api._refresh_authentication_token = AsyncMock(return_value=None)
+            api.authenticate = AsyncMock(side_effect=APIAuthError(400))
+
+            with pytest.raises(APIAuthError):
+                await api._ensure_valid_token()
+
+            api.authenticate.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_ensure_valid_token_refresh_avoids_sign_in(self):
+        """A successful refresh must not fall back to a full sign-in."""
+        with patch("aiohttp.ClientSession"):
+            api = QvantumAPI("test@example.com", "password", "test-agent")
+            api._token = "expired_token"
+            api._token_expiry = datetime.datetime.now() - datetime.timedelta(seconds=1)
+            api._refreshtoken = "refresh_token"
+
+            async def fake_refresh():
+                api._token = "fresh_token"
+
+            api._refresh_authentication_token = AsyncMock(side_effect=fake_refresh)
+            api.authenticate = AsyncMock()
+
+            await api._ensure_valid_token()
+
+            api.authenticate.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_ensure_valid_token_signs_in_once_without_refresh_token(self):
+        """Without a refresh token, sign in exactly once."""
+        with patch("aiohttp.ClientSession"):
+            api = QvantumAPI("test@example.com", "password", "test-agent")
+            api._token = None
+            api._token_expiry = None
+
+            async def fake_authenticate():
+                api._token = "signed_in_token"
+                api._token_expiry = datetime.datetime.now() + datetime.timedelta(
+                    hours=1
+                )
+
+            api.authenticate = AsyncMock(side_effect=fake_authenticate)
+
+            await api._ensure_valid_token()
+
+            api.authenticate.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test__refresh_authentication_token_no_refreshtoken_returns_none(self):
         """_refresh_authentication_token returns immediately when no refresh token is set."""
         with patch("aiohttp.ClientSession") as mock_session_class:

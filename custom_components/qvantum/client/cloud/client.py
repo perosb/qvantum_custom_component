@@ -184,18 +184,25 @@ class QvantumCloudClient:
                     _LOGGER.error("Token refresh failed: %s", response.status)
 
     async def _ensure_valid_token(self) -> None:
+        """Ensure a valid token, signing in at most once per call.
+
+        Refresh first when a refresh token exists; otherwise (or when refresh
+        yields no token) sign in with the stored credentials. An AuthError
+        from authenticate() propagates immediately so a rejected password is
+        not retried within the same request.
+        """
         self._ensure_open()
-        if not self._token or datetime.now() >= self._token_expiry:
-            try:
-                await self._refresh_authentication_token()
-                if not self._token:
-                    await self.authenticate()
-                    if not self._token:
-                        raise AuthError(None, "Failed to obtain authentication token")
-            except AuthError:
-                await self.authenticate()
-                if not self._token:
-                    raise AuthError(None, "Failed to obtain authentication token")
+        if self._token and self._token_expiry and datetime.now() < self._token_expiry:
+            return
+
+        if self._refreshtoken:
+            await self._refresh_authentication_token()
+            if self._token:
+                return
+
+        await self.authenticate()
+        if not self._token:
+            raise AuthError(None, "Failed to obtain authentication token")
 
     async def _request_json(
         self,
