@@ -28,6 +28,7 @@ class MockHVACAction:
     HEATING = "heating"
     IDLE = "idle"
     DEFROSTING = "defrosting"
+    COOLING = "cooling"
 
 
 # Mock UnitOfTemperature
@@ -256,6 +257,18 @@ class TestQvantumIndoorClimateEntity:
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.hvac_action == "defrosting"
 
+    def test_hvac_action_cooling(self, mock_coordinator, mock_device):
+        """Test HVAC action when cooling."""
+        mock_coordinator.data["values"]["hp_status"] = 4
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.hvac_action == "cooling"
+
+    def test_hvac_action_hot_water_is_idle(self, mock_coordinator, mock_device):
+        """Hot water production does not heat the room; report idle."""
+        mock_coordinator.data["values"]["hp_status"] = 2
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.hvac_action == "idle"
+
     def test_hvac_action_unknown(self, mock_coordinator, mock_device):
         """Test HVAC action for unknown status."""
         mock_coordinator.data["values"]["hp_status"] = 99
@@ -300,7 +313,11 @@ class TestQvantumIndoorClimateEntity:
         """Target temperature is hidden when no indoor room sensor is in use."""
         mock_coordinator.data["values"]["sensor_mode"] = sensor_mode
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
-        assert entity.supported_features == {}
+        features = entity.supported_features
+        # Must be a zero-valued ClimateEntityFeature flag, not an empty dict:
+        # HA's climate service does bitwise checks on supported_features.
+        assert features == 0
+        assert not isinstance(features, dict)
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test entity availability when bt2 data exists."""
