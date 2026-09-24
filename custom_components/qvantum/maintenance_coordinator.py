@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .client.cloud import QvantumCloudClient
 from .client.exceptions import AuthError as APIAuthError
+from .client.exceptions import RateLimitError as APIRateLimitError
 from .const import DOMAIN, FIRMWARE_KEYS
 import traceback
 
@@ -131,6 +132,9 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
                 return self._cloud_unavailable_result(err)
             _LOGGER.error("Authentication error during firmware check: %s", err)
             raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
+        except APIRateLimitError as err:
+            _LOGGER.warning("Rate limit exceeded during firmware check: %s", err)
+            raise UpdateFailed(f"Rate limit exceeded: {err}") from err
         except Exception as err:
             if getattr(self.main_coordinator, "modbus_enabled", False):
                 return self._cloud_unavailable_result(err)

@@ -24,7 +24,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
 from .client.cloud import QvantumCloudClient
-from .client.exceptions import APIAuthError, APIConnectionError
+from .client.exceptions import APIAuthError, APIConnectionError, APIRateLimitError
 from .client.modbus.device import IdentityProbeError, async_probe_identity
 from .const import (
     DEFAULT_MODBUS_HOST,
@@ -123,7 +123,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         return {"title": title, "serial": serial}
     except APIAuthError as err:
         raise InvalidAuth from err
-    except APIConnectionError as err:
+    except (APIConnectionError, APIRateLimitError) as err:
         raise CannotConnect from err
     finally:
         if hasattr(api, "close"):

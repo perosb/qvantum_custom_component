@@ -296,6 +296,27 @@ class TestQvantumMaintenanceCoordinator:
             await maintenance_coordinator.async_check_firmware_updates()
 
     @pytest.mark.asyncio
+    async def test_async_check_firmware_updates_rate_limit_warns(
+        self, maintenance_coordinator, mock_main_coordinator, caplog
+    ):
+        """HTTP 429 becomes a clean UpdateFailed warning, not an unexpected error."""
+        import logging
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+        from custom_components.qvantum.client.exceptions import APIRateLimitError
+
+        mock_main_coordinator.modbus_enabled = False
+        maintenance_coordinator.client.get_device_metadata = AsyncMock(
+            side_effect=APIRateLimitError(429)
+        )
+
+        with caplog.at_level(logging.WARNING):
+            with pytest.raises(UpdateFailed, match="Rate limit exceeded"):
+                await maintenance_coordinator.async_check_firmware_updates()
+
+        assert "Rate limit exceeded during firmware check" in caplog.text
+        assert "Error checking firmware updates" not in caplog.text
+
+    @pytest.mark.asyncio
     async def test_create_firmware_update_notifications(
         self, maintenance_coordinator, mock_main_coordinator
     ):
