@@ -12,8 +12,10 @@ from homeassistant.const import (
     CONF_SCAN_INTERVAL,
     CONF_USERNAME,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
+from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
 
@@ -237,6 +239,20 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             update_method=self.async_update_data,
             update_interval=timedelta(seconds=self.poll_interval),
         )
+
+        # Enabled metrics only change when the registries change (user toggles
+        # an entity, a device appears, ...). The first poll runs before the
+        # entity registration events, which immediately invalidate the entry.
+        self._enabled_metrics_cache: dict[str, list[str]] = {}
+        for event_type in (
+            EVENT_ENTITY_REGISTRY_UPDATED,
+            EVENT_DEVICE_REGISTRY_UPDATED,
+        ):
+            config_entry.async_on_unload(
+                hass.bus.async_listen(
+                    event_type, self._invalidate_enabled_metrics_cache
+                )
+            )
 
     def apply_poll_interval(self, config_entry: ConfigEntry) -> bool:
         """Apply poll-interval options in place without tearing down the entry.
@@ -538,6 +554,20 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         return None
 
     def _get_enabled_metrics(self, device_id: str) -> list[str]:
+        """Return enabled metrics for a device, cached until a registry changes."""
+        cached = self._enabled_metrics_cache.get(device_id)
+        if cached is not None:
+            return list(cached)
+        metrics = self._compute_enabled_metrics(device_id)
+        self._enabled_metrics_cache[device_id] = metrics
+        return list(metrics)
+
+    @callback
+    def _invalidate_enabled_metrics_cache(self, _event: object) -> None:
+        """Drop cached metrics after an entity or device registry change."""
+        self._enabled_metrics_cache.clear()
+
+    def _compute_enabled_metrics(self, device_id: str) -> list[str]:
         """Get list of enabled metrics for a device based on entity registry."""
         from homeassistant.helpers import entity_registry as er
 
@@ -562,6 +592,16 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             registry = er.async_get(self.hass)
             enabled_metrics = set()
             known_metrics = set()
+
+            # Known metrics include the default metrics always.
+            # HTTP-only disabled metrics are only known in HTTP mode.
+            # Modbus disabled metrics are known in Modbus mode.
+            allowed_metrics = set(default_metrics)
+            if self.modbus_enabled:
+                allowed_metrics |= set(DEFAULT_DISABLED_MODBUS_METRICS)
+            else:
+                allowed_metrics |= set(DEFAULT_DISABLED_HTTP_METRICS)
+
             for entity in er.async_entries_for_device(
                 registry, device_entry.id, include_disabled_entities=True
             ):
@@ -569,15 +609,6 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                     f"_{device_id}"
                 ):
                     metric_key = extract_metric_key(entity.unique_id, device_id)
-
-                    # Known metrics include the default metrics always.
-                    # HTTP-only disabled metrics are only known in HTTP mode.
-                    # Modbus disabled metrics are known in Modbus mode.
-                    allowed_metrics = set(default_metrics)
-                    if self.modbus_enabled:
-                        allowed_metrics |= set(DEFAULT_DISABLED_MODBUS_METRICS)
-                    else:
-                        allowed_metrics |= set(DEFAULT_DISABLED_HTTP_METRICS)
 
                     if metric_key in allowed_metrics:
                         known_metrics.add(metric_key)
