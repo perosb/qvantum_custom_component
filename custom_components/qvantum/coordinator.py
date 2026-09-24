@@ -20,6 +20,7 @@ from homeassistant.helpers.storage import Store
 from .client.cloud import QvantumCloudClient
 from .client.exceptions import (
     AuthError as APIAuthError,
+    RateLimitError as APIRateLimitError,
     TransportError as APIConnectionError,
 )
 from .client.modbus import QvantumModbusClient
@@ -853,6 +854,15 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 err,
             )
             raise UpdateFailed(f"Error communicating with API: {err}") from err
+        except APIRateLimitError as err:
+            # Cloud throttling is expected under load; warn without a traceback
+            # instead of logging an unexpected error on every poll.
+            _LOGGER.warning(
+                "Rate limit exceeded for device %s: %s",
+                self._logged_device_id(),
+                err,
+            )
+            raise UpdateFailed(f"Rate limit exceeded: {err}") from err
         except asyncio.TimeoutError as err:
             _LOGGER.error(
                 "Timeout fetching data for device %s",
