@@ -3730,6 +3730,30 @@ class TestDeviceLookupWhenHttpDown:
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     @pytest.mark.asyncio
+    async def test_async_update_data_rate_limit_raises_update_failed(
+        self, mock_super_init, caplog
+    ):
+        """HTTP 429 raises UpdateFailed as a warning, not as an unexpected error."""
+        import logging
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+        from custom_components.qvantum.client.exceptions import RateLimitError
+
+        coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=False)
+        coordinator._device = {"id": "test_device", "model": "QE-6"}
+        mock_api.get_metrics = AsyncMock(
+            return_value={"metrics": {"hpid": "test_device", "bt1": 20.0}}
+        )
+        mock_api.get_settings = AsyncMock(side_effect=RateLimitError(429))
+
+        with caplog.at_level(logging.WARNING):
+            with pytest.raises(UpdateFailed, match="Rate limit exceeded"):
+                await coordinator.async_update_data()
+
+        assert "Rate limit exceeded for device test_device" in caplog.text
+        assert "Unexpected error fetching data for device" not in caplog.text
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
     async def test_persists_device_after_successful_probe(self, mock_super_init):
         """A successful Modbus identity probe is stored for later startups."""
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=True)
