@@ -240,7 +240,7 @@ class TestIntegrationSetup:
             patch(
                 "custom_components.qvantum.QvantumMaintenanceCoordinator",
                 return_value=mock_firmware_coordinator,
-            ),
+            ) as maint_cls,
             patch("custom_components.qvantum.services.async_setup_services"),
         ):
             result = await async_setup_entry(hass, mock_config_entry)
@@ -253,6 +253,9 @@ class TestIntegrationSetup:
             mock_config_entry.add_update_listener.assert_called_once_with(
                 _async_update_listener
             )
+            # Cloud mode builds and first-refreshes the maintenance coordinator.
+            maint_cls.assert_called_once()
+            mock_firmware_coordinator.async_config_entry_first_refresh.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_no_device_data(
@@ -436,6 +439,33 @@ class TestIntegrationSetup:
             # Ensure exact matching - all expected notifications called exactly once
             actual_calls = [call[0][1] for call in mock_async_dismiss.call_args_list]
             assert set(actual_calls) == set(expected_calls)
+
+    @pytest.mark.asyncio
+    async def test_async_unload_entry_modbus_skips_firmware_notification_dismissal(
+        self, hass, mock_config_entry
+    ):
+        """Modbus mode has no cloud firmware notifications to clear."""
+        hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+        mock_api = MagicMock()
+        mock_api.close = AsyncMock()
+
+        mock_main_coordinator = MagicMock()
+        mock_main_coordinator._device = {"id": "test_device_123"}
+        mock_main_coordinator.async_shutdown = AsyncMock()
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = mock_main_coordinator
+        mock_config_entry.runtime_data.maintenance_coordinator = None
+        mock_config_entry.runtime_data.client = mock_api
+        mock_config_entry.runtime_data.extra_dhw = None
+
+        with patch(
+            "custom_components.qvantum.async_dismiss", new_callable=AsyncMock
+        ) as mock_async_dismiss:
+            result = await async_unload_entry(hass, mock_config_entry)
+
+        assert result is True
+        mock_async_dismiss.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_async_unload_entry_with_nonawaitable_dismiss(
@@ -708,12 +738,10 @@ class TestIntegrationSetup:
         hass.config_entries.async_forward_entry_setups.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry_modbus_continues_when_maintenance_http_down(
+    async def test_async_setup_entry_modbus_skips_maintenance_coordinator(
         self, hass, mock_config_entry, mock_api, mock_coordinator
     ):
-        """A down cloud API must not block Modbus setup at firmware-check time."""
-        from homeassistant.exceptions import ConfigEntryNotReady
-
+        """Cloud firmware/access monitoring must not be built in Modbus mode."""
         mock_config_entry.options = {"modbus_tcp": True}
         mock_coordinator.data = {
             "device": {
@@ -728,11 +756,6 @@ class TestIntegrationSetup:
         mock_coordinator.async_restore_dhw_state = AsyncMock()
         mock_config_entry.add_update_listener = MagicMock()
 
-        mock_firmware_coordinator = MagicMock()
-        mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock(
-            side_effect=ConfigEntryNotReady("HTTP API down")
-        )
-
         with (
             patch(
                 "custom_components.qvantum._async_modbus_unit", return_value=MagicMock()
@@ -743,57 +766,15 @@ class TestIntegrationSetup:
                 return_value=mock_coordinator,
             ),
             patch(
-                "custom_components.qvantum.QvantumMaintenanceCoordinator",
-                return_value=mock_firmware_coordinator,
-            ),
+                "custom_components.qvantum.QvantumMaintenanceCoordinator"
+            ) as maint_cls,
             patch("custom_components.qvantum.services.async_setup_services"),
         ):
             result = await async_setup_entry(hass, mock_config_entry)
 
         assert result is True
-
-    @pytest.mark.asyncio
-    async def test_async_setup_entry_modbus_continues_when_maintenance_times_out(
-        self, hass, mock_config_entry, mock_api, mock_coordinator
-    ):
-        """A hung cloud firmware check must not stall Modbus setup."""
-        mock_config_entry.options = {"modbus_tcp": True}
-        mock_coordinator.data = {
-            "device": {
-                "id": "test_device_123",
-                "model": "QE-6",
-                "vendor": "Qvantum",
-                "device_metadata": {"display_fw_version": "1.0"},
-            },
-            "values": {},
-        }
-        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
-        mock_coordinator.async_restore_dhw_state = AsyncMock()
-        mock_config_entry.add_update_listener = MagicMock()
-
-        mock_firmware_coordinator = MagicMock()
-        mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock(
-            side_effect=TimeoutError()
-        )
-
-        with (
-            patch(
-                "custom_components.qvantum._async_modbus_unit", return_value=MagicMock()
-            ),
-            patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api),
-            patch(
-                "custom_components.qvantum.QvantumDataUpdateCoordinator",
-                return_value=mock_coordinator,
-            ),
-            patch(
-                "custom_components.qvantum.QvantumMaintenanceCoordinator",
-                return_value=mock_firmware_coordinator,
-            ),
-            patch("custom_components.qvantum.services.async_setup_services"),
-        ):
-            result = await async_setup_entry(hass, mock_config_entry)
-
-        assert result is True
+        maint_cls.assert_not_called()
+        assert mock_config_entry.runtime_data.maintenance_coordinator is None
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_requests_shared_modbus_unit(
