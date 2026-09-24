@@ -304,11 +304,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     await _async_sync_extra_hot_water_service(hass)
 
-    # Initialize maintenance coordinator (handles firmware updates and maintenance tasks)
-    maintenance_coordinator = QvantumMaintenanceCoordinator(
-        hass, config_entry, coordinator
-    )
+    # Firmware/access monitoring is cloud-only: its entities are created only in
+    # cloud mode, so Modbus mode must not build the coordinator either.
+    maintenance_coordinator: QvantumMaintenanceCoordinator | None = None
     if not modbus_enabled:
+        maintenance_coordinator = QvantumMaintenanceCoordinator(
+            hass, config_entry, coordinator
+        )
         try:
             await asyncio.wait_for(
                 maintenance_coordinator.async_config_entry_first_refresh(),
