@@ -87,6 +87,9 @@ When a task is complete:
 3. Push **that branch only** (`git push -u origin HEAD`).
 4. Open a PR against the default branch with `gh pr create`.
 
+After the PR is open, stay on the feature branch — there is no need to switch
+back to `main`. Switch to `main` and pull the latest when starting the next PR.
+
 Do not ask for permission for these steps. Do not merge unless asked. If asked, use squash merge.
 
 **Read-only review goes in a worktree; development uses the normal checkout.**
