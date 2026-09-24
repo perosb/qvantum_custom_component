@@ -558,6 +558,80 @@ class TestQvantumDataUpdateCoordinator:
         assert "Adding new default metric 'picpin_relay_gp10'" in caplog.text
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_get_enabled_metrics_cached_until_registry_changes(self, mock_super_init):
+        """The entity registry is only scanned once until a registry event arrives."""
+        mock_hass = MagicMock()
+        mock_device_registry = MagicMock()
+        mock_entity_registry = MagicMock()
+
+        mock_device = MagicMock()
+        mock_device.id = "device_id_123"
+        mock_device.identifiers = {(DOMAIN, "qvantum-test_device")}
+        mock_device_registry.async_get_device_by_identifier.return_value = mock_device
+
+        mock_entity = MagicMock()
+        mock_entity.device_id = "device_id_123"
+        mock_entity.disabled_by = None
+        mock_entity.unique_id = "qvantum_bt1_test_device"
+        mock_entity_registry.entities.get_entries_for_device_id.return_value = [
+            mock_entity
+        ]
+
+        mock_hass.data = {
+            DOMAIN: make_client_mock(),
+            "device_registry": mock_device_registry,
+            "entity_registry": mock_entity_registry,
+        }
+
+        mock_super_init.return_value = None
+        config_entry = MagicMock()
+        config_entry.options.get.return_value = 30
+        config_entry.unique_id = "test_device"
+        coordinator = QvantumDataUpdateCoordinator(mock_hass, config_entry, client=make_client_mock())
+        coordinator.hass = mock_hass
+
+        first = coordinator._get_enabled_metrics("test_device")
+        second = coordinator._get_enabled_metrics("test_device")
+
+        assert first == second
+        mock_entity_registry.entities.get_entries_for_device_id.assert_called_once_with(
+            "device_id_123", True
+        )
+
+        coordinator._invalidate_enabled_metrics_cache(None)
+        coordinator._get_enabled_metrics("test_device")
+        assert mock_entity_registry.entities.get_entries_for_device_id.call_count == 2
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_registers_registry_listeners_for_metrics_cache(self, mock_super_init):
+        """Entity and device registry changes must invalidate the cached metrics."""
+        from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
+        from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
+
+        mock_super_init.return_value = None
+        mock_hass = MagicMock()
+        mock_hass.data = {DOMAIN: MagicMock()}
+        config_entry = MagicMock()
+        config_entry.options.get.return_value = 30
+        config_entry.unique_id = "test_device"
+
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, config_entry, client=make_client_mock()
+        )
+
+        listened = {
+            call.args[0]: call.args[1]
+            for call in mock_hass.bus.async_listen.call_args_list
+        }
+        assert set(listened) == {
+            EVENT_ENTITY_REGISTRY_UPDATED,
+            EVENT_DEVICE_REGISTRY_UPDATED,
+        }
+        for handler in listened.values():
+            assert handler == coordinator._invalidate_enabled_metrics_cache
+        assert config_entry.async_on_unload.call_count == 2
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_modbus_excludes_http_disabled_metrics(self, mock_super_init):
         """Test that Modbus mode ignores HTTP-only disabled metrics."""
         mock_super_init.return_value = None
