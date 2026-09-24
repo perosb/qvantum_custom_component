@@ -89,6 +89,21 @@ When a task is complete:
 
 Do not ask for permission for these steps. Do not merge unless asked. If asked, use squash merge.
 
+**Read-only review goes in a worktree; development uses the normal checkout.**
+Another review or session may be using the primary checkout, so never switch
+its branch to inspect a PR. Check the PR branch out in a temporary
+`git worktree` under `/tmp/opencode/` instead:
+
+```bash
+git fetch origin <branch>
+git worktree add --detach /tmp/opencode/qvantum-review-<n> origin/<branch>
+# inspect and run tests there
+git worktree remove /tmp/opencode/qvantum-review-<n>
+```
+
+Features, fixes, and review follow-ups follow the branch flow above in the
+standard checkout.
+
 ## Commits and PRs
 
 **Commits and PR titles** always start with a conventional prefix, then an
@@ -131,7 +146,9 @@ Labels (`bug` / `enhancement` / `chore`) feed release-drafter. Version lives in
 
 When asked to review a PR, **post the review on GitHub**. Do not only summarize
 in chat. `.github/CODEOWNERS` auto-requests `@perosb-bot`; that does not replace
-posting comments when you are asked to review.
+posting comments when you are asked to review. Run the PR branch in a
+`git worktree` for read-only verification — never by switching the primary
+checkout (see Git workflow).
 
 **How to comment**
 
