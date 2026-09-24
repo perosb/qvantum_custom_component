@@ -1,0 +1,42 @@
+name: opencode-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: opencode-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Fork PRs get no repository secrets, so the run would fail on the missing key.
+    if: github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      # Pinned to v1.18.32: the action receives a write-capable GITHUB_TOKEN.
+      - uses: anomalyco/opencode/github@545f51d26cc39a907d2867492d498d9607ea5fa4 # v1.18.32
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: openrouter/~z-ai/glm-latest
+          variant: max
+          share: false
+          use_github_token: true
+          prompt: |
+            Review this pull request following the review conventions in
+            AGENTS.md ("Code reviews", "What to flag").
+
+            Every inline comment must be actionable: one or two sentences of
+            why, then a concrete fix. When the fix is a drop-in replacement of
+            the commented lines, include a GitHub ```suggestion``` block so the
+            author can apply it in one click. Post the review immediately as a
+            review with event COMMENT; do not approve or leave it pending.

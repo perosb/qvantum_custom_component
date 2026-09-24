@@ -148,19 +148,23 @@ Labels (`bug` / `enhancement` / `chore`) feed release-drafter. Version lives in
 ## Code reviews
 
 When asked to review a PR, **post the review on GitHub**. Do not only summarize
-in chat. `.github/CODEOWNERS` auto-requests `@perosb-bot`; that does not replace
-posting comments when you are asked to review. Run the PR branch in a
-`git worktree` for read-only verification — never by switching the primary
-checkout (see Git workflow).
+in chat. The `opencode-review` workflow (`.github/workflows/review.yml`) posts an
+automated review on every PR; that does not replace posting comments when you
+are asked to review. Run the PR branch in a `git worktree` for read-only
+verification if needed — never by switching the primary checkout, unless it is
+a fresh clone no other session depends on (for example, the CI checkout in the
+`opencode-review` workflow).
 
 **How to comment**
 
 - Inline on the changed line (or a short contiguous range), in the same style
   as GitHub Copilot: one or two sentences of *why*, then an actionable fix.
-- When the fix is a concrete replacement, include a GitHub suggestion block so
-  the author can apply it in one click. The block must be a drop-in replacement
-  of the commented lines; GitHub rejects comments that are not on a line in the
-  diff.
+- Every comment must be actionable. When the fix is a concrete replacement,
+  include a GitHub suggestion block so the author can apply it in one click.
+  The automated `opencode-review` follows the same rule — never leave an inline
+  comment that only points out a problem without a concrete fix. The block must
+  be a drop-in replacement of the commented lines; GitHub rejects comments that
+  are not on a line in the diff.
 - Publish immediately (`gh api …/pulls/<n>/reviews` with `"event": "COMMENT"`)
   so comments are visible. Leave the review PENDING only if asked. Do not
   approve unless asked. You cannot approve your own PR. Do not merge unless
