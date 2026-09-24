@@ -656,7 +656,14 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
         except Exception as err:
             _LOGGER.debug("Failed closing Qvantum client on unload: %s", err)
 
-    if unload_ok and device_id:
+    # Firmware notifications are created only by the cloud maintenance
+    # coordinator, so Modbus mode has none to clear.
+    if (
+        unload_ok
+        and device_id
+        and runtime is not None
+        and runtime.maintenance_coordinator is not None
+    ):
         # Clear notifications for all firmware components
         for fw_key in FIRMWARE_KEYS:
             notification_id = f"qvantum_firmware_update_{device_id}_{fw_key}"

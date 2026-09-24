@@ -441,6 +441,33 @@ class TestIntegrationSetup:
             assert set(actual_calls) == set(expected_calls)
 
     @pytest.mark.asyncio
+    async def test_async_unload_entry_modbus_skips_firmware_notification_dismissal(
+        self, hass, mock_config_entry
+    ):
+        """Modbus mode has no cloud firmware notifications to clear."""
+        hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+        mock_api = MagicMock()
+        mock_api.close = AsyncMock()
+
+        mock_main_coordinator = MagicMock()
+        mock_main_coordinator._device = {"id": "test_device_123"}
+        mock_main_coordinator.async_shutdown = AsyncMock()
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = mock_main_coordinator
+        mock_config_entry.runtime_data.maintenance_coordinator = None
+        mock_config_entry.runtime_data.client = mock_api
+        mock_config_entry.runtime_data.extra_dhw = None
+
+        with patch(
+            "custom_components.qvantum.async_dismiss", new_callable=AsyncMock
+        ) as mock_async_dismiss:
+            result = await async_unload_entry(hass, mock_config_entry)
+
+        assert result is True
+        mock_async_dismiss.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_async_unload_entry_with_nonawaitable_dismiss(
         self, hass, mock_config_entry
     ):
