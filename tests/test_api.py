@@ -105,6 +105,34 @@ class TestQvantumCloudClient:
             await api.authenticate()
 
     @pytest.mark.asyncio
+    async def test_authenticate_rate_limit(self, mock_session):
+        """A throttled sign-in is retryable, not invalid credentials."""
+        cm, mock_response = mock_session.make_cm_response(status=429)
+        mock_session.post.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+
+        with pytest.raises(APIRateLimitError):
+            await api.authenticate()
+
+    @pytest.mark.asyncio
+    async def test_get_devices_429_error(self, mock_session):
+        """Throttling must raise instead of returning partial device data."""
+        cm, mock_response = mock_session.make_cm_response(status=429)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        with pytest.raises(APIRateLimitError):
+            await api.get_devices()
+
+    @pytest.mark.asyncio
     async def test_get_devices(self, authenticated_api):
         """Test getting devices."""
         devices_data = load_test_data("devices.json")
@@ -501,6 +529,21 @@ class TestQvantumCloudClient:
         assert api._settings_data == {}
 
     @pytest.mark.asyncio
+    async def test_get_settings_429_error(self, mock_session):
+        """Throttling must raise instead of silently serving stale settings."""
+        cm, mock_response = mock_session.make_cm_response(status=429)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        with pytest.raises(APIRateLimitError):
+            await api.get_settings("test_device")
+
+    @pytest.mark.asyncio
     async def test_set_extra_tap_water(self, mock_session):
         """Test setting extra tap water with positive minutes (duration)."""
         update_data = load_test_data("settings_update_test_device.json")
@@ -694,6 +737,23 @@ class TestQvantumCloudClient:
 
         # Token should be None after failed refresh
         assert api._token is None
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_rate_limit_propagates(self, mock_session):
+        """A throttled refresh must not fall back to a full sign-in."""
+        cm, mock_response = mock_session.make_cm_response(status=429)
+        mock_session.post.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._refreshtoken = "refresh_token"
+        api._token = None
+
+        with pytest.raises(APIRateLimitError):
+            await api._ensure_valid_token()
+
+        assert mock_session.post.call_count == 1
 
     @pytest.mark.asyncio
     async def test_set_extra_tap_water_negative_minutes(self, mock_session):
@@ -954,6 +1014,25 @@ class TestQvantumCloudClient:
         assert result == {}
 
     @pytest.mark.asyncio
+    async def test_get_device_metadata_429_error(self, mock_session):
+        """A 429 must preserve cached metadata instead of clearing it."""
+        cached_data = {"id": "test_device", "model": "QE-6"}
+        cm, mock_response = mock_session.make_cm_response(status=429)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._device_metadata = cached_data
+
+        with pytest.raises(APIRateLimitError):
+            await api.get_device_metadata("test_device")
+
+        assert api._device_metadata == cached_data
+
+    @pytest.mark.asyncio
     async def test_get_metrics_500_error(self, mock_session):
         """Test getting metrics with 500 error."""
         cm, mock_response = mock_session.make_cm_response(status=500)
@@ -998,6 +1077,21 @@ class TestQvantumCloudClient:
         result = await api.get_metrics("test_device")
 
         assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_429_error(self, mock_session):
+        """Throttling must raise instead of silently serving stale metrics."""
+        cm, mock_response = mock_session.make_cm_response(status=429)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        with pytest.raises(APIRateLimitError):
+            await api.get_metrics("test_device")
 
     @pytest.mark.asyncio
     async def test_get_metrics_with_custom_enabled_metrics(self, authenticated_api):
@@ -1113,17 +1207,22 @@ class TestQvantumCloudClient:
         mock_session.close.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_handle_response_403_raises_connection_error(self):
-        from custom_components.qvantum.client.exceptions import APIConnectionError
+    async def test_handle_response_403_unauthenticates_and_raises_auth_error(self):
+        """403 means the stored token was rejected: drop it for a reauth."""
+        from custom_components.qvantum.client.exceptions import APIAuthError
 
         class DummyResponse:
             status = 403
             ok = False
 
         api = QvantumAPI("test@example.com", "password", "test-agent")
+        api._token = "stale_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
 
-        with pytest.raises(APIConnectionError):
+        with pytest.raises(APIAuthError):
             await api._handle_response(DummyResponse())
+
+        assert api._token is None
 
     @pytest.mark.asyncio
     async def test_get_device_metadata_403_raises_auth_error(self, mock_session):
@@ -1216,6 +1315,23 @@ class TestQvantumCloudClient:
         assert call_args[1]["json"] == {"command": {"set_fan_mode": {"mode": 0}}}
 
     @pytest.mark.asyncio
+    async def test_send_command_non_2xx_raises(self, mock_session):
+        """A failed command must surface the HTTP error, not return its body."""
+        cm, mock_response = mock_session.make_cm_response(
+            status=500, json_data={"error": "boom"}
+        )
+        mock_session.post.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+        with pytest.raises(APIConnectionError):
+            await api.set_fanspeedselector("test_device", "off")
+
+    @pytest.mark.asyncio
     async def test_set_heating_curve_point_uses_cloud_ud_curve_key(
         self, mock_session
     ):
@@ -1241,7 +1357,9 @@ class TestQvantumCloudClient:
 
     @pytest.mark.asyncio
     async def test_update_settings_non_200_response(self, mock_session):
-        """Test _update_settings with non-200 response."""
+        """A failed settings write must raise instead of returning an error body."""
+        from custom_components.qvantum.client.exceptions import APIConnectionError
+
         cm, mock_response = mock_session.make_cm_response(status=400)
         mock_session.patch.return_value = cm
 
@@ -1251,10 +1369,8 @@ class TestQvantumCloudClient:
         api._token = "test_token"
         api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
 
-        result = await api._update_settings("test_device", {"settings": []})
-
-        # Should still return the response data even on error status
-        assert result is not None
+        with pytest.raises(APIConnectionError):
+            await api._update_settings("test_device", {"settings": []})
 
     # --- get_http_metrics tests ---
 

@@ -98,12 +98,20 @@ class QvantumCloudClient:
         self._reset_state()
 
     async def _handle_response(self, response: aiohttp.ClientResponse) -> None:
-        if not response.ok:
-            if response.status == 401:
-                raise AuthError(response.status)
-            if response.status == 429:
-                raise RateLimitError(response.status)
-            raise TransportError(response.status)
+        """Raise a typed error for a failed response.
+
+        401/403 invalidate the stored token, 429 is client throttling, and
+        anything else is a transport failure. 2xx responses return to the
+        caller.
+        """
+        if response.ok:
+            return
+        if response.status in (401, 403):
+            await self.unauthenticate()
+            raise AuthError(response.status)
+        if response.status == 429:
+            raise RateLimitError(response.status)
+        raise TransportError(response.status)
 
     def _request_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}
@@ -154,6 +162,8 @@ class QvantumCloudClient:
                         seconds=int(expires_in) - DEFAULT_TOKEN_BUFFER_SECONDS
                     )
                     return True
+                case 429:
+                    raise RateLimitError(response.status)
                 case _:
                     _LOGGER.error("Authentication failed: %s", response.status)
                     raise AuthError(response.status)
@@ -180,6 +190,9 @@ class QvantumCloudClient:
                     self._token_expiry = datetime.now() + timedelta(
                         seconds=int(expires_in) - DEFAULT_TOKEN_BUFFER_SECONDS
                     )
+                case 429:
+                    # Throttling must not fall through to a full sign-in.
+                    raise RateLimitError(response.status)
                 case _:
                     _LOGGER.error("Token refresh failed: %s", response.status)
 
@@ -189,7 +202,8 @@ class QvantumCloudClient:
         Refresh first when a refresh token exists; otherwise (or when refresh
         yields no token) sign in with the stored credentials. An AuthError
         from authenticate() propagates immediately so a rejected password is
-        not retried within the same request.
+        not retried within the same request. A rate-limited refresh raises
+        RateLimitError instead of adding a sign-in request on top.
         """
         self._ensure_open()
         if self._token and self._token_expiry and datetime.now() < self._token_expiry:
@@ -209,8 +223,13 @@ class QvantumCloudClient:
         method: str,
         url: str,
         payload: Optional[dict] = None,
-        validate_status: bool = False,
+        validate_status: bool = True,
     ) -> dict[str, Any]:
+        """Send a JSON request and return the decoded body.
+
+        Writes validate the HTTP status by default so a failed update raises
+        instead of surfacing an error body as if it were a result.
+        """
         await self._ensure_valid_token()
         request = getattr(self._session, method)
         kwargs: dict[str, Any] = self._http_kwargs()
@@ -384,9 +403,11 @@ class QvantumCloudClient:
                 case 200:
                     self._device_metadata = await response.json()
                     self._device_metadata_etag = response.headers.get("ETag")
-                case 403:
+                case 401 | 403:
                     await self.unauthenticate()
                     raise AuthError(response.status)
+                case 429:
+                    raise RateLimitError(response.status)
                 case 304:
                     _LOGGER.debug("Device metadata not modified, using cached data.")
                 case status if status >= 500:
@@ -467,10 +488,12 @@ class QvantumCloudClient:
                         response.headers.get("ETag"),
                         data.get("total_latency"),
                     )
-                case 403:
+                case 401 | 403:
                     _LOGGER.error("Authentication failure: %s", response.status)
                     await self.unauthenticate()
                     raise AuthError(response.status)
+                case 429:
+                    raise RateLimitError(response.status)
                 case 304:
                     _LOGGER.debug("HTTP values not modified, using cached data.")
                     return None, None, None
@@ -498,9 +521,11 @@ class QvantumCloudClient:
                     self._settings_data = await response.json()
                     self._settings_etag = response.headers.get("ETag")
                     _LOGGER.debug("HTTP Settings fetched: %s", self._settings_data)
-                case 403:
+                case 401 | 403:
                     await self.unauthenticate()
                     raise AuthError(response.status)
+                case 429:
+                    raise RateLimitError(response.status)
                 case 304:
                     _LOGGER.debug("HTTP Settings not modified, using cached data.")
                 case status if status >= 500:
@@ -527,9 +552,11 @@ class QvantumCloudClient:
                     devices_data = await response.json()
                     _LOGGER.debug("Devices fetched successfully: %s", devices_data)
                     return devices_data.get("devices") if devices_data else None
-                case 403:
+                case 401 | 403:
                     await self.unauthenticate()
                     raise AuthError(response.status)
+                case 429:
+                    raise RateLimitError(response.status)
                 case _:
                     _LOGGER.error(
                         "Failed to fetch devices, status: %s", response.status
