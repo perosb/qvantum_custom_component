@@ -8,14 +8,13 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.qvantum.client.modbus.maps import heating_curve_points
-from custom_components.qvantum.const import (
+from . import MyConfigEntry
+from .client.modbus.maps import heating_curve_points
+from .const import (
     SETTING_UPDATE_APPLIED,
     HeatingCurveType,
     SensorMode,
 )
-
-from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity
 
