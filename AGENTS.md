@@ -193,7 +193,7 @@ Correctness first, style second. In this repo that means:
 - Cloud-only entities created in Modbus mode, or the reverse.
 - `client/` importing `homeassistant*` / `custom_components*`, or HA calling
   `isinstance` on the transport instead of coordinator helpers.
-- Missing translations, tests, or a coverage drop below 80%.
+- Missing translations, tests, or a coverage drop below 92%.
 
 Do not invent nits to fill space, and do not restate the PR in every inline
 comment. Skip pre-existing problems in untouched lines unless the diff newly
@@ -210,7 +210,7 @@ If the diff is clean, still publish a short overview review with an empty
 python -m pytest        # from repo root; pytest.ini sets coverage and timeout
 ```
 
-- Coverage floor **80%** (`--cov-fail-under=80`). Aim to keep or raise it.
+- Coverage floor **92%** (`--cov-fail-under=92`). Aim to keep or raise it.
 - Per-test timeout **30s** (`pytest-timeout`). A hung asyncio wait should fail,
   not freeze the suite.
 - Modbus tests inject `modbus_connection.mock.MockModbusConnection` — never open

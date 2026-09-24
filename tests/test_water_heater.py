@@ -1,4 +1,4 @@
-"""Tests for Qvantum water_heater entities (avoids metaclass issues)."""
+"""Tests for Qvantum water_heater entities."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 

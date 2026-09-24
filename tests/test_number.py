@@ -1,4 +1,4 @@
-"""Tests for Qvantum number entities (working version that avoids metaclass issues)."""
+"""Tests for Qvantum number entities."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest

@@ -1,4 +1,4 @@
-"""Tests for Qvantum climate entities (working version that avoids metaclass issues)."""
+"""Tests for Qvantum climate entities."""
 
 from enum import IntFlag
 from unittest.mock import AsyncMock, MagicMock, patch

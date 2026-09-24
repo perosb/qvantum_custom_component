@@ -1,4 +1,4 @@
-"""Tests for Qvantum select entities (working version that avoids metaclass issues)."""
+"""Tests for Qvantum select entities."""
 
 from homeassistant.exceptions import HomeAssistantError
 from unittest.mock import AsyncMock, MagicMock, patch
