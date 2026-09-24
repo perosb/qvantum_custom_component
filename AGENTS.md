@@ -151,8 +151,9 @@ When asked to review a PR, **post the review on GitHub**. Do not only summarize
 in chat. The `opencode-review` workflow (`.github/workflows/review.yml`) posts an
 automated review on every PR; that does not replace posting comments when you
 are asked to review. Run the PR branch in a `git worktree` for read-only
-verification if needed — never by switching the primary checkout, unless a
-fresh clone (see Git workflow).
+verification if needed — never by switching the primary checkout, unless it is
+a fresh clone no other session depends on (for example, the CI checkout in the
+`opencode-review` workflow).
 
 **How to comment**
 
