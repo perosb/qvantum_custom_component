@@ -1,6 +1,8 @@
 """Tests for Qvantum sensors."""
 
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 
@@ -9,9 +11,20 @@ class MockCoordinatorEntity:
     def __init__(self, coordinator):
         self.coordinator = coordinator
 
+    @property
+    def available(self):
+        """Mock available property."""
+        return self.coordinator is not None
+
 
 class MockSensorEntity:
     pass
+
+
+# Mock EntityCategory
+class MockEntityCategory:
+    class DIAGNOSTIC:
+        name = "DIAGNOSTIC"
 
 
 # Patch the imports before importing the sensor module
@@ -19,34 +32,38 @@ with patch(
     "homeassistant.helpers.update_coordinator.CoordinatorEntity", MockCoordinatorEntity
 ):
     with patch("homeassistant.components.sensor.SensorEntity", MockSensorEntity):
-        from homeassistant.components.sensor import (
-            SensorDeviceClass,
-            SensorStateClass,
-        )
-        from homeassistant.const import (
-            UnitOfTemperature,
-            UnitOfEnergy,
-            UnitOfPower,
-            UnitOfPressure,
-            UnitOfElectricCurrent,
-            UnitOfTime,
-        )
-        from homeassistant.helpers.device_registry import DeviceInfo
+        with patch("homeassistant.const.EntityCategory", MockEntityCategory):
+            from homeassistant.components.sensor import (
+                SensorDeviceClass,
+                SensorStateClass,
+            )
+            from homeassistant.const import (
+                UnitOfTemperature,
+                UnitOfEnergy,
+                UnitOfPower,
+                UnitOfPressure,
+                UnitOfElectricCurrent,
+                UnitOfTime,
+            )
+            from homeassistant.helpers.device_registry import DeviceInfo
+            from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
-        from custom_components.qvantum.sensor import (
-            QvantumBaseSensorEntity,
-            QvantumTemperatureEntity,
-            QvantumEnergyEntity,
-            QvantumPowerEntity,
-            QvantumPressureEntity,
-            QvantumCurrentEntity,
-            QvantumDiagnosticEntity,
-            QvantumTotalEnergyEntity,
-            QvantumTimerEntity,
-            _get_sensor_type,
-            async_setup_entry,
-        )
-        from homeassistant.helpers.entity_registry import RegistryEntryDisabler
+            from custom_components.qvantum.sensor import (
+                QvantumAccessExpireEntity,
+                QvantumBaseSensorEntity,
+                QvantumCurrentEntity,
+                QvantumDiagnosticEntity,
+                QvantumEnergyEntity,
+                QvantumFirmwareLastCheckSensorEntity,
+                QvantumFirmwareSensorEntity,
+                QvantumPowerEntity,
+                QvantumPressureEntity,
+                QvantumTemperatureEntity,
+                QvantumTimerEntity,
+                QvantumTotalEnergyEntity,
+                _get_sensor_type,
+                async_setup_entry,
+            )
 
 
 @pytest.fixture
@@ -54,7 +71,16 @@ def mock_coordinator():
     """Create a mock coordinator with test data."""
     coordinator = MagicMock()
     coordinator.data = {
-        "device": {"id": "test_device_123"},
+        "device": {
+            "id": "test_device_123",
+            "model": "QE-6",
+            "vendor": "Qvantum",
+            "device_metadata": {
+                "display_fw_version": "1.3.6",
+                "cc_fw_version": "140",
+                "inv_fw_version": "140",
+            },
+        },
         "values": {
             "hpid": "test_device_123",
             "bt1": 20.5,  # Temperature
@@ -89,6 +115,27 @@ def mock_device():
         manufacturer="Qvantum",
         model="QE-6",
     )
+
+
+@pytest.fixture
+def mock_firmware_coordinator(mock_coordinator):
+    """Create a mock firmware coordinator with test data."""
+    firmware_coordinator = MagicMock()
+    firmware_coordinator.main_coordinator = mock_coordinator
+    firmware_coordinator.data = {
+        "firmware_versions": {
+            "display_fw_version": "1.3.6",
+            "cc_fw_version": "140",
+            "inv_fw_version": "140",
+        },
+        "access_level": {
+            "readAccessLevel": 20,
+            "writeAccessLevel": 20,
+            "expiresAt": "2026-01-26T18:35:29.768Z",
+        },
+        "last_check": "2024-01-01T12:00:00.000Z",
+    }
+    return firmware_coordinator
 
 
 class TestQvantumBaseSensorEntity:
@@ -147,6 +194,13 @@ class TestQvantumBaseSensorEntity:
         )
         assert entity._attr_native_unit_of_measurement == "l/m"
 
+    def test_degree_minute_unit_assignment(self, mock_coordinator, mock_device):
+        """Test degree minute unit assignment."""
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "degree_minute", mock_device, True
+        )
+        assert entity._attr_native_unit_of_measurement in {"dm", "°min"}
+
     def test_compressor_blocked_sec_unit_assignment(self, mock_coordinator, mock_device):
         """Blocked-compressor countdown is a duration in seconds."""
         entity = QvantumBaseSensorEntity(
@@ -183,6 +237,21 @@ class TestQvantumBaseSensorEntity:
         assert entity._attr_state_class == SensorStateClass.TOTAL_INCREASING
         assert entity._attr_entity_category.name == "DIAGNOSTIC"
 
+    def test_diagnostic_countdown_sensors(self, mock_coordinator, mock_device):
+        """Filter life, blocked countdown, and lifetime counters are diagnostics."""
+        for key in (
+            "ventilation_filter_time_left",
+            "compressor_blocked_sec",
+            "compressor_run_time",
+            "compressor_starts",
+            "ventilation_fan_run_time",
+        ):
+            entity = QvantumBaseSensorEntity(mock_coordinator, key, mock_device, True)
+            assert entity._attr_entity_category.name == "DIAGNOSTIC", key
+
+        other = QvantumBaseSensorEntity(mock_coordinator, "bt1", mock_device, True)
+        assert getattr(other, "_attr_entity_category", None) is None
+
     def test_alarm_count_sensor(self, mock_coordinator, mock_device):
         """Active-alarm count is a diagnostic measurement with integer display."""
         entity = QvantumBaseSensorEntity(
@@ -191,6 +260,7 @@ class TestQvantumBaseSensorEntity:
         assert entity._attr_entity_category.name == "DIAGNOSTIC"
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
         assert entity._attr_suggested_display_precision == 0
+        assert getattr(entity, "_attr_device_class", None) is None
 
     @pytest.mark.parametrize("metric_key", [f"alarm_{i}_code" for i in range(1, 6)])
     def test_alarm_code_sensors(self, mock_coordinator, mock_device, metric_key):
@@ -201,6 +271,7 @@ class TestQvantumBaseSensorEntity:
         assert entity._attr_entity_category.name == "DIAGNOSTIC"
         assert entity._attr_suggested_display_precision == 0
         assert getattr(entity, "_attr_state_class", None) is None
+        assert getattr(entity, "_attr_device_class", None) is None
 
     def test_compressor_starts_unit_assignment(self, mock_coordinator, mock_device):
         """Compressor start count is a diagnostic total-increasing counter."""
@@ -315,13 +386,23 @@ class TestQvantumPressureEntity:
         )
         assert entity.available is True
 
-    def test_unavailable_with_none_value(self, mock_coordinator, mock_device):
+    def test_available_without_value(self, mock_coordinator, mock_device):
         """Test availability when pressure value is missing."""
+        del mock_coordinator.data["values"]["bp1_pressure"]
+        entity = QvantumPressureEntity(
+            mock_coordinator, "bp1_pressure", mock_device, True
+        )
+        assert entity.available is False
+
+    def test_unavailable_with_none_value(self, mock_coordinator, mock_device):
+        """Test availability when pressure value is None."""
         mock_coordinator.data["values"]["bp1_pressure"] = None
         entity = QvantumPressureEntity(
             mock_coordinator, "bp1_pressure", mock_device, True
         )
         assert entity.available is False
+
+
 class TestQvantumCurrentEntity:
     """Test the QvantumCurrentEntity class."""
 
@@ -335,6 +416,7 @@ class TestQvantumCurrentEntity:
         assert entity._attr_native_unit_of_measurement == UnitOfElectricCurrent.AMPERE
         assert entity._attr_state_class == SensorStateClass.MEASUREMENT
         assert entity.native_value == 5.2
+
 
 class TestQvantumTotalEnergyEntity:
     """Test the QvantumTotalEnergyEntity class."""
@@ -787,3 +869,234 @@ class TestSensorSetup:
         # The integration still checks and updates disabled HTTP metrics, so we expect
         # integration-disabled call for each disabled metric that is included.
         assert mock_entity_registry.async_update_entity.call_count == expected_calls
+
+
+def test_should_exclude_metric_respects_excluded_patterns():
+    """Test that metrics matching excluded patterns are excluded."""
+    from custom_components.qvantum.sensor import _should_exclude_metric
+
+    assert _should_exclude_metric("op_man_dhw") is True
+    assert _should_exclude_metric("smart_dhw_mode") is True
+    assert _should_exclude_metric("picpin_relay_gp10") is True
+    assert _should_exclude_metric("vacation_mode") is True
+    assert _should_exclude_metric("heatingreleased") is True
+    assert _should_exclude_metric("compressor_blocked") is True
+    assert _should_exclude_metric("compressor_blocked_sec") is False
+    assert _should_exclude_metric("some_other_metric") is False
+
+
+def test_default_metric_creates_entity_for_binary_sensors_not_switches():
+    """Relay bits become binary sensors; switch-style excluded patterns do not."""
+    from custom_components.qvantum.const import default_metric_creates_entity
+
+    assert default_metric_creates_entity("picpin_relay_gp10") is True
+    assert default_metric_creates_entity("picpin_relay_pump") is True
+    assert default_metric_creates_entity("bt1") is True
+    assert default_metric_creates_entity("op_man_dhw") is False
+    assert default_metric_creates_entity("use_adaptive") is False
+
+
+class TestQvantumFirmwareSensorEntity:
+    """Test the QvantumFirmwareSensorEntity class."""
+
+    def test_init(self, mock_firmware_coordinator, mock_device):
+        """Test firmware sensor entity initialization."""
+        entity = QvantumFirmwareSensorEntity(
+            mock_firmware_coordinator, "display_fw_version", mock_device, True
+        )
+
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+        assert entity.firmware_key == "display_fw_version"
+        assert entity._attr_translation_key == "firmware_display_fw_version"
+
+    def test_state_from_firmware_coordinator(
+        self, mock_firmware_coordinator, mock_device
+    ):
+        """Test firmware version from firmware coordinator data."""
+        entity = QvantumFirmwareSensorEntity(
+            mock_firmware_coordinator, "display_fw_version", mock_device, True
+        )
+
+        assert entity.native_value == "1.3.6"
+
+    def test_state_fallback_to_device_metadata(
+        self, mock_firmware_coordinator, mock_device
+    ):
+        """Test firmware version fallback to device metadata."""
+        # Clear firmware coordinator data to test fallback
+        mock_firmware_coordinator.data = {}
+
+        entity = QvantumFirmwareSensorEntity(
+            mock_firmware_coordinator, "display_fw_version", mock_device, True
+        )
+
+        # The mock_coordinator fixture has device metadata
+        assert entity.native_value == "1.3.6"  # From device metadata in main coordinator
+
+    def test_state_none_when_no_data(self, mock_firmware_coordinator, mock_device):
+        """Test firmware version returns None when no data available."""
+        mock_firmware_coordinator.data = {}
+        mock_firmware_coordinator.main_coordinator.data = {}
+
+        entity = QvantumFirmwareSensorEntity(
+            mock_firmware_coordinator, "display_fw_version", mock_device, True
+        )
+
+        assert entity.native_value is None
+
+
+class TestQvantumFirmwareLastCheckSensorEntity:
+    """Test the QvantumFirmwareLastCheckSensorEntity class."""
+
+    def test_init(self, mock_firmware_coordinator, mock_device):
+        """Test firmware last check sensor entity initialization."""
+        entity = QvantumFirmwareLastCheckSensorEntity(
+            mock_firmware_coordinator, "firmware_last_check", mock_device, True
+        )
+
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+        assert entity._attr_device_class == SensorDeviceClass.TIMESTAMP
+
+    def test_state_with_last_check(self, mock_firmware_coordinator, mock_device):
+        """Test last check timestamp parsing."""
+        entity = QvantumFirmwareLastCheckSensorEntity(
+            mock_firmware_coordinator, "firmware_last_check", mock_device, True
+        )
+
+        state = entity.native_value
+        assert state is not None
+        # Should be a datetime object for TIMESTAMP device class
+        assert isinstance(state, datetime)
+        # Should parse the expected timestamp "2024-01-01T12:00:00.000Z"
+        assert state.year == 2024
+        assert state.month == 1
+        assert state.day == 1
+        assert state.hour == 12
+        assert state.minute == 0
+        assert state.second == 0
+        assert state.tzinfo is not None
+        assert state.tzinfo == timezone.utc
+
+    def test_state_none_when_no_data(self, mock_firmware_coordinator, mock_device):
+        """Test last check returns None when no data available."""
+        mock_firmware_coordinator.data = {}
+
+        entity = QvantumFirmwareLastCheckSensorEntity(
+            mock_firmware_coordinator, "firmware_last_check", mock_device, True
+        )
+
+        assert entity.native_value is None
+
+
+class TestQvantumAccessExpireEntity:
+    """Test the QvantumAccessExpireEntity class."""
+
+    def test_init(self, mock_firmware_coordinator, mock_device):
+        """Test access expire sensor entity initialization."""
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+        assert entity._attr_device_class == "timestamp"
+        assert entity._metric_key == "expiresAt"
+        assert entity._attr_translation_key == "expires_at"
+
+    def test_state_with_valid_data(self, mock_firmware_coordinator, mock_device):
+        """Test access expiration timestamp parsing with valid data."""
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        state = entity.native_value
+        assert isinstance(state, datetime)
+        assert state.year == 2026
+        assert state.month == 1
+        assert state.day == 26
+        assert state.hour == 18
+        assert state.minute == 35
+        assert state.second == 29
+
+    def test_state_with_none_data(self, mock_firmware_coordinator, mock_device):
+        """Test access expiration returns None when no data available."""
+        mock_firmware_coordinator.data = {}
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.native_value is None
+
+    def test_state_with_missing_access_level(
+        self, mock_firmware_coordinator, mock_device
+    ):
+        """Test access expiration returns None when access_level is missing."""
+        mock_firmware_coordinator.data = {"firmware_versions": {}}
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.native_value is None
+
+    def test_state_with_missing_expires_at(
+        self, mock_firmware_coordinator, mock_device
+    ):
+        """Test access expiration returns None when expiresAt key is missing."""
+        mock_firmware_coordinator.data = {
+            "access_level": {
+                "readAccessLevel": 20,
+                "writeAccessLevel": 20,
+            }
+        }
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.native_value is None
+
+    def test_available_with_data(self, mock_firmware_coordinator, mock_device):
+        """Test entity availability when data is present."""
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.available is True
+
+    def test_available_without_data(self, mock_firmware_coordinator, mock_device):
+        """Test entity availability when no data is present."""
+        mock_firmware_coordinator.data = {}
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.available is False
+
+    def test_available_without_access_level(
+        self, mock_firmware_coordinator, mock_device
+    ):
+        """Test entity availability when access_level is missing."""
+        mock_firmware_coordinator.data = {"firmware_versions": {}}
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.available is False
+
+    def test_available_without_expires_at(self, mock_firmware_coordinator, mock_device):
+        """Test entity availability when expiresAt key is missing."""
+        mock_firmware_coordinator.data = {
+            "access_level": {
+                "readAccessLevel": 20,
+                "writeAccessLevel": 20,
+            }
+        }
+
+        entity = QvantumAccessExpireEntity(
+            mock_firmware_coordinator, "expiresAt", mock_device, True
+        )
+
+        assert entity.available is False

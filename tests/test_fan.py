@@ -1,4 +1,4 @@
-"""Tests for Qvantum fan entities (working version that avoids metaclass issues)."""
+"""Tests for Qvantum fan entities."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest

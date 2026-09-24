@@ -1,6 +1,7 @@
 """Tests for Qvantum binary sensors."""
 
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 
@@ -14,18 +15,39 @@ class MockBinarySensorEntity:
     pass
 
 
+# Mock EntityCategory
+class MockEntityCategory:
+    class DIAGNOSTIC:
+        name = "DIAGNOSTIC"
+
+
+# Mock BinarySensorDeviceClass
+class MockBinarySensorDeviceClass:
+    class CONNECTIVITY:
+        name = "CONNECTIVITY"
+
+    class PROBLEM:
+        name = "PROBLEM"
+
+
 # Patch the imports before importing the binary_sensor module
 with patch(
     "homeassistant.helpers.update_coordinator.CoordinatorEntity", MockCoordinatorEntity
 ):
-    with patch("homeassistant.components.binary_sensor.BinarySensorEntity", MockBinarySensorEntity):
-        from homeassistant.helpers.device_registry import DeviceInfo
-        from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-        from homeassistant.const import EntityCategory
+    with patch(
+        "homeassistant.components.binary_sensor.BinarySensorEntity",
+        MockBinarySensorEntity,
+    ):
+        with patch("homeassistant.const.EntityCategory", MockEntityCategory):
+            with patch(
+                "homeassistant.components.binary_sensor.BinarySensorDeviceClass",
+                MockBinarySensorDeviceClass,
+            ):
+                from homeassistant.helpers.device_registry import DeviceInfo
 
-        from custom_components.qvantum.binary_sensor import (
-            QvantumBaseBinaryEntity,
-        )
+                from custom_components.qvantum.binary_sensor import (
+                    QvantumBaseBinaryEntity,
+                )
 
 
 @pytest.fixture
@@ -35,9 +57,24 @@ def mock_coordinator():
     coordinator.data = {
         "device": {"id": "test_device_123"},
         "values": {
-            "hpid": "test_device_123",  # Add hpid for unique_id generation
-            "op_man_addition": 1,  # Binary sensor value
-            "op_man_defrost": 0,  # Another binary sensor value
+            "hpid": "test_device_123",
+            "op_man_addition": 1,  # Binary sensor values
+            "op_man_cooling": 0,
+            "op_man_dhw": 1,
+            "enable_sc_dhw": 0,
+            "enable_sc_sh": 1,
+            "cooling_enabled": 1,
+            "use_adaptive": 0,
+            "picpin_relay_heat_l1": 1,
+            "picpin_relay_heat_l2": 0,
+            "picpin_relay_heat_l3": 1,
+            "picpin_relay_gp10": 0,
+            "picpin_relay_qm10": 0,
+            "picpin_relay_qn8_1": 0,
+            "picpin_relay_qn8_2": 1,
+            "picpin_relay_gp3": 0,
+            "picpin_relay_ha12": 1,
+            "qn8position": 1,
         },
         "connectivity": {
             "connected": True,
@@ -73,23 +110,20 @@ class TestQvantumBaseBinaryEntity:
 
     def test_is_on_true(self, mock_coordinator, mock_device):
         """Test binary entity state when on."""
-        mock_coordinator.data["values"]["op_man_addition"] = 1
         entity = QvantumBaseBinaryEntity(
             mock_coordinator, "op_man_addition", mock_device, True
         )
-        assert entity.is_on
+        assert entity.is_on == 1  # op_man_addition is 1
 
     def test_is_on_false(self, mock_coordinator, mock_device):
         """Test binary entity state when off."""
-        mock_coordinator.data["values"]["op_man_addition"] = 0
         entity = QvantumBaseBinaryEntity(
-            mock_coordinator, "op_man_addition", mock_device, True
+            mock_coordinator, "op_man_cooling", mock_device
         )
-        assert not entity.is_on
+        assert entity.is_on == 0  # op_man_cooling is 0
 
     def test_available_true(self, mock_coordinator, mock_device):
         """Test binary entity availability when data exists."""
-        mock_coordinator.data["values"]["op_man_addition"] = 1
         entity = QvantumBaseBinaryEntity(
             mock_coordinator, "op_man_addition", mock_device, True
         )
@@ -101,3 +135,187 @@ class TestQvantumBaseBinaryEntity:
             mock_coordinator, "missing_metric", mock_device, True
         )
         assert entity.available is False
+
+    def test_connectivity_entities_are_diagnostic(self, mock_coordinator, mock_device):
+        """Wi-Fi and cloud connected sensors belong in the diagnostics category."""
+        wifi = QvantumBaseBinaryEntity(
+            mock_coordinator, "wifi_connected", mock_device, True
+        )
+        cloud = QvantumBaseBinaryEntity(
+            mock_coordinator, "cloud_connected", mock_device, True
+        )
+        heating = QvantumBaseBinaryEntity(
+            mock_coordinator, "heatingreleased", mock_device, True
+        )
+
+        assert wifi._attr_entity_category.name == "DIAGNOSTIC"
+        assert wifi._attr_device_class.name == "CONNECTIVITY"
+        assert cloud._attr_entity_category.name == "DIAGNOSTIC"
+        assert cloud._attr_device_class.name == "CONNECTIVITY"
+        # Status flags are diagnostic but not connectivity device class
+        assert heating._attr_entity_category.name == "DIAGNOSTIC"
+        assert getattr(heating, "_attr_device_class", None) is None
+
+    def test_alarm_active_is_problem_not_diagnostic(
+        self, mock_coordinator, mock_device
+    ):
+        """Active-alarm flag uses PROBLEM and stays on the main device view."""
+        mock_coordinator.data["values"]["alarm_active"] = 1
+        entity = QvantumBaseBinaryEntity(
+            mock_coordinator, "alarm_active", mock_device, True
+        )
+        assert entity._attr_device_class.name == "PROBLEM"
+        assert getattr(entity, "_attr_entity_category", None) is None
+        assert entity.is_on == 1
+        assert entity.available is True
+
+        mock_coordinator.data["values"]["alarm_active"] = 0
+        assert entity.is_on == 0
+
+    def test_status_binary_sensors_are_diagnostic(self, mock_coordinator, mock_device):
+        """Release / protection / pump status flags use the diagnostics category."""
+        for key in (
+            "heatingreleased",
+            "coolingreleased",
+            "compressorreleased",
+            "additionreleased",
+            "freeze_protection_active",
+            "compressor_blocked",
+            "picpin_relay_heat_l1",
+            "picpin_relay_heat_l2",
+            "picpin_relay_heat_l3",
+            "picpin_relay_gp10",
+            "picpin_relay_qm10",
+            "picpin_relay_qn8_1",
+            "picpin_relay_qn8_2",
+            "picpin_relay_gp3",
+            "picpin_relay_ha12",
+            "picpin_relay_pump",
+        ):
+            entity = QvantumBaseBinaryEntity(mock_coordinator, key, mock_device, True)
+            assert entity._attr_entity_category.name == "DIAGNOSTIC", key
+            assert getattr(entity, "_attr_device_class", None) is None, key
+
+        demand = QvantumBaseBinaryEntity(
+            mock_coordinator, "heatingdemand", mock_device, True
+        )
+        assert getattr(demand, "_attr_entity_category", None) is None
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry(
+    hass, mock_config_entry, mock_coordinator, mock_device
+):
+    """Test setting up binary sensor entities."""
+    from custom_components.qvantum.binary_sensor import (
+        async_setup_entry,
+        QvantumBaseBinaryEntity,
+    )
+    from custom_components.qvantum import RuntimeData
+
+    # Mock the entity registry
+    mock_entity_registry = MagicMock()
+    hass.data["entity_registry"] = mock_entity_registry
+
+    # Mock the device registry
+    mock_device_registry = MagicMock()
+    mock_device_registry.async_get_device_by_identifier.return_value = None
+    hass.data["device_registry"] = mock_device_registry
+
+    mock_config_entry.runtime_data = RuntimeData(
+        coordinator=mock_coordinator,
+        device=mock_device,
+        client=MagicMock(),
+    )
+    # HTTP path: MagicMock would otherwise make modbus_enabled truthy.
+    mock_coordinator.modbus_enabled = False
+
+    async_add_entities = MagicMock()
+
+    # Add entity_id property to the class for the test
+    @property
+    def entity_id(self):
+        return f"binary_sensor.{self._attr_unique_id}"
+
+    QvantumBaseBinaryEntity.entity_id = entity_id
+
+    try:
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+        # Check that entities were added
+        assert async_add_entities.called
+        entities = async_add_entities.call_args[0][0]
+        assert len(entities) == 17
+
+        # Check that we have the expected sensor types
+        sensor_names = [
+            "additionreleased",
+            "compressorreleased",
+            "cooling_enabled",
+            "coolingdemand",
+            "coolingreleased",
+            "dhwdemand",
+            "heatingdemand",
+            "heatingreleased",
+            "picpin_relay_gp10",
+            "picpin_relay_gp3",
+            "picpin_relay_ha12",
+            "picpin_relay_heat_l1",
+            "picpin_relay_heat_l2",
+            "picpin_relay_heat_l3",
+            "picpin_relay_qm10",
+            "picpin_relay_qn8_1",
+            "picpin_relay_qn8_2",
+        ]
+
+        entity_metric_keys = sorted([e._metric_key for e in entities])
+        assert entity_metric_keys == sorted(sensor_names)
+    finally:
+        # Clean up
+        if hasattr(QvantumBaseBinaryEntity, "entity_id"):
+            delattr(QvantumBaseBinaryEntity, "entity_id")
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_modbus_includes_pump_relay(
+    hass, mock_config_entry, mock_coordinator, mock_device
+):
+    """Modbus setup creates picpin_relay_pump; HTTP setup does not."""
+    from custom_components.qvantum.binary_sensor import (
+        async_setup_entry,
+        QvantumBaseBinaryEntity,
+    )
+    from custom_components.qvantum import RuntimeData
+
+    hass.data["entity_registry"] = MagicMock()
+    mock_device_registry = MagicMock()
+    mock_device_registry.async_get_device_by_identifier.return_value = None
+    hass.data["device_registry"] = mock_device_registry
+
+    mock_config_entry.runtime_data = RuntimeData(
+        coordinator=mock_coordinator,
+        device=mock_device,
+        client=MagicMock(),
+    )
+    mock_coordinator.modbus_enabled = True
+    mock_coordinator.data["values"]["picpin_relay_pump"] = 1
+    mock_coordinator.data["values"]["vacation_mode"] = 0
+
+    async_add_entities = MagicMock()
+
+    @property
+    def entity_id(self):
+        return f"binary_sensor.{self._attr_unique_id}"
+
+    QvantumBaseBinaryEntity.entity_id = entity_id
+
+    try:
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+        keys = {entity._metric_key for entity in async_add_entities.call_args[0][0]}
+        assert "picpin_relay_pump" in keys
+        assert "vacation_mode" in keys
+        assert "picpin_relay_gp10" in keys
+        assert "picpin_relay_ha12" in keys
+    finally:
+        if hasattr(QvantumBaseBinaryEntity, "entity_id"):
+            delattr(QvantumBaseBinaryEntity, "entity_id")
