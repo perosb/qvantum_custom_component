@@ -178,10 +178,14 @@ async def async_get_config_entry_diagnostics(
     diagnostics["maintenance"] = _maintenance_diagnostics(
         getattr(runtime, "maintenance_coordinator", None)
     )
-    diagnostics["modbus_link"] = {
-        "host": getattr(runtime, "modbus_host", None),
-        "port": getattr(runtime, "modbus_port", None),
-        "unit_id": getattr(runtime, "modbus_unit_id", None),
-    }
+    diagnostics["modbus_link"] = (
+        {
+            "host": getattr(runtime, "modbus_host", None),
+            "port": getattr(runtime, "modbus_port", None),
+            "unit_id": getattr(runtime, "modbus_unit_id", None),
+        }
+        if bool(getattr(coordinator, "modbus_enabled", False))
+        else None
+    )
 
     return async_redact_data(diagnostics, TO_REDACT)
