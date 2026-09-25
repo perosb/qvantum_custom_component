@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import pytest
+import time
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -29,6 +30,7 @@ from custom_components.qvantum.const import (
     DHW_SESSION_GAP_SEC,
     DHW_SHOWER_DURATION_MIN,
     MIN_MODBUS_SCAN_INTERVAL,
+    MODBUS_SW_VERSION_REFRESH_INTERVAL,
     REQUIRED_METRICS,
 )
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -3844,6 +3846,10 @@ class TestDeviceLookupWhenHttpDown:
         await coordinator.async_update_data()
 
         mock_api.get_primary_device.assert_not_called()
+        # The startup probe already read registers 191-193, so the first
+        # poll must not probe them a second time.
+        mock_api.probe_identity.assert_awaited_once()
+        assert coordinator._sw_version_refreshed_at is not None
         coordinator._device_store.async_save.assert_awaited_once_with(
             {"username": "test@example.com", "device": device}
         )
@@ -4158,3 +4164,251 @@ class TestDeviceLookupWhenHttpDown:
         assert coordinator._current_username() is None
         coordinator._config_entry.data = {"username": ""}
         assert coordinator._current_username() is None
+
+
+class TestModbusFirmwareVersionRefresh:
+    """Display firmware refresh from the Modbus identity island (191-193)."""
+
+    def _make_coordinator(self, mock_super_init, probe):
+        mock_super_init.return_value = None
+        mock_api = make_client_mock(modbus=True)
+        mock_api.probe_identity = probe
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+        mock_config_entry = MagicMock()
+        mock_config_entry.entry_id = "test_entry_id"
+        mock_config_entry.unique_id = "test_device_123"
+        mock_config_entry.data = {"username": "test@example.com"}
+        mock_config_entry.options.get.side_effect = _modbus_options_get
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, mock_config_entry, client=mock_api
+        )
+        coordinator.client = mock_api
+        coordinator.hass = mock_hass
+        coordinator._device = {"id": "test_device_123", "sw_version": "1.7.22"}
+        coordinator._device_store = MagicMock()
+        coordinator._device_store.async_load = AsyncMock(return_value=None)
+        coordinator._device_store.async_save = AsyncMock()
+        return coordinator, mock_api
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_poll_refreshes_display_firmware(self, mock_super_init):
+        """A changed probe version updates the device and the registry."""
+        coordinator, _ = self._make_coordinator(
+            mock_super_init,
+            AsyncMock(return_value={"id": "test_device_123", "sw_version": "1.7.23"}),
+        )
+
+        with patch.object(
+            coordinator,
+            "_update_device_registry_sw_version",
+            new_callable=AsyncMock,
+        ) as mock_registry:
+            result = await coordinator.async_update_data()
+
+        assert result["device"]["sw_version"] == "1.7.23"
+        mock_registry.assert_awaited_once_with("1.7.23")
+        coordinator._device_store.async_save.assert_awaited()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_poll_skips_unchanged_firmware(self, mock_super_init):
+        """An unchanged version causes no store write and no registry update."""
+        coordinator, _ = self._make_coordinator(
+            mock_super_init,
+            AsyncMock(return_value={"id": "test_device_123", "sw_version": "1.7.22"}),
+        )
+
+        with patch.object(
+            coordinator,
+            "_update_device_registry_sw_version",
+            new_callable=AsyncMock,
+        ) as mock_registry:
+            await coordinator.async_update_data()
+
+        mock_registry.assert_not_awaited()
+        coordinator._device_store.async_save.assert_not_awaited()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_refresh_is_throttled_between_polls(self, mock_super_init):
+        """The identity island is not re-probed on every fast Modbus poll."""
+        coordinator, mock_api = self._make_coordinator(
+            mock_super_init,
+            AsyncMock(return_value={"id": "test_device_123", "sw_version": "1.7.22"}),
+        )
+
+        await coordinator.async_update_data()
+        await coordinator.async_update_data()
+
+        mock_api.probe_identity.assert_awaited_once()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_refresh_runs_again_after_interval(self, mock_super_init):
+        """Once the refresh interval elapsed the version is probed again."""
+        coordinator, mock_api = self._make_coordinator(
+            mock_super_init,
+            AsyncMock(return_value={"id": "test_device_123", "sw_version": "1.7.23"}),
+        )
+        coordinator._sw_version_refreshed_at = (
+            time.monotonic() - MODBUS_SW_VERSION_REFRESH_INTERVAL - 1
+        )
+
+        with patch.object(
+            coordinator,
+            "_update_device_registry_sw_version",
+            new_callable=AsyncMock,
+        ) as mock_registry:
+            result = await coordinator.async_update_data()
+
+        assert result["device"]["sw_version"] == "1.7.23"
+        mock_registry.assert_awaited_once_with("1.7.23")
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_probe_failure_keeps_last_version(self, mock_super_init):
+        """A refused identity read must not fail the poll or clear the version."""
+        coordinator, _ = self._make_coordinator(
+            mock_super_init, AsyncMock(side_effect=Exception("identity refused"))
+        )
+
+        result = await coordinator.async_update_data()
+
+        assert result["device"]["sw_version"] == "1.7.22"
+        coordinator._device_store.async_save.assert_not_awaited()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_probe_cancellation_propagates(self, mock_super_init):
+        """Cancellation during the refresh must abort the poll."""
+        coordinator, _ = self._make_coordinator(
+            mock_super_init, AsyncMock(side_effect=asyncio.CancelledError())
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            await coordinator.async_update_data()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_update_device_registry_sw_version_writes_changed_value(
+        self, mock_super_init
+    ):
+        """A newer display firmware is written to the HA device registry."""
+        coordinator, _ = self._make_coordinator(mock_super_init, AsyncMock())
+        mock_device_entry = MagicMock()
+        mock_device_entry.id = "device_id_123"
+        mock_device_entry.sw_version = "1.7.22"
+        mock_registry = MagicMock()
+
+        with patch(
+            "custom_components.qvantum.entity.async_get_qvantum_device_entry",
+            return_value=mock_device_entry,
+        ), patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            await coordinator._update_device_registry_sw_version("1.7.23")
+
+        mock_registry.async_update_device.assert_called_once_with(
+            "device_id_123", sw_version="1.7.23"
+        )
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_update_device_registry_sw_version_skips_unchanged_value(
+        self, mock_super_init
+    ):
+        """An already current registry value must not be rewritten."""
+        coordinator, _ = self._make_coordinator(mock_super_init, AsyncMock())
+        mock_device_entry = MagicMock()
+        mock_device_entry.id = "device_id_123"
+        mock_device_entry.sw_version = "1.7.22"
+        mock_registry = MagicMock()
+
+        with patch(
+            "custom_components.qvantum.entity.async_get_qvantum_device_entry",
+            return_value=mock_device_entry,
+        ), patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            await coordinator._update_device_registry_sw_version("1.7.22")
+
+        mock_registry.async_update_device.assert_not_called()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_update_device_registry_sw_version_swallows_errors(
+        self, mock_super_init
+    ):
+        """Registry failures must never fail the poll."""
+        coordinator, _ = self._make_coordinator(mock_super_init, AsyncMock())
+
+        with patch(
+            "custom_components.qvantum.entity.async_get_qvantum_device_entry",
+            side_effect=Exception("registry unavailable"),
+        ):
+            await coordinator._update_device_registry_sw_version("1.7.23")
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_update_device_registry_sw_version_without_device_entry(
+        self, mock_super_init
+    ):
+        """A missing registry entry (setup ordering) is ignored."""
+        coordinator, _ = self._make_coordinator(mock_super_init, AsyncMock())
+        mock_registry = MagicMock()
+
+        with patch(
+            "custom_components.qvantum.entity.async_get_qvantum_device_entry",
+            return_value=None,
+        ), patch(
+            "homeassistant.helpers.device_registry.async_get",
+            return_value=mock_registry,
+        ):
+            await coordinator._update_device_registry_sw_version("1.7.23")
+
+        mock_registry.async_update_device.assert_not_called()
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_cloud_poll_never_refreshes_modbus_firmware(self, mock_super_init):
+        """Cloud polls must not touch the Modbus identity island."""
+        mock_super_init.return_value = None
+        mock_api = make_client_mock()
+        mock_api.get_primary_device = AsyncMock(
+            return_value={"id": "test_device_123", "sw_version": "1.0"}
+        )
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+        mock_config_entry = MagicMock()
+        mock_config_entry.entry_id = "test_entry_id"
+        mock_config_entry.unique_id = "test_device_123"
+        mock_config_entry.data = {"username": "test@example.com"}
+        mock_config_entry.options.get.side_effect = lambda key, default=None: default
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, mock_config_entry, client=mock_api
+        )
+        coordinator.client = mock_api
+        coordinator.hass = mock_hass
+        coordinator._device_store = MagicMock()
+        coordinator._device_store.async_load = AsyncMock(return_value=None)
+
+        await coordinator.async_update_data()
+
+        mock_api.get_primary_device.assert_awaited()
+        assert coordinator._sw_version_refreshed_at is None
