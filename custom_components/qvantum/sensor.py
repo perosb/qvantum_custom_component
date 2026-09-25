@@ -141,7 +141,14 @@ async def async_setup_entry(
     sensors.append(QvantumDiagnosticEntity(coordinator, "latency", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device, True))
     sensors.append(QvantumTimerEntity(coordinator, "tap_stop", device, True))
-    if not coordinator.modbus_enabled:
+    if coordinator.modbus_enabled:
+        # Local Modbus: display firmware from input registers 191-193.
+        sensors.append(
+            QvantumDisplayFirmwareEntity(
+                coordinator, "display_fw_version", device, True
+            )
+        )
+    else:
         # Cloud-only: firmware and access level from the HTTP API
         maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
         sensors.append(
@@ -178,7 +185,9 @@ async def async_setup_entry(
     # Clean up disabled entities that are no longer supported in the current mode.
     # Include special sensor keys so they are never removed by cleanup.
     special_sensor_keys = {"totalenergy", "latency", "hpid", "tap_stop"}
-    if not coordinator.modbus_enabled:
+    if coordinator.modbus_enabled:
+        special_sensor_keys.add("display_fw_version")
+    else:
         special_sensor_keys.update(
             {
                 "expiresAt",
@@ -560,6 +569,37 @@ class QvantumFirmwareSensorEntity(QvantumEntity, SensorEntity):
         )
 
         return firmware_available or device_available
+
+
+class QvantumDisplayFirmwareEntity(QvantumEntity, SensorEntity):
+    """Modbus-only display firmware version (input registers 191-193)."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        coordinator: QvantumDataUpdateCoordinator,
+        metric_key: str,
+        device: DeviceInfo | dict,
+        enabled_by_default: bool = True,
+    ) -> None:
+        """Initialize the display firmware sensor."""
+        super().__init__(coordinator, metric_key, device, enabled_by_default)
+        self._attr_translation_key = "firmware_display_fw_version"
+
+    @property
+    def native_value(self) -> str | None:
+        """Return display firmware from device data, metadata as fallback."""
+        device_data = (self.coordinator.data or {}).get("device") or {}
+        version = device_data.get("sw_version")
+        if version:
+            return version
+        return (device_data.get("device_metadata") or {}).get("display_fw_version")
+
+    @property
+    def available(self) -> bool:
+        """Return True when a display firmware version is known."""
+        return self.native_value is not None
 
 
 class QvantumFirmwareLastCheckSensorEntity(QvantumEntity, SensorEntity):

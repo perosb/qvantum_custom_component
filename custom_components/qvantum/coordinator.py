@@ -47,6 +47,7 @@ from .const import (
     SETTING_UPDATE_APPLIED,
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
+    MODBUS_SW_VERSION_REFRESH_INTERVAL,
     REQUIRED_METRICS,
     REQUIRED_MODBUS_METRICS,
     CONF_MODBUS_SCAN_INTERVAL,
@@ -187,6 +188,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self.extra_dhw = extra_dhw
         self._config_entry = config_entry
         self._device = None
+        self._sw_version_refreshed_at: float | None = None
         self._last_heatingenergy: float | None = None
         self._last_heatingenergy_time: datetime | None = None
         self._last_dhwenergy: float | None = None
@@ -474,6 +476,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 probed = None
             if isinstance(probed, dict) and probed.get("id"):
                 self._device = probed
+                # The probe just read registers 191-193; don't re-read until
+                # the refresh interval elapses.
+                self._sw_version_refreshed_at = time.monotonic()
                 await self._persist_device_state()
                 return
             if not self._store_account_mismatch:
@@ -757,6 +762,72 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         values.pop("tap_stop", None)
         _LOGGER.debug("Cleared extra-DHW restore timer; extra DHW is off")
 
+    async def _refresh_modbus_sw_version(self) -> None:
+        """Refresh the display firmware version from input registers 191-193.
+
+        The version only changes on a display firmware update, so the identity
+        island is re-probed at most once per interval. A failed read never
+        fails the poll; the last known version stays on the device.
+        """
+        now = time.monotonic()
+        refreshed_at = self._sw_version_refreshed_at
+        if (
+            refreshed_at is not None
+            and now - refreshed_at < MODBUS_SW_VERSION_REFRESH_INTERVAL
+        ):
+            return
+        self._sw_version_refreshed_at = now
+        try:
+            probed = await self.client.probe_identity()
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:
+            _LOGGER.debug(
+                "Failed to refresh Modbus display firmware version: %s", err
+            )
+            return
+        if not isinstance(probed, dict) or not isinstance(self._device, dict):
+            return
+        sw_version = probed.get("sw_version")
+        if not sw_version or self._device.get("sw_version") == sw_version:
+            return
+        self._device["sw_version"] = sw_version
+        await self._persist_device_state()
+        await self._update_device_registry_sw_version(str(sw_version))
+
+    async def _update_device_registry_sw_version(self, sw_version: str) -> None:
+        """Write a refreshed Modbus display firmware version to the registry.
+
+        Cloud firmware sync stays in the maintenance coordinator; Modbus only
+        reports the display firmware.
+        """
+        try:
+            from homeassistant.helpers import device_registry as dr
+
+            from .entity import (
+                _coordinator_config_entry_id,
+                async_get_qvantum_device_entry,
+            )
+
+            device_id = self.device_id
+            device_entry = async_get_qvantum_device_entry(
+                self.hass, device_id, _coordinator_config_entry_id(self)
+            )
+            if device_entry is None or device_entry.sw_version == sw_version:
+                return
+            dr.async_get(self.hass).async_update_device(
+                device_entry.id, sw_version=sw_version
+            )
+            _LOGGER.info(
+                "Updated device registry firmware version for device %s to %s",
+                device_id,
+                sw_version,
+            )
+        except Exception as err:
+            _LOGGER.debug(
+                "Failed to update device registry firmware version: %s", err
+            )
+
     async def async_update_data(self):
         """Fetch data from API endpoint."""
         try:
@@ -844,6 +915,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
             if self.modbus_enabled:
                 await self._sync_modbus_extra_dhw_timer(values, poll_started=poll_started)
+                await self._refresh_modbus_sw_version()
 
             self._derive_tap_water_capacity(values)
 

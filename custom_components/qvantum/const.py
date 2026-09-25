@@ -116,6 +116,9 @@ DEFAULT_MODBUS_PORT = 502
 DEFAULT_MODBUS_UNIT_ID = 1
 # Bound cloud lookups so a down HTTP API cannot stall Modbus startup.
 HTTP_CLOUD_LOOKUP_TIMEOUT = 15
+# Display firmware (input registers 191-193) only changes on a display update,
+# so the Modbus identity island is re-probed at most this often.
+MODBUS_SW_VERSION_REFRESH_INTERVAL = 3600
 
 # Metrics available in both HTTP and Modbus modes
 DEFAULT_ENABLED_METRICS = [

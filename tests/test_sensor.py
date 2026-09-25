@@ -53,6 +53,7 @@ with patch(
                 QvantumBaseSensorEntity,
                 QvantumCurrentEntity,
                 QvantumDiagnosticEntity,
+                QvantumDisplayFirmwareEntity,
                 QvantumEnergyEntity,
                 QvantumFirmwareLastCheckSensorEntity,
                 QvantumFirmwareSensorEntity,
@@ -745,8 +746,58 @@ class TestSensorSetup:
         assert "latency" in allowed
         assert "hpid" in allowed
         assert "tap_stop" in allowed
+        assert "display_fw_version" in allowed
         assert "expiresAt" not in allowed
         assert "firmware_last_check" not in allowed
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_creates_display_firmware_sensor(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Modbus mode exposes the display firmware probed from input 191-193."""
+        from custom_components.qvantum.const import CONF_MODBUS_TCP
+
+        mock_config_entry.options = {CONF_MODBUS_TCP: True}
+        mock_coordinator.modbus_enabled = True
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        firmware_entities = [
+            entity
+            for entity in entities
+            if isinstance(entity, QvantumDisplayFirmwareEntity)
+        ]
+
+        assert len(firmware_entities) == 1
+        entity = firmware_entities[0]
+        assert entity._attr_unique_id == "qvantum_display_fw_version_test_device_123"
+        assert entity._attr_translation_key == "firmware_display_fw_version"
+        assert entity.native_value == "1.3.6"
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_http_does_not_create_display_firmware_sensor(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Cloud mode keeps its cloud firmware sensors; no Modbus sensor is added."""
+        mock_coordinator.modbus_enabled = False
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        assert not any(
+            isinstance(entity, QvantumDisplayFirmwareEntity) for entity in entities
+        )
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_respects_user_enabled_entities(
@@ -894,6 +945,60 @@ def test_default_metric_creates_entity_for_binary_sensors_not_switches():
     assert default_metric_creates_entity("bt1") is True
     assert default_metric_creates_entity("op_man_dhw") is False
     assert default_metric_creates_entity("use_adaptive") is False
+
+
+class TestQvantumDisplayFirmwareEntity:
+    """Test the Modbus display firmware sensor (input registers 191-193)."""
+
+    def test_init(self, mock_coordinator, mock_device):
+        """Test entity initialization, unique id, and translation key."""
+        entity = QvantumDisplayFirmwareEntity(
+            mock_coordinator, "display_fw_version", mock_device, True
+        )
+
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+        assert entity._attr_unique_id == "qvantum_display_fw_version_test_device_123"
+        assert entity._attr_translation_key == "firmware_display_fw_version"
+        assert entity._attr_entity_registry_enabled_default is True
+
+    def test_state_from_device_sw_version(self, mock_coordinator, mock_device):
+        """The probed sw_version wins over device metadata."""
+        mock_coordinator.data["device"]["sw_version"] = "1.7.22"
+
+        entity = QvantumDisplayFirmwareEntity(
+            mock_coordinator, "display_fw_version", mock_device, True
+        )
+
+        assert entity.native_value == "1.7.22"
+
+    def test_state_falls_back_to_device_metadata(self, mock_coordinator, mock_device):
+        """The registry-recovery path only has device_metadata."""
+        entity = QvantumDisplayFirmwareEntity(
+            mock_coordinator, "display_fw_version", mock_device, True
+        )
+
+        assert entity.native_value == "1.3.6"
+
+    def test_tracks_device_updates(self, mock_coordinator, mock_device):
+        """A refreshed version is reflected without recreating the entity."""
+        entity = QvantumDisplayFirmwareEntity(
+            mock_coordinator, "display_fw_version", mock_device, True
+        )
+
+        mock_coordinator.data["device"]["sw_version"] = "1.7.23"
+
+        assert entity.native_value == "1.7.23"
+
+    def test_unavailable_without_version(self, mock_coordinator, mock_device):
+        """No sw_version and no metadata makes the sensor unavailable."""
+        mock_coordinator.data["device"] = {"id": "test_device_123"}
+
+        entity = QvantumDisplayFirmwareEntity(
+            mock_coordinator, "display_fw_version", mock_device, True
+        )
+
+        assert entity.native_value is None
+        assert entity.available is False
 
 
 class TestQvantumFirmwareSensorEntity:
