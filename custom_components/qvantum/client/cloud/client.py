@@ -74,6 +74,7 @@ class QvantumCloudClient:
         self._metrics_etag = None
         self._device_metadata: dict = {}
         self._device_metadata_etag = None
+        self._missing_metrics_warned: set[str] = set()
 
     def _ensure_open(self) -> None:
         if self._closed:
@@ -445,7 +446,17 @@ class QvantumCloudClient:
                     if metric_name == "fan0_10v":
                         metrics[metric_name] = int(float(metrics[metric_name]) * 10)
                 else:
-                    _LOGGER.warning("Metric %s not found in response data.", metric_name)
+                    if metric_name not in self._missing_metrics_warned:
+                        self._missing_metrics_warned.add(metric_name)
+                        _LOGGER.warning(
+                            "Metric %s not found in response data; suppressing "
+                            "further warnings until the session is reset.",
+                            metric_name,
+                        )
+                    else:
+                        _LOGGER.debug(
+                            "Metric %s still not found in response data.", metric_name
+                        )
             self._metrics_data = {"metrics": metrics}
             self._metrics_etag = etag
         _LOGGER.debug("HTTP metrics read: %s", self._metrics_data)

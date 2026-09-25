@@ -6,6 +6,7 @@ elevated-access coverage lives in ``tests/test_api_cloud_maintenance.py``.
 
 import datetime
 import json
+import logging
 import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -1114,6 +1115,69 @@ class TestQvantumCloudClient:
         assert "bt1" in result["metrics"]
         assert "bt2" not in result["metrics"]  # bt2 should not be included
         assert result["metrics"]["bt1"] == metrics_data["values"]["bt1"]
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_warns_once_per_missing_metric(
+        self, authenticated_api, caplog
+    ):
+        """Each missing metric warns once instead of on every poll."""
+        metrics_data = load_test_data("metrics_test_device.json")
+        cm, _ = authenticated_api._session.make_cm_response(
+            status=200, json_data=metrics_data, headers={"ETag": "etag123"}
+        )
+        authenticated_api._session.get.return_value = cm
+
+        missing = ["missing_one", "missing_two"]
+        enabled = ["bt1", *missing]
+        with caplog.at_level(
+            logging.WARNING, logger="custom_components.qvantum.client.cloud.client"
+        ):
+            await authenticated_api.get_metrics("test_device", enabled_metrics=enabled)
+            await authenticated_api.get_metrics("test_device", enabled_metrics=enabled)
+
+        warnings = [
+            record.getMessage()
+            for record in caplog.records
+            if record.levelno >= logging.WARNING
+        ]
+        assert len(warnings) == 2
+        for metric_name in missing:
+            assert sum(metric_name in message for message in warnings) == 1, (
+                f"expected exactly one warning for {metric_name}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_missing_metric_warning_repeats_after_unauthenticate(
+        self, authenticated_api, caplog
+    ):
+        """A new session (unauthenticate) may warn about the same metric again."""
+        metrics_data = load_test_data("metrics_test_device.json")
+        cm, _ = authenticated_api._session.make_cm_response(
+            status=200, json_data=metrics_data, headers={"ETag": "etag123"}
+        )
+        authenticated_api._session.get.return_value = cm
+
+        enabled = ["bt1", "missing_metric"]
+        with caplog.at_level(
+            logging.WARNING, logger="custom_components.qvantum.client.cloud.client"
+        ):
+            await authenticated_api.get_metrics("test_device", enabled_metrics=enabled)
+            await authenticated_api.unauthenticate()
+            # The next poll re-authenticates; keep the mocked credentials valid.
+            authenticated_api._token = "test_token"
+            authenticated_api._token_expiry = datetime.datetime(2100, 1, 1)
+            api_metrics = await authenticated_api.get_metrics(
+                "test_device", enabled_metrics=enabled
+            )
+
+        assert "bt1" in api_metrics["metrics"]
+        warnings = [
+            record.getMessage()
+            for record in caplog.records
+            if record.levelno >= logging.WARNING
+            and "missing_metric" in record.getMessage()
+        ]
+        assert len(warnings) == 2
 
     @pytest.mark.asyncio
     async def test_get_metrics_with_empty_enabled_metrics(self, authenticated_api):
