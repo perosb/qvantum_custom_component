@@ -123,6 +123,24 @@ def test_alarm_translations_exist_in_all_locales():
         assert data["device_automation"]["condition_type"]["is_alarm_active"], path.name
 
 
+def test_dhw_device_automation_translations_exist_in_all_locales():
+    """DHW device triggers and conditions have strings in every locale."""
+    trigger_keys = ("dhw_shower_started", "dhw_tank_low", "extra_dhw_finished")
+    condition_keys = (
+        "is_dhw_shower_active",
+        "is_dhw_tank_low",
+        "is_extra_dhw_active",
+    )
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        triggers = data["device_automation"]["trigger_type"]
+        conditions = data["device_automation"]["condition_type"]
+        for key in trigger_keys:
+            assert triggers[key], f"{path.name} missing {key}"
+        for key in condition_keys:
+            assert conditions[key], f"{path.name} missing {key}"
+
+
 def _entity_translation_keys(node: object, path: str = "entity") -> list[str]:
     """Yield translation-key path segments under entity.<domain>."""
     keys: list[str] = []

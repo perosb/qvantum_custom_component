@@ -12,6 +12,9 @@
       "wifi_disconnected": "{entity_name} mistede Wi-Fi-forbindelsen",
       "cloud_disconnected": "{entity_name} mistede cloudforbindelsen",
       "filter_soon_due": "{entity_name} filter skal snart udskiftes",
+      "dhw_shower_started": "{entity_name} registrerede varmtvandstapning",
+      "dhw_tank_low": "{entity_name} lav",
+      "extra_dhw_finished": "{entity_name} afsluttet",
       "alarm_active": "{entity_name} gik i alarm"
     },
     "condition_type": {
@@ -21,6 +24,9 @@
       "is_wifi_disconnected": "{entity_name} er afbrudt fra Wi-Fi",
       "is_cloud_disconnected": "{entity_name} er afbrudt fra cloud",
       "is_filter_soon_due": "{entity_name} filter skal snart udskiftes",
+      "is_dhw_shower_active": "{entity_name} rapporterer varmtvandstapning",
+      "is_dhw_tank_low": "{entity_name} er lav",
+      "is_extra_dhw_active": "{entity_name} er aktivt",
       "is_alarm_active": "{entity_name} har en aktiv alarm"
     }
   },

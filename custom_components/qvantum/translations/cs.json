@@ -12,6 +12,9 @@
       "wifi_disconnected": "{entity_name} se odpojil od Wi-Fi",
       "cloud_disconnected": "{entity_name} se odpojil od cloudu",
       "filter_soon_due": "{entity_name} filtr bude brzy nutné vyměnit",
+      "dhw_shower_started": "{entity_name} zaznamenalo odběr teplé vody",
+      "dhw_tank_low": "{entity_name} nízká",
+      "extra_dhw_finished": "{entity_name} dokončena",
       "alarm_active": "{entity_name} začal alarmovat"
     },
     "condition_type": {
@@ -21,6 +24,9 @@
       "is_wifi_disconnected": "{entity_name} je odpojený od Wi-Fi",
       "is_cloud_disconnected": "{entity_name} je odpojený od cloudu",
       "is_filter_soon_due": "{entity_name} filtr bude brzy nutné vyměnit",
+      "is_dhw_shower_active": "{entity_name} hlásí odběr teplé vody",
+      "is_dhw_tank_low": "{entity_name} je nízká",
+      "is_extra_dhw_active": "{entity_name} je aktivní",
       "is_alarm_active": "{entity_name} má aktivní alarm"
     }
   },
