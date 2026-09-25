@@ -25,21 +25,13 @@ with patch(
     "homeassistant.helpers.update_coordinator.CoordinatorEntity", MockCoordinatorEntity
 ):
     with patch("homeassistant.components.select.SelectEntity", MockSelectEntity):
-        with patch(
-            "custom_components.qvantum.const.SETTING_UPDATE_APPLIED",
-            "APPLIED",
-        ):
-            with patch(
-                "custom_components.qvantum.coordinator.handle_setting_update_response",
-                new_callable=AsyncMock,
-            ):
-                from homeassistant.helpers.device_registry import DeviceInfo
+        from homeassistant.helpers.device_registry import DeviceInfo
 
-                from custom_components.qvantum.select import (
-                    QvantumSelectEntity,
-                    async_setup_entry,
-                )
-                from custom_components.qvantum.const import HeatingCurveType, SensorMode
+        from custom_components.qvantum.select import (
+            QvantumSelectEntity,
+            async_setup_entry,
+        )
+        from custom_components.qvantum.const import HeatingCurveType, SensorMode
 
 
 @pytest.fixture
