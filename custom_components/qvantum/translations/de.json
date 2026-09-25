@@ -453,6 +453,14 @@
           "4": "Kühlung"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Heizkurven-Berater",
+        "state": {
+          "reduce": "Kurve senken",
+          "ok": "Kurve passt",
+          "increase": "Kurve anheben"
+        }
+      },
       "smart_dhw_status": {
         "name": "Intelligenter Status für Brauchwasser"
       },

@@ -105,7 +105,7 @@ async def async_setup_entry(
         )
 
     # Special metrics that have dedicated sensor classes (created explicitly below)
-    special_metrics = {"latency", "hpid", "tap_stop"}
+    special_metrics = {"latency", "hpid", "tap_stop", "heating_curve_advisor"}
 
     # Create entities using a hybrid approach:
     # - Disabled-by-default metrics: always create so they appear in the entity registry
@@ -142,10 +142,16 @@ async def async_setup_entry(
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device, True))
     sensors.append(QvantumTimerEntity(coordinator, "tap_stop", device, True))
     if coordinator.modbus_enabled:
-        # Local Modbus: display firmware from input registers 191-193.
+        # Local Modbus: display firmware from input registers 191-193 and the
+        # derived heating curve advisor (no cloud equivalent).
         sensors.append(
             QvantumDisplayFirmwareEntity(
                 coordinator, "display_fw_version", device, True
+            )
+        )
+        sensors.append(
+            QvantumHeatingCurveAdvisorEntity(
+                coordinator, "heating_curve_advisor", device, True
             )
         )
     else:
@@ -186,7 +192,7 @@ async def async_setup_entry(
     # Include special sensor keys so they are never removed by cleanup.
     special_sensor_keys = {"totalenergy", "latency", "hpid", "tap_stop"}
     if coordinator.modbus_enabled:
-        special_sensor_keys.add("display_fw_version")
+        special_sensor_keys.update({"display_fw_version", "heating_curve_advisor"})
     else:
         special_sensor_keys.update(
             {
@@ -397,6 +403,43 @@ class QvantumTotalEnergyEntity(QvantumEnergyEntity):
         compressor = self._values.get("compressorenergy")
         additional = self._values.get("additionalenergy")
         return self._is_data_valid(compressor, additional)
+
+
+class QvantumHeatingCurveAdvisorEntity(QvantumBaseSensorEntity):
+    """Modbus-only heating curve advisor derived from the room deviation.
+
+    The coordinator samples the indoor temperature against
+    ``indoor_temperature_target`` while heating. Once the rolling window is
+    full, the state is ``reduce`` (room consistently warmer than target),
+    ``increase`` (room consistently colder) or ``ok``.
+    """
+
+    @property
+    def native_value(self):
+        """Return the advised curve action."""
+        data = self._values.get(self._metric_key)
+        if not isinstance(data, dict):
+            return None
+        return data.get("state")
+
+    @property
+    def available(self):
+        """Check if an advice has been derived."""
+        return self.native_value is not None
+
+    @property
+    def extra_state_attributes(self):
+        """Return the deviation and the context behind the advice."""
+        data = self._values.get(self._metric_key)
+        if not isinstance(data, dict):
+            return None
+        return {
+            "mean_deviation_c": data.get("mean_deviation_c"),
+            "observed_hours": data.get("observed_hours"),
+            "window_hours": data.get("window_hours"),
+            "curve_type_heating": data.get("curve_type_heating"),
+            "bt1": data.get("bt1"),
+        }
 
 
 class QvantumDiagnosticEntity(QvantumBaseSensorEntity):

@@ -453,6 +453,14 @@
           "4": "Cooling"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Heating curve advisor",
+        "state": {
+          "reduce": "Reduce curve",
+          "ok": "Curve OK",
+          "increase": "Increase curve"
+        }
+      },
       "smart_dhw_status": {
         "name": "Smart status for hot water"
       },

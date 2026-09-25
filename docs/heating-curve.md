@@ -148,6 +148,25 @@ Writing 23 from HA **does** change Auto `cal_heat_temp` on Modbus. It is
 not the same as the app’s DUT fields. HA cannot reproduce the DUT
 generator.
 
+## Heating curve advisor
+
+**Modbus-only** derived sensor `heating_curve_advisor` that points at a likely
+curve change. It samples `room - indoor_temperature_target` (BT2, or the
+external room sensor when that source is selected) only while `hp_status` is
+Heating, over a rolling **6 h** window. Once the window is full:
+
+| Mean deviation | State | Suggested action |
+|---|---|---|
+| > +1.0 °C | `reduce` | Room consistently warmer than target — lower the curve |
+| < −1.0 °C | `increase` | Room consistently colder than target — raise the curve |
+| otherwise | `ok` | No change |
+
+The state is advice only; nothing is written automatically. Attributes carry
+`mean_deviation_c`, `observed_hours`, `window_hours` and the context behind the
+advice (`curve_type_heating`, `bt1`). The window lives in memory only, so it
+refills for up to 6 h after a restart; the sensor reports `ok` until then.
+Cloud mode does not create this sensor.
+
 ## Practical notes
 
 - After Auto from HA, 24–30 may still show the last User defined (or

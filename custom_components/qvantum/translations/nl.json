@@ -453,6 +453,14 @@
           "4": "Koeling"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Stooklijnadviseur",
+        "state": {
+          "reduce": "Stooklijn verlagen",
+          "ok": "Stooklijn correct",
+          "increase": "Stooklijn verhogen"
+        }
+      },
       "smart_dhw_status": {
         "name": "Slimme status voor warm water"
       },

@@ -30,9 +30,14 @@ from custom_components.qvantum.const import (
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_SESSION_GAP_SEC,
     DHW_SHOWER_DURATION_MIN,
+    HEATING_CURVE_ADVISOR_THRESHOLD_C,
+    HEATING_CURVE_ADVISOR_WINDOW_HOURS,
+    HP_STATUS_HEATING,
+    HP_STATUS_IDLE,
     MIN_MODBUS_SCAN_INTERVAL,
     MODBUS_SW_VERSION_REFRESH_INTERVAL,
     REQUIRED_METRICS,
+    SensorMode,
 )
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.util import dt as dt_util
@@ -1853,6 +1858,190 @@ class TestCalculateDhwPower:
             coordinator._calculate_dhw_power(values)
 
         assert values["dhwpower"] == 240.0
+
+
+class TestCalculateHeatingCurveAdvisor:
+    """Tests for _calculate_heating_curve_advisor."""
+
+    def _make_coordinator(self):
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            mock_hass = MagicMock()
+            mock_hass.data = {DOMAIN: MagicMock()}
+            mock_config_entry = MagicMock()
+            mock_config_entry.options.get.side_effect = lambda key, default=None: (
+                default
+            )
+            mock_config_entry.data = {}
+            mock_config_entry.unique_id = "test_device_123"
+            coordinator = QvantumDataUpdateCoordinator(
+                mock_hass, mock_config_entry, client=make_client_mock()
+            )
+            coordinator.data = None
+        return coordinator
+
+    @staticmethod
+    def _values(
+        deviation: float = 0.0, hp_status: int = HP_STATUS_HEATING
+    ) -> dict:
+        """Return a heating poll whose room deviates by ``deviation`` °C."""
+        return {
+            "bt2": 21.0 + deviation,
+            "indoor_temperature_target": 21.0,
+            "hp_status": hp_status,
+            "bt1": 5.0,
+            "curve_type_heating": 0,
+        }
+
+    def _advise(self, coordinator, values: dict) -> dict:
+        coordinator._calculate_heating_curve_advisor(values)
+        return values["heating_curve_advisor"]
+
+    def test_reports_ok_until_window_is_full(self):
+        """Advice requires a full window; before that the mean is informational."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 9, 25, 6, 0, 0, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            first = self._advise(coordinator, self._values(deviation=1.5))
+            assert first["state"] == "ok"
+            assert first["observed_hours"] == 0.0
+
+            mock_now.return_value = t0 + timedelta(hours=3)
+            midway = self._advise(coordinator, self._values(deviation=1.5))
+            assert midway["state"] == "ok"
+            assert midway["observed_hours"] == 3.0
+            assert midway["mean_deviation_c"] == 1.5
+
+            mock_now.return_value = t0 + timedelta(
+                hours=HEATING_CURVE_ADVISOR_WINDOW_HOURS
+            )
+            full = self._advise(coordinator, self._values(deviation=1.5))
+
+        assert full["state"] == "reduce"
+        assert full["mean_deviation_c"] == 1.5
+        assert full["observed_hours"] == HEATING_CURVE_ADVISOR_WINDOW_HOURS
+        assert full["window_hours"] == HEATING_CURVE_ADVISOR_WINDOW_HOURS
+        assert full["curve_type_heating"] == 0
+        assert full["bt1"] == 5.0
+
+    def test_increase_when_room_colder_than_target(self):
+        """A mean deviation below the negative threshold raises the curve."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 9, 25, 6, 0, 0, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            self._advise(coordinator, self._values(deviation=-1.5))
+            mock_now.return_value = t0 + timedelta(
+                hours=HEATING_CURVE_ADVISOR_WINDOW_HOURS
+            )
+            advice = self._advise(coordinator, self._values(deviation=-1.5))
+
+        assert advice["state"] == "increase"
+        assert advice["mean_deviation_c"] == -1.5
+
+    def test_ok_at_threshold_boundary(self):
+        """Exactly at ±threshold is still ok; only beyond it triggers advice."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 9, 25, 6, 0, 0, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            self._advise(
+                coordinator, self._values(deviation=HEATING_CURVE_ADVISOR_THRESHOLD_C)
+            )
+            mock_now.return_value = t0 + timedelta(
+                hours=HEATING_CURVE_ADVISOR_WINDOW_HOURS
+            )
+            advice = self._advise(
+                coordinator, self._values(deviation=HEATING_CURVE_ADVISOR_THRESHOLD_C)
+            )
+
+        assert advice["state"] == "ok"
+        assert advice["mean_deviation_c"] == HEATING_CURVE_ADVISOR_THRESHOLD_C
+
+    def test_samples_only_while_heating(self):
+        """Polls outside heating must not enter the window."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 9, 25, 6, 0, 0, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            self._advise(coordinator, self._values(deviation=1.5))
+
+            mock_now.return_value = t0 + timedelta(hours=3)
+            idle = self._advise(
+                coordinator,
+                self._values(deviation=20.0, hp_status=HP_STATUS_IDLE),
+            )
+
+        assert idle["mean_deviation_c"] == 1.5
+        assert idle["state"] == "ok"
+
+    def test_stale_window_resets_after_gap(self):
+        """A window whose samples aged out reports ok with no mean."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 9, 25, 6, 0, 0, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            self._advise(coordinator, self._values(deviation=1.5))
+
+            mock_now.return_value = t0 + timedelta(
+                hours=HEATING_CURVE_ADVISOR_WINDOW_HOURS + 1
+            )
+            idle = self._advise(
+                coordinator,
+                self._values(deviation=20.0, hp_status=HP_STATUS_IDLE),
+            )
+
+        assert idle["state"] == "ok"
+        assert idle["mean_deviation_c"] is None
+        assert idle["observed_hours"] == 0.0
+
+    def test_external_room_sensor_is_used(self):
+        """With an external room sensor selected, its reading drives the advice."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 9, 25, 6, 0, 0, tzinfo=timezone.utc)
+
+        def values():
+            return {
+                "sensor_mode": SensorMode.EXTERNAL,
+                "room_temp_external": 23.0,
+                "bt2": 19.0,
+                "indoor_temperature_target": 20.0,
+                "hp_status": HP_STATUS_HEATING,
+                "bt1": 5.0,
+                "curve_type_heating": 1,
+            }
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            self._advise(coordinator, values())
+            mock_now.return_value = t0 + timedelta(
+                hours=HEATING_CURVE_ADVISOR_WINDOW_HOURS
+            )
+            advice = self._advise(coordinator, values())
+
+        assert advice["state"] == "reduce"
+        assert advice["mean_deviation_c"] == 3.0
+        assert advice["curve_type_heating"] == 1
+
+    def test_missing_inputs_publish_nothing(self):
+        """Without indoor temperature or target the sensor stays unavailable."""
+        coordinator = self._make_coordinator()
+
+        values = {"bt2": 21.0, "hp_status": HP_STATUS_HEATING}
+        coordinator._calculate_heating_curve_advisor(values)
+        assert "heating_curve_advisor" not in values
+
+        values = {"indoor_temperature_target": 21.0, "hp_status": HP_STATUS_HEATING}
+        coordinator._calculate_heating_curve_advisor(values)
+        assert "heating_curve_advisor" not in values
 
 
 class TestCalculateTapWaterCap:

@@ -453,6 +453,14 @@
           "4": "Refroidissement"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Conseiller de courbe de chauffage",
+        "state": {
+          "reduce": "Réduire la courbe",
+          "ok": "Courbe correcte",
+          "increase": "Augmenter la courbe"
+        }
+      },
       "smart_dhw_status": {
         "name": "Statut Smart pour eau chaude"
       },

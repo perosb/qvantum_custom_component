@@ -519,6 +519,14 @@
           "4": "Kyler"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Kurvrådgivare",
+        "state": {
+          "reduce": "Sänk kurvan",
+          "ok": "Kurvan är bra",
+          "increase": "Höj kurvan"
+        }
+      },
       "smart_dhw_status": {
         "name": "Smart status för varmvatten"
       },
