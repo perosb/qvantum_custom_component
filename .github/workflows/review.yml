@@ -43,8 +43,31 @@ jobs:
             Review this pull request following the review conventions in
             AGENTS.md ("Code reviews", "What to flag").
 
-            Every inline comment must be actionable: one or two sentences of
-            why, then a concrete fix. When the fix is a drop-in replacement of
-            the commented lines, include a GitHub ```suggestion``` block so the
-            author can apply it in one click. Post the review immediately as a
-            review with event COMMENT; do not approve or leave it pending.
+            Post immediately as a pull request review with event COMMENT.
+            Do not approve, request changes, or leave the review pending.
+
+            Inline comments:
+            - Only on changed lines (diff RIGHT / new file).
+            - Actionable: one or two sentences of why, then a concrete fix.
+            - One issue per comment.
+
+            GitHub apply-in-one-click suggestions:
+            When the fix is a drop-in replacement of the exact line range you
+            commented on, the comment body MUST end with a suggestion block
+            and nothing after it:
+
+            ```suggestion
+            the full replacement text for those lines
+            ```
+
+            Rules for ```suggestion:
+            - Fence language is exactly "suggestion" (not python, not diff).
+            - The block is the new source only. No +/- prefixes, no surrounding
+              explanation inside the fence.
+            - It must replace the entire commented range 1:1: same number of
+              leading spaces, same line endings. If you change three lines,
+              the review comment must cover those three lines (start_line + line).
+            - Do not put the suggestion only in the review summary.
+            - Skip the suggestion block if the fix is not a literal line
+              replacement (renames across files, new files, logic that needs
+              more than the highlighted lines).
