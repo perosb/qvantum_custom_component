@@ -594,6 +594,7 @@ class TestSensorSetup:
 
         assert len(tap_stop_entities) == 1
         assert isinstance(tap_stop_entities[0], QvantumTimerEntity)
+        assert tap_stop_entities[0]._attr_device_class is SensorDeviceClass.TIMESTAMP
         assert unique_ids.count("qvantum_tap_stop_test_device_123") == 1
 
     @pytest.mark.asyncio
