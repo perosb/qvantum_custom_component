@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from custom_components.qvantum.coordinator import (
+    async_apply_setting,
     handle_setting_update_response,
     QvantumDataUpdateCoordinator,
     _firmware_metadata_from_sw_version,
@@ -253,6 +254,77 @@ class TestHandleSettingUpdateResponse:
         # Should not update data or refresh
         coordinator.async_set_updated_data.assert_not_called()
         # No refresh called
+
+
+class TestAsyncApplySetting:
+    """Test the async_apply_setting helper used by optimistic writers."""
+
+    @pytest.mark.asyncio
+    async def test_applies_value_and_extra_updates(self):
+        """Confirmed writes update the key and all extra updates together."""
+        coordinator = MagicMock()
+        coordinator.data = {"values": {"use_adaptive": False}}
+        coordinator.async_set_updated_data = MagicMock()
+
+        result = await async_apply_setting(
+            coordinator,
+            response={"status": "APPLIED"},
+            key="use_adaptive",
+            value=True,
+            extra_updates={"smart_sh_mode": 1, "smart_dhw_mode": 1},
+        )
+
+        assert result is True
+        assert coordinator.data["values"] == {
+            "use_adaptive": True,
+            "smart_sh_mode": 1,
+            "smart_dhw_mode": 1,
+        }
+        coordinator.async_set_updated_data.assert_called_once_with(coordinator.data)
+
+    @pytest.mark.asyncio
+    async def test_heatpump_status_applies_extra_updates(self):
+        """heatpump_status=APPLIED is enough to apply optimistic updates."""
+        coordinator = MagicMock()
+        coordinator.data = {"values": {"sensor_mode": 0}}
+        coordinator.async_set_updated_data = MagicMock()
+
+        result = await async_apply_setting(
+            coordinator,
+            response={"heatpump_status": "APPLIED"},
+            key="use_operation_sensor",
+            value=1,
+            extra_updates={"sensor_mode": 1},
+        )
+
+        assert result is True
+        assert coordinator.data["values"] == {
+            "use_operation_sensor": 1,
+            "sensor_mode": 1,
+        }
+        coordinator.async_set_updated_data.assert_called_once_with(coordinator.data)
+
+    @pytest.mark.asyncio
+    async def test_failed_response_keeps_data_untouched(self):
+        """A non-APPLIED response must not write the key or any extras."""
+        coordinator = MagicMock()
+        coordinator.data = {"values": {"use_adaptive": False, "smart_sh_mode": 0}}
+        coordinator.async_set_updated_data = MagicMock()
+
+        result = await async_apply_setting(
+            coordinator,
+            response={"status": "FAILED"},
+            key="use_adaptive",
+            value=True,
+            extra_updates={"smart_sh_mode": 1},
+        )
+
+        assert result is False
+        assert coordinator.data["values"] == {
+            "use_adaptive": False,
+            "smart_sh_mode": 0,
+        }
+        coordinator.async_set_updated_data.assert_not_called()
 
 
 class TestQvantumDataUpdateCoordinator:

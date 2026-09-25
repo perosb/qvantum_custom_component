@@ -75,24 +75,31 @@ _COMPRESSOR_TO_HP_STATUS_MAP = {
 }
 
 
-async def handle_setting_update_response(
-    api_response: Optional[dict[str, Any]],
-    coordinator: QvantumDataUpdateCoordinator,
-    data_section: Optional[str],
-    key: Optional[str],
-    value: Any,
-) -> bool:
-    """Handle API response for setting updates and update coordinator data if successful."""
-    success = bool(
+def _setting_update_applied(api_response: Optional[dict[str, Any]]) -> bool:
+    """Return True when the transport reports the setting as applied."""
+    return bool(
         api_response
         and (
             api_response.get("status") == SETTING_UPDATE_APPLIED
             or api_response.get("heatpump_status") == SETTING_UPDATE_APPLIED
         )
     )
-    if success and data_section and key is not None:
+
+
+async def handle_setting_update_response(
+    api_response: Optional[dict[str, Any]],
+    coordinator: QvantumDataUpdateCoordinator,
+    data_section: Optional[str],
+    key: Optional[str],
+    value: Any,
+    extra_updates: Optional[dict[str, Any]] = None,
+) -> bool:
+    """Handle API response for setting updates and update coordinator data if successful."""
+    if _setting_update_applied(api_response) and data_section and key is not None:
         section = coordinator.data.get(data_section)
         section[key] = value
+        if extra_updates:
+            section.update(extra_updates)
         if key == "extra_tap_water":
             _apply_extra_dhw_tap_stop(coordinator, section, value)
             # map_operation_mode prefers dhw_mode; keep it aligned with Extra on/off
@@ -105,6 +112,26 @@ async def handle_setting_update_response(
         coordinator.async_set_updated_data(coordinator.data)
         return True
     return False
+
+
+async def async_apply_setting(
+    coordinator: QvantumDataUpdateCoordinator,
+    *,
+    response: Optional[dict[str, Any]],
+    key: str,
+    value: Any,
+    extra_updates: Optional[dict[str, Any]] = None,
+) -> bool:
+    """Optimistically apply a confirmed setting write to coordinator data.
+
+    Entities call this after a write instead of repeating the ``APPLIED``
+    check: ``values[key]`` and ``extra_updates`` (for settings that must move
+    together, e.g. the SmartControl modes) are only applied when the
+    transport confirmed the write.
+    """
+    return await handle_setting_update_response(
+        response, coordinator, "values", key, value, extra_updates=extra_updates
+    )
 
 
 def _is_extra_dhw_on(value: Any) -> bool:
