@@ -10,12 +10,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .client.modbus.maps import heating_curve_points
-from .const import (
-    SETTING_UPDATE_APPLIED,
-    HeatingCurveType,
-    SensorMode,
-)
-from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .const import HeatingCurveType, SensorMode
+from .coordinator import QvantumDataUpdateCoordinator, async_apply_setting
 from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -105,13 +101,12 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
             response = await self.coordinator.async_write_metric(
                 self._hpid, "sensor_mode", option_value
             )
-            if response and (
-                response.get("status") == SETTING_UPDATE_APPLIED
-                or response.get("heatpump_status") == SETTING_UPDATE_APPLIED
-            ):
-                self.coordinator.data.get("values", {})["sensor_mode"] = option_value
-            await handle_setting_update_response(
-                response, self.coordinator, "values", self._metric_key, option_value
+            await async_apply_setting(
+                self.coordinator,
+                response=response,
+                key=self._metric_key,
+                value=option_value,
+                extra_updates={"sensor_mode": option_value},
             )
             return
 
@@ -120,15 +115,11 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
             response = await self.coordinator.client.set_curve_type_heating(
                 self._hpid, option_value
             )
-            if response and (
-                response.get("status") == SETTING_UPDATE_APPLIED
-                or response.get("heatpump_status") == SETTING_UPDATE_APPLIED
-            ):
-                self.coordinator.data.get("values", {})[
-                    self._metric_key
-                ] = option_value
-            await handle_setting_update_response(
-                response, self.coordinator, "values", self._metric_key, option_value
+            await async_apply_setting(
+                self.coordinator,
+                response=response,
+                key=self._metric_key,
+                value=option_value,
             )
             return
 
@@ -143,20 +134,19 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
         response = await self.coordinator.async_set_smartcontrol(
             self._hpid, sh_mode, dhw_mode
         )
-        # Handle response
         use_adaptive_value = option != "off"
-
-        # This needs to be handled here to update both modes together
-        if use_adaptive_value:
-            if response and (
-                response.get("status") == SETTING_UPDATE_APPLIED
-                or response.get("heatpump_status") == SETTING_UPDATE_APPLIED
-            ):
-                self.coordinator.data.get("values", {})["smart_sh_mode"] = sh_mode
-                self.coordinator.data.get("values", {})["smart_dhw_mode"] = dhw_mode
-
-        await handle_setting_update_response(
-            response, self.coordinator, "values", self._metric_key, use_adaptive_value
+        # Both SmartControl modes must move together with use_adaptive.
+        extra_updates = (
+            {"smart_sh_mode": sh_mode, "smart_dhw_mode": dhw_mode}
+            if use_adaptive_value
+            else None
+        )
+        await async_apply_setting(
+            self.coordinator,
+            response=response,
+            key=self._metric_key,
+            value=use_adaptive_value,
+            extra_updates=extra_updates,
         )
 
     @property
