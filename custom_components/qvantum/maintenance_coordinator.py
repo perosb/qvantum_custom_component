@@ -117,6 +117,13 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
             else:
                 _LOGGER.debug("No firmware changes detected for device %s", device_id)
 
+            # Sync the device registry on every successful check with the
+            # versions just fetched. The idempotent write keeps partial or
+            # outdated registry values from surviving a restart.
+            await self._update_device_registry_firmware_versions(
+                device_id, current_versions
+            )
+
             return {
                 "device_id": device_id,
                 "firmware_versions": current_versions,
@@ -158,14 +165,11 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
     async def _create_firmware_update_notifications(
         self, device_id: str, firmware_changes: list[dict[str, str]]
     ) -> None:
-        """Create persistent notifications for firmware updates and update device registry."""
+        """Create persistent notifications for firmware updates."""
         try:
             # Get device info for better notification context
             device_info = self.main_coordinator.data.get("device", {})
             device_name = device_info.get("model", f"Device {device_id}")
-
-            # Update device registry with new firmware versions
-            await self._update_device_registry_firmware_versions(device_id)
 
             # Create a notification for each firmware component that changed
             for change in firmware_changes:
@@ -216,12 +220,26 @@ The firmware has been automatically updated. No action is required.
         except Exception as err:
             _LOGGER.error("Error creating firmware update notification: %s", err)
 
-    async def _update_device_registry_firmware_versions(self, device_id: str) -> None:
-        """Update the device registry with current firmware versions."""
+    async def _update_device_registry_firmware_versions(
+        self, device_id: str, firmware_versions: dict
+    ) -> None:
+        """Sync the HA device registry with freshly fetched firmware versions."""
         try:
             from homeassistant.helpers.device_registry import async_get
 
             from .entity import async_get_qvantum_device_entry
+
+            display_version = firmware_versions.get("display_fw_version")
+            cc_version = firmware_versions.get("cc_fw_version")
+            inv_version = firmware_versions.get("inv_fw_version")
+
+            if not (display_version and cc_version and inv_version):
+                _LOGGER.debug(
+                    "Incomplete firmware version data for device %s", device_id
+                )
+                return
+
+            new_sw_version = f"{display_version}/{cc_version}/{inv_version}"
 
             device_entry = async_get_qvantum_device_entry(
                 self.hass,
@@ -233,31 +251,23 @@ The firmware has been automatically updated. No action is required.
                 _LOGGER.debug("Device entry not found for device %s", device_id)
                 return
 
-            # Get current firmware versions from the firmware coordinator data
-            firmware_versions = (
-                self.data.get("firmware_versions", {}) if self.data else {}
-            )
-            display_version = firmware_versions.get("display_fw_version")
-            cc_version = firmware_versions.get("cc_fw_version")
-            inv_version = firmware_versions.get("inv_fw_version")
-
-            if display_version and cc_version and inv_version:
-                new_sw_version = f"{display_version}/{cc_version}/{inv_version}"
-
-                # Update the device registry entry
-                async_get(self.hass).async_update_device(
-                    device_entry.id, sw_version=new_sw_version
-                )
-
-                _LOGGER.info(
-                    "Updated device registry firmware version for device %s to %s",
-                    device_id,
-                    new_sw_version,
-                )
-            else:
+            if device_entry.sw_version == new_sw_version:
                 _LOGGER.debug(
-                    "Incomplete firmware version data for device %s", device_id
+                    "Device registry firmware version for device %s is up to date",
+                    device_id,
                 )
+                return
+
+            # Update the device registry entry
+            async_get(self.hass).async_update_device(
+                device_entry.id, sw_version=new_sw_version
+            )
+
+            _LOGGER.info(
+                "Updated device registry firmware version for device %s to %s",
+                device_id,
+                new_sw_version,
+            )
 
         except Exception as err:
             _LOGGER.error("Error updating device registry firmware versions: %s", err)
