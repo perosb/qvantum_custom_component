@@ -676,6 +676,11 @@
           "off": "Vypnuto"
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Výměna filtru ventilace"
+      }
     }
   },
   "config": {

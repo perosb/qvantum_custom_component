@@ -676,6 +676,11 @@
           "off": "Av"
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Ventilationsfilterbyte"
+      }
     }
   },
   "config": {

@@ -145,6 +145,7 @@ _ENTITY_ICONS: dict[str, str] = {
     "cloud_connected": "mdi:cloud-check",
     "compressor_blocked_sec": "mdi:timer-sand",
     "ventilation_filter_time_left": "mdi:air-filter",
+    "ventilation_filter_due": "mdi:air-filter",
     "compressor_run_time": "mdi:timer-outline",
     "compressor_starts": "mdi:counter",
     "ventilation_fan_run_time": "mdi:fan-clock",

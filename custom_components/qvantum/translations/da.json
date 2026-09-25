@@ -676,6 +676,11 @@
           "off": "Fra"
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Ventilationsfilterudskiftning"
+      }
     }
   },
   "config": {

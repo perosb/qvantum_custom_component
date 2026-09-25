@@ -103,6 +103,14 @@ def test_runtime_sensor_translations_exist_in_all_locales():
             assert sensors[key]["name"], f"{path.name} missing {key}"
 
 
+def test_filter_calendar_translation_exists_in_all_locales():
+    """The Modbus-only filter calendar has a name in every locale."""
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        name = data["entity"]["calendar"]["ventilation_filter_due"]["name"]
+        assert name, f"{path.name} missing filter calendar name"
+
+
 def test_alarm_translations_exist_in_all_locales():
     """Modbus alarm entities have names and device-automation strings."""
     sensor_keys = (

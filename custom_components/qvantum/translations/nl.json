@@ -676,6 +676,11 @@
           "off": "Uit"
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Vervanging ventilatiefilter"
+      }
     }
   },
   "config": {

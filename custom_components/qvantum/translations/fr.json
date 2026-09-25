@@ -676,6 +676,11 @@
           "off": "Arrêt"
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Remplacement du filtre de ventilation"
+      }
     }
   },
   "config": {

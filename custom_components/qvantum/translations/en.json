@@ -676,6 +676,11 @@
           "off": "Off"
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Ventilation filter replacement"
+      }
     }
   },
   "config": {

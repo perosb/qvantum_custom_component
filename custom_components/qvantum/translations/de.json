@@ -676,6 +676,11 @@
           "off": "Aus"
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Lüftungsfilterwechsel"
+      }
     }
   },
   "config": {
