@@ -453,6 +453,14 @@
           "4": "Jäähdytys"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Lämmityskäyräneuvoja",
+        "state": {
+          "reduce": "Laske käyrää",
+          "ok": "Käyrä on sopiva",
+          "increase": "Nosta käyrää"
+        }
+      },
       "smart_dhw_status": {
         "name": "Älykäs käyttöveden tila"
       },

@@ -163,6 +163,7 @@ _ENTITY_ICONS: dict[str, str] = {
     "picpin_relay_ha12": "mdi:pump",
     # Sensors
     "tap_water_cap": "mdi:account-group",
+    "heating_curve_advisor": "mdi:tune-variant",
     "fanrpm": "mdi:fan",
     "compressormeasuredspeed": "mdi:turbine",
     "degree_minute": "mdi:metronome",

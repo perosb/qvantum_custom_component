@@ -453,6 +453,14 @@
           "4": "Køling"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Varmekurverådgiver",
+        "state": {
+          "reduce": "Sænk kurven",
+          "ok": "Kurven er fin",
+          "increase": "Hæv kurven"
+        }
+      },
       "smart_dhw_status": {
         "name": "Smart-status for varmt vand"
       },

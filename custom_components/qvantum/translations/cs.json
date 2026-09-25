@@ -453,6 +453,14 @@
           "4": "Chlazení"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Poradce topné křivky",
+        "state": {
+          "reduce": "Snížit křivku",
+          "ok": "Křivka je v pořádku",
+          "increase": "Zvýšit křivku"
+        }
+      },
       "smart_dhw_status": {
         "name": "Smart stav teplé vody"
       },

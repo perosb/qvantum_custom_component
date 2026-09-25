@@ -57,6 +57,7 @@ with patch(
                 QvantumEnergyEntity,
                 QvantumFirmwareLastCheckSensorEntity,
                 QvantumFirmwareSensorEntity,
+                QvantumHeatingCurveAdvisorEntity,
                 QvantumPowerEntity,
                 QvantumPressureEntity,
                 QvantumTemperatureEntity,
@@ -467,6 +468,54 @@ class TestQvantumTotalEnergyEntity:
         assert entity.available is False
 
 
+class TestQvantumHeatingCurveAdvisorEntity:
+    """Test the QvantumHeatingCurveAdvisorEntity class."""
+
+    def test_state_and_attributes(self, mock_coordinator, mock_device):
+        """The advisor exposes the derived state and its context."""
+        expected_attributes = {
+            "mean_deviation_c": 1.5,
+            "observed_hours": 6.0,
+            "window_hours": 6.0,
+            "curve_type_heating": 0,
+            "bt1": 5.0,
+        }
+        mock_coordinator.data["values"]["heating_curve_advisor"] = {
+            "state": "reduce",
+            **expected_attributes,
+        }
+        entity = QvantumHeatingCurveAdvisorEntity(
+            mock_coordinator, "heating_curve_advisor", mock_device, True
+        )
+
+        assert entity.native_value == "reduce"
+        assert entity.available is True
+        assert entity.extra_state_attributes == expected_attributes
+        assert getattr(entity, "_attr_device_class", None) is None
+        assert entity._attr_icon == "mdi:tune-variant"
+
+    def test_unavailable_without_advice(self, mock_coordinator, mock_device):
+        """No derived advice means no state and no attributes."""
+        entity = QvantumHeatingCurveAdvisorEntity(
+            mock_coordinator, "heating_curve_advisor", mock_device, True
+        )
+
+        assert entity.native_value is None
+        assert entity.available is False
+        assert entity.extra_state_attributes is None
+
+    def test_non_dict_value_is_treated_as_missing(self, mock_coordinator, mock_device):
+        """A plain metric value cannot satisfy the advisor contract."""
+        mock_coordinator.data["values"]["heating_curve_advisor"] = "reduce"
+        entity = QvantumHeatingCurveAdvisorEntity(
+            mock_coordinator, "heating_curve_advisor", mock_device, True
+        )
+
+        assert entity.native_value is None
+        assert entity.available is False
+        assert entity.extra_state_attributes is None
+
+
 class TestQvantumDiagnosticEntity:
     """Test the QvantumDiagnosticEntity class."""
 
@@ -748,6 +797,7 @@ class TestSensorSetup:
         assert "hpid" in allowed
         assert "tap_stop" in allowed
         assert "display_fw_version" in allowed
+        assert "heating_curve_advisor" in allowed
         assert "expiresAt" not in allowed
         assert "firmware_last_check" not in allowed
 
@@ -798,6 +848,57 @@ class TestSensorSetup:
         entities = async_add_entities.call_args[0][0]
         assert not any(
             isinstance(entity, QvantumDisplayFirmwareEntity) for entity in entities
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_creates_heating_curve_advisor(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Modbus mode exposes the derived heating curve advisor once."""
+        from custom_components.qvantum.const import CONF_MODBUS_TCP
+
+        mock_config_entry.options = {CONF_MODBUS_TCP: True}
+        mock_coordinator.modbus_enabled = True
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        advisors = [
+            entity
+            for entity in entities
+            if isinstance(entity, QvantumHeatingCurveAdvisorEntity)
+        ]
+
+        assert len(advisors) == 1
+        assert (
+            advisors[0]._attr_unique_id
+            == "qvantum_heating_curve_advisor_test_device_123"
+        )
+        assert advisors[0]._attr_translation_key == "heating_curve_advisor"
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_http_does_not_create_heating_curve_advisor(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """The advisor is derived from Modbus-only metrics; cloud mode skips it."""
+        mock_coordinator.modbus_enabled = False
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        assert not any(
+            isinstance(entity, QvantumHeatingCurveAdvisorEntity)
+            for entity in entities
         )
 
     @pytest.mark.asyncio

@@ -453,6 +453,14 @@
           "4": "Hűtés"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Fűtési görbe tanácsadó",
+        "state": {
+          "reduce": "Görbe csökkentése",
+          "ok": "Görbe megfelelő",
+          "increase": "Görbe növelése"
+        }
+      },
       "smart_dhw_status": {
         "name": "Intelligens állapot melegvízhez"
       },

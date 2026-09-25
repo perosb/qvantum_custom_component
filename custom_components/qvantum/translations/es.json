@@ -453,6 +453,14 @@
           "4": "Refrigeración"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Asesor de curva de calefacción",
+        "state": {
+          "reduce": "Bajar la curva",
+          "ok": "Curva correcta",
+          "increase": "Subir la curva"
+        }
+      },
       "smart_dhw_status": {
         "name": "Estado inteligente agua caliente sanitaria"
       },

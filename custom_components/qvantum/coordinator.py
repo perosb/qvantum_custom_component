@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import deque
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
 from homeassistant.config_entries import ConfigEntry
@@ -251,6 +252,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._tap_water_cap_zero_mode: bool = False
         self._tap_water_cap_reheating_floor_mode: bool = False
         self._tap_water_cap_start_time: datetime | None = None
+        self._heating_curve_deviations: deque[tuple[float, float]] = deque()
+        self._heating_curve_window_start: float | None = None
         self._last_persisted_dhw_state: tuple | None = None
         self._dhw_store: Store = Store(
             hass, 1, f"{DOMAIN}.dhw_ema.{config_entry.entry_id}"
@@ -950,6 +953,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._calculate_heating_power(values)
                 self._calculate_dhw_power(values)
                 self._calculate_tap_water_cap(values)
+                self._calculate_heating_curve_advisor(values)
                 self._persist_dhw_state()
 
             _LOGGER.debug("Final values: %s", values)

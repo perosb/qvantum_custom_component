@@ -453,6 +453,14 @@
           "4": "Chłodzenie"
         }
       },
+      "heating_curve_advisor": {
+        "name": "Doradca krzywej grzewczej",
+        "state": {
+          "reduce": "Obniż krzywą",
+          "ok": "Krzywa w porządku",
+          "increase": "Podnieś krzywą"
+        }
+      },
       "smart_dhw_status": {
         "name": "Status Smart dla ciepłej wody"
       },

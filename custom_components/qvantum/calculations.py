@@ -27,7 +27,10 @@ from .const import (
     DHW_SHOWER_DURATION_MIN,
     DHW_SHOWER_TEMP_C,
     DHW_TANK_VOLUME_L,
+    HEATING_CURVE_ADVISOR_THRESHOLD_C,
+    HEATING_CURVE_ADVISOR_WINDOW_HOURS,
     HP_STATUS_HEATING,
+    SensorMode,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -123,6 +126,85 @@ class QvantumCalculationsMixin:
             last_energy_attr="_last_dhwenergy",
             last_time_attr="_last_dhwenergy_time",
             mode_label="dhw",
+        )
+
+    def _calculate_heating_curve_advisor(self, values: dict) -> None:
+        """Derive heating_curve_advisor from indoor temperature vs target.
+
+        Samples ``indoor temperature - indoor_temperature_target`` only while
+        the heat pump is actively heating; outside heating the deviation says
+        nothing about the heating curve. Once the rolling window covers
+        ``HEATING_CURVE_ADVISOR_WINDOW_HOURS``, a mean deviation beyond
+        ``HEATING_CURVE_ADVISOR_THRESHOLD_C`` suggests lowering the curve
+        (room consistently too warm) or raising it (room consistently too
+        cold). The window lives in memory only and starts over after a
+        restart.
+        """
+        sensor_mode = values.get("sensor_mode")
+        if sensor_mode is None:
+            sensor_mode = values.get("use_operation_sensor")
+        indoor_temp = None
+        # Fall back to bt2 when the selected sensor has no reading.
+        for key in (*SensorMode.current_temperature_keys(sensor_mode), "bt2"):
+            indoor_temp = values.get(key)
+            if indoor_temp is not None:
+                break
+        target = values.get("indoor_temperature_target")
+        if indoor_temp is None or target is None:
+            return
+
+        now_ts = dt_util.utcnow().timestamp()
+        window_sec = HEATING_CURVE_ADVISOR_WINDOW_HOURS * 3600.0
+        history = self._heating_curve_deviations
+
+        if values.get("hp_status") == HP_STATUS_HEATING:
+            if not history:
+                self._heating_curve_window_start = now_ts
+            history.append((now_ts, indoor_temp - target))
+
+        cutoff = now_ts - window_sec
+        while history and history[0][0] < cutoff:
+            history.popleft()
+        if not history:
+            self._heating_curve_window_start = None
+        elif self._heating_curve_window_start is None:
+            self._heating_curve_window_start = history[0][0]
+
+        window_start = self._heating_curve_window_start
+        if window_start is not None:
+            observed_sec = min(now_ts - window_start, window_sec)
+        else:
+            observed_sec = 0.0
+        ready = window_start is not None and now_ts - window_start >= window_sec
+
+        mean_deviation = None
+        if history:
+            mean_deviation = sum(sample[1] for sample in history) / len(history)
+
+        state = "ok"
+        if ready and mean_deviation is not None:
+            if mean_deviation > HEATING_CURVE_ADVISOR_THRESHOLD_C:
+                state = "reduce"
+            elif mean_deviation < -HEATING_CURVE_ADVISOR_THRESHOLD_C:
+                state = "increase"
+
+        values["heating_curve_advisor"] = {
+            "state": state,
+            "mean_deviation_c": (
+                round(mean_deviation, 2) if mean_deviation is not None else None
+            ),
+            "observed_hours": round(observed_sec / 3600.0, 1),
+            "window_hours": HEATING_CURVE_ADVISOR_WINDOW_HOURS,
+            "curve_type_heating": values.get("curve_type_heating"),
+            "bt1": values.get("bt1"),
+        }
+        _LOGGER.debug(
+            "Calculated heating_curve_advisor=%s (mean_deviation=%.2f°C, observed=%.1fh, window=%.1fh, samples=%d)",
+            state,
+            mean_deviation if mean_deviation is not None else 0.0,
+            observed_sec / 3600.0,
+            HEATING_CURVE_ADVISOR_WINDOW_HOURS,
+            len(history),
         )
 
     def _finalize_tap_water_session(self, *, tank_temp: float | None) -> None:

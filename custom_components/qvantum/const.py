@@ -43,6 +43,13 @@ HP_STATUS_HOT_WATER = 2
 HP_STATUS_HEATING = 3
 HP_STATUS_COOLING = 4
 
+# Heating curve advisor: rolling window of the indoor-temperature deviation
+# from the target while heating. A mean deviation beyond the threshold across
+# a full window suggests lowering (room too warm) or raising (room too cold)
+# the heating curve.
+HEATING_CURVE_ADVISOR_WINDOW_HOURS = 6.0
+HEATING_CURVE_ADVISOR_THRESHOLD_C = 1.0
+
 # Cloud/HTTP `sensor_mode` setting names (same meanings as SensorMode).
 SENSOR_MODE_HTTP_BT2 = "bt2"
 SENSOR_MODE_HTTP_EXT_ROOM_SENSOR = "ext_room_sensor"
@@ -167,6 +174,7 @@ DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "dhwpower",  # Derived from dhwenergy delta; only meaningful with fast Modbus polling
     "tap_water_cap",  # Derived from bt30/bt33/bf1_l_min; only computed in Modbus mode
     "tap_water_minutes",  # Minutes of hot water remaining; companion to tap_water_cap
+    "heating_curve_advisor",  # Derived from indoor temp vs target while heating; only computed in Modbus mode
     "smart_dhw_control_status",
     "compressor_state",
     "picpin_relay_pump",
@@ -327,6 +335,11 @@ REQUIRED_MODBUS_METRICS = [
     "bt30",  # Tank temperature
     "bt33",  # Cold water inlet temperature
     "bf1_l_min",  # DHW flow rate
+    # Required by the heating curve advisor derived metric in Modbus mode.
+    # bt2 is already in REQUIRED_METRICS, and indoor_temperature_target comes
+    # from the holding-register settings that are always read.
+    "hp_status",
+    "bt1",
 ]
 
 # Sensor type classification (substring match in _get_sensor_type).
