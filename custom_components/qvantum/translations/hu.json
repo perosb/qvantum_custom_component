@@ -12,6 +12,9 @@
       "wifi_disconnected": "{entity_name} Wi-Fi-kapcsolata megszakadt",
       "cloud_disconnected": "{entity_name} felhőkapcsolata megszakadt",
       "filter_soon_due": "{entity_name} szűrője hamarosan cserére szorul",
+      "dhw_shower_started": "{entity_name} melegvíz-vételezést észlelt",
+      "dhw_tank_low": "{entity_name} alacsonyra csökkent",
+      "extra_dhw_finished": "{entity_name} befejeződött",
       "alarm_active": "{entity_name} riasztást adott"
     },
     "condition_type": {
@@ -21,6 +24,9 @@
       "is_wifi_disconnected": "{entity_name} Wi-Fi-kapcsolata megszakadt",
       "is_cloud_disconnected": "{entity_name} felhőkapcsolata megszakadt",
       "is_filter_soon_due": "{entity_name} szűrője hamarosan cserére szorul",
+      "is_dhw_shower_active": "{entity_name} melegvíz-vételezést jelez",
+      "is_dhw_tank_low": "{entity_name} alacsony",
+      "is_extra_dhw_active": "{entity_name} aktív",
       "is_alarm_active": "{entity_name} aktív riasztással rendelkezik"
     }
   },

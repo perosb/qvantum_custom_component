@@ -12,6 +12,9 @@
       "wifi_disconnected": "{entity_name} utraciło połączenie z Wi-Fi",
       "cloud_disconnected": "{entity_name} utraciło połączenie z chmurą",
       "filter_soon_due": "{entity_name} filtr wkrótce wymaga wymiany",
+      "dhw_shower_started": "{entity_name} wykrył pobór ciepłej wody",
+      "dhw_tank_low": "{entity_name} niska",
+      "extra_dhw_finished": "{entity_name} zakończona",
       "alarm_active": "{entity_name} zgłosił alarm"
     },
     "condition_type": {
@@ -21,6 +24,9 @@
       "is_wifi_disconnected": "{entity_name} jest odłączone od Wi-Fi",
       "is_cloud_disconnected": "{entity_name} jest odłączone od chmury",
       "is_filter_soon_due": "{entity_name} filtr wkrótce wymaga wymiany",
+      "is_dhw_shower_active": "{entity_name} zgłasza pobór ciepłej wody",
+      "is_dhw_tank_low": "{entity_name} jest niska",
+      "is_extra_dhw_active": "{entity_name} jest aktywna",
       "is_alarm_active": "{entity_name} ma aktywny alarm"
     }
   },

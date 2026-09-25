@@ -381,6 +381,9 @@ DHW_FLOW_SNAPSHOT_THRESHOLD_LPM = 0.1  # Minimum flow used to sample cold/flow v
 DHW_MIN_SHOWER_FLOW_LPM = (
     3.0  # Minimum flow threshold used to open/continue shower sessions and to qualify completed sessions for EMA learning
 )
+DHW_TANK_LOW_SHOWERS = (
+    2.0  # Remaining showers at or below which the tank-low device trigger/condition fires
+)
 DHW_DEFAULT_COLD_TEMP_C = (
     8.0  # Default cold water temperature when no recent observation (°C)
 )

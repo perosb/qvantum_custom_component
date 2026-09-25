@@ -7,7 +7,6 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.const import (
-    CONF_BELOW,
     CONF_CONDITION,
     CONF_DEVICE_ID,
     CONF_DOMAIN,
@@ -25,13 +24,11 @@ from homeassistant.helpers.typing import ConfigType
 from .const import DOMAIN
 from .device_automation_helpers import (
     BINARY_CONDITION_MAP,
-    CONDITION_FILTER_SOON_DUE,
-    FILTER_METRIC,
+    NUMERIC_CONDITION_MAP,
     async_entries_for_status_metrics,
-    filter_below_hours,
 )
 
-CONDITION_TYPES = set(BINARY_CONDITION_MAP) | {CONDITION_FILTER_SOON_DUE}
+CONDITION_TYPES = set(BINARY_CONDITION_MAP) | set(NUMERIC_CONDITION_MAP)
 
 CONDITION_SCHEMA = cv.DEVICE_CONDITION_BASE_SCHEMA.extend(
     {
@@ -62,15 +59,17 @@ async def async_get_conditions(
             }
         )
 
-    filter_entry = entries.get(FILTER_METRIC)
-    if filter_entry is not None:
+    for condition_type, (metric, _bound, _threshold) in NUMERIC_CONDITION_MAP.items():
+        entry = entries.get(metric)
+        if entry is None:
+            continue
         conditions.append(
             {
                 CONF_CONDITION: "device",
                 CONF_DOMAIN: DOMAIN,
                 CONF_DEVICE_ID: device_id,
-                CONF_ENTITY_ID: filter_entry.id,
-                CONF_TYPE: CONDITION_FILTER_SOON_DUE,
+                CONF_ENTITY_ID: entry.id,
+                CONF_TYPE: condition_type,
             }
         )
 
@@ -85,11 +84,12 @@ def async_condition_from_config(
     condition_type = config[CONF_TYPE]
     entity_id = config[CONF_ENTITY_ID]
 
-    if condition_type == CONDITION_FILTER_SOON_DUE:
+    if condition_type in NUMERIC_CONDITION_MAP:
+        _metric, bound, threshold = NUMERIC_CONDITION_MAP[condition_type]
         numeric_config: dict[str, Any] = {
             CONF_CONDITION: "numeric_state",
             CONF_ENTITY_ID: entity_id,
-            CONF_BELOW: filter_below_hours(),
+            bound: threshold,
         }
         numeric_config = cv.NUMERIC_STATE_CONDITION_SCHEMA(numeric_config)
         numeric_config = condition.numeric_state_validate_config(hass, numeric_config)

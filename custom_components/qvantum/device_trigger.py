@@ -26,13 +26,11 @@ from homeassistant.helpers.typing import ConfigType
 from .const import DOMAIN
 from .device_automation_helpers import (
     BINARY_TRIGGER_MAP,
-    FILTER_METRIC,
-    TRIGGER_FILTER_SOON_DUE,
+    NUMERIC_TRIGGER_MAP,
     async_entries_for_status_metrics,
-    filter_below_hours,
 )
 
-TRIGGER_TYPES = set(BINARY_TRIGGER_MAP) | {TRIGGER_FILTER_SOON_DUE}
+TRIGGER_TYPES = set(BINARY_TRIGGER_MAP) | set(NUMERIC_TRIGGER_MAP)
 
 TRIGGER_SCHEMA = DEVICE_TRIGGER_BASE_SCHEMA.extend(
     {
@@ -63,15 +61,17 @@ async def async_get_triggers(
             }
         )
 
-    filter_entry = entries.get(FILTER_METRIC)
-    if filter_entry is not None:
+    for trigger_type, (metric, _bound, _threshold) in NUMERIC_TRIGGER_MAP.items():
+        entry = entries.get(metric)
+        if entry is None:
+            continue
         triggers.append(
             {
                 CONF_PLATFORM: "device",
                 CONF_DOMAIN: DOMAIN,
                 CONF_DEVICE_ID: device_id,
-                CONF_ENTITY_ID: filter_entry.id,
-                CONF_TYPE: TRIGGER_FILTER_SOON_DUE,
+                CONF_ENTITY_ID: entry.id,
+                CONF_TYPE: trigger_type,
             }
         )
 
@@ -88,11 +88,12 @@ async def async_attach_trigger(
     trigger_type = config[CONF_TYPE]
     entity_id = config[CONF_ENTITY_ID]
 
-    if trigger_type == TRIGGER_FILTER_SOON_DUE:
+    if trigger_type in NUMERIC_TRIGGER_MAP:
+        _metric, bound, threshold = NUMERIC_TRIGGER_MAP[trigger_type]
         numeric_config: dict[str, Any] = {
             numeric_state_trigger.CONF_PLATFORM: "numeric_state",
             numeric_state_trigger.CONF_ENTITY_ID: entity_id,
-            numeric_state_trigger.CONF_BELOW: filter_below_hours(),
+            bound: threshold,
         }
         numeric_config = await numeric_state_trigger.async_validate_trigger_config(
             hass, numeric_config
