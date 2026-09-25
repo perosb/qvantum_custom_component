@@ -131,6 +131,11 @@ async def test_modbus_mode_structure(hass):
     assert result["coordinator"]["modbus_enabled"] is True
     assert result["coordinator"]["modbus_writable"] is True
     assert result["extra_dhw"] == {"restore_at": 1712232000.0, "armed": True}
+    assert result["modbus_link"] == {
+        "host": "Qvantum-HP",
+        "port": 502,
+        "unit_id": 1,
+    }
     # Maintenance coordinator exists only in cloud mode.
     assert result["maintenance"] is None
 
