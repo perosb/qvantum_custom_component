@@ -428,7 +428,7 @@ class QvantumTimerEntity(QvantumBaseSensorEntity):
     ) -> None:
         super().__init__(coordinator, metric_key, device, enabled_by_default)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_device_class = "timestamp"
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP
 
     @property
     def native_value(self):
