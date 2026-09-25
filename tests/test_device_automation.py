@@ -46,7 +46,33 @@ def _entry(*, unique_id: str, domain: str, entry_id: str = "uuid-1") -> SimpleNa
         domain=domain,
         id=entry_id,
         entity_id=f"{domain}.stub",
+        config_entry_id="entry-1",
     )
+
+
+def _hass_with_write_access(
+    *,
+    modbus: bool = False,
+    writable: bool = False,
+    write_access_level: int | None = None,
+) -> MagicMock:
+    """Build a hass stub whose config entry reports the given write access."""
+    coordinator = SimpleNamespace(
+        modbus_enabled=modbus, client=SimpleNamespace(writable=writable)
+    )
+    maintenance = SimpleNamespace(
+        data=None
+        if write_access_level is None
+        else {"access_level": {"writeAccessLevel": write_access_level}}
+    )
+    runtime = SimpleNamespace(
+        coordinator=coordinator, maintenance_coordinator=maintenance
+    )
+    hass = MagicMock()
+    hass.config_entries.async_get_entry.return_value = SimpleNamespace(
+        runtime_data=runtime
+    )
+    return hass
 
 
 def test_metric_from_unique_id_extracts_status_metrics():
@@ -165,7 +191,7 @@ def test_condition_schema_accepts_filter_soon_due():
 
 
 def test_async_entries_for_status_metrics_filters_domain_and_collisions():
-    hass = MagicMock()
+    hass = _hass_with_write_access(modbus=True, writable=True)
     entries = [
         _entry(
             unique_id="qvantum_wifi_connected_1",
@@ -224,6 +250,104 @@ def test_async_entries_for_status_metrics_filters_domain_and_collisions():
     assert found["wifi_connected"].id == "e-wifi"
     assert found["ventilation_filter_time_left"].id == "e-filter"
     assert found["extra_tap_water"].id == "e-extra"
+
+
+@pytest.mark.parametrize(
+    ("hass_kwargs", "writable_switch"),
+    [
+        ({"modbus": True, "writable": True}, True),
+        ({"modbus": True, "writable": False}, False),
+        ({"modbus": False, "write_access_level": 20}, True),
+        ({"modbus": False, "write_access_level": 10}, False),
+        ({"modbus": False}, False),
+    ],
+)
+def test_async_entries_for_status_metrics_gates_switch_on_write_access(
+    hass_kwargs, writable_switch
+):
+    """The extra-DHW switch is only listed when its entity can change state."""
+    entries = [
+        _entry(
+            unique_id="qvantum_extra_tap_water_1",
+            domain="switch",
+            entry_id="e-extra",
+        ),
+        _entry(unique_id="qvantum_bf1_l_min_1", domain="sensor", entry_id="e-flow"),
+    ]
+    hass = _hass_with_write_access(**hass_kwargs)
+    registry = MagicMock()
+    with (
+        patch(
+            "custom_components.qvantum.device_automation_helpers.er.async_get",
+            return_value=registry,
+        ),
+        patch(
+            "custom_components.qvantum.device_automation_helpers.er.async_entries_for_device",
+            return_value=entries,
+        ),
+    ):
+        found = async_entries_for_status_metrics(hass, "ha-device")
+
+    assert ("extra_tap_water" in found) is writable_switch
+    assert "bf1_l_min" in found  # sensor-backed metrics are never gated
+
+
+@pytest.mark.asyncio
+async def test_async_get_triggers_omits_extra_dhw_without_write_access():
+    """Read-only installs are not offered a trigger that can never fire."""
+    entries = [
+        _entry(
+            unique_id="qvantum_extra_tap_water_1",
+            domain="switch",
+            entry_id="e-extra",
+        ),
+        _entry(unique_id="qvantum_bf1_l_min_1", domain="sensor", entry_id="e-flow"),
+    ]
+    hass = _hass_with_write_access(modbus=True, writable=False)
+    with (
+        patch(
+            "custom_components.qvantum.device_automation_helpers.er.async_get",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.qvantum.device_automation_helpers.er.async_entries_for_device",
+            return_value=entries,
+        ),
+    ):
+        triggers = await device_trigger.async_get_triggers(hass, "ha-device")
+
+    types = {t[CONF_TYPE] for t in triggers}
+    assert "extra_dhw_finished" not in types
+    assert TRIGGER_DHW_SHOWER_STARTED in types
+
+
+@pytest.mark.asyncio
+async def test_async_get_conditions_omit_extra_dhw_without_write_access():
+    """The extra-DHW condition cannot pass without write access either."""
+    entries = [
+        _entry(
+            unique_id="qvantum_extra_tap_water_1",
+            domain="switch",
+            entry_id="e-extra",
+        ),
+        _entry(unique_id="qvantum_bf1_l_min_1", domain="sensor", entry_id="e-flow"),
+    ]
+    hass = _hass_with_write_access(modbus=False, write_access_level=10)
+    with (
+        patch(
+            "custom_components.qvantum.device_automation_helpers.er.async_get",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.qvantum.device_automation_helpers.er.async_entries_for_device",
+            return_value=entries,
+        ),
+    ):
+        conditions = await device_condition.async_get_conditions(hass, "ha-device")
+
+    types = {c[CONF_TYPE] for c in conditions}
+    assert "is_extra_dhw_active" not in types
+    assert CONDITION_DHW_SHOWER_ACTIVE in types
 
 
 @pytest.mark.asyncio

@@ -30,7 +30,7 @@ BINARY_STATUS_METRICS: dict[str, str] = {
 SENSOR_STATUS_METRICS: dict[str, str] = {
     "ventilation_filter_time_left": "sensor",
     "bf1_l_min": "sensor",  # DHW flow rate; rises for any tap-water draw
-    "tap_water_cap": "sensor",  # Modbus-only derived showers remaining
+    "tap_water_cap": "sensor",  # Showers remaining; Modbus derives, cloud reports
 }
 
 SWITCH_STATUS_METRICS: dict[str, str] = {
@@ -92,7 +92,8 @@ NUMERIC_TRIGGER_MAP: dict[str, tuple[str, str, float]] = {
         "above",
         float(DHW_MIN_SHOWER_FLOW_LPM),
     ),
-    # tap_water_cap is Modbus-only; the registry lookup gates the trigger.
+    # Enabled by default only via Modbus; cloud also reports tap_water_cap
+    # (disabled by default there), so the registry lookup gates the trigger.
     TRIGGER_DHW_TANK_LOW: ("tap_water_cap", "below", DHW_TANK_LOW_SHOWERS),
 }
 
@@ -146,10 +147,35 @@ def metric_from_unique_id(unique_id: str | None) -> str | None:
     return None
 
 
+def _switch_metric_writable(hass: HomeAssistant, entry: er.RegistryEntry) -> bool:
+    """Return whether a switch-backed status metric can ever change state.
+
+    Mirrors ``QvantumAccessMixin._has_write_access`` for switch metrics:
+    Modbus writes are opt-in and cloud accounts need ``writeAccessLevel`` 20,
+    and without write access the switch entity stays unavailable. Listing its
+    trigger or condition anyway would offer one that can never fire.
+    """
+    config_entry = hass.config_entries.async_get_entry(entry.config_entry_id)
+    runtime = getattr(config_entry, "runtime_data", None)
+    coordinator = getattr(runtime, "coordinator", None)
+    if coordinator is None:
+        return False
+    if getattr(coordinator, "modbus_enabled", False):
+        return bool(getattr(getattr(coordinator, "client", None), "writable", False))
+    maintenance_coordinator = getattr(runtime, "maintenance_coordinator", None)
+    data = getattr(maintenance_coordinator, "data", None) or {}
+    access_level = data.get("access_level") or {}
+    return access_level.get("writeAccessLevel", 0) >= 20
+
+
 def async_entries_for_status_metrics(
     hass: HomeAssistant, device_id: str
 ) -> dict[str, er.RegistryEntry]:
-    """Map status metric keys to entity-registry entries for a HA device."""
+    """Map status metric keys to entity-registry entries for a HA device.
+
+    Switch-backed metrics are skipped when their entity can never change
+    state, so read-only installs are not offered a dead trigger or condition.
+    """
     registry = er.async_get(hass)
     found: dict[str, er.RegistryEntry] = {}
     for entry in er.async_entries_for_device(registry, device_id):
@@ -158,6 +184,8 @@ def async_entries_for_status_metrics(
             continue
         expected_domain = ALL_STATUS_METRICS.get(metric)
         if expected_domain and entry.domain != expected_domain:
+            continue
+        if expected_domain == "switch" and not _switch_metric_writable(hass, entry):
             continue
         found[metric] = entry
     return found
