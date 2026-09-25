@@ -113,11 +113,7 @@ async def test_cloud_mode_structure(hass):
     assert coordinator["dhw_ema"]["last_published_tap_water_minutes"] == 42
     assert coordinator["shower_event_history_count"] == 1
     assert result["extra_dhw"] is None
-    assert result["modbus_link"] == {
-        "host": "Qvantum-HP",
-        "port": 502,
-        "unit_id": 1,
-    }
+    assert result["modbus_link"] is None
     assert result["maintenance"]["firmware_versions"]["display_fw_version"] == "1.2.3"
     assert result["maintenance"]["firmware_changed"] is False
     json.dumps(result)  # diagnostics must stay JSON-serializable
