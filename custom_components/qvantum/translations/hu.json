@@ -676,6 +676,11 @@
           "off": "Ki"
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Szellőzőszűrő cseréje"
+      }
     }
   },
   "config": {

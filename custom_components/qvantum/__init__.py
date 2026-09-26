@@ -66,6 +66,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.FAN,
     Platform.WATER_HEATER,
+    Platform.CALENDAR,
 ]
 
 type MyConfigEntry = ConfigEntry[RuntimeData]

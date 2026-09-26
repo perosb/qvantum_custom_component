@@ -676,6 +676,11 @@
           "off": "Wył."
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Wymiana filtra wentylacji"
+      }
     }
   },
   "config": {

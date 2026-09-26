@@ -676,6 +676,11 @@
           "off": "Apagado"
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Cambio del filtro de ventilación"
+      }
     }
   },
   "config": {

@@ -676,6 +676,11 @@
           "off": "Pois"
         }
       }
+    },
+    "calendar": {
+      "ventilation_filter_due": {
+        "name": "Ilmanvaihtosuodattimen vaihto"
+      }
     }
   },
   "config": {
