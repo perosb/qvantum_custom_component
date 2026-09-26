@@ -2,15 +2,16 @@
 
 Exposes a snapshot of the integration's local state so support can see which
 transport is active, what the coordinator last received, and how the local
-DHW/extra-DHW state machines look. Credentials, tokens and access expiry
-timestamps are redacted or omitted before the payload leaves the instance.
+DHW/extra-DHW state machines look. Credentials, tokens, access expiry
+timestamps and device identifiers (serial/hpid) are redacted or omitted
+before the payload leaves the instance.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -27,7 +28,15 @@ TO_REDACT = {
     "id_token",
     "accessCode",
     "expiresAt",
+    # Device identifiers; also scrubbed dynamically when they appear inside
+    # other strings or mapping keys (title, enabled-metrics cache).
+    "serial",
+    "device_id",
+    "hpid",
 }
+
+# Coordinator device fields that carry the heat pump serial / hpid.
+_IDENTIFIER_KEYS = ("id", "serial", "hpid")
 
 # Local DHW EMA state kept on the coordinator (values only, no timestamps).
 _DHW_EMA_FIELDS = (
@@ -41,6 +50,75 @@ _DHW_EMA_FIELDS = (
     "_tap_water_cap_zero_mode",
     "_tap_water_cap_reheating_floor_mode",
 )
+
+
+def _sensitive_identifiers(config_entry: ConfigEntry, runtime: Any) -> set[str]:
+    """Return device identifiers (serial/hpid) that must not leave the instance.
+
+    The config-entry unique id is the device serial set up by the config flow,
+    so it also covers diagnostics for an entry that is not loaded yet.
+    """
+    identifiers: set[str] = set()
+
+    def _add(candidate: Any) -> None:
+        if isinstance(candidate, str) and candidate:
+            identifiers.add(candidate)
+
+    _add(getattr(config_entry, "unique_id", None))
+
+    coordinator = getattr(runtime, "coordinator", None)
+    if coordinator is None:
+        return identifiers
+
+    _add(getattr(coordinator, "device_id", None))
+    data = getattr(coordinator, "data", None)
+    if isinstance(data, dict):
+        for section in ("device", "values"):
+            section_data = data.get(section)
+            if not isinstance(section_data, dict):
+                continue
+            for key in _IDENTIFIER_KEYS:
+                _add(section_data.get(key))
+    return identifiers
+
+
+def _redact_identifier_text(value: str, identifiers: set[str]) -> str:
+    """Replace every known device identifier inside a string.
+
+    Longest identifiers first so a serial that contains another identifier
+    (or vice versa) is replaced deterministically.
+    """
+    for identifier in sorted(identifiers, key=len, reverse=True):
+        if identifier in value:
+            value = value.replace(identifier, REDACTED)
+    return value
+
+
+def _redact_identifiers(value: Any, identifiers: set[str]) -> Any:
+    """Recursively replace device identifiers in mapping keys and string values.
+
+    Device ids show up in more than value fields: the config-entry title
+    ("Qvantum QE-6 (<serial>)"), ``enabled_metrics`` cache keys and values
+    ``hpid`` all embed the serial. Scrub keys as well as values so a dump
+    never carries it.
+    """
+    if not identifiers:
+        return value
+    if isinstance(value, dict):
+        redacted: dict[Any, Any] = {}
+        for key, item in value.items():
+            new_key = (
+                _redact_identifier_text(key, identifiers)
+                if isinstance(key, str)
+                else key
+            )
+            redacted[new_key] = _redact_identifiers(item, identifiers)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_identifiers(item, identifiers) for item in value]
+    if isinstance(value, str):
+        return _redact_identifier_text(value, identifiers)
+    return value
 
 
 def _entry_diagnostics(config_entry: ConfigEntry) -> dict[str, Any]:
@@ -159,6 +237,7 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     """Return redacted diagnostics for a Qvantum config entry."""
     runtime = getattr(config_entry, "runtime_data", None)
+    identifiers = _sensitive_identifiers(config_entry, runtime)
     diagnostics: dict[str, Any] = {
         "entry": _entry_diagnostics(config_entry),
         "entities": _entity_counts(hass, getattr(config_entry, "entry_id", None)),
@@ -166,7 +245,9 @@ async def async_get_config_entry_diagnostics(
     }
 
     if runtime is None:
-        return async_redact_data(diagnostics, TO_REDACT)
+        return async_redact_data(
+            _redact_identifiers(diagnostics, identifiers), TO_REDACT
+        )
 
     coordinator = getattr(runtime, "coordinator", None)
     diagnostics["coordinator"] = (
@@ -188,4 +269,4 @@ async def async_get_config_entry_diagnostics(
         else None
     )
 
-    return async_redact_data(diagnostics, TO_REDACT)
+    return async_redact_data(_redact_identifiers(diagnostics, identifiers), TO_REDACT)

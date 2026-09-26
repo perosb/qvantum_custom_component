@@ -13,6 +13,10 @@ from custom_components.qvantum.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 
+REDACTED = "**REDACTED**"
+# Same length/format as a real Qvantum serial number.
+SERIAL = "3010100244154033"
+
 
 def _coordinator() -> SimpleNamespace:
     return SimpleNamespace(
@@ -21,7 +25,7 @@ def _coordinator() -> SimpleNamespace:
         device_id="dev-1",
         data={
             "device": {"id": "dev-1", "model": "QE-6"},
-            "values": {"bt2": 21.5, "hp_status": 3, "compressor_state": 6},
+            "values": {"hpid": "dev-1", "bt2": 21.5, "hp_status": 3},
         },
         _enabled_metrics_cache={"dev-1": ["bt2", "bt1"]},
         _last_shower_cold_temp=8.5,
@@ -78,6 +82,7 @@ def _runtime(
 def _entry(runtime: SimpleNamespace | None = None, **overrides) -> SimpleNamespace:
     entry = SimpleNamespace(
         entry_id="entry-1",
+        unique_id="test-unique-id",
         title="Qvantum",
         version=7,
         minor_version=0,
@@ -93,7 +98,16 @@ def _entry(runtime: SimpleNamespace | None = None, **overrides) -> SimpleNamespa
 
 
 def test_redact_keys_cover_credentials():
-    assert {"password", "username", "token", "refresh_token", "expiresAt"} <= TO_REDACT
+    assert {
+        "password",
+        "username",
+        "token",
+        "refresh_token",
+        "expiresAt",
+        "serial",
+        "device_id",
+        "hpid",
+    } <= TO_REDACT
 
 
 @pytest.mark.asyncio
@@ -106,9 +120,11 @@ async def test_cloud_mode_structure(hass):
     assert coordinator["modbus_enabled"] is False
     assert coordinator["modbus_writable"] is False
     assert coordinator["poll_interval"] == 120
-    assert coordinator["device_id"] == "dev-1"
+    assert coordinator["device_id"] == REDACTED
+    assert coordinator["device"]["id"] == REDACTED
+    assert coordinator["values"]["hpid"] == REDACTED
     assert coordinator["values"]["bt2"] == 21.5
-    assert coordinator["enabled_metrics"] == {"dev-1": ["bt1", "bt2"]}
+    assert coordinator["enabled_metrics"] == {REDACTED: ["bt1", "bt2"]}
     assert coordinator["dhw_ema"]["last_shower_cold_temp"] == 8.5
     assert coordinator["dhw_ema"]["last_published_tap_water_minutes"] == 42
     assert coordinator["shower_event_history_count"] == 1
@@ -163,6 +179,50 @@ async def test_secrets_and_expiry_are_redacted(hass):
     assert "hunter2" not in serialized
     assert "user@example.com" not in serialized
     assert "2026-01-26T18:35:29.768Z" not in serialized
+
+
+@pytest.mark.asyncio
+async def test_device_serial_is_redacted_everywhere(hass):
+    coordinator = _coordinator()
+    coordinator.device_id = SERIAL
+    coordinator.data = {
+        "device": {
+            "id": SERIAL,
+            "serial": SERIAL,
+            "model": "QE-6",
+            "connectivity": {
+                "connected": True,
+                "timestamp": "2026-09-23T14:47:22.607Z",
+            },
+        },
+        "values": {"hpid": SERIAL, "bt2": 20.3},
+    }
+    coordinator._enabled_metrics_cache = {SERIAL: ["bt2"]}
+    entry = _entry(
+        _runtime(coordinator),
+        unique_id=SERIAL,
+        title=f"Qvantum QE-6 ({SERIAL})",
+    )
+    result = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert SERIAL not in json.dumps(result)
+    assert result["entry"]["title"] == f"Qvantum QE-6 ({REDACTED})"
+    assert result["coordinator"]["device_id"] == REDACTED
+    assert result["coordinator"]["device"]["id"] == REDACTED
+    assert result["coordinator"]["device"]["serial"] == REDACTED
+    assert result["coordinator"]["values"]["hpid"] == REDACTED
+    assert result["coordinator"]["values"]["bt2"] == 20.3
+    assert result["coordinator"]["enabled_metrics"] == {REDACTED: ["bt2"]}
+
+
+@pytest.mark.asyncio
+async def test_unloaded_entry_hides_serial_from_title(hass):
+    entry = _entry(unique_id=SERIAL, title=f"Qvantum QE-6 ({SERIAL})")
+    result = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert result["runtime_data_loaded"] is False
+    assert SERIAL not in json.dumps(result)
+    assert result["entry"]["title"] == f"Qvantum QE-6 ({REDACTED})"
 
 
 @pytest.mark.asyncio
