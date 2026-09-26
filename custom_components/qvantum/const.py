@@ -340,7 +340,7 @@ REQUIRED_MODBUS_METRICS = [
     "bt30",  # Tank temperature
     "bt33",  # Cold water inlet temperature
     "bf1_l_min",  # DHW flow rate
-# Required by the heating curve advisor derived metric in Modbus mode.
+    # Required by the heating curve advisor derived metric in Modbus mode.
     # bt2 is already in REQUIRED_METRICS, and indoor_temperature_target comes
     # from the holding-register settings that are always read.
     "hp_status",
