@@ -25,3 +25,4 @@ dmypy.json
 .vscode/
 .idea/
 *.pdf
+docs/*.json
