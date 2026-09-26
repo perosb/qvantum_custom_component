@@ -4,7 +4,8 @@ The pump reports ``ventilation_filter_time_left`` (input register 91, hours)
 but no absolute replacement date, and the cloud API does not expose the metric
 at all. The calendar derives a stable "due" anchor from the first observed
 reading and persists it so a restart does not move the event. A jump up in the
-remaining hours means a new filter was fitted; the anchor is then reset.
+remaining hours means a new filter was fitted; the anchor is then reset. The
+due date is exposed as a single all-day event on the local due date.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from homeassistant.util import dt as dt_util
 from . import MyConfigEntry
 from .const import (
     DOMAIN,
-    FILTER_CALENDAR_EVENT_HOURS,
+    FILTER_CALENDAR_EVENT_DAYS,
     FILTER_CALENDAR_RESET_JUMP_HOURS,
 )
 from .coordinator import QvantumDataUpdateCoordinator
@@ -56,16 +57,11 @@ async def async_setup_entry(
     calendar_keys = {FILTER_DUE_METRIC} if modbus_enabled else set()
 
     if modbus_enabled:
-        # Tests call platform setup with a mocked hass; production always has a
-        # real config dir and therefore a store.
-        store: Store | None = None
-        config_dir = getattr(getattr(hass, "config", None), "config_dir", None)
-        if isinstance(config_dir, str):
-            store = Store(
-                hass,
-                _STORE_VERSION,
-                f"{DOMAIN}.filter_calendar.{config_entry.entry_id}",
-            )
+        store = Store(
+            hass,
+            _STORE_VERSION,
+            f"{DOMAIN}.filter_calendar.{config_entry.entry_id}",
+        )
 
         async_add_entities(
             [
@@ -112,13 +108,15 @@ class QvantumFilterCalendarEntity(QvantumEntity, CalendarEntity):
 
     @property
     def event(self) -> CalendarEvent | None:
-        """Return the next replacement window, or None without filter data."""
+        """Return the next replacement all-day event, or None without data."""
         due_at = self._due_at
         if due_at is None or self._hours_left is None:
             return None
+        # All-day event on the local due date; the end date is exclusive.
+        due_date = dt_util.as_local(due_at).date()
         return CalendarEvent(
-            start=due_at,
-            end=due_at + timedelta(hours=FILTER_CALENDAR_EVENT_HOURS),
+            start=due_date,
+            end=due_date + timedelta(days=FILTER_CALENDAR_EVENT_DAYS),
             summary=self._event_summary,
         )
 
@@ -197,7 +195,7 @@ class QvantumFilterCalendarEntity(QvantumEntity, CalendarEntity):
         if (
             hours_left > FILTER_CALENDAR_RESET_JUMP_HOURS
             and now
-            > self._due_at + timedelta(hours=FILTER_CALENDAR_EVENT_HOURS)
+            > self._due_at + timedelta(days=FILTER_CALENDAR_EVENT_DAYS)
         ):
             # The anchored due passed while the counter still reported usable
             # hours (for example the pump pauses the countdown). Realign the

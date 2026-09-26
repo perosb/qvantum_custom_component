@@ -30,10 +30,10 @@ DOMAIN = "qvantum"
 # Device automation: ventilation filter is "soon due" when hours remaining
 # fall below this threshold (see device_trigger / device_condition).
 FILTER_SOON_DUE_HOURS = 48
-# Filter calendar (Modbus only): one "replacement due" event spans this many
-# hours, and a jump up in the remaining hours larger than the reset threshold
-# means a new filter was fitted and the due event must be re-anchored.
-FILTER_CALENDAR_EVENT_HOURS = 1.0
+# Filter calendar (Modbus only): the "replacement due" event covers this many
+# whole days, and a jump up in the remaining hours larger than the reset
+# threshold means a new filter was fitted and the due event must be re-anchored.
+FILTER_CALENDAR_EVENT_DAYS = 1
 FILTER_CALENDAR_RESET_JUMP_HOURS = 1.0
 DEFAULT_SCAN_INTERVAL = 120
 MIN_SCAN_INTERVAL = 60
@@ -340,11 +340,14 @@ REQUIRED_MODBUS_METRICS = [
     "bt30",  # Tank temperature
     "bt33",  # Cold water inlet temperature
     "bf1_l_min",  # DHW flow rate
-    # Required by the heating curve advisor derived metric in Modbus mode.
+# Required by the heating curve advisor derived metric in Modbus mode.
     # bt2 is already in REQUIRED_METRICS, and indoor_temperature_target comes
     # from the holding-register settings that are always read.
     "hp_status",
     "bt1",
+    # Required by the always-created filter calendar; the diagnostic sensor
+    # that also exposes this metric can be disabled independently.
+    "ventilation_filter_time_left",
 ]
 
 # Sensor type classification (substring match in _get_sensor_type).

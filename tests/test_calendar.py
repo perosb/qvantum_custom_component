@@ -14,6 +14,7 @@ from custom_components.qvantum.calendar import (
     QvantumFilterCalendarEntity,
     async_setup_entry,
 )
+from custom_components.qvantum.const import REQUIRED_MODBUS_METRICS
 from custom_components.qvantum.entity import QvantumEntity
 
 
@@ -47,6 +48,11 @@ def _config_entry(*, modbus: bool) -> MagicMock:
     return entry
 
 
+def test_filter_metric_is_always_polled_in_modbus_mode():
+    """Disabling the diagnostic filter sensor must not blank the calendar."""
+    assert FILTER_METRIC in REQUIRED_MODBUS_METRICS
+
+
 def test_entity_identity():
     entity = _entity()
 
@@ -64,7 +70,7 @@ def test_event_is_none_without_reading():
     assert entity.event is None
 
 
-def test_event_anchored_to_first_reading():
+def test_event_is_all_day_on_due_date():
     entity = _entity(hours_left=100.0)
     before = dt_util.utcnow()
 
@@ -73,9 +79,13 @@ def test_event_anchored_to_first_reading():
     after = dt_util.utcnow()
     event = entity.event
     assert event is not None
-    assert before + timedelta(hours=100) <= event.start_datetime_local
-    assert event.start_datetime_local <= after + timedelta(hours=100)
-    assert event.end_datetime_local - event.start_datetime_local == timedelta(hours=1)
+    assert event.all_day is True
+    expected_dates = {
+        dt_util.as_local(before + timedelta(hours=100)).date(),
+        dt_util.as_local(after + timedelta(hours=100)).date(),
+    }
+    assert event.start in expected_dates
+    assert event.end == event.start + timedelta(days=1)
     assert event.summary == "Ventilation filter replacement"
 
 
@@ -110,7 +120,7 @@ def test_new_filter_reanchors_due():
 def test_stale_anchor_realigns_to_live_reading():
     entity = _entity(hours_left=48.0)
     entity._refresh_due()
-    entity._due_at = dt_util.utcnow() - timedelta(hours=2)
+    entity._due_at = dt_util.utcnow() - timedelta(days=2)
 
     entity.coordinator.data["values"][FILTER_METRIC] = 12.0
     before = dt_util.utcnow()
@@ -196,17 +206,17 @@ async def test_async_get_events_filters_window(hass):
     start = event.start_datetime_local
 
     assert await entity.async_get_events(
-        hass, start - timedelta(hours=1), start + timedelta(hours=2)
+        hass, start - timedelta(hours=1), start + timedelta(days=1, hours=1)
     ) == [event]
     assert (
         await entity.async_get_events(
-            hass, start - timedelta(hours=3), start - timedelta(hours=1)
+            hass, start - timedelta(days=1), start - timedelta(hours=1)
         )
         == []
     )
     assert (
         await entity.async_get_events(
-            hass, start + timedelta(hours=2), start + timedelta(hours=3)
+            hass, start + timedelta(days=1), start + timedelta(days=2)
         )
         == []
     )
@@ -345,7 +355,6 @@ async def test_setup_entry_cloud_creates_nothing():
 @pytest.mark.asyncio
 async def test_setup_entry_modbus_creates_store():
     hass = MagicMock()
-    hass.config.config_dir = "/config"
     entry = _config_entry(modbus=True)
     captured: list[QvantumFilterCalendarEntity] = []
 
