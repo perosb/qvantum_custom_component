@@ -275,6 +275,33 @@ async def test_malformed_state_is_tolerated(hass):
 
 
 @pytest.mark.asyncio
+async def test_missing_device_section_still_redacts_values(hass):
+    """Only one identity section is present: the scrub skips the other."""
+    coordinator = _coordinator()
+    coordinator.data = {"values": {"hpid": "dev-1", "bt2": 20.3}}
+    runtime = _runtime(coordinator)
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    assert result["coordinator"]["device"] == {}
+    assert result["coordinator"]["values"]["hpid"] == REDACTED
+    assert result["coordinator"]["values"]["bt2"] == 20.3
+
+
+@pytest.mark.asyncio
+async def test_unknown_identifiers_pass_through(hass):
+    """No unique id, device id or hpid: the scrub leaves the payload alone."""
+    coordinator = _coordinator()
+    coordinator.device_id = None
+    coordinator.data = None
+    entry = _entry(_runtime(coordinator), unique_id=None)
+    result = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert result["coordinator"]["device_id"] is None
+    assert result["coordinator"]["values"] == {}
+    assert result["entry"]["title"] == "Qvantum"
+
+
+@pytest.mark.asyncio
 async def test_entity_counts_report_total_and_enabled(hass):
     entries = [
         SimpleNamespace(disabled_by=None),
