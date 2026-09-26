@@ -39,13 +39,13 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **Control:** Operation modes, target temperatures, vacation mode, ventilation, and supported settings.
 - **Hot water (`water_heater`):** Tank temperature and DHW stop target with Eco, Normal, Extra, Smart, and Off modes.
 - **Energy Dashboard:** Compressor, heating, DHW, additional, and total energy sensors are ready for one-click setup.
-- **Device automations:** Triggers and conditions for defrost, compressor blocking, freeze protection, Wi-Fi/cloud connectivity, and a ventilation filter due in under 48 hours.
+- **Device automations:** Triggers and conditions for defrost, compressor blocking, freeze protection, Wi-Fi/cloud connectivity, a ventilation filter due in under 48 hours, tap-water draws, a low hot-water tank, and extra hot water finishing.
 - **External room sensor:** When configured by the pump, a Modbus number entity can mirror an external temperature into the control setpoint.
 - **Modbus writes:** Optional local writes for supported targets, DHW, fan, operation, room compensation, and sensor settings.
 
 #### Device automation details
 
-Available triggers and conditions depend on the entities present. They cover defrosting, compressor blocking, freeze protection, Wi-Fi/cloud disconnection, and a ventilation filter with fewer than 48 hours remaining.
+Available triggers and conditions depend on the entities present. They cover defrosting, compressor blocking, freeze protection, Wi-Fi/cloud disconnection, a ventilation filter with fewer than 48 hours remaining, tap-water draws, a low hot-water tank, and extra hot water finishing.
 
 #### External room sensor example
 
@@ -63,6 +63,13 @@ action:
     data:
       value: "{{ states('sensor.some_external_room_temperature') | float }}"
 ```
+
+### Dashboards
+
+Ready-made dashboard recipes are in [docs/dashboard.md](docs/dashboard.md):
+instantaneous and seasonal COP, energy distribution, tap-water statistics, and
+heat-pump status history. Copy the YAML into your own Lovelace views and adjust
+the entity IDs to your language and naming.
 
 ### Services and Elevate Access
 
