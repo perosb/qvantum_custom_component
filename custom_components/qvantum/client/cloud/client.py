@@ -112,6 +112,9 @@ class QvantumCloudClient:
             # A concurrent close() is already draining: wait for the same
             # drain point instead of returning while requests are in flight.
             await self._drained.wait()
+            if not self._closed:
+                # The draining close() was cancelled; finish the close here.
+                await self.close()
             return
         self._closed = True
         try:
