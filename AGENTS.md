@@ -127,8 +127,9 @@ gh extension install github/gh-stack   # once per machine
    layer's diff; keep the `## Summary` / `## Test plan` body per layer.
    `Depends on #N` is unnecessary — the stack encodes the dependency.
 3. **Sync** — after review feedback or new commits on `main`:
-   `gh stack sync` fetches, cascade-rebases, pushes atomically with
-   `--force-with-lease`, and syncs PR state. Never rebase a stack layer onto
+   `gh stack sync` fetches, cascade-rebases, and pushes all branches in one
+   atomic `git push` (`--force-with-lease --atomic`). `gh stack push` is
+   per-branch and not atomic — prefer `sync`. Never rebase a stack layer onto
    `main` by hand; that breaks the stack.
 4. **Merge** — `gh stack merge --yes --squash` merges the whole stack
    atomically, and `gh stack merge <pr-number>` lands everything up to that PR.
