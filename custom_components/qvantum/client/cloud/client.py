@@ -137,8 +137,30 @@ class QvantumCloudClient:
         result.update(kwargs)
         return result
 
+    @staticmethod
+    async def _firebase_error_message(
+        response: aiohttp.ClientResponse, default: str = "Authentication failed"
+    ) -> str:
+        """Return Firebase's ``error.message`` when the body carries one."""
+        try:
+            data = await response.json()
+        except (aiohttp.ContentTypeError, ValueError):
+            return default
+        if isinstance(data, dict):
+            error = data.get("error")
+            if isinstance(error, dict):
+                message = error.get("message")
+                if isinstance(message, str) and message:
+                    return message
+        return default
+
     async def authenticate(self) -> bool:
-        """Sign in with email/password and store tokens."""
+        """Sign in with email/password and store tokens.
+
+        A rejected sign-in is an ``AuthError``, throttling a
+        ``RateLimitError``, and a server-side failure a ``TransportError`` so
+        a transient outage does not send Home Assistant into reauth.
+        """
         self._ensure_open()
         payload = {
             "returnSecureToken": "true",
@@ -165,6 +187,15 @@ class QvantumCloudClient:
                     return True
                 case 429:
                     raise RateLimitError(response.status)
+                case 400:
+                    message = await self._firebase_error_message(response)
+                    _LOGGER.error(
+                        "Authentication failed: %s (%s)", response.status, message
+                    )
+                    raise AuthError(response.status, message)
+                case status if status >= 500:
+                    _LOGGER.error("Authentication failed: %s", status)
+                    raise TransportError(status, "Authentication failed")
                 case _:
                     _LOGGER.error("Authentication failed: %s", response.status)
                     raise AuthError(response.status)
@@ -194,6 +225,11 @@ class QvantumCloudClient:
                 case 429:
                     # Throttling must not fall through to a full sign-in.
                     raise RateLimitError(response.status)
+                case status if status >= 500:
+                    # A server-side failure is retryable; do not add a
+                    # sign-in request on top of an outage.
+                    _LOGGER.error("Token refresh failed: %s", status)
+                    raise TransportError(status, "Token refresh failed")
                 case _:
                     _LOGGER.error("Token refresh failed: %s", response.status)
 

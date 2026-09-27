@@ -108,3 +108,63 @@ async def test_injected_session_authenticate_uses_timeout_and_user_agent(mock_se
     assert post_kwargs["timeout"] is HTTP_TIMEOUT
     assert post_kwargs["headers"]["User-Agent"] == "test-agent"
     assert "Authorization" not in post_kwargs["headers"]
+
+
+@pytest.mark.asyncio
+async def test_authenticate_server_error_raises_transport_error(mock_session):
+    """A 5xx sign-in failure is retryable, not invalid credentials."""
+    cm, _ = mock_session.make_cm_response(status=503, json_data={})
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    with pytest.raises(TransportError, match="Authentication failed"):
+        await client.authenticate()
+
+
+@pytest.mark.asyncio
+async def test_authenticate_invalid_credentials_surfaces_server_message(mock_session):
+    """Firebase's error.message is surfaced on rejected credentials."""
+    cm, _ = mock_session.make_cm_response(
+        status=400,
+        json_data={"error": {"code": 400, "message": "INVALID_PASSWORD"}},
+    )
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    with pytest.raises(AuthError, match="INVALID_PASSWORD"):
+        await client.authenticate()
+
+
+@pytest.mark.asyncio
+async def test_authenticate_400_without_body_keeps_default_message(mock_session):
+    """A 400 without a Firebase error body still raises a clear AuthError."""
+    cm, _ = mock_session.make_cm_response(status=400, json_data={})
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    with pytest.raises(AuthError, match="Authentication failed"):
+        await client.authenticate()
+
+
+@pytest.mark.asyncio
+async def test_refresh_server_error_does_not_fall_back_to_sign_in(mock_session):
+    """A 5xx token refresh raises instead of adding a sign-in request."""
+    cm, _ = mock_session.make_cm_response(status=503, json_data={})
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._refreshtoken = "refresh_token"
+    client._token = None
+    client._token_expiry = None
+
+    with pytest.raises(TransportError, match="Token refresh failed"):
+        await client._ensure_valid_token()
+    mock_session.post.assert_called_once()
