@@ -271,6 +271,11 @@ class QvantumModbusClient:
         self, device_id: str, capacity: int
     ) -> dict[str, Any]:
         capacity_to_stop_start = {v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()}
+        if capacity not in capacity_to_stop_start:
+            raise ValueError(
+                f"Unsupported tap water capacity {capacity}; expected one of "
+                f"{sorted(capacity_to_stop_start)}"
+            )
         start, stop = capacity_to_stop_start[capacity]
         _LOGGER.debug(
             "Setting tap water capacity %s maps to stop %s and start %s.",

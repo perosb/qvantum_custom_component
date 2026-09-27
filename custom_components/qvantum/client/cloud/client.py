@@ -11,7 +11,11 @@ from typing import Any, Optional
 
 import aiohttp
 
-from ..constants import HEATING_CURVE_HTTP_KEYS, TAP_WATER_CAPACITY_MAPPINGS
+from ..constants import (
+    HEATING_CURVE_HTTP_KEYS,
+    SETTING_UPDATE_APPLIED,
+    TAP_WATER_CAPACITY_MAPPINGS,
+)
 from ..exceptions import AuthError, RateLimitError, TransportError
 from ..models import MetricsPayload, SettingsPayload
 from .endpoints import (
@@ -472,10 +476,10 @@ class QvantumCloudClient:
 
     async def set_tap_water(
         self, device_id: str, start: int = 0, stop: int = 0
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any]:
         if stop == 0 and start == 0:
             _LOGGER.debug("No tap water settings to update, both stop and start are 0.")
-            return None
+            return {"status": SETTING_UPDATE_APPLIED}
         payload: dict[str, Any] = {"settings": []}
         if stop:
             payload["settings"].append({"name": "tap_water_stop", "value": stop})
@@ -485,7 +489,7 @@ class QvantumCloudClient:
 
     async def set_tap_water_capacity_target(
         self, device_id: str, capacity: int
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any]:
         if capacity in _CUSTOM_CAPACITIES:
             capacity_to_stop_start = {v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()}
             start, stop = capacity_to_stop_start[capacity]

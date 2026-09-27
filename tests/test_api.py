@@ -948,7 +948,7 @@ class TestQvantumCloudClient:
 
     @pytest.mark.asyncio
     async def test_set_tap_water_no_settings(self, mock_session):
-        """Test setting tap water with no parameters (should return early)."""
+        """Test setting tap water with no parameters (no-op still applies)."""
         api = QvantumAPI(
             "test@example.com", "password", "test-agent", session=mock_session
         )
@@ -957,7 +957,7 @@ class TestQvantumCloudClient:
 
         result = await api.set_tap_water("test_device")
 
-        assert result is None
+        assert result == {"status": "APPLIED"}
         mock_session.patch.assert_not_called()
 
     @pytest.mark.asyncio

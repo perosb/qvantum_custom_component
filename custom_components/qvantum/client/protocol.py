@@ -73,7 +73,11 @@ class QvantumClient(Protocol):
     async def set_tap_water(
         self, device_id: str, start: int = 0, stop: int = 0
     ) -> dict[str, Any]:
-        """Write DHW start/stop temperatures."""
+        """Write DHW start/stop temperatures.
+
+        A 0/0 call is a no-op that still reports APPLIED, so callers can treat
+        the result uniformly.
+        """
         ...
 
     async def set_tap_water_capacity_target(

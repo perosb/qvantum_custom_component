@@ -366,3 +366,18 @@ async def test_connection_error_during_sign_in_is_cached(mock_session):
     with pytest.raises(TransportError, match="Authentication request failed"):
         await client._ensure_valid_token()
     mock_session.post.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_set_tap_water_noop_reports_applied(mock_session):
+    """A 0/0 tap-water call is a no-op that still reports APPLIED."""
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._token = "test_token"
+    client._token_expiry = datetime.now() + timedelta(hours=1)
+
+    result = await client.set_tap_water("test_device", start=0, stop=0)
+
+    assert result == {"status": "APPLIED"}
+    mock_session.patch.assert_not_called()
