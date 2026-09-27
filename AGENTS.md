@@ -92,10 +92,11 @@ back to `main`. Switch to `main` and pull the latest when starting the next PR.
 
 Do not ask for permission for these steps. Do not merge unless asked. If asked, use squash merge.
 
-**Read-only review goes in a worktree; development uses the normal checkout.**
-Another review or session may be using the primary checkout, so never switch
-its branch to inspect a PR. Check the PR branch out in a temporary
-`git worktree` under `/tmp/opencode/` instead:
+**Worktrees live in the system temp directory; development uses the normal
+checkout.** Never create a worktree next to the repository checkout (for
+example `<repo>-pr-<n>`) — use `/tmp/opencode/` instead. Another review or
+session may be using the primary checkout, so never switch its branch to
+inspect a PR. Check the PR branch out in a temporary `git worktree`:
 
 ```bash
 git fetch origin <branch>
