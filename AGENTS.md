@@ -94,15 +94,16 @@ Do not ask for permission for these steps. Do not merge unless asked. If asked, 
 
 **Worktrees live in the system temp directory; development uses the normal
 checkout.** Never create a worktree next to the repository checkout (for
-example `<repo>-pr-<n>`) — use `/tmp/opencode/` instead. Another review or
-session may be using the primary checkout, so never switch its branch to
-inspect a PR. Check the PR branch out in a temporary `git worktree`:
+example `<repo>-pr-<n>`) — use the system temp directory (`${TMPDIR:-/tmp}`)
+instead. Another review or session may be using the primary checkout, so never
+switch its branch to inspect a PR. Check the PR branch out in a temporary
+`git worktree`:
 
 ```bash
 git fetch origin <branch>
-git worktree add --detach /tmp/opencode/qvantum-review-<n> origin/<branch>
+git worktree add --detach "${TMPDIR:-/tmp}/qvantum-review-<n>" origin/<branch>
 # inspect and run tests there
-git worktree remove /tmp/opencode/qvantum-review-<n>
+git worktree remove "${TMPDIR:-/tmp}/qvantum-review-<n>"
 ```
 
 Features, fixes, and review follow-ups follow the branch flow above in the
