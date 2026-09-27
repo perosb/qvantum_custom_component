@@ -11,7 +11,11 @@ import pytest
 
 from custom_components.qvantum.client.cloud import QvantumCloudClient
 from custom_components.qvantum.client.cloud.endpoints import HTTP_TIMEOUT
-from custom_components.qvantum.client.exceptions import AuthError, TransportError
+from custom_components.qvantum.client.exceptions import (
+    AuthError,
+    RateLimitError,
+    TransportError,
+)
 
 
 def load_test_data(filename):
@@ -294,9 +298,51 @@ async def test_auth_failure_cooldown_expires(mock_session):
         await client._ensure_valid_token()
     assert mock_session.post.call_count == 1
 
-    failed_at, err = client._auth_failure
-    client._auth_failure = (failed_at - 10_000, err)
+    failed_at, err_type, status, message = client._auth_failure
+    client._auth_failure = (failed_at - 10_000, err_type, status, message)
 
     with pytest.raises(AuthError):
         await client._ensure_valid_token()
     assert mock_session.post.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_cached_auth_failure_raises_fresh_instances(mock_session):
+    """Each caller gets its own exception instance, not a shared traceback."""
+    cm, _ = mock_session.make_cm_response(status=400, json_data={})
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    with pytest.raises(AuthError) as first:
+        await client._ensure_valid_token()
+    with pytest.raises(AuthError) as second:
+        await client._ensure_valid_token()
+
+    assert first.value is not second.value
+    assert str(first.value) == str(second.value)
+
+
+@pytest.mark.asyncio
+async def test_authenticate_sign_in_lockout_raises_rate_limit(mock_session):
+    """Firebase's 400 lockout must not send Home Assistant into reauth."""
+    cm, _ = mock_session.make_cm_response(
+        status=400,
+        json_data={
+            "error": {
+                "message": (
+                    "TOO_MANY_ATTEMPTS_TRY_LATER : Access to this account has "
+                    "been temporarily disabled by a short-term security measure."
+                )
+            }
+        },
+    )
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    with pytest.raises(RateLimitError):
+        await client.authenticate()

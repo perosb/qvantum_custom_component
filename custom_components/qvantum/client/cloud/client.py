@@ -81,7 +81,10 @@ class QvantumCloudClient:
         self._device_metadata: dict = {}
         self._device_metadata_etag = None
         self._missing_metrics_warned: set[str] = set()
-        self._auth_failure: tuple[float, Exception] | None = None
+        self._auth_failure: (
+            tuple[float, type[AuthError | TransportError | RateLimitError], int | None, str]
+            | None
+        ) = None
 
     def _ensure_open(self) -> None:
         if self._closed:
@@ -199,6 +202,10 @@ class QvantumCloudClient:
                     _LOGGER.error(
                         "Authentication failed: %s (%s)", response.status, message
                     )
+                    if message.startswith("TOO_MANY_ATTEMPTS_TRY_LATER"):
+                        # Firebase's sign-in lockout is a 400, not a 429; it
+                        # must not send Home Assistant into reauth.
+                        raise RateLimitError(response.status, message)
                     raise AuthError(response.status, message)
                 case status if status >= 500:
                     _LOGGER.error("Authentication failed: %s", status)
@@ -273,7 +280,12 @@ class QvantumCloudClient:
                 if not self._token:
                     raise AuthError(None, "Failed to obtain authentication token")
             except (AuthError, RateLimitError, TransportError) as err:
-                self._auth_failure = (time.monotonic(), err)
+                self._auth_failure = (
+                    time.monotonic(),
+                    type(err),
+                    err.status,
+                    err.message,
+                )
                 raise
             self._auth_failure = None
 
@@ -282,14 +294,15 @@ class QvantumCloudClient:
 
         Without this, releasing the lock after a failed refresh/sign-in lets
         every waiter retry the API, so a burst of concurrent callers with a
-        rejected password still fires one request per caller.
+        rejected password still fires one request per caller. Each caller
+        gets a fresh exception instance so tracebacks stay per-caller.
         """
         failure = self._auth_failure
         if failure is None:
             return
-        failed_at, err = failure
+        failed_at, err_type, status, message = failure
         if time.monotonic() - failed_at < DEFAULT_AUTH_FAILURE_COOLDOWN_SECONDS:
-            raise err
+            raise err_type(status, message)
         self._auth_failure = None
 
     def _token_is_valid(self) -> bool:
