@@ -168,6 +168,34 @@ async def test_authenticate_400_body_read_error_keeps_default_message(mock_sessi
 
 
 @pytest.mark.asyncio
+async def test_authenticate_400_non_dict_body_keeps_default_message(mock_session):
+    """A non-object Firebase error body falls back to the default message."""
+    cm, _ = mock_session.make_cm_response(status=400, json_data=["busy"])
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    with pytest.raises(AuthError, match="Authentication failed"):
+        await client.authenticate()
+
+
+@pytest.mark.asyncio
+async def test_authenticate_400_empty_message_keeps_default_message(mock_session):
+    """An empty error.message falls back to the default message."""
+    cm, _ = mock_session.make_cm_response(
+        status=400, json_data={"error": {"message": ""}}
+    )
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    with pytest.raises(AuthError, match="Authentication failed"):
+        await client.authenticate()
+
+
+@pytest.mark.asyncio
 async def test_refresh_server_error_does_not_fall_back_to_sign_in(mock_session):
     """A 5xx token refresh raises instead of adding a sign-in request."""
     cm, _ = mock_session.make_cm_response(status=503, json_data={})
