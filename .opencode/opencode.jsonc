@@ -1,0 +1,24 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "logLevel": "WARN",
+    "enabled_providers": [
+        "openrouter"
+    ],
+    "providers": {
+        "openrouter": {
+            "body": {
+                "provider": {
+                    "allow_fallbacks": true,
+                    "zdr": true,
+                    "data_collection": "deny",
+                    "sort": {
+                        "by": "price"
+                    },
+                    "preferred_min_throughput": {
+                        "p90": 40
+                    }
+                }
+            }
+        }
+    }
+}
