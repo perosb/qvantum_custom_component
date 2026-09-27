@@ -802,6 +802,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         island is re-probed at most once per interval. A failed read never
         fails the poll; the last known version stays on the device.
         """
+        if not isinstance(self.client, QvantumModbusClientProtocol):
+            return
         now = time.monotonic()
         refreshed_at = self._sw_version_refreshed_at
         if (

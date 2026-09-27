@@ -6,17 +6,18 @@ Assistant coordinator can type its client as either without pretending a
 Modbus client can do SmartControl, or that a cloud client can write holding
 registers.
 
-Write methods document the ``APPLIED`` success shape. Cloud returns the raw
-API body (the settings PATCH path answers ``{"success": true}``), so callers
-must treat the response as opaque and check ``status`` / ``heatpump_status``
-before applying optimistic updates.
+Write methods return the raw API body as a plain dict: Modbus answers
+``{"status": "APPLIED"}`` while cloud passes through the API response (the
+settings PATCH path answers ``{"success": true}``). Callers must treat the
+response as opaque and check ``status`` / ``heatpump_status`` before applying
+optimistic updates; ``ApplyResult`` documents that success shape.
 """
 
 from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from .models import ApplyResult, MetricsPayload, SettingsPayload
+from .models import MetricsPayload, SettingsPayload
 
 
 @runtime_checkable
@@ -41,53 +42,55 @@ class QvantumClient(Protocol):
 
     async def update_setting(
         self, device_id: str, name: str, value: Any
-    ) -> ApplyResult:
+    ) -> dict[str, Any]:
         """Write a single named setting."""
         ...
 
     async def set_indoor_temperature_target(
         self, device_id: str, temperature: float
-    ) -> ApplyResult:
+    ) -> dict[str, Any]:
         """Write the indoor temperature setpoint."""
         ...
 
     async def set_indoor_temperature_offset(
         self, device_id: str, value: int
-    ) -> ApplyResult:
+    ) -> dict[str, Any]:
         """Write the indoor temperature offset."""
         ...
 
     async def set_curve_type_heating(
         self, device_id: str, value: int
-    ) -> ApplyResult:
+    ) -> dict[str, Any]:
         """Write Auto (0) / User defined (1) heating-curve source."""
         ...
 
     async def set_heating_curve_point(
         self, device_id: str, metric_key: str, value: int
-    ) -> ApplyResult:
+    ) -> dict[str, Any]:
         """Write one user-defined heating-curve supply point (canonical name)."""
         ...
 
     async def set_tap_water(
         self, device_id: str, start: int = 0, stop: int = 0
-    ) -> ApplyResult:
+    ) -> dict[str, Any]:
         """Write DHW start/stop temperatures."""
         ...
 
     async def set_tap_water_capacity_target(
         self, device_id: str, capacity: int
-    ) -> ApplyResult:
+    ) -> dict[str, Any]:
         """Write the DHW capacity level (1–7)."""
         ...
 
     async def set_fanspeedselector(
         self, device_id: str, preset_mode: str
-    ) -> ApplyResult:
+    ) -> dict[str, Any]:
         """Write fan preset (``off`` / ``normal`` / ``extra``)."""
         ...
 
-    async def set_extra_tap_water(self, device_id: str, minutes: int) -> ApplyResult:
+    async def set_extra_tap_water(
+        self, device_id: str, minutes: int
+    ) -> dict[str, Any]:
         """Request extra DHW.
 
         Cloud encodes duration on the wire. Modbus writes Extra/Normal only;
@@ -106,11 +109,13 @@ class QvantumCloudClientProtocol(QvantumClient, Protocol):
 
     async def update_settings(
         self, device_id: str, settings: dict
-    ) -> ApplyResult:
+    ) -> dict[str, Any]:
         """Write several settings in one command."""
         ...
 
-    async def set_smartcontrol(self, device_id: str, sh: int, dhw: int) -> ApplyResult:
+    async def set_smartcontrol(
+        self, device_id: str, sh: int, dhw: int
+    ) -> dict[str, Any]:
         """Write the SmartControl heating/DHW modes."""
         ...
 
@@ -152,7 +157,7 @@ class QvantumModbusClientProtocol(QvantumClient, Protocol):
 
     async def write_metric(
         self, device_id: str, metric_key: str, value: float
-    ) -> ApplyResult:
+    ) -> dict[str, Any]:
         """Write a holding field by HTTP/settings metric name."""
         ...
 
