@@ -287,6 +287,18 @@ class QvantumCloudClient:
                     err.message,
                 )
                 raise
+            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                # Connection-level failures must be typed and cached too, or
+                # every waiter retries the network in the flaky cases the
+                # cooldown targets.
+                failure = TransportError(None, f"Authentication request failed: {err}")
+                self._auth_failure = (
+                    time.monotonic(),
+                    type(failure),
+                    failure.status,
+                    failure.message,
+                )
+                raise failure from err
             self._auth_failure = None
 
     def _raise_recent_auth_failure(self) -> None:
@@ -296,6 +308,10 @@ class QvantumCloudClient:
         every waiter retry the API, so a burst of concurrent callers with a
         rejected password still fires one request per caller. Each caller
         gets a fresh exception instance so tracebacks stay per-caller.
+
+        The cache also covers retryable ``TransportError``/``RateLimitError``,
+        so a transient blip fails fast for the cooldown window instead of
+        re-hitting the API on every poll.
         """
         failure = self._auth_failure
         if failure is None:

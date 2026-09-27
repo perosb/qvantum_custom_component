@@ -346,3 +346,23 @@ async def test_authenticate_sign_in_lockout_raises_rate_limit(mock_session):
     )
     with pytest.raises(RateLimitError):
         await client.authenticate()
+
+
+@pytest.mark.asyncio
+async def test_connection_error_during_sign_in_is_cached(mock_session):
+    """A connection failure during auth is typed and cached for waiters."""
+    cm, _ = mock_session.make_cm_response(status=200, json_data={})
+    cm.__aenter__ = AsyncMock(
+        side_effect=aiohttp.ClientConnectionError("connection refused")
+    )
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    with pytest.raises(TransportError, match="Authentication request failed"):
+        await client._ensure_valid_token()
+    with pytest.raises(TransportError, match="Authentication request failed"):
+        await client._ensure_valid_token()
+    mock_session.post.assert_called_once()
