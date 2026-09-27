@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -16,6 +17,7 @@ from .endpoints import (
     API_INTERNAL_URL,
     API_URL,
     AUTH_URL,
+    DEFAULT_AUTH_FAILURE_COOLDOWN_SECONDS,
     DEFAULT_TOKEN_BUFFER_SECONDS,
     DEFAULT_TOKEN_EXPIRY_SECONDS,
     FIREBASE_API_KEY,
@@ -79,6 +81,7 @@ class QvantumCloudClient:
         self._device_metadata: dict = {}
         self._device_metadata_etag = None
         self._missing_metrics_warned: set[str] = set()
+        self._auth_failure: tuple[float, Exception] | None = None
 
     def _ensure_open(self) -> None:
         if self._closed:
@@ -249,24 +252,45 @@ class QvantumCloudClient:
         Concurrent callers share ``_token_lock`` so an expired token triggers
         one refresh/sign-in rather than one request per caller; the token is
         re-checked after acquiring the lock because a waiter may have already
-        refreshed it.
+        refreshed it. A failed attempt is cached for a short cooldown so the
+        waiters fail fast instead of each issuing their own request.
         """
         self._ensure_open()
         if self._token_is_valid():
             return
+        self._raise_recent_auth_failure()
 
         async with self._token_lock:
             if self._token_is_valid():
                 return
+            self._raise_recent_auth_failure()
 
-            if self._refreshtoken:
-                await self._refresh_authentication_token()
-                if self._token:
-                    return
+            try:
+                if self._refreshtoken:
+                    await self._refresh_authentication_token()
+                if not self._token:
+                    await self.authenticate()
+                if not self._token:
+                    raise AuthError(None, "Failed to obtain authentication token")
+            except (AuthError, RateLimitError, TransportError) as err:
+                self._auth_failure = (time.monotonic(), err)
+                raise
+            self._auth_failure = None
 
-            await self.authenticate()
-            if not self._token:
-                raise AuthError(None, "Failed to obtain authentication token")
+    def _raise_recent_auth_failure(self) -> None:
+        """Re-raise the last auth failure while its cooldown is active.
+
+        Without this, releasing the lock after a failed refresh/sign-in lets
+        every waiter retry the API, so a burst of concurrent callers with a
+        rejected password still fires one request per caller.
+        """
+        failure = self._auth_failure
+        if failure is None:
+            return
+        failed_at, err = failure
+        if time.monotonic() - failed_at < DEFAULT_AUTH_FAILURE_COOLDOWN_SECONDS:
+            raise err
+        self._auth_failure = None
 
     def _token_is_valid(self) -> bool:
         """Whether a stored token exists and has not expired yet."""

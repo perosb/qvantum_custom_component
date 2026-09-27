@@ -247,3 +247,56 @@ async def test_concurrent_token_refresh_issues_one_request(mock_session):
 
     mock_session.post.assert_called_once()
     assert client._token == "new_access_token"
+
+
+@pytest.mark.asyncio
+async def test_failed_sign_in_is_not_retried_by_waiters(mock_session):
+    """Concurrent callers share one failed attempt instead of one each."""
+    cm, resp = mock_session.make_cm_response(
+        status=400, json_data={"error": {"message": "INVALID_PASSWORD"}}
+    )
+
+    async def slow_enter():
+        await asyncio.sleep(0)
+        return resp
+
+    cm.__aenter__ = AsyncMock(side_effect=slow_enter)
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    results = await asyncio.gather(
+        client._ensure_valid_token(),
+        client._ensure_valid_token(),
+        client._ensure_valid_token(),
+        return_exceptions=True,
+    )
+
+    assert all(isinstance(err, AuthError) for err in results)
+    mock_session.post.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_auth_failure_cooldown_expires(mock_session):
+    """A stale failure is ignored so a later poll can retry the sign-in."""
+    cm, _ = mock_session.make_cm_response(status=400, json_data={})
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    with pytest.raises(AuthError):
+        await client._ensure_valid_token()
+    with pytest.raises(AuthError):
+        await client._ensure_valid_token()
+    assert mock_session.post.call_count == 1
+
+    failed_at, err = client._auth_failure
+    client._auth_failure = (failed_at - 10_000, err)
+
+    with pytest.raises(AuthError):
+        await client._ensure_valid_token()
+    assert mock_session.post.call_count == 2
