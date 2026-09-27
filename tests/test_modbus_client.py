@@ -98,6 +98,26 @@ async def test_set_fanspeedselector_and_tap_water():
 
 
 @pytest.mark.asyncio
+async def test_set_tap_water_noop_reports_applied():
+    """A 0/0 tap-water call is a no-op that still reports APPLIED."""
+    _connection, client = _client()
+
+    result = await client.set_tap_water("dev1", start=0, stop=0)
+
+    assert result == {"status": "APPLIED"}
+
+
+@pytest.mark.parametrize("capacity", [0, 8, -1])
+@pytest.mark.asyncio
+async def test_set_tap_water_capacity_rejects_unknown_level(capacity):
+    """Capacities outside 1-7 fail clearly instead of raising KeyError."""
+    _connection, client = _client()
+
+    with pytest.raises(ValueError, match=f"Unsupported tap water capacity {capacity}"):
+        await client.set_tap_water_capacity_target("dev1", capacity)
+
+
+@pytest.mark.asyncio
 async def test_set_heating_curve_point_writes_holding():
     _connection, client = _client(writable=True)
     result = await client.set_heating_curve_point("dev1", "curve_minus_30", 59)

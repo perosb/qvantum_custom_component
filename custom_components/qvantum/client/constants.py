@@ -16,6 +16,9 @@ DHW_MODE_EXTRA = 2
 DHW_MODE_SMART = 3
 
 # Tap water capacity mappings (start, stop) -> capacity.
+# Modbus maps every level 1-7 through this table; cloud writes
+# ``tap_water_capacity_target`` directly for levels 2-5 and only uses the
+# table for the custom levels {1, 6, 7}. Keep the two in sync.
 TAP_WATER_CAPACITY_MAPPINGS = {
     (52, 58): 1,
     (52, 62): 2,
