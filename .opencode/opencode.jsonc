@@ -17,7 +17,7 @@
                         "by": "price"
                     },
                     "preferred_min_throughput": {
-                        "p90": 40
+                        "p90": 50
                     }
                 }
             }
