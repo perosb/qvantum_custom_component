@@ -109,6 +109,9 @@ class QvantumCloudClient:
         running so a shared session is never closed beneath them.
         """
         if self._closed:
+            # A concurrent close() is already draining: wait for the same
+            # drain point instead of returning while requests are in flight.
+            await self._drained.wait()
             return
         self._closed = True
         try:
@@ -582,10 +585,14 @@ class QvantumCloudClient:
                     )
                     raise TransportError(response.status)
                 case _:
-                    _LOGGER.error(
-                        "Failed to fetch device metadata, status: %s", response.status
+                    # Keep the last known metadata so the device stays
+                    # identified during a transient failure, matching the
+                    # metrics and settings reads.
+                    _LOGGER.warning(
+                        "Failed to fetch device metadata, status: %s; keeping "
+                        "cached metadata.",
+                        response.status,
                     )
-                    self._device_metadata = {}
         _LOGGER.debug("Device metadata fetched: %s", self._device_metadata)
         return self._device_metadata
 

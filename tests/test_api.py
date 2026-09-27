@@ -1018,6 +1018,29 @@ class TestQvantumCloudClient:
         assert result == {}
 
     @pytest.mark.asyncio
+    async def test_get_device_metadata_404_keeps_cached_data_and_warns(
+        self, mock_session, caplog
+    ):
+        """Unexpected status keeps cached metadata and warns about staleness."""
+        cached_data = {"id": "test_device", "model": "QE-6"}
+        cm, mock_response = mock_session.make_cm_response(status=404)
+        mock_session.get.return_value = cm
+
+        api = QvantumAPI(
+            "test@example.com", "password", "test-agent", session=mock_session
+        )
+        api._token = "test_token"
+        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._device_metadata = cached_data
+
+        with caplog.at_level(logging.WARNING):
+            result = await api.get_device_metadata("test_device")
+
+        assert result == cached_data
+        assert api._device_metadata == cached_data
+        assert "keeping cached metadata" in caplog.text
+
+    @pytest.mark.asyncio
     async def test_get_device_metadata_429_error(self, mock_session):
         """A 429 must preserve cached metadata instead of clearing it."""
         cached_data = {"id": "test_device", "model": "QE-6"}
