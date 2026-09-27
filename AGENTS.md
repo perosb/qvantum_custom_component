@@ -107,6 +107,38 @@ git worktree remove /tmp/opencode/qvantum-review-<n>
 Features, fixes, and review follow-ups follow the branch flow above in the
 standard checkout.
 
+### Stacked work (GitHub native stacks)
+
+Dependent work goes in a **GitHub stack**: one concern per layer, land on
+`main` in order. Use the official `gh stack` extension — do not open stacked
+PRs by hand and do not rebase a layer onto `main` manually.
+
+```bash
+gh extension install github/gh-stack   # once per machine
+```
+
+1. **Create** — `gh stack init <branch1> <branch2> …` (bottom to top): the
+   first branch is based on `main`, each next on the previous. `gh stack add`
+   appends a layer while the work grows. `gh stack init` and `gh stack link`
+   adopt existing branches and PRs, so hand-made PRs can be turned into a
+   stack instead of being rebased one by one.
+2. **Submit** — `gh stack submit` pushes every branch, opens or updates each
+   PR, and creates the stack on GitHub. Each PR then shows only its own
+   layer's diff; keep the `## Summary` / `## Test plan` body per layer.
+   `Depends on #N` is unnecessary — the stack encodes the dependency.
+3. **Sync** — after review feedback or new commits on `main`:
+   `gh stack sync` fetches, cascade-rebases, pushes atomically with
+   `--force-with-lease`, and syncs PR state. Never rebase a stack layer onto
+   `main` by hand; that breaks the stack.
+4. **Merge** — `gh stack merge --yes --squash` merges the whole stack
+   atomically, and `gh stack merge <pr-number>` lands everything up to that PR.
+   Do not merge layers one by one.
+
+If `gh-stack` cannot be installed, fall back to base-branch stacking: child PR
+base = parent branch, `Depends on #N` in the body, and after a parent
+squash-merge rebase the child with
+`git rebase --onto origin/main <old-parent-tip> <child-branch>` before pushing.
+
 ## Commits and PRs
 
 **Commits and PR titles** always start with a conventional prefix, then an
@@ -139,8 +171,9 @@ Do not omit the prefix for large work. Release automation commits
 - [ ] In HA, … (only for behavior a unit test cannot prove)
 ```
 
-Stacked work: one concern per PR, `Depends on #N` in the body, land on `main`
-in order. Do not bundle unrelated refactors.
+Stacked work: one concern per PR, land on `main` in order — use GitHub native
+stacks via `gh stack` (see Stacked work under Git workflow). Do not bundle
+unrelated refactors.
 
 Labels (`bug` / `enhancement` / `chore`) feed release-drafter. Version lives in
 `manifest.json` and `const.py`; the release workflow rewrites it from the tag.
