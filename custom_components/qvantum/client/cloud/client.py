@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -16,6 +17,7 @@ from .endpoints import (
     API_INTERNAL_URL,
     API_URL,
     AUTH_URL,
+    DEFAULT_AUTH_FAILURE_COOLDOWN_SECONDS,
     DEFAULT_TOKEN_BUFFER_SECONDS,
     DEFAULT_TOKEN_EXPIRY_SECONDS,
     FIREBASE_API_KEY,
@@ -62,6 +64,10 @@ class QvantumCloudClient:
                 timeout=HTTP_TIMEOUT,
             )
             self._session_owner = True
+        # Guards token acquisition so concurrent callers share one
+        # refresh/sign-in instead of issuing one request each. It survives
+        # ``unauthenticate()``: only the token state resets, not the lock.
+        self._token_lock = asyncio.Lock()
         self._reset_state()
 
     def _reset_state(self) -> None:
@@ -75,6 +81,10 @@ class QvantumCloudClient:
         self._device_metadata: dict = {}
         self._device_metadata_etag = None
         self._missing_metrics_warned: set[str] = set()
+        self._auth_failure: (
+            tuple[float, type[AuthError | TransportError | RateLimitError], int | None, str]
+            | None
+        ) = None
 
     def _ensure_open(self) -> None:
         if self._closed:
@@ -192,6 +202,10 @@ class QvantumCloudClient:
                     _LOGGER.error(
                         "Authentication failed: %s (%s)", response.status, message
                     )
+                    if message.startswith("TOO_MANY_ATTEMPTS_TRY_LATER"):
+                        # Firebase's sign-in lockout is a 400, not a 429; it
+                        # must not send Home Assistant into reauth.
+                        raise RateLimitError(response.status, message)
                     raise AuthError(response.status, message)
                 case status if status >= 500:
                     _LOGGER.error("Authentication failed: %s", status)
@@ -241,19 +255,79 @@ class QvantumCloudClient:
         from authenticate() propagates immediately so a rejected password is
         not retried within the same request. A rate-limited refresh raises
         RateLimitError instead of adding a sign-in request on top.
+
+        Concurrent callers share ``_token_lock`` so an expired token triggers
+        one refresh/sign-in rather than one request per caller; the token is
+        re-checked after acquiring the lock because a waiter may have already
+        refreshed it. A failed attempt is cached for a short cooldown so the
+        waiters fail fast instead of each issuing their own request.
         """
         self._ensure_open()
-        if self._token and self._token_expiry and datetime.now() < self._token_expiry:
+        if self._token_is_valid():
             return
+        self._raise_recent_auth_failure()
 
-        if self._refreshtoken:
-            await self._refresh_authentication_token()
-            if self._token:
+        async with self._token_lock:
+            if self._token_is_valid():
                 return
+            self._raise_recent_auth_failure()
 
-        await self.authenticate()
-        if not self._token:
-            raise AuthError(None, "Failed to obtain authentication token")
+            try:
+                if self._refreshtoken:
+                    await self._refresh_authentication_token()
+                if not self._token:
+                    await self.authenticate()
+                if not self._token:
+                    raise AuthError(None, "Failed to obtain authentication token")
+            except (AuthError, RateLimitError, TransportError) as err:
+                self._auth_failure = (
+                    time.monotonic(),
+                    type(err),
+                    err.status,
+                    err.message,
+                )
+                raise
+            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                # Connection-level failures must be typed and cached too, or
+                # every waiter retries the network in the flaky cases the
+                # cooldown targets.
+                failure = TransportError(None, f"Authentication request failed: {err}")
+                self._auth_failure = (
+                    time.monotonic(),
+                    type(failure),
+                    failure.status,
+                    failure.message,
+                )
+                raise failure from err
+            self._auth_failure = None
+
+    def _raise_recent_auth_failure(self) -> None:
+        """Re-raise the last auth failure while its cooldown is active.
+
+        Without this, releasing the lock after a failed refresh/sign-in lets
+        every waiter retry the API, so a burst of concurrent callers with a
+        rejected password still fires one request per caller. Each caller
+        gets a fresh exception instance so tracebacks stay per-caller.
+
+        The cache also covers retryable ``TransportError``/``RateLimitError``,
+        so a transient blip fails fast for the cooldown window instead of
+        re-hitting the API on every poll.
+        """
+        failure = self._auth_failure
+        if failure is None:
+            return
+        failed_at, err_type, status, message = failure
+        if time.monotonic() - failed_at < DEFAULT_AUTH_FAILURE_COOLDOWN_SECONDS:
+            raise err_type(status, message)
+        self._auth_failure = None
+
+    def _token_is_valid(self) -> bool:
+        """Whether a stored token exists and has not expired yet."""
+        return bool(
+            self._token
+            and self._token_expiry
+            and datetime.now() < self._token_expiry
+        )
 
     async def _request_json(
         self,

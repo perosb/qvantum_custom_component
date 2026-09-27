@@ -1,15 +1,21 @@
 """Direct tests for QvantumCloudClient."""
 
+import asyncio
 import json
 import os
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
 
 from custom_components.qvantum.client.cloud import QvantumCloudClient
 from custom_components.qvantum.client.cloud.endpoints import HTTP_TIMEOUT
-from custom_components.qvantum.client.exceptions import AuthError, TransportError
+from custom_components.qvantum.client.exceptions import (
+    AuthError,
+    RateLimitError,
+    TransportError,
+)
 
 
 def load_test_data(filename):
@@ -110,7 +116,6 @@ async def test_injected_session_authenticate_uses_timeout_and_user_agent(mock_se
     assert post_kwargs["headers"]["User-Agent"] == "test-agent"
     assert "Authorization" not in post_kwargs["headers"]
 
-
 @pytest.mark.asyncio
 async def test_authenticate_server_error_raises_transport_error(mock_session):
     """A 5xx sign-in failure is retryable, not invalid credentials."""
@@ -209,5 +214,155 @@ async def test_refresh_server_error_does_not_fall_back_to_sign_in(mock_session):
     client._token_expiry = None
 
     with pytest.raises(TransportError, match="Token refresh failed"):
+        await client._ensure_valid_token()
+    mock_session.post.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_token_refresh_issues_one_request(mock_session):
+    """Concurrent callers share a single refresh request."""
+    refresh_data = {
+        "access_token": "new_access_token",
+        "refresh_token": "new_refresh_token",
+        "expires_in": 3600,
+    }
+    cm, resp = mock_session.make_cm_response(status=200, json_data=refresh_data)
+
+    async def slow_enter():
+        # Force a suspension so the second caller reaches the lock while the
+        # first is still refreshing.
+        await asyncio.sleep(0)
+        return resp
+
+    cm.__aenter__ = AsyncMock(side_effect=slow_enter)
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._token = "expired_token"
+    client._token_expiry = datetime.now() - timedelta(seconds=1)
+    client._refreshtoken = "refresh_token"
+
+    await asyncio.gather(
+        client._ensure_valid_token(),
+        client._ensure_valid_token(),
+    )
+
+    mock_session.post.assert_called_once()
+    assert client._token == "new_access_token"
+
+
+@pytest.mark.asyncio
+async def test_failed_sign_in_is_not_retried_by_waiters(mock_session):
+    """Concurrent callers share one failed attempt instead of one each."""
+    cm, resp = mock_session.make_cm_response(
+        status=400, json_data={"error": {"message": "INVALID_PASSWORD"}}
+    )
+
+    async def slow_enter():
+        await asyncio.sleep(0)
+        return resp
+
+    cm.__aenter__ = AsyncMock(side_effect=slow_enter)
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    results = await asyncio.gather(
+        client._ensure_valid_token(),
+        client._ensure_valid_token(),
+        client._ensure_valid_token(),
+        return_exceptions=True,
+    )
+
+    assert all(isinstance(err, AuthError) for err in results)
+    mock_session.post.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_auth_failure_cooldown_expires(mock_session):
+    """A stale failure is ignored so a later poll can retry the sign-in."""
+    cm, _ = mock_session.make_cm_response(status=400, json_data={})
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    with pytest.raises(AuthError):
+        await client._ensure_valid_token()
+    with pytest.raises(AuthError):
+        await client._ensure_valid_token()
+    assert mock_session.post.call_count == 1
+
+    failed_at, err_type, status, message = client._auth_failure
+    client._auth_failure = (failed_at - 10_000, err_type, status, message)
+
+    with pytest.raises(AuthError):
+        await client._ensure_valid_token()
+    assert mock_session.post.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_cached_auth_failure_raises_fresh_instances(mock_session):
+    """Each caller gets its own exception instance, not a shared traceback."""
+    cm, _ = mock_session.make_cm_response(status=400, json_data={})
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    with pytest.raises(AuthError) as first:
+        await client._ensure_valid_token()
+    with pytest.raises(AuthError) as second:
+        await client._ensure_valid_token()
+
+    assert first.value is not second.value
+    assert str(first.value) == str(second.value)
+
+
+@pytest.mark.asyncio
+async def test_authenticate_sign_in_lockout_raises_rate_limit(mock_session):
+    """Firebase's 400 lockout must not send Home Assistant into reauth."""
+    cm, _ = mock_session.make_cm_response(
+        status=400,
+        json_data={
+            "error": {
+                "message": (
+                    "TOO_MANY_ATTEMPTS_TRY_LATER : Access to this account has "
+                    "been temporarily disabled by a short-term security measure."
+                )
+            }
+        },
+    )
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    with pytest.raises(RateLimitError):
+        await client.authenticate()
+
+
+@pytest.mark.asyncio
+async def test_connection_error_during_sign_in_is_cached(mock_session):
+    """A connection failure during auth is typed and cached for waiters."""
+    cm, _ = mock_session.make_cm_response(status=200, json_data={})
+    cm.__aenter__ = AsyncMock(
+        side_effect=aiohttp.ClientConnectionError("connection refused")
+    )
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    with pytest.raises(TransportError, match="Authentication request failed"):
+        await client._ensure_valid_token()
+    with pytest.raises(TransportError, match="Authentication request failed"):
         await client._ensure_valid_token()
     mock_session.post.assert_called_once()

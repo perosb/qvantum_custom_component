@@ -17,6 +17,7 @@ class AuthError(Exception):
         message: str = "Authentication failed",
     ) -> None:
         self.status = status
+        self.message = message
         if status is not None:
             super().__init__(f"{message}: {status}")
         else:
@@ -32,6 +33,7 @@ class TransportError(Exception):
         message: str = "API request failed",
     ) -> None:
         self.status = status
+        self.message = message
         if status is not None:
             super().__init__(f"{message}: {status}")
         else:
@@ -47,6 +49,7 @@ class RateLimitError(Exception):
         message: str = "Rate limit exceeded",
     ) -> None:
         self.status = status
+        self.message = message
         if status is not None:
             super().__init__(f"{message}: {status}")
         else:

@@ -13,6 +13,9 @@ FIREBASE_API_KEY = "AIzaSyCLQ22XHjH8LmId-PB1DY8FBsN53rWTpFw"
 
 DEFAULT_TOKEN_BUFFER_SECONDS = 60
 DEFAULT_TOKEN_EXPIRY_SECONDS = 3540
+# A failed refresh/sign-in is cached for this long so a burst of concurrent
+# callers fails fast instead of issuing one auth request per caller.
+DEFAULT_AUTH_FAILURE_COOLDOWN_SECONDS = 30
 METRICS_TIMEOUT_SECONDS = 12
 VENTILATION_BOOST_MINUTES = 120
 

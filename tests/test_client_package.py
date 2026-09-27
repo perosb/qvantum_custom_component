@@ -73,18 +73,21 @@ def test_exception_aliases_match_canonical_types():
 def test_auth_error_without_status_keeps_message():
     err = AuthError(None, "Invalid credentials")
     assert err.status is None
+    assert err.message == "Invalid credentials"
     assert str(err) == "Invalid credentials"
 
 
 def test_transport_error_with_status_appends_code():
     err = TransportError(500, "API request failed")
     assert err.status == 500
+    assert err.message == "API request failed"
     assert str(err) == "API request failed: 500"
 
 
 def test_rate_limit_error_default_message():
     err = RateLimitError(429)
     assert err.status == 429
+    assert err.message == "Rate limit exceeded"
     assert str(err) == "Rate limit exceeded: 429"
 
 
