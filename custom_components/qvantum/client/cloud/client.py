@@ -62,6 +62,10 @@ class QvantumCloudClient:
                 timeout=HTTP_TIMEOUT,
             )
             self._session_owner = True
+        # Guards token acquisition so concurrent callers share one
+        # refresh/sign-in instead of issuing one request each. It survives
+        # ``unauthenticate()``: only the token state resets, not the lock.
+        self._token_lock = asyncio.Lock()
         self._reset_state()
 
     def _reset_state(self) -> None:
@@ -241,19 +245,36 @@ class QvantumCloudClient:
         from authenticate() propagates immediately so a rejected password is
         not retried within the same request. A rate-limited refresh raises
         RateLimitError instead of adding a sign-in request on top.
+
+        Concurrent callers share ``_token_lock`` so an expired token triggers
+        one refresh/sign-in rather than one request per caller; the token is
+        re-checked after acquiring the lock because a waiter may have already
+        refreshed it.
         """
         self._ensure_open()
-        if self._token and self._token_expiry and datetime.now() < self._token_expiry:
+        if self._token_is_valid():
             return
 
-        if self._refreshtoken:
-            await self._refresh_authentication_token()
-            if self._token:
+        async with self._token_lock:
+            if self._token_is_valid():
                 return
 
-        await self.authenticate()
-        if not self._token:
-            raise AuthError(None, "Failed to obtain authentication token")
+            if self._refreshtoken:
+                await self._refresh_authentication_token()
+                if self._token:
+                    return
+
+            await self.authenticate()
+            if not self._token:
+                raise AuthError(None, "Failed to obtain authentication token")
+
+    def _token_is_valid(self) -> bool:
+        """Whether a stored token exists and has not expired yet."""
+        return bool(
+            self._token
+            and self._token_expiry
+            and datetime.now() < self._token_expiry
+        )
 
     async def _request_json(
         self,

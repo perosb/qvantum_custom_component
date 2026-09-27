@@ -1,8 +1,10 @@
 """Direct tests for QvantumCloudClient."""
 
+import asyncio
 import json
 import os
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
@@ -110,7 +112,6 @@ async def test_injected_session_authenticate_uses_timeout_and_user_agent(mock_se
     assert post_kwargs["headers"]["User-Agent"] == "test-agent"
     assert "Authorization" not in post_kwargs["headers"]
 
-
 @pytest.mark.asyncio
 async def test_authenticate_server_error_raises_transport_error(mock_session):
     """A 5xx sign-in failure is retryable, not invalid credentials."""
@@ -211,3 +212,38 @@ async def test_refresh_server_error_does_not_fall_back_to_sign_in(mock_session):
     with pytest.raises(TransportError, match="Token refresh failed"):
         await client._ensure_valid_token()
     mock_session.post.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_token_refresh_issues_one_request(mock_session):
+    """Concurrent callers share a single refresh request."""
+    refresh_data = {
+        "access_token": "new_access_token",
+        "refresh_token": "new_refresh_token",
+        "expires_in": 3600,
+    }
+    cm, resp = mock_session.make_cm_response(status=200, json_data=refresh_data)
+
+    async def slow_enter():
+        # Force a suspension so the second caller reaches the lock while the
+        # first is still refreshing.
+        await asyncio.sleep(0)
+        return resp
+
+    cm.__aenter__ = AsyncMock(side_effect=slow_enter)
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._token = "expired_token"
+    client._token_expiry = datetime.now() - timedelta(seconds=1)
+    client._refreshtoken = "refresh_token"
+
+    await asyncio.gather(
+        client._ensure_valid_token(),
+        client._ensure_valid_token(),
+    )
+
+    mock_session.post.assert_called_once()
+    assert client._token == "new_access_token"
