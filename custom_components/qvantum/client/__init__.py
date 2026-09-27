@@ -36,7 +36,11 @@ from .exceptions import (
     TransportError,
 )
 from .models import ApplyResult, Device, MetricsPayload, SettingsPayload
-from .protocol import QvantumClient
+from .protocol import (
+    QvantumClient,
+    QvantumCloudClientProtocol,
+    QvantumModbusClientProtocol,
+)
 
 __all__ = [
     "APIAuthError",
@@ -58,6 +62,8 @@ __all__ = [
     "FAN_SPEED_VALUE_OFF",
     "MetricsPayload",
     "QvantumClient",
+    "QvantumCloudClientProtocol",
+    "QvantumModbusClientProtocol",
     "RELAY_HEAT_L1_POWER_W",
     "RELAY_HEAT_L2_POWER_W",
     "RELAY_HEAT_L3_POWER_W",

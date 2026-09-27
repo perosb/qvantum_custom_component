@@ -103,8 +103,33 @@ def test_const_reexports_client_protocol_constants():
 def test_client_package_exports_protocol():
     assert hasattr(qvantum_client, "QvantumClient")
     assert hasattr(qvantum_client, "MetricsPayload")
+    assert hasattr(qvantum_client, "QvantumCloudClientProtocol")
+    assert hasattr(qvantum_client, "QvantumModbusClientProtocol")
     assert not hasattr(qvantum_client, "QvantumModbusClient")
     assert not hasattr(qvantum_client, "QvantumCloudClient")
+
+
+def test_transport_protocols_match_concrete_clients():
+    """Each client satisfies its transport protocol and not the other's."""
+    from unittest.mock import Mock
+
+    from custom_components.qvantum.client.cloud import QvantumCloudClient
+    from custom_components.qvantum.client.modbus import QvantumModbusClient
+    from custom_components.qvantum.client.protocol import (
+        QvantumClient,
+        QvantumCloudClientProtocol,
+        QvantumModbusClientProtocol,
+    )
+
+    cloud = QvantumCloudClient("user", "pass", "agent", session=Mock())
+    modbus = QvantumModbusClient()
+
+    assert isinstance(cloud, QvantumClient)
+    assert isinstance(modbus, QvantumClient)
+    assert isinstance(cloud, QvantumCloudClientProtocol)
+    assert isinstance(modbus, QvantumModbusClientProtocol)
+    assert not isinstance(cloud, QvantumModbusClientProtocol)
+    assert not isinstance(modbus, QvantumCloudClientProtocol)
 
 
 def test_modbus_shims_removed():

@@ -25,12 +25,18 @@ from ..constants import (
     TAP_WATER_CAPACITY_MAPPINGS,
 )
 from ..exceptions import TransportError
+from ..models import ApplyResult, MetricsPayload, SettingsPayload
 from .device import IdentityProbeError, QvantumModbusDevice, holding_field_for_metric
 from .maps import MODBUS_HOLDING_REGISTER_MAP, MODBUS_HOLDING_TO_SETTINGS_MAP
 
 _LOGGER = logging.getLogger(__name__)
 
-_APPLIED = {"status": SETTING_UPDATE_APPLIED}
+
+def _applied() -> ApplyResult:
+    """Return a fresh APPLIED result so callers cannot mutate a shared dict."""
+    return {"status": SETTING_UPDATE_APPLIED}
+
+
 _FAN_PRESETS = {
     FAN_SPEED_STATE_OFF: FAN_SPEED_VALUE_OFF,
     FAN_SPEED_STATE_NORMAL: FAN_SPEED_VALUE_NORMAL,
@@ -137,7 +143,7 @@ class QvantumModbusClient:
 
     async def get_metrics(
         self, device_id: str, enabled_metrics: list[str] | None = None
-    ) -> dict[str, Any]:
+    ) -> MetricsPayload:
         """Read input registers and return an HTTP-shaped metrics payload."""
 
         async def _update(device: QvantumModbusDevice):
@@ -153,7 +159,7 @@ class QvantumModbusClient:
 
     async def get_settings(
         self, device_id: str, enabled_settings: list[str] | None = None
-    ) -> dict[str, Any]:
+    ) -> SettingsPayload:
         """Read holding registers exposed as HTTP-shaped settings."""
         enabled = enabled_settings or [
             key
@@ -186,13 +192,13 @@ class QvantumModbusClient:
 
     async def write_holding_register(
         self, device_id: str, register_address: int, value: int
-    ) -> dict[str, str]:
+    ) -> ApplyResult:
         """Write a raw holding register (FC06)."""
         self._ensure_writable()
 
         async def _write(device: QvantumModbusDevice):
             await device.write_holding_register(register_address, int(value))
-            return dict(_APPLIED)
+            return _applied()
 
         return await self._run(
             _write,
@@ -203,14 +209,14 @@ class QvantumModbusClient:
 
     async def write_metric(
         self, device_id: str, metric_key: str, value: float
-    ) -> dict[str, str]:
+    ) -> ApplyResult:
         """Write a holding field by HTTP/settings metric name."""
         self._ensure_writable()
         holding_field_for_metric(metric_key)
 
         async def _write(device: QvantumModbusDevice):
             await device.write_metric(metric_key, value)
-            return dict(_APPLIED)
+            return _applied()
 
         return await self._run(
             _write,
@@ -221,7 +227,7 @@ class QvantumModbusClient:
 
     async def update_setting(
         self, device_id: str, name: str, value: Any
-    ) -> dict[str, str]:
+    ) -> ApplyResult:
         """Write one setting, coercing bools to 0/1."""
         if isinstance(value, bool):
             value = int(value)
@@ -229,41 +235,41 @@ class QvantumModbusClient:
 
     async def set_indoor_temperature_target(
         self, device_id: str, temperature: float
-    ) -> dict[str, str]:
+    ) -> ApplyResult:
         return await self.write_metric(
             device_id, "indoor_temperature_target", temperature
         )
 
     async def set_indoor_temperature_offset(
         self, device_id: str, value: int
-    ) -> dict[str, str]:
+    ) -> ApplyResult:
         return await self.write_metric(device_id, "indoor_temperature_offset", value)
 
     async def set_curve_type_heating(
         self, device_id: str, value: int
-    ) -> dict[str, str]:
+    ) -> ApplyResult:
         return await self.write_metric(device_id, "curve_type_heating", int(value))
 
     async def set_heating_curve_point(
         self, device_id: str, metric_key: str, value: int
-    ) -> dict[str, str]:
+    ) -> ApplyResult:
         return await self.write_metric(device_id, metric_key, int(value))
 
     async def set_tap_water(
         self, device_id: str, start: int = 0, stop: int = 0
-    ) -> dict[str, str] | None:
+    ) -> ApplyResult:
         if stop == 0 and start == 0:
             _LOGGER.debug("No tap water settings to update, both stop and start are 0.")
-            return dict(_APPLIED)
+            return _applied()
         if stop:
             await self.write_metric(device_id, "tap_water_stop", stop)
         if start:
             await self.write_metric(device_id, "tap_water_start", start)
-        return dict(_APPLIED)
+        return _applied()
 
     async def set_tap_water_capacity_target(
         self, device_id: str, capacity: int
-    ) -> dict[str, str] | None:
+    ) -> ApplyResult:
         capacity_to_stop_start = {v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()}
         start, stop = capacity_to_stop_start[capacity]
         _LOGGER.debug(
@@ -276,7 +282,7 @@ class QvantumModbusClient:
 
     async def set_fanspeedselector(
         self, device_id: str, preset_mode: str
-    ) -> dict[str, str]:
+    ) -> ApplyResult:
         if preset_mode not in _FAN_PRESETS:
             raise ValueError(f"Invalid preset_mode: {preset_mode}")
         return await self.write_metric(
@@ -285,7 +291,7 @@ class QvantumModbusClient:
 
     async def set_extra_tap_water(
         self, device_id: str, minutes: int
-    ) -> dict[str, str]:
+    ) -> ApplyResult:
         """Write DHW Extra if minutes != 0 else Normal. No restore timer."""
         mode = DHW_MODE_NORMAL if minutes == 0 else DHW_MODE_EXTRA
         return await self.write_metric(device_id, "extra_tap_water", mode)
