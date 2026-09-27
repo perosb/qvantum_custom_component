@@ -490,6 +490,11 @@ class QvantumCloudClient:
     async def set_tap_water_capacity_target(
         self, device_id: str, capacity: int
     ) -> dict[str, Any]:
+        if capacity not in set(TAP_WATER_CAPACITY_MAPPINGS.values()):
+            raise ValueError(
+                f"Unsupported tap water capacity {capacity}; expected one of "
+                f"{sorted(TAP_WATER_CAPACITY_MAPPINGS.values())}"
+            )
         if capacity in _CUSTOM_CAPACITIES:
             capacity_to_stop_start = {v: k for k, v in TAP_WATER_CAPACITY_MAPPINGS.items()}
             start, stop = capacity_to_stop_start[capacity]

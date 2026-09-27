@@ -381,3 +381,21 @@ async def test_set_tap_water_noop_reports_applied(mock_session):
 
     assert result == {"status": "APPLIED"}
     mock_session.patch.assert_not_called()
+
+
+@pytest.mark.parametrize("capacity", [0, 8, -1])
+@pytest.mark.asyncio
+async def test_set_tap_water_capacity_target_rejects_unknown_level(
+    mock_session, capacity
+):
+    """Capacities outside 1-7 fail clearly on the cloud client too."""
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._token = "test_token"
+    client._token_expiry = datetime.now() + timedelta(hours=1)
+
+    with pytest.raises(ValueError, match=f"Unsupported tap water capacity {capacity}"):
+        await client.set_tap_water_capacity_target("test_device", capacity)
+
+    mock_session.patch.assert_not_called()
