@@ -81,6 +81,244 @@ async def test_get_metrics_after_close_raises(mock_session):
 
 
 @pytest.mark.asyncio
+async def test_close_is_idempotent_and_rejects_new_requests(mock_session):
+    """close() is repeatable; a new request never reaches the session."""
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    await client.close()
+    await client.close()
+
+    with pytest.raises(TransportError, match="Cloud client is closed"):
+        async with client._track_request(mock_session.get("http://example.com")):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_cancelled_close_can_be_retried(mock_session):
+    """A close() cancelled while draining leaves the client open for a retry."""
+    cm, resp = mock_session.make_cm_response(status=200, json_data={"values": {}})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_enter():
+        entered.set()
+        await release.wait()
+        return resp
+
+    cm.__aenter__ = AsyncMock(side_effect=slow_enter)
+    mock_session.get.return_value = cm
+    mock_session.close = AsyncMock()
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._session_owner = True
+    client._token = "test_token"
+    client._token_expiry = datetime.now() + timedelta(hours=1)
+
+    request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
+    closer = None
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+
+        closer = asyncio.create_task(client.close())
+        for _ in range(10):
+            if client._closed:
+                break
+            await asyncio.sleep(0)
+        assert client._closed is True
+
+        closer.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await closer
+        assert client._closed is False
+
+        release.set()
+        await asyncio.wait_for(request, timeout=1)
+
+        await client.close()
+        assert client._closed is True
+        mock_session.close.assert_awaited_once()
+    finally:
+        release.set()
+        for task in (request, closer):
+            if task is not None and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+
+@pytest.mark.asyncio
+async def test_concurrent_close_takes_over_after_cancellation(mock_session):
+    """A waiting close() finishes the job when the draining one is cancelled."""
+    cm, resp = mock_session.make_cm_response(status=200, json_data={"values": {}})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_enter():
+        entered.set()
+        await release.wait()
+        return resp
+
+    cm.__aenter__ = AsyncMock(side_effect=slow_enter)
+    mock_session.get.return_value = cm
+    mock_session.close = AsyncMock()
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._session_owner = True
+    client._token = "test_token"
+    client._token_expiry = datetime.now() + timedelta(hours=1)
+
+    request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
+    first = None
+    second = None
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+
+        first = asyncio.create_task(client.close())
+        for _ in range(10):
+            if client._closed:
+                break
+            await asyncio.sleep(0)
+        assert client._closed is True
+
+        second = asyncio.create_task(client.close())
+        await asyncio.sleep(0)
+
+        first.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await first
+        assert client._closed is False
+
+        release.set()
+        await asyncio.wait_for(request, timeout=1)
+        await asyncio.wait_for(second, timeout=1)
+
+        assert client._closed is True
+        mock_session.close.assert_awaited_once()
+    finally:
+        release.set()
+        for task in (request, first, second):
+            if task is not None and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+
+@pytest.mark.asyncio
+async def test_concurrent_close_waits_for_drain(mock_session):
+    """A second close() waits for the drain instead of returning early."""
+    cm, resp = mock_session.make_cm_response(status=200, json_data={"values": {}})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_enter():
+        entered.set()
+        await release.wait()
+        return resp
+
+    cm.__aenter__ = AsyncMock(side_effect=slow_enter)
+    mock_session.get.return_value = cm
+    mock_session.close = AsyncMock()
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._session_owner = True
+    client._token = "test_token"
+    client._token_expiry = datetime.now() + timedelta(hours=1)
+
+    request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
+    closers = []
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+
+        first = asyncio.create_task(client.close())
+        closers.append(first)
+        for _ in range(10):
+            if client._closed:
+                break
+            await asyncio.sleep(0)
+
+        second = asyncio.create_task(client.close())
+        closers.append(second)
+        done, _pending = await asyncio.wait({second}, timeout=0.05)
+        assert second not in done
+
+        release.set()
+        await asyncio.wait_for(request, timeout=1)
+        await asyncio.wait_for(asyncio.gather(*closers), timeout=1)
+
+        mock_session.close.assert_awaited_once()
+    finally:
+        release.set()
+        for task in (request, *closers):
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+
+@pytest.mark.asyncio
+async def test_close_waits_for_in_flight_request(mock_session):
+    """close() drains active HTTP requests before closing an owned session."""
+    cm, resp = mock_session.make_cm_response(status=200, json_data={"values": {}})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_enter():
+        entered.set()
+        await release.wait()
+        return resp
+
+    cm.__aenter__ = AsyncMock(side_effect=slow_enter)
+    mock_session.get.return_value = cm
+    mock_session.close = AsyncMock()
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._session_owner = True
+    client._token = "test_token"
+    client._token_expiry = datetime.now() + timedelta(hours=1)
+
+    request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
+    closer = None
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+
+        closer = asyncio.create_task(client.close())
+        done, _pending = await asyncio.wait({closer}, timeout=0.05)
+        assert closer not in done
+        assert client._closed is True
+        mock_session.close.assert_not_awaited()
+
+        release.set()
+        await asyncio.wait_for(request, timeout=1)
+        await asyncio.wait_for(closer, timeout=1)
+
+        mock_session.close.assert_awaited_once()
+    finally:
+        release.set()
+        for task in (request, closer):
+            if task is not None and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+
+@pytest.mark.asyncio
 async def test_set_indoor_temperature_target_patches(mock_session):
     update_data = load_test_data("settings_update_test_device.json")
     cm, _ = mock_session.make_cm_response(status=200, json_data=update_data)

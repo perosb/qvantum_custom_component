@@ -92,16 +92,20 @@ back to `main`. Switch to `main` and pull the latest when starting the next PR.
 
 Do not ask for permission for these steps. Do not merge unless asked. If asked, use squash merge.
 
-**Read-only review goes in a worktree; development uses the normal checkout.**
-Another review or session may be using the primary checkout, so never switch
-its branch to inspect a PR. Check the PR branch out in a temporary
-`git worktree` under `/tmp/opencode/` instead:
+**Worktrees live in the system temp directory; development uses the normal
+checkout.** Never create a worktree next to the repository checkout (for
+example `<repo>-pr-<n>`) — use the system temp directory (`${TMPDIR:-/tmp}`)
+instead. Another review or session may be using the primary checkout, so never
+switch its branch to inspect a PR. A fresh, single-session checkout (CI or an
+ephemeral workspace) is the exception: use that clone and its checkout
+directly, no worktree. Otherwise check the PR branch out in a temporary
+`git worktree`:
 
 ```bash
 git fetch origin <branch>
-git worktree add --detach /tmp/opencode/qvantum-review-<n> origin/<branch>
+git worktree add --detach "${TMPDIR:-/tmp}/qvantum-review-<n>" origin/<branch>
 # inspect and run tests there
-git worktree remove /tmp/opencode/qvantum-review-<n>
+git worktree remove "${TMPDIR:-/tmp}/qvantum-review-<n>"
 ```
 
 Features, fixes, and review follow-ups follow the branch flow above in the
@@ -186,8 +190,7 @@ in chat. The `opencode-review` workflow (`.github/workflows/review.yml`) posts a
 automated review on every PR; that does not replace posting comments when you
 are asked to review. Run the PR branch in a `git worktree` for read-only
 verification if needed — never by switching the primary checkout, unless it is
-a fresh clone no other session depends on (for example, the CI checkout in the
-`opencode-review` workflow).
+a fresh, single-session clone (for example the CI checkout).
 
 **How to comment**
 

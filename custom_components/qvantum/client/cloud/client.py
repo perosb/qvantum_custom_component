@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -73,6 +74,11 @@ class QvantumCloudClient:
         # refresh/sign-in instead of issuing one request each. It survives
         # ``unauthenticate()``: only the token state resets, not the lock.
         self._token_lock = asyncio.Lock()
+        # In-flight HTTP bookkeeping so ``close()`` can drain active requests
+        # before closing an owned session. Both survive ``unauthenticate()``.
+        self._inflight_requests = 0
+        self._drained = asyncio.Event()
+        self._drained.set()
         self._reset_state()
 
     def _reset_state(self) -> None:
@@ -96,10 +102,28 @@ class QvantumCloudClient:
             raise TransportError(None, "Cloud client is closed")
 
     async def close(self) -> None:
-        """Close an owned HTTP session. Injected sessions are left to the owner."""
+        """Drain in-flight requests, then close an owned HTTP session.
+
+        Injected sessions are left to the owner. Mirroring the Modbus
+        client's write lock, ``close()`` waits for requests that are already
+        running so a shared session is never closed beneath them.
+        """
         if self._closed:
+            # A concurrent close() is already draining: wait for the same
+            # drain point instead of returning while requests are in flight.
+            await self._drained.wait()
+            if not self._closed:
+                # The draining close() was cancelled; finish the close here.
+                await self.close()
             return
         self._closed = True
+        try:
+            await self._drained.wait()
+        except asyncio.CancelledError:
+            # A cancelled close() must not leave the client closed with the
+            # session still open; let a later close() retry.
+            self._closed = False
+            raise
         if getattr(self, "_session_owner", False) and self._session:
             try:
                 await self._session.close()
@@ -109,6 +133,27 @@ class QvantumCloudClient:
             except Exception as exc:
                 _LOGGER.debug("Error closing HTTP session: %s", exc)
             self._session = None
+
+    @asynccontextmanager
+    async def _track_request(self, request: Any):
+        """Run an HTTP request while counting it as in flight.
+
+        ``close()`` waits for these to drain before closing an owned
+        session. The closed check and the increment are one synchronous
+        step, so a request either is counted by ``close()`` or is rejected
+        instead of touching a session that is closing.
+        """
+        if self._closed:
+            raise TransportError(None, "Cloud client is closed")
+        self._inflight_requests += 1
+        self._drained.clear()
+        try:
+            async with request as response:
+                yield response
+        finally:
+            self._inflight_requests -= 1
+            if not self._inflight_requests:
+                self._drained.set()
 
     async def unauthenticate(self) -> None:
         self._reset_state()
@@ -183,9 +228,11 @@ class QvantumCloudClient:
             "password": self._password,
             "clientType": "CLIENT_TYPE_WEB",
         }
-        async with self._session.post(
-            f"{self._auth_url}/v1/accounts:signInWithPassword?key={self._firebase_api_key}",
-            **self._http_kwargs(include_auth=False, json=payload),
+        async with self._track_request(
+            self._session.post(
+                f"{self._auth_url}/v1/accounts:signInWithPassword?key={self._firebase_api_key}",
+                **self._http_kwargs(include_auth=False, json=payload),
+            )
         ) as response:
             match response.status:
                 case 200:
@@ -225,9 +272,11 @@ class QvantumCloudClient:
             return
         payload = {"grant_type": "refresh_token", "refresh_token": self._refreshtoken}
         self._token = None
-        async with self._session.post(
-            f"{self._token_url}/v1/token?key={self._firebase_api_key}",
-            **self._http_kwargs(include_auth=False, json=payload),
+        async with self._track_request(
+            self._session.post(
+                f"{self._token_url}/v1/token?key={self._firebase_api_key}",
+                **self._http_kwargs(include_auth=False, json=payload),
+            )
         ) as response:
             match response.status:
                 case 200:
@@ -351,7 +400,7 @@ class QvantumCloudClient:
         kwargs: dict[str, Any] = self._http_kwargs()
         if payload is not None:
             kwargs["json"] = payload
-        async with request(url, **kwargs) as response:
+        async with self._track_request(request(url, **kwargs)) as response:
             if validate_status:
                 await self._handle_response(response)
             data = await response.json()
@@ -516,9 +565,11 @@ class QvantumCloudClient:
         extra: dict[str, str] = {}
         if self._device_metadata_etag:
             extra["If-None-Match"] = self._device_metadata_etag
-        async with self._session.get(
-            f"{self._api_url}/api/device-info/v1/devices/{device_id}/status",
-            **self._http_kwargs(headers=extra),
+        async with self._track_request(
+            self._session.get(
+                f"{self._api_url}/api/device-info/v1/devices/{device_id}/status",
+                **self._http_kwargs(headers=extra),
+            )
         ) as response:
             match response.status:
                 case 200:
@@ -537,10 +588,14 @@ class QvantumCloudClient:
                     )
                     raise TransportError(response.status)
                 case _:
-                    _LOGGER.error(
-                        "Failed to fetch device metadata, status: %s", response.status
+                    # Keep the last known metadata so the device stays
+                    # identified during a transient failure, matching the
+                    # metrics and settings reads.
+                    _LOGGER.warning(
+                        "Failed to fetch device metadata, status: %s; keeping "
+                        "cached metadata.",
+                        response.status,
                     )
-                    self._device_metadata = {}
         _LOGGER.debug("Device metadata fetched: %s", self._device_metadata)
         return self._device_metadata
 
@@ -605,10 +660,12 @@ class QvantumCloudClient:
         if etag_header:
             extra["If-None-Match"] = etag_header
         names_list = "".join(f"&names[]={name}" for name in metric_names)
-        async with self._session.get(
-            f"{API_INTERNAL_URL}/api/internal/v1/devices/{device_id}/values"
-            f"?use_internal_names=true&timeout={METRICS_TIMEOUT_SECONDS}{names_list}",
-            **self._http_kwargs(headers=extra),
+        async with self._track_request(
+            self._session.get(
+                f"{API_INTERNAL_URL}/api/internal/v1/devices/{device_id}/values"
+                f"?use_internal_names=true&timeout={METRICS_TIMEOUT_SECONDS}{names_list}",
+                **self._http_kwargs(headers=extra),
+            )
         ) as response:
             match response.status:
                 case 200:
@@ -632,8 +689,10 @@ class QvantumCloudClient:
                     _LOGGER.error("Server error fetching HTTP values: %s", status)
                     raise TransportError(response.status)
                 case _:
-                    _LOGGER.error(
-                        "Failed to fetch HTTP values, status: %s", response.status
+                    _LOGGER.warning(
+                        "Failed to fetch HTTP values, status: %s; keeping "
+                        "cached values.",
+                        response.status,
                     )
                     return None, None, None
 
@@ -643,9 +702,11 @@ class QvantumCloudClient:
         extra: dict[str, str] = {}
         if self._settings_etag:
             extra["If-None-Match"] = self._settings_etag
-        async with self._session.get(
-            f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings",
-            **self._http_kwargs(headers=extra),
+        async with self._track_request(
+            self._session.get(
+                f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings",
+                **self._http_kwargs(headers=extra),
+            )
         ) as response:
             match response.status:
                 case 200:
@@ -665,18 +726,23 @@ class QvantumCloudClient:
                     )
                     raise TransportError(response.status)
                 case _:
-                    _LOGGER.error(
-                        "Failed to fetch HTTP settings, status: %s", response.status
+                    # Keep the last known settings so entities stay usable
+                    # during a transient failure, matching get_metrics.
+                    _LOGGER.warning(
+                        "Failed to fetch HTTP settings, status: %s; keeping "
+                        "cached settings.",
+                        response.status,
                     )
-                    self._settings_data = {}
         _LOGGER.debug("HTTP Settings read: %s", self._settings_data)
         return self._settings_data
 
     async def get_devices(self) -> list | None:
         await self._ensure_valid_token()
-        async with self._session.get(
-            f"{self._api_url}/api/inventory/v1/users/me/devices",
-            **self._http_kwargs(),
+        async with self._track_request(
+            self._session.get(
+                f"{self._api_url}/api/inventory/v1/users/me/devices",
+                **self._http_kwargs(),
+            )
         ) as response:
             match response.status:
                 case 200:
@@ -708,9 +774,11 @@ class QvantumCloudClient:
 
     async def get_access_level(self, device_id: str) -> dict[str, Any]:
         await self._ensure_valid_token()
-        async with self._session.get(
-            f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
-            **self._http_kwargs(),
+        async with self._track_request(
+            self._session.get(
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
+                **self._http_kwargs(),
+            )
         ) as response:
             await self._handle_response(response)
             data = await response.json()
@@ -721,9 +789,11 @@ class QvantumCloudClient:
 
     async def _generate_code(self, device_id: str) -> dict[str, Any] | None:
         await self._ensure_valid_token()
-        async with self._session.post(
-            f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/generate-access-code?use_internal_names=true",
-            **self._http_kwargs(),
+        async with self._track_request(
+            self._session.post(
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/generate-access-code?use_internal_names=true",
+                **self._http_kwargs(),
+            )
         ) as response:
             if response.ok:
                 data = await response.json()
@@ -741,9 +811,11 @@ class QvantumCloudClient:
         _LOGGER.debug(
             "Claiming grant for device %s with access code %s.", device_id, access_code
         )
-        async with self._session.post(
-            f"{API_INTERNAL_URL}/api/internal/v1/auth/device/claim-grant?access_code={access_code}&use_internal_names=true",
-            **self._http_kwargs(),
+        async with self._track_request(
+            self._session.post(
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/claim-grant?access_code={access_code}&use_internal_names=true",
+                **self._http_kwargs(),
+            )
         ) as response:
             if response.ok:
                 data = await response.json()
@@ -758,9 +830,11 @@ class QvantumCloudClient:
 
     async def _approve_access(self, device_id: str, access_code: str) -> bool:
         await self._ensure_valid_token()
-        async with self._session.post(
-            f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/access-grants?access_code={access_code}&approve=true&use_internal_names=true",
-            **self._http_kwargs(),
+        async with self._track_request(
+            self._session.post(
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/access-grants?access_code={access_code}&approve=true&use_internal_names=true",
+                **self._http_kwargs(),
+            )
         ) as response:
             if response.ok:
                 _LOGGER.debug("Access approved for device %s.", device_id)
@@ -774,9 +848,11 @@ class QvantumCloudClient:
 
     async def elevate_access(self, device_id: str) -> dict[str, Any] | None:
         await self._ensure_valid_token()
-        async with self._session.get(
-            f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
-            **self._http_kwargs(),
+        async with self._track_request(
+            self._session.get(
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
+                **self._http_kwargs(),
+            )
         ) as response:
             await self._handle_response(response)
             data = await response.json()
@@ -804,9 +880,11 @@ class QvantumCloudClient:
                 return None
             if not await self._approve_access(device_id, access_code):
                 return None
-            async with self._session.get(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
-                **self._http_kwargs(),
+            async with self._track_request(
+                self._session.get(
+                    f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
+                    **self._http_kwargs(),
+                )
             ) as response:
                 await self._handle_response(response)
                 data = await response.json()
