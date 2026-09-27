@@ -144,7 +144,7 @@ class QvantumCloudClient:
         """Return Firebase's ``error.message`` when the body carries one."""
         try:
             data = await response.json()
-        except (aiohttp.ContentTypeError, ValueError):
+        except (aiohttp.ClientError, ValueError):
             return default
         if isinstance(data, dict):
             error = data.get("error")

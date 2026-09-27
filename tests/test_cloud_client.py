@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime, timedelta
 
+import aiohttp
 import pytest
 
 from custom_components.qvantum.client.cloud import QvantumCloudClient
@@ -143,6 +144,20 @@ async def test_authenticate_invalid_credentials_surfaces_server_message(mock_ses
 async def test_authenticate_400_without_body_keeps_default_message(mock_session):
     """A 400 without a Firebase error body still raises a clear AuthError."""
     cm, _ = mock_session.make_cm_response(status=400, json_data={})
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    with pytest.raises(AuthError, match="Authentication failed"):
+        await client.authenticate()
+
+
+@pytest.mark.asyncio
+async def test_authenticate_400_body_read_error_keeps_default_message(mock_session):
+    """A dropped connection while reading the 400 body still raises AuthError."""
+    cm, resp = mock_session.make_cm_response(status=400, json_data={})
+    resp.json.side_effect = aiohttp.ClientPayloadError("connection closed")
     mock_session.post.return_value = cm
 
     client = QvantumCloudClient(
