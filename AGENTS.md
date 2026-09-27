@@ -1,286 +1,186 @@
-# Qvantum Home Assistant custom component — agent notes
+# Qvantum Home Assistant — agent notes
 
-Home Assistant integration for Qvantum heat pumps. One config entry, two exclusive
-transports: **cloud HTTP** or **local Modbus TCP**. Requires Home Assistant **2026.9+**
-(shared Modbus connection). HACS zip is `custom_components/qvantum/`.
+HA integration for Qvantum heat pumps. One config entry, two exclusive transports:
+**cloud HTTP** XOR **local Modbus TCP**. Requires HA **2026.9+**. HACS zip:
+`custom_components/qvantum/`.
 
 ## Layout
 
 ```
 custom_components/qvantum/
-  __init__.py                 # setup/unload, RuntimeData, Cloud XOR Modbus
+  __init__.py                 # setup/unload, RuntimeData
   coordinator.py              # poll, derived metrics, extra-DHW helper
   maintenance_coordinator.py  # firmware / elevate-access (cloud)
   extra_dhw.py                # ExtraDhwTimer (HA Store + async_call_later)
-  calculations.py             # derived metrics (heatingpower, tap capacity, …)
+  calculations.py
   entity.py                   # QvantumEntity, icons, write-access mixin
-  config_flow.py              # cloud login or Modbus host/port/unit probe
-  const.py                    # HA config keys, enabled-metric lists; re-exports client constants
-  sensor.py, binary_sensor.py, climate.py, number.py, switch.py, button.py, select.py, fan.py, water_heater.py
-  services.py / services.yaml # extra_hot_water
-  client/                     # vendored comms library — no Home Assistant imports
-    protocol.py               # QvantumClient Protocol
-    exceptions.py             # AuthError, TransportError, RateLimitError (+ API* aliases)
-    constants.py              # DHW modes, fan presets, capacity map, relay watts
-    models.py
-    cloud/                    # QvantumCloudClient (Firebase + REST)
-    modbus/                   # QvantumModbusClient, device, maps, model
-  translations/               # cs, da, de, en, es, fi, fr, hu, nl, pl, sv
-  test_data/                  # recorded HTTP fixtures
-tests/                        # unit tests (pytest)
+  config_flow.py
+  const.py                    # HA keys; re-exports client constants
+  sensor.py, binary_sensor.py, climate.py, number.py, switch.py,
+  button.py, select.py, fan.py, water_heater.py
+  services.py / services.yaml
+  client/                     # vendored comms — no Home Assistant imports
+    protocol.py, exceptions.py, constants.py, models.py
+    cloud/  modbus/
+  translations/               # cs da de en es fi fr hu nl pl sv
+  test_data/
+tests/
 ```
 
-`config_entry.runtime_data` is a `RuntimeData` dataclass: `coordinator`,
-`maintenance_coordinator`, `device`, `client`, `extra_dhw` (Modbus only), and
-Modbus host/port/unit. Platforms read `config_entry.runtime_data.coordinator`
-and `device`. Shared writes go through `QvantumClient` on `coordinator.client`.
-Cloud-only and Modbus-only writes go through coordinator helpers
-(`async_set_extra_tap_water`, `async_write_metric`, `async_set_smartcontrol`,
-`async_elevate_access`) so platforms stay protocol-blind.
+`config_entry.runtime_data` (`RuntimeData`): `coordinator`,
+`maintenance_coordinator`, `device`, `client`, `extra_dhw` (Modbus only),
+Modbus host/port/unit. Platforms read `runtime_data.coordinator` and `device`.
+Shared writes: `QvantumClient` on `coordinator.client`. Cloud-only / Modbus-only
+writes: coordinator helpers (`async_set_extra_tap_water`, `async_write_metric`,
+`async_set_smartcontrol`, `async_elevate_access`) — no `isinstance` on transport.
 
 ## Client vs Home Assistant
 
-`client/` is the seed of a future standalone library. Isolation is enforced by
-`tests/test_client_package.py`.
+`client/` is a future standalone library. Enforced by `tests/test_client_package.py`.
 
-- **Never** import `homeassistant*` or `custom_components*` from `client/`.
-  Relative imports must stay inside `client/`.
-- `client/__init__.py` must not import `cloud` or `modbus`. HA `const.py` imports
-  `client.constants`; an eager cloud/Modbus import would pull `aiohttp` /
-  `modbus_connection` into every load path.
-- Import transports from `client.cloud` / `client.modbus` (or
-  `client.cloud.client` / `client.modbus.client`).
-- Coordinators and entities keep **canonical metric/setting names**. Both
-  transports return HTTP-shaped payloads (`{"metrics": …}`, `{"settings": …}`).
-  Successful writes return `{"status": "APPLIED"}` (`SETTING_UPDATE_APPLIED`).
-- Cloud/HTTP entities that are controls (for example `switch`, `number`, and
-  similar writable entities) must always be included in `REQUIRED_METRICS` so
-  they remain present and writable in the cloud transport.
-- Extra-DHW **duration** and derived calculations stay in HA. Cloud encodes
-  minutes on the wire; Modbus only writes Extra/Normal — `ExtraDhwTimer` restores
-  Normal. Construct the timer only when Modbus is enabled.
-- Poll `latency` is coordinator telemetry, not a protocol register.
-- Cloud uses `async_get_clientsession(hass)` (do not own a session in HA).
-  Modbus borrows HA 2026.9 `async_get_unit`; the client never opens or closes TCP.
-- Prefer named setters (`set_indoor_temperature_target`, `update_setting`, …).
-  `write_metric` is Modbus (holding field by canonical name). Cloud has
-  `set_smartcontrol` / `update_settings`; those are cloud-only. Entities call
-  coordinator helpers for those, not `isinstance` on the transport.
-- Import maps and device types from `client.modbus`.
+- Never import `homeassistant*` or `custom_components*` from `client/`.
+  Relative imports stay inside `client/`.
+- `client/__init__.py` must not import `cloud` or `modbus` (would pull `aiohttp` /
+  `modbus_connection` on every load). HA `const.py` imports `client.constants`.
+- Import transports from `client.cloud` / `client.modbus`.
+- Coordinators and entities use **canonical metric/setting names**. Both
+  transports return HTTP-shaped payloads (`{"metrics"}`, `{"settings"}`).
+  Successful writes: `{"status": "APPLIED"}` (`SETTING_UPDATE_APPLIED`).
+- Cloud writable entities (`switch`, `number`, …) stay in `REQUIRED_METRICS`.
+- Extra-DHW **duration** and derived calc stay in HA. Cloud encodes minutes;
+  Modbus writes Extra/Normal — `ExtraDhwTimer` restores Normal. Construct the
+  timer only when Modbus is enabled.
+- Poll `latency` is coordinator telemetry, not a register.
+- Cloud: `async_get_clientsession(hass)` (do not own a session). Modbus: HA
+  2026.9 `async_get_unit`; client never opens/closes TCP.
+- Prefer named setters. `write_metric` is Modbus. Cloud: `set_smartcontrol` /
+  `update_settings` via coordinator helpers.
+- Import maps/types from `client.modbus`.
+- Exceptions: `AuthError`, `TransportError`, `RateLimitError`. Aliases in HA/tests:
+  `APIAuthError`, `APIConnectionError`, `APIRateLimitError`. Do not name a class
+  `ConnectionError`.
 
-Exceptions: `AuthError`, `TransportError`, `RateLimitError`. HA and tests still
-use aliases `APIAuthError`, `APIConnectionError`, `APIRateLimitError`. Do not
-name a class `ConnectionError` (shadows the builtin).
+## Git
 
-## Git workflow
+**Never push to `main`** (no force). Land only via PR; squash-merge only when asked.
 
-**Never push to `main`.** Not `git push origin main`, not `--force`, not
-`--force-with-lease`. GitHub blocks force-pushes to `main`; do not try to
-bypass it. Land work only by opening a PR and merging when asked.
+1. New feature branch from latest `main`. Never commit on `main`.
+2. Conventional commit (table below).
+3. `git push -u origin HEAD` — that branch only.
+4. `gh pr create` against default branch. Stay on the feature branch.
 
-When a task is complete:
+Do not ask permission for these steps. Do not merge unless asked.
 
-1. Create a **new** feature branch from latest `main`. If `HEAD` is already
-   `main` (for example after a merge), still branch first — never commit on
-   `main`.
-2. Commit with a clear message.
-3. Push **that branch only** (`git push -u origin HEAD`).
-4. Open a PR against the default branch with `gh pr create`.
-
-After the PR is open, stay on the feature branch — there is no need to switch
-back to `main`. Switch to `main` and pull the latest when starting the next PR.
-
-Do not ask for permission for these steps. Do not merge unless asked. If asked, use squash merge.
-
-**Worktrees live in the system temp directory; development uses the normal
-checkout.** Never create a worktree next to the repository checkout (for
-example `<repo>-pr-<n>`) — use the system temp directory (`${TMPDIR:-/tmp}`)
-instead. Another review or session may be using the primary checkout, so never
-switch its branch to inspect a PR. A fresh, single-session checkout (CI or an
-ephemeral workspace) is the exception: use that clone and its checkout
-directly, no worktree. Otherwise check the PR branch out in a temporary
-`git worktree`:
+**Worktrees live in `${TMPDIR:-/tmp}`.** Never create `<repo>-pr-<n>` next to the
+checkout. Never switch the primary checkout to inspect a PR (another session may
+own it). Exception: a fresh single-session clone (CI) — use that checkout, no
+worktree.
 
 ```bash
 git fetch origin <branch>
 git worktree add --detach "${TMPDIR:-/tmp}/qvantum-review-<n>" origin/<branch>
-# inspect and run tests there
+# inspect / pytest there
 git worktree remove "${TMPDIR:-/tmp}/qvantum-review-<n>"
 ```
 
-Features, fixes, and review follow-ups follow the branch flow above in the
-standard checkout.
+### Stacked work
 
-### Stacked work (GitHub native stacks)
+Use official `gh stack` (`gh extension install github/gh-stack`). One concern
+per layer; land on `main` in order. Do not hand-stack or rebase a layer onto
+`main`.
 
-Dependent work goes in a **GitHub stack**: one concern per layer, land on
-`main` in order. Use the official `gh stack` extension — do not open stacked
-PRs by hand and do not rebase a layer onto `main` manually.
+- Create: `gh stack init <b1> <b2> …` (bottom → top) or `gh stack add` / `link`.
+- Submit: `gh stack submit`.
+- Sync: `gh stack sync` (atomic `--force-with-lease`). Prefer over `gh stack push`.
+- Merge: `gh stack merge --yes --squash` or `gh stack merge <pr>`.
 
-```bash
-gh extension install github/gh-stack   # once per machine
-```
-
-1. **Create** — `gh stack init <branch1> <branch2> …` (bottom to top): the
-   first branch is based on `main`, each next on the previous. `gh stack add`
-   appends a layer while the work grows. `gh stack init` and `gh stack link`
-   adopt existing branches and PRs, so hand-made PRs can be turned into a
-   stack instead of being rebased one by one.
-2. **Submit** — `gh stack submit` pushes every branch, opens or updates each
-   PR, and creates the stack on GitHub. Each PR then shows only its own
-   layer's diff; keep the `## Summary` / `## Test plan` body per layer.
-   `Depends on #N` is unnecessary — the stack encodes the dependency.
-3. **Sync** — after review feedback or new commits on `main`:
-   `gh stack sync` fetches, cascade-rebases, and pushes all branches in one
-   atomic `git push` (`--force-with-lease --atomic`). `gh stack push` is
-   per-branch and not atomic — prefer `sync`. Never rebase a stack layer onto
-   `main` by hand; that breaks the stack.
-4. **Merge** — `gh stack merge --yes --squash` merges the whole stack
-   atomically, and `gh stack merge <pr-number>` lands everything up to that PR.
-   Do not merge layers one by one.
-
-If `gh-stack` cannot be installed, fall back to base-branch stacking: child PR
-base = parent branch, `Depends on #N` in the body, and after a parent
-squash-merge rebase the child with
-`git rebase --onto origin/main <old-parent-tip> <child-branch>` before pushing.
+Fallback if `gh-stack` is missing: child base = parent branch, `Depends on #N`,
+then `git rebase --onto origin/main <old-parent-tip> <child>` after parent squash.
 
 ## Commits and PRs
 
-**Commits and PR titles** always start with a conventional prefix, then an
-imperative subject. Use a body that says *why* when the subject is not enough.
+Title: `type: Imperative subject`. Body = *why* when the subject is not enough.
 
-| Prefix | Use for |
+| Prefix | Use |
 |---|---|
-| `feat:` | New behavior or a user-visible capability |
-| `fix:` | Bug fix |
-| `refactor:` | Structure change with no intended behavior change |
+| `feat:` | New / user-visible behavior |
+| `fix:` | Bug |
+| `refactor:` | Structure, no intended behavior change |
 | `test:` | Tests only |
-| `docs:` | Documentation only |
-| `chore:` | Tooling, CI, dependencies, housekeeping |
+| `docs:` | Docs only |
+| `chore:` | Tooling, CI, deps |
 
-Examples: `feat: Cut over HA to Cloud XOR Modbus clients`,
-`refactor: Drop leftover QvantumAPI facades`, `fix: Cancel extra-DHW before close`.
+Release automation owns `Update for new version <tag>` — leave it to CI.
 
-Do not omit the prefix for large work. Release automation commits
-`Update for new version <tag>` — leave that to CI.
-
-**PR body** — keep this shape:
+PR body:
 
 ```markdown
 ## Summary
-- What changed, in bullets.
-- Call out transport (cloud vs Modbus) and user-visible behavior.
+- What changed. Call out cloud vs Modbus and user-visible behavior.
 
 ## Test plan
 - [x] `pytest` — N passed, coverage %
-- [ ] In HA, … (only for behavior a unit test cannot prove)
+- [ ] In HA, … (only if a unit test cannot prove it)
 ```
 
-Stacked work: one concern per PR, land on `main` in order — use GitHub native
-stacks via `gh stack` (see Stacked work under Git workflow). Do not bundle
-unrelated refactors.
-
-Labels (`bug` / `enhancement` / `chore`) feed release-drafter. Version lives in
-`manifest.json` and `const.py`; the release workflow rewrites it from the tag.
+Labels `bug` / `enhancement` / `chore` feed release-drafter. Version lives in
+`manifest.json` and `const.py`; release workflow rewrites from the tag.
 
 ## Code reviews
 
-When asked to review a PR, **post the review on GitHub**. Do not only summarize
-in chat. The `opencode-review` workflow (`.github/workflows/review.yml`) posts an
-automated review on every PR; that does not replace posting comments when you
-are asked to review. Run the PR branch in a `git worktree` for read-only
-verification if needed — never by switching the primary checkout, unless it is
-a fresh, single-session clone (for example the CI checkout).
+When asked to review, **post on GitHub** (`event: COMMENT`). Chat summary is not
+enough. Verify in a `/tmp` worktree — never by switching the primary checkout
+(unless CI clone).
 
-**How to comment**
+- Inline on changed lines (diff RIGHT). One or two sentences of *why*, then a
+  concrete fix. English.
+- If the fix is a drop-in replacement, end the comment with a `suggestion` fence
+  only (no +/- , exact whitespace, range = replaced lines). Skip the fence when
+  the fix spans files or needs more than the highlighted lines.
+- Max substance: correctness. Do not invent nits. Skip pre-existing issues on
+  untouched lines unless the diff newly depends on them.
+- Publish immediately. Do not approve or merge unless asked. You cannot approve
+  your own PR.
+- After pushing a fix, resolve the GitHub thread (`resolveReviewThread`).
+- Clean diff: still publish a short overview with empty `comments`.
 
-- Inline on the changed line (or a short contiguous range), in the same style
-  as GitHub Copilot: one or two sentences of *why*, then an actionable fix.
-- Every comment must be actionable. When the fix is a concrete replacement,
-  include a GitHub suggestion block so the author can apply it in one click.
-  The automated `opencode-review` follows the same rule — never leave an inline
-  comment that only points out a problem without a concrete fix. The block must
-  be a drop-in replacement of the commented lines; GitHub rejects comments that
-  are not on a line in the diff.
-- Publish immediately (`gh api …/pulls/<n>/reviews` with `"event": "COMMENT"`)
-  so comments are visible. Leave the review PENDING only if asked. Do not
-  approve unless asked. You cannot approve your own PR. Do not merge unless
-  asked.
-- Review comments are English, matching PR titles and Copilot.
-- When you address a review comment and push the fix, resolve the corresponding
-  GitHub review thread (`resolveReviewThread` GraphQL mutation) so only threads
-  that still need work stay open.
+**Flag**
 
-Suggestion block:
-
-````markdown
-Hour-duration metrics including `ventilation_fan_run_time` must be assigned
-before the generic `"fan"` substring match, which otherwise sets unit percent.
-
-```suggestion
-        elif metric_key in _DURATION_HOURS_SENSORS:
-            self._attr_native_unit_of_measurement = UnitOfTime.HOURS
-            self._attr_device_class = SensorDeviceClass.DURATION
-            self._attr_suggested_display_precision = 0
-```
-````
-
-**What to flag**
-
-Correctness first, style second. In this repo that means:
-
-- Wrong Modbus register or cloud endpoint; holding vs input mix-ups (e.g.
-  holding 88 is `sg_enabled`, not a runtime counter).
-- Cloud-only entities created in Modbus mode, or the reverse.
-- `client/` importing `homeassistant*` / `custom_components*`, or HA calling
-  `isinstance` on the transport instead of coordinator helpers.
-- Missing translations, tests, or a coverage drop below 92%.
-
-Do not invent nits to fill space, and do not restate the PR in every inline
-comment. Skip pre-existing problems in untouched lines unless the diff newly
-depends on them. Match surrounding conventions (including existing test
-patterns) rather than “fixing” them in new lines only.
-
-If the diff is clean, still publish a short overview review with an empty
-`comments` array — no inline threads, no approval.
+- Wrong Modbus register or cloud endpoint; holding vs input (holding 88 =
+  `sg_enabled`, not a runtime counter).
+- Cloud-only entities in Modbus mode, or the reverse.
+- `client/` importing HA, or HA `isinstance` on transport.
+- Missing translations/tests, or coverage below **92%**.
 
 ## Tests
 
 ```bash
 ./run-tests.sh          # venv + requirements-test.txt + pytest
-python -m pytest        # from repo root; pytest.ini sets coverage and timeout
+python -m pytest        # repo root; pytest.ini sets coverage + timeout
 ```
 
-- Coverage floor **92%** (`--cov-fail-under=92`). Aim to keep or raise it.
-- Per-test timeout **30s** (`pytest-timeout`). A hung asyncio wait should fail,
-  not freeze the suite.
-- Modbus tests inject `modbus_connection.mock.MockModbusConnection` — never open
-  a TCP socket.
-- `tests/test_api.py` defines a **test-only** `QvantumAPI` helper that constructs
-  Cloud or Modbus. Production code must not grow a new facade.
-- Async tests that spawn tasks must cancel leftovers in `finally` (see
-  `test_close_waits_for_in_flight_modbus_lock`).
-- Dual-mode tests (HTTP and Modbus on one object) are obsolete; skip or rewrite
-  against a single transport.
+- Coverage floor **92%**. Timeout **30s** per test.
+- Modbus tests inject `modbus_connection.mock.MockModbusConnection` — no TCP.
+- `tests/test_api.py` `QvantumAPI` is test-only. Do not add a production facade.
+- Cancel leftover asyncio tasks in `finally`.
+- Dual-mode tests (HTTP and Modbus on one object) are obsolete.
 
 ## Translations and entities
 
-Edit `custom_components/qvantum/translations/*.json` together. Keep HVAC terms
-consistent across languages; validate JSON. Entity unique IDs and config-entry
-migrations live in `__init__.py` — bump `CONFIG_VERSION` when the entry schema
-changes, and add a migration test.
+Edit all `translations/*.json` together. Validate JSON. Unique IDs and
+config-entry migrations live in `__init__.py` — bump `CONFIG_VERSION` and add a
+migration test when the entry schema changes.
 
-Icons belong on `QvantumEntity`. Cloud-only entities (SmartControl, firmware
-boards, access expiry, elevate-access) must not be created in Modbus mode.
+Icons on `QvantumEntity`. Cloud-only (SmartControl, firmware boards, access
+expiry, elevate-access) must not be created in Modbus mode.
 
 ## Product constraints
 
 - `single_config_entry`: one instance; switch cloud ↔ Modbus via reconfigure.
-- Modbus writes are opt-in (`CONF_MODBUS_WRITE`). Do not enable them by default.
-- Interval-only option changes apply in place; host/port/unit/enablement reloads
-  the entry.
-- Do not invent cloud endpoints or Modbus registers. Maps live in
-  `client/modbus/maps.py`; HTTP paths in `client/cloud/endpoints.py`.
+- Modbus writes opt-in (`CONF_MODBUS_WRITE`) — never default on.
+- Interval-only option changes apply in place; host/port/unit/enablement reloads.
+- Do not invent endpoints or registers. Maps: `client/modbus/maps.py`.
+  HTTP paths: `client/cloud/endpoints.py`.
 
 ---
 
