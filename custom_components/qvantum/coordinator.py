@@ -27,7 +27,10 @@ from .client.exceptions import (
     TransportError as APIConnectionError,
 )
 from .client.modbus import QvantumModbusClient
-from .client.protocol import QvantumClient
+from .client.protocol import (
+    QvantumCloudClientProtocol,
+    QvantumModbusClientProtocol,
+)
 from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
 from .calculations import QvantumCalculationsMixin
 from .client.constants import alias_heating_curve_settings
@@ -204,7 +207,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         hass: HomeAssistant,
         config_entry: ConfigEntry,
         *,
-        client: QvantumClient,
+        client: QvantumCloudClientProtocol | QvantumModbusClientProtocol,
         extra_dhw: ExtraDhwTimer | None = None,
     ) -> None:
         """Initialize coordinator."""
@@ -212,7 +215,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             config_entry
         )
 
-        self.client: QvantumClient = client
+        self.client: QvantumCloudClientProtocol | QvantumModbusClientProtocol = client
         self.extra_dhw = extra_dhw
         self._config_entry = config_entry
         self._device = None
@@ -799,6 +802,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         island is re-probed at most once per interval. A failed read never
         fails the poll; the last known version stays on the device.
         """
+        if not isinstance(self.client, QvantumModbusClientProtocol):
+            return
         now = time.monotonic()
         refreshed_at = self._sw_version_refreshed_at
         if (

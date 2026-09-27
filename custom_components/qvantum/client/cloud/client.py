@@ -13,6 +13,7 @@ import aiohttp
 
 from ..constants import HEATING_CURVE_HTTP_KEYS, TAP_WATER_CAPACITY_MAPPINGS
 from ..exceptions import AuthError, RateLimitError, TransportError
+from ..models import MetricsPayload, SettingsPayload
 from .endpoints import (
     API_INTERNAL_URL,
     API_URL,
@@ -74,9 +75,9 @@ class QvantumCloudClient:
         self._token = None
         self._refreshtoken = None
         self._token_expiry = None
-        self._settings_data: dict = {}
+        self._settings_data: SettingsPayload = {}
         self._settings_etag = None
-        self._metrics_data: dict = {}
+        self._metrics_data: MetricsPayload = {}
         self._metrics_etag = None
         self._device_metadata: dict = {}
         self._device_metadata_etag = None
@@ -536,7 +537,7 @@ class QvantumCloudClient:
 
     async def get_metrics(
         self, device_id: str, enabled_metrics: list[str] | None = None
-    ) -> dict[str, Any]:
+    ) -> MetricsPayload:
         self._ensure_open()
         http_values, etag, total_latency = await self._get_http_values(
             device_id,
@@ -544,7 +545,7 @@ class QvantumCloudClient:
             etag_header=self._metrics_etag,
         )
         if http_values is not None:
-            metrics: dict = {"hpid": device_id, "latency": total_latency}
+            metrics: dict[str, Any] = {"hpid": device_id, "latency": total_latency}
             names = (
                 enabled_metrics
                 if enabled_metrics is not None
@@ -574,7 +575,7 @@ class QvantumCloudClient:
 
     async def get_http_metrics(
         self, device_id: str, metric_names: list[str]
-    ) -> dict[str, Any]:
+    ) -> MetricsPayload:
         http_values, _, _ = await self._get_http_values(device_id, metric_names)
         if not http_values:
             return {"metrics": {}}
@@ -627,7 +628,7 @@ class QvantumCloudClient:
                     )
                     return None, None, None
 
-    async def get_settings(self, device_id: str) -> dict[str, Any]:
+    async def get_settings(self, device_id: str) -> SettingsPayload:
         self._ensure_open()
         await self._ensure_valid_token()
         extra: dict[str, str] = {}
