@@ -81,6 +81,70 @@ async def test_get_metrics_after_close_raises(mock_session):
 
 
 @pytest.mark.asyncio
+async def test_close_is_idempotent_and_rejects_new_requests(mock_session):
+    """close() is repeatable; a new request never reaches the session."""
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    await client.close()
+    await client.close()
+
+    with pytest.raises(TransportError, match="Cloud client is closed"):
+        async with client._track_request(mock_session.get("http://example.com")):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_close_waits_for_in_flight_request(mock_session):
+    """close() drains active HTTP requests before closing an owned session."""
+    cm, resp = mock_session.make_cm_response(status=200, json_data={"values": {}})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_enter():
+        entered.set()
+        await release.wait()
+        return resp
+
+    cm.__aenter__ = AsyncMock(side_effect=slow_enter)
+    mock_session.get.return_value = cm
+    mock_session.close = AsyncMock()
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._session_owner = True
+    client._token = "test_token"
+    client._token_expiry = datetime.now() + timedelta(hours=1)
+
+    request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
+    closer = None
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+
+        closer = asyncio.create_task(client.close())
+        done, _pending = await asyncio.wait({closer}, timeout=0.05)
+        assert closer not in done
+        assert client._closed is True
+        mock_session.close.assert_not_awaited()
+
+        release.set()
+        await asyncio.wait_for(request, timeout=1)
+        await asyncio.wait_for(closer, timeout=1)
+
+        mock_session.close.assert_awaited_once()
+    finally:
+        release.set()
+        for task in (request, closer):
+            if task is not None and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+
+@pytest.mark.asyncio
 async def test_set_indoor_temperature_target_patches(mock_session):
     update_data = load_test_data("settings_update_test_device.json")
     cm, _ = mock_session.make_cm_response(status=200, json_data=update_data)
