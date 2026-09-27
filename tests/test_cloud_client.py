@@ -95,6 +95,63 @@ async def test_close_is_idempotent_and_rejects_new_requests(mock_session):
 
 
 @pytest.mark.asyncio
+async def test_cancelled_close_can_be_retried(mock_session):
+    """A close() cancelled while draining leaves the client open for a retry."""
+    cm, resp = mock_session.make_cm_response(status=200, json_data={"values": {}})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_enter():
+        entered.set()
+        await release.wait()
+        return resp
+
+    cm.__aenter__ = AsyncMock(side_effect=slow_enter)
+    mock_session.get.return_value = cm
+    mock_session.close = AsyncMock()
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._session_owner = True
+    client._token = "test_token"
+    client._token_expiry = datetime.now() + timedelta(hours=1)
+
+    request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
+    closer = None
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+
+        closer = asyncio.create_task(client.close())
+        for _ in range(10):
+            if client._closed:
+                break
+            await asyncio.sleep(0)
+        assert client._closed is True
+
+        closer.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await closer
+        assert client._closed is False
+
+        release.set()
+        await asyncio.wait_for(request, timeout=1)
+
+        await client.close()
+        assert client._closed is True
+        mock_session.close.assert_awaited_once()
+    finally:
+        release.set()
+        for task in (request, closer):
+            if task is not None and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+
+@pytest.mark.asyncio
 async def test_close_waits_for_in_flight_request(mock_session):
     """close() drains active HTTP requests before closing an owned session."""
     cm, resp = mock_session.make_cm_response(status=200, json_data={"values": {}})

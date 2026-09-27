@@ -111,7 +111,13 @@ class QvantumCloudClient:
         if self._closed:
             return
         self._closed = True
-        await self._drained.wait()
+        try:
+            await self._drained.wait()
+        except asyncio.CancelledError:
+            # A cancelled close() must not leave the client closed with the
+            # session still open; let a later close() retry.
+            self._closed = False
+            raise
         if getattr(self, "_session_owner", False) and self._session:
             try:
                 await self._session.close()
