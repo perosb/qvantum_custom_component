@@ -42,7 +42,7 @@
                             "p90": 50
                         },
                         "preferred_max_latency": {
-                            "p90": 8
+                            "p90": 5
                         }
                     }
                 }
