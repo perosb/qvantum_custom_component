@@ -13,6 +13,7 @@ jobs:
     # Fork PRs get no repository secrets, so the run would fail on the missing key.
     if: github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: write
@@ -34,7 +35,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: ${{ github.event.pull_request.additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
+          model: ${{ github.event.pull_request.additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~deepseek/deepseek-flash-latest' }}
           variant: max
           share: false
           use_github_token: true
@@ -44,11 +45,13 @@ jobs:
 
             Post immediately as a pull request review with event COMMENT.
             Do not approve, request changes, or leave the review pending.
+            Post exactly one review (event COMMENT). Never submit duplicate reviews.
 
             Scope:
             - Diff only. Do not explore the whole repo unless a changed line is unintelligible without one extra file.
             - Do not run the full test suite. At most a single targeted pytest if the bug is test-shaped.
             - Skip nits: naming, import order, comments, style already covered by linters.
+            - Before calling a config entry unused, check `.github/workflows/*.yml` for model references.
             - Max 8 inline comments. If more issues exist, put the rest as a short numbered list in the review body.
             - No praise. Empty review body is fine if there are no findings: post "No blockers." and zero inlines.
 

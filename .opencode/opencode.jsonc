@@ -1,23 +1,71 @@
 {
     "$schema": "https://opencode.ai/config.json",
-    "model": "openrouter/~z-ai/glm-flash-latest#max",
-    "small_model": "openrouter/~z-ai/glm-flash-latest#low",
+    "model": "openrouter/~z-ai/glm-flash-latest",
+    "small_model": "openrouter/~openai/gpt-luna-latest",
     "logLevel": "WARN",
     "enabled_providers": [
         "openrouter"
     ],
-    "providers": {
+    "permission": {
+        "external_directory": {
+            "/tmp/**": "allow"
+        }
+    },
+    "provider": {
         "openrouter": {
-            "body": {
-                "provider": {
-                    "allow_fallbacks": true,
-                    "zdr": true,
-                    "data_collection": "deny",
-                    "sort": {
-                        "by": "price"
-                    },
-                    "preferred_min_throughput": {
-                        "p90": 50
+            "options": {
+                "headers": {
+                    "HTTP-Referer": "https://github.com/perosb/qvantum_custom_component",
+                    "X-Title": "qvantum-ci-review"
+                },
+                "extraBody": {
+                    "provider": {
+                        "allow_fallbacks": true,
+                        "order": [
+                            "relace",
+                            "inference-net",
+                            "deepinfra",
+                            "sail-research",
+                            "morph",
+                            "coreweave",
+                            "together",
+                            "parasail",
+                            "open-inference",
+                            "azure"
+                        ],
+                        "zdr": true,
+                        "data_collection": "deny",
+                        "sort": {
+                            "by": "price"
+                        },
+                        "preferred_min_throughput": {
+                            "p90": 50
+                        },
+                        "preferred_max_latency": {
+                            "p90": 6
+                        }
+                    }
+                }
+            },
+            "models": {
+                "~z-ai/glm-flash-latest": {
+                    "options": {
+                        "reasoning": { "effort": "xhigh" }
+                    }
+                },
+                "~z-ai/glm-latest": {
+                    "options": {
+                        "reasoning": { "effort": "xhigh" }
+                    }
+                },
+                "~openai/gpt-luna-latest": {
+                    "options": {
+                        "reasoning": { "effort": "low" }
+                    }
+                },
+                "~deepseek/deepseek-flash-latest": {
+                    "options": {
+                        "reasoning": { "effort": "xhigh" }
                     }
                 }
             }
