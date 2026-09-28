@@ -35,7 +35,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: openrouter/~z-ai/glm-latest
+          model: ${{ github.event.pull_request.additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~deepseek/deepseek-flash-latest' }}
           variant: max
           share: false
           use_github_token: true

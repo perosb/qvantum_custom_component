@@ -43,6 +43,11 @@
                     "options": {
                         "reasoning": { "effort": "low" }
                     }
+                },
+                "~deepseek/deepseek-flash-latest": {
+                    "options": {
+                        "reasoning": { "effort": "xhigh" }
+                    }
                 }
             }
         }
