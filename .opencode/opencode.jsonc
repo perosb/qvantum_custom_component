@@ -6,6 +6,11 @@
     "enabled_providers": [
         "openrouter"
     ],
+    "permission": {
+        "external_directory": {
+            "/tmp/**": "allow"
+        }
+    },
     "provider": {
         "openrouter": {
             "options": {
