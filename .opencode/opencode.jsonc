@@ -17,6 +17,18 @@
                 "extraBody": {
                     "provider": {
                         "allow_fallbacks": true,
+                        "order": [
+                            "relace",
+                            "inference-net",
+                            "deepinfra",
+                            "sail-research",
+                            "morph",
+                            "coreweave",
+                            "together",
+                            "parasail",
+                            "open-inference",
+                            "azure"
+                        ],
                         "zdr": true,
                         "data_collection": "deny",
                         "sort": {

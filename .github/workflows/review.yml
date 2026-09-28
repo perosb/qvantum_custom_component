@@ -13,7 +13,7 @@ jobs:
     # Fork PRs get no repository secrets, so the run would fail on the missing key.
     if: github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: write
