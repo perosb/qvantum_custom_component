@@ -31,17 +31,17 @@
             "models": {
                 "~z-ai/glm-flash-latest": {
                     "options": {
-                        "reasoningEffort": "max"
+                        "reasoning": { "effort": "xhigh" }
                     }
                 },
                 "~z-ai/glm-latest": {
                     "options": {
-                        "reasoningEffort": "max"
+                        "reasoning": { "effort": "xhigh" }
                     }
                 },
                 "~openai/gpt-luna-latest": {
                     "options": {
-                        "reasoningEffort": "low"
+                        "reasoning": { "effort": "low" }
                     }
                 }
             }
