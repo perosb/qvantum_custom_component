@@ -14,6 +14,10 @@
     "provider": {
         "openrouter": {
             "options": {
+                "headers": {
+                    "HTTP-Referer": "https://github.com/perosb/qvantum_custom_component",
+                    "X-Title": "qvantum-ci-review"
+                },
                 "extraBody": {
                     "provider": {
                         "allow_fallbacks": true,
@@ -36,6 +40,9 @@
                         },
                         "preferred_min_throughput": {
                             "p90": 50
+                        },
+                        "preferred_max_latency": {
+                            "p90": 8
                         }
                     }
                 }
