@@ -51,7 +51,7 @@ jobs:
             - Diff only. Do not explore the whole repo unless a changed line is unintelligible without one extra file.
             - Do not run the full test suite. At most a single targeted pytest if the bug is test-shaped.
             - Skip nits: naming, import order, comments, style already covered by linters.
-            - Before calling a config entry unused or inert, check .github/workflows/*.yml for dynamic model selection.
+            - Before calling a config entry unused, check `.github/workflows/*.yml` for model references.
             - Max 8 inline comments. If more issues exist, put the rest as a short numbered list in the review body.
             - No praise. Empty review body is fine if there are no findings: post "No blockers." and zero inlines.
 
