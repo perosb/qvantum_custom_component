@@ -86,13 +86,15 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
     def available(self):
         """Return true if entity is available.
 
-        Availability only requires data; write access is enforced in
-        ``set_fanspeedselector`` so a read-only account can still see the
-        current fan state.
+        The fan is control-only: without write access it behaves like a
+        switch and is shown as unavailable, so Home Assistant never offers a
+        toggle that would fail on use. Read-only fan state has no separate
+        sensor here, so there is nothing to keep visible.
         """
         return (
             super().available
             and self._values.get(self._metric_key) is not None
+            and self._has_write_access
         )
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:

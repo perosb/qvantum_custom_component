@@ -322,12 +322,12 @@ class TestWriteAccessBehaviour:
         assert entity.available is False
 
     def test_available_without_write_access(self, mock_device):
-        """A read-only account can still see the current fan state."""
+        """The control-only fan is unavailable without write access."""
         coordinator = _spec_coordinator(write_level=10)
         entity = QvantumFanEntity(coordinator, "fanspeedselector", mock_device)
 
         assert entity._has_write_access is False
-        assert entity.available is True
+        assert entity.available is False
 
     @pytest.mark.asyncio
     async def test_set_preset_mode_requires_write_access(self, mock_device):
@@ -363,14 +363,14 @@ def _modbus_no_write_coordinator():
 
 
 class TestWriteFeatureGating:
-    """Controls are hidden without write access; the state stays available."""
+    """The fan is control-only: without write access it is unavailable."""
 
     def test_controls_hidden_without_write_access(self, mock_device):
         coordinator = _modbus_no_write_coordinator()
         entity = QvantumFanEntity(coordinator, "fanspeedselector", mock_device)
 
         assert entity._has_write_access is False
-        assert entity.available is True
+        assert entity.available is False
         assert entity.supported_features == 0
 
     def test_controls_shown_with_write_access(self, mock_device):
