@@ -80,6 +80,26 @@ async def test_restore_retries_after_failed_write():
 
 
 @pytest.mark.asyncio
+async def test_failed_restore_does_not_clobber_newer_schedule():
+    """A failed write for a superseded deadline must not re-arm a retry."""
+    write, timer = _timer()
+    write.side_effect = RuntimeError("modbus down")
+    unsub = MagicMock()
+    with patch(
+        "homeassistant.helpers.event.async_call_later", return_value=unsub
+    ) as later:
+        await timer.async_schedule("dev1", 60)
+        _, _, old_callback = later.call_args[0]
+        # A new period is scheduled before the old callback's write fails.
+        await timer.async_schedule("dev1", 120)
+        calls_after_reschedule = later.call_count
+        await old_callback(None)
+
+    assert later.call_count == calls_after_reschedule
+    assert timer.restore_at is not None
+
+
+@pytest.mark.asyncio
 async def test_restore_ignores_implausible_deadline():
     """A far-future persisted deadline is rejected and cleared."""
     write, timer = _timer()

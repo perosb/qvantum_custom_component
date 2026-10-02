@@ -134,8 +134,10 @@ class ExtraDhwTimer:
                     "Failed to restore DHW mode after extra hot water timer: %s", err
                 )
                 # Keep the deadline and retry shortly; returning here used to
-                # leave restore_at in the past with no active callback.
-                if self.hass is not None:
+                # leave restore_at in the past with no active callback. Only
+                # re-arm when this closure is still the active deadline so a
+                # newer period's timer is not clobbered.
+                if self.hass is not None and self.restore_at == restore_at:
                     self.unsub = async_call_later(
                         self.hass, _RESTORE_RETRY_SECONDS, _restore
                     )
