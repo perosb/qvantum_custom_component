@@ -538,12 +538,40 @@ async def test_auth_failure_cooldown_expires(mock_session):
         await client._ensure_valid_token()
     assert mock_session.post.call_count == 1
 
-    failed_at, err_type, status, message = client._auth_failure
-    client._auth_failure = (failed_at - 10_000, err_type, status, message)
+    failed_at, err_type, status, message, retry_after = client._auth_failure
+    client._auth_failure = (
+        failed_at - 10_000,
+        err_type,
+        status,
+        message,
+        retry_after,
+    )
 
     with pytest.raises(AuthError):
         await client._ensure_valid_token()
     assert mock_session.post.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_cached_rate_limit_keeps_retry_after(mock_session):
+    """A cached 429 re-raised in its cooldown keeps the Retry-After hint."""
+    cm, _ = mock_session.make_cm_response(
+        status=429, json_data={}, headers={"Retry-After": "45"}
+    )
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    with pytest.raises(RateLimitError) as first:
+        await client._ensure_valid_token()
+    with pytest.raises(RateLimitError) as second:
+        await client._ensure_valid_token()
+
+    assert first.value.retry_after == 45.0
+    assert second.value.retry_after == 45.0
+    mock_session.post.assert_called_once()
 
 
 @pytest.mark.asyncio

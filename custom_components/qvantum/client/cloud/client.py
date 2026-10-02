@@ -126,7 +126,13 @@ class QvantumCloudClient:
         self._device_metadata_etag = None
         self._missing_metrics_warned: set[str] = set()
         self._auth_failure: (
-            tuple[float, type[AuthError | TransportError | RateLimitError], int | None, str]
+            tuple[
+                float,
+                type[AuthError | TransportError | RateLimitError],
+                int | None,
+                str,
+                float | None,
+            ]
             | None
         ) = None
 
@@ -426,6 +432,7 @@ class QvantumCloudClient:
                     type(err),
                     err.status,
                     err.message,
+                    getattr(err, "retry_after", None),
                 )
                 raise
             except (aiohttp.ClientError, asyncio.TimeoutError) as err:
@@ -438,6 +445,7 @@ class QvantumCloudClient:
                     type(failure),
                     failure.status,
                     failure.message,
+                    None,
                 )
                 raise failure from err
             self._auth_failure = None
@@ -457,8 +465,12 @@ class QvantumCloudClient:
         failure = self._auth_failure
         if failure is None:
             return
-        failed_at, err_type, status, message = failure
+        failed_at, err_type, status, message, retry_after = failure
         if time.monotonic() - failed_at < DEFAULT_AUTH_FAILURE_COOLDOWN_SECONDS:
+            if err_type is RateLimitError and retry_after is not None:
+                # Preserve the Retry-After hint so the coordinator can still
+                # back off while the cached failure is in its cooldown window.
+                raise err_type(status, message, retry_after=retry_after)
             raise err_type(status, message)
         self._auth_failure = None
 
