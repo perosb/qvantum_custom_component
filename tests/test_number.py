@@ -1154,3 +1154,48 @@ class TestHeatingCurveNumbers:
         assert "curve_minus_30" in entity_keys
         assert "curve_0" in entity_keys
         assert "curve_30" in entity_keys
+
+
+class TestNumberAvailabilityAndWriteGuard:
+    """H1/H2: base availability and service-bypass write guard."""
+
+    def test_available_is_false_when_coordinator_failed(
+        self, mock_coordinator, mock_device
+    ):
+        """A failed poll makes the number unavailable even with cached data."""
+        mock_coordinator.last_update_success = False
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_set_native_value_requires_write_access(self, mock_device):
+        """A service call cannot bypass the write-access check."""
+        from homeassistant.exceptions import HomeAssistantError
+        from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+        coordinator = MagicMock(spec=QvantumDataUpdateCoordinator)
+        coordinator.data = {
+            "values": {
+                "hpid": "test_device_123",
+                "tap_water_capacity_target": 4,
+            }
+        }
+        coordinator.modbus_enabled = False
+        coordinator.last_update_success = True
+        coordinator.client = MagicMock()
+        coordinator.config_entry = MagicMock()
+        maintenance = MagicMock()
+        maintenance.data = {"access_level": {"writeAccessLevel": 10}}
+        coordinator.config_entry.runtime_data.maintenance_coordinator = maintenance
+
+        entity = QvantumNumberEntity(
+            coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+
+        assert entity._has_write_access is False
+        with pytest.raises(HomeAssistantError, match="Write access is not enabled"):
+            await entity.async_set_native_value(5.0)
+
+        coordinator.client.set_tap_water_capacity_target.assert_not_called()

@@ -1293,6 +1293,7 @@ class TestQvantumAccessExpireEntity:
 
         assert entity.available is False
 
+
     def test_available_without_expires_at(self, mock_firmware_coordinator, mock_device):
         """Test entity availability when expiresAt key is missing."""
         mock_firmware_coordinator.data = {
@@ -1321,3 +1322,23 @@ def test_access_expire_handles_none_access_level(
 
     assert entity.available is False
     assert entity.native_value is None
+
+
+class TestSensorAvailabilityChaining:
+    """H1: availability must reflect the coordinator's last poll result."""
+
+    def test_available_is_false_when_coordinator_failed(
+        self, mock_coordinator, mock_device
+    ):
+        mock_coordinator.last_update_success = False
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "bt1", mock_device, True
+        )
+        assert entity.available is False
+
+    def test_available_is_true_when_coordinator_ok(self, mock_coordinator, mock_device):
+        mock_coordinator.last_update_success = True
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "bt1", mock_device, True
+        )
+        assert entity.available is True

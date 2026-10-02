@@ -264,3 +264,33 @@ class TestQvantumButtonEntity:
         ]
         assert "elevate_access" not in cleanup.call_args.args[2]
         assert cleanup.call_args.args[3] == "button"
+
+
+class TestButtonAvailability:
+    """Every platform override must honor coordinator availability."""
+
+    def test_extra_tap_water_unavailable_when_coordinator_failed(
+        self, mock_coordinator, mock_device
+    ):
+        """A failed poll hides the button even when write access is granted."""
+        mock_coordinator.last_update_success = False
+        entity = QvantumButtonEntity(
+            mock_coordinator, "extra_tap_water_60min", mock_device
+        )
+
+        assert entity._has_write_access is True
+        assert entity.available is False
+
+    def test_elevate_access_unavailable_when_coordinator_failed(
+        self, mock_coordinator, mock_device, mock_maintenance_coordinator
+    ):
+        """A failed poll hides the cloud-only elevate-access button."""
+        mock_coordinator.last_update_success = False
+        entity = QvantumButtonEntity(
+            mock_coordinator,
+            "elevate_access",
+            mock_device,
+            mock_maintenance_coordinator,
+        )
+
+        assert entity.available is False
