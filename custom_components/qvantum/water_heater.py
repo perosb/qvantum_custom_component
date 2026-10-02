@@ -234,20 +234,19 @@ class QvantumWaterHeaterEntity(
             applied = await handle_setting_update_response(
                 response, self.coordinator, "values", "extra_tap_water", "on"
             )
-            self._optimistic_dhw_mode(DHW_MODE_EXTRA)
+            if applied:
+                self._optimistic_dhw_mode(DHW_MODE_EXTRA)
 
         elif operation_mode == OPERATION_NORMAL:
             response = await self.coordinator.async_set_extra_tap_water(self._hpid, 0)
             applied = await handle_setting_update_response(
                 response, self.coordinator, "values", "extra_tap_water", "off"
             )
-            self._optimistic_dhw_mode(DHW_MODE_NORMAL)
+            if applied:
+                self._optimistic_dhw_mode(DHW_MODE_NORMAL)
 
         else:
             # Eco / Smart require writing holding 53 (dhw_mode); Modbus only.
-            # Clear timed Extra restore so it cannot snap mode back to Normal.
-            await self._async_clear_extra_dhw_timer()
-
             dhw_mode = OPERATION_TO_DHW_MODE[operation_mode]
             response = await self.coordinator.async_write_metric(
                 self._hpid, "extra_tap_water", dhw_mode
@@ -259,7 +258,12 @@ class QvantumWaterHeaterEntity(
                 "extra_tap_water",
                 "on" if dhw_mode == DHW_MODE_EXTRA else "off",
             )
-            self._optimistic_dhw_mode(dhw_mode)
+            if applied:
+                self._optimistic_dhw_mode(dhw_mode)
+                # Clear a pending timed Extra->Normal restore only once the new
+                # mode is on the pump. Clearing earlier would drop the HA timer
+                # on a failed write and leave the pump in Extra indefinitely.
+                await self._async_clear_extra_dhw_timer()
 
         # Leaving Off re-enables DHW in manual mode, but only once the mode
         # write succeeded so a failure cannot leave a half-applied state.
