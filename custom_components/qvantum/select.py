@@ -96,6 +96,8 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Update the current value."""
+        self._require_write_access()
+
         if self._metric_key == "use_operation_sensor":
             option_value = int(option)
             response = await self.coordinator.async_write_metric(
@@ -229,6 +231,9 @@ class QvantumSelectEntity(QvantumEntity, SelectEntity):
     def available(self):
         """Check if data is available."""
         if not self.coordinator.data:
+            return False
+
+        if not super().available:
             return False
 
         metrics = self.coordinator.data.get("values") or {}

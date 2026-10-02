@@ -167,6 +167,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Update the current value."""
+        self._require_write_access()
 
         response = {}
         coordinator_update_value: int | float = value
@@ -248,7 +249,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
     @property
     def available(self):
         """Check if data is available."""
-        return (
+        return super().available and (
             (
                 self._metric_key not in MODBUS_WRITE_METRICS
                 or self._is_modbus_write_allowed()

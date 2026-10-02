@@ -112,9 +112,14 @@ class QvantumWaterHeaterEntity(
 
     @property
     def available(self) -> bool:
-        return (
+        """Return True when a tank or target temperature is known.
+
+        Readability is independent of write access; the setters enforce write
+        access themselves so a read-only account can still see temperatures.
+        """
+        return self._coordinator_available and (
             self.current_temperature is not None or self.target_temperature is not None
-        ) and self._has_write_access
+        )
 
     @property
     def current_temperature(self) -> float | None:
@@ -165,6 +170,7 @@ class QvantumWaterHeaterEntity(
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Write tap_water_stop via the existing set_tap_water path."""
+        self._require_write_access()
         temperature = kwargs.get("temperature")
         if temperature is None:
             return
@@ -190,6 +196,7 @@ class QvantumWaterHeaterEntity(
 
     async def async_set_operation_mode(self, operation_mode: str) -> None:
         """Map HA operation mode onto existing DHW write helpers."""
+        self._require_write_access()
         if operation_mode not in self.operation_list:
             raise HomeAssistantError(
                 f"Unsupported DHW operation mode: {operation_mode}"

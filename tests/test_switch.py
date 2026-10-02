@@ -553,3 +553,53 @@ class TestQvantumSwitchEntity:
         mock_coordinator.async_set_updated_data.assert_called_once_with(
             mock_coordinator.data
         )
+
+
+class TestSwitchAvailabilityAndWriteGuard:
+    """H1/H2: base availability and service-bypass write guard."""
+
+    def test_available_is_false_when_coordinator_failed(
+        self, mock_coordinator, mock_device
+    ):
+        """A failed poll makes the switch unavailable even with cached data."""
+        mock_coordinator.data["values"]["extra_tap_water"] = "on"
+        mock_coordinator.last_update_success = False
+        entity = QvantumSwitchEntity(mock_coordinator, "extra_tap_water", mock_device)
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_turn_on_requires_write_access(self, mock_coordinator, mock_device):
+        """A service call cannot bypass the write-access check."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        mock_coordinator.config_entry.runtime_data.maintenance_coordinator.data = {
+            "access_level": {"writeAccessLevel": 10}
+        }
+        entity = QvantumSwitchEntity(mock_coordinator, "op_mode", mock_device)
+
+        assert entity._has_write_access is False
+        with pytest.raises(HomeAssistantError, match="Write access is not enabled"):
+            await entity.async_turn_on()
+
+        mock_coordinator.client.update_setting.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_vacation_mode_is_not_blocked_by_write_guard(
+        self, mock_coordinator, mock_device
+    ):
+        """vacation_mode is intentionally writable without elevated access."""
+        mock_coordinator.data["values"]["vacation_mode"] = "off"
+        mock_coordinator.config_entry.runtime_data.maintenance_coordinator.data = {
+            "access_level": {"writeAccessLevel": 10}
+        }
+        mock_coordinator.client.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        entity = QvantumSwitchEntity(mock_coordinator, "vacation_mode", mock_device)
+
+        assert entity._has_write_access is False
+        await entity.async_turn_on()
+
+        mock_coordinator.client.update_setting.assert_called_once_with(
+            "test_device_123", "vacation_mode", True
+        )

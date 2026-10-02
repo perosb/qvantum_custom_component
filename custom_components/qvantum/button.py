@@ -105,7 +105,8 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
     def available(self):
         """Check if button is available."""
         if self._metric_key == "elevate_access":
-            return not getattr(self.coordinator, "modbus_enabled", False)
-        else:
-            # Other action buttons require write access
-            return self._has_write_access
+            return super().available and not getattr(
+                self.coordinator, "modbus_enabled", False
+            )
+        # Other action buttons require write access
+        return super().available and self._has_write_access

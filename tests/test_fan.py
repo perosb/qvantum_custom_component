@@ -287,3 +287,56 @@ class TestQvantumFanEntity:
         assert async_add_entities.called
         entities = async_add_entities.call_args[0][0]
         assert len(entities) == 0
+
+
+def _spec_coordinator(write_level: int):
+    """Coordinator mock that passes the ``isinstance`` write-access check."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+    coordinator = MagicMock(spec=QvantumDataUpdateCoordinator)
+    coordinator.data = {
+        "device": {"id": "test_device_123"},
+        "values": {
+            "hpid": "test_device_123",
+            "fanspeedselector": FAN_SPEED_STATE_NORMAL,
+        },
+    }
+    coordinator.modbus_enabled = False
+    coordinator.last_update_success = True
+    coordinator.client = MagicMock()
+    coordinator.config_entry = MagicMock()
+    maintenance = MagicMock()
+    maintenance.data = {"access_level": {"writeAccessLevel": write_level}}
+    coordinator.config_entry.runtime_data.maintenance_coordinator = maintenance
+    return coordinator
+
+
+class TestWriteAccessBehaviour:
+    """Readability is independent of write access; writes enforce it."""
+
+    def test_available_is_false_when_coordinator_failed(self, mock_coordinator, mock_device):
+        """A failed poll makes the entity unavailable even with data cached."""
+        mock_coordinator.last_update_success = False
+        entity = QvantumFanEntity(mock_coordinator, "fanspeedselector", mock_device)
+        assert entity.available is False
+
+    def test_available_without_write_access(self, mock_device):
+        """A read-only account can still see the current fan state."""
+        coordinator = _spec_coordinator(write_level=10)
+        entity = QvantumFanEntity(coordinator, "fanspeedselector", mock_device)
+
+        assert entity._has_write_access is False
+        assert entity.available is True
+
+    @pytest.mark.asyncio
+    async def test_set_preset_mode_requires_write_access(self, mock_device):
+        """set_preset_mode raises instead of writing for a read-only account."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        coordinator = _spec_coordinator(write_level=10)
+        entity = QvantumFanEntity(coordinator, "fanspeedselector", mock_device)
+
+        with pytest.raises(HomeAssistantError, match="Write access is not enabled"):
+            await entity.async_set_preset_mode(FAN_SPEED_STATE_EXTRA)
+
+        coordinator.client.set_fanspeedselector.assert_not_called()
