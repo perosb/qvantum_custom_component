@@ -638,7 +638,7 @@ class QvantumCloudClient:
                             metrics[metric_name] = int(
                                 float(metrics[metric_name]) * 10
                             )
-                        except (TypeError, ValueError):
+                        except (TypeError, ValueError, OverflowError):
                             _LOGGER.debug(
                                 "Could not scale fan0_10v value %r; keeping raw value",
                                 metrics[metric_name],

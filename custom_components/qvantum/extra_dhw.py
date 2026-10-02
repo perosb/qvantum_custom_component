@@ -173,8 +173,7 @@ class ExtraDhwTimer:
         if (
             isinstance(restore_at, bool)
             or not isinstance(restore_at, (int, float))
-            or restore_at <= 0
-            or restore_at > now + _MAX_RESTORE_HORIZON_SECONDS
+            or not 0 < restore_at <= now + _MAX_RESTORE_HORIZON_SECONDS
         ):
             _LOGGER.warning(
                 "Ignoring implausible persisted extra DHW restore deadline %s",

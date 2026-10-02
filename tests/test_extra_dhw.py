@@ -105,3 +105,17 @@ async def test_restore_ignores_bool_deadline():
 
     write.assert_not_called()
     timer.store.async_remove.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_restore_ignores_nan_deadline():
+    """A NaN restore_at (accepted by json.loads) must not be scheduled."""
+    write, timer = _timer()
+    timer.store.async_load = AsyncMock(
+        return_value={"device_id": "dev1", "restore_at": float("nan")}
+    )
+
+    await timer.async_restore(writable=True)
+
+    write.assert_not_called()
+    timer.store.async_remove.assert_awaited()

@@ -708,3 +708,22 @@ async def test_get_metrics_keeps_unscalable_fan0_10v(mock_session):
     result = await client.get_metrics("dev1", ["fan0_10v", "bt1"])
     assert result["metrics"]["fan0_10v"] is None
     assert result["metrics"]["bt1"] == 20.5
+
+
+@pytest.mark.asyncio
+async def test_get_metrics_keeps_infinite_fan0_10v(mock_session):
+    """An infinite fan0_10v must not raise OverflowError out of the poll."""
+    cm, _ = mock_session.make_cm_response(
+        status=200, json_data={"values": {"fan0_10v": float("inf"), "bt1": 20.5}}
+    )
+    mock_session.get.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._token = "test_token"
+    client._token_expiry = datetime.now() + timedelta(hours=1)
+
+    result = await client.get_metrics("dev1", ["fan0_10v", "bt1"])
+    assert result["metrics"]["fan0_10v"] == float("inf")
+    assert result["metrics"]["bt1"] == 20.5
