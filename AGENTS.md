@@ -200,11 +200,6 @@ access, so no control is offered when a write would fail.
 
 *Keep this file accurate when architecture or workflow changes.*
 
-After a repeated mistake or a durable project convention, append one bullet under Learnings at the bottom of this file.
-Remove a bullet as soon as it is fixed, obsolete, or contradicted. Do not add one-off notes.
-
 ## Learnings
+Add a bullet here only after the same mistake happens twice. One line: the correction, not the story. Remove a bullet as soon as it is fixed, obsolete, or contradicted. Do not add one-off notes.
 
-- DHW Eco/Smart modes are Modbus-only: holding 53 (`dhw_mode`) has no cloud
-  setter, so cloud offers Normal/Extra/Off only and Eco/Smart writes are
-  refused there.
