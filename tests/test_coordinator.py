@@ -4722,3 +4722,91 @@ class TestRateLimitBackoff:
         mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
         await coordinator.async_update_data()
         assert coordinator.update_interval.total_seconds() == coordinator.poll_interval
+
+
+class TestPollAndRestoreHardening:
+    """H3/G15: poll task cancellation and corrupted DHW store handling."""
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_update_data_cancels_sibling_on_failure(self, mock_super_init):
+        """A failing metrics call must cancel the concurrent settings call."""
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
+        mock_super_init.return_value = None
+        cancelled = asyncio.Event()
+
+        async def hanging_settings(*_args, **_kwargs):
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+
+        mock_api = make_client_mock()
+        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.get_metrics = AsyncMock(side_effect=APIAuthError(None, "nope"))
+        mock_api.get_settings = AsyncMock(side_effect=hanging_settings)
+
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+        mock_config_entry = MagicMock()
+        mock_config_entry.entry_id = "test_entry_id"
+        mock_config_entry.unique_id = "test_device_123"
+        mock_config_entry.data = {}
+        mock_config_entry.options.get.side_effect = lambda key, default=None: default
+
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, mock_config_entry, client=make_client_mock()
+        )
+        coordinator.client = mock_api
+        coordinator.hass = mock_hass
+        coordinator._device_store = MagicMock()
+        coordinator._device_store.async_load = AsyncMock(return_value=None)
+
+        with pytest.raises(ConfigEntryAuthFailed):
+            await coordinator.async_update_data()
+
+        assert cancelled.is_set()
+
+    @pytest.mark.asyncio
+    async def test_corrupt_dhw_store_values_are_sanitized(self):
+        """Zero duration and non-numeric values are dropped, not trusted."""
+        coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+        store = MagicMock()
+        store.async_load = AsyncMock(
+            return_value={
+                "cold_temp": 10,
+                "flow_lpm": "bad",
+                "shower_temp": float("inf"),
+                "shower_duration": 0,
+                "tap_water_cap": 2,
+                "published_cap": 3,
+                "published_minutes": 4,
+            }
+        )
+        coordinator._dhw_store = store
+
+        await coordinator.async_restore_dhw_state()
+
+        assert coordinator._last_shower_cold_temp == 10.0
+        assert coordinator._last_shower_flow_lpm is None
+        assert coordinator._last_shower_temp_c is None
+        assert coordinator._last_shower_duration_min is None
+        assert coordinator._last_tap_water_cap == 2.0
+        assert coordinator._last_published_tap_water_cap == 3.0
+        assert coordinator._last_published_tap_water_minutes == 4.0
+
+    @pytest.mark.asyncio
+    async def test_non_dict_dhw_store_is_ignored(self):
+        """A non-dict store payload must not raise."""
+        coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
+        store = MagicMock()
+        store.async_load = AsyncMock(return_value=["not", "a", "dict"])
+        coordinator._dhw_store = store
+
+        await coordinator.async_restore_dhw_state()

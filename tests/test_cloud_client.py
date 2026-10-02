@@ -778,3 +778,68 @@ class TestHasSufficientAccess:
 
         assert result == {"writeAccessLevel": 30}
         client._generate_code.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_metrics_non_json_body_raises_transport_error(mock_session):
+    """A 200 with a non-JSON body must not leak an aiohttp/json error."""
+    cm, resp = mock_session.make_cm_response(status=200, json_data={})
+    resp.json = AsyncMock(side_effect=ValueError("not json"))
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    with pytest.raises(TransportError, match="Invalid JSON response"):
+        await client.get_metrics("dev1", ["bt1"])
+
+
+@pytest.mark.asyncio
+async def test_write_non_json_body_raises_transport_error(mock_session):
+    """The write path maps decode failures to TransportError as well."""
+    cm, resp = mock_session.make_cm_response(status=200, json_data={})
+    resp.json = AsyncMock(side_effect=ValueError("not json"))
+    mock_session.post.return_value = cm
+    client = _authed_client(mock_session)
+
+    with pytest.raises(TransportError, match="Invalid JSON response"):
+        await client.update_setting("dev1", "some_setting", 1)
+
+
+@pytest.mark.asyncio
+async def test_get_metrics_scales_fan0_10v(mock_session):
+    """fan0_10v is multiplied by ten when numeric."""
+    cm, _ = mock_session.make_cm_response(
+        status=200, json_data={"values": {"fan0_10v": 75}}
+    )
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    result = await client.get_metrics("dev1", ["fan0_10v"])
+    assert result["metrics"]["fan0_10v"] == 750
+
+
+@pytest.mark.asyncio
+async def test_get_metrics_keeps_unscalable_fan0_10v(mock_session):
+    """A null/non-numeric fan0_10v must not fail the whole poll."""
+    cm, _ = mock_session.make_cm_response(
+        status=200, json_data={"values": {"fan0_10v": None, "bt1": 20.5}}
+    )
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    result = await client.get_metrics("dev1", ["fan0_10v", "bt1"])
+    assert result["metrics"]["fan0_10v"] is None
+    assert result["metrics"]["bt1"] == 20.5
+
+
+@pytest.mark.asyncio
+async def test_get_metrics_keeps_infinite_fan0_10v(mock_session):
+    """An infinite fan0_10v must not raise OverflowError out of the poll."""
+    cm, _ = mock_session.make_cm_response(
+        status=200, json_data={"values": {"fan0_10v": float("inf"), "bt1": 20.5}}
+    )
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    result = await client.get_metrics("dev1", ["fan0_10v", "bt1"])
+    assert result["metrics"]["fan0_10v"] == float("inf")
+    assert result["metrics"]["bt1"] == 20.5

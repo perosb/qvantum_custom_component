@@ -70,17 +70,20 @@ class TestModbusSettingWrites:
         write.assert_awaited_once_with("dev1", "indoor_temperature_offset", -2)
 
     @pytest.mark.asyncio
-    async def test_tap_water_writes_start_and_stop(self):
-        client, _timer = _modbus()
-        with patch.object(
-            client,
-            "write_metric",
-            AsyncMock(return_value={"status": "APPLIED"}),
-        ) as write:
-            result = await client.set_tap_water("dev1", start=52, stop=62)
-        assert write.await_count == 2
-        write.assert_any_await("dev1", "tap_water_stop", 62)
-        write.assert_any_await("dev1", "tap_water_start", 52)
+    async def test_tap_water_writes_start_and_stop_atomically(self):
+        """Both holdings are written in one atomic, order-safe pass."""
+        connection = MockModbusConnection()
+        unit = connection.for_unit(1)
+        client = QvantumModbusClient(unit, writable=True)
+        order: list[int] = []
+        unit.on_write(lambda event: order.append(event.address))
+
+        result = await client.set_tap_water("dev1", start=52, stop=62)
+
+        assert client.unit.holding[56] == 52
+        assert client.unit.holding[57] == 62
+        # Stop is lowered before start is raised (56=start, 57=stop).
+        assert order == [57, 56]
         assert result == {"status": "APPLIED"}
 
     @pytest.mark.asyncio

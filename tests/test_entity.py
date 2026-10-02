@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from custom_components.qvantum.entity import (
     QvantumAccessMixin,
     QvantumEntity,
@@ -231,6 +233,55 @@ def test_has_write_access_uses_live_access_level_on_qvantum_coordinator():
 
     maintenance_coordinator.data = {"access_level": 0}
     assert entity._has_write_access is False
+
+
+def test_coordinator_available_reflects_last_update_success():
+    """An entity is unavailable while the coordinator's last poll failed."""
+    coordinator = MagicMock()
+    coordinator.last_update_success = False
+    entity = DummyAccessEntity(coordinator)
+
+    assert entity._coordinator_available is False
+
+    coordinator.last_update_success = True
+    assert entity._coordinator_available is True
+
+
+def test_coordinator_available_defaults_true_when_attribute_missing():
+    """Coordinators without the attribute (tests, __new__) default available."""
+    entity = DummyAccessEntity(object())
+
+    assert entity._coordinator_available is True
+
+
+class _WriteAccessStub(QvantumAccessMixin):
+    """Minimal entity whose write access is fixed for guard tests."""
+
+    def __init__(self, *, allowed: bool) -> None:
+        self.coordinator = None
+        self._write_access_warning_logged = False
+        self._allowed = allowed
+
+    @property
+    def _has_write_access(self) -> bool:
+        return self._allowed
+
+
+def test_require_write_access_raises_when_denied():
+    """Write methods must refuse to run without write access."""
+    from homeassistant.exceptions import HomeAssistantError
+
+    entity = _WriteAccessStub(allowed=False)
+
+    with pytest.raises(HomeAssistantError, match="Write access is not enabled"):
+        entity._require_write_access()
+
+
+def test_require_write_access_passes_when_allowed():
+    """Write methods are allowed to run with write access."""
+    entity = _WriteAccessStub(allowed=True)
+
+    entity._require_write_access()
 
 
 def test_resolve_device_id_from_identifier():

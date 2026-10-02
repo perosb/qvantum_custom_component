@@ -16,6 +16,12 @@ from .client.protocol import QvantumClient
 
 _LOGGER = logging.getLogger(__name__)
 
+# Retry a failed DHW->Normal restore after this delay instead of leaving the
+# deadline armed with no callback.
+_RESTORE_RETRY_SECONDS = 60
+# Reject persisted deadlines further than this into the future (corrupt store).
+_MAX_RESTORE_HORIZON_SECONDS = 48 * 3600
+
 WriteNormal = Callable[[str], Awaitable[Any]]
 
 
@@ -127,6 +133,14 @@ class ExtraDhwTimer:
                 _LOGGER.warning(
                     "Failed to restore DHW mode after extra hot water timer: %s", err
                 )
+                # Keep the deadline and retry shortly; returning here used to
+                # leave restore_at in the past with no active callback. Only
+                # re-arm when this closure is still the active deadline so a
+                # newer period's timer is not clobbered.
+                if self.hass is not None and self.restore_at == restore_at:
+                    self.unsub = async_call_later(
+                        self.hass, _RESTORE_RETRY_SECONDS, _restore
+                    )
                 return
             self.restore_at = None
             self.armed_at = None
@@ -155,16 +169,34 @@ class ExtraDhwTimer:
             return
         device_id = data.get("device_id")
         restore_at = data.get("restore_at")
-        if not device_id or not isinstance(restore_at, (int, float)):
+        if not device_id:
             return
-        remaining = float(restore_at) - datetime.now(timezone.utc).timestamp()
+        now = datetime.now(timezone.utc).timestamp()
+        if (
+            isinstance(restore_at, bool)
+            or not isinstance(restore_at, (int, float))
+            or not 0 < restore_at <= now + _MAX_RESTORE_HORIZON_SECONDS
+        ):
+            _LOGGER.warning(
+                "Ignoring implausible persisted extra DHW restore deadline %s",
+                restore_at,
+            )
+            await self.async_persist(None)
+            return
+        remaining = float(restore_at) - now
         if remaining <= 0:
             self.restore_at = float(restore_at)
+            self.armed_at = time.monotonic()
             try:
                 await self._write_normal(str(device_id))
             except Exception as err:
                 _LOGGER.warning(
                     "Failed to restore DHW mode after extra hot water timer: %s", err
+                )
+                # Re-arm through the scheduling path so the failed write is
+                # retried instead of leaving the deadline with no callback.
+                await self.async_schedule_at(
+                    str(device_id), float(restore_at), persist=False
                 )
                 return
             self.restore_at = None

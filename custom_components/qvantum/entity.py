@@ -3,6 +3,7 @@
 import logging
 from typing import Union, List
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -100,6 +101,28 @@ class QvantumAccessMixin:
     def _local_write_available(self) -> bool:
         """Return True when this entity can write locally without the cloud API."""
         return False
+
+    @property
+    def _coordinator_available(self) -> bool:
+        """Return True when the owning coordinator's last poll succeeded.
+
+        Home Assistant's ``DataUpdateCoordinator`` keeps the last good data
+        after a failed poll, so an entity that only checks its own value would
+        keep reporting stale data as available. Overridden ``available``
+        properties must AND their data checks with this.
+        """
+        return bool(getattr(self.coordinator, "last_update_success", True))
+
+    def _require_write_access(self) -> None:
+        """Raise when this entity may not write.
+
+        Availability hides controls in the UI, but Home Assistant services
+        bypass availability, so every write method must enforce this itself.
+        """
+        if not self._has_write_access:
+            raise HomeAssistantError(
+                "Write access is not enabled for this entity"
+            )
 
 
 # Metrics whose entity implementations write via Modbus holding registers.
@@ -217,6 +240,14 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
     def metric_key(self) -> str:
         """Return the metric key for this entity."""
         return self._metric_key
+
+    @property
+    def available(self) -> bool:
+        """Return True when the coordinator's last poll succeeded.
+
+        Subclasses layer their own data checks on top via ``super().available``.
+        """
+        return self._coordinator_available
 
     @property
     def _values(self) -> dict:

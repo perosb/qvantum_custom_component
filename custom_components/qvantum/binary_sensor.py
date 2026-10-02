@@ -130,5 +130,8 @@ class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
         """Check if data is available."""
         if not self._values:
             return False
-        return self._values.get(self._metric_key) is not None
+        return (
+            super().available
+            and self._values.get(self._metric_key) is not None
+        )
 

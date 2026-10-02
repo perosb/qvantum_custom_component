@@ -65,6 +65,10 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs):
         """Update the current value."""
+        # vacation_mode is intentionally available without elevated write
+        # access, so it must not be blocked by the generic write guard.
+        if self._metric_key != "vacation_mode":
+            self._require_write_access()
         match self._metric_key:
             case "extra_tap_water":
                 response = await self.coordinator.async_set_extra_tap_water(
@@ -92,6 +96,10 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         """Update the current value."""
+        # vacation_mode is intentionally available without elevated write
+        # access, so it must not be blocked by the generic write guard.
+        if self._metric_key != "vacation_mode":
+            self._require_write_access()
         match self._metric_key:
             case "extra_tap_water":
                 response = await self.coordinator.async_set_extra_tap_water(
@@ -129,6 +137,9 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
     @property
     def available(self):
         if not self.coordinator.data:
+            return False
+
+        if not super().available:
             return False
 
         values = self._values

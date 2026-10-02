@@ -262,6 +262,21 @@ class QvantumCloudClient:
         return result
 
     @staticmethod
+    async def _decode_json(response: aiohttp.ClientResponse) -> Any:
+        """Decode a JSON body, mapping decode failures to ``TransportError``.
+
+        A successful status with a non-JSON body (proxy error page, truncated
+        gateway response) must not leak an ``aiohttp``/``json`` exception
+        across the library boundary.
+        """
+        try:
+            return await response.json()
+        except (aiohttp.ClientError, ValueError) as err:
+            raise TransportError(
+                response.status, "Invalid JSON response"
+            ) from err
+
+    @staticmethod
     async def _firebase_error_message(
         response: aiohttp.ClientResponse, default: str = "Authentication failed"
     ) -> str:
@@ -301,7 +316,7 @@ class QvantumCloudClient:
             match response.status:
                 case 200:
                     _LOGGER.debug("Authentication successful: %s", response.status)
-                    auth_data = await response.json()
+                    auth_data = await self._decode_json(response)
                     self._token = auth_data.get("idToken")
                     self._refreshtoken = auth_data.get("refreshToken")
                     expires_in = auth_data.get(
@@ -349,7 +364,7 @@ class QvantumCloudClient:
             match response.status:
                 case 200:
                     _LOGGER.debug("Token refreshed successfully: %s", response.status)
-                    auth_data = await response.json()
+                    auth_data = await self._decode_json(response)
                     self._token = auth_data.get("access_token")
                     self._refreshtoken = auth_data.get("refresh_token")
                     expires_in = auth_data.get(
@@ -479,7 +494,7 @@ class QvantumCloudClient:
         async with self._track_request(request(url, **kwargs)) as response:
             if validate_status:
                 await self._handle_response(response)
-            data = await response.json()
+            data = await self._decode_json(response)
             _LOGGER.debug(
                 "Response received %s: %s", response.status, self._preview(data)
             )
@@ -651,7 +666,7 @@ class QvantumCloudClient:
         ) as response:
             match response.status:
                 case 200:
-                    self._device_metadata = await response.json()
+                    self._device_metadata = await self._decode_json(response)
                     self._device_metadata_etag = response.headers.get("ETag")
                 case 401 | 403:
                     await self.unauthenticate()
@@ -699,7 +714,15 @@ class QvantumCloudClient:
                 if metric_name in http_values:
                     metrics[metric_name] = http_values[metric_name]
                     if metric_name == "fan0_10v":
-                        metrics[metric_name] = int(float(metrics[metric_name]) * 10)
+                        try:
+                            metrics[metric_name] = int(
+                                float(metrics[metric_name]) * 10
+                            )
+                        except (TypeError, ValueError, OverflowError):
+                            _LOGGER.debug(
+                                "Could not scale fan0_10v value %r; keeping raw value",
+                                metrics[metric_name],
+                            )
                 else:
                     if metric_name not in self._missing_metrics_warned:
                         self._missing_metrics_warned.add(metric_name)
@@ -752,7 +775,7 @@ class QvantumCloudClient:
         ) as response:
             match response.status:
                 case 200:
-                    data = await response.json()
+                    data = await self._decode_json(response)
                     _LOGGER.debug("HTTP values fetched: %s", data)
                     return (
                         data.get("values", {}),
@@ -795,7 +818,7 @@ class QvantumCloudClient:
         ) as response:
             match response.status:
                 case 200:
-                    self._settings_data = await response.json()
+                    self._settings_data = await self._decode_json(response)
                     self._settings_etag = response.headers.get("ETag")
                     _LOGGER.debug("HTTP Settings fetched: %s", self._settings_data)
                 case 401 | 403:
@@ -833,7 +856,7 @@ class QvantumCloudClient:
         ) as response:
             match response.status:
                 case 200:
-                    devices_data = await response.json()
+                    devices_data = await self._decode_json(response)
                     _LOGGER.debug("Devices fetched successfully: %s", devices_data)
                     return devices_data.get("devices") if devices_data else None
                 case 401 | 403:
@@ -870,7 +893,7 @@ class QvantumCloudClient:
             )
         ) as response:
             await self._handle_response(response)
-            data = await response.json()
+            data = await self._decode_json(response)
             _LOGGER.debug(
                 "Access level response received %s: %s", response.status, data
             )
@@ -885,7 +908,7 @@ class QvantumCloudClient:
             )
         ) as response:
             if response.ok:
-                data = await response.json()
+                data = await self._decode_json(response)
                 _LOGGER.debug("Response received %s: %s", response.status, data)
                 return data
             _LOGGER.error(
@@ -907,7 +930,7 @@ class QvantumCloudClient:
             )
         ) as response:
             if response.ok:
-                data = await response.json()
+                data = await self._decode_json(response)
                 _LOGGER.debug("Response received %s: %s", response.status, data)
                 return True
             _LOGGER.error(

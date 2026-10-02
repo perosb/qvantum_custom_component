@@ -73,10 +73,15 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
 
     @property
     def available(self):
-        """Return true if entity is available."""
+        """Return true if entity is available.
+
+        Availability only requires data; write access is enforced in
+        ``set_fanspeedselector`` so a read-only account can still see the
+        current fan state.
+        """
         return (
-            self._values.get(self._metric_key) is not None
-            and self._has_write_access
+            super().available
+            and self._values.get(self._metric_key) is not None
         )
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
@@ -98,6 +103,7 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
         await self.set_fanspeedselector(FAN_SPEED_STATE_OFF)
 
     async def set_fanspeedselector(self, preset: str) -> None:
+        self._require_write_access()
         response = await self.coordinator.client.set_fanspeedselector(self._hpid, preset)
         await handle_setting_update_response(
             response,

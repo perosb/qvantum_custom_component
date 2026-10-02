@@ -64,6 +64,7 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperature."""
+        self._require_write_access()
         temperature = kwargs["temperature"]
         response = await self.coordinator.client.set_indoor_temperature_target(
             self._hpid, temperature
@@ -103,8 +104,13 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
 
     @property
     def available(self):
-        """Check if data is available."""
-        return self.current_temperature is not None and self._has_write_access
+        """Check if data is available.
+
+        Availability only requires the room temperature; write access is
+        enforced in ``async_set_temperature`` so a read-only account can still
+        see the indoor temperature.
+        """
+        return self._coordinator_available and self.current_temperature is not None
 
     @property
     def current_temperature(self):

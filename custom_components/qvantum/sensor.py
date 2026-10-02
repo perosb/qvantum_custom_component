@@ -273,7 +273,10 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
     @property
     def available(self):
         """Check if data is available."""
-        return self._values.get(self._metric_key) is not None
+        return (
+            super().available
+            and self._values.get(self._metric_key) is not None
+        )
 
 class QvantumTemperatureEntity(QvantumBaseSensorEntity):
     """Sensor for temperature measurements."""
@@ -399,10 +402,17 @@ class QvantumTotalEnergyEntity(QvantumEnergyEntity):
 
     @property
     def available(self):
-        """Check if data is available."""
+        """Check if data is available.
+
+        Uses the coordinator helper directly rather than
+        ``super().available`` because the synthetic ``totalenergy`` key is not
+        present in the values payload that the base sensor checks.
+        """
         compressor = self._values.get("compressorenergy")
         additional = self._values.get("additionalenergy")
-        return self._is_data_valid(compressor, additional)
+        return self._coordinator_available and self._is_data_valid(
+            compressor, additional
+        )
 
 
 class QvantumHeatingCurveAdvisorEntity(QvantumBaseSensorEntity):
@@ -425,7 +435,7 @@ class QvantumHeatingCurveAdvisorEntity(QvantumBaseSensorEntity):
     @property
     def available(self):
         """Check if an advice has been derived."""
-        return self.native_value is not None
+        return super().available and self.native_value is not None
 
     @property
     def extra_state_attributes(self):
@@ -485,7 +495,7 @@ class QvantumTimerEntity(QvantumBaseSensorEntity):
     def available(self):
         """Check if data is available."""
         val = self._values.get(self._metric_key)
-        return val is not None and val > 0
+        return super().available and val is not None and val > 0
 
 
 class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
@@ -509,9 +519,8 @@ class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
     @property
     def native_value(self) -> datetime | None:
         """Get expires_at from access_level data."""
-        expire_at_str = (
-            (self.coordinator.data or {}).get("access_level", {}).get(self._metric_key)
-        )
+        access_level = (self.coordinator.data or {}).get("access_level") or {}
+        expire_at_str = access_level.get(self._metric_key)
         if expire_at_str:
             return dt_utils.parse_datetime(expire_at_str)
         return None
@@ -519,9 +528,10 @@ class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
     @property
     def available(self) -> bool:
         """Check if data is available."""
-        return (self.coordinator.data or {}).get("access_level", {}).get(
-            self._metric_key
-        ) is not None
+        access_level = (self.coordinator.data or {}).get("access_level") or {}
+        return (
+            super().available and access_level.get(self._metric_key) is not None
+        )
 
 
 def _should_exclude_metric(metric: str) -> bool:
@@ -642,7 +652,7 @@ class QvantumDisplayFirmwareEntity(QvantumEntity, SensorEntity):
     @property
     def available(self) -> bool:
         """Return True when a display firmware version is known."""
-        return self.native_value is not None
+        return super().available and self.native_value is not None
 
 
 class QvantumFirmwareLastCheckSensorEntity(QvantumEntity, SensorEntity):
