@@ -1,5 +1,6 @@
 """Tests for Qvantum water_heater entities."""
 
+from enum import IntFlag
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -15,7 +16,7 @@ class MockWaterHeaterEntity:
     pass
 
 
-class MockWaterHeaterEntityFeature:
+class MockWaterHeaterEntityFeature(IntFlag):
     TARGET_TEMPERATURE = 1
     OPERATION_MODE = 2
     ON_OFF = 8
@@ -414,3 +415,56 @@ class TestWriteAccessBehaviour:
             await entity.async_set_temperature(temperature=70)
 
         coordinator.client.set_tap_water.assert_not_called()
+
+
+def _modbus_no_write_coordinator():
+    """Modbus coordinator whose entry has Modbus writes disabled."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+    coordinator = MagicMock(spec=QvantumDataUpdateCoordinator)
+    coordinator.data = {
+        "values": {
+            "hpid": "test_device_123",
+            "bt30": 54.5,
+            "tap_water_stop": 62,
+            "extra_tap_water": "off",
+            "op_man_dhw": 1,
+            "dhw_mode": DHW_MODE_NORMAL,
+        },
+    }
+    coordinator.modbus_enabled = True
+    coordinator.last_update_success = True
+    coordinator.client = MagicMock()
+    coordinator.extra_dhw = MagicMock()
+    coordinator.extra_dhw.async_clear = AsyncMock()
+    coordinator.config_entry = MagicMock()
+    coordinator.config_entry.options = {}
+    coordinator.config_entry.data = {}
+    return coordinator
+
+
+class TestWriteFeatureGating:
+    """Controls are hidden without write access; the reading stays available."""
+
+    def test_controls_hidden_without_write_access(self, mock_device):
+        coordinator = _modbus_no_write_coordinator()
+        entity = QvantumWaterHeaterEntity(coordinator, mock_device)
+
+        assert entity._has_write_access is False
+        assert entity.available is True
+        assert entity.supported_features == 0
+
+    def test_controls_shown_with_write_access(self, mock_device):
+        coordinator = _modbus_no_write_coordinator()
+        coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        entity = QvantumWaterHeaterEntity(coordinator, mock_device)
+
+        assert entity._has_write_access is True
+        assert (
+            entity.supported_features
+            & MockWaterHeaterEntityFeature.TARGET_TEMPERATURE
+        )
+        assert entity.supported_features & MockWaterHeaterEntityFeature.OPERATION_MODE

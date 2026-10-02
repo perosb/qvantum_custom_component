@@ -1,5 +1,6 @@
 """Tests for Qvantum fan entities."""
 
+from enum import IntFlag
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
@@ -14,8 +15,8 @@ class MockFanEntity:
     pass
 
 
-# Mock FanEntityFeature
-class MockFanEntityFeature:
+# Mock FanEntityFeature as an IntFlag so FanEntityFeature(0) is constructible.
+class MockFanEntityFeature(IntFlag):
     PRESET_MODE = 1
     TURN_OFF = 2
     TURN_ON = 4
@@ -340,3 +341,45 @@ class TestWriteAccessBehaviour:
             await entity.async_set_preset_mode(FAN_SPEED_STATE_EXTRA)
 
         coordinator.client.set_fanspeedselector.assert_not_called()
+
+def _modbus_no_write_coordinator():
+    """Modbus coordinator whose entry has Modbus writes disabled."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+    coordinator = MagicMock(spec=QvantumDataUpdateCoordinator)
+    coordinator.data = {
+        "values": {
+            "hpid": "test_device_123",
+            "fanspeedselector": FAN_SPEED_STATE_NORMAL,
+        },
+    }
+    coordinator.modbus_enabled = True
+    coordinator.last_update_success = True
+    coordinator.client = MagicMock()
+    coordinator.config_entry = MagicMock()
+    coordinator.config_entry.options = {}
+    coordinator.config_entry.data = {}
+    return coordinator
+
+
+class TestWriteFeatureGating:
+    """Controls are hidden without write access; the state stays available."""
+
+    def test_controls_hidden_without_write_access(self, mock_device):
+        coordinator = _modbus_no_write_coordinator()
+        entity = QvantumFanEntity(coordinator, "fanspeedselector", mock_device)
+
+        assert entity._has_write_access is False
+        assert entity.available is True
+        assert entity.supported_features == 0
+
+    def test_controls_shown_with_write_access(self, mock_device):
+        coordinator = _modbus_no_write_coordinator()
+        coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        entity = QvantumFanEntity(coordinator, "fanspeedselector", mock_device)
+
+        assert entity._has_write_access is True
+        assert entity.supported_features == (1 | 2 | 4)

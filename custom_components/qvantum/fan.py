@@ -62,6 +62,17 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
         )
 
     @property
+    def supported_features(self) -> FanEntityFeature:
+        """Return fan controls only when a write can succeed.
+
+        Without write access the entity still reports the current speed but
+        offers no preset/turn-on/turn-off controls.
+        """
+        if not self._has_write_access:
+            return FanEntityFeature(0)
+        return self._attr_supported_features
+
+    @property
     def preset_mode(self):
         """Get metric from API data."""
         return self._values.get(self._metric_key)
