@@ -49,6 +49,10 @@
             },
             "models": {
                 "~z-ai/glm-flash-latest": {
+                    "limit": {
+                        "context": 1048576,
+                        "output": 128000
+                    },
                     "options": {
                         "reasoning": { "effort": "xhigh" }
                     }
