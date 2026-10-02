@@ -205,3 +205,6 @@ Remove a bullet as soon as it is fixed, obsolete, or contradicted. Do not add on
 
 ## Learnings
 
+- DHW Eco/Smart modes are Modbus-only: holding 53 (`dhw_mode`) has no cloud
+  setter, so cloud offers Normal/Extra/Off only and Eco/Smart writes are
+  refused there.

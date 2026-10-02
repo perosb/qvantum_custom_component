@@ -754,6 +754,11 @@
           "modbus_unit_id": "Unit ID",
           "modbus_scan_interval": "Scan interval (seconds)",
           "modbus_write": "Enable writing via Modbus"
+        },
+        "data_description": {
+          "modbus_host": "Hostname or IP of the heat pump. Default is Qvantum-HP.",
+          "modbus_scan_interval": "How often to poll over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds.",
+          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
         }
       },
       "reauth_confirm": {
@@ -762,6 +767,10 @@
         "data": {
           "password": "Password",
           "username": "Username"
+        },
+        "data_description": {
+          "username": "Your Qvantum account email.",
+          "password": "Your Qvantum account password."
         }
       }
     }
@@ -779,7 +788,8 @@
         },
         "data_description": {
           "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds.",
-          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product."
+          "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
+          "scan_interval": "How often to poll the Qvantum cloud API. Default is 120 seconds."
         },
         "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
         "title": "Options"

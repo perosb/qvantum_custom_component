@@ -294,3 +294,23 @@ class TestButtonAvailability:
         )
 
         assert entity.available is False
+
+
+@pytest.mark.asyncio
+async def test_async_press_elevate_access_unexpected_response(
+    mock_coordinator, mock_device, mock_maintenance_coordinator, caplog
+):
+    """H12: a response without writeAccessLevel is not treated as success."""
+    mock_coordinator.async_elevate_access = AsyncMock(return_value={"error": "nope"})
+    button = QvantumButtonEntity(
+        mock_coordinator,
+        "elevate_access",
+        mock_device,
+        mock_maintenance_coordinator,
+    )
+
+    await button.async_press()
+
+    assert "unexpected response" in caplog.text
+    mock_maintenance_coordinator.async_refresh.assert_not_called()
+    mock_coordinator.async_refresh.assert_not_called()

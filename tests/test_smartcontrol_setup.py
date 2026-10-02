@@ -57,13 +57,12 @@ async def test_cloud_setup_creates_smartcontrol_entities(
     added = MagicMock()
     with patch("custom_components.qvantum.entity.cleanup_disabled_entities") as cleanup:
         await setup_select(hass, mock_config_entry, added)
+    # use_operation_sensor writes Modbus holding 9 and is Modbus-only.
     assert {entity._metric_key for entity in added.call_args.args[0]} == {
         "use_adaptive",
-        "use_operation_sensor",
     }
     assert cleanup.call_args.args[2] == {
         "use_adaptive",
-        "use_operation_sensor",
         "curve_type_heating",
     }
     assert cleanup.call_args.args[3] == "select"

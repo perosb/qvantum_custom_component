@@ -754,6 +754,11 @@
           "modbus_unit_id": "ID de unidad",
           "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)",
           "modbus_write": "Activar escritura mediante Modbus"
+        },
+        "data_description": {
+          "modbus_host": "Nombre de host o IP de la bomba de calor. El valor predeterminado es Qvantum-HP.",
+          "modbus_scan_interval": "Con qué frecuencia consultar por Modbus TCP. El mínimo es 5 segundos. El valor predeterminado es 15 segundos.",
+          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto."
         }
       },
       "reauth_confirm": {
@@ -762,6 +767,10 @@
         "data": {
           "password": "Contraseña",
           "username": "Nombre de usuario"
+        },
+        "data_description": {
+          "username": "El correo electrónico de tu cuenta de Qvantum.",
+          "password": "La contraseña de tu cuenta de Qvantum."
         }
       }
     }
@@ -779,7 +788,8 @@
         },
         "data_description": {
           "modbus_scan_interval": "Con qué frecuencia se consulta la bomba de calor por Modbus TCP. Valores más bajos dan precisión casi en tiempo real de caudal y volumen. El mínimo es 5 segundos. El valor predeterminado es 15 segundos.",
-          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto."
+          "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto.",
+          "scan_interval": "Con qué frecuencia se consulta la API en la nube de Qvantum. Predeterminado: 120 segundos."
         },
         "description": "Ajustes del modo de conexión actual. Usa reconfigurar para cambiar entre nube y Modbus.",
         "title": "Opciones"

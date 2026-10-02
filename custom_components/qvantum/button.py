@@ -93,6 +93,12 @@ class QvantumButtonEntity(QvantumEntity, ButtonEntity):
                 if response is None:
                     _LOGGER.error("Failed to elevate access")
                     return
+                if not isinstance(response, dict) or "writeAccessLevel" not in response:
+                    _LOGGER.warning(
+                        "Elevate access returned an unexpected response: %s",
+                        str(response)[:200],
+                    )
+                    return
 
                 _LOGGER.info("Access level: %s", response)
 

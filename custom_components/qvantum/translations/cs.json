@@ -754,6 +754,11 @@
           "modbus_unit_id": "ID jednotky",
           "modbus_scan_interval": "Interval dotazování Modbus (sekundy)",
           "modbus_write": "Povolit zápis přes Modbus"
+        },
+        "data_description": {
+          "modbus_host": "Název hostitele nebo IP adresa tepelného čerpadla. Výchozí je Qvantum-HP.",
+          "modbus_scan_interval": "Jak často dotazovat přes Modbus TCP. Minimum je 5 sekund. Výchozí je 15 sekund.",
+          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku."
         }
       },
       "reauth_confirm": {
@@ -762,6 +767,10 @@
         "data": {
           "password": "Heslo",
           "username": "Uživatelské jméno"
+        },
+        "data_description": {
+          "username": "E-mailová adresa vašeho účtu Qvantum.",
+          "password": "Heslo k vašemu účtu Qvantum."
         }
       }
     }
@@ -779,7 +788,8 @@
         },
         "data_description": {
           "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund.",
-          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku."
+          "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku.",
+          "scan_interval": "Jak často se dotazuje cloudové API Qvantum. Výchozí je 120 sekund."
         },
         "description": "Nastavení aktuálního režimu připojení. Pro přepnutí mezi cloudem a Modbusem použijte nové nastavení.",
         "title": "Možnosti"

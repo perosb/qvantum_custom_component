@@ -28,17 +28,21 @@ async def async_setup_entry(
 
     values = coordinator.data.get("values", {})
     entities = []
-    select_keys = {"use_operation_sensor", "curve_type_heating"}
-    if not coordinator.modbus_enabled:
+    select_keys = {"curve_type_heating"}
+    if coordinator.modbus_enabled:
+        # Sensor mode writes holding 9; there is no cloud setter for it.
+        select_keys.add("use_operation_sensor")
+        if "use_operation_sensor" in values:
+            entities.append(
+                QvantumSelectEntity(coordinator, "use_operation_sensor", device)
+            )
+    else:
+        # SmartControl is cloud-only (holdings 163/164 have no cloud writes).
         select_keys.add("use_adaptive")
         if "use_adaptive" in values:
             entities.append(QvantumSelectEntity(coordinator, "use_adaptive", device))
     if "curve_type_heating" in values:
         entities.append(QvantumSelectEntity(coordinator, "curve_type_heating", device))
-    if "use_operation_sensor" in values:
-        entities.append(
-            QvantumSelectEntity(coordinator, "use_operation_sensor", device)
-        )
 
     async_add_entities(entities)
 

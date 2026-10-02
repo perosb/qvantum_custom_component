@@ -754,6 +754,11 @@
           "modbus_unit_id": "Enheds-ID",
           "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)",
           "modbus_write": "Aktivér skrivning via Modbus"
+        },
+        "data_description": {
+          "modbus_host": "Værtsnavn eller IP-adresse på varmepumpen. Standard er Qvantum-HP.",
+          "modbus_scan_interval": "Hvor ofte der forespørges over Modbus TCP. Minimum er 5 sekunder. Standard er 15 sekunder.",
+          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne."
         }
       },
       "reauth_confirm": {
@@ -762,6 +767,10 @@
         "data": {
           "password": "Adgangskode",
           "username": "Brugernavn"
+        },
+        "data_description": {
+          "username": "Din e-mailadresse til Qvantum-kontoen.",
+          "password": "Din adgangskode til Qvantum-kontoen."
         }
       }
     }
@@ -779,7 +788,8 @@
         },
         "data_description": {
           "modbus_scan_interval": "Hvor ofte varmepumpen skal forespørges over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder.",
-          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne."
+          "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne.",
+          "scan_interval": "Hvor ofte Qvantum-cloud-API'et polles. Standard er 120 sekunder."
         },
         "description": "Indstillinger for den aktuelle forbindelsestilstand. Brug genkonfiguration til at skifte mellem sky og Modbus.",
         "title": "Indstillinger"

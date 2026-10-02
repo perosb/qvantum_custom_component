@@ -468,3 +468,111 @@ class TestWriteFeatureGating:
             & MockWaterHeaterEntityFeature.TARGET_TEMPERATURE
         )
         assert entity.supported_features & MockWaterHeaterEntityFeature.OPERATION_MODE
+
+
+class TestEcoSmartModbusOnly:
+    """H10: Eco/Smart are Modbus-only; cloud never offers or writes them."""
+
+    def test_operation_modes_cloud_ignores_dhw_mode(self):
+        modes = operation_modes_for_values(
+            {"dhw_mode": DHW_MODE_ECO, "op_man_dhw": 1}, modbus_enabled=False
+        )
+        assert modes == [OPERATION_NORMAL, OPERATION_EXTRA, OPERATION_OFF]
+        assert OPERATION_ECO not in modes
+        assert OPERATION_SMART not in modes
+
+    @pytest.mark.asyncio
+    async def test_set_operation_eco_cloud_does_not_touch_state(
+        self, mock_coordinator, mock_device
+    ):
+        mock_coordinator.data["values"]["op_man_dhw"] = 0
+        entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
+
+        with pytest.raises(HomeAssistantError, match="requires Modbus"):
+            await entity.async_set_operation_mode(OPERATION_ECO)
+
+        mock_coordinator.client.update_setting.assert_not_called()
+        mock_coordinator.async_write_metric.assert_not_called()
+        mock_coordinator.extra_dhw.async_clear.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_set_operation_normal_from_off_re_enables_after_write(
+        self, mock_coordinator, mock_device
+    ):
+        mock_coordinator.data["values"]["op_man_dhw"] = 0
+        entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
+
+        await entity.async_set_operation_mode(OPERATION_NORMAL)
+
+        mock_coordinator.async_set_extra_tap_water.assert_awaited_once_with(
+            "test_device_123", 0
+        )
+        mock_coordinator.client.update_setting.assert_awaited_once_with(
+            "test_device_123", "op_man_dhw", 1
+        )
+
+    @pytest.mark.asyncio
+    async def test_failed_mode_write_does_not_re_enable_dhw(
+        self, mock_coordinator, mock_device
+    ):
+        mock_coordinator.data["values"]["op_man_dhw"] = 0
+        mock_coordinator.async_set_extra_tap_water = AsyncMock(
+            return_value={"status": "FAILED"}
+        )
+        entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
+
+        await entity.async_set_operation_mode(OPERATION_NORMAL)
+
+        mock_coordinator.client.update_setting.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_set_operation_unknown_mode_raises(
+        self, mock_modbus_coordinator, mock_device
+    ):
+        entity = QvantumWaterHeaterEntity(mock_modbus_coordinator, mock_device)
+
+        with pytest.raises(HomeAssistantError, match="Unsupported DHW operation mode"):
+            await entity.async_set_operation_mode("bogus")
+
+    @pytest.mark.asyncio
+    async def test_failed_eco_write_keeps_extra_timer_and_mode(
+        self, mock_modbus_coordinator, mock_device
+    ):
+        """A failed Eco write must not drop the restore timer or fake the mode."""
+        mock_modbus_coordinator.async_write_metric = AsyncMock(
+            return_value={"status": "FAILED"}
+        )
+        entity = QvantumWaterHeaterEntity(mock_modbus_coordinator, mock_device)
+
+        await entity.async_set_operation_mode(OPERATION_ECO)
+
+        mock_modbus_coordinator.extra_dhw.async_clear.assert_not_called()
+        assert mock_modbus_coordinator.data["values"]["dhw_mode"] == DHW_MODE_NORMAL
+
+    @pytest.mark.asyncio
+    async def test_failed_extra_write_keeps_dhw_mode(
+        self, mock_modbus_coordinator, mock_device
+    ):
+        """A failed Extra write must not optimistically report Extra."""
+        mock_modbus_coordinator.async_set_extra_tap_water = AsyncMock(
+            return_value={"status": "FAILED"}
+        )
+        entity = QvantumWaterHeaterEntity(mock_modbus_coordinator, mock_device)
+
+        await entity.async_set_operation_mode(OPERATION_EXTRA)
+
+        assert mock_modbus_coordinator.data["values"]["dhw_mode"] == DHW_MODE_NORMAL
+
+    @pytest.mark.asyncio
+    async def test_failed_off_write_keeps_extra_timer(
+        self, mock_coordinator, mock_device
+    ):
+        """A failed Off write must not drop the pending Extra restore timer."""
+        mock_coordinator.client.update_setting = AsyncMock(
+            return_value={"status": "FAILED"}
+        )
+        entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
+
+        await entity.async_set_operation_mode(OPERATION_OFF)
+
+        mock_coordinator.extra_dhw.async_clear.assert_not_called()
