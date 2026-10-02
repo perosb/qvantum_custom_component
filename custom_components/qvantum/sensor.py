@@ -229,6 +229,7 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
         """Set appropriate units based on metric key patterns."""
         if "rpm" in metric_key or metric_key in ["compressormeasuredspeed"]:
             self._attr_native_unit_of_measurement = "rpm"
+            self._attr_state_class = SensorStateClass.MEASUREMENT
         elif metric_key in _DURATION_HOURS_SENSORS:
             # Must precede the generic "fan" match so ventilation_fan_run_time
             # is hours, not percent.
@@ -241,6 +242,7 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             or metric_key.startswith("qn8")
         ):
             self._attr_native_unit_of_measurement = "%"
+            self._attr_state_class = SensorStateClass.MEASUREMENT
         elif "timeleft" in metric_key or metric_key == "compressor_blocked_sec":
             self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
             self._attr_device_class = SensorDeviceClass.DURATION
@@ -254,14 +256,18 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             self._attr_suggested_display_precision = 0
         elif "tap_water_cap" == metric_key:
             self._attr_suggested_display_precision = 1
+            self._attr_state_class = SensorStateClass.MEASUREMENT
         elif "tap_water_minutes" == metric_key:
             self._attr_native_unit_of_measurement = UnitOfTime.MINUTES
             self._attr_device_class = SensorDeviceClass.DURATION
             self._attr_suggested_display_precision = 0
+            self._attr_state_class = SensorStateClass.MEASUREMENT
         elif "bf1_l_min" == metric_key:
             self._attr_native_unit_of_measurement = "l/m"
+            self._attr_state_class = SensorStateClass.MEASUREMENT
         elif "degree_minute" == metric_key:
             self._attr_native_unit_of_measurement = "°min"
+            self._attr_state_class = SensorStateClass.MEASUREMENT
         if metric_key in _TOTAL_INCREASING_SENSORS:
             self._attr_state_class = SensorStateClass.TOTAL_INCREASING
 

@@ -1342,3 +1342,23 @@ class TestSensorAvailabilityChaining:
             mock_coordinator, "bt1", mock_device, True
         )
         assert entity.available is True
+
+
+@pytest.mark.parametrize(
+    "metric_key",
+    [
+        "tap_water_cap",
+        "tap_water_minutes",
+        "bf1_l_min",
+        "fanrpm",
+        "gp1_speed",
+        "gp2_speed",
+        "degree_minute",
+    ],
+)
+def test_measurement_state_class_for_derived_sensors(
+    mock_coordinator, mock_device, metric_key
+):
+    """H17: instantaneous/derived readings get long-term statistics."""
+    entity = QvantumBaseSensorEntity(mock_coordinator, metric_key, mock_device, True)
+    assert entity._attr_state_class == SensorStateClass.MEASUREMENT

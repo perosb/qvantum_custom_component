@@ -272,3 +272,16 @@ def test_config_flow_strings_are_localized():
         assert data["config"]["step"]["user"]["title"] != en_user_title, path.name
         assert data["config"]["step"]["user"]["menu_options"]["cloud"]
         assert data["config"]["step"]["user"]["menu_options"]["modbus"]
+
+
+def test_reconfigure_and_reauth_have_data_descriptions():
+    """H19: reconfigure/reauth/options steps describe their fields too."""
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        step = data["config"]["step"]
+        assert step["reconfigure_modbus"]["data_description"]["modbus_write"], path.name
+        assert step["reauth_confirm"]["data_description"]["username"], path.name
+        assert step["reauth_confirm"]["data_description"]["password"], path.name
+        assert data["options"]["step"]["init"]["data_description"]["scan_interval"], (
+            path.name
+        )

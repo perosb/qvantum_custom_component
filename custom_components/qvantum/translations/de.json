@@ -754,6 +754,11 @@
           "modbus_unit_id": "Geräte-ID",
           "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)",
           "modbus_write": "Schreiben über Modbus aktivieren"
+        },
+        "data_description": {
+          "modbus_host": "Hostname oder IP-Adresse der Wärmepumpe. Standard ist Qvantum-HP.",
+          "modbus_scan_interval": "Wie oft über Modbus TCP abgefragt wird. Minimum sind 5 Sekunden. Standard sind 15 Sekunden.",
+          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen."
         }
       },
       "reauth_confirm": {
@@ -762,6 +767,10 @@
         "data": {
           "password": "Passwort",
           "username": "Benutzername"
+        },
+        "data_description": {
+          "username": "E-Mail-Adresse deines Qvantum-Kontos.",
+          "password": "Passwort deines Qvantum-Kontos."
         }
       }
     }
@@ -779,7 +788,8 @@
         },
         "data_description": {
           "modbus_scan_interval": "Wie oft die Wärmepumpe über Modbus TCP abgefragt wird. Niedrigere Werte ermöglichen nahezu Echtzeit-Durchfluss- und Volumenmessung. Minimum sind 5 Sekunden. Standard sind 15 Sekunden.",
-          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen."
+          "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen.",
+          "scan_interval": "Wie oft die Qvantum-Cloud-API abgefragt wird. Standard sind 120 Sekunden."
         },
         "description": "Einstellungen für den aktuellen Verbindungsmodus. Über Rekonfiguration zwischen Cloud und Modbus wechseln.",
         "title": "Optionen"
