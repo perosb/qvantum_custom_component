@@ -221,8 +221,11 @@ class QvantumWaterHeaterEntity(
         values = self._values
 
         if operation_mode == OPERATION_OFF:
-            await self._async_clear_extra_dhw_timer()
-            await self._async_set_op_man_dhw(0)
+            applied = await self._async_set_op_man_dhw(0)
+            if applied:
+                # Drop the restore timer only once DHW is actually off on the
+                # pump; otherwise Extra would keep running with no restore.
+                await self._async_clear_extra_dhw_timer()
             return
 
         applied = False
@@ -278,11 +281,11 @@ class QvantumWaterHeaterEntity(
         """Disable DHW via op_man_dhw when available."""
         await self.async_set_operation_mode(OPERATION_OFF)
 
-    async def _async_set_op_man_dhw(self, value: int) -> None:
+    async def _async_set_op_man_dhw(self, value: int) -> bool:
         response = await self.coordinator.client.update_setting(
             self._hpid, "op_man_dhw", value
         )
-        await handle_setting_update_response(
+        return await handle_setting_update_response(
             response, self.coordinator, "values", "op_man_dhw", value
         )
 

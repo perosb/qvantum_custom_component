@@ -562,3 +562,17 @@ class TestEcoSmartModbusOnly:
         await entity.async_set_operation_mode(OPERATION_EXTRA)
 
         assert mock_modbus_coordinator.data["values"]["dhw_mode"] == DHW_MODE_NORMAL
+
+    @pytest.mark.asyncio
+    async def test_failed_off_write_keeps_extra_timer(
+        self, mock_coordinator, mock_device
+    ):
+        """A failed Off write must not drop the pending Extra restore timer."""
+        mock_coordinator.client.update_setting = AsyncMock(
+            return_value={"status": "FAILED"}
+        )
+        entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
+
+        await entity.async_set_operation_mode(OPERATION_OFF)
+
+        mock_coordinator.extra_dhw.async_clear.assert_not_called()
