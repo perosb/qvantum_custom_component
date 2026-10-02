@@ -122,6 +122,14 @@ def test_tap_water_write_order_lowers_stop_first_otherwise():
     assert writes == [("tap_water_stop", 62), ("tap_water_start", 52)]
 
 
+def test_tap_water_write_order_raises_start_first_on_equal_boundary():
+    """When the new stop equals the current start, raise start first."""
+    writes = tap_water_write_order(
+        start=40, stop=50, current_start=50, current_stop=60
+    )
+    assert writes == [("tap_water_start", 40), ("tap_water_stop", 50)]
+
+
 def test_tap_water_write_order_rejects_inverted_pair():
     with pytest.raises(ValueError, match="must be below tap_water_stop"):
         tap_water_write_order(
@@ -160,6 +168,24 @@ async def test_set_fanspeedselector_and_tap_water():
     await client.set_tap_water_capacity_target("dev1", 2)
     assert client.unit.holding[56] == 52
     assert client.unit.holding[57] == 62
+
+
+@pytest.mark.asyncio
+async def test_set_tap_water_uses_fresh_values_between_polls():
+    """Stale cached settings must not reject a valid follow-up write."""
+    connection = MockModbusConnection()
+    unit = connection.for_unit(1)
+    client = QvantumModbusClient(unit, writable=True)
+    unit.holding[56] = 52  # dhw_start_normal
+    unit.holding[57] = 62  # dhw_stop_normal
+    await client.get_settings("dev1")  # a poll caches 52/62
+
+    await client.set_tap_water("dev1", stop=80)
+    # No poll in between; the cached stop is still 62 but the unit holds 80.
+    await client.set_tap_water("dev1", start=75)
+
+    assert unit.holding[56] == 75
+    assert unit.holding[57] == 80
 
 
 @pytest.mark.asyncio

@@ -68,7 +68,7 @@ def tap_water_write_order(
     if start and stop:
         if start >= stop:
             raise ValueError("tap_water_start must be below tap_water_stop")
-        if current_start is not None and stop < current_start:
+        if current_start is not None and stop <= current_start:
             return [("tap_water_start", start), ("tap_water_stop", stop)]
         return [("tap_water_stop", stop), ("tap_water_start", start)]
     if stop:
@@ -332,6 +332,10 @@ class QvantumModbusClient:
         self._ensure_writable()
 
         async def _write(device: QvantumModbusDevice):
+            # A write does not update the cached settings, so within one poll
+            # interval the cached pair can be stale. Re-read under the lock so
+            # the order and crossing check use the values just written.
+            await device.async_update_settings()
             current_start = _as_int(
                 getattr(device.settings, "dhw_start_normal", None)
             )
