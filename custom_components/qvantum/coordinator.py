@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from collections import deque
 from datetime import datetime, timedelta
@@ -354,14 +355,28 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 exc_info=True,
             )
             return
-        if data:
-            self._last_shower_cold_temp = data.get("cold_temp")
-            self._last_shower_flow_lpm = data.get("flow_lpm")
-            self._last_shower_temp_c = data.get("shower_temp")
-            self._last_shower_duration_min = data.get("shower_duration")
-            self._last_tap_water_cap = data.get("tap_water_cap")
-            self._last_published_tap_water_cap = data.get("published_cap")
-            self._last_published_tap_water_minutes = data.get("published_minutes")
+        if isinstance(data, dict):
+            self._last_shower_cold_temp = self._coerce_store_number(
+                data.get("cold_temp")
+            )
+            self._last_shower_flow_lpm = self._coerce_store_number(
+                data.get("flow_lpm"), positive=True
+            )
+            self._last_shower_temp_c = self._coerce_store_number(
+                data.get("shower_temp")
+            )
+            self._last_shower_duration_min = self._coerce_store_number(
+                data.get("shower_duration"), positive=True
+            )
+            self._last_tap_water_cap = self._coerce_store_number(
+                data.get("tap_water_cap")
+            )
+            self._last_published_tap_water_cap = self._coerce_store_number(
+                data.get("published_cap")
+            )
+            self._last_published_tap_water_minutes = self._coerce_store_number(
+                data.get("published_minutes")
+            )
             _LOGGER.debug(
                 "Restored DHW EMA state: cold=%.1f°C, flow=%.1f L/min, shower_temp=%.1f°C, dur=%.1f min, cap=%.2f showers",
                 self._last_shower_cold_temp or 0.0,
@@ -370,6 +385,25 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._last_shower_duration_min or 0.0,
                 self._last_tap_water_cap or 0.0,
             )
+
+    @staticmethod
+    def _coerce_store_number(
+        value: object, *, positive: bool = False
+    ) -> float | None:
+        """Return a finite float from stored state, or None when unusable.
+
+        A corrupted or hand-edited Store file must never break every poll:
+        a zero shower duration used to raise ``ZeroDivisionError`` in the
+        capacity calculation, and non-numeric values broke the EMA updates.
+        """
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        number = float(value)
+        if not math.isfinite(number):
+            return None
+        if positive and number <= 0:
+            return None
+        return number
 
     async def _load_cached_device(self) -> dict | None:
         """Load last-known device identity from persistent storage."""
@@ -885,14 +919,25 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 len(enabled_metrics),
             )
 
-            # Fetch metrics and settings concurrently for better performance
+            # Fetch metrics and settings concurrently for better performance.
+            # Create explicit tasks so a failure in one cancels the other
+            # instead of leaving an orphaned request running past the poll.
             poll_started = time.monotonic()
-            metrics_task = self.client.get_metrics(
-                device_id, enabled_metrics=enabled_metrics
+            metrics_task = asyncio.ensure_future(
+                self.client.get_metrics(
+                    device_id, enabled_metrics=enabled_metrics
+                )
             )
-            settings_task = self.client.get_settings(device_id)
-
-            data, settings = await asyncio.gather(metrics_task, settings_task)
+            settings_task = asyncio.ensure_future(self.client.get_settings(device_id))
+            try:
+                data, settings = await asyncio.gather(metrics_task, settings_task)
+            except BaseException:
+                for task in (metrics_task, settings_task):
+                    task.cancel()
+                await asyncio.gather(
+                    metrics_task, settings_task, return_exceptions=True
+                )
+                raise
             if (
                 self.modbus_enabled
                 and isinstance(data, dict)

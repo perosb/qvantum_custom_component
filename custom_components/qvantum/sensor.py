@@ -519,9 +519,8 @@ class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
     @property
     def native_value(self) -> datetime | None:
         """Get expires_at from access_level data."""
-        expire_at_str = (
-            (self.coordinator.data or {}).get("access_level", {}).get(self._metric_key)
-        )
+        access_level = (self.coordinator.data or {}).get("access_level") or {}
+        expire_at_str = access_level.get(self._metric_key)
         if expire_at_str:
             return dt_utils.parse_datetime(expire_at_str)
         return None
@@ -529,9 +528,10 @@ class QvantumAccessExpireEntity(QvantumEntity, SensorEntity):
     @property
     def available(self) -> bool:
         """Check if data is available."""
-        return super().available and (self.coordinator.data or {}).get(
-            "access_level", {}
-        ).get(self._metric_key) is not None
+        access_level = (self.coordinator.data or {}).get("access_level") or {}
+        return (
+            super().available and access_level.get(self._metric_key) is not None
+        )
 
 
 def _should_exclude_metric(metric: str) -> bool:

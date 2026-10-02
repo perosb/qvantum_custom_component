@@ -60,3 +60,82 @@ async def test_restore_without_write_drops_store():
     await timer.async_restore(writable=False)
     timer.store.async_remove.assert_awaited_once()
     write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_restore_retries_after_failed_write():
+    """A failed DHW->Normal write keeps the deadline and reschedules."""
+    write, timer = _timer()
+    write.side_effect = RuntimeError("modbus down")
+    unsub = MagicMock()
+    with patch(
+        "homeassistant.helpers.event.async_call_later", return_value=unsub
+    ) as later:
+        await timer.async_schedule("dev1", 60)
+        _, _, callback = later.call_args[0]
+        await callback(None)
+
+    assert later.call_count == 2
+    assert timer.restore_at is not None
+
+
+@pytest.mark.asyncio
+async def test_failed_restore_does_not_clobber_newer_schedule():
+    """A failed write for a superseded deadline must not re-arm a retry."""
+    write, timer = _timer()
+    write.side_effect = RuntimeError("modbus down")
+    unsub = MagicMock()
+    with patch(
+        "homeassistant.helpers.event.async_call_later", return_value=unsub
+    ) as later:
+        await timer.async_schedule("dev1", 60)
+        _, _, old_callback = later.call_args[0]
+        # A new period is scheduled before the old callback's write fails.
+        await timer.async_schedule("dev1", 120)
+        calls_after_reschedule = later.call_count
+        await old_callback(None)
+
+    assert later.call_count == calls_after_reschedule
+    assert timer.restore_at is not None
+
+
+@pytest.mark.asyncio
+async def test_restore_ignores_implausible_deadline():
+    """A far-future persisted deadline is rejected and cleared."""
+    write, timer = _timer()
+    timer.store.async_load = AsyncMock(
+        return_value={"device_id": "dev1", "restore_at": 1e15}
+    )
+
+    await timer.async_restore(writable=True)
+
+    write.assert_not_called()
+    timer.store.async_remove.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_restore_ignores_bool_deadline():
+    """A boolean restore_at must not be treated as a numeric deadline."""
+    write, timer = _timer()
+    timer.store.async_load = AsyncMock(
+        return_value={"device_id": "dev1", "restore_at": True}
+    )
+
+    await timer.async_restore(writable=True)
+
+    write.assert_not_called()
+    timer.store.async_remove.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_restore_ignores_nan_deadline():
+    """A NaN restore_at (accepted by json.loads) must not be scheduled."""
+    write, timer = _timer()
+    timer.store.async_load = AsyncMock(
+        return_value={"device_id": "dev1", "restore_at": float("nan")}
+    )
+
+    await timer.async_restore(writable=True)
+
+    write.assert_not_called()
+    timer.store.async_remove.assert_awaited()
