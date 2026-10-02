@@ -8,7 +8,9 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Optional
+from urllib.parse import quote, urlencode
 
 import aiohttp
 
@@ -36,6 +38,37 @@ from .endpoints import (
 _LOGGER = logging.getLogger(__name__)
 
 _CUSTOM_CAPACITIES = {1, 6, 7}
+
+
+def _encode_path(value: Any) -> str:
+    """URL-encode a value that goes into a path segment."""
+    return quote(str(value), safe="")
+
+
+def _parse_retry_after(response: aiohttp.ClientResponse) -> float | None:
+    """Parse a ``Retry-After`` header (seconds or HTTP-date) into seconds."""
+    headers = getattr(response, "headers", None)
+    if not headers:
+        return None
+    raw = headers.get("Retry-After")
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        pass
+    try:
+        when = parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
 
 
 class QvantumCloudClient:
@@ -161,9 +194,9 @@ class QvantumCloudClient:
     async def _handle_response(self, response: aiohttp.ClientResponse) -> None:
         """Raise a typed error for a failed response.
 
-        401/403 invalidate the stored token, 429 is client throttling, and
-        anything else is a transport failure. 2xx responses return to the
-        caller.
+        401/403 invalidate the stored token, 429 is client throttling (with
+        any ``Retry-After`` hint), and anything else is a transport failure
+        carrying a truncated response body for diagnostics.
         """
         if response.ok:
             return
@@ -171,8 +204,39 @@ class QvantumCloudClient:
             await self.unauthenticate()
             raise AuthError(response.status)
         if response.status == 429:
-            raise RateLimitError(response.status)
-        raise TransportError(response.status)
+            raise RateLimitError(
+                response.status, retry_after=_parse_retry_after(response)
+            )
+        raise TransportError(response.status, await self._error_detail(response))
+
+    @staticmethod
+    async def _error_detail(
+        response: aiohttp.ClientResponse, default: str = "API request failed"
+    ) -> str:
+        """Return ``default`` plus a short text body, when one is readable."""
+        try:
+            text = await response.text()
+        except (aiohttp.ClientError, ValueError, TypeError, AttributeError):
+            return default
+        if not isinstance(text, str):
+            return default
+        text = " ".join(text.split())
+        if not text:
+            return default
+        if len(text) > 200:
+            text = text[:200] + "…"
+        detail = f"{default}: {text}"
+        headers = getattr(response, "headers", None) or {}
+        request_id = headers.get("x-request-id")
+        if request_id:
+            detail = f"{detail} (request-id {request_id})"
+        return detail
+
+    @staticmethod
+    def _preview(value: Any, limit: int = 200) -> str:
+        """Truncated, whitespace-collapsed value for debug logging."""
+        text = " ".join(repr(value).split())
+        return text if len(text) <= limit else text[:limit] + "…"
 
     def _request_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}
@@ -248,7 +312,9 @@ class QvantumCloudClient:
                     )
                     return True
                 case 429:
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case 400:
                     message = await self._firebase_error_message(response)
                     _LOGGER.error(
@@ -292,7 +358,9 @@ class QvantumCloudClient:
                     )
                 case 429:
                     # Throttling must not fall through to a full sign-in.
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case status if status >= 500:
                     # A server-side failure is retryable; do not add a
                     # sign-in request on top of an outage.
@@ -404,14 +472,16 @@ class QvantumCloudClient:
             if validate_status:
                 await self._handle_response(response)
             data = await response.json()
-            _LOGGER.debug("Response received %s: %s", response.status, data)
+            _LOGGER.debug(
+                "Response received %s: %s", response.status, self._preview(data)
+            )
             return data
 
     async def _update_settings(self, device_id: str, payload: dict) -> dict[str, Any]:
         _LOGGER.debug(json.dumps(payload))
         return await self._request_json(
             "patch",
-            f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings?dispatch=false",
+            f"{self._api_url}/api/device-info/v1/devices/{_encode_path(device_id)}/settings?dispatch=false",
             payload,
         )
 
@@ -420,7 +490,7 @@ class QvantumCloudClient:
         _LOGGER.debug(json.dumps(wrapped_payload))
         return await self._request_json(
             "post",
-            f"{self._api_url}/api/commands/v1/devices/{device_id}/commands?wait=true&use_internal_names=true",
+            f"{self._api_url}/api/commands/v1/devices/{_encode_path(device_id)}/commands?wait=true&use_internal_names=true",
             wrapped_payload,
         )
 
@@ -567,7 +637,7 @@ class QvantumCloudClient:
             extra["If-None-Match"] = self._device_metadata_etag
         async with self._track_request(
             self._session.get(
-                f"{self._api_url}/api/device-info/v1/devices/{device_id}/status",
+                f"{self._api_url}/api/device-info/v1/devices/{_encode_path(device_id)}/status",
                 **self._http_kwargs(headers=extra),
             )
         ) as response:
@@ -579,7 +649,9 @@ class QvantumCloudClient:
                     await self.unauthenticate()
                     raise AuthError(response.status)
                 case 429:
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case 304:
                     _LOGGER.debug("Device metadata not modified, using cached data.")
                 case status if status >= 500:
@@ -659,11 +731,14 @@ class QvantumCloudClient:
         extra: dict[str, str] = {}
         if etag_header:
             extra["If-None-Match"] = etag_header
-        names_list = "".join(f"&names[]={name}" for name in metric_names)
+        query = urlencode(
+            [("use_internal_names", "true"), ("timeout", METRICS_TIMEOUT_SECONDS)]
+            + [("names[]", name) for name in metric_names]
+        )
         async with self._track_request(
             self._session.get(
-                f"{API_INTERNAL_URL}/api/internal/v1/devices/{device_id}/values"
-                f"?use_internal_names=true&timeout={METRICS_TIMEOUT_SECONDS}{names_list}",
+                f"{API_INTERNAL_URL}/api/internal/v1/devices/{_encode_path(device_id)}/values"
+                f"?{query}",
                 **self._http_kwargs(headers=extra),
             )
         ) as response:
@@ -681,7 +756,9 @@ class QvantumCloudClient:
                     await self.unauthenticate()
                     raise AuthError(response.status)
                 case 429:
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case 304:
                     _LOGGER.debug("HTTP values not modified, using cached data.")
                     return None, None, None
@@ -704,7 +781,7 @@ class QvantumCloudClient:
             extra["If-None-Match"] = self._settings_etag
         async with self._track_request(
             self._session.get(
-                f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings",
+                f"{self._api_url}/api/device-info/v1/devices/{_encode_path(device_id)}/settings",
                 **self._http_kwargs(headers=extra),
             )
         ) as response:
@@ -717,7 +794,9 @@ class QvantumCloudClient:
                     await self.unauthenticate()
                     raise AuthError(response.status)
                 case 429:
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case 304:
                     _LOGGER.debug("HTTP Settings not modified, using cached data.")
                 case status if status >= 500:
@@ -753,7 +832,9 @@ class QvantumCloudClient:
                     await self.unauthenticate()
                     raise AuthError(response.status)
                 case 429:
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case _:
                     _LOGGER.error(
                         "Failed to fetch devices, status: %s", response.status
@@ -776,7 +857,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._track_request(
             self._session.get(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{_encode_path(device_id)}/my-access-level?use_internal_names=true",
                 **self._http_kwargs(),
             )
         ) as response:
@@ -791,7 +872,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._track_request(
             self._session.post(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/generate-access-code?use_internal_names=true",
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{_encode_path(device_id)}/generate-access-code?use_internal_names=true",
                 **self._http_kwargs(),
             )
         ) as response:
@@ -813,7 +894,7 @@ class QvantumCloudClient:
         )
         async with self._track_request(
             self._session.post(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/claim-grant?access_code={access_code}&use_internal_names=true",
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/claim-grant?access_code={quote(str(access_code), safe='')}&use_internal_names=true",
                 **self._http_kwargs(),
             )
         ) as response:
@@ -832,7 +913,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._track_request(
             self._session.post(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/access-grants?access_code={access_code}&approve=true&use_internal_names=true",
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{_encode_path(device_id)}/access-grants?access_code={quote(str(access_code), safe='')}&approve=true&use_internal_names=true",
                 **self._http_kwargs(),
             )
         ) as response:
@@ -850,7 +931,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._track_request(
             self._session.get(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{_encode_path(device_id)}/my-access-level?use_internal_names=true",
                 **self._http_kwargs(),
             )
         ) as response:
@@ -882,7 +963,7 @@ class QvantumCloudClient:
                 return None
             async with self._track_request(
                 self._session.get(
-                    f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
+                    f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{_encode_path(device_id)}/my-access-level?use_internal_names=true",
                     **self._http_kwargs(),
                 )
             ) as response:

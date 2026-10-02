@@ -3,7 +3,8 @@
 import asyncio
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from unittest.mock import AsyncMock
 
 import aiohttp
@@ -637,3 +638,70 @@ async def test_set_tap_water_capacity_target_rejects_unknown_level(
         await client.set_tap_water_capacity_target("test_device", capacity)
 
     mock_session.patch.assert_not_called()
+
+
+def _authed_client(mock_session) -> QvantumCloudClient:
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._token = "test_token"
+    client._token_expiry = datetime.now() + timedelta(hours=1)
+    return client
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_error_carries_retry_after_seconds(mock_session):
+    cm, _ = mock_session.make_cm_response(
+        status=429, json_data={}, headers={"Retry-After": "120"}
+    )
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    with pytest.raises(RateLimitError) as excinfo:
+        await client.get_access_level("dev1")
+
+    assert excinfo.value.retry_after == 120.0
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_error_parses_http_date_retry_after(mock_session):
+    when = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=90))
+    cm, _ = mock_session.make_cm_response(
+        status=429, json_data={}, headers={"Retry-After": when}
+    )
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    with pytest.raises(RateLimitError) as excinfo:
+        await client.get_access_level("dev1")
+
+    assert excinfo.value.retry_after == pytest.approx(90, abs=3)
+
+
+@pytest.mark.asyncio
+async def test_transport_error_includes_body_and_request_id(mock_session):
+    cm, resp = mock_session.make_cm_response(
+        status=502, json_data={}, headers={"x-request-id": "abc123"}
+    )
+    resp.text = AsyncMock(return_value="  upstream   failure ")
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    with pytest.raises(TransportError) as excinfo:
+        await client.get_access_level("dev1")
+
+    assert "upstream failure" in str(excinfo.value)
+    assert "abc123" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_device_id_and_metric_names_are_url_encoded(mock_session):
+    cm, _ = mock_session.make_cm_response(status=200, json_data={"values": {}})
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    await client.get_metrics("id/with spaces?", ["bt1"])
+
+    url = mock_session.get.call_args[0][0]
+    assert "id%2Fwith%20spaces%3F" in url
+    assert "names%5B%5D=bt1" in url
