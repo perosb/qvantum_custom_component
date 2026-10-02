@@ -31,10 +31,55 @@ from .maps import MODBUS_HOLDING_REGISTER_MAP, MODBUS_HOLDING_TO_SETTINGS_MAP
 
 _LOGGER = logging.getLogger(__name__)
 
+# Upper bound for a single Modbus operation. Without it a hung unit operation
+# would hold the client lock forever, stalling every poll and write.
+_DEFAULT_OPERATION_TIMEOUT_SECONDS = 15.0
+
 
 def _applied() -> dict[str, Any]:
     """Return a fresh APPLIED result so callers cannot mutate a shared dict."""
     return {"status": SETTING_UPDATE_APPLIED}
+
+
+def _as_int(value: Any) -> int | None:
+    """Return int(value), or None when missing/unconvertible."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def tap_water_write_order(
+    *,
+    start: int,
+    stop: int,
+    current_start: int | None,
+    current_stop: int | None,
+) -> list[tuple[str, int]]:
+    """Return the (metric_key, value) writes for a tap-water update.
+
+    Keeps ``start < stop`` true at every intermediate step: when the new stop
+    is below the current start the new start is raised first, otherwise the
+    stop is lowered first. Raises ``ValueError`` for an inverted pair or a
+    single value that would cross the current counterpart.
+    """
+    if start and stop:
+        if start >= stop:
+            raise ValueError("tap_water_start must be below tap_water_stop")
+        if current_start is not None and stop <= current_start:
+            return [("tap_water_start", start), ("tap_water_stop", stop)]
+        return [("tap_water_stop", stop), ("tap_water_start", start)]
+    if stop:
+        if current_start is not None and stop <= current_start:
+            raise ValueError("tap_water_stop must be above tap_water_start")
+        return [("tap_water_stop", stop)]
+    if start:
+        if current_stop is not None and start >= current_stop:
+            raise ValueError("tap_water_start must be below tap_water_stop")
+        return [("tap_water_start", start)]
+    return []
 
 
 _FAN_PRESETS = {
@@ -52,6 +97,7 @@ class QvantumModbusClient:
         unit: ModbusUnit | None = None,
         *,
         writable: bool = False,
+        operation_timeout: float | None = None,
     ) -> None:
         self._unit = unit
         self._writable = bool(writable)
@@ -60,6 +106,11 @@ class QvantumModbusClient:
         )
         self._lock = asyncio.Lock()
         self._closed = False
+        self._operation_timeout = (
+            _DEFAULT_OPERATION_TIMEOUT_SECONDS
+            if operation_timeout is None
+            else float(operation_timeout)
+        )
 
     @property
     def device(self) -> QvantumModbusDevice | None:
@@ -84,6 +135,8 @@ class QvantumModbusClient:
         """Bind a unit (used by tests that inject a mock after construct)."""
         self._unit = unit
         self._device = QvantumModbusDevice(unit)
+        # Re-opening after a close() must make the client usable again.
+        self._closed = False
         return self._device
 
     def _ensure_open(self) -> None:
@@ -127,9 +180,18 @@ class QvantumModbusClient:
             if not device:
                 raise TransportError(None, missing_client_message)
             try:
-                return await operation(device)
+                return await asyncio.wait_for(
+                    operation(device), timeout=self._operation_timeout
+                )
             except asyncio.CancelledError:
                 raise
+            except asyncio.TimeoutError as err:
+                _LOGGER.error("Modbus timeout %s", error_label)
+                raise TransportError(
+                    None,
+                    f"{failure_prefix}: timed out after "
+                    f"{self._operation_timeout:g}s",
+                ) from err
             except ModbusError as err:
                 _LOGGER.error("Modbus error %s: %s", error_label, err)
                 raise TransportError(None, f"{failure_prefix}: {err}") from err
@@ -258,14 +320,44 @@ class QvantumModbusClient:
     async def set_tap_water(
         self, device_id: str, start: int = 0, stop: int = 0
     ) -> dict[str, Any]:
+        """Write tap-water start/stop atomically under one lock.
+
+        The two holdings are written under a single lock acquisition so a
+        concurrent poll cannot observe a half-applied pair, and the order is
+        chosen so ``start < stop`` holds at every intermediate step.
+        """
         if stop == 0 and start == 0:
             _LOGGER.debug("No tap water settings to update, both stop and start are 0.")
             return _applied()
-        if stop:
-            await self.write_metric(device_id, "tap_water_stop", stop)
-        if start:
-            await self.write_metric(device_id, "tap_water_start", start)
-        return _applied()
+        self._ensure_writable()
+
+        async def _write(device: QvantumModbusDevice):
+            # A write does not update the cached settings, so within one poll
+            # interval the cached pair can be stale. Re-read under the lock so
+            # the order and crossing check use the values just written.
+            await device.async_update_settings()
+            current_start = _as_int(
+                getattr(device.settings, "dhw_start_normal", None)
+            )
+            current_stop = _as_int(
+                getattr(device.settings, "dhw_stop_normal", None)
+            )
+            writes = tap_water_write_order(
+                start=int(start),
+                stop=int(stop),
+                current_start=current_start,
+                current_stop=current_stop,
+            )
+            for metric_key, value in writes:
+                await device.write_metric(metric_key, value)
+            return _applied()
+
+        return await self._run(
+            _write,
+            error_label=f"writing tap water for device {device_id}",
+            missing_client_message=f"Modbus client not initialized for device {device_id}",
+            failure_prefix="Modbus write failed",
+        )
 
     async def set_tap_water_capacity_target(
         self, device_id: str, capacity: int

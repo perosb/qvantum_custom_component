@@ -19,14 +19,43 @@ from .maps import (
 _RELAYS_BITMASK_ADDRESS = MODBUS_INPUT_REGISTER_MAP["relays_bitmask"][0]
 
 
+def _write_validator(signed: bool, scale: float):
+    """Return a write validator rejecting values the register cannot hold.
+
+    ``encode_int`` only checks the 16-bit width, so the scaled raw value can
+    still wrap: a negative value on an unsigned register becomes a large
+    positive one, and a value above the signed range becomes negative. Bound
+    the raw value the same way ``NumberField.encode`` computes it.
+    """
+    low, high = (-32768, 32767) if signed else (0, 65535)
+    kind = "signed" if signed else "unsigned"
+    # Mirror the field's rounding precision so the bound matches encode().
+    decimals = max(0, len(f"{scale:.10f}".rstrip("0").split(".")[1]))
+
+    def _validate(value):
+        if isinstance(value, bool):
+            return value
+        if not isinstance(value, (int, float)):
+            raise ValueError(f"value {value!r} is not numeric")
+        raw = round(round(float(value), decimals) / scale)
+        if not low <= raw <= high:
+            raise ValueError(
+                f"value {value} does not fit the {kind} 16-bit register"
+            )
+        return value
+
+    return _validate
+
+
 def _register_field(
     data_type: str, address: int, scale: float, *, writable: bool = False
 ):
     """Return a gauge or integer field matching a register-map tuple."""
     signed = data_type == "int16"
+    write_arg = _write_validator(signed, scale) if writable else False
     if scale == 1.0:
-        return integer(address, signed=signed, writable=writable)
-    return gauge(address, scale, signed=signed, writable=writable)
+        return integer(address, signed=signed, writable=write_arg)
+    return gauge(address, scale, signed=signed, writable=write_arg)
 
 
 def _component_from_map(

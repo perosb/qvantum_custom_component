@@ -81,7 +81,33 @@ class TestRegisterMapAlignment:
             assert field.address == address
             assert field.signed is (data_type == "int16")
             assert (field.scale or 1.0) == scale
-            assert field.writable is True
+            # Writable fields carry a signedness validator, not a bare True.
+            assert field.writable
+
+    def test_unsigned_holding_rejects_negative_value(self):
+        """A negative value must not silently wrap an unsigned register."""
+        field = QvantumSettings.declared_fields["dhw_mode"]
+        assert field.signed is False
+        with pytest.raises(ValueError, match="unsigned"):
+            field.writable(-1)
+
+        # Signed fields keep accepting negatives.
+        signed_field = QvantumSettings.declared_fields["stop_heating"]
+        assert signed_field.writable(-15) == -15
+
+    def test_signed_holding_rejects_overflowing_value(self):
+        """A raw value above the signed range must not wrap negative."""
+        field = QvantumSettings.declared_fields["desired_indoor_temp"]
+        assert field.signed is True
+        with pytest.raises(ValueError, match="signed"):
+            field.writable(4000)
+        # The top of the representable range is still accepted.
+        assert field.writable(3276.7) == 3276.7
+
+    def test_holding_validator_rejects_non_numeric(self):
+        field = QvantumSettings.declared_fields["dhw_mode"]
+        with pytest.raises(ValueError, match="not numeric"):
+            field.writable(object())
 
     def test_identity_fields_match_register_map(self):
         for name, (address, data_type, scale) in MODBUS_IDENTITY_REGISTER_MAP.items():
