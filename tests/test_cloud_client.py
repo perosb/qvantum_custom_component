@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 from unittest.mock import AsyncMock
@@ -64,7 +65,7 @@ async def test_get_metrics_maps_values(mock_session):
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     result = await client.get_metrics("test_device", ["bt1", "bt2"])
     assert result["metrics"]["bt1"] == metrics_data["values"]["bt1"]
@@ -116,7 +117,7 @@ async def test_cancelled_close_can_be_retried(mock_session):
     )
     client._session_owner = True
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
     closer = None
@@ -173,7 +174,7 @@ async def test_concurrent_close_takes_over_after_cancellation(mock_session):
     )
     client._session_owner = True
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
     first = None
@@ -234,7 +235,7 @@ async def test_concurrent_close_waits_for_drain(mock_session):
     )
     client._session_owner = True
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
     closers = []
@@ -290,7 +291,7 @@ async def test_close_waits_for_in_flight_request(mock_session):
     )
     client._session_owner = True
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
     closer = None
@@ -328,7 +329,7 @@ async def test_set_indoor_temperature_target_patches(mock_session):
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     result = await client.set_indoor_temperature_target("test_device", 22.5)
     assert result == update_data
@@ -480,7 +481,7 @@ async def test_concurrent_token_refresh_issues_one_request(mock_session):
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "expired_token"
-    client._token_expiry = datetime.now() - timedelta(seconds=1)
+    client._token_expiry = time.monotonic() - 1
     client._refreshtoken = "refresh_token"
 
     await asyncio.gather(
@@ -614,7 +615,7 @@ async def test_set_tap_water_noop_reports_applied(mock_session):
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     result = await client.set_tap_water("test_device", start=0, stop=0)
 
@@ -632,7 +633,7 @@ async def test_set_tap_water_capacity_target_rejects_unknown_level(
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     with pytest.raises(ValueError, match=f"Unsupported tap water capacity {capacity}"):
         await client.set_tap_water_capacity_target("test_device", capacity)
@@ -645,7 +646,7 @@ def _authed_client(mock_session) -> QvantumCloudClient:
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
     return client
 
 
@@ -705,3 +706,75 @@ async def test_device_id_and_metric_names_are_url_encoded(mock_session):
     url = mock_session.get.call_args[0][0]
     assert "id%2Fwith%20spaces%3F" in url
     assert "names%5B%5D=bt1" in url
+
+
+@pytest.mark.asyncio
+async def test_authenticate_stores_monotonic_expiry(mock_session):
+    """Token expiry is a monotonic deadline, immune to wall-clock jumps."""
+    auth_data = load_test_data("auth_signin.json")
+    cm, _ = mock_session.make_cm_response(status=200, json_data=auth_data)
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    assert await client.authenticate() is True
+    assert isinstance(client._token_expiry, float)
+    assert client._token_expiry > time.monotonic()
+    assert client._token_is_valid() is True
+
+
+@pytest.mark.asyncio
+async def test_extra_tap_water_uses_utc_epoch(mock_session):
+    cm, _ = mock_session.make_cm_response(status=200, json_data={})
+    mock_session.post.return_value = cm
+    client = _authed_client(mock_session)
+
+    before = datetime.now(timezone.utc).timestamp()
+    await client.set_extra_tap_water("dev1", 60)
+
+    payload = mock_session.post.call_args.kwargs["json"]["command"][
+        "set_additional_hot_water"
+    ]
+    assert payload["stopTime"] == pytest.approx(before + 3600, abs=5)
+
+
+class TestHasSufficientAccess:
+    """G10: expiresAt parsing never raises and tolerates naive timestamps."""
+
+    def test_level_20_is_sufficient(self):
+        assert (
+            QvantumCloudClient._has_sufficient_access({"writeAccessLevel": 20})
+            is True
+        )
+        assert (
+            QvantumCloudClient._has_sufficient_access({"writeAccessLevel": 10})
+            is False
+        )
+
+    def test_naive_expiry_within_a_day_is_sufficient(self):
+        soon = (datetime.now() - timedelta(hours=1)).isoformat()
+        assert (
+            QvantumCloudClient._has_sufficient_access({"expiresAt": soon}) is True
+        )
+
+    def test_malformed_expiry_is_not_sufficient(self):
+        assert (
+            QvantumCloudClient._has_sufficient_access({"expiresAt": "not-a-date"})
+            is False
+        )
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_skips_when_already_sufficient(self, mock_session):
+        cm, _ = mock_session.make_cm_response(
+            status=200, json_data={"writeAccessLevel": 30}
+        )
+        mock_session.get.return_value = cm
+        client = _authed_client(mock_session)
+        client._generate_code = AsyncMock()
+
+        result = await client.elevate_access("dev1")
+
+        assert result == {"writeAccessLevel": 30}
+        client._generate_code.assert_not_called()

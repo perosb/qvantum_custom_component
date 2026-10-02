@@ -307,8 +307,10 @@ class QvantumCloudClient:
                     expires_in = auth_data.get(
                         "expiresIn", DEFAULT_TOKEN_EXPIRY_SECONDS
                     )
-                    self._token_expiry = datetime.now() + timedelta(
-                        seconds=int(expires_in) - DEFAULT_TOKEN_BUFFER_SECONDS
+                    self._token_expiry = (
+                        time.monotonic()
+                        + int(expires_in)
+                        - DEFAULT_TOKEN_BUFFER_SECONDS
                     )
                     return True
                 case 429:
@@ -353,8 +355,10 @@ class QvantumCloudClient:
                     expires_in = auth_data.get(
                         "expires_in", DEFAULT_TOKEN_EXPIRY_SECONDS
                     )
-                    self._token_expiry = datetime.now() + timedelta(
-                        seconds=int(expires_in) - DEFAULT_TOKEN_BUFFER_SECONDS
+                    self._token_expiry = (
+                        time.monotonic()
+                        + int(expires_in)
+                        - DEFAULT_TOKEN_BUFFER_SECONDS
                     )
                 case 429:
                     # Throttling must not fall through to a full sign-in.
@@ -444,11 +448,15 @@ class QvantumCloudClient:
         self._auth_failure = None
 
     def _token_is_valid(self) -> bool:
-        """Whether a stored token exists and has not expired yet."""
+        """Whether a stored token exists and has not expired yet.
+
+        Expiry is a ``time.monotonic()`` deadline, so a system clock jump
+        cannot discard a fresh token or honour a stale one.
+        """
         return bool(
             self._token
             and self._token_expiry
-            and datetime.now() < self._token_expiry
+            and time.monotonic() < self._token_expiry
         )
 
     async def _request_json(
@@ -517,7 +525,7 @@ class QvantumCloudClient:
         return await self.update_settings(device_id, payload)
 
     async def set_extra_tap_water(self, device_id: str, minutes: int) -> dict[str, Any]:
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
         if minutes == 0:
             stop_time = int(current_time.timestamp())
             indefinite = False
@@ -569,7 +577,7 @@ class QvantumCloudClient:
     async def set_fanspeedselector(
         self, device_id: str, preset_mode: str
     ) -> dict[str, Any]:
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
         match preset_mode:
             case "off":
                 payload = {"set_fan_mode": {"mode": 0}}
@@ -927,47 +935,43 @@ class QvantumCloudClient:
                 )
             return response.ok
 
-    async def elevate_access(self, device_id: str) -> dict[str, Any] | None:
-        await self._ensure_valid_token()
-        async with self._track_request(
-            self._session.get(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{_encode_path(device_id)}/my-access-level?use_internal_names=true",
-                **self._http_kwargs(),
+    @staticmethod
+    def _has_sufficient_access(data: dict[str, Any]) -> bool:
+        """Return True when the current grant already allows authenticated writes.
+
+        A ``writeAccessLevel`` of 20+ is sufficient. Otherwise an ``expiresAt``
+        within the next day is treated as sufficient as well, matching the
+        previous behaviour: a grant that is about to lapse is not worth a
+        redundant re-elevation here. Parsing is lenient — a missing, naive or
+        malformed timestamp never raises and falls back to "not sufficient".
+        """
+        if data.get("writeAccessLevel", 0) >= 20:
+            return True
+        expires_at = data.get("expiresAt")
+        if not expires_at:
+            return False
+        try:
+            expires_at_dt = datetime.fromisoformat(
+                str(expires_at).replace("Z", "+00:00")
             )
-        ) as response:
-            await self._handle_response(response)
-            data = await response.json()
-            _LOGGER.debug("Response received %s: %s", response.status, data)
-            expires_at = data.get("expiresAt")
-            has_sufficient_access = data.get("writeAccessLevel", 0) >= 20
-            if not has_sufficient_access and expires_at:
-                try:
-                    expires_at_dt = datetime.fromisoformat(
-                        expires_at.replace("Z", "+00:00")
-                    )
-                    if expires_at_dt < datetime.now(timezone.utc) + timedelta(days=1):
-                        has_sufficient_access = True
-                except ValueError:
-                    pass
-            if has_sufficient_access:
-                return data
-            code_data = await self._generate_code(device_id)
-            if not code_data:
-                return None
-            access_code = code_data.get("accessCode")
-            if not access_code:
-                return None
-            if not await self._claim_grant(device_id, access_code):
-                return None
-            if not await self._approve_access(device_id, access_code):
-                return None
-            async with self._track_request(
-                self._session.get(
-                    f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{_encode_path(device_id)}/my-access-level?use_internal_names=true",
-                    **self._http_kwargs(),
-                )
-            ) as response:
-                await self._handle_response(response)
-                data = await response.json()
-                _LOGGER.debug("Response received %s: %s", response.status, data)
-                return data
+        except (TypeError, ValueError):
+            return False
+        if expires_at_dt.tzinfo is None:
+            expires_at_dt = expires_at_dt.replace(tzinfo=timezone.utc)
+        return expires_at_dt < datetime.now(timezone.utc) + timedelta(days=1)
+
+    async def elevate_access(self, device_id: str) -> dict[str, Any] | None:
+        data = await self.get_access_level(device_id)
+        if self._has_sufficient_access(data):
+            return data
+        code_data = await self._generate_code(device_id)
+        if not code_data:
+            return None
+        access_code = code_data.get("accessCode")
+        if not access_code:
+            return None
+        if not await self._claim_grant(device_id, access_code):
+            return None
+        if not await self._approve_access(device_id, access_code):
+            return None
+        return await self.get_access_level(device_id)

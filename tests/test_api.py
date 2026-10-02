@@ -8,6 +8,7 @@ import datetime
 import json
 import logging
 import os
+import time
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -128,7 +129,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIRateLimitError):
             await api.get_devices()
@@ -179,7 +180,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_tap_water("test_device", stop=60, start=50)
 
@@ -215,7 +216,7 @@ class TestQvantumCloudClient:
         api = QvantumAPI("test@example.com", "password", "test-agent")
         api._token = "test_token"
         api._refreshtoken = "refresh_token"
-        api._token_expiry = datetime.datetime.now()
+        api._token_expiry = time.monotonic()
         api._settings_data = {"test": "data"}
         api._settings_etag = "etag"
         api._metrics_data = {"test": "data"}
@@ -268,7 +269,7 @@ class TestQvantumCloudClient:
 
             # Simulate expired/missing token
             api._token = None
-            api._token_expiry = datetime.datetime.now() - datetime.timedelta(seconds=1)
+            api._token_expiry = time.monotonic() - 1
 
             # Make refresh and authenticate not set a token
             api._refresh_authentication_token = AsyncMock(return_value=None)
@@ -285,7 +286,7 @@ class TestQvantumCloudClient:
         with patch("aiohttp.ClientSession"):
             api = QvantumAPI("test@example.com", "password", "test-agent")
             api._token = None
-            api._token_expiry = datetime.datetime.now() - datetime.timedelta(seconds=1)
+            api._token_expiry = time.monotonic() - 1
             api._refreshtoken = "refresh_token"
             api._refresh_authentication_token = AsyncMock(return_value=None)
             api.authenticate = AsyncMock(side_effect=APIAuthError(400))
@@ -301,7 +302,7 @@ class TestQvantumCloudClient:
         with patch("aiohttp.ClientSession"):
             api = QvantumAPI("test@example.com", "password", "test-agent")
             api._token = "expired_token"
-            api._token_expiry = datetime.datetime.now() - datetime.timedelta(seconds=1)
+            api._token_expiry = time.monotonic() - 1
             api._refreshtoken = "refresh_token"
 
             async def fake_refresh():
@@ -324,9 +325,7 @@ class TestQvantumCloudClient:
 
             async def fake_authenticate():
                 api._token = "signed_in_token"
-                api._token_expiry = datetime.datetime.now() + datetime.timedelta(
-                    hours=1
-                )
+                api._token_expiry = time.monotonic() + 3600
 
             api.authenticate = AsyncMock(side_effect=fake_authenticate)
 
@@ -375,7 +374,7 @@ class TestQvantumCloudClient:
         )
         # Set expired token
         api._token = "old_token"
-        api._token_expiry = datetime.datetime.now() - datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() - 3600
         api._refreshtoken = "refresh_token"
 
         result = await api.get_metrics("test_device")
@@ -393,7 +392,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(Exception):  # APIAuthError
             await api.get_metrics("test_device")
@@ -408,7 +407,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._metrics_etag = "etag123"
 
         result = await api.get_metrics("test_device")
@@ -431,7 +430,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.get_settings("test_device")
 
@@ -448,7 +447,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._settings_data = cached_data
 
         result = await api.get_settings("test_device")
@@ -465,7 +464,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIAuthError):
             await api.get_settings("test_device")
@@ -481,7 +480,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._settings_data = cached_data
 
         with pytest.raises(APIConnectionError):
@@ -501,7 +500,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._settings_data = cached_data
 
         with pytest.raises(APIConnectionError):
@@ -521,7 +520,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._settings_data = cached_data
 
         with caplog.at_level(logging.WARNING):
@@ -542,7 +541,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIRateLimitError):
             await api.get_settings("test_device")
@@ -561,7 +560,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         # Capture current time before API call to avoid race condition
         current_time = int(datetime.datetime.now().timestamp())
@@ -600,7 +599,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         # Capture current time before API call to avoid race condition
         current_time = int(datetime.datetime.now().timestamp())
@@ -636,7 +635,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_indoor_temperature_offset("test_device", 5)
 
@@ -656,7 +655,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_fanspeedselector("test_device", "normal")
 
@@ -676,7 +675,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_tap_water_capacity_target("test_device", 5)
 
@@ -696,7 +695,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_indoor_temperature_target("test_device", 22.5)
 
@@ -773,7 +772,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_extra_tap_water("test_device", -1)
 
@@ -801,7 +800,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_fanspeedselector("test_device", "off")
 
@@ -821,7 +820,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_fanspeedselector("test_device", "extra")
 
@@ -851,7 +850,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_tap_water_capacity_target("test_device", 1)
 
@@ -873,7 +872,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_tap_water_capacity_target("test_device", 6)
 
@@ -893,7 +892,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_tap_water_capacity_target("test_device", 7)
 
@@ -913,7 +912,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_tap_water("test_device", stop=60)
 
@@ -938,7 +937,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_tap_water("test_device", start=50)
 
@@ -956,7 +955,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.set_tap_water("test_device")
 
@@ -974,7 +973,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._device_metadata = cached_data
 
         with pytest.raises(APIConnectionError):
@@ -993,7 +992,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._device_metadata = cached_data
 
         with pytest.raises(APIConnectionError):
@@ -1011,7 +1010,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.get_device_metadata("test_device")
 
@@ -1030,7 +1029,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._device_metadata = cached_data
 
         with caplog.at_level(logging.WARNING):
@@ -1051,7 +1050,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._device_metadata = cached_data
 
         with pytest.raises(APIRateLimitError):
@@ -1069,7 +1068,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIConnectionError):
             await api.get_metrics("test_device")
@@ -1084,7 +1083,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIConnectionError):
             await api.get_metrics("test_device")
@@ -1099,7 +1098,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api.get_metrics("test_device")
 
@@ -1118,7 +1117,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._metrics_data = cached_data
 
         with caplog.at_level(logging.WARNING):
@@ -1137,7 +1136,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIRateLimitError):
             await api.get_metrics("test_device")
@@ -1213,7 +1212,7 @@ class TestQvantumCloudClient:
             await authenticated_api.unauthenticate()
             # The next poll re-authenticates; keep the mocked credentials valid.
             authenticated_api._token = "test_token"
-            authenticated_api._token_expiry = datetime.datetime(2100, 1, 1)
+            authenticated_api._token_expiry = time.monotonic() + 10**9
             api_metrics = await authenticated_api.get_metrics(
                 "test_device", enabled_metrics=enabled
             )
@@ -1295,7 +1294,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         cm, _ = mock_session.make_cm_response(status=200, json_data={"command": {}})
         mock_session.post.return_value = cm
@@ -1329,7 +1328,7 @@ class TestQvantumCloudClient:
 
         api = QvantumAPI("test@example.com", "password", "test-agent")
         api._token = "stale_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIAuthError):
             await api._handle_response(DummyResponse())
@@ -1345,7 +1344,7 @@ class TestQvantumCloudClient:
 
         api = QvantumAPI("test@example.com", "password", "test-agent", session=mock_session)
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIAuthError):
             await api.get_device_metadata("test_device")
@@ -1360,7 +1359,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
         api._metrics_etag = "metrics-etag"
         api._device_metadata_etag = "metadata-etag"
 
@@ -1381,7 +1380,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         result = await api._request_json("post", "https://example.test/endpoint")
 
@@ -1402,7 +1401,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIConnectionError):
             await api._request_json(
@@ -1419,7 +1418,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         await api._send_command("test_device", {"set_fan_mode": {"mode": 0}})
 
@@ -1438,7 +1437,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIConnectionError):
             await api.set_fanspeedselector("test_device", "off")
@@ -1454,7 +1453,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         await api.set_heating_curve_point("test_device", "curve_minus_30", 59)
         await api.set_curve_type_heating("test_device", 1)
@@ -1479,7 +1478,7 @@ class TestQvantumCloudClient:
             "test@example.com", "password", "test-agent", session=mock_session
         )
         api._token = "test_token"
-        api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+        api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIConnectionError):
             await api._update_settings("test_device", {"settings": []})

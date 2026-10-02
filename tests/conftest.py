@@ -5,7 +5,7 @@ for most Home Assistant modules. This file only contains minimal custom stubs
 for integration-specific functionality.
 """
 
-import datetime
+import time
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -89,7 +89,7 @@ def api_with_session(mock_session):
     
     api = QvantumAPI("test@example.com", "password", "test-agent", session=mock_session)
     api._token = "test_token"
-    api._token_expiry = datetime.datetime.now() + datetime.timedelta(hours=1)
+    api._token_expiry = time.monotonic() + 3600
     api._refreshtoken = "test_refresh"
     return api
 
@@ -198,7 +198,7 @@ async def authenticated_api():
 
     # Set up authentication
     api._token = "test_token"
-    api._token_expiry = datetime.datetime(2100, 1, 1)
+    api._token_expiry = time.monotonic() + 10**9
     api._refreshtoken = "test_refresh"
 
     return api
