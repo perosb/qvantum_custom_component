@@ -197,3 +197,9 @@ state-reporting entities (climate, water_heater, fan); control entities
 ---
 
 *Keep this file accurate when architecture or workflow changes.*
+
+After a repeated mistake or a durable project convention, append one bullet under Learnings at the bottom of this file.
+Remove a bullet as soon as it is fixed, obsolete, or contradicted. Do not add one-off notes.
+
+## Learnings
+
