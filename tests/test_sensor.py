@@ -1307,3 +1307,17 @@ class TestQvantumAccessExpireEntity:
         )
 
         assert entity.available is False
+
+
+def test_access_expire_handles_none_access_level(
+    mock_firmware_coordinator, mock_device
+):
+    """A None access_level must not raise AttributeError in available/value."""
+    mock_firmware_coordinator.data = {"access_level": None}
+
+    entity = QvantumAccessExpireEntity(
+        mock_firmware_coordinator, "expiresAt", mock_device, True
+    )
+
+    assert entity.available is False
+    assert entity.native_value is None
