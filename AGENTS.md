@@ -194,14 +194,12 @@ state-reporting entities (climate, water_heater, fan); control entities
 - Do not invent endpoints or registers. Maps: `client/modbus/maps.py`.
   HTTP paths: `client/cloud/endpoints.py`.
 
-## Learnings
-
-- One concern per branch: for independent work, branch fresh from latest `main`
-  before starting the next PR; dependent layers use `gh stack`. Committing the
-  next concern onto the previous PR's branch forces a split later (happened
-  twice in the robustness batch) — if it happens, reset the old branch and
-  cherry-pick the new work onto a fresh branch from `main`.
-
 ---
 
 *Keep this file accurate when architecture or workflow changes.*
+
+After a repeated mistake or a durable project convention, append one bullet under Learnings at the bottom of this file.
+Remove a bullet as soon as it is fixed, obsolete, or contradicted. Do not add one-off notes.
+
+## Learnings
+
