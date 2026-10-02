@@ -396,3 +396,58 @@ class TestQvantumIndoorClimateEntity:
         await entity.async_set_hvac_mode("heat")
 
         # No assertions needed as it just logs
+
+
+def _spec_coordinator(write_level: int):
+    """Coordinator mock that passes the ``isinstance`` write-access check."""
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+    coordinator = MagicMock(spec=QvantumDataUpdateCoordinator)
+    coordinator.data = {
+        "device": {"id": "test_device_123"},
+        "values": {
+            "hpid": "test_device_123",
+            "bt2": 22.5,
+            "indoor_temperature_target": 21.0,
+            "sensor_mode": SENSOR_MODE_HTTP_BT2,
+        },
+    }
+    coordinator.modbus_enabled = False
+    coordinator.last_update_success = True
+    coordinator.client = MagicMock()
+    coordinator.config_entry = MagicMock()
+    maintenance = MagicMock()
+    maintenance.data = {"access_level": {"writeAccessLevel": write_level}}
+    coordinator.config_entry.runtime_data.maintenance_coordinator = maintenance
+    return coordinator
+
+
+class TestWriteAccessBehaviour:
+    """Readability is independent of write access; writes enforce it."""
+
+    def test_available_is_false_when_coordinator_failed(self, mock_coordinator, mock_device):
+        """A failed poll makes the entity unavailable even with data cached."""
+        mock_coordinator.last_update_success = False
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+        assert entity.available is False
+
+    def test_available_without_write_access(self, mock_device):
+        """A read-only account can still see the indoor temperature."""
+        coordinator = _spec_coordinator(write_level=10)
+        entity = QvantumIndoorClimateEntity(coordinator, mock_device)
+
+        assert entity._has_write_access is False
+        assert entity.available is True
+
+    @pytest.mark.asyncio
+    async def test_set_temperature_requires_write_access(self, mock_device):
+        """set_temperature raises instead of writing for a read-only account."""
+        from homeassistant.exceptions import HomeAssistantError
+
+        coordinator = _spec_coordinator(write_level=10)
+        entity = QvantumIndoorClimateEntity(coordinator, mock_device)
+
+        with pytest.raises(HomeAssistantError, match="Write access is not enabled"):
+            await entity.async_set_temperature(temperature=23.0)
+
+        coordinator.client.set_indoor_temperature_target.assert_not_called()

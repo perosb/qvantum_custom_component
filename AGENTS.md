@@ -174,6 +174,12 @@ migration test when the entry schema changes.
 Icons on `QvantumEntity`. Cloud-only (SmartControl, firmware boards, access
 expiry, elevate-access) must not be created in Modbus mode.
 
+Entity `available` must AND its data check with `_coordinator_available` (the
+coordinator's `last_update_success`); HA keeps stale data after a failed poll.
+Availability is not a write guard: every write method calls
+`_require_write_access()` (`QvantumAccessMixin`) first, because services bypass
+availability. Readability must not depend on write access.
+
 ## Product constraints
 
 - `single_config_entry`: one instance; switch cloud ↔ Modbus via reconfigure.
