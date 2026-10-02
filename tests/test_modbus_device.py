@@ -95,6 +95,15 @@ class TestRegisterMapAlignment:
         signed_field = QvantumSettings.declared_fields["stop_heating"]
         assert signed_field.writable(-15) == -15
 
+    def test_signed_holding_rejects_overflowing_value(self):
+        """A raw value above the signed range must not wrap negative."""
+        field = QvantumSettings.declared_fields["desired_indoor_temp"]
+        assert field.signed is True
+        with pytest.raises(ValueError, match="signed"):
+            field.writable(4000)
+        # The top of the representable range is still accepted.
+        assert field.writable(3276.7) == 3276.7
+
     def test_holding_validator_rejects_non_numeric(self):
         field = QvantumSettings.declared_fields["dhw_mode"]
         with pytest.raises(ValueError, match="not numeric"):
