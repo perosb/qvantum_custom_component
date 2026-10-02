@@ -96,7 +96,13 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         Always a ``ClimateEntityFeature`` flag (0 when nothing is offered).
         Home Assistant's climate service does bitwise checks against this
         value, so returning an empty dict breaks ``set_temperature``.
+
+        Without write access the setpoint is not offered at all, so the UI
+        does not present a control that would only fail on use; the entity
+        stays available to report the current temperature.
         """
+        if not self._has_write_access:
+            return ClimateEntityFeature(0)
         if SensorMode.allows_target_temperature(self._sensor_mode()):
             return ClimateEntityFeature.TARGET_TEMPERATURE
 

@@ -183,8 +183,10 @@ coordinator's `last_update_success`); HA keeps stale data after a failed poll.
 Availability is not a write guard: write methods call `_require_write_access()`
 (`QvantumAccessMixin`) first, because services bypass availability
 (`vacation_mode` is exempt). Readability must not depend on write access for
-state-reporting entities (climate, water_heater, fan); control entities
-(switch, number, select, button) gate availability on write access.
+state-reporting entities (climate, water_heater) — they stay available and gate
+their write features (`supported_features`) on write access. Control-only
+entities (fan, switch, number, select, button) gate availability on write
+access, so no control is offered when a write would fail.
 
 ## Product constraints
 

@@ -62,6 +62,17 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
         )
 
     @property
+    def supported_features(self) -> FanEntityFeature:
+        """Return fan controls only when a write can succeed.
+
+        Without write access the entity still reports the current speed but
+        offers no preset/turn-on/turn-off controls.
+        """
+        if not self._has_write_access:
+            return FanEntityFeature(0)
+        return self._attr_supported_features
+
+    @property
     def preset_mode(self):
         """Get metric from API data."""
         return self._values.get(self._metric_key)
@@ -75,13 +86,15 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
     def available(self):
         """Return true if entity is available.
 
-        Availability only requires data; write access is enforced in
-        ``set_fanspeedselector`` so a read-only account can still see the
-        current fan state.
+        The fan is control-only: without write access it behaves like a
+        switch and is shown as unavailable, so Home Assistant never offers a
+        toggle that would fail on use. Read-only fan state has no separate
+        sensor here, so there is nothing to keep visible.
         """
         return (
             super().available
             and self._values.get(self._metric_key) is not None
+            and self._has_write_access
         )
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:

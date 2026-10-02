@@ -102,6 +102,14 @@ class QvantumWaterHeaterEntity(
 
     @property
     def supported_features(self) -> WaterHeaterEntityFeature:
+        """Return the write features, or none without write access.
+
+        The entity stays available to report tank/target temperatures, but
+        the target-temperature and operation-mode controls are only offered
+        when a write can actually succeed.
+        """
+        if not self._has_write_access:
+            return WaterHeaterEntityFeature(0)
         features = (
             WaterHeaterEntityFeature.TARGET_TEMPERATURE
             | WaterHeaterEntityFeature.OPERATION_MODE
