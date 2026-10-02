@@ -3,7 +3,9 @@
 import asyncio
 import json
 import os
-from datetime import datetime, timedelta
+import time
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from unittest.mock import AsyncMock
 
 import aiohttp
@@ -63,7 +65,7 @@ async def test_get_metrics_maps_values(mock_session):
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     result = await client.get_metrics("test_device", ["bt1", "bt2"])
     assert result["metrics"]["bt1"] == metrics_data["values"]["bt1"]
@@ -115,7 +117,7 @@ async def test_cancelled_close_can_be_retried(mock_session):
     )
     client._session_owner = True
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
     closer = None
@@ -172,7 +174,7 @@ async def test_concurrent_close_takes_over_after_cancellation(mock_session):
     )
     client._session_owner = True
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
     first = None
@@ -233,7 +235,7 @@ async def test_concurrent_close_waits_for_drain(mock_session):
     )
     client._session_owner = True
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
     closers = []
@@ -289,7 +291,7 @@ async def test_close_waits_for_in_flight_request(mock_session):
     )
     client._session_owner = True
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     request = asyncio.create_task(client.get_metrics("dev1", ["bt1"]))
     closer = None
@@ -327,7 +329,7 @@ async def test_set_indoor_temperature_target_patches(mock_session):
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     result = await client.set_indoor_temperature_target("test_device", 22.5)
     assert result == update_data
@@ -479,7 +481,7 @@ async def test_concurrent_token_refresh_issues_one_request(mock_session):
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "expired_token"
-    client._token_expiry = datetime.now() - timedelta(seconds=1)
+    client._token_expiry = time.monotonic() - 1
     client._refreshtoken = "refresh_token"
 
     await asyncio.gather(
@@ -536,12 +538,40 @@ async def test_auth_failure_cooldown_expires(mock_session):
         await client._ensure_valid_token()
     assert mock_session.post.call_count == 1
 
-    failed_at, err_type, status, message = client._auth_failure
-    client._auth_failure = (failed_at - 10_000, err_type, status, message)
+    failed_at, err_type, status, message, retry_after = client._auth_failure
+    client._auth_failure = (
+        failed_at - 10_000,
+        err_type,
+        status,
+        message,
+        retry_after,
+    )
 
     with pytest.raises(AuthError):
         await client._ensure_valid_token()
     assert mock_session.post.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_cached_rate_limit_keeps_retry_after(mock_session):
+    """A cached 429 re-raised in its cooldown keeps the Retry-After hint."""
+    cm, _ = mock_session.make_cm_response(
+        status=429, json_data={}, headers={"Retry-After": "45"}
+    )
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    with pytest.raises(RateLimitError) as first:
+        await client._ensure_valid_token()
+    with pytest.raises(RateLimitError) as second:
+        await client._ensure_valid_token()
+
+    assert first.value.retry_after == 45.0
+    assert second.value.retry_after == 45.0
+    mock_session.post.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -613,7 +643,7 @@ async def test_set_tap_water_noop_reports_applied(mock_session):
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     result = await client.set_tap_water("test_device", start=0, stop=0)
 
@@ -631,12 +661,151 @@ async def test_set_tap_water_capacity_target_rejects_unknown_level(
         "test@example.com", "password", "test-agent", session=mock_session
     )
     client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client._token_expiry = time.monotonic() + 3600
 
     with pytest.raises(ValueError, match=f"Unsupported tap water capacity {capacity}"):
         await client.set_tap_water_capacity_target("test_device", capacity)
 
     mock_session.patch.assert_not_called()
+
+
+def _authed_client(mock_session) -> QvantumCloudClient:
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+    client._token = "test_token"
+    client._token_expiry = time.monotonic() + 3600
+    return client
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_error_carries_retry_after_seconds(mock_session):
+    cm, _ = mock_session.make_cm_response(
+        status=429, json_data={}, headers={"Retry-After": "120"}
+    )
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    with pytest.raises(RateLimitError) as excinfo:
+        await client.get_access_level("dev1")
+
+    assert excinfo.value.retry_after == 120.0
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_error_parses_http_date_retry_after(mock_session):
+    when = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=90))
+    cm, _ = mock_session.make_cm_response(
+        status=429, json_data={}, headers={"Retry-After": when}
+    )
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    with pytest.raises(RateLimitError) as excinfo:
+        await client.get_access_level("dev1")
+
+    assert excinfo.value.retry_after == pytest.approx(90, abs=3)
+
+
+@pytest.mark.asyncio
+async def test_transport_error_includes_body_and_request_id(mock_session):
+    cm, resp = mock_session.make_cm_response(
+        status=502, json_data={}, headers={"x-request-id": "abc123"}
+    )
+    resp.text = AsyncMock(return_value="  upstream   failure ")
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    with pytest.raises(TransportError) as excinfo:
+        await client.get_access_level("dev1")
+
+    assert "upstream failure" in str(excinfo.value)
+    assert "abc123" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_device_id_and_metric_names_are_url_encoded(mock_session):
+    cm, _ = mock_session.make_cm_response(status=200, json_data={"values": {}})
+    mock_session.get.return_value = cm
+    client = _authed_client(mock_session)
+
+    await client.get_metrics("id/with spaces?", ["bt1"])
+
+    url = mock_session.get.call_args[0][0]
+    assert "id%2Fwith%20spaces%3F" in url
+    assert "names%5B%5D=bt1" in url
+
+
+@pytest.mark.asyncio
+async def test_authenticate_stores_monotonic_expiry(mock_session):
+    """Token expiry is a monotonic deadline, immune to wall-clock jumps."""
+    auth_data = load_test_data("auth_signin.json")
+    cm, _ = mock_session.make_cm_response(status=200, json_data=auth_data)
+    mock_session.post.return_value = cm
+
+    client = QvantumCloudClient(
+        "test@example.com", "password", "test-agent", session=mock_session
+    )
+
+    assert await client.authenticate() is True
+    assert isinstance(client._token_expiry, float)
+    assert client._token_expiry > time.monotonic()
+    assert client._token_is_valid() is True
+
+
+@pytest.mark.asyncio
+async def test_extra_tap_water_uses_utc_epoch(mock_session):
+    cm, _ = mock_session.make_cm_response(status=200, json_data={})
+    mock_session.post.return_value = cm
+    client = _authed_client(mock_session)
+
+    before = datetime.now(timezone.utc).timestamp()
+    await client.set_extra_tap_water("dev1", 60)
+
+    payload = mock_session.post.call_args.kwargs["json"]["command"][
+        "set_additional_hot_water"
+    ]
+    assert payload["stopTime"] == pytest.approx(before + 3600, abs=5)
+
+
+class TestHasSufficientAccess:
+    """G10: expiresAt parsing never raises and tolerates naive timestamps."""
+
+    def test_level_20_is_sufficient(self):
+        assert (
+            QvantumCloudClient._has_sufficient_access({"writeAccessLevel": 20})
+            is True
+        )
+        assert (
+            QvantumCloudClient._has_sufficient_access({"writeAccessLevel": 10})
+            is False
+        )
+
+    def test_naive_expiry_within_a_day_is_sufficient(self):
+        soon = (datetime.now() - timedelta(hours=1)).isoformat()
+        assert (
+            QvantumCloudClient._has_sufficient_access({"expiresAt": soon}) is True
+        )
+
+    def test_malformed_expiry_is_not_sufficient(self):
+        assert (
+            QvantumCloudClient._has_sufficient_access({"expiresAt": "not-a-date"})
+            is False
+        )
+
+    @pytest.mark.asyncio
+    async def test_elevate_access_skips_when_already_sufficient(self, mock_session):
+        cm, _ = mock_session.make_cm_response(
+            status=200, json_data={"writeAccessLevel": 30}
+        )
+        mock_session.get.return_value = cm
+        client = _authed_client(mock_session)
+        client._generate_code = AsyncMock()
+
+        result = await client.elevate_access("dev1")
+
+        assert result == {"writeAccessLevel": 30}
+        client._generate_code.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -645,12 +814,7 @@ async def test_get_metrics_non_json_body_raises_transport_error(mock_session):
     cm, resp = mock_session.make_cm_response(status=200, json_data={})
     resp.json = AsyncMock(side_effect=ValueError("not json"))
     mock_session.get.return_value = cm
-
-    client = QvantumCloudClient(
-        "test@example.com", "password", "test-agent", session=mock_session
-    )
-    client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client = _authed_client(mock_session)
 
     with pytest.raises(TransportError, match="Invalid JSON response"):
         await client.get_metrics("dev1", ["bt1"])
@@ -662,12 +826,7 @@ async def test_write_non_json_body_raises_transport_error(mock_session):
     cm, resp = mock_session.make_cm_response(status=200, json_data={})
     resp.json = AsyncMock(side_effect=ValueError("not json"))
     mock_session.post.return_value = cm
-
-    client = QvantumCloudClient(
-        "test@example.com", "password", "test-agent", session=mock_session
-    )
-    client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client = _authed_client(mock_session)
 
     with pytest.raises(TransportError, match="Invalid JSON response"):
         await client.update_setting("dev1", "some_setting", 1)
@@ -680,12 +839,7 @@ async def test_get_metrics_scales_fan0_10v(mock_session):
         status=200, json_data={"values": {"fan0_10v": 75}}
     )
     mock_session.get.return_value = cm
-
-    client = QvantumCloudClient(
-        "test@example.com", "password", "test-agent", session=mock_session
-    )
-    client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client = _authed_client(mock_session)
 
     result = await client.get_metrics("dev1", ["fan0_10v"])
     assert result["metrics"]["fan0_10v"] == 750
@@ -698,12 +852,7 @@ async def test_get_metrics_keeps_unscalable_fan0_10v(mock_session):
         status=200, json_data={"values": {"fan0_10v": None, "bt1": 20.5}}
     )
     mock_session.get.return_value = cm
-
-    client = QvantumCloudClient(
-        "test@example.com", "password", "test-agent", session=mock_session
-    )
-    client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client = _authed_client(mock_session)
 
     result = await client.get_metrics("dev1", ["fan0_10v", "bt1"])
     assert result["metrics"]["fan0_10v"] is None
@@ -717,12 +866,7 @@ async def test_get_metrics_keeps_infinite_fan0_10v(mock_session):
         status=200, json_data={"values": {"fan0_10v": float("inf"), "bt1": 20.5}}
     )
     mock_session.get.return_value = cm
-
-    client = QvantumCloudClient(
-        "test@example.com", "password", "test-agent", session=mock_session
-    )
-    client._token = "test_token"
-    client._token_expiry = datetime.now() + timedelta(hours=1)
+    client = _authed_client(mock_session)
 
     result = await client.get_metrics("dev1", ["fan0_10v", "bt1"])
     assert result["metrics"]["fan0_10v"] == float("inf")

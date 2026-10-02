@@ -14,7 +14,7 @@ from custom_components.qvantum.coordinator import (
     _firmware_metadata_from_sw_version,
 )
 from tests.conftest import make_client_mock
-from custom_components.qvantum.client.exceptions import APIAuthError
+from custom_components.qvantum.client.exceptions import APIAuthError, RateLimitError
 from custom_components.qvantum.const import (
     DHW_MODE_EXTRA,
     DHW_MODE_NORMAL,
@@ -4673,6 +4673,55 @@ class TestModbusFirmwareVersionRefresh:
 
         mock_api.get_primary_device.assert_awaited()
         assert coordinator._sw_version_refreshed_at is None
+
+
+class TestRateLimitBackoff:
+    """G6: Retry-After widens the poll and a success restores it."""
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    @pytest.mark.asyncio
+    async def test_retry_after_widens_interval_then_success_restores(
+        self, mock_super_init
+    ):
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        mock_super_init.return_value = None
+
+        mock_api = make_client_mock()
+        mock_api.get_primary_device = AsyncMock(return_value={"id": "test_device_123"})
+        mock_api.get_metrics = AsyncMock(
+            side_effect=RateLimitError(429, retry_after=300)
+        )
+        mock_api.get_settings = AsyncMock(return_value={"settings": []})
+
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: mock_api,
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+        mock_config_entry = MagicMock()
+        mock_config_entry.entry_id = "test_entry_id"
+        mock_config_entry.unique_id = "test_device_123"
+        mock_config_entry.data = {}
+        mock_config_entry.options.get.side_effect = lambda key, default=None: default
+
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, mock_config_entry, client=make_client_mock()
+        )
+        coordinator.client = mock_api
+        coordinator.hass = mock_hass
+        coordinator._device_store = MagicMock()
+        coordinator._device_store.async_load = AsyncMock(return_value=None)
+
+        with pytest.raises(UpdateFailed):
+            await coordinator.async_update_data()
+        assert coordinator.update_interval.total_seconds() == 300
+
+        # A later success restores the configured interval.
+        mock_api.get_metrics = AsyncMock(return_value={"metrics": {}})
+        await coordinator.async_update_data()
+        assert coordinator.update_interval.total_seconds() == coordinator.poll_interval
 
 
 class TestPollAndRestoreHardening:

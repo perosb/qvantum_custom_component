@@ -47,9 +47,14 @@ class RateLimitError(Exception):
         self,
         status: int | None = None,
         message: str = "Rate limit exceeded",
+        *,
+        retry_after: float | None = None,
     ) -> None:
         self.status = status
         self.message = message
+        # Seconds to wait before retrying, parsed from a ``Retry-After``
+        # header when the server supplied one. None when unknown.
+        self.retry_after = retry_after
         if status is not None:
             super().__init__(f"{message}: {status}")
         else:

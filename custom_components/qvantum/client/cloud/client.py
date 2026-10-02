@@ -8,7 +8,9 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Optional
+from urllib.parse import quote, urlencode
 
 import aiohttp
 
@@ -36,6 +38,37 @@ from .endpoints import (
 _LOGGER = logging.getLogger(__name__)
 
 _CUSTOM_CAPACITIES = {1, 6, 7}
+
+
+def _encode_path(value: Any) -> str:
+    """URL-encode a value that goes into a path segment."""
+    return quote(str(value), safe="")
+
+
+def _parse_retry_after(response: aiohttp.ClientResponse) -> float | None:
+    """Parse a ``Retry-After`` header (seconds or HTTP-date) into seconds."""
+    headers = getattr(response, "headers", None)
+    if not headers:
+        return None
+    raw = headers.get("Retry-After")
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        pass
+    try:
+        when = parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
 
 
 class QvantumCloudClient:
@@ -93,7 +126,13 @@ class QvantumCloudClient:
         self._device_metadata_etag = None
         self._missing_metrics_warned: set[str] = set()
         self._auth_failure: (
-            tuple[float, type[AuthError | TransportError | RateLimitError], int | None, str]
+            tuple[
+                float,
+                type[AuthError | TransportError | RateLimitError],
+                int | None,
+                str,
+                float | None,
+            ]
             | None
         ) = None
 
@@ -161,9 +200,9 @@ class QvantumCloudClient:
     async def _handle_response(self, response: aiohttp.ClientResponse) -> None:
         """Raise a typed error for a failed response.
 
-        401/403 invalidate the stored token, 429 is client throttling, and
-        anything else is a transport failure. 2xx responses return to the
-        caller.
+        401/403 invalidate the stored token, 429 is client throttling (with
+        any ``Retry-After`` hint), and anything else is a transport failure
+        carrying a truncated response body for diagnostics.
         """
         if response.ok:
             return
@@ -171,8 +210,39 @@ class QvantumCloudClient:
             await self.unauthenticate()
             raise AuthError(response.status)
         if response.status == 429:
-            raise RateLimitError(response.status)
-        raise TransportError(response.status)
+            raise RateLimitError(
+                response.status, retry_after=_parse_retry_after(response)
+            )
+        raise TransportError(response.status, await self._error_detail(response))
+
+    @staticmethod
+    async def _error_detail(
+        response: aiohttp.ClientResponse, default: str = "API request failed"
+    ) -> str:
+        """Return ``default`` plus a short text body, when one is readable."""
+        try:
+            text = await response.text()
+        except (aiohttp.ClientError, ValueError, TypeError, AttributeError):
+            return default
+        if not isinstance(text, str):
+            return default
+        text = " ".join(text.split())
+        if not text:
+            return default
+        if len(text) > 200:
+            text = text[:200] + "…"
+        detail = f"{default}: {text}"
+        headers = getattr(response, "headers", None) or {}
+        request_id = headers.get("x-request-id")
+        if request_id:
+            detail = f"{detail} (request-id {request_id})"
+        return detail
+
+    @staticmethod
+    def _preview(value: Any, limit: int = 200) -> str:
+        """Truncated, whitespace-collapsed value for debug logging."""
+        text = " ".join(repr(value).split())
+        return text if len(text) <= limit else text[:limit] + "…"
 
     def _request_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}
@@ -258,12 +328,16 @@ class QvantumCloudClient:
                     expires_in = auth_data.get(
                         "expiresIn", DEFAULT_TOKEN_EXPIRY_SECONDS
                     )
-                    self._token_expiry = datetime.now() + timedelta(
-                        seconds=int(expires_in) - DEFAULT_TOKEN_BUFFER_SECONDS
+                    self._token_expiry = (
+                        time.monotonic()
+                        + int(expires_in)
+                        - DEFAULT_TOKEN_BUFFER_SECONDS
                     )
                     return True
                 case 429:
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case 400:
                     message = await self._firebase_error_message(response)
                     _LOGGER.error(
@@ -302,12 +376,16 @@ class QvantumCloudClient:
                     expires_in = auth_data.get(
                         "expires_in", DEFAULT_TOKEN_EXPIRY_SECONDS
                     )
-                    self._token_expiry = datetime.now() + timedelta(
-                        seconds=int(expires_in) - DEFAULT_TOKEN_BUFFER_SECONDS
+                    self._token_expiry = (
+                        time.monotonic()
+                        + int(expires_in)
+                        - DEFAULT_TOKEN_BUFFER_SECONDS
                     )
                 case 429:
                     # Throttling must not fall through to a full sign-in.
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case status if status >= 500:
                     # A server-side failure is retryable; do not add a
                     # sign-in request on top of an outage.
@@ -354,6 +432,7 @@ class QvantumCloudClient:
                     type(err),
                     err.status,
                     err.message,
+                    getattr(err, "retry_after", None),
                 )
                 raise
             except (aiohttp.ClientError, asyncio.TimeoutError) as err:
@@ -366,6 +445,7 @@ class QvantumCloudClient:
                     type(failure),
                     failure.status,
                     failure.message,
+                    None,
                 )
                 raise failure from err
             self._auth_failure = None
@@ -385,17 +465,25 @@ class QvantumCloudClient:
         failure = self._auth_failure
         if failure is None:
             return
-        failed_at, err_type, status, message = failure
+        failed_at, err_type, status, message, retry_after = failure
         if time.monotonic() - failed_at < DEFAULT_AUTH_FAILURE_COOLDOWN_SECONDS:
+            if err_type is RateLimitError and retry_after is not None:
+                # Preserve the Retry-After hint so the coordinator can still
+                # back off while the cached failure is in its cooldown window.
+                raise err_type(status, message, retry_after=retry_after)
             raise err_type(status, message)
         self._auth_failure = None
 
     def _token_is_valid(self) -> bool:
-        """Whether a stored token exists and has not expired yet."""
+        """Whether a stored token exists and has not expired yet.
+
+        Expiry is a ``time.monotonic()`` deadline, so a system clock jump
+        cannot discard a fresh token or honour a stale one.
+        """
         return bool(
             self._token
             and self._token_expiry
-            and datetime.now() < self._token_expiry
+            and time.monotonic() < self._token_expiry
         )
 
     async def _request_json(
@@ -419,14 +507,16 @@ class QvantumCloudClient:
             if validate_status:
                 await self._handle_response(response)
             data = await self._decode_json(response)
-            _LOGGER.debug("Response received %s: %s", response.status, data)
+            _LOGGER.debug(
+                "Response received %s: %s", response.status, self._preview(data)
+            )
             return data
 
     async def _update_settings(self, device_id: str, payload: dict) -> dict[str, Any]:
         _LOGGER.debug(json.dumps(payload))
         return await self._request_json(
             "patch",
-            f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings?dispatch=false",
+            f"{self._api_url}/api/device-info/v1/devices/{_encode_path(device_id)}/settings?dispatch=false",
             payload,
         )
 
@@ -435,7 +525,7 @@ class QvantumCloudClient:
         _LOGGER.debug(json.dumps(wrapped_payload))
         return await self._request_json(
             "post",
-            f"{self._api_url}/api/commands/v1/devices/{device_id}/commands?wait=true&use_internal_names=true",
+            f"{self._api_url}/api/commands/v1/devices/{_encode_path(device_id)}/commands?wait=true&use_internal_names=true",
             wrapped_payload,
         )
 
@@ -462,7 +552,7 @@ class QvantumCloudClient:
         return await self.update_settings(device_id, payload)
 
     async def set_extra_tap_water(self, device_id: str, minutes: int) -> dict[str, Any]:
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
         if minutes == 0:
             stop_time = int(current_time.timestamp())
             indefinite = False
@@ -514,7 +604,7 @@ class QvantumCloudClient:
     async def set_fanspeedselector(
         self, device_id: str, preset_mode: str
     ) -> dict[str, Any]:
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
         match preset_mode:
             case "off":
                 payload = {"set_fan_mode": {"mode": 0}}
@@ -582,7 +672,7 @@ class QvantumCloudClient:
             extra["If-None-Match"] = self._device_metadata_etag
         async with self._track_request(
             self._session.get(
-                f"{self._api_url}/api/device-info/v1/devices/{device_id}/status",
+                f"{self._api_url}/api/device-info/v1/devices/{_encode_path(device_id)}/status",
                 **self._http_kwargs(headers=extra),
             )
         ) as response:
@@ -594,7 +684,9 @@ class QvantumCloudClient:
                     await self.unauthenticate()
                     raise AuthError(response.status)
                 case 429:
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case 304:
                     _LOGGER.debug("Device metadata not modified, using cached data.")
                 case status if status >= 500:
@@ -682,11 +774,14 @@ class QvantumCloudClient:
         extra: dict[str, str] = {}
         if etag_header:
             extra["If-None-Match"] = etag_header
-        names_list = "".join(f"&names[]={name}" for name in metric_names)
+        query = urlencode(
+            [("use_internal_names", "true"), ("timeout", METRICS_TIMEOUT_SECONDS)]
+            + [("names[]", name) for name in metric_names]
+        )
         async with self._track_request(
             self._session.get(
-                f"{API_INTERNAL_URL}/api/internal/v1/devices/{device_id}/values"
-                f"?use_internal_names=true&timeout={METRICS_TIMEOUT_SECONDS}{names_list}",
+                f"{API_INTERNAL_URL}/api/internal/v1/devices/{_encode_path(device_id)}/values"
+                f"?{query}",
                 **self._http_kwargs(headers=extra),
             )
         ) as response:
@@ -704,7 +799,9 @@ class QvantumCloudClient:
                     await self.unauthenticate()
                     raise AuthError(response.status)
                 case 429:
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case 304:
                     _LOGGER.debug("HTTP values not modified, using cached data.")
                     return None, None, None
@@ -727,7 +824,7 @@ class QvantumCloudClient:
             extra["If-None-Match"] = self._settings_etag
         async with self._track_request(
             self._session.get(
-                f"{self._api_url}/api/device-info/v1/devices/{device_id}/settings",
+                f"{self._api_url}/api/device-info/v1/devices/{_encode_path(device_id)}/settings",
                 **self._http_kwargs(headers=extra),
             )
         ) as response:
@@ -740,7 +837,9 @@ class QvantumCloudClient:
                     await self.unauthenticate()
                     raise AuthError(response.status)
                 case 429:
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case 304:
                     _LOGGER.debug("HTTP Settings not modified, using cached data.")
                 case status if status >= 500:
@@ -776,7 +875,9 @@ class QvantumCloudClient:
                     await self.unauthenticate()
                     raise AuthError(response.status)
                 case 429:
-                    raise RateLimitError(response.status)
+                    raise RateLimitError(
+                        response.status, retry_after=_parse_retry_after(response)
+                    )
                 case _:
                     _LOGGER.error(
                         "Failed to fetch devices, status: %s", response.status
@@ -799,7 +900,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._track_request(
             self._session.get(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{_encode_path(device_id)}/my-access-level?use_internal_names=true",
                 **self._http_kwargs(),
             )
         ) as response:
@@ -814,7 +915,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._track_request(
             self._session.post(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/generate-access-code?use_internal_names=true",
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{_encode_path(device_id)}/generate-access-code?use_internal_names=true",
                 **self._http_kwargs(),
             )
         ) as response:
@@ -836,7 +937,7 @@ class QvantumCloudClient:
         )
         async with self._track_request(
             self._session.post(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/claim-grant?access_code={access_code}&use_internal_names=true",
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/claim-grant?access_code={quote(str(access_code), safe='')}&use_internal_names=true",
                 **self._http_kwargs(),
             )
         ) as response:
@@ -855,7 +956,7 @@ class QvantumCloudClient:
         await self._ensure_valid_token()
         async with self._track_request(
             self._session.post(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/access-grants?access_code={access_code}&approve=true&use_internal_names=true",
+                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{_encode_path(device_id)}/access-grants?access_code={quote(str(access_code), safe='')}&approve=true&use_internal_names=true",
                 **self._http_kwargs(),
             )
         ) as response:
@@ -869,47 +970,43 @@ class QvantumCloudClient:
                 )
             return response.ok
 
-    async def elevate_access(self, device_id: str) -> dict[str, Any] | None:
-        await self._ensure_valid_token()
-        async with self._track_request(
-            self._session.get(
-                f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
-                **self._http_kwargs(),
+    @staticmethod
+    def _has_sufficient_access(data: dict[str, Any]) -> bool:
+        """Return True when the current grant already allows authenticated writes.
+
+        A ``writeAccessLevel`` of 20+ is sufficient. Otherwise an ``expiresAt``
+        within the next day is treated as sufficient as well, matching the
+        previous behaviour: a grant that is about to lapse is not worth a
+        redundant re-elevation here. Parsing is lenient — a missing, naive or
+        malformed timestamp never raises and falls back to "not sufficient".
+        """
+        if data.get("writeAccessLevel", 0) >= 20:
+            return True
+        expires_at = data.get("expiresAt")
+        if not expires_at:
+            return False
+        try:
+            expires_at_dt = datetime.fromisoformat(
+                str(expires_at).replace("Z", "+00:00")
             )
-        ) as response:
-            await self._handle_response(response)
-            data = await self._decode_json(response)
-            _LOGGER.debug("Response received %s: %s", response.status, data)
-            expires_at = data.get("expiresAt")
-            has_sufficient_access = data.get("writeAccessLevel", 0) >= 20
-            if not has_sufficient_access and expires_at:
-                try:
-                    expires_at_dt = datetime.fromisoformat(
-                        expires_at.replace("Z", "+00:00")
-                    )
-                    if expires_at_dt < datetime.now(timezone.utc) + timedelta(days=1):
-                        has_sufficient_access = True
-                except ValueError:
-                    pass
-            if has_sufficient_access:
-                return data
-            code_data = await self._generate_code(device_id)
-            if not code_data:
-                return None
-            access_code = code_data.get("accessCode")
-            if not access_code:
-                return None
-            if not await self._claim_grant(device_id, access_code):
-                return None
-            if not await self._approve_access(device_id, access_code):
-                return None
-            async with self._track_request(
-                self._session.get(
-                    f"{API_INTERNAL_URL}/api/internal/v1/auth/device/{device_id}/my-access-level?use_internal_names=true",
-                    **self._http_kwargs(),
-                )
-            ) as response:
-                await self._handle_response(response)
-                data = await self._decode_json(response)
-                _LOGGER.debug("Response received %s: %s", response.status, data)
-                return data
+        except (TypeError, ValueError):
+            return False
+        if expires_at_dt.tzinfo is None:
+            expires_at_dt = expires_at_dt.replace(tzinfo=timezone.utc)
+        return expires_at_dt < datetime.now(timezone.utc) + timedelta(days=1)
+
+    async def elevate_access(self, device_id: str) -> dict[str, Any] | None:
+        data = await self.get_access_level(device_id)
+        if self._has_sufficient_access(data):
+            return data
+        code_data = await self._generate_code(device_id)
+        if not code_data:
+            return None
+        access_code = code_data.get("accessCode")
+        if not access_code:
+            return None
+        if not await self._claim_grant(device_id, access_code):
+            return None
+        if not await self._approve_access(device_id, access_code):
+            return None
+        return await self.get_access_level(device_id)

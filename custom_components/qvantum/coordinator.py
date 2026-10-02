@@ -64,6 +64,10 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Cap a Retry-After backoff so a hostile/huge value cannot park the poller
+# for hours; a successful poll restores the configured interval.
+_MAX_RATE_LIMIT_BACKOFF_SECONDS = 3600
+
 _COMPRESSOR_TO_HP_STATUS_MAP = {
     2: HP_STATUS_HEATING,   # Heating → Heating
     3: HP_STATUS_COOLING,   # Cooling → Cooling
@@ -309,6 +313,24 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             self.name,
         )
         return True
+
+    def _apply_rate_limit_backoff(self, retry_after: float | None) -> None:
+        """Temporarily widen the poll interval while the API throttles us."""
+        if not retry_after or retry_after <= self.poll_interval:
+            return
+        seconds = min(float(retry_after), _MAX_RATE_LIMIT_BACKOFF_SECONDS)
+        current = getattr(self, "update_interval", None)
+        current_seconds = current.total_seconds() if current else 0.0
+        if current_seconds >= seconds:
+            return
+        self.update_interval = timedelta(seconds=seconds)
+        _LOGGER.debug("Rate limited; backing off poll to %ss", seconds)
+
+    def _restore_poll_interval(self) -> None:
+        """Restore the configured interval after a throttled period."""
+        desired = timedelta(seconds=self.poll_interval)
+        if getattr(self, "update_interval", None) != desired:
+            self.update_interval = desired
 
     async def async_set_extra_tap_water(self, device_id: str | int, minutes: int):
         """Write extra DHW and arm or clear the local restore timer."""
@@ -1020,6 +1042,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 len(values),
             )
 
+            # A successful poll clears any Retry-After backoff.
+            self._restore_poll_interval()
+
             return result
 
         except APIAuthError as err:
@@ -1041,6 +1066,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         except APIRateLimitError as err:
             # Cloud throttling is expected under load; warn without a traceback
             # instead of logging an unexpected error on every poll.
+            self._apply_rate_limit_backoff(getattr(err, "retry_after", None))
             _LOGGER.warning(
                 "Rate limit exceeded for device %s: %s",
                 self._logged_device_id(),
