@@ -1,16 +1,23 @@
 """Base entity classes for Qvantum integration."""
 
+from __future__ import annotations
+
 import logging
-from typing import Union, List
+from typing import TYPE_CHECKING
+
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
 from .const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE, DOMAIN
 from .coordinator import QvantumDataUpdateCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
+
+if TYPE_CHECKING:
+    from homeassistant.helpers.device_registry import DeviceEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -217,7 +224,7 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
 
     def __init__(
         self,
-        coordinator: Union[QvantumDataUpdateCoordinator, QvantumMaintenanceCoordinator],
+        coordinator: QvantumDataUpdateCoordinator | QvantumMaintenanceCoordinator,
         metric_key: str,
         device: DeviceInfo | dict[str, object],
         enabled_by_default: bool = True,
@@ -277,7 +284,7 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
 
 
 def disable_entities_by_default(
-    hass: HomeAssistant, entities: List["QvantumEntity"]
+    hass: HomeAssistant, entities: list[QvantumEntity]
 ) -> None:
     """Disable entities that should be disabled by default."""
     from homeassistant.helpers import entity_registry as er
@@ -314,7 +321,7 @@ def async_get_qvantum_device_entry(
     hass: HomeAssistant,
     device_id: str | None,
     config_entry_id: str | None,
-):
+) -> DeviceEntry | None:
     """Return the device registry entry for a Qvantum heat pump, if registered.
 
     Looks the device up by identifier, scoped to the owning config entry.
@@ -368,3 +375,20 @@ def cleanup_disabled_entities(
                 entities_to_remove.append(entity_entry.entity_id)
     for entity_id in entities_to_remove:
         entity_registry.async_remove(entity_id)
+
+
+def finalize_platform_setup(
+    hass: HomeAssistant,
+    coordinator: QvantumDataUpdateCoordinator,
+    async_add_entities: AddEntitiesCallback,
+    entities: list[QvantumEntity],
+    possible_metrics: set[str],
+    domain: str,
+    *,
+    disable_by_default: bool = False,
+) -> None:
+    """Register platform entities and prune registry entries for dead metrics."""
+    async_add_entities(entities)
+    if disable_by_default:
+        disable_entities_by_default(hass, entities)
+    cleanup_disabled_entities(hass, coordinator, possible_metrics, domain)

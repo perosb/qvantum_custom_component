@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
+from .constants import SETTING_UPDATE_APPLIED
+
 
 class MetricsPayload(TypedDict, total=False):
     """``get_metrics`` result: ``{"metrics": {name: value, ...}}``."""
@@ -41,3 +43,20 @@ class Device(TypedDict, total=False):
     vendor: str
     model: str
     sw_version: str | None
+
+
+def result_applied(result: dict[str, Any] | None) -> bool:
+    """Return True when a write result reports the setting as applied.
+
+    Modbus answers ``{"status": "APPLIED"}``; some cloud endpoints answer
+    ``{"heatpump_status": "APPLIED"}``. A settings PATCH answers
+    ``{"success": true}``, which carries no state and is not treated as
+    applied, so callers fall back to the next poll.
+    """
+    return bool(
+        result
+        and (
+            result.get("status") == SETTING_UPDATE_APPLIED
+            or result.get("heatpump_status") == SETTING_UPDATE_APPLIED
+        )
+    )

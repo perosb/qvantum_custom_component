@@ -14,8 +14,10 @@ from homeassistant.const import (
     CONF_SCAN_INTERVAL,
     CONF_USERNAME,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
 from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -27,6 +29,7 @@ from .client.exceptions import (
     RateLimitError as APIRateLimitError,
     TransportError as APIConnectionError,
 )
+from .client.models import result_applied
 from .client.modbus import QvantumModbusClient
 from .client.protocol import (
     QvantumCloudClientProtocol,
@@ -49,7 +52,6 @@ from .const import (
     HP_STATUS_HEATING,
     HP_STATUS_HOT_WATER,
     MIN_MODBUS_SCAN_INTERVAL,
-    SETTING_UPDATE_APPLIED,
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
     MODBUS_SW_VERSION_REFRESH_INTERVAL,
@@ -84,17 +86,6 @@ _COMPRESSOR_TO_HP_STATUS_MAP = {
 }
 
 
-def _setting_update_applied(api_response: Optional[dict[str, Any]]) -> bool:
-    """Return True when the transport reports the setting as applied."""
-    return bool(
-        api_response
-        and (
-            api_response.get("status") == SETTING_UPDATE_APPLIED
-            or api_response.get("heatpump_status") == SETTING_UPDATE_APPLIED
-        )
-    )
-
-
 async def handle_setting_update_response(
     api_response: Optional[dict[str, Any]],
     coordinator: QvantumDataUpdateCoordinator,
@@ -104,7 +95,7 @@ async def handle_setting_update_response(
     extra_updates: Optional[dict[str, Any]] = None,
 ) -> bool:
     """Handle API response for setting updates and update coordinator data if successful."""
-    if _setting_update_applied(api_response) and data_section and key is not None:
+    if result_applied(api_response) and data_section and key is not None:
         section = coordinator.data.get(data_section)
         section[key] = value
         if extra_updates:
@@ -284,14 +275,16 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # an entity, a device appears, ...). The first poll runs before the
         # entity registration events, which immediately invalidate the entry.
         self._enabled_metrics_cache: dict[str, list[str]] = {}
+        # Registry events are global; remember which ids belong to this entry
+        # so a removal (already gone from the registry) can still be matched.
+        self._known_entity_ids: set[str] = set()
+        self._known_device_ids: set[str] = set()
         for event_type in (
             EVENT_ENTITY_REGISTRY_UPDATED,
             EVENT_DEVICE_REGISTRY_UPDATED,
         ):
             config_entry.async_on_unload(
-                hass.bus.async_listen(
-                    event_type, self._invalidate_enabled_metrics_cache
-                )
+                hass.bus.async_listen(event_type, self._handle_registry_updated)
             )
 
     def apply_poll_interval(self, config_entry: ConfigEntry) -> bool:
@@ -657,14 +650,58 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         return list(metrics)
 
     @callback
-    def _invalidate_enabled_metrics_cache(self, _event: object) -> None:
+    def _handle_registry_updated(self, event: Event) -> None:
+        """Drop cached metrics only for this entry's registry changes."""
+        if self._registry_event_affects_entry(event):
+            self._invalidate_enabled_metrics_cache(event)
+
+    def _registry_event_affects_entry(self, event: Event) -> bool:
+        """Return True when a registry event touches this config entry.
+
+        Entity and device registry events are global; without this filter
+        every registry change in Home Assistant cleared the metrics cache.
+        """
+        data = event.data or {}
+        entity_id = data.get("entity_id")
+        if entity_id is not None:
+            if entity_id in self._known_entity_ids:
+                # Removed entities are gone from the registry, so a previously
+                # seen id is the only way to recognize them.
+                if data.get("action") == "remove":
+                    self._known_entity_ids.discard(entity_id)
+                return True
+            entity_entry = er.async_get(self.hass).async_get(entity_id)
+            if (
+                entity_entry is None
+                or entity_entry.config_entry_id != self.config_entry.entry_id
+            ):
+                return False
+            self._known_entity_ids.add(entity_id)
+            return True
+
+        device_id = data.get("device_id")
+        if device_id is None:
+            return False
+        if device_id in self._known_device_ids:
+            if data.get("action") == "remove":
+                self._known_device_ids.discard(device_id)
+            return True
+        device_entry = dr.async_get(self.hass).async_get(device_id)
+        if (
+            device_entry is None
+            or self.config_entry.entry_id not in device_entry.config_entries
+        ):
+            return False
+        self._known_device_ids.add(device_id)
+        return True
+
+    @callback
+    def _invalidate_enabled_metrics_cache(self, _event: object = None) -> None:
         """Drop cached metrics after an entity or device registry change."""
         self._enabled_metrics_cache.clear()
 
     def _compute_enabled_metrics(self, device_id: str) -> list[str]:
         """Get list of enabled metrics for a device based on entity registry."""
-        from homeassistant.helpers import entity_registry as er
-
         from .entity import (
             _coordinator_config_entry_id,
             async_get_qvantum_device_entry,
@@ -683,6 +720,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             _coordinator_config_entry_id(self),
         )
         if device_entry:
+            self._known_device_ids.add(device_entry.id)
             registry = er.async_get(self.hass)
             enabled_metrics = set()
             known_metrics = set()
@@ -703,6 +741,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                     f"_{device_id}"
                 ):
                     metric_key = extract_metric_key(entity.unique_id, device_id)
+                    self._known_entity_ids.add(entity.entity_id)
 
                     if metric_key in allowed_metrics:
                         known_metrics.add(metric_key)

@@ -9,6 +9,7 @@ from custom_components.qvantum.entity import (
     QvantumEntity,
     async_get_qvantum_device_entry,
     cleanup_disabled_entities,
+    finalize_platform_setup,
 )
 from custom_components.qvantum.const import DOMAIN
 
@@ -466,3 +467,47 @@ def test_cleanup_disabled_entities_skips_when_device_missing():
         cleanup_disabled_entities(hass, coordinator, {"bt1"}, "sensor")
 
     mock_entity_registry.async_remove.assert_not_called()
+
+
+def test_finalize_platform_setup_registers_disables_and_cleans():
+    """The shared platform tail adds, disables by default, and prunes."""
+    hass = MagicMock()
+    coordinator = MagicMock()
+    async_add_entities = MagicMock()
+    entities = [MagicMock()]
+
+    with (
+        patch("custom_components.qvantum.entity.disable_entities_by_default") as disable,
+        patch("custom_components.qvantum.entity.cleanup_disabled_entities") as cleanup,
+    ):
+        finalize_platform_setup(
+            hass,
+            coordinator,
+            async_add_entities,
+            entities,
+            {"bt1"},
+            "sensor",
+            disable_by_default=True,
+        )
+
+    async_add_entities.assert_called_once_with(entities)
+    disable.assert_called_once_with(hass, entities)
+    cleanup.assert_called_once_with(hass, coordinator, {"bt1"}, "sensor")
+
+
+def test_finalize_platform_setup_skips_disable_by_default():
+    """Platforms whose entities are enabled by default skip the disable pass."""
+    with (
+        patch("custom_components.qvantum.entity.disable_entities_by_default") as disable,
+        patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+    ):
+        finalize_platform_setup(
+            MagicMock(),
+            MagicMock(),
+            MagicMock(),
+            [],
+            set(),
+            "switch",
+        )
+
+    disable.assert_not_called()

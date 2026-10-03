@@ -389,13 +389,10 @@ class TestQvantumIndoorClimateEntity:
 
     @pytest.mark.asyncio
     async def test_async_set_hvac_mode(self, mock_coordinator, mock_device):
-        """Test setting HVAC mode (currently just logs)."""
+        """The heat-only mode is accepted as an intentional no-op."""
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
 
-        # This method currently just logs the mode
         await entity.async_set_hvac_mode("heat")
-
-        # No assertions needed as it just logs
 
 
 def _spec_coordinator(write_level: int):

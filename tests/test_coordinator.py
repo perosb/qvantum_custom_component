@@ -707,8 +707,145 @@ class TestQvantumDataUpdateCoordinator:
             EVENT_DEVICE_REGISTRY_UPDATED,
         }
         for handler in listened.values():
-            assert handler == coordinator._invalidate_enabled_metrics_cache
+            assert handler == coordinator._handle_registry_updated
         assert config_entry.async_on_unload.call_count == 2
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_registry_event_for_other_entry_keeps_metrics_cache(
+        self, mock_super_init
+    ):
+        """Another integration's registry event must not clear the cache."""
+        mock_super_init.return_value = None
+        mock_hass = MagicMock()
+        other_entry = MagicMock()
+        other_entry.config_entry_id = "other_entry_id"
+        mock_hass.data = {
+            DOMAIN: MagicMock(),
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+        mock_hass.data["entity_registry"].async_get.return_value = other_entry
+
+        config_entry = MagicMock()
+        config_entry.options.get.return_value = 30
+        config_entry.unique_id = "test_device"
+        config_entry.entry_id = "test_entry_id"
+
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, config_entry, client=make_client_mock()
+        )
+        coordinator.hass = mock_hass
+        coordinator.config_entry = config_entry
+        coordinator._enabled_metrics_cache["test_device"] = ["bt1"]
+
+        coordinator._handle_registry_updated(
+            MagicMock(data={"action": "update", "entity_id": "sensor.other"})
+        )
+
+        assert coordinator._enabled_metrics_cache == {"test_device": ["bt1"]}
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_registry_event_for_own_entity_clears_metrics_cache(
+        self, mock_super_init
+    ):
+        """This entry's entity event clears the cache and is remembered."""
+        mock_super_init.return_value = None
+        mock_hass = MagicMock()
+        own_entry = MagicMock()
+        own_entry.config_entry_id = "test_entry_id"
+        mock_hass.data = {
+            DOMAIN: MagicMock(),
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+        mock_hass.data["entity_registry"].async_get.return_value = own_entry
+
+        config_entry = MagicMock()
+        config_entry.options.get.return_value = 30
+        config_entry.unique_id = "test_device"
+        config_entry.entry_id = "test_entry_id"
+
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, config_entry, client=make_client_mock()
+        )
+        coordinator.hass = mock_hass
+        coordinator.config_entry = config_entry
+        coordinator._enabled_metrics_cache["test_device"] = ["bt1"]
+
+        coordinator._handle_registry_updated(
+            MagicMock(data={"action": "create", "entity_id": "sensor.qvantum_bt1"})
+        )
+
+        assert coordinator._enabled_metrics_cache == {}
+        assert "sensor.qvantum_bt1" in coordinator._known_entity_ids
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_registry_event_for_own_device_clears_metrics_cache(
+        self, mock_super_init
+    ):
+        """This entry's device event clears the cache and is remembered."""
+        mock_super_init.return_value = None
+        mock_hass = MagicMock()
+        device_entry = MagicMock()
+        device_entry.config_entries = {"test_entry_id"}
+        mock_hass.data = {
+            DOMAIN: MagicMock(),
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+        mock_hass.data["device_registry"].async_get.return_value = device_entry
+
+        config_entry = MagicMock()
+        config_entry.options.get.return_value = 30
+        config_entry.unique_id = "test_device"
+        config_entry.entry_id = "test_entry_id"
+
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, config_entry, client=make_client_mock()
+        )
+        coordinator.hass = mock_hass
+        coordinator.config_entry = config_entry
+        coordinator._enabled_metrics_cache["test_device"] = ["bt1"]
+
+        coordinator._handle_registry_updated(
+            MagicMock(data={"action": "update", "device_id": "device_id_123"})
+        )
+
+        assert coordinator._enabled_metrics_cache == {}
+        assert "device_id_123" in coordinator._known_device_ids
+
+    @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
+    def test_registry_remove_event_for_known_entity_clears_metrics_cache(
+        self, mock_super_init
+    ):
+        """A removed entity is matched by its previously seen id."""
+        mock_super_init.return_value = None
+        mock_hass = MagicMock()
+        mock_hass.data = {
+            DOMAIN: MagicMock(),
+            "device_registry": MagicMock(),
+            "entity_registry": MagicMock(),
+        }
+
+        config_entry = MagicMock()
+        config_entry.options.get.return_value = 30
+        config_entry.unique_id = "test_device"
+        config_entry.entry_id = "test_entry_id"
+
+        coordinator = QvantumDataUpdateCoordinator(
+            mock_hass, config_entry, client=make_client_mock()
+        )
+        coordinator.hass = mock_hass
+        coordinator.config_entry = config_entry
+        coordinator._known_entity_ids.add("sensor.qvantum_bt1")
+        coordinator._enabled_metrics_cache["test_device"] = ["bt1"]
+
+        coordinator._handle_registry_updated(
+            MagicMock(data={"action": "remove", "entity_id": "sensor.qvantum_bt1"})
+        )
+
+        assert coordinator._enabled_metrics_cache == {}
+        assert "sensor.qvantum_bt1" not in coordinator._known_entity_ids
 
     @patch("homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__")
     def test_get_enabled_metrics_modbus_excludes_http_disabled_metrics(self, mock_super_init):

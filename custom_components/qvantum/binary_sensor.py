@@ -19,7 +19,7 @@ from .const import (
 )
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
-from .entity import QvantumEntity
+from .entity import QvantumEntity, finalize_platform_setup
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,17 +86,15 @@ async def async_setup_entry(
             )
         )
 
-    async_add_entities(sensors)
-
-    # Disable entities that should be disabled by default
-    from .entity import disable_entities_by_default
-
-    disable_entities_by_default(hass, sensors)
-
-    # Clean up disabled entities that are no longer supported in the current mode
-    from .entity import cleanup_disabled_entities
-
-    cleanup_disabled_entities(hass, coordinator, set(names), "binary_sensor")
+    finalize_platform_setup(
+        hass,
+        coordinator,
+        async_add_entities,
+        sensors,
+        set(names),
+        "binary_sensor",
+        disable_by_default=True,
+    )
 
 
 class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):

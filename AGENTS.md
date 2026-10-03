@@ -45,7 +45,8 @@ writes: coordinator helpers (`async_set_extra_tap_water`, `async_write_metric`,
 - Import transports from `client.cloud` / `client.modbus`.
 - Coordinators and entities use **canonical metric/setting names**. Both
   transports return HTTP-shaped payloads (`{"metrics"}`, `{"settings"}`).
-  Successful writes: `{"status": "APPLIED"}` (`SETTING_UPDATE_APPLIED`).
+  Successful writes: `{"status": "APPLIED"}` (`heatpump_status` counts too);
+  check with `client.models.result_applied`.
 - Cloud writable entities (`switch`, `number`, …) stay in `REQUIRED_METRICS`.
 - Extra-DHW **duration** and derived calc stay in HA. Cloud encodes minutes;
   Modbus writes Extra/Normal — `ExtraDhwTimer` restores Normal. Construct the

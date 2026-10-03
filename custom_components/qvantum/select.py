@@ -12,7 +12,7 @@ from . import MyConfigEntry
 from .client.modbus.maps import heating_curve_points
 from .const import HeatingCurveType, SensorMode
 from .coordinator import QvantumDataUpdateCoordinator, async_apply_setting
-from .entity import QvantumEntity
+from .entity import QvantumEntity, finalize_platform_setup
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,11 +44,14 @@ async def async_setup_entry(
     if "curve_type_heating" in values:
         entities.append(QvantumSelectEntity(coordinator, "curve_type_heating", device))
 
-    async_add_entities(entities)
-
-    from .entity import cleanup_disabled_entities
-
-    cleanup_disabled_entities(hass, coordinator, select_keys, "select")
+    finalize_platform_setup(
+        hass,
+        coordinator,
+        async_add_entities,
+        entities,
+        select_keys,
+        "select",
+    )
 
     _LOGGER.debug("Setting up platform SELECT")
 

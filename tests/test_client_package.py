@@ -136,3 +136,17 @@ def test_modbus_shims_removed():
     root = CLIENT_ROOT.parent
     for name in ("modbus.py", "modbus_device.py", "modbus_model.py"):
         assert not (root / name).exists(), f"{name} compatibility shim should be gone"
+
+
+def test_result_applied_accepts_both_success_shapes():
+    """Both transports report success with an APPLIED marker."""
+    assert qvantum_client.result_applied({"status": "APPLIED"}) is True
+    assert qvantum_client.result_applied({"heatpump_status": "APPLIED"}) is True
+
+
+def test_result_applied_rejects_failure_shapes():
+    """Missing or state-less bodies are not treated as applied."""
+    assert qvantum_client.result_applied(None) is False
+    assert qvantum_client.result_applied({}) is False
+    assert qvantum_client.result_applied({"status": "FAILED"}) is False
+    assert qvantum_client.result_applied({"success": True}) is False

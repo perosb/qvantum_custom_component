@@ -164,6 +164,40 @@ async def validate_modbus(
     }
 
 
+async def _async_validate_cloud_step(
+    hass: HomeAssistant, user_input: dict[str, Any], errors: dict[str, str]
+) -> dict[str, Any] | None:
+    """Validate cloud credentials, mapping failures onto form errors."""
+    try:
+        return await validate_input(hass, user_input)
+    except CannotConnect:
+        errors["base"] = "cannot_connect"
+    except InvalidAuth:
+        errors["base"] = "invalid_auth"
+    except Exception:
+        _LOGGER.exception("Unexpected exception")
+        errors["base"] = "unknown"
+    return None
+
+
+async def _async_validate_modbus_step(
+    hass: HomeAssistant,
+    host: str,
+    port: int,
+    unit_id: int,
+    errors: dict[str, str],
+) -> dict[str, Any] | None:
+    """Probe Modbus, mapping failures onto form errors."""
+    try:
+        return await validate_modbus(hass, host, port, unit_id)
+    except CannotConnect:
+        errors["base"] = "cannot_connect"
+    except Exception:
+        _LOGGER.exception("Unexpected exception")
+        errors["base"] = "unknown"
+    return None
+
+
 class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Qvantum Integration."""
 
@@ -190,16 +224,8 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         """Set up using a Qvantum account."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            try:
-                info = await validate_input(self.hass, user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except Exception:
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-            else:
+            info = await _async_validate_cloud_step(self.hass, user_input, errors)
+            if info is not None:
                 unique_id = info.get("serial") or info["title"]
                 await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured()
@@ -240,14 +266,10 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 user_input.get(CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL)
             )
             write_enabled = bool(user_input.get(CONF_MODBUS_WRITE, False))
-            try:
-                info = await validate_modbus(self.hass, host, port, unit_id)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except Exception:
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-            else:
+            info = await _async_validate_modbus_step(
+                self.hass, host, port, unit_id, errors
+            )
+            if info is not None:
                 await self.async_set_unique_id(info["serial"])
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
@@ -300,16 +322,8 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         entry = self._get_reauth_entry()
         if user_input is not None:
-            try:
-                info = await validate_input(self.hass, user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except Exception:
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-            else:
+            info = await _async_validate_cloud_step(self.hass, user_input, errors)
+            if info is not None:
                 await self.async_set_unique_id(info.get("serial") or info["title"])
                 self._abort_if_unique_id_mismatch(reason="wrong_account")
                 return self.async_update_reload_and_abort(
@@ -343,16 +357,8 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         config_entry = self._reconfigure_entry()
         if user_input is not None:
-            try:
-                info = await validate_input(self.hass, user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except Exception:
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-            else:
+            info = await _async_validate_cloud_step(self.hass, user_input, errors)
+            if info is not None:
                 return self.async_update_reload_and_abort(
                     config_entry,
                     unique_id=info.get("serial") or info["title"],
@@ -428,14 +434,10 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 user_input.get(CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL)
             )
             write_enabled = bool(user_input.get(CONF_MODBUS_WRITE, False))
-            try:
-                info = await validate_modbus(self.hass, host, port, unit_id)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except Exception:
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-            else:
+            info = await _async_validate_modbus_step(
+                self.hass, host, port, unit_id, errors
+            )
+            if info is not None:
                 return self.async_update_reload_and_abort(
                     config_entry,
                     unique_id=info["serial"],

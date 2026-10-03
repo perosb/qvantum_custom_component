@@ -6,7 +6,6 @@ import asyncio
 from dataclasses import dataclass
 import inspect
 import logging
-import json
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
@@ -406,7 +405,7 @@ async def async_remove_config_entry_device(
 
 
 # Example migration function
-async def async_migrate_entry(hass, config_entry: ConfigEntry):
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     """Migrate old entry."""
     _LOGGER.debug("Migrating configuration from version %s.%s", config_entry.version, config_entry.minor_version)
 

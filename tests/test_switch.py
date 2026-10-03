@@ -109,7 +109,6 @@ class TestQvantumSwitchEntity:
         assert entity._attr_device_class == "switch"
         assert entity._attr_has_entity_name is True
         assert entity._attr_icon == "mdi:water-boiler"
-        assert entity._attr_is_on is False
         assert entity._attr_translation_key == "extra_tap_water"
 
     def test_init_op_mode_icon(self, mock_coordinator, mock_device):

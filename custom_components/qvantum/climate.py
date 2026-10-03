@@ -44,11 +44,11 @@ async def async_setup_entry(
 
     async_add_entities(sensors)
 
-    _LOGGER.debug(f"Setting up platform CLIMATE")
+    _LOGGER.debug("Setting up platform CLIMATE")
 
 
 class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateEntity):
-    """Sensor for qvantum."""
+    """Indoor climate entity for the Qvantum heat pump."""
 
     def __init__(
         self, coordinator: QvantumDataUpdateCoordinator, device: DeviceInfo
@@ -77,9 +77,14 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
             temperature,
         )
 
-    async def async_set_hvac_mode(self, hvac_mode):
-        """Set new target hvac mode."""
-        _LOGGER.debug(hvac_mode)
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+        """Accept the heat-only mode without error.
+
+        ``hvac_modes`` only offers ``HVACMode.HEAT``, which is the pump's
+        actual state, so there is no writable mode. Implementing this keeps a
+        ``climate.set_hvac_mode: heat`` service call a no-op instead of raising
+        ``NotImplementedError``.
+        """
 
     def _sensor_mode(self):
         """HTTP `sensor_mode`, falling back to Modbus `use_operation_sensor`."""
@@ -149,11 +154,11 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         return HVACAction.IDLE
 
     @property
-    def hvac_mode(self):
-        """Must be implemented"""
+    def hvac_mode(self) -> HVACMode:
+        """Return the only mode the pump exposes."""
         return HVACMode.HEAT
 
     @property
-    def hvac_modes(self):
-        """Must be implemented"""
+    def hvac_modes(self) -> list[HVACMode]:
+        """Return the single heat mode."""
         return [HVACMode.HEAT]
