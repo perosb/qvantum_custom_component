@@ -512,7 +512,10 @@ class QvantumCloudClient:
             )
             return data
 
-    async def _update_settings(self, device_id: str, payload: dict) -> dict[str, Any]:
+    async def _patch_device_settings(
+        self, device_id: str, payload: dict
+    ) -> dict[str, Any]:
+        """PATCH device settings; the body carries no applied state."""
         _LOGGER.debug(json.dumps(payload))
         return await self._request_json(
             "patch",
@@ -521,6 +524,7 @@ class QvantumCloudClient:
         )
 
     async def _send_command(self, device_id: str, payload: dict) -> dict[str, Any]:
+        """POST a command and wait for it; the body reports APPLIED."""
         wrapped_payload = {"command": payload}
         _LOGGER.debug(json.dumps(wrapped_payload))
         return await self._request_json(
@@ -532,14 +536,17 @@ class QvantumCloudClient:
     async def update_setting(
         self, device_id: str, name: str, value: Any
     ) -> dict[str, Any]:
+        """Write one setting via the commands endpoint."""
         return await self._send_command(device_id, {"update_settings": {name: value}})
 
     async def update_settings(
         self, device_id: str, settings: dict
     ) -> dict[str, Any]:
+        """Write several settings via the commands endpoint."""
         return await self._send_command(device_id, {"update_settings": settings})
 
     async def set_smartcontrol(self, device_id: str, sh: int, dhw: int) -> dict[str, Any]:
+        """Write SmartControl modes via the commands endpoint."""
         use_adaptive = sh != -1 and dhw != -1
         if not use_adaptive:
             payload = {"use_adaptive": False}
@@ -552,6 +559,7 @@ class QvantumCloudClient:
         return await self.update_settings(device_id, payload)
 
     async def set_extra_tap_water(self, device_id: str, minutes: int) -> dict[str, Any]:
+        """Request extra DHW via the commands endpoint (cloud encodes minutes)."""
         current_time = datetime.now(timezone.utc)
         if minutes == 0:
             stop_time = int(current_time.timestamp())
@@ -577,11 +585,13 @@ class QvantumCloudClient:
     async def set_curve_type_heating(
         self, device_id: str, value: int
     ) -> dict[str, Any]:
+        """Write the heating-curve source via the commands endpoint."""
         return await self.update_setting(device_id, "curve_type_heating", int(value))
 
     async def set_heating_curve_point(
         self, device_id: str, metric_key: str, value: int
     ) -> dict[str, Any]:
+        """Write one user-defined curve point via the commands endpoint."""
         http_key = HEATING_CURVE_HTTP_KEYS.get(metric_key)
         if http_key is None:
             raise ValueError(f"Unknown heating-curve point: {metric_key}")
@@ -590,20 +600,23 @@ class QvantumCloudClient:
     async def set_indoor_temperature_offset(
         self, device_id: str, value: int
     ) -> dict[str, Any]:
+        """Write the offset via the settings PATCH endpoint."""
         payload = {"settings": [{"name": "indoor_temperature_offset", "value": value}]}
-        return await self._update_settings(device_id, payload)
+        return await self._patch_device_settings(device_id, payload)
 
     async def set_indoor_temperature_target(
         self, device_id: str, temperature: float
     ) -> dict[str, Any]:
+        """Write the setpoint via the settings PATCH endpoint."""
         payload = {
             "settings": [{"name": "indoor_temperature_target", "value": temperature}]
         }
-        return await self._update_settings(device_id, payload)
+        return await self._patch_device_settings(device_id, payload)
 
     async def set_fanspeedselector(
         self, device_id: str, preset_mode: str
     ) -> dict[str, Any]:
+        """Write the fan preset via the commands endpoint."""
         current_time = datetime.now(timezone.utc)
         match preset_mode:
             case "off":
@@ -631,6 +644,11 @@ class QvantumCloudClient:
     async def set_tap_water(
         self, device_id: str, start: int = 0, stop: int = 0
     ) -> dict[str, Any]:
+        """Write DHW start/stop via the settings PATCH endpoint.
+
+        A 0/0 call is a no-op that reports APPLIED so callers can treat the
+        result uniformly.
+        """
         if stop == 0 and start == 0:
             _LOGGER.debug("No tap water settings to update, both stop and start are 0.")
             return {"status": SETTING_UPDATE_APPLIED}
@@ -639,11 +657,15 @@ class QvantumCloudClient:
             payload["settings"].append({"name": "tap_water_stop", "value": stop})
         if start:
             payload["settings"].append({"name": "tap_water_start", "value": start})
-        return await self._update_settings(device_id, payload)
+        return await self._patch_device_settings(device_id, payload)
 
     async def set_tap_water_capacity_target(
         self, device_id: str, capacity: int
     ) -> dict[str, Any]:
+        """Write DHW capacity via the settings PATCH endpoint.
+
+        Custom levels fall back to a start/stop PATCH pair.
+        """
         if capacity not in set(TAP_WATER_CAPACITY_MAPPINGS.values()):
             raise ValueError(
                 f"Unsupported tap water capacity {capacity}; expected one of "
@@ -663,7 +685,7 @@ class QvantumCloudClient:
             "settings": [{"name": "tap_water_capacity_target", "value": capacity}]
         }
         _LOGGER.debug("Setting tap water capacity target to %s.", capacity)
-        return await self._update_settings(device_id, payload)
+        return await self._patch_device_settings(device_id, payload)
 
     async def get_device_metadata(self, device_id: str) -> dict[str, Any]:
         await self._ensure_valid_token()

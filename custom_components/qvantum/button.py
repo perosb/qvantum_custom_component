@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
-from .entity import QvantumEntity
+from .entity import QvantumEntity, finalize_platform_setup
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,11 +43,14 @@ async def async_setup_entry(
         )
         button_keys.add("elevate_access")
 
-    async_add_entities(buttons)
-
-    from .entity import cleanup_disabled_entities
-
-    cleanup_disabled_entities(hass, coordinator, button_keys, "button")
+    finalize_platform_setup(
+        hass,
+        coordinator,
+        async_add_entities,
+        buttons,
+        button_keys,
+        "button",
+    )
 
     _LOGGER.debug("Setting up platform BUTTON")
 

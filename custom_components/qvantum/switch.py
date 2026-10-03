@@ -1,6 +1,7 @@
 """Interfaces with the Qvantum Heat Pump api sensors."""
 
 import logging
+from typing import Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
 from homeassistant.core import HomeAssistant
@@ -10,9 +11,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
-from .entity import QvantumEntity
+from .entity import QvantumEntity, finalize_platform_setup
 
 _LOGGER = logging.getLogger(__name__)
+
+# Switch metrics that write booleans rather than 0/1 integers.
+_BOOLEAN_SWITCH_KEYS = frozenset({"enable_sc_dhw", "enable_sc_sh", "vacation_mode"})
 
 
 async def async_setup_entry(
@@ -41,17 +45,20 @@ async def async_setup_entry(
         if switch_name in coordinator.data.get("values", {}):
             sensors.append(QvantumSwitchEntity(coordinator, switch_name, device))
 
-    async_add_entities(sensors)
-
-    from .entity import cleanup_disabled_entities
-
-    cleanup_disabled_entities(hass, coordinator, set(switch_names), "switch")
+    finalize_platform_setup(
+        hass,
+        coordinator,
+        async_add_entities,
+        sensors,
+        set(switch_names),
+        "switch",
+    )
 
     _LOGGER.debug("Setting up platform SWITCH")
 
 
 class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
-    """Sensor for qvantum."""
+    """Switch entity for a writable Qvantum setting."""
 
     def __init__(
         self,
@@ -61,69 +68,41 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
     ) -> None:
         super().__init__(coordinator, metric_key, device)
         self._attr_device_class = SwitchDeviceClass.SWITCH
-        self._attr_is_on = False
 
-    async def async_turn_off(self, **kwargs):
-        """Update the current value."""
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the setting off."""
+        await self._async_write(False)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the setting on."""
+        await self._async_write(True)
+
+    async def _async_write(self, turn_on: bool) -> None:
+        """Write the on/off value, mapping per-metric transports."""
         # vacation_mode is intentionally available without elevated write
         # access, so it must not be blocked by the generic write guard.
         if self._metric_key != "vacation_mode":
             self._require_write_access()
-        match self._metric_key:
-            case "extra_tap_water":
-                response = await self.coordinator.async_set_extra_tap_water(
-                    self._hpid, 0
-                )
-                await handle_setting_update_response(
-                    response, self.coordinator, "values", self._metric_key, "off"
-                )
 
-            case "enable_sc_dhw" | "enable_sc_sh" | "vacation_mode":
-                response = await self.coordinator.client.update_setting(
-                    self._hpid, self._metric_key, False
-                )
-                await handle_setting_update_response(
-                    response, self.coordinator, "values", self._metric_key, False
-                )
+        if self._metric_key == "extra_tap_water":
+            response = await self.coordinator.async_set_extra_tap_water(
+                self._hpid, -1 if turn_on else 0
+            )
+            value: bool | str = "on" if turn_on else "off"
+        elif self._metric_key in _BOOLEAN_SWITCH_KEYS:
+            value = turn_on
+            response = await self.coordinator.client.update_setting(
+                self._hpid, self._metric_key, value
+            )
+        else:
+            value = 1 if turn_on else 0
+            response = await self.coordinator.client.update_setting(
+                self._hpid, self._metric_key, value
+            )
 
-            case _:
-                response = await self.coordinator.client.update_setting(
-                    self._hpid, self._metric_key, 0
-                )
-                await handle_setting_update_response(
-                    response, self.coordinator, "values", self._metric_key, 0
-                )
-
-    async def async_turn_on(self, **kwargs):
-        """Update the current value."""
-        # vacation_mode is intentionally available without elevated write
-        # access, so it must not be blocked by the generic write guard.
-        if self._metric_key != "vacation_mode":
-            self._require_write_access()
-        match self._metric_key:
-            case "extra_tap_water":
-                response = await self.coordinator.async_set_extra_tap_water(
-                    self._hpid, -1
-                )
-                await handle_setting_update_response(
-                    response, self.coordinator, "values", self._metric_key, "on"
-                )
-
-            case "enable_sc_dhw" | "enable_sc_sh" | "vacation_mode":
-                response = await self.coordinator.client.update_setting(
-                    self._hpid, self._metric_key, True
-                )
-                await handle_setting_update_response(
-                    response, self.coordinator, "values", self._metric_key, True
-                )
-
-            case _:
-                response = await self.coordinator.client.update_setting(
-                    self._hpid, self._metric_key, 1
-                )
-                await handle_setting_update_response(
-                    response, self.coordinator, "values", self._metric_key, 1
-                )
+        await handle_setting_update_response(
+            response, self.coordinator, "values", self._metric_key, value
+        )
 
     @property
     def is_on(self):

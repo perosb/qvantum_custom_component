@@ -1467,7 +1467,7 @@ class TestQvantumCloudClient:
         }
 
     @pytest.mark.asyncio
-    async def test_update_settings_non_200_response(self, mock_session):
+    async def test_patch_device_settings_non_200_response(self, mock_session):
         """A failed settings write must raise instead of returning an error body."""
         from custom_components.qvantum.client.exceptions import APIConnectionError
 
@@ -1481,7 +1481,7 @@ class TestQvantumCloudClient:
         api._token_expiry = time.monotonic() + 3600
 
         with pytest.raises(APIConnectionError):
-            await api._update_settings("test_device", {"settings": []})
+            await api._patch_device_settings("test_device", {"settings": []})
 
     # --- get_http_metrics tests ---
 

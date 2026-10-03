@@ -104,7 +104,7 @@ async def async_setup_entry(
 
 
 class QvantumNumberEntity(QvantumEntity, NumberEntity):
-    """Sensor for qvantum."""
+    """Number entity for a writable Qvantum setting."""
 
     def __init__(
         self,

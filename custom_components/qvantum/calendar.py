@@ -11,7 +11,7 @@ due date is exposed as a single all-day event on the local due date.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.components.calendar import (
@@ -172,7 +172,7 @@ class QvantumFilterCalendarEntity(QvantumEntity, CalendarEntity):
         due_at = data.get("due_at")
         anchor_hours = data.get("anchor_hours")
         if isinstance(due_at, (int, float)) and not isinstance(due_at, bool):
-            self._due_at = dt_util.utc_from_timestamp(float(due_at))
+            self._due_at = datetime.fromtimestamp(float(due_at), tz=timezone.utc)
         if isinstance(anchor_hours, (int, float)) and not isinstance(
             anchor_hours, bool
         ):

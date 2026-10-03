@@ -1,7 +1,7 @@
 """Interfaces with the Qvantum Heat Pump api sensors."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Type
 
 from homeassistant.components.sensor import (
@@ -36,7 +36,7 @@ from .const import (
     CURRENT_METRICS,
     PRESSURE_METRICS,
 )
-from .entity import QvantumEntity
+from .entity import QvantumEntity, finalize_platform_setup
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
@@ -181,15 +181,8 @@ async def async_setup_entry(
             )
         )
 
-    async_add_entities(sensors)
-
-    # Disable entities that should be disabled by default
-    from .entity import disable_entities_by_default
-
-    disable_entities_by_default(hass, sensors)
-
-    # Clean up disabled entities that are no longer supported in the current mode.
-    # Include special sensor keys so they are never removed by cleanup.
+    # Register entities, disable them by default where needed, and prune
+    # registry entries for metrics no longer supported in the current mode.
     special_sensor_keys = {"totalenergy", "latency", "hpid", "tap_stop"}
     if coordinator.modbus_enabled:
         special_sensor_keys.update({"display_fw_version", "heating_curve_advisor"})
@@ -203,13 +196,20 @@ async def async_setup_entry(
                 "firmware_last_check",
             }
         )
-    from .entity import cleanup_disabled_entities
 
-    cleanup_disabled_entities(hass, coordinator, possible_metrics | special_sensor_keys, "sensor")
+    finalize_platform_setup(
+        hass,
+        coordinator,
+        async_add_entities,
+        sensors,
+        possible_metrics | special_sensor_keys,
+        "sensor",
+        disable_by_default=True,
+    )
 
 
 class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
-    """Sensor for qvantum."""
+    """Base sensor entity for Qvantum metrics."""
 
     def __init__(
         self,
@@ -495,7 +495,7 @@ class QvantumTimerEntity(QvantumBaseSensorEntity):
         epoch = self._values.get(self._metric_key)
         if epoch is None or epoch <= 0:
             return None
-        return dt_utils.utc_from_timestamp(epoch)
+        return datetime.fromtimestamp(epoch, tz=timezone.utc)
 
     @property
     def available(self):
@@ -584,7 +584,7 @@ class QvantumFirmwareSensorEntity(QvantumEntity, SensorEntity):
     @property
     def native_value(self) -> str | None:
         """Return the firmware version."""
-        # First try to get from firmware coordinator data (updated every 60 minutes)
+        # First try to get from firmware coordinator data (updated every 2 hours)
         if self.coordinator.data and "firmware_versions" in self.coordinator.data:
             firmware_versions = self.coordinator.data.get("firmware_versions", {})
             version = firmware_versions.get(self.firmware_key)

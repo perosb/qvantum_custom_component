@@ -9,8 +9,8 @@ registers.
 Write methods return the raw API body as a plain dict: Modbus answers
 ``{"status": "APPLIED"}`` while cloud passes through the API response (the
 settings PATCH path answers ``{"success": true}``). Callers must treat the
-response as opaque and check ``status`` / ``heatpump_status`` before applying
-optimistic updates; ``ApplyResult`` documents that success shape.
+response as opaque and check it with ``models.result_applied`` before applying
+optimistic updates; ``ApplyResult`` documents the APPLIED shape.
 """
 
 from __future__ import annotations

@@ -35,7 +35,13 @@ from .exceptions import (
     RateLimitError,
     TransportError,
 )
-from .models import ApplyResult, Device, MetricsPayload, SettingsPayload
+from .models import (
+    ApplyResult,
+    Device,
+    MetricsPayload,
+    SettingsPayload,
+    result_applied,
+)
 from .protocol import (
     QvantumClient,
     QvantumCloudClientProtocol,
@@ -73,4 +79,5 @@ __all__ = [
     "SettingsPayload",
     "TAP_WATER_CAPACITY_MAPPINGS",
     "TransportError",
+    "result_applied",
 ]
