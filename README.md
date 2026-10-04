@@ -42,6 +42,7 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **Device automations:** Triggers and conditions for defrost, compressor blocking, freeze protection, Wi-Fi/cloud connectivity, and a ventilation filter due in under 48 hours.
 - **External room sensor:** When configured by the pump, a Modbus number entity can mirror an external temperature into the control setpoint.
 - **Modbus writes:** Optional local writes for supported targets, DHW, fan, operation, room compensation, and sensor settings.
+- **Custom heating curve (Modbus):** A self-calibrating shadow curve that can replace the pump's Auto curve after a manual switch-on; see [docs/heating-curve.md](docs/heating-curve.md).
 
 #### Device automation details
 
@@ -64,6 +65,36 @@ action:
       value: "{{ states('sensor.some_external_room_temperature') | float }}"
 ```
 
+#### Custom heating curve
+
+Modbus-only, and **Enable writing via Modbus** must be on. The integration
+freezes the pump's current Auto curve as a baseline and computes one shared
+adjustment in °C from the Open-Meteo forecast, the local daylight rhythm, a
+self-calibrating solar model and the measured heating power. The seven
+resulting supply points are exposed as `sensor.qvantum_custom_curve_*`
+(plus `sensor.qvantum_custom_curve_adjustment` and
+`sensor.qvantum_custom_curve_deviation`).
+
+It starts in **shadow mode**: nothing is written and the computed curve is
+compared with the pump's own `cal_heat_temp`. `switch.qvantum_custom_curve_control`
+is the only user-facing source of truth for writing:
+
+- **Off (shadow):** compute and log only.
+- **On (active):** write the seven points while the pump still uses Auto,
+  zero the parallel offset (holding 15), read back and verify, and only then
+  switch holding 22 to User defined. Turning it off — or any failed write —
+  writes holding 22 back to Auto.
+
+> [!WARNING]
+> Turn off any existing Home Assistant automation that writes the curve
+> offset number entity (holding 15, "Förskjutning av värmekurva" / curve
+> offset) before enabling the switch, or solar gain will be applied twice.
+> The integration zeroes holding 15 during activation.
+
+Wait until the deviation sensor's `ready` attribute is true (at least three
+full days of shadow data) before switching on. The `blocker` attribute names
+the missing signal while it is false.
+
 ### Services and Elevate Access
 
 #### `qvantum.extra_hot_water`
@@ -78,6 +109,17 @@ data:
 ```
 
 Cloud extra ventilation is a timed boost; local Modbus fan extra is a sticky preset. The extra-DHW switch and timer are also available, and the service works in both modes.
+
+#### `qvantum.set_curve_control`
+
+The custom heating curve from an automation; `mode` is `shadow` or `active`.
+The switch remains the only user-facing source of truth.
+
+```yaml
+service: qvantum.set_curve_control
+data:
+  mode: active
+```
 
 #### Elevate Access
 
