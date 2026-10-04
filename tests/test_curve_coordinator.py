@@ -107,6 +107,7 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._last_calibration_ts = None
     # Throttle baseline learning off by default; dedicated tests re-enable it.
     coordinator._last_baseline_learn_ts = float("inf")
+    coordinator._last_active_ts = None
     coordinator._forecast = None
     coordinator._forecast_ok = False
     coordinator._indoor_margins = deque(maxlen=INDOOR_MARGIN_CYCLES)
@@ -205,6 +206,47 @@ async def test_baseline_observations_requires_both_series() -> None:
 
     assert await coordinator._async_baseline_observations() == []
     coordinator._async_statistics.assert_not_awaited()
+
+
+async def test_baseline_observations_slices_after_active() -> None:
+    coordinator = make_coordinator()
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "cal_heat_temp": "sensor.s"}
+    )
+    coordinator._async_statistics = AsyncMock(return_value={})
+    since = time.time() - 3600.0
+
+    await coordinator._async_baseline_observations(since_ts=since)
+
+    start = coordinator._async_statistics.call_args.args[1]
+    assert start.timestamp() == pytest.approx(since, abs=1.0)
+
+
+async def test_baseline_observations_keeps_full_window_without_active() -> None:
+    coordinator = make_coordinator()
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "cal_heat_temp": "sensor.s"}
+    )
+    coordinator._async_statistics = AsyncMock(return_value={})
+
+    await coordinator._async_baseline_observations()
+
+    start = coordinator._async_statistics.call_args.args[1]
+    assert start.timestamp() == pytest.approx(
+        time.time() - cc.BASELINE_LEARN_DAYS * 86400.0, abs=5.0
+    )
+
+
+async def test_learn_baseline_slices_after_active() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._last_active_ts = 1234.5
+    coordinator._async_baseline_observations = AsyncMock(return_value=[])
+    coordinator._last_baseline_learn_ts = None
+
+    await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, time.time())
+
+    coordinator._async_baseline_observations.assert_awaited_once_with(since_ts=1234.5)
 
 
 async def test_learn_baseline_corrects_only_while_auto() -> None:
@@ -499,6 +541,7 @@ async def test_async_restore_loads_state() -> None:
             "model": _model_to_state(model),
             "calibrated_at": "2026-03-01T00:00:00+00:00",
             "calibrated_ts": 1_770_000_000.0,
+            "last_active_ts": 1_770_000_500.0,
             "indoor_margins": [[1_770_000_000.0, 0.4], ["bad"], [1_770_000_100.0, -0.2]],
         }
     )
@@ -510,6 +553,7 @@ async def test_async_restore_loads_state() -> None:
     assert coordinator.model == model
     assert coordinator._calibrated_at == "2026-03-01T00:00:00+00:00"
     assert coordinator._last_calibration_ts == 1_770_000_000.0
+    assert coordinator._last_active_ts == 1_770_000_500.0
     assert list(coordinator._indoor_margins) == [
         (1_770_000_000.0, 0.4),
         (1_770_000_100.0, -0.2),
@@ -1229,6 +1273,26 @@ async def test_deactivate_writes_auto() -> None:
     ]
 
 
+async def test_revert_records_last_active() -> None:
+    coordinator, _client = make_writable_coordinator()
+    coordinator._mode = "active"
+
+    before = time.time()
+    await coordinator.async_set_control_mode("shadow")
+
+    assert coordinator._last_active_ts is not None
+    assert coordinator._last_active_ts >= before
+
+
+async def test_revert_from_shadow_does_not_record_last_active() -> None:
+    coordinator, _client = make_writable_coordinator()
+    assert not coordinator.active
+
+    await coordinator._async_revert()
+
+    assert coordinator._last_active_ts is None
+
+
 async def test_revert_pending_retries_until_reachable() -> None:
     coordinator, client = make_writable_coordinator()
     coordinator._mode = "active"
@@ -1276,6 +1340,21 @@ async def test_apply_active_without_user_defined_goes_shadow() -> None:
 
     assert not coordinator.active
     assert client.set_heating_curve_point.await_args_list == []
+
+
+async def test_apply_active_demotion_records_last_active() -> None:
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 0}
+    )
+    coordinator._mode = "active"
+    coordinator._last_active_ts = None
+
+    before = time.time()
+    await coordinator._async_apply_active(make_result())
+
+    assert not coordinator.active
+    assert coordinator._last_active_ts is not None
+    assert coordinator._last_active_ts >= before
 
 
 async def test_apply_active_reverts_on_failure() -> None:

@@ -169,8 +169,9 @@ The frozen baseline is the app's seven-point table, but that table is only a
 side dump: on Auto the firmware follows holding 23, so it can diverge from what
 the pump actually delivers. While the pump is on Auto the coordinator corrects
 the baseline from observed `(BT1, cal_heat_temp)` hours (heating hours only,
-from recorder statistics), fitting the residual `observed − interpolated` and
-keeping the cached curve's shape beyond the observed outdoor range. The
+after the last time active control ended, from recorder statistics), fitting
+the residual `observed − interpolated` and keeping the cached curve's shape
+beyond the observed outdoor range. The
 correction self-stabilises: once it matches, the residual falls under the noise
 threshold and nothing more is written. This is why `ready` can become true even
 when the cached table initially disagrees with Auto.
