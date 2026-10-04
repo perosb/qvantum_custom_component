@@ -70,6 +70,23 @@ def hour_ts(timestamp: float | int) -> int:
     return value - (value % 3600)
 
 
+def _safe_hour_ts(timestamp: Any) -> int | None:
+    """Hour-floor a wire value; ``None`` when it is not a usable timestamp."""
+    try:
+        return hour_ts(timestamp)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _finite_float(value: Any) -> float | None:
+    """Coerce a wire value to a finite float; ``None`` for corrupt input."""
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return numeric if math.isfinite(numeric) else None
+
+
 def _base_params(latitude: float, longitude: float) -> dict[str, str]:
     return {
         "latitude": f"{latitude:.6f}",
@@ -121,13 +138,13 @@ def parse_forecast(payload: Any) -> WeatherForecast:
     for ts_raw, temperature, ghi in zip(times, temperatures, irradiances):
         if ts_raw is None or temperature is None or ghi is None:
             continue
-        temperature_c = float(temperature)
-        ghi_wm2 = float(ghi)
-        if not (math.isfinite(temperature_c) and math.isfinite(ghi_wm2)):
+        ts = _safe_hour_ts(ts_raw)
+        temperature_c = _finite_float(temperature)
+        ghi_wm2 = _finite_float(ghi)
+        if ts is None or temperature_c is None or ghi_wm2 is None:
             # A corrupt hour must stay missing: max(0.0, NaN) would launder
             # it into a valid-looking calm hour and bias calibration.
             continue
-        ts = hour_ts(ts_raw)
         points[ts] = HourlyWeather(
             hour_ts=ts,
             temperature_c=temperature_c,
@@ -135,21 +152,21 @@ def parse_forecast(payload: Any) -> WeatherForecast:
         )
 
     current = payload.get("current")
-    if isinstance(current, dict) and current.get("time") is not None:
-        ts = hour_ts(current["time"])
+    ts = _safe_hour_ts(current.get("time")) if isinstance(current, dict) else None
+    if ts is not None:
         existing = points.get(ts)
         if existing is not None:
-            ghi_raw = current.get("shortwave_radiation")
             temperature_raw = current.get("temperature_2m")
+            ghi_raw = current.get("shortwave_radiation")
             temperature_c = existing.temperature_c
             ghi_wm2 = existing.ghi_wm2
             if temperature_raw is not None:
-                candidate = float(temperature_raw)
-                if math.isfinite(candidate):
+                candidate = _finite_float(temperature_raw)
+                if candidate is not None:
                     temperature_c = candidate
             if ghi_raw is not None:
-                candidate = float(ghi_raw)
-                if math.isfinite(candidate):
+                candidate = _finite_float(ghi_raw)
+                if candidate is not None:
                     ghi_wm2 = max(0.0, candidate)
             points[ts] = HourlyWeather(
                 hour_ts=ts,
@@ -174,10 +191,11 @@ def parse_ghi_history(payload: Any) -> dict[int, float]:
     for ts_raw, value in zip(times, values):
         if ts_raw is None or value is None:
             continue
-        numeric = float(value)
-        if not math.isfinite(numeric):
+        ts = _safe_hour_ts(ts_raw)
+        numeric = _finite_float(value)
+        if ts is None or numeric is None:
             continue
-        series[hour_ts(ts_raw)] = max(0.0, numeric)
+        series[ts] = max(0.0, numeric)
     return series
 
 

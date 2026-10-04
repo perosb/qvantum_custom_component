@@ -183,6 +183,27 @@ def test_parse_forecast_non_finite_current_keeps_existing() -> None:
     assert parse_forecast(payload).at(BASE) == HourlyWeather(BASE, 1.0, 90.0)
 
 
+def test_parse_forecast_skips_non_numeric_scalars() -> None:
+    payload = _forecast_payload(["abc", BASE], [1.0, 2.0], [100.0, 120.0])
+
+    assert [point.hour_ts for point in parse_forecast(payload).points] == [BASE]
+
+    only_corrupt = _forecast_payload([BASE], ["not-a-number"], [100.0])
+    with pytest.raises(OpenMeteoError, match="no hourly forecast"):
+        parse_forecast(only_corrupt)
+
+
+def test_parse_forecast_non_numeric_current_is_ignored() -> None:
+    payload = _forecast_payload(
+        [BASE],
+        [1.0],
+        [90.0],
+        current={"time": "nope", "shortwave_radiation": 500.0},
+    )
+
+    assert parse_forecast(payload).at(BASE) == HourlyWeather(BASE, 1.0, 90.0)
+
+
 def test_parse_forecast_rejects_unusable_payloads() -> None:
     with pytest.raises(OpenMeteoError, match="missing hourly"):
         parse_forecast(["not", "a", "dict"])
@@ -214,6 +235,17 @@ def test_parse_ghi_history_skips_non_finite() -> None:
     }
 
     assert parse_ghi_history(payload) == {BASE: 10.0, BASE + 7200: 30.0}
+
+
+def test_parse_ghi_history_skips_non_numeric() -> None:
+    payload = {
+        "hourly": {
+            "time": [BASE, "bad", BASE + 7200],
+            "shortwave_radiation": [10.0, 20.0, "inf"],
+        }
+    }
+
+    assert parse_ghi_history(payload) == {BASE: 10.0}
 
 
 def test_parse_ghi_history_rejects_unusable_payloads() -> None:
