@@ -502,8 +502,17 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             raise HomeAssistantError("No writable curve points yet")
 
         client = self._main.client
-        values = self._main_values()
-        if values.get("curve_type_heating") != HeatingCurveType.AUTO:
+        # The poll cache can be one scan interval stale. Read the live curve
+        # type before deciding, so a pump moved to User defined in the app
+        # just before activation cannot have its table mutated while live.
+        try:
+            live = await self._async_read_pump_settings()
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa: BLE001 — fall back to the poll cache
+            _LOGGER.debug("Could not read the live curve type: %s", err)
+            live = self._main_values()
+        if live.get("curve_type_heating") != HeatingCurveType.AUTO:
             response = await self._async_write_or_revert(
                 client.set_curve_type_heating(device_id, int(HeatingCurveType.AUTO)),
                 label="curve_type_heating=Auto",

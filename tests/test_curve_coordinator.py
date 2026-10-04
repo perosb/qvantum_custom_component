@@ -863,11 +863,17 @@ def make_snapshot(points=None, **overrides) -> CurveSnapshot:
     return CurveSnapshot(**values)
 
 
-def make_writable_coordinator(*, points=None, settings=None, snapshot=None):
-    coordinator = make_coordinator(
-        values=VALUES, settings={**SETTINGS, **(settings or {})}
-    )
+def make_writable_coordinator(
+    *, points=None, settings=None, snapshot=None, live_curve_type=None
+):
+    merged = {**SETTINGS, **(settings or {})}
+    coordinator = make_coordinator(values=VALUES, settings=merged)
     expected = points if points is not None else BASELINE
+    curve_type = (
+        live_curve_type
+        if live_curve_type is not None
+        else merged["curve_type_heating"]
+    )
     client = MagicMock()
     client.writable = True
     client.set_heating_curve_point = AsyncMock(return_value={"status": "APPLIED"})
@@ -880,6 +886,7 @@ def make_writable_coordinator(*, points=None, settings=None, snapshot=None):
             "settings": [
                 {"name": key, "value": value} for key, value in expected.items()
             ]
+            + [{"name": "curve_type_heating", "value": curve_type}]
         }
     )
     coordinator._main.client = client
@@ -967,6 +974,35 @@ async def test_activate_writes_points_offset_then_curve_type() -> None:
     assert len(client.set_curve_type_heating.await_args_list) == 1
     assert coordinator.active
 
+
+
+async def test_activate_reads_live_curve_type_not_the_cache() -> None:
+    coordinator, client = make_writable_coordinator(live_curve_type=1)
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    assert client.set_curve_type_heating.await_args_list[0].args == (
+        "test_device_123",
+        0,
+    )
+    assert coordinator.active
+
+
+async def test_activate_falls_back_to_cached_curve_type_on_read_failure() -> None:
+    coordinator, client = make_writable_coordinator()
+    readback = client.get_settings.return_value
+    client.get_settings = AsyncMock(side_effect=[RuntimeError("offline"), readback])
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    # Cached Auto skips the Auto-first write; activation still completes.
+    assert client.set_curve_type_heating.await_args_list[-1].args == (
+        "test_device_123",
+        1,
+    )
+    assert coordinator.active
 
 
 async def test_activate_switches_to_auto_first_when_pump_is_user_defined() -> None:
