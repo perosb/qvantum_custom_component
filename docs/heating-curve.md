@@ -174,8 +174,8 @@ Entities:
 - `sensor.qvantum_custom_curve_deviation` — computed supply at the measured
   outdoor minus `cal_heat_temp` (input 35), with `shadow`, `ready`, `blocker`
   attributes.
-- `sensor.qvantum_custom_curve_solar_model` — model trust in %, with `a`, `b`,
-  standard error and R² diagnostics.
+- `sensor.qvantum_custom_curve_solar_model` — model trust in %, with
+  `a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque` and `r2_solar` diagnostics.
 - `switch.qvantum_custom_curve_control` — off = shadow, on = active writing.
   `qvantum.set_curve_control` with `mode: shadow|active` does the same from an
   automation.
