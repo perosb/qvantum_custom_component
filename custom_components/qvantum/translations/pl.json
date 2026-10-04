@@ -585,25 +585,25 @@
         "name": "Kod alarmu 5"
       },
       "custom_curve_30": {
-        "name": "Własna krzywa grzewcza: +30°C"
+        "name": "Własna krzywa grzewcza 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Własna krzywa grzewcza: +20°C"
+        "name": "Własna krzywa grzewcza 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Własna krzywa grzewcza: +10°C"
+        "name": "Własna krzywa grzewcza 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Własna krzywa grzewcza: 0°C"
+        "name": "Własna krzywa grzewcza 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Własna krzywa grzewcza: -10°C"
+        "name": "Własna krzywa grzewcza 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Własna krzywa grzewcza: -20°C"
+        "name": "Własna krzywa grzewcza 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Własna krzywa grzewcza: -30°C"
+        "name": "Własna krzywa grzewcza 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Własna krzywa grzewcza: korekta"

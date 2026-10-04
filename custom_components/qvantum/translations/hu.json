@@ -585,25 +585,25 @@
         "name": "5. riasztáskód"
       },
       "custom_curve_30": {
-        "name": "Saját fűtési görbe: +30°C"
+        "name": "Saját fűtési görbe 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Saját fűtési görbe: +20°C"
+        "name": "Saját fűtési görbe 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Saját fűtési görbe: +10°C"
+        "name": "Saját fűtési görbe 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Saját fűtési görbe: 0°C"
+        "name": "Saját fűtési görbe 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Saját fűtési görbe: -10°C"
+        "name": "Saját fűtési görbe 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Saját fűtési görbe: -20°C"
+        "name": "Saját fűtési görbe 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Saját fűtési görbe: -30°C"
+        "name": "Saját fűtési görbe 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Saját fűtési görbe: korrekció"

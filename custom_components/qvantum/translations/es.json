@@ -585,25 +585,25 @@
         "name": "Código de alarma 5"
       },
       "custom_curve_30": {
-        "name": "Curva de calefacción propia: +30°C"
+        "name": "Curva de calefacción propia 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Curva de calefacción propia: +20°C"
+        "name": "Curva de calefacción propia 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Curva de calefacción propia: +10°C"
+        "name": "Curva de calefacción propia 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Curva de calefacción propia: 0°C"
+        "name": "Curva de calefacción propia 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Curva de calefacción propia: -10°C"
+        "name": "Curva de calefacción propia 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Curva de calefacción propia: -20°C"
+        "name": "Curva de calefacción propia 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Curva de calefacción propia: -30°C"
+        "name": "Curva de calefacción propia 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Curva de calefacción propia: ajuste"

@@ -585,25 +585,25 @@
         "name": "Alarm 5 code"
       },
       "custom_curve_30": {
-        "name": "Custom heating curve: +30°C"
+        "name": "Custom heating curve 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Custom heating curve: +20°C"
+        "name": "Custom heating curve 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Custom heating curve: +10°C"
+        "name": "Custom heating curve 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Custom heating curve: 0°C"
+        "name": "Custom heating curve 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Custom heating curve: -10°C"
+        "name": "Custom heating curve 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Custom heating curve: -20°C"
+        "name": "Custom heating curve 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Custom heating curve: -30°C"
+        "name": "Custom heating curve 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Custom heating curve: adjustment"

@@ -94,6 +94,13 @@ _CURVE_SENSOR_KEYS = frozenset(
     }
 )
 
+# Numeric prefix so the seven points sort 1→7 (+30 … −30) like the pump's own
+# curve numbers in any entity list, independent of locale.
+_CURVE_POINT_SLUGS: dict[str, str] = {
+    sensor_key: f"custom_curve_{index:02d}_{sensor_key.removeprefix('custom_curve_')}"
+    for index, sensor_key in enumerate(_CURVE_POINT_METRICS, start=1)
+}
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -507,6 +514,11 @@ class QvantumCurvePointSensor(QvantumCurveSensorEntity):
     ) -> None:
         super().__init__(curve_coordinator, metric_key, device, enabled_by_default)
         self._curve_key = _CURVE_POINT_METRICS[metric_key]
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        """Indexed slug so the seven points sort like the pump's 1–7."""
+        return _CURVE_POINT_SLUGS[self._metric_key]
 
     @property
     def native_value(self):

@@ -585,25 +585,25 @@
         "name": "Kód alarmu 5"
       },
       "custom_curve_30": {
-        "name": "Vlastní topná křivka: +30°C"
+        "name": "Vlastní topná křivka 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Vlastní topná křivka: +20°C"
+        "name": "Vlastní topná křivka 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Vlastní topná křivka: +10°C"
+        "name": "Vlastní topná křivka 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Vlastní topná křivka: 0°C"
+        "name": "Vlastní topná křivka 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Vlastní topná křivka: -10°C"
+        "name": "Vlastní topná křivka 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Vlastní topná křivka: -20°C"
+        "name": "Vlastní topná křivka 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Vlastní topná křivka: -30°C"
+        "name": "Vlastní topná křivka 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Vlastní topná křivka: úprava"

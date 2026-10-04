@@ -585,25 +585,25 @@
         "name": "Alarm 5-code"
       },
       "custom_curve_30": {
-        "name": "Eigen stooklijn: +30°C"
+        "name": "Eigen stooklijn 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Eigen stooklijn: +20°C"
+        "name": "Eigen stooklijn 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Eigen stooklijn: +10°C"
+        "name": "Eigen stooklijn 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Eigen stooklijn: 0°C"
+        "name": "Eigen stooklijn 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Eigen stooklijn: -10°C"
+        "name": "Eigen stooklijn 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Eigen stooklijn: -20°C"
+        "name": "Eigen stooklijn 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Eigen stooklijn: -30°C"
+        "name": "Eigen stooklijn 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Eigen stooklijn: aanpassing"

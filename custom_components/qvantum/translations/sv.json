@@ -585,25 +585,25 @@
         "name": "Larm 5-kod"
       },
       "custom_curve_30": {
-        "name": "Egen värmekurva: +30°C"
+        "name": "Egen värmekurva 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Egen värmekurva: +20°C"
+        "name": "Egen värmekurva 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Egen värmekurva: +10°C"
+        "name": "Egen värmekurva 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Egen värmekurva: 0°C"
+        "name": "Egen värmekurva 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Egen värmekurva: -10°C"
+        "name": "Egen värmekurva 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Egen värmekurva: -20°C"
+        "name": "Egen värmekurva 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Egen värmekurva: -30°C"
+        "name": "Egen värmekurva 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Egen värmekurva: justering"

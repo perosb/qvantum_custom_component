@@ -585,25 +585,25 @@
         "name": "Hälytys 5 -koodi"
       },
       "custom_curve_30": {
-        "name": "Oma lämmityskäyrä: +30°C"
+        "name": "Oma lämmityskäyrä 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Oma lämmityskäyrä: +20°C"
+        "name": "Oma lämmityskäyrä 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Oma lämmityskäyrä: +10°C"
+        "name": "Oma lämmityskäyrä 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Oma lämmityskäyrä: 0°C"
+        "name": "Oma lämmityskäyrä 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Oma lämmityskäyrä: -10°C"
+        "name": "Oma lämmityskäyrä 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Oma lämmityskäyrä: -20°C"
+        "name": "Oma lämmityskäyrä 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Oma lämmityskäyrä: -30°C"
+        "name": "Oma lämmityskäyrä 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Oma lämmityskäyrä: säätö"
