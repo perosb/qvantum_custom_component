@@ -14,6 +14,7 @@ write to the heat pump.
 from __future__ import annotations
 
 import asyncio
+import math
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -120,11 +121,17 @@ def parse_forecast(payload: Any) -> WeatherForecast:
     for ts_raw, temperature, ghi in zip(times, temperatures, irradiances):
         if ts_raw is None or temperature is None or ghi is None:
             continue
+        temperature_c = float(temperature)
+        ghi_wm2 = float(ghi)
+        if not (math.isfinite(temperature_c) and math.isfinite(ghi_wm2)):
+            # A corrupt hour must stay missing: max(0.0, NaN) would launder
+            # it into a valid-looking calm hour and bias calibration.
+            continue
         ts = hour_ts(ts_raw)
         points[ts] = HourlyWeather(
             hour_ts=ts,
-            temperature_c=float(temperature),
-            ghi_wm2=max(0.0, float(ghi)),
+            temperature_c=temperature_c,
+            ghi_wm2=max(0.0, ghi_wm2),
         )
 
     current = payload.get("current")
@@ -132,16 +139,22 @@ def parse_forecast(payload: Any) -> WeatherForecast:
         ts = hour_ts(current["time"])
         existing = points.get(ts)
         if existing is not None:
-            ghi = current.get("shortwave_radiation")
-            temperature = current.get("temperature_2m")
+            ghi_raw = current.get("shortwave_radiation")
+            temperature_raw = current.get("temperature_2m")
+            temperature_c = existing.temperature_c
+            ghi_wm2 = existing.ghi_wm2
+            if temperature_raw is not None:
+                candidate = float(temperature_raw)
+                if math.isfinite(candidate):
+                    temperature_c = candidate
+            if ghi_raw is not None:
+                candidate = float(ghi_raw)
+                if math.isfinite(candidate):
+                    ghi_wm2 = max(0.0, candidate)
             points[ts] = HourlyWeather(
                 hour_ts=ts,
-                temperature_c=(
-                    existing.temperature_c
-                    if temperature is None
-                    else float(temperature)
-                ),
-                ghi_wm2=existing.ghi_wm2 if ghi is None else max(0.0, float(ghi)),
+                temperature_c=temperature_c,
+                ghi_wm2=ghi_wm2,
             )
 
     if not points:
@@ -161,7 +174,10 @@ def parse_ghi_history(payload: Any) -> dict[int, float]:
     for ts_raw, value in zip(times, values):
         if ts_raw is None or value is None:
             continue
-        series[hour_ts(ts_raw)] = max(0.0, float(value))
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            continue
+        series[hour_ts(ts_raw)] = max(0.0, numeric)
     return series
 
 
