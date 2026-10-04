@@ -36,48 +36,10 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: ${{ github.event.pull_request.additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~deepseek/deepseek-flash-latest' }}
+          model: ${{ github.event.pull_request.additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
           variant: max
           share: false
           use_github_token: true
           prompt: |
-            Review this pull request following the review conventions in
-            AGENTS.md ("Code reviews", "What to flag").
-
-            Post immediately as a pull request review with event COMMENT.
-            Do not approve, request changes, or leave the review pending.
-            Post exactly one review (event COMMENT). Never submit duplicate reviews.
-
-            Scope:
-            - Diff only. Do not explore the whole repo unless a changed line is unintelligible without one extra file.
-            - Do not run the full test suite. At most a single targeted pytest if the bug is test-shaped.
-            - Skip nits: naming, import order, comments, style already covered by linters.
-            - Before calling a config entry unused, check `.github/workflows/*.yml` for model references.
-            - Max 8 inline comments. If more issues exist, put the rest as a short numbered list in the review body.
-            - No praise. Empty review body is fine if there are no findings: post "No blockers." and zero inlines.
-
-            Inline comments:
-            - Only on changed lines (diff RIGHT / new file).
-            - Actionable: one or two sentences of why, then a concrete fix.
-            - One issue per comment.
-
-            GitHub apply-in-one-click suggestions:
-            When the fix is a drop-in replacement of the exact line range you
-            commented on, the comment body MUST end with a suggestion block
-            and nothing after it:
-
-            ```suggestion
-            the full replacement text for those lines
-            ```
-
-            Rules for ```suggestion:
-            - Fence language is exactly "suggestion" (not python, not diff).
-            - The block is the new source only. No +/- prefixes, no surrounding
-              explanation inside the fence.
-            - It must replace the entire commented range 1:1: same number of
-              leading spaces, same line endings. If you change three lines,
-              the review comment must cover those three lines (start_line + line).
-            - Do not put the suggestion only in the review summary.
-            - Skip the suggestion block if the fix is not a literal line
-              replacement (renames across files, new files, logic that needs
-              more than the highlighted lines).
+            ${{ vars.OPENCODE_REVIEW_PROMPT }}
+            
