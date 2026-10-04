@@ -1058,6 +1058,21 @@ async def test_activate_reverts_on_readback_mismatch() -> None:
     )
 
 
+async def test_activation_clears_stale_revert_latch() -> None:
+    coordinator, client = make_writable_coordinator()
+    coordinator._revert_pending = True
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    assert coordinator.active
+    assert not coordinator._revert_pending
+
+    client.set_curve_type_heating.reset_mock()
+    await coordinator._async_retry_revert()
+    client.set_curve_type_heating.assert_not_awaited()
+
+
 async def test_deactivate_writes_auto() -> None:
     coordinator, client = make_writable_coordinator()
     coordinator._mode = "active"

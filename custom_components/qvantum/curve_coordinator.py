@@ -580,6 +580,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             int(HeatingCurveType.USER_DEFINED),
         )
         self._mode = "active"
+        # A latch from an earlier failed revert is obsolete once the pump
+        # follows our table again; keeping it would write 22 back to Auto on
+        # the next cycle and silently undo this activation.
+        self._revert_pending = False
         await self._async_persist()
         _LOGGER.info("Custom heating curve active (holding 22 = User defined)")
 
