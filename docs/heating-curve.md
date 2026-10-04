@@ -148,24 +148,72 @@ Writing 23 from HA **does** change Auto `cal_heat_temp` on Modbus. It is
 not the same as the app’s DUT fields. HA cannot reproduce the DUT
 generator.
 
-## Heating curve advisor
+## Custom curve control
 
-**Modbus-only** derived sensor `heating_curve_advisor` that points at a likely
-curve change. It samples `room - indoor_temperature_target` (BT2, or the
-external room sensor when that source is selected) only while `hp_status` is
-Heating, over a rolling **6 h** window. Once the window is full:
+**Modbus-only** and requires the Modbus write option. The module freezes the
+pump's current seven-point table (holding 24–30) as the baseline and computes
+**one** shared adjustment in °C, applied to all seven points:
 
-| Mean deviation | State | Suggested action |
-|---|---|---|
-| > +1.0 °C | `reduce` | Room consistently warmer than target — lower the curve |
-| < −1.0 °C | `increase` | Room consistently colder than target — raise the curve |
-| otherwise | `ok` | No change |
+| Term | Source |
+|---|---|
+| outdoor | Open-Meteo hourly temperature trend over the next hours (never instantaneous BT1), damped |
+| night/day | local sunrise/sunset (Home Assistant location), bounded |
+| solar | self-calibrating `a`/`b`/`trust` model from recorder statistics (`heatingpower`, indoor, outdoor) plus Open-Meteo GHI history; gain in W → °C through the local baseline slope |
+| load | one-sided reduction when measured heating power is below the model demand at the target indoor temperature |
 
-The state is advice only; nothing is written automatically. Attributes carry
-`mean_deviation_c`, `observed_hours`, `window_hours` and the context behind the
-advice (`curve_type_heating`, `bt1`). The window lives in memory only, so it
-refills for up to 6 h after a restart; the sensor reports `ok` until then.
-Cloud mode does not create this sensor.
+Indoor deviation from the target is a **cap** only (a warm house blocks upward
+adjustment, a cold house blocks downward), it never drives a term. Points are
+clamped to 10–80 °C and fall toward warmer outdoors.
+
+Entities:
+
+- `sensor.qvantum_custom_curve_30` … `sensor.qvantum_custom_curve_minus_30` —
+  the computed shadow points, with `baseline` and `adjustment` attributes.
+- `sensor.qvantum_custom_curve_adjustment` — the shared adjustment, with
+  `outdoor_c`, `night_day_c`, `solar_c`, `load_c` attributes.
+- `sensor.qvantum_custom_curve_deviation` — computed supply at the measured
+  outdoor minus `cal_heat_temp` (input 35), with `shadow`, `ready`, `blocker`
+  attributes.
+- `sensor.qvantum_custom_curve_solar_model` — model trust in %, with
+  `a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque` and `r2_solar` diagnostics.
+- `switch.qvantum_custom_curve_control` — off = shadow, on = active writing.
+  `qvantum.set_curve_control` with `mode: shadow|active` does the same from an
+  automation.
+
+### Activation and reversion
+
+The switch never turns itself on. `ready` becomes true after at least three
+full local days of deviation statistics with ≥ 90 % coverage, a median
+absolute deviation ≤ 1.0 °C and no hourly deviation beyond 3.0 °C. The
+`blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
+`window`, `median`, `max`). `ready` is a signal, not an activation.
+
+Turning the switch on:
+
+1. writes holding 24–30 while 22 is still Auto (firmware ignores the table, so
+   a failed point changes nothing)
+2. writes the parallel offset (holding 15) to 0
+3. reads back and verifies all seven points
+4. only then writes holding 22 to User defined
+
+Active cycles write only points that changed by ≥ 1 °C, one at a time with a
+pause. Any failed write, an out-of-range or non-monotone table, or a lost
+connection writes holding 22 back to Auto and turns the switch off. If the
+pump is instead moved off User defined, the coordinator returns to shadow
+without touching holding 22. A revert that cannot be written is latched and
+retried, so a lost connection cannot leave the integration claiming control.
+
+**One writer:** disable Home Assistant automations that write the curve offset
+(holding 15) while the switch is on, otherwise solar gain is applied twice.
+
+### Solar model
+
+The fit uses recorder long-term statistics (`heatingpower`, outdoor and indoor
+temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily.
+`a` (W/K), `b` (m²) and a continuous trust in [0, 1] from `b`'s t-statistic
+are computed from your house's data — nothing is hand-tuned. Weak evidence
+keeps the solar term tiny automatically, and GHI is smoothed with an
+exponential kernel so one cloud cannot swing the curve.
 
 ## Practical notes
 
