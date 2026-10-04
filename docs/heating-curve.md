@@ -157,13 +157,24 @@ pump's current seven-point table (holding 24–30) as the baseline and computes
 | Term | Source |
 |---|---|
 | outdoor | Open-Meteo hourly temperature trend over the next hours (never instantaneous BT1), damped |
-| night/day | local sunrise/sunset (Home Assistant location), bounded |
+| night/day | local sunrise/sunset (Home Assistant location); amplitude is a fraction of the forecast's diurnal supply swing (curve slope × outdoor range), bounded |
 | solar | self-calibrating `a`/`b`/`trust` model from recorder statistics (`heatingpower`, indoor, outdoor) plus Open-Meteo GHI history; gain in W → °C through the local baseline slope |
 | load | one-sided reduction when measured heating power is below the model demand at the target indoor temperature |
 
 Indoor deviation from the target is a **cap** only (a warm house blocks upward
 adjustment, a cold house blocks downward), it never drives a term. Points are
 clamped to 10–80 °C and fall toward warmer outdoors.
+
+The frozen baseline is the app's seven-point table, but that table is only a
+side dump: on Auto the firmware follows holding 23, so it can diverge from what
+the pump actually delivers. While the pump is on Auto the coordinator corrects
+the baseline from observed `(BT1, cal_heat_temp)` hours (heating hours only,
+after the last time active control ended, from recorder statistics), fitting
+the residual `observed − interpolated` and keeping the cached curve's shape
+beyond the observed outdoor range. The
+correction self-stabilises: once it matches, the residual falls under the noise
+threshold and nothing more is written. This is why `ready` can become true even
+when the cached table initially disagrees with Auto.
 
 Entities:
 
@@ -175,7 +186,7 @@ Entities:
   `outdoor_c`, `night_day_c`, `solar_c`, `load_c` attributes.
 - `sensor.qvantum_custom_curve_deviation` — computed supply at the measured
   outdoor minus `cal_heat_temp` (input 35), with `shadow`, `ready`, `blocker`
-  attributes.
+  and `baseline_auto` (baseline frozen while the pump was on Auto) attributes.
 - `sensor.qvantum_custom_curve_solar_model` — model trust in %, with
   `a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque` and `r2_solar` diagnostics.
 - `switch.qvantum_custom_curve_control` — off = shadow, on = active writing.
@@ -188,7 +199,9 @@ The switch never turns itself on. `ready` becomes true after at least three
 full local days of deviation statistics with ≥ 90 % coverage, a median
 absolute deviation ≤ 1.0 °C and no hourly deviation beyond 3.0 °C. The
 `blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
-`window`, `median`, `max`). `ready` is a signal, not an activation.
+`window`, `median`, `max`). `ready` is a signal, not an activation. `ready`
+also needs the deviation sensor enabled and the recorder running: without
+hourly statistics the window stays incomplete and `blocker` is `window`.
 
 Turning the switch on:
 
@@ -207,6 +220,9 @@ retried, so a lost connection cannot leave the integration claiming control.
 
 **One writer:** disable Home Assistant automations that write the curve offset
 (holding 15) while the switch is on, otherwise solar gain is applied twice.
+Reversion (active → shadow) writes holding 22 back to Auto but does **not**
+restore the parallel offset; leave the offset-writing automations off until
+they are deliberately re-enabled.
 
 ### Solar model
 

@@ -6,7 +6,10 @@ The adjustment is the sum of four forecast-driven terms:
 - ``outdoor``   — anticipation: move a fraction of the baseline's supply
   change over the next hours, driven by the forecast temperature trend
   rather than the instantaneous BT1.
-- ``night_day`` — a small bounded daylight-rhythm offset.
+- ``night_day`` — a daylight-rhythm offset whose amplitude is a fraction of
+  the forecast's diurnal supply swing (local curve slope × outdoor range),
+  so a flat day adds nothing and a volatile one gets a larger (bounded)
+  offset.
 - ``solar``     — the uncertainty-weighted solar gain from
   :mod:`~custom_components.qvantum.solar_gain`, converted to supply degrees
   through the local baseline slope.
@@ -16,6 +19,12 @@ The adjustment is the sum of four forecast-driven terms:
 
 Indoor deviation is a **cap only** — a warm house vetoes upward adjustment
 and a cold house vetoes downward adjustment, it never drives a term.
+
+The frozen baseline is the app's seven-point table, which is only a side
+dump: on Auto the firmware follows holding 23, so that table can diverge
+from what the pump actually delivers. :func:`corrected_baseline` learns the
+residual from observed ``(BT1, cal_heat_temp)`` hours and corrects the table
+without changing its shape outside the observed range.
 
 No Home Assistant imports and no pump writes: the module takes mappings and
 returns the seven supply temperatures plus the term breakdown.
@@ -43,10 +52,14 @@ OUTDOOR_DAMP = 0.5
 #: Anticipation clamp.
 OUTDOOR_MAX_C = 1.0
 
-#: Daylight rhythm: peak boost at local solar noon.
-DAY_PHASE_MAX_C = 0.5
-#: Daylight rhythm: peak setback at local solar midnight.
-NIGHT_PHASE_MAX_C = 0.5
+#: Daylight rhythm amplitude as a fraction of the forecast diurnal supply
+#: swing (|local curve slope| × forecast outdoor range). A flat day has no
+#: rhythm offset; a volatile day gets a larger (bounded) one.
+NIGHT_DAY_SWING_FRACTION = 0.1
+#: Cap on the daylight rhythm amplitude.
+NIGHT_DAY_MAX_C = 1.0
+#: Hours over which the diurnal swing is measured.
+NIGHT_DAY_HORIZON_H = 24
 
 #: Solar term clamp (only ever reduces the curve).
 SOLAR_MAX_C = 2.0
@@ -55,8 +68,19 @@ SOLAR_MAX_C = 2.0
 LOAD_MAX_C = 0.5
 #: Measured/predicted shortfall that reaches the full load reduction.
 LOAD_SPAN = 0.5
-#: Below this predicted demand the ratio is meaningless.
-LOAD_Q_FLOOR_W = 200.0
+#: Predicted demand must exceed this multiple of the identified heat-loss
+#: coefficient (W/K) for the load ratio to be meaningful. Relative to ``a``
+#: so it scales with the house instead of a fixed watt floor.
+LOAD_Q_FLOOR_K = 1.0
+
+#: Observed Auto hours needed before a baseline correction is attempted.
+BASELINE_MIN_SAMPLES = 24
+#: Minimum observed outdoor span for a meaningful correction.
+BASELINE_MIN_SPAN_C = 5.0
+#: Ignore corrections smaller than this (fit noise).
+BASELINE_MIN_CORRECTION_C = 1.0
+#: Never move a baseline point by more than this.
+BASELINE_MAX_CORRECTION_C = 8.0
 
 #: Hard clamp on the total adjustment.
 TOTAL_MAX_C = 3.0
@@ -179,9 +203,44 @@ def outdoor_adjustment_c(
     return _clamp(raw, -OUTDOOR_MAX_C, OUTDOOR_MAX_C)
 
 
-def night_day_adjustment_c(now_ts: int, daylight: DayPhase | None) -> float:
-    """Small daylight-rhythm offset: boost around noon, setback at night."""
-    if daylight is None:
+def diurnal_swing_c(
+    forecast_temperature: Mapping[int, float],
+    now_ts: int,
+    *,
+    horizon_hours: int = NIGHT_DAY_HORIZON_H,
+) -> float | None:
+    """Forecast outdoor max−min over the next ``horizon_hours``.
+
+    ``None`` when fewer than two usable hours exist, which turns the
+    daylight-rhythm term off rather than inventing a swing.
+    """
+    now_hour = now_ts - (now_ts % 3600)
+    values: list[float] = []
+    for step in range(max(1, horizon_hours) + 1):
+        value = forecast_temperature.get(now_hour + step * 3600)
+        if value is None:
+            continue
+        numeric = float(value)
+        if math.isfinite(numeric):
+            values.append(numeric)
+    if len(values) < 2:
+        return None
+    return max(values) - min(values)
+
+
+def night_day_adjustment_c(
+    now_ts: int,
+    daylight: DayPhase | None,
+    *,
+    amplitude_c: float,
+) -> float:
+    """Bounded daylight-rhythm offset: boost around noon, setback at night.
+
+    ``amplitude_c`` comes from :func:`compute_curve` (a fraction of the
+    forecast's diurnal supply swing); zero disables the term when there is
+    no usable forecast.
+    """
+    if daylight is None or amplitude_c <= 0.0:
         return 0.0
     sunrise = daylight.sunrise_ts
     sunset = daylight.sunset_ts
@@ -190,7 +249,7 @@ def night_day_adjustment_c(now_ts: int, daylight: DayPhase | None) -> float:
         if span <= 0:
             return 0.0
         phase = (now_ts - sunrise) / span
-        return DAY_PHASE_MAX_C * math.sin(math.pi * _clamp(phase, 0.0, 1.0))
+        return amplitude_c * math.sin(math.pi * _clamp(phase, 0.0, 1.0))
     if now_ts < sunrise:
         span = sunrise - daylight.previous_sunset_ts
         if span <= 0:
@@ -201,7 +260,7 @@ def night_day_adjustment_c(now_ts: int, daylight: DayPhase | None) -> float:
         if span <= 0:
             return 0.0
         phase = (now_ts - sunset) / span
-    return -NIGHT_PHASE_MAX_C * math.sin(math.pi * _clamp(phase, 0.0, 1.0))
+    return -amplitude_c * math.sin(math.pi * _clamp(phase, 0.0, 1.0))
 
 
 def solar_adjustment_c(
@@ -246,12 +305,102 @@ def load_adjustment_c(
         + model.c_w
         - model.solar_gain_w(smooth_ghi(ghi_by_hour, now_ts))
     )
-    if expected_w <= LOAD_Q_FLOOR_W:
+    if expected_w <= model.a_w_per_k * LOAD_Q_FLOOR_K:
         return 0.0
     shortfall = 1.0 - (q_actual_w / expected_w)
     if shortfall <= 0.0:
         return 0.0
     return -LOAD_MAX_C * _clamp(shortfall / LOAD_SPAN, 0.0, 1.0)
+
+
+def _median(values: Sequence[float]) -> float:
+    ordered = sorted(values)
+    n = len(ordered)
+    mid = n // 2
+    if n % 2:
+        return ordered[mid]
+    return 0.5 * (ordered[mid - 1] + ordered[mid])
+
+
+def _fit_line(x: Sequence[float], y: Sequence[float]) -> tuple[float, float]:
+    """Ordinary least squares ``y ≈ slope·x + intercept``."""
+    n = len(x)
+    mean_x = sum(x) / n
+    mean_y = sum(y) / n
+    sxx = sum((xi - mean_x) ** 2 for xi in x)
+    if sxx <= 1e-12:
+        return 0.0, mean_y
+    sxy = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(x, y))
+    slope = sxy / sxx
+    return slope, mean_y - slope * mean_x
+
+
+def corrected_baseline(
+    cached: Mapping[str, float],
+    observations: Sequence[tuple[float, float]],
+    *,
+    min_samples: int = BASELINE_MIN_SAMPLES,
+    min_span_c: float = BASELINE_MIN_SPAN_C,
+    min_correction_c: float = BASELINE_MIN_CORRECTION_C,
+    max_correction_c: float = BASELINE_MAX_CORRECTION_C,
+) -> dict[str, float] | None:
+    """Correct the frozen Auto baseline against observed pump behaviour.
+
+    ``cached`` is the app's seven-point table (a side dump: on Auto the
+    firmware follows holding 23, so this table can diverge from what the
+    pump actually delivers). ``observations`` are hourly
+    ``(outdoor BT1, cal_heat_temp)`` pairs measured while the pump was on
+    Auto. The residual ``observed − interpolated(cached)`` is median-bucketed
+    by outdoor and fitted with a line, so the correction keeps the cached
+    curve's shape beyond the observed range instead of extrapolating raw data.
+
+    Returns ``None`` when there is too little data, the outdoor span is too
+    narrow, or the correction is below the noise threshold — the caller then
+    keeps the cached baseline.
+    """
+    try:
+        base = normalize_baseline(cached)
+    except (TypeError, ValueError):
+        return None
+
+    clean: list[tuple[float, float]] = []
+    for outdoor, supply in observations:
+        outdoor_c = float(outdoor)
+        supply_c = float(supply)
+        if math.isfinite(outdoor_c) and math.isfinite(supply_c):
+            clean.append((outdoor_c, supply_c))
+    if len(clean) < min_samples:
+        return None
+    outdoors = [outdoor for outdoor, _ in clean]
+    if max(outdoors) - min(outdoors) < min_span_c:
+        return None
+
+    buckets: dict[int, list[float]] = {}
+    for outdoor_c, supply_c in clean:
+        residual = supply_c - interpolate_supply(base, outdoor_c)
+        buckets.setdefault(round(outdoor_c), []).append(residual)
+    if len(buckets) < 2:
+        return None
+    bucket_x = sorted(buckets)
+    slope, intercept = _fit_line(
+        [float(x) for x in bucket_x], [_median(buckets[x]) for x in bucket_x]
+    )
+
+    correction = {
+        key: _clamp(
+            slope * outdoor + intercept, -max_correction_c, max_correction_c
+        )
+        for key, outdoor in HEATING_CURVE_OUTDOOR_TEMPS.items()
+    }
+    if max(abs(value) for value in correction.values()) < min_correction_c:
+        return None
+
+    raw = {
+        key: supply + correction[key]
+        for key, (_, supply) in zip(CURVE_KEYS, base)
+    }
+    repaired = normalize_baseline(raw)
+    return {key: supply for key, (_, supply) in zip(CURVE_KEYS, repaired)}
 
 
 def compute_curve(
@@ -278,7 +427,17 @@ def compute_curve(
         now_ts,
         horizon_hours=outdoor_horizon_hours,
     )
-    night_day_c = night_day_adjustment_c(now_ts, daylight)
+    night_amplitude_c = 0.0
+    swing_c = diurnal_swing_c(forecast_temperature, now_ts)
+    if swing_c is not None and forecast_now is not None:
+        night_amplitude_c = _clamp(
+            NIGHT_DAY_SWING_FRACTION * abs(curve_slope(points, forecast_now)) * swing_c,
+            0.0,
+            NIGHT_DAY_MAX_C,
+        )
+    night_day_c = night_day_adjustment_c(
+        now_ts, daylight, amplitude_c=night_amplitude_c
+    )
     solar_c = solar_adjustment_c(
         model, ghi_by_hour, now_ts, points, forecast_now
     )

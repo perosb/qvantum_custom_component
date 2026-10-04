@@ -14,7 +14,11 @@ from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.qvantum import curve_coordinator as cc
 from custom_components.qvantum.const import HP_STATUS_HEATING
-from custom_components.qvantum.heating_curve import CurveResult
+from custom_components.qvantum.heating_curve import (
+    CurveResult,
+    interpolate_supply,
+    normalize_baseline,
+)
 from custom_components.qvantum.curve_coordinator import (
     INDOOR_MARGIN_CYCLES,
     POWER_CYCLES,
@@ -101,6 +105,9 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._model = None
     coordinator._calibrated_at = None
     coordinator._last_calibration_ts = None
+    # Throttle baseline learning off by default; dedicated tests re-enable it.
+    coordinator._last_baseline_learn_ts = float("inf")
+    coordinator._last_active_ts = None
     coordinator._forecast = None
     coordinator._forecast_ok = False
     coordinator._indoor_margins = deque(maxlen=INDOOR_MARGIN_CYCLES)
@@ -141,6 +148,165 @@ def test_freeze_baseline_complete_and_rejects_bad_values() -> None:
     assert freeze_baseline({**BASELINE, "curve_0": "42"}) is None
     assert freeze_baseline({**BASELINE, "curve_0": True}) is None
     assert freeze_baseline({}) is None
+
+
+def _curve_observations(offset: float) -> list[tuple[float, float]]:
+    base = normalize_baseline(BASELINE)
+    return [
+        (float(outdoor), interpolate_supply(base, float(outdoor)) + offset)
+        for outdoor in range(21)
+        for _ in range(2)
+    ]
+
+
+async def test_baseline_observations_joins_bt1_and_supply() -> None:
+    coordinator = make_coordinator()
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "cal_heat_temp": "sensor.s"}
+    )
+    coordinator._async_statistics = AsyncMock(
+        return_value={
+            "sensor.t": [{"start": 100, "mean": 5.0}, {"start": 200, "mean": 6.0}],
+            "sensor.s": [{"start": 100, "mean": 35.0}, {"start": 300, "mean": 40.0}],
+        }
+    )
+
+    observations = await coordinator._async_baseline_observations()
+
+    assert observations == [(5.0, 35.0)]
+    coordinator._async_statistics.assert_awaited_once()
+
+
+async def test_baseline_observations_skips_idle_hours() -> None:
+    coordinator = make_coordinator()
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "heatingpower": "sensor.q",
+        }
+    )
+    coordinator._async_statistics = AsyncMock(
+        return_value={
+            "sensor.t": [{"start": 100, "mean": 5.0}, {"start": 200, "mean": 6.0}],
+            "sensor.s": [{"start": 100, "mean": 35.0}, {"start": 200, "mean": 36.0}],
+            "sensor.q": [{"start": 100, "mean": 900.0}, {"start": 200, "mean": 10.0}],
+        }
+    )
+
+    observations = await coordinator._async_baseline_observations()
+
+    assert observations == [(5.0, 35.0)]
+
+
+async def test_baseline_observations_requires_both_series() -> None:
+    coordinator = make_coordinator()
+    coordinator._resolve_statistic_ids = MagicMock(return_value={"bt1": "sensor.t"})
+    coordinator._async_statistics = AsyncMock()
+
+    assert await coordinator._async_baseline_observations() == []
+    coordinator._async_statistics.assert_not_awaited()
+
+
+async def test_baseline_observations_slices_after_active() -> None:
+    coordinator = make_coordinator()
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "cal_heat_temp": "sensor.s"}
+    )
+    coordinator._async_statistics = AsyncMock(return_value={})
+    since = time.time() - 3600.0
+
+    await coordinator._async_baseline_observations(since_ts=since)
+
+    start = coordinator._async_statistics.call_args.args[1]
+    assert start.timestamp() == pytest.approx(since, abs=1.0)
+
+
+async def test_baseline_observations_keeps_full_window_without_active() -> None:
+    coordinator = make_coordinator()
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "cal_heat_temp": "sensor.s"}
+    )
+    coordinator._async_statistics = AsyncMock(return_value={})
+
+    await coordinator._async_baseline_observations()
+
+    start = coordinator._async_statistics.call_args.args[1]
+    assert start.timestamp() == pytest.approx(
+        time.time() - cc.BASELINE_LEARN_DAYS * 86400.0, abs=5.0
+    )
+
+
+async def test_learn_baseline_slices_after_active() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._last_active_ts = 1234.5
+    coordinator._async_baseline_observations = AsyncMock(return_value=[])
+    coordinator._last_baseline_learn_ts = None
+
+    await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, time.time())
+
+    coordinator._async_baseline_observations.assert_awaited_once_with(since_ts=1234.5)
+
+
+async def test_learn_baseline_corrects_only_while_auto() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_baseline_observations = AsyncMock(
+        return_value=_curve_observations(-3.0)
+    )
+    coordinator._last_baseline_learn_ts = None
+
+    await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, 1000.0)
+
+    assert coordinator.baseline["curve_30"] == pytest.approx(22.0)
+    assert coordinator.baseline["curve_minus_30"] == pytest.approx(57.0)
+    assert coordinator._last_baseline_learn_ts == 1000.0
+    coordinator._async_baseline_observations.assert_awaited_once()
+
+
+async def test_learn_baseline_skips_user_defined_and_active() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_baseline_observations = AsyncMock(return_value=[])
+    coordinator._last_baseline_learn_ts = None
+
+    await coordinator._async_learn_baseline(
+        {**VALUES, **SETTINGS, "curve_type_heating": 1}, 1000.0
+    )
+    coordinator._async_baseline_observations.assert_not_awaited()
+
+    coordinator._mode = "active"
+    await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, 2000.0)
+    coordinator._async_baseline_observations.assert_not_awaited()
+
+    coordinator._mode = "shadow"
+    coordinator._baseline = None
+    await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, 3000.0)
+    coordinator._async_baseline_observations.assert_not_awaited()
+
+
+async def test_learn_baseline_throttles_and_swallows_failures() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_baseline_observations = AsyncMock(return_value=[])
+    coordinator._last_baseline_learn_ts = None
+
+    await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, 1000.0)
+    await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, 1000.0 + 3600.0)
+    assert coordinator._async_baseline_observations.await_count == 1
+
+    await coordinator._async_learn_baseline(
+        {**VALUES, **SETTINGS}, 1000.0 + cc.BASELINE_LEARN_REFRESH_HOURS * 3600.0
+    )
+    assert coordinator._async_baseline_observations.await_count == 2
+
+    coordinator._async_baseline_observations = AsyncMock(
+        side_effect=RuntimeError("recorder down")
+    )
+    coordinator._last_baseline_learn_ts = None
+    await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, 9000.0)
+    assert coordinator.baseline == BASELINE
 
 
 def test_build_samples_joins_and_filters() -> None:
@@ -258,6 +424,7 @@ async def test_snapshot_shadow_freezes_baseline_and_reports_blocker() -> None:
     assert snapshot.deviation_c == pytest.approx(36.0 - 37.0)
     assert not snapshot.ready
     assert snapshot.blocker == "history"
+    assert snapshot.baseline_auto is True
     assert snapshot.model is None
 
 
@@ -314,6 +481,24 @@ async def test_snapshot_without_baseline_does_not_fetch_forecast() -> None:
     assert snapshot.points == {}
 
 
+async def test_snapshot_learns_baseline_while_auto() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_baseline_observations = AsyncMock(
+        return_value=_curve_observations(-3.0)
+    )
+    coordinator._last_baseline_learn_ts = None
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert coordinator.baseline["curve_30"] == pytest.approx(22.0)
+    assert snapshot.baseline == coordinator.baseline
+    assert snapshot.baseline_auto is True
+
+
 async def test_update_data_degrades_on_failure() -> None:
     coordinator = make_coordinator()
 
@@ -356,6 +541,7 @@ async def test_async_restore_loads_state() -> None:
             "model": _model_to_state(model),
             "calibrated_at": "2026-03-01T00:00:00+00:00",
             "calibrated_ts": 1_770_000_000.0,
+            "last_active_ts": 1_770_000_500.0,
             "indoor_margins": [[1_770_000_000.0, 0.4], ["bad"], [1_770_000_100.0, -0.2]],
         }
     )
@@ -367,6 +553,7 @@ async def test_async_restore_loads_state() -> None:
     assert coordinator.model == model
     assert coordinator._calibrated_at == "2026-03-01T00:00:00+00:00"
     assert coordinator._last_calibration_ts == 1_770_000_000.0
+    assert coordinator._last_active_ts == 1_770_000_500.0
     assert list(coordinator._indoor_margins) == [
         (1_770_000_000.0, 0.4),
         (1_770_000_100.0, -0.2),
@@ -858,6 +1045,7 @@ def make_snapshot(points=None, **overrides) -> CurveSnapshot:
         window_hours=0.0,
         model=None,
         calibrated_at=None,
+        baseline_auto=False,
     )
     values.update(overrides)
     return CurveSnapshot(**values)
@@ -1085,6 +1273,26 @@ async def test_deactivate_writes_auto() -> None:
     ]
 
 
+async def test_revert_records_last_active() -> None:
+    coordinator, _client = make_writable_coordinator()
+    coordinator._mode = "active"
+
+    before = time.time()
+    await coordinator.async_set_control_mode("shadow")
+
+    assert coordinator._last_active_ts is not None
+    assert coordinator._last_active_ts >= before
+
+
+async def test_revert_from_shadow_does_not_record_last_active() -> None:
+    coordinator, _client = make_writable_coordinator()
+    assert not coordinator.active
+
+    await coordinator._async_revert()
+
+    assert coordinator._last_active_ts is None
+
+
 async def test_revert_pending_retries_until_reachable() -> None:
     coordinator, client = make_writable_coordinator()
     coordinator._mode = "active"
@@ -1132,6 +1340,21 @@ async def test_apply_active_without_user_defined_goes_shadow() -> None:
 
     assert not coordinator.active
     assert client.set_heating_curve_point.await_args_list == []
+
+
+async def test_apply_active_demotion_records_last_active() -> None:
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 0}
+    )
+    coordinator._mode = "active"
+    coordinator._last_active_ts = None
+
+    before = time.time()
+    await coordinator._async_apply_active(make_result())
+
+    assert not coordinator.active
+    assert coordinator._last_active_ts is not None
+    assert coordinator._last_active_ts >= before
 
 
 async def test_apply_active_reverts_on_failure() -> None:

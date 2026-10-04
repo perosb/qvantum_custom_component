@@ -21,7 +21,7 @@ import math
 import time
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo
 
@@ -43,6 +43,7 @@ from .heating_curve import (
     MIN_SUPPLY_C,
     DayPhase,
     compute_curve,
+    corrected_baseline,
     interpolate_supply,
     normalize_baseline,
 )
@@ -64,6 +65,10 @@ CALIBRATION_REFRESH_HOURS = 24.0
 MIN_CALIBRATION_SAMPLES = 72
 MIN_SAMPLE_DELTA_T_K = 5.0
 MIN_SAMPLE_Q_W = 50.0
+#: Days of observed ``(BT1, cal_heat_temp)`` used to correct the baseline.
+BASELINE_LEARN_DAYS = 7
+#: Minimum time between baseline-correction statistics fetches.
+BASELINE_LEARN_REFRESH_HOURS = 6.0
 INDOOR_MARGIN_CYCLES = 96  # 24 h at 15 min
 POWER_CYCLES = 4  # 1 h at 15 min
 READY_WINDOW_DAYS = 3
@@ -111,6 +116,7 @@ class CurveSnapshot:
     window_hours: float
     model: SolarModel | None
     calibrated_at: str | None
+    baseline_auto: bool = False
 
 
 def freeze_baseline(settings: Mapping[str, Any]) -> dict[str, float] | None:
@@ -326,6 +332,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._model: SolarModel | None = None
         self._calibrated_at: str | None = None
         self._last_calibration_ts: float | None = None
+        self._last_baseline_learn_ts: float | None = None
+        self._last_active_ts: float | None = None
         self._forecast: WeatherForecast | None = None
         self._forecast_ok = False
         self._indoor_margins: deque[tuple[float, float]] = deque(
@@ -378,10 +386,20 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "model": _model_to_state(self._model),
             "calibrated_at": self._calibrated_at,
             "calibrated_ts": self._last_calibration_ts,
+            "last_active_ts": self._last_active_ts,
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "mode": self._mode,
             "revert_pending": self._revert_pending,
         }
+
+    def _mark_active_ended(self) -> None:
+        """Record when the pump last stopped following our table.
+
+        ``cal_heat_temp`` after this instant is Auto behaviour; before it,
+        hours may have followed the user-defined table we wrote. Baseline
+        learning must not read across the boundary.
+        """
+        self._last_active_ts = dt_util.utcnow().timestamp()
 
     async def _async_persist(self) -> None:
         store = self._store
@@ -420,6 +438,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         calibrated_ts = data.get("calibrated_ts")
         if isinstance(calibrated_ts, (int, float)) and not isinstance(calibrated_ts, bool):
             self._last_calibration_ts = float(calibrated_ts)
+        last_active_ts = data.get("last_active_ts")
+        if isinstance(last_active_ts, (int, float)) and not isinstance(
+            last_active_ts, bool
+        ):
+            self._last_active_ts = float(last_active_ts)
         margins = data.get("indoor_margins")
         if isinstance(margins, list):
             for item in margins:
@@ -591,6 +614,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         """Safety fallback: write holding 22 back to Auto, stop writing."""
         was_active = self._mode == "active"
         self._mode = "shadow"
+        if was_active:
+            self._mark_active_ended()
         device_id = getattr(self._main, "device_id", None)
         client = getattr(self._main, "client", None)
         if self.writable and device_id and client is not None:
@@ -650,6 +675,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if values.get("curve_type_heating") != HeatingCurveType.USER_DEFINED:
             # Someone moved the pump off User defined; stop claiming control.
             self._mode = "shadow"
+            self._mark_active_ended()
             await self._async_persist()
             self.async_update_listeners()
             return
@@ -706,6 +732,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             window_hours=0.0,
             model=self._model,
             calibrated_at=self._calibrated_at,
+            baseline_auto=bool(self._baseline_auto),
         )
 
     def _main_values(self) -> dict:
@@ -810,7 +837,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return {}
         registry = er.async_get(self.hass)
         resolved: dict[str, str] = {}
-        for key in ("heatingpower", "bt1", "bt2", "room_temp_external", "room_temp_ext"):
+        for key in (
+            "heatingpower",
+            "bt1",
+            "bt2",
+            "cal_heat_temp",
+            "room_temp_external",
+            "room_temp_ext",
+        ):
             entity_id = registry.async_get_entity_id(
                 "sensor", DOMAIN, f"qvantum_{key}_{device_id}"
             )
@@ -904,6 +938,93 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             series[int(start)] = float(mean)
         return series
 
+    async def _async_baseline_observations(
+        self, *, since_ts: float | None = None
+    ) -> list[tuple[float, float]]:
+        """Hourly ``(BT1, cal_heat_temp)`` pairs from recorder statistics.
+
+        Only hours with measured heating power are kept: when the circuit is
+        idle ``cal_heat_temp`` can sit at the min-supply clamp and no longer
+        describe the curve, which would drag the correction. ``since_ts``
+        slices the window after the last time active control ended, so hours
+        that followed our own table never enter the Auto fit.
+        """
+        resolved = self._resolve_statistic_ids()
+        outdoor_id = resolved.get("bt1")
+        supply_id = resolved.get("cal_heat_temp")
+        power_id = resolved.get("heatingpower")
+        if not outdoor_id or not supply_id:
+            return []
+        statistic_ids = {outdoor_id, supply_id}
+        if power_id:
+            statistic_ids.add(power_id)
+        start = dt_util.utcnow() - timedelta(days=BASELINE_LEARN_DAYS)
+        if since_ts is not None:
+            start = max(start, datetime.fromtimestamp(since_ts, tz=timezone.utc))
+        rows = await self._async_statistics(statistic_ids, start)
+
+        def _series(entity_id: str) -> dict[int, float]:
+            series: dict[int, float] = {}
+            for row in rows.get(entity_id, []):
+                mean = row.get("mean")
+                start = row.get("start")
+                if mean is None or start is None:
+                    continue
+                series[int(start)] = float(mean)
+            return series
+
+        outdoor = _series(outdoor_id)
+        supply = _series(supply_id)
+        power = _series(power_id) if power_id else {}
+        observations: list[tuple[float, float]] = []
+        for ts in sorted(set(outdoor) & set(supply)):
+            if power_id and power.get(ts, 0.0) < MIN_SAMPLE_Q_W:
+                continue
+            observations.append((outdoor[ts], supply[ts]))
+        return observations
+
+    async def _async_learn_baseline(self, values: Mapping[str, Any], now_ts: float) -> None:
+        """Correct the frozen baseline from observed Auto behaviour.
+
+        Only meaningful while the pump is on Auto (holding 22 = 0): in User
+        defined ``cal_heat_temp`` would follow our own table. Observations are
+        also sliced after the last time active control ended, so a recent
+        active period cannot bias the fit. The correction is throttled and
+        self-stabilises — once it matches the observations the residual falls
+        under the noise threshold and nothing is written.
+        """
+        if self._baseline is None or self.active:
+            return
+        if values.get("curve_type_heating") != HeatingCurveType.AUTO:
+            return
+        if (
+            self._last_baseline_learn_ts is not None
+            and now_ts - self._last_baseline_learn_ts
+            < BASELINE_LEARN_REFRESH_HOURS * 3600.0
+        ):
+            return
+        self._last_baseline_learn_ts = now_ts
+        try:
+            observations = await self._async_baseline_observations(
+                since_ts=self._last_active_ts
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa: BLE001 — correction is best effort
+            _LOGGER.debug("Baseline learning unavailable: %s", err)
+            return
+        if not observations:
+            return
+        candidate = corrected_baseline(self._baseline, observations)
+        if candidate is None:
+            return
+        self._baseline = candidate
+        _LOGGER.info(
+            "Heating-curve baseline corrected from %s observed Auto hours",
+            len(observations),
+        )
+        await self._async_persist()
+
     def _indoor_value(self, values: Mapping[str, Any]) -> float | None:
         mode = values.get("sensor_mode")
         if mode is None:
@@ -975,6 +1096,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
 
         if self._ensure_baseline(values):
             await self._async_persist()
+
+        # Learn what Auto actually delivers while the pump still follows it;
+        # once active, cal_heat_temp would mirror our own table.
+        await self._async_learn_baseline(values, now_ts)
 
         self._forecast_ok = False
         if self._baseline is not None:
@@ -1078,4 +1203,5 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             window_hours=readiness.window_hours,
             model=self._model,
             calibrated_at=self._calibrated_at,
+            baseline_auto=bool(self._baseline_auto),
         )

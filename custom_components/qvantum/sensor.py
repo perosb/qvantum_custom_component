@@ -617,6 +617,7 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             "median_abs_c": snapshot.median_abs_c,
             "max_abs_c": snapshot.max_abs_c,
             "window_hours": snapshot.window_hours,
+            "baseline_auto": snapshot.baseline_auto,
         }
 
 

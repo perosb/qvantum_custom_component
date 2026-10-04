@@ -517,6 +517,7 @@ def _curve_snapshot(**overrides) -> CurveSnapshot:
             valid=True,
         ),
         calibrated_at="2026-03-01T00:00:00+00:00",
+        baseline_auto=True,
     )
     values.update(overrides)
     return CurveSnapshot(**values)
@@ -620,6 +621,7 @@ class TestQvantumCurveSensors:
         assert entity.extra_state_attributes["ready"] is True
         assert entity.extra_state_attributes["blocker"] is None
         assert entity.extra_state_attributes["window_hours"] == 84.0
+        assert entity.extra_state_attributes["baseline_auto"] is True
 
     def test_deviation_sensor_unavailable_without_value(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot(deviation_c=None))

@@ -42,7 +42,7 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **Device automations:** Triggers and conditions for defrost, compressor blocking, freeze protection, Wi-Fi/cloud connectivity, and a ventilation filter due in under 48 hours.
 - **External room sensor:** When configured by the pump, a Modbus number entity can mirror an external temperature into the control setpoint.
 - **Modbus writes:** Optional local writes for supported targets, DHW, fan, operation, room compensation, and sensor settings.
-- **Custom heating curve (Modbus):** A self-calibrating shadow curve that can replace the pump's Auto curve after a manual switch-on; see [docs/heating-curve.md](docs/heating-curve.md).
+- **Custom heating curve (Modbus):** A self-learning curve based on the weather forecast and the pump's own data. It starts in shadow mode and replaces the pump's Auto curve once you switch it on; see [docs/heating-curve.md](docs/heating-curve.md).
 
 #### Device automation details
 
@@ -67,33 +67,28 @@ action:
 
 #### Custom heating curve
 
-Modbus-only, and **Enable writing via Modbus** must be on. The integration
-freezes the pump's current seven-point table (holding 24–30) as a baseline and
-computes one shared adjustment in °C from the Open-Meteo forecast, the local
-daylight rhythm, a self-calibrating solar model and the measured heating
-power. The seven resulting supply points are exposed as
-`sensor.qvantum_custom_curve_*` (plus `sensor.qvantum_custom_curve_adjustment`
-and `sensor.qvantum_custom_curve_deviation`).
+Modbus-only, and **Enable writing via Modbus** must be enabled. Instead of
+using the pump's fixed Auto curve, the integration learns how your house
+responds — from the outdoor forecast, the local daylight rhythm, the sun and
+the heat the pump delivers — and calculates its own version of the curve.
 
-It starts in **shadow mode**: nothing is written and the computed curve is
-compared with the pump's own `cal_heat_temp`. `switch.qvantum_custom_curve_control`
-is the only user-facing source of truth for writing:
+It always starts in **shadow mode**: nothing is written, and the calculated
+curve is only compared with the pump's own curve. When the comparison has
+looked good for a few days, the deviation sensor reports `ready` and you can
+turn on `switch.qvantum_custom_curve_control`. The integration then takes over
+the curve; turning the switch off — or a failed write, or a lost connection —
+hands control straight back to the pump's Auto curve.
 
-- **Off (shadow):** compute and log only.
-- **On (active):** write the seven points while the pump still uses Auto,
-  zero the parallel offset (holding 15), read back and verify, and only then
-  switch holding 22 to User defined. Turning it off — or any failed write —
-  writes holding 22 back to Auto.
+**What is expected of you:**
 
-> [!WARNING]
-> Turn off any existing Home Assistant automation that writes the curve
-> offset number entity (holding 15, "Förskjutning av värmekurva" / curve
-> offset) before enabling the switch, or solar gain will be applied twice.
-> The integration zeroes holding 15 during activation.
+- Enable Modbus writing.
+- Wait until the deviation sensor reports `ready` (a few days of shadow data).
+- Turn off any existing Home Assistant automation that adjusts the curve
+  offset ("Förskjutning av värmekurva") before switching on, otherwise the
+  adjustment is applied twice.
+- Flip the switch yourself; the integration never does.
 
-Wait until the deviation sensor's `ready` attribute is true (at least three
-full days of shadow data) before switching on. The `blocker` attribute names
-the missing signal while it is false.
+Details: [docs/heating-curve.md](docs/heating-curve.md).
 
 ### Services and Elevate Access
 
