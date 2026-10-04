@@ -199,7 +199,9 @@ The switch never turns itself on. `ready` becomes true after at least three
 full local days of deviation statistics with ≥ 90 % coverage, a median
 absolute deviation ≤ 1.0 °C and no hourly deviation beyond 3.0 °C. The
 `blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
-`window`, `median`, `max`). `ready` is a signal, not an activation.
+`window`, `median`, `max`). `ready` is a signal, not an activation. `ready`
+also needs the deviation sensor enabled and the recorder running: without
+hourly statistics the window stays incomplete and `blocker` is `window`.
 
 Turning the switch on:
 
@@ -218,6 +220,9 @@ retried, so a lost connection cannot leave the integration claiming control.
 
 **One writer:** disable Home Assistant automations that write the curve offset
 (holding 15) while the switch is on, otherwise solar gain is applied twice.
+Reversion (active → shadow) writes holding 22 back to Auto but does **not**
+restore the parallel offset; leave the offset-writing automations off until
+they are deliberately re-enabled.
 
 ### Solar model
 
