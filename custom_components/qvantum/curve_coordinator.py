@@ -412,24 +412,29 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             calibrated_at=self._calibrated_at,
         )
 
-    def _main_sections(self) -> tuple[dict, dict]:
-        data = self._main.data if isinstance(self._main.data, dict) else {}
-        values = data.get("values") if isinstance(data.get("values"), dict) else {}
-        settings = data.get("settings") if isinstance(data.get("settings"), dict) else {}
-        return values, settings
+    def _main_values(self) -> dict:
+        """Merged main-coordinator values.
 
-    def _ensure_baseline(self, settings: Mapping[str, Any]) -> bool:
+        The main coordinator merges the holding-register settings into the
+        same ``values`` section as the metrics (``{"device", "values"}``), so
+        curve type, targets and the seven points all live there.
+        """
+        data = self._main.data if isinstance(self._main.data, dict) else {}
+        values = data.get("values")
+        return values if isinstance(values, dict) else {}
+
+    def _ensure_baseline(self, values: Mapping[str, Any]) -> bool:
         """Freeze the pump's seven points once; ``True`` when newly frozen."""
         if self._baseline is not None:
             return False
-        baseline = freeze_baseline(settings)
+        baseline = freeze_baseline(values)
         if baseline is None:
             return False
         self._baseline = baseline
         self._baseline_auto = (
-            settings.get("curve_type_heating") == HeatingCurveType.AUTO
+            values.get("curve_type_heating") == HeatingCurveType.AUTO
         )
-        value = settings.get("temp_compensation_curve")
+        value = values.get("temp_compensation_curve")
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             self._curve_23 = int(value)
         _LOGGER.info(
@@ -551,7 +556,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return {}
 
     def _indoor_metric_key(self, resolved: Mapping[str, str]) -> str | None:
-        values, _settings = self._main_sections()
+        values = self._main_values()
         mode = values.get("sensor_mode")
         if mode is None:
             mode = values.get("use_operation_sensor")
@@ -579,6 +584,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         indoor_key = self._indoor_metric_key(resolved)
         if indoor_key:
             maps["indoor"] = maps[indoor_key]
+        if "bt1" in maps:
+            maps["outdoor"] = maps["bt1"]
         return maps
 
     async def _async_deviation_hours(self) -> dict[int, float]:
@@ -663,11 +670,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         )
 
     async def _async_compute_snapshot(self) -> CurveSnapshot:
-        values, settings = self._main_sections()
+        values = self._main_values()
         now = dt_util.utcnow()
         now_ts = now.timestamp()
 
-        if self._ensure_baseline(settings):
+        if self._ensure_baseline(values):
             await self._async_persist()
 
         self._forecast_ok = False
@@ -713,7 +720,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 q_actual_w=q_actual,
             )
 
-        shadow = settings.get("curve_type_heating") != HeatingCurveType.USER_DEFINED
+        shadow = values.get("curve_type_heating") != HeatingCurveType.USER_DEFINED
         deviation = None
         if result is not None:
             measured_outdoor = values.get("bt1")

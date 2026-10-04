@@ -85,7 +85,8 @@ def make_coordinator(*, values=None, settings=None, store=None):
     ):
         coordinator = QvantumCurveCoordinator.__new__(QvantumCurveCoordinator)
     main = MagicMock()
-    main.data = {"values": values or {}, "settings": settings or {}}
+    # Production merges holding-register settings into the values section.
+    main.data = {"values": {**(values or {}), **(settings or {})}}
     main.device_id = "test_device_123"
     coordinator._main = main
     coordinator._session = MagicMock()
@@ -695,6 +696,7 @@ async def test_hourly_maps_builds_series_and_indoor() -> None:
 
     assert maps["heatingpower"] == {100: 1200.0}
     assert maps["bt1"] == {100: 5.0}
+    assert maps["outdoor"] == {100: 5.0}
     assert maps["indoor"] == {100: 19.0}
 
 

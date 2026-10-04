@@ -484,6 +484,11 @@ class QvantumCurveSensorEntity(CoordinatorEntity, SensorEntity):
         self._attr_device_info = device
         self._attr_entity_registry_enabled_default = enabled_by_default
 
+    @property
+    def suggested_object_id(self) -> str | None:
+        """Stable English slug; translated names must not move entity IDs."""
+        return self._metric_key
+
 
 class QvantumCurvePointSensor(QvantumCurveSensorEntity):
     """One computed supply point of the shadow curve."""
@@ -502,11 +507,6 @@ class QvantumCurvePointSensor(QvantumCurveSensorEntity):
     ) -> None:
         super().__init__(curve_coordinator, metric_key, device, enabled_by_default)
         self._curve_key = _CURVE_POINT_METRICS[metric_key]
-
-    @property
-    def suggested_object_id(self) -> str | None:
-        """Stable English slug; translated names would change entity IDs."""
-        return self._metric_key
 
     @property
     def native_value(self):

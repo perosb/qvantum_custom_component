@@ -571,6 +571,18 @@ class TestQvantumCurveSensors:
         )
         assert empty.available is False
 
+    def test_all_curve_sensors_have_stable_slugs(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        cases = (
+            (QvantumCurveAdjustmentSensor, "custom_curve_adjustment"),
+            (QvantumCurveDeviationSensor, "custom_curve_deviation"),
+            (QvantumCurveSolarModelSensor, "custom_curve_solar_model"),
+        )
+
+        for sensor_cls, key in cases:
+            entity = sensor_cls(coordinator, key, mock_device)
+            assert entity.suggested_object_id == key
+
     def test_deviation_sensor_shadow_attributes(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())
         entity = QvantumCurveDeviationSensor(
