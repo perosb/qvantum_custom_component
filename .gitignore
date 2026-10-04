@@ -26,3 +26,4 @@ dmypy.json
 .idea/
 *.pdf
 docs/*.json
+.opencode/
