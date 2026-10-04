@@ -5,19 +5,22 @@ from __future__ import annotations
 import pytest
 
 from custom_components.qvantum.heating_curve import (
-    DAY_PHASE_MAX_C,
+    BASELINE_MAX_CORRECTION_C,
+    BASELINE_MIN_CORRECTION_C,
     INDOOR_CAP_C,
     LOAD_MAX_C,
     MAX_SUPPLY_C,
     MIN_SUPPLY_C,
-    NIGHT_PHASE_MAX_C,
+    NIGHT_DAY_MAX_C,
     OUTDOOR_MAX_C,
     SOLAR_MAX_C,
     TOTAL_MAX_C,
     CurveResult,
     DayPhase,
     compute_curve,
+    corrected_baseline,
     curve_slope,
+    diurnal_swing_c,
     interpolate_supply,
     load_adjustment_c,
     night_day_adjustment_c,
@@ -155,21 +158,35 @@ def test_outdoor_adjustment_anticipates_forecast_trend() -> None:
     assert outdoor_adjustment_c(points, {}, BASE_HOUR) == 0.0
 
 
+def test_diurnal_swing_c_measures_range() -> None:
+    assert diurnal_swing_c(forecast_map(10.0, (5.0, 15.0)), BASE_HOUR) == 10.0
+    assert diurnal_swing_c(forecast_map(10.0, (10.0,)), BASE_HOUR) == 0.0
+    assert diurnal_swing_c(forecast_map(10.0), BASE_HOUR) is None
+    assert diurnal_swing_c({}, BASE_HOUR) is None
+    assert diurnal_swing_c(forecast_map(None), BASE_HOUR) is None
+    assert diurnal_swing_c({BASE_HOUR: float("nan"), BASE_HOUR + 3600: 5.0}, BASE_HOUR) is None
+
+
 def test_night_day_adjustment_follows_sun() -> None:
-    assert night_day_adjustment_c(DAY0 + 12 * 3600, DAYLIGHT) == pytest.approx(
-        DAY_PHASE_MAX_C
-    )
-    assert night_day_adjustment_c(DAY0, DAYLIGHT) == pytest.approx(
-        -NIGHT_PHASE_MAX_C
-    )
-    assert night_day_adjustment_c(DAY0 + 6 * 3600, DAYLIGHT) == 0.0
-    assert night_day_adjustment_c(DAY0 + 18 * 3600, DAYLIGHT) == pytest.approx(
-        0.0, abs=1e-12
-    )
-    assert night_day_adjustment_c(DAY0 + 21 * 3600, DAYLIGHT) == pytest.approx(
-        -NIGHT_PHASE_MAX_C * 0.7071, abs=1e-4
-    )
-    assert night_day_adjustment_c(DAY0 + 12 * 3600, None) == 0.0
+    amplitude = 0.75
+
+    assert night_day_adjustment_c(
+        DAY0 + 12 * 3600, DAYLIGHT, amplitude_c=amplitude
+    ) == pytest.approx(amplitude)
+    assert night_day_adjustment_c(
+        DAY0, DAYLIGHT, amplitude_c=amplitude
+    ) == pytest.approx(-amplitude)
+    assert night_day_adjustment_c(
+        DAY0 + 6 * 3600, DAYLIGHT, amplitude_c=amplitude
+    ) == 0.0
+    assert night_day_adjustment_c(
+        DAY0 + 18 * 3600, DAYLIGHT, amplitude_c=amplitude
+    ) == pytest.approx(0.0, abs=1e-12)
+    assert night_day_adjustment_c(
+        DAY0 + 21 * 3600, DAYLIGHT, amplitude_c=amplitude
+    ) == pytest.approx(-amplitude * 0.7071, abs=1e-4)
+    assert night_day_adjustment_c(DAY0 + 12 * 3600, None, amplitude_c=amplitude) == 0.0
+    assert night_day_adjustment_c(DAY0 + 12 * 3600, DAYLIGHT, amplitude_c=0.0) == 0.0
 
 
 def test_night_day_adjustment_degenerate_spans() -> None:
@@ -180,9 +197,9 @@ def test_night_day_adjustment_degenerate_spans() -> None:
         next_sunrise_ts=DAY0,
     )
 
-    assert night_day_adjustment_c(DAY0, flat) == 0.0
-    assert night_day_adjustment_c(DAY0 + 3600, flat) == 0.0
-    assert night_day_adjustment_c(DAY0 - 3600, flat) == 0.0
+    assert night_day_adjustment_c(DAY0, flat, amplitude_c=0.5) == 0.0
+    assert night_day_adjustment_c(DAY0 + 3600, flat, amplitude_c=0.5) == 0.0
+    assert night_day_adjustment_c(DAY0 - 3600, flat, amplitude_c=0.5) == 0.0
 
 
 def test_solar_adjustment_scales_with_trust_and_caps() -> None:
@@ -247,6 +264,66 @@ def test_load_adjustment_reduces_when_pump_coasts() -> None:
     assert load_adjustment_c(tiny, 0.0, 21.0, 20.0, {}, BASE_HOUR) == 0.0
 
 
+def _observed_pairs(offset: float, *, span: int = 20) -> list[tuple[float, float]]:
+    base = normalize_baseline(BASELINE)
+    return [
+        (float(outdoor), interpolate_supply(base, float(outdoor)) + offset)
+        for outdoor in range(span + 1)
+        for _ in range(2)
+    ]
+
+
+def test_corrected_baseline_shifts_and_keeps_shape() -> None:
+    learned = corrected_baseline(BASELINE, _observed_pairs(-3.0))
+
+    assert learned is not None
+    for key, value in BASELINE.items():
+        assert learned[key] == pytest.approx(value - 3.0)
+    # Outside the observed range the cached shape is kept, shifted by the fit.
+    assert learned["curve_30"] == pytest.approx(22.0)
+    assert learned["curve_minus_30"] == pytest.approx(57.0)
+
+
+def test_corrected_baseline_rejects_small_or_thin_data() -> None:
+    assert corrected_baseline(BASELINE, _observed_pairs(-3.0)[:10]) is None
+    assert corrected_baseline(BASELINE, [(0.0, 30.0)] * 30) is None
+    assert corrected_baseline(BASELINE, _observed_pairs(-3.0, span=2)) is None
+    assert corrected_baseline({"curve_0": 42.0}, _observed_pairs(-3.0)) is None
+    # Below the noise threshold: keep the cached baseline.
+    assert (
+        corrected_baseline(BASELINE, _observed_pairs(-BASELINE_MIN_CORRECTION_C / 2))
+        is None
+    )
+    # Non-finite rows are dropped, so the correction falls back to "too thin".
+    noisy = _observed_pairs(-3.0)[:10] + [(float("nan"), 30.0)] * 30
+    assert corrected_baseline(BASELINE, noisy) is None
+
+
+def test_corrected_baseline_clamps_extreme_correction() -> None:
+    learned = corrected_baseline(BASELINE, _observed_pairs(-40.0))
+
+    assert learned is not None
+    assert learned["curve_30"] == pytest.approx(
+        BASELINE["curve_30"] - BASELINE_MAX_CORRECTION_C
+    )
+    assert all(MIN_SUPPLY_C <= value <= MAX_SUPPLY_C for value in learned.values())
+
+
+def test_corrected_baseline_fits_a_tilt() -> None:
+    base = normalize_baseline(BASELINE)
+    observations = [
+        (float(outdoor), interpolate_supply(base, float(outdoor)) - 0.2 * outdoor)
+        for outdoor in range(21)
+        for _ in range(2)
+    ]
+
+    learned = corrected_baseline(BASELINE, observations)
+
+    assert learned is not None
+    assert learned["curve_30"] < learned["curve_minus_30"]
+    assert learned["curve_minus_30"] == pytest.approx(60.0 + 0.2 * 30.0, abs=0.5)
+
+
 def test_compute_curve_cold_trend_raises_all_points() -> None:
     result = compute_curve(
         baseline=BASELINE,
@@ -300,20 +377,35 @@ def test_compute_curve_night_setback() -> None:
     result = compute_curve(
         baseline=BASELINE,
         now_ts=DAY0,
-        forecast_temperature=forecast_map(10.0),
+        forecast_temperature=forecast_map(0.0, (20.0,) * 6, now_ts=DAY0),
         ghi_by_hour={},
         daylight=DAYLIGHT,
     )
 
-    assert result.night_day_c == pytest.approx(-NIGHT_PHASE_MAX_C)
-    assert result.adjustment_c == pytest.approx(-NIGHT_PHASE_MAX_C)
+    assert result.night_day_c == pytest.approx(-NIGHT_DAY_MAX_C)
+    assert result.adjustment_c == pytest.approx(
+        result.outdoor_c - NIGHT_DAY_MAX_C
+    )
+
+
+def test_compute_curve_night_setback_needs_a_swing() -> None:
+    # A usable daylight phase but a flat forecast: no invented rhythm offset.
+    result = compute_curve(
+        baseline=BASELINE,
+        now_ts=DAY0,
+        forecast_temperature=forecast_map(10.0, (10.0,) * 6, now_ts=DAY0),
+        ghi_by_hour={},
+        daylight=DAYLIGHT,
+    )
+
+    assert result.night_day_c == 0.0
 
 
 def test_compute_curve_combines_terms_and_clamps_total() -> None:
     result = compute_curve(
         baseline=BASELINE,
         now_ts=DAY0,
-        forecast_temperature=forecast_map(5.0, (15.0,) * 6, now_ts=DAY0),
+        forecast_temperature=forecast_map(5.0, (25.0,) * 6, now_ts=DAY0),
         ghi_by_hour=ghi_flat(now_ts=DAY0),
         model=make_model(),
         daylight=DAYLIGHT,
@@ -322,7 +414,7 @@ def test_compute_curve_combines_terms_and_clamps_total() -> None:
     )
 
     assert result.outdoor_c == pytest.approx(-OUTDOOR_MAX_C)
-    assert result.night_day_c == pytest.approx(-NIGHT_PHASE_MAX_C)
+    assert result.night_day_c == pytest.approx(-NIGHT_DAY_MAX_C)
     assert result.solar_c == pytest.approx(-SOLAR_MAX_C)
     assert result.load_c == pytest.approx(-LOAD_MAX_C)
     assert result.adjustment_c == pytest.approx(-TOTAL_MAX_C)
