@@ -49,6 +49,7 @@ from .const import (
     HTTP_CLOUD_LOOKUP_TIMEOUT,
 )
 from .coordinator import QvantumDataUpdateCoordinator
+from .curve_coordinator import QvantumCurveCoordinator
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
@@ -210,6 +211,7 @@ class RuntimeData:
     maintenance_coordinator: QvantumMaintenanceCoordinator | None = None
     device: DeviceInfo | None = None
     extra_dhw: ExtraDhwTimer | None = None
+    curve_coordinator: QvantumCurveCoordinator | None = None
     modbus_host: str = DEFAULT_MODBUS_HOST
     modbus_port: int = DEFAULT_MODBUS_PORT
     modbus_unit_id: int = DEFAULT_MODBUS_UNIT_ID
@@ -304,6 +306,19 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     await _async_sync_extra_hot_water_service(hass)
 
+    # Custom heating curve (shadow) is Modbus-only. It never blocks setup:
+    # the update method degrades to a blocker snapshot on any failure.
+    curve_coordinator: QvantumCurveCoordinator | None = None
+    if modbus_enabled:
+        curve_coordinator = QvantumCurveCoordinator(hass, config_entry, coordinator)
+        await curve_coordinator.async_restore()
+        try:
+            await curve_coordinator.async_refresh()
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:
+            _LOGGER.debug("Curve coordinator first refresh failed: %s", err)
+
     # Firmware/access monitoring is cloud-only: its entities are created only in
     # cloud mode, so Modbus mode must not build the coordinator either.
     maintenance_coordinator: QvantumMaintenanceCoordinator | None = None
@@ -332,6 +347,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         maintenance_coordinator,
         device,
         extra_dhw=extra_dhw,
+        curve_coordinator=curve_coordinator,
         modbus_host=modbus_host,
         modbus_port=modbus_port,
         modbus_unit_id=modbus_unit_id,
@@ -619,6 +635,7 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
     if runtime is not None:
         for coordinator in (
             getattr(runtime, "maintenance_coordinator", None),
+            getattr(runtime, "curve_coordinator", None),
             getattr(runtime, "coordinator", None),
         ):
             if coordinator is None:

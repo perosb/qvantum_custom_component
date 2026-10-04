@@ -453,14 +453,6 @@
           "4": "Koeling"
         }
       },
-      "heating_curve_advisor": {
-        "name": "Stooklijnadviseur",
-        "state": {
-          "reduce": "Stooklijn verlagen",
-          "ok": "Stooklijn correct",
-          "increase": "Stooklijn verhogen"
-        }
-      },
       "smart_dhw_status": {
         "name": "Slimme status voor warm water"
       },
@@ -588,6 +580,36 @@
       },
       "alarm_5_code": {
         "name": "Alarm 5-code"
+      },
+      "custom_curve_30": {
+        "name": "Eigen stooklijn: +30°C"
+      },
+      "custom_curve_20": {
+        "name": "Eigen stooklijn: +20°C"
+      },
+      "custom_curve_10": {
+        "name": "Eigen stooklijn: +10°C"
+      },
+      "custom_curve_0": {
+        "name": "Eigen stooklijn: 0°C"
+      },
+      "custom_curve_minus_10": {
+        "name": "Eigen stooklijn: -10°C"
+      },
+      "custom_curve_minus_20": {
+        "name": "Eigen stooklijn: -20°C"
+      },
+      "custom_curve_minus_30": {
+        "name": "Eigen stooklijn: -30°C"
+      },
+      "custom_curve_adjustment": {
+        "name": "Eigen stooklijn: aanpassing"
+      },
+      "custom_curve_deviation": {
+        "name": "Eigen stooklijn: afwijking"
+      },
+      "custom_curve_solar_model": {
+        "name": "Eigen stooklijn: zonnemodel"
       }
     },
     "number": {

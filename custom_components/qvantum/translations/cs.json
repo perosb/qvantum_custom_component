@@ -453,14 +453,6 @@
           "4": "Chlazení"
         }
       },
-      "heating_curve_advisor": {
-        "name": "Poradce topné křivky",
-        "state": {
-          "reduce": "Snížit křivku",
-          "ok": "Křivka je v pořádku",
-          "increase": "Zvýšit křivku"
-        }
-      },
       "smart_dhw_status": {
         "name": "Smart stav teplé vody"
       },
@@ -588,6 +580,36 @@
       },
       "alarm_5_code": {
         "name": "Kód alarmu 5"
+      },
+      "custom_curve_30": {
+        "name": "Vlastní topná křivka: +30°C"
+      },
+      "custom_curve_20": {
+        "name": "Vlastní topná křivka: +20°C"
+      },
+      "custom_curve_10": {
+        "name": "Vlastní topná křivka: +10°C"
+      },
+      "custom_curve_0": {
+        "name": "Vlastní topná křivka: 0°C"
+      },
+      "custom_curve_minus_10": {
+        "name": "Vlastní topná křivka: -10°C"
+      },
+      "custom_curve_minus_20": {
+        "name": "Vlastní topná křivka: -20°C"
+      },
+      "custom_curve_minus_30": {
+        "name": "Vlastní topná křivka: -30°C"
+      },
+      "custom_curve_adjustment": {
+        "name": "Vlastní topná křivka: úprava"
+      },
+      "custom_curve_deviation": {
+        "name": "Vlastní topná křivka: odchylka"
+      },
+      "custom_curve_solar_model": {
+        "name": "Vlastní topná křivka: solární model"
       }
     },
     "number": {

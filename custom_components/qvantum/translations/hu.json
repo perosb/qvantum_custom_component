@@ -453,14 +453,6 @@
           "4": "Hűtés"
         }
       },
-      "heating_curve_advisor": {
-        "name": "Fűtési görbe tanácsadó",
-        "state": {
-          "reduce": "Görbe csökkentése",
-          "ok": "Görbe megfelelő",
-          "increase": "Görbe növelése"
-        }
-      },
       "smart_dhw_status": {
         "name": "Intelligens állapot melegvízhez"
       },
@@ -588,6 +580,36 @@
       },
       "alarm_5_code": {
         "name": "5. riasztáskód"
+      },
+      "custom_curve_30": {
+        "name": "Saját fűtési görbe: +30°C"
+      },
+      "custom_curve_20": {
+        "name": "Saját fűtési görbe: +20°C"
+      },
+      "custom_curve_10": {
+        "name": "Saját fűtési görbe: +10°C"
+      },
+      "custom_curve_0": {
+        "name": "Saját fűtési görbe: 0°C"
+      },
+      "custom_curve_minus_10": {
+        "name": "Saját fűtési görbe: -10°C"
+      },
+      "custom_curve_minus_20": {
+        "name": "Saját fűtési görbe: -20°C"
+      },
+      "custom_curve_minus_30": {
+        "name": "Saját fűtési görbe: -30°C"
+      },
+      "custom_curve_adjustment": {
+        "name": "Saját fűtési görbe: korrekció"
+      },
+      "custom_curve_deviation": {
+        "name": "Saját fűtési görbe: eltérés"
+      },
+      "custom_curve_solar_model": {
+        "name": "Saját fűtési görbe: szoláris modell"
       }
     },
     "number": {

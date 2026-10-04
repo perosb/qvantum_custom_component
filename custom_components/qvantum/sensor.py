@@ -22,7 +22,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_utils
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
 from .const import (
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
@@ -36,9 +38,10 @@ from .const import (
     CURRENT_METRICS,
     PRESSURE_METRICS,
 )
-from .entity import QvantumEntity, finalize_platform_setup
+from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
+from .curve_coordinator import QvantumCurveCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -70,6 +73,24 @@ _TOTAL_INCREASING_SENSORS = frozenset(
         "compressor_run_time",
         "compressor_starts",
         "ventilation_fan_run_time",
+    }
+)
+
+# Custom-curve sensor keys (translation/unique-id/slug) mapped to the pump's
+# canonical curve point keys used in coordinator snapshots. Stable English
+# slugs keep dashboards and automations working across locales.
+_CURVE_POINT_METRICS: dict[str, str] = {
+    (
+        f"custom_curve_minus_{abs(outdoor)}" if outdoor < 0 else f"custom_curve_{outdoor}"
+    ): metric_key
+    for metric_key, outdoor in HEATING_CURVE_OUTDOOR_TEMPS.items()
+}
+_CURVE_SENSOR_KEYS = frozenset(
+    {
+        *_CURVE_POINT_METRICS,
+        "custom_curve_adjustment",
+        "custom_curve_deviation",
+        "custom_curve_solar_model",
     }
 )
 
@@ -105,7 +126,7 @@ async def async_setup_entry(
         )
 
     # Special metrics that have dedicated sensor classes (created explicitly below)
-    special_metrics = {"latency", "hpid", "tap_stop", "heating_curve_advisor"}
+    special_metrics = {"latency", "hpid", "tap_stop"}
 
     # Create entities using a hybrid approach:
     # - Disabled-by-default metrics: always create so they appear in the entity registry
@@ -143,17 +164,35 @@ async def async_setup_entry(
     sensors.append(QvantumTimerEntity(coordinator, "tap_stop", device, True))
     if coordinator.modbus_enabled:
         # Local Modbus: display firmware from input registers 191-193 and the
-        # derived heating curve advisor (no cloud equivalent).
+        # custom heating-curve shadow sensors (no cloud equivalent).
         sensors.append(
             QvantumDisplayFirmwareEntity(
                 coordinator, "display_fw_version", device, True
             )
         )
-        sensors.append(
-            QvantumHeatingCurveAdvisorEntity(
-                coordinator, "heating_curve_advisor", device, True
-            )
+        curve_coordinator = getattr(
+            config_entry.runtime_data, "curve_coordinator", None
         )
+        if isinstance(curve_coordinator, QvantumCurveCoordinator):
+            for curve_key in _CURVE_POINT_METRICS:
+                sensors.append(
+                    QvantumCurvePointSensor(curve_coordinator, curve_key, device)
+                )
+            sensors.append(
+                QvantumCurveAdjustmentSensor(
+                    curve_coordinator, "custom_curve_adjustment", device
+                )
+            )
+            sensors.append(
+                QvantumCurveDeviationSensor(
+                    curve_coordinator, "custom_curve_deviation", device
+                )
+            )
+            sensors.append(
+                QvantumCurveSolarModelSensor(
+                    curve_coordinator, "custom_curve_solar_model", device
+                )
+            )
     else:
         # Cloud-only: firmware and access level from the HTTP API
         maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
@@ -185,7 +224,12 @@ async def async_setup_entry(
     # registry entries for metrics no longer supported in the current mode.
     special_sensor_keys = {"totalenergy", "latency", "hpid", "tap_stop"}
     if coordinator.modbus_enabled:
-        special_sensor_keys.update({"display_fw_version", "heating_curve_advisor"})
+        special_sensor_keys.update(
+            {
+                "display_fw_version",
+                *_CURVE_SENSOR_KEYS,
+            }
+        )
     else:
         special_sensor_keys.update(
             {
@@ -421,40 +465,190 @@ class QvantumTotalEnergyEntity(QvantumEnergyEntity):
         )
 
 
-class QvantumHeatingCurveAdvisorEntity(QvantumBaseSensorEntity):
-    """Modbus-only heating curve advisor derived from the room deviation.
+class QvantumCurveSensorEntity(CoordinatorEntity, SensorEntity):
+    """Base for custom heating-curve sensors (Modbus-only coordinator)."""
 
-    The coordinator samples the indoor temperature against
-    ``indoor_temperature_target`` while heating. Once the rolling window is
-    full, the state is ``reduce`` (room consistently warmer than target),
-    ``increase`` (room consistently colder) or ``ok``.
-    """
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        curve_coordinator: QvantumCurveCoordinator,
+        metric_key: str,
+        device: DeviceInfo | dict,
+        enabled_by_default: bool = True,
+    ) -> None:
+        super().__init__(curve_coordinator)
+        self._metric_key = metric_key
+        self._attr_translation_key = metric_key
+        self._attr_unique_id = f"qvantum_{metric_key}_{resolve_device_id(device)}"
+        self._attr_device_info = device
+        self._attr_entity_registry_enabled_default = enabled_by_default
+
+
+class QvantumCurvePointSensor(QvantumCurveSensorEntity):
+    """One computed supply point of the shadow curve."""
+
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:chart-bell-curve"
+
+    def __init__(
+        self,
+        curve_coordinator: QvantumCurveCoordinator,
+        metric_key: str,
+        device: DeviceInfo | dict,
+        enabled_by_default: bool = True,
+    ) -> None:
+        super().__init__(curve_coordinator, metric_key, device, enabled_by_default)
+        self._curve_key = _CURVE_POINT_METRICS[metric_key]
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        """Stable English slug; translated names would change entity IDs."""
+        return self._metric_key
 
     @property
     def native_value(self):
-        """Return the advised curve action."""
-        data = self._values.get(self._metric_key)
-        if not isinstance(data, dict):
+        """Return the computed supply temperature for this outdoor point."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
             return None
-        return data.get("state")
+        return snapshot.points.get(self._curve_key)
 
     @property
-    def available(self):
-        """Check if an advice has been derived."""
+    def available(self) -> bool:
+        """Check the snapshot has this point."""
+        snapshot = self.coordinator.data
+        return (
+            super().available
+            and snapshot is not None
+            and self._curve_key in snapshot.points
+        )
+
+    @property
+    def extra_state_attributes(self):
+        """Return the frozen baseline and the shared adjustment."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        return {
+            "baseline": snapshot.baseline.get(self._curve_key),
+            "adjustment": snapshot.adjustment_c,
+        }
+
+
+class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
+    """The shared adjustment applied to every curve point."""
+
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:tune-variant"
+
+    @property
+    def native_value(self):
+        """Return the adjustment in °C."""
+        snapshot = self.coordinator.data
+        return None if snapshot is None else snapshot.adjustment_c
+
+    @property
+    def available(self) -> bool:
+        """Only meaningful once the curve has been computed."""
+        snapshot = self.coordinator.data
+        return super().available and snapshot is not None and bool(snapshot.points)
+
+    @property
+    def extra_state_attributes(self):
+        """Return the term breakdown."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        return {
+            "outdoor_c": snapshot.outdoor_c,
+            "night_day_c": snapshot.night_day_c,
+            "solar_c": snapshot.solar_c,
+            "load_c": snapshot.load_c,
+            "capped_by_indoor": snapshot.capped_by_indoor,
+        }
+
+
+class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
+    """Computed supply minus the pump's ``cal_heat_temp`` (shadow comparison)."""
+
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:scale-balance"
+
+    @property
+    def native_value(self):
+        """Return computed minus Auto supply in °C."""
+        snapshot = self.coordinator.data
+        return None if snapshot is None else snapshot.deviation_c
+
+    @property
+    def available(self) -> bool:
+        """Check a deviation has been derived."""
         return super().available and self.native_value is not None
 
     @property
     def extra_state_attributes(self):
-        """Return the deviation and the context behind the advice."""
-        data = self._values.get(self._metric_key)
-        if not isinstance(data, dict):
+        """Return shadow state and activation-readiness details."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
             return None
         return {
-            "mean_deviation_c": data.get("mean_deviation_c"),
-            "observed_hours": data.get("observed_hours"),
-            "window_hours": data.get("window_hours"),
-            "curve_type_heating": data.get("curve_type_heating"),
-            "bt1": data.get("bt1"),
+            "shadow": snapshot.shadow,
+            "ready": snapshot.ready,
+            "blocker": snapshot.blocker,
+            "median_abs_c": snapshot.median_abs_c,
+            "max_abs_c": snapshot.max_abs_c,
+            "window_hours": snapshot.window_hours,
+        }
+
+
+class QvantumCurveSolarModelSensor(QvantumCurveSensorEntity):
+    """Diagnostic solar-model confidence and coefficients."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:weather-sunny"
+
+    @property
+    def native_value(self):
+        """Return the model trust in percent."""
+        snapshot = self.coordinator.data
+        if snapshot is None or snapshot.model is None:
+            return None
+        return round(snapshot.model.trust * 100)
+
+    @property
+    def available(self) -> bool:
+        """Check a solar model has been identified."""
+        return super().available and self.native_value is not None
+
+    @property
+    def extra_state_attributes(self):
+        """Return the identified coefficients and diagnostics."""
+        snapshot = self.coordinator.data
+        if snapshot is None or snapshot.model is None:
+            return None
+        model = snapshot.model
+        return {
+            "a_w_per_k": round(model.a_w_per_k, 2),
+            "b_m2": round(model.b_m2, 4),
+            "c_w": round(model.c_w, 1),
+            "b_std_err": (
+                None if model.b_std_err is None else round(model.b_std_err, 5)
+            ),
+            "r2_opaque": round(model.r2_opaque, 3),
+            "r2_solar": round(model.r2_solar, 3),
+            "n_opaque": model.n_opaque,
+            "n_solar": model.n_solar,
+            "valid": model.valid,
+            "calibrated_at": snapshot.calibrated_at,
         }
 
 
