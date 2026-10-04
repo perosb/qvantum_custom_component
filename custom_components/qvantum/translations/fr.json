@@ -453,14 +453,6 @@
           "4": "Refroidissement"
         }
       },
-      "heating_curve_advisor": {
-        "name": "Conseiller de courbe de chauffage",
-        "state": {
-          "reduce": "Réduire la courbe",
-          "ok": "Courbe correcte",
-          "increase": "Augmenter la courbe"
-        }
-      },
       "smart_dhw_status": {
         "name": "Statut Smart pour eau chaude"
       },
@@ -588,6 +580,36 @@
       },
       "alarm_5_code": {
         "name": "Code d'alarme 5"
+      },
+      "custom_curve_30": {
+        "name": "Courbe de chauffage personnalisée: +30°C"
+      },
+      "custom_curve_20": {
+        "name": "Courbe de chauffage personnalisée: +20°C"
+      },
+      "custom_curve_10": {
+        "name": "Courbe de chauffage personnalisée: +10°C"
+      },
+      "custom_curve_0": {
+        "name": "Courbe de chauffage personnalisée: 0°C"
+      },
+      "custom_curve_minus_10": {
+        "name": "Courbe de chauffage personnalisée: -10°C"
+      },
+      "custom_curve_minus_20": {
+        "name": "Courbe de chauffage personnalisée: -20°C"
+      },
+      "custom_curve_minus_30": {
+        "name": "Courbe de chauffage personnalisée: -30°C"
+      },
+      "custom_curve_adjustment": {
+        "name": "Courbe de chauffage personnalisée: ajustement"
+      },
+      "custom_curve_deviation": {
+        "name": "Courbe de chauffage personnalisée: écart"
+      },
+      "custom_curve_solar_model": {
+        "name": "Courbe de chauffage personnalisée: modèle solaire"
       }
     },
     "number": {

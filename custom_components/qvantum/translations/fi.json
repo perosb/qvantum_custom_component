@@ -453,14 +453,6 @@
           "4": "Jäähdytys"
         }
       },
-      "heating_curve_advisor": {
-        "name": "Lämmityskäyräneuvoja",
-        "state": {
-          "reduce": "Laske käyrää",
-          "ok": "Käyrä on sopiva",
-          "increase": "Nosta käyrää"
-        }
-      },
       "smart_dhw_status": {
         "name": "Älykäs käyttöveden tila"
       },
@@ -588,6 +580,36 @@
       },
       "alarm_5_code": {
         "name": "Hälytys 5 -koodi"
+      },
+      "custom_curve_30": {
+        "name": "Oma lämmityskäyrä: +30°C"
+      },
+      "custom_curve_20": {
+        "name": "Oma lämmityskäyrä: +20°C"
+      },
+      "custom_curve_10": {
+        "name": "Oma lämmityskäyrä: +10°C"
+      },
+      "custom_curve_0": {
+        "name": "Oma lämmityskäyrä: 0°C"
+      },
+      "custom_curve_minus_10": {
+        "name": "Oma lämmityskäyrä: -10°C"
+      },
+      "custom_curve_minus_20": {
+        "name": "Oma lämmityskäyrä: -20°C"
+      },
+      "custom_curve_minus_30": {
+        "name": "Oma lämmityskäyrä: -30°C"
+      },
+      "custom_curve_adjustment": {
+        "name": "Oma lämmityskäyrä: säätö"
+      },
+      "custom_curve_deviation": {
+        "name": "Oma lämmityskäyrä: poikkeama"
+      },
+      "custom_curve_solar_model": {
+        "name": "Oma lämmityskäyrä: aurinkomalli"
       }
     },
     "number": {

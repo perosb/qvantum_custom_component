@@ -453,14 +453,6 @@
           "4": "Refrigeración"
         }
       },
-      "heating_curve_advisor": {
-        "name": "Asesor de curva de calefacción",
-        "state": {
-          "reduce": "Bajar la curva",
-          "ok": "Curva correcta",
-          "increase": "Subir la curva"
-        }
-      },
       "smart_dhw_status": {
         "name": "Estado inteligente agua caliente sanitaria"
       },
@@ -588,6 +580,36 @@
       },
       "alarm_5_code": {
         "name": "Código de alarma 5"
+      },
+      "custom_curve_30": {
+        "name": "Curva de calefacción propia: +30°C"
+      },
+      "custom_curve_20": {
+        "name": "Curva de calefacción propia: +20°C"
+      },
+      "custom_curve_10": {
+        "name": "Curva de calefacción propia: +10°C"
+      },
+      "custom_curve_0": {
+        "name": "Curva de calefacción propia: 0°C"
+      },
+      "custom_curve_minus_10": {
+        "name": "Curva de calefacción propia: -10°C"
+      },
+      "custom_curve_minus_20": {
+        "name": "Curva de calefacción propia: -20°C"
+      },
+      "custom_curve_minus_30": {
+        "name": "Curva de calefacción propia: -30°C"
+      },
+      "custom_curve_adjustment": {
+        "name": "Curva de calefacción propia: ajuste"
+      },
+      "custom_curve_deviation": {
+        "name": "Curva de calefacción propia: desviación"
+      },
+      "custom_curve_solar_model": {
+        "name": "Curva de calefacción propia: modelo solar"
       }
     },
     "number": {

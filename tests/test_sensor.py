@@ -51,13 +51,16 @@ with patch(
             from custom_components.qvantum.sensor import (
                 QvantumAccessExpireEntity,
                 QvantumBaseSensorEntity,
+                QvantumCurveAdjustmentSensor,
+                QvantumCurveDeviationSensor,
+                QvantumCurvePointSensor,
+                QvantumCurveSolarModelSensor,
                 QvantumCurrentEntity,
                 QvantumDiagnosticEntity,
                 QvantumDisplayFirmwareEntity,
                 QvantumEnergyEntity,
                 QvantumFirmwareLastCheckSensorEntity,
                 QvantumFirmwareSensorEntity,
-                QvantumHeatingCurveAdvisorEntity,
                 QvantumPowerEntity,
                 QvantumPressureEntity,
                 QvantumTemperatureEntity,
@@ -66,6 +69,11 @@ with patch(
                 _get_sensor_type,
                 async_setup_entry,
             )
+            from custom_components.qvantum.curve_coordinator import (
+                CurveSnapshot,
+                QvantumCurveCoordinator,
+            )
+            from custom_components.qvantum.solar_gain import SolarModel
 
 
 @pytest.fixture
@@ -468,52 +476,177 @@ class TestQvantumTotalEnergyEntity:
         assert entity.available is False
 
 
-class TestQvantumHeatingCurveAdvisorEntity:
-    """Test the QvantumHeatingCurveAdvisorEntity class."""
+CURVE_BASELINE = {
+    "curve_30": 25.0,
+    "curve_20": 30.0,
+    "curve_10": 36.0,
+    "curve_0": 42.0,
+    "curve_minus_10": 48.0,
+    "curve_minus_20": 54.0,
+    "curve_minus_30": 60.0,
+}
 
-    def test_state_and_attributes(self, mock_coordinator, mock_device):
-        """The advisor exposes the derived state and its context."""
-        expected_attributes = {
-            "mean_deviation_c": 1.5,
-            "observed_hours": 6.0,
-            "window_hours": 6.0,
-            "curve_type_heating": 0,
-            "bt1": 5.0,
-        }
-        mock_coordinator.data["values"]["heating_curve_advisor"] = {
-            "state": "reduce",
-            **expected_attributes,
-        }
-        entity = QvantumHeatingCurveAdvisorEntity(
-            mock_coordinator, "heating_curve_advisor", mock_device, True
-        )
 
-        assert entity.native_value == "reduce"
+def _curve_snapshot(**overrides) -> CurveSnapshot:
+    values = dict(
+        shadow=True,
+        points={key: value + 1.0 for key, value in CURVE_BASELINE.items()},
+        baseline=dict(CURVE_BASELINE),
+        adjustment_c=1.0,
+        outdoor_c=0.3,
+        night_day_c=0.2,
+        solar_c=-0.4,
+        load_c=0.9,
+        capped_by_indoor=False,
+        deviation_c=0.5,
+        ready=True,
+        blocker=None,
+        median_abs_c=0.4,
+        max_abs_c=0.9,
+        window_hours=84.0,
+        model=SolarModel(
+            a_w_per_k=161.0,
+            b_m2=0.1,
+            c_w=300.0,
+            trust=0.25,
+            r2_opaque=0.9,
+            r2_solar=0.3,
+            b_std_err=0.05,
+            n_opaque=200,
+            n_solar=100,
+            valid=True,
+        ),
+        calibrated_at="2026-03-01T00:00:00+00:00",
+    )
+    values.update(overrides)
+    return CurveSnapshot(**values)
+
+
+def _curve_coordinator(snapshot: CurveSnapshot) -> QvantumCurveCoordinator:
+    coordinator = QvantumCurveCoordinator.__new__(QvantumCurveCoordinator)
+    coordinator.data = snapshot
+    return coordinator
+
+
+class TestQvantumCurveSensors:
+    """Test the custom heating-curve shadow sensors."""
+
+    def test_point_sensor_value_and_attributes(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        entity = QvantumCurvePointSensor(coordinator, "custom_curve_30", mock_device)
+
+        assert entity.native_value == 26.0
         assert entity.available is True
-        assert entity.extra_state_attributes == expected_attributes
-        assert getattr(entity, "_attr_device_class", None) is None
-        assert entity._attr_icon == "mdi:tune-variant"
+        assert entity.extra_state_attributes == {"baseline": 25.0, "adjustment": 1.0}
+        assert entity.suggested_object_id == "custom_curve_30"
+        assert entity._attr_unique_id == "qvantum_custom_curve_30_test_device_123"
 
-    def test_unavailable_without_advice(self, mock_coordinator, mock_device):
-        """No derived advice means no state and no attributes."""
-        entity = QvantumHeatingCurveAdvisorEntity(
-            mock_coordinator, "heating_curve_advisor", mock_device, True
+    def test_point_sensor_unavailable_without_point(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot(points={}))
+        entity = QvantumCurvePointSensor(coordinator, "custom_curve_minus_30", mock_device)
+
+        assert entity.native_value is None
+        assert entity.available is False
+        assert entity.extra_state_attributes["baseline"] == 60.0
+
+    def test_adjustment_sensor_breakdown(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        entity = QvantumCurveAdjustmentSensor(
+            coordinator, "custom_curve_adjustment", mock_device
+        )
+
+        assert entity.native_value == 1.0
+        assert entity.extra_state_attributes == {
+            "outdoor_c": 0.3,
+            "night_day_c": 0.2,
+            "solar_c": -0.4,
+            "load_c": 0.9,
+            "capped_by_indoor": False,
+        }
+
+        empty = QvantumCurveAdjustmentSensor(
+            _curve_coordinator(_curve_snapshot(points={})),
+            "custom_curve_adjustment",
+            mock_device,
+        )
+        assert empty.available is False
+
+    def test_all_curve_sensors_have_stable_slugs(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        cases = (
+            (QvantumCurveAdjustmentSensor, "custom_curve_adjustment"),
+            (QvantumCurveDeviationSensor, "custom_curve_deviation"),
+            (QvantumCurveSolarModelSensor, "custom_curve_solar_model"),
+        )
+
+        for sensor_cls, key in cases:
+            entity = sensor_cls(coordinator, key, mock_device)
+            assert entity.suggested_object_id == key
+
+    def test_deviation_sensor_shadow_attributes(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        entity = QvantumCurveDeviationSensor(
+            coordinator, "custom_curve_deviation", mock_device
+        )
+
+        assert entity.native_value == 0.5
+        assert entity.extra_state_attributes["shadow"] is True
+        assert entity.extra_state_attributes["ready"] is True
+        assert entity.extra_state_attributes["blocker"] is None
+        assert entity.extra_state_attributes["window_hours"] == 84.0
+
+    def test_deviation_sensor_unavailable_without_value(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot(deviation_c=None))
+        entity = QvantumCurveDeviationSensor(
+            coordinator, "custom_curve_deviation", mock_device
+        )
+
+        assert entity.available is False
+
+    def test_solar_model_sensor_reports_trust_and_coefficients(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        entity = QvantumCurveSolarModelSensor(
+            coordinator, "custom_curve_solar_model", mock_device
+        )
+
+        assert entity.native_value == 25
+        attrs = entity.extra_state_attributes
+        assert attrs["a_w_per_k"] == 161.0
+        assert attrs["b_m2"] == 0.1
+        assert attrs["r2_solar"] == 0.3
+        assert attrs["calibrated_at"] == "2026-03-01T00:00:00+00:00"
+
+    def test_solar_model_sensor_unavailable_without_model(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot(model=None))
+        entity = QvantumCurveSolarModelSensor(
+            coordinator, "custom_curve_solar_model", mock_device
         )
 
         assert entity.native_value is None
         assert entity.available is False
         assert entity.extra_state_attributes is None
 
-    def test_non_dict_value_is_treated_as_missing(self, mock_coordinator, mock_device):
-        """A plain metric value cannot satisfy the advisor contract."""
-        mock_coordinator.data["values"]["heating_curve_advisor"] = "reduce"
-        entity = QvantumHeatingCurveAdvisorEntity(
-            mock_coordinator, "heating_curve_advisor", mock_device, True
+    def test_curve_sensors_handle_missing_snapshot(self, mock_device):
+        coordinator = _curve_coordinator(None)
+        point = QvantumCurvePointSensor(coordinator, "custom_curve_30", mock_device)
+        adjustment = QvantumCurveAdjustmentSensor(
+            coordinator, "custom_curve_adjustment", mock_device
+        )
+        deviation = QvantumCurveDeviationSensor(
+            coordinator, "custom_curve_deviation", mock_device
+        )
+        model = QvantumCurveSolarModelSensor(
+            coordinator, "custom_curve_solar_model", mock_device
         )
 
-        assert entity.native_value is None
-        assert entity.available is False
-        assert entity.extra_state_attributes is None
+        assert point.native_value is None
+        assert point.extra_state_attributes is None
+        assert adjustment.native_value is None
+        assert adjustment.extra_state_attributes is None
+        assert deviation.native_value is None
+        assert deviation.extra_state_attributes is None
+        assert model.native_value is None
+        assert model.extra_state_attributes is None
 
 
 class TestQvantumDiagnosticEntity:
@@ -797,7 +930,11 @@ class TestSensorSetup:
         assert "hpid" in allowed
         assert "tap_stop" in allowed
         assert "display_fw_version" in allowed
-        assert "heating_curve_advisor" in allowed
+        assert "custom_curve_30" in allowed
+        assert "custom_curve_minus_30" in allowed
+        assert "custom_curve_adjustment" in allowed
+        assert "custom_curve_deviation" in allowed
+        assert "custom_curve_solar_model" in allowed
         assert "expiresAt" not in allowed
         assert "firmware_last_check" not in allowed
 
@@ -851,14 +988,17 @@ class TestSensorSetup:
         )
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry_modbus_creates_heating_curve_advisor(
+    async def test_async_setup_entry_modbus_creates_curve_sensors(
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):
-        """Modbus mode exposes the derived heating curve advisor once."""
+        """Modbus mode exposes the seven points plus the adjustment sensors."""
         from custom_components.qvantum.const import CONF_MODBUS_TCP
 
         mock_config_entry.options = {CONF_MODBUS_TCP: True}
         mock_coordinator.modbus_enabled = True
+        mock_config_entry.runtime_data.curve_coordinator = _curve_coordinator(
+            _curve_snapshot()
+        )
 
         with (
             patch("custom_components.qvantum.entity.disable_entities_by_default"),
@@ -868,25 +1008,51 @@ class TestSensorSetup:
             await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
 
         entities = async_add_entities.call_args[0][0]
-        advisors = [
+        points = [
             entity
             for entity in entities
-            if isinstance(entity, QvantumHeatingCurveAdvisorEntity)
+            if isinstance(entity, QvantumCurvePointSensor)
+        ]
+        adjustments = [
+            entity
+            for entity in entities
+            if isinstance(entity, QvantumCurveAdjustmentSensor)
+        ]
+        deviations = [
+            entity
+            for entity in entities
+            if isinstance(entity, QvantumCurveDeviationSensor)
+        ]
+        models = [
+            entity
+            for entity in entities
+            if isinstance(entity, QvantumCurveSolarModelSensor)
         ]
 
-        assert len(advisors) == 1
-        assert (
-            advisors[0]._attr_unique_id
-            == "qvantum_heating_curve_advisor_test_device_123"
+        assert len(points) == 7
+        assert {(e._attr_unique_id, e._attr_translation_key) for e in points} == {
+            (
+                f"qvantum_custom_curve_{key}_test_device_123",
+                f"custom_curve_{key}",
+            )
+            for key in ("30", "20", "10", "0", "minus_10", "minus_20", "minus_30")
+        }
+        assert len(adjustments) == len(deviations) == len(models) == 1
+        assert adjustments[0]._attr_unique_id == (
+            "qvantum_custom_curve_adjustment_test_device_123"
         )
-        assert advisors[0]._attr_translation_key == "heating_curve_advisor"
+        assert deviations[0]._attr_translation_key == "custom_curve_deviation"
+        assert models[0]._attr_translation_key == "custom_curve_solar_model"
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry_http_does_not_create_heating_curve_advisor(
+    async def test_async_setup_entry_http_does_not_create_curve_sensors(
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):
-        """The advisor is derived from Modbus-only metrics; cloud mode skips it."""
+        """The custom curve is Modbus-only; cloud mode skips its sensors."""
         mock_coordinator.modbus_enabled = False
+        mock_config_entry.runtime_data.curve_coordinator = _curve_coordinator(
+            _curve_snapshot()
+        )
 
         with (
             patch("custom_components.qvantum.entity.disable_entities_by_default"),
@@ -897,8 +1063,7 @@ class TestSensorSetup:
 
         entities = async_add_entities.call_args[0][0]
         assert not any(
-            isinstance(entity, QvantumHeatingCurveAdvisorEntity)
-            for entity in entities
+            isinstance(entity, QvantumCurvePointSensor) for entity in entities
         )
 
     @pytest.mark.asyncio

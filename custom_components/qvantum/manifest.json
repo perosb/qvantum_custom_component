@@ -1,6 +1,9 @@
 {
     "domain": "qvantum",
     "name": "Qvantum Heat Pump",
+    "after_dependencies": [
+        "recorder"
+    ],
     "codeowners": [
         "@perosb"
     ],

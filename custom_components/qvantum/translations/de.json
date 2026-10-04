@@ -453,14 +453,6 @@
           "4": "Kühlung"
         }
       },
-      "heating_curve_advisor": {
-        "name": "Heizkurven-Berater",
-        "state": {
-          "reduce": "Kurve senken",
-          "ok": "Kurve passt",
-          "increase": "Kurve anheben"
-        }
-      },
       "smart_dhw_status": {
         "name": "Intelligenter Status für Brauchwasser"
       },
@@ -588,6 +580,36 @@
       },
       "alarm_5_code": {
         "name": "Alarm 5 Code"
+      },
+      "custom_curve_30": {
+        "name": "Eigene Heizkurve: +30°C"
+      },
+      "custom_curve_20": {
+        "name": "Eigene Heizkurve: +20°C"
+      },
+      "custom_curve_10": {
+        "name": "Eigene Heizkurve: +10°C"
+      },
+      "custom_curve_0": {
+        "name": "Eigene Heizkurve: 0°C"
+      },
+      "custom_curve_minus_10": {
+        "name": "Eigene Heizkurve: -10°C"
+      },
+      "custom_curve_minus_20": {
+        "name": "Eigene Heizkurve: -20°C"
+      },
+      "custom_curve_minus_30": {
+        "name": "Eigene Heizkurve: -30°C"
+      },
+      "custom_curve_adjustment": {
+        "name": "Eigene Heizkurve: Anpassung"
+      },
+      "custom_curve_deviation": {
+        "name": "Eigene Heizkurve: Abweichung"
+      },
+      "custom_curve_solar_model": {
+        "name": "Eigene Heizkurve: Solarmodell"
       }
     },
     "number": {

@@ -519,14 +519,6 @@
           "4": "Kyler"
         }
       },
-      "heating_curve_advisor": {
-        "name": "Kurvrådgivare",
-        "state": {
-          "reduce": "Sänk kurvan",
-          "ok": "Kurvan är bra",
-          "increase": "Höj kurvan"
-        }
-      },
       "smart_dhw_status": {
         "name": "Smart status för varmvatten"
       },
@@ -588,6 +580,36 @@
       },
       "alarm_5_code": {
         "name": "Larm 5-kod"
+      },
+      "custom_curve_30": {
+        "name": "Egen värmekurva: +30°C"
+      },
+      "custom_curve_20": {
+        "name": "Egen värmekurva: +20°C"
+      },
+      "custom_curve_10": {
+        "name": "Egen värmekurva: +10°C"
+      },
+      "custom_curve_0": {
+        "name": "Egen värmekurva: 0°C"
+      },
+      "custom_curve_minus_10": {
+        "name": "Egen värmekurva: -10°C"
+      },
+      "custom_curve_minus_20": {
+        "name": "Egen värmekurva: -20°C"
+      },
+      "custom_curve_minus_30": {
+        "name": "Egen värmekurva: -30°C"
+      },
+      "custom_curve_adjustment": {
+        "name": "Egen värmekurva: justering"
+      },
+      "custom_curve_deviation": {
+        "name": "Egen värmekurva: avvikelse"
+      },
+      "custom_curve_solar_model": {
+        "name": "Egen värmekurva: solmodell"
       }
     },
     "number": {

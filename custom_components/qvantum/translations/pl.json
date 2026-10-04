@@ -453,14 +453,6 @@
           "4": "Chłodzenie"
         }
       },
-      "heating_curve_advisor": {
-        "name": "Doradca krzywej grzewczej",
-        "state": {
-          "reduce": "Obniż krzywą",
-          "ok": "Krzywa w porządku",
-          "increase": "Podnieś krzywą"
-        }
-      },
       "smart_dhw_status": {
         "name": "Status Smart dla ciepłej wody"
       },
@@ -588,6 +580,36 @@
       },
       "alarm_5_code": {
         "name": "Kod alarmu 5"
+      },
+      "custom_curve_30": {
+        "name": "Własna krzywa grzewcza: +30°C"
+      },
+      "custom_curve_20": {
+        "name": "Własna krzywa grzewcza: +20°C"
+      },
+      "custom_curve_10": {
+        "name": "Własna krzywa grzewcza: +10°C"
+      },
+      "custom_curve_0": {
+        "name": "Własna krzywa grzewcza: 0°C"
+      },
+      "custom_curve_minus_10": {
+        "name": "Własna krzywa grzewcza: -10°C"
+      },
+      "custom_curve_minus_20": {
+        "name": "Własna krzywa grzewcza: -20°C"
+      },
+      "custom_curve_minus_30": {
+        "name": "Własna krzywa grzewcza: -30°C"
+      },
+      "custom_curve_adjustment": {
+        "name": "Własna krzywa grzewcza: korekta"
+      },
+      "custom_curve_deviation": {
+        "name": "Własna krzywa grzewcza: odchylenie"
+      },
+      "custom_curve_solar_model": {
+        "name": "Własna krzywa grzewcza: model słoneczny"
       }
     },
     "number": {

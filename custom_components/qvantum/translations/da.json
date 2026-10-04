@@ -453,14 +453,6 @@
           "4": "Køling"
         }
       },
-      "heating_curve_advisor": {
-        "name": "Varmekurverådgiver",
-        "state": {
-          "reduce": "Sænk kurven",
-          "ok": "Kurven er fin",
-          "increase": "Hæv kurven"
-        }
-      },
       "smart_dhw_status": {
         "name": "Smart-status for varmt vand"
       },
@@ -588,6 +580,36 @@
       },
       "alarm_5_code": {
         "name": "Alarm 5-kode"
+      },
+      "custom_curve_30": {
+        "name": "Egen varmekurve: +30°C"
+      },
+      "custom_curve_20": {
+        "name": "Egen varmekurve: +20°C"
+      },
+      "custom_curve_10": {
+        "name": "Egen varmekurve: +10°C"
+      },
+      "custom_curve_0": {
+        "name": "Egen varmekurve: 0°C"
+      },
+      "custom_curve_minus_10": {
+        "name": "Egen varmekurve: -10°C"
+      },
+      "custom_curve_minus_20": {
+        "name": "Egen varmekurve: -20°C"
+      },
+      "custom_curve_minus_30": {
+        "name": "Egen varmekurve: -30°C"
+      },
+      "custom_curve_adjustment": {
+        "name": "Egen varmekurve: justering"
+      },
+      "custom_curve_deviation": {
+        "name": "Egen varmekurve: afvigelse"
+      },
+      "custom_curve_solar_model": {
+        "name": "Egen varmekurve: solmodel"
       }
     },
     "number": {
