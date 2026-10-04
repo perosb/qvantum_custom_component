@@ -57,7 +57,7 @@
         "name": "Modo vacaciones"
       },
       "custom_curve_control": {
-        "name": "Curva de calefacción propia: control"
+        "name": "Curva de calefacción adaptativa: control"
       }
     },
     "select": {
@@ -585,34 +585,34 @@
         "name": "Código de alarma 5"
       },
       "custom_curve_30": {
-        "name": "Curva de calefacción propia 1: 30°C"
+        "name": "Curva de calefacción adaptativa 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Curva de calefacción propia 2: 20°C"
+        "name": "Curva de calefacción adaptativa 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Curva de calefacción propia 3: 10°C"
+        "name": "Curva de calefacción adaptativa 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Curva de calefacción propia 4: 0°C"
+        "name": "Curva de calefacción adaptativa 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Curva de calefacción propia 5: -10°C"
+        "name": "Curva de calefacción adaptativa 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Curva de calefacción propia 6: -20°C"
+        "name": "Curva de calefacción adaptativa 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Curva de calefacción propia 7: -30°C"
+        "name": "Curva de calefacción adaptativa 7: -30°C"
       },
       "custom_curve_adjustment": {
-        "name": "Curva de calefacción propia: ajuste"
+        "name": "Curva de calefacción adaptativa: ajuste"
       },
       "custom_curve_deviation": {
-        "name": "Curva de calefacción propia: desviación"
+        "name": "Curva de calefacción adaptativa: desviación"
       },
       "custom_curve_solar_model": {
-        "name": "Curva de calefacción propia: modelo solar"
+        "name": "Curva de calefacción adaptativa: modelo solar"
       }
     },
     "number": {
@@ -838,7 +838,7 @@
     },
     "set_curve_control": {
       "name": "Establecer control de curva",
-      "description": "Modo de control de la curva de calefacción propia",
+      "description": "Modo de control de la curva de calefacción adaptativa",
       "fields": {
         "mode": {
           "name": "Modo",

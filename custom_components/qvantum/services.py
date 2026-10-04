@@ -120,7 +120,7 @@ async def async_setup_services(hass: HomeAssistant):
             return {
                 "qvantum": {
                     "exception": "unknown_error",
-                    "details": "Custom curve control is only available in Modbus mode",
+                    "details": "Adaptive curve control is only available in Modbus mode",
                 }
             }
         try:

@@ -57,7 +57,7 @@
         "name": "Režim dovolené"
       },
       "custom_curve_control": {
-        "name": "Vlastní topná křivka: ovládání"
+        "name": "Adaptivní topná křivka: ovládání"
       }
     },
     "select": {
@@ -585,34 +585,34 @@
         "name": "Kód alarmu 5"
       },
       "custom_curve_30": {
-        "name": "Vlastní topná křivka 1: 30°C"
+        "name": "Adaptivní topná křivka 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Vlastní topná křivka 2: 20°C"
+        "name": "Adaptivní topná křivka 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Vlastní topná křivka 3: 10°C"
+        "name": "Adaptivní topná křivka 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Vlastní topná křivka 4: 0°C"
+        "name": "Adaptivní topná křivka 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Vlastní topná křivka 5: -10°C"
+        "name": "Adaptivní topná křivka 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Vlastní topná křivka 6: -20°C"
+        "name": "Adaptivní topná křivka 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Vlastní topná křivka 7: -30°C"
+        "name": "Adaptivní topná křivka 7: -30°C"
       },
       "custom_curve_adjustment": {
-        "name": "Vlastní topná křivka: úprava"
+        "name": "Adaptivní topná křivka: úprava"
       },
       "custom_curve_deviation": {
-        "name": "Vlastní topná křivka: odchylka"
+        "name": "Adaptivní topná křivka: odchylka"
       },
       "custom_curve_solar_model": {
-        "name": "Vlastní topná křivka: solární model"
+        "name": "Adaptivní topná křivka: solární model"
       }
     },
     "number": {
@@ -838,7 +838,7 @@
     },
     "set_curve_control": {
       "name": "Nastavit ovládání křivky",
-      "description": "Režim ovládání vlastní topné křivky",
+      "description": "Režim ovládání adaptivní topné křivky",
       "fields": {
         "mode": {
           "name": "Režim",

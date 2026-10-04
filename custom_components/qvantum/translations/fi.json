@@ -57,7 +57,7 @@
         "name": "Lomatila"
       },
       "custom_curve_control": {
-        "name": "Oma lämmityskäyrä: ohjaus"
+        "name": "Adaptiivinen lämmityskäyrä: ohjaus"
       }
     },
     "select": {
@@ -585,34 +585,34 @@
         "name": "Hälytys 5 -koodi"
       },
       "custom_curve_30": {
-        "name": "Oma lämmityskäyrä 1: 30°C"
+        "name": "Adaptiivinen lämmityskäyrä 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Oma lämmityskäyrä 2: 20°C"
+        "name": "Adaptiivinen lämmityskäyrä 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Oma lämmityskäyrä 3: 10°C"
+        "name": "Adaptiivinen lämmityskäyrä 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Oma lämmityskäyrä 4: 0°C"
+        "name": "Adaptiivinen lämmityskäyrä 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Oma lämmityskäyrä 5: -10°C"
+        "name": "Adaptiivinen lämmityskäyrä 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Oma lämmityskäyrä 6: -20°C"
+        "name": "Adaptiivinen lämmityskäyrä 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Oma lämmityskäyrä 7: -30°C"
+        "name": "Adaptiivinen lämmityskäyrä 7: -30°C"
       },
       "custom_curve_adjustment": {
-        "name": "Oma lämmityskäyrä: säätö"
+        "name": "Adaptiivinen lämmityskäyrä: säätö"
       },
       "custom_curve_deviation": {
-        "name": "Oma lämmityskäyrä: poikkeama"
+        "name": "Adaptiivinen lämmityskäyrä: poikkeama"
       },
       "custom_curve_solar_model": {
-        "name": "Oma lämmityskäyrä: aurinkomalli"
+        "name": "Adaptiivinen lämmityskäyrä: aurinkomalli"
       }
     },
     "number": {
@@ -838,7 +838,7 @@
     },
     "set_curve_control": {
       "name": "Aseta käyrän ohjaus",
-      "description": "Oman lämmityskäyrän ohjaustila",
+      "description": "Adaptiivisen lämmityskäyrän ohjaustila",
       "fields": {
         "mode": {
           "name": "Tila",

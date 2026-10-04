@@ -14,7 +14,7 @@ extra_hot_water:
 set_curve_control:
   name: set_curve_control
   description: >-
-    Custom heating-curve control mode. "shadow" only computes and logs the
+    Adaptive heating-curve control mode. "shadow" only computes and logs the
     curve; "active" writes the seven points and switches the pump to User
     defined. Modbus only, and only one of the two modes is ever active.
   fields:

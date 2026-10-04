@@ -57,7 +57,7 @@
         "name": "Vacation mode"
       },
       "custom_curve_control": {
-        "name": "Custom heating curve: control"
+        "name": "Adaptive heating curve: control"
       }
     },
     "select": {
@@ -585,34 +585,34 @@
         "name": "Alarm 5 code"
       },
       "custom_curve_30": {
-        "name": "Custom heating curve 1: 30°C"
+        "name": "Adaptive heating curve 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Custom heating curve 2: 20°C"
+        "name": "Adaptive heating curve 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Custom heating curve 3: 10°C"
+        "name": "Adaptive heating curve 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Custom heating curve 4: 0°C"
+        "name": "Adaptive heating curve 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Custom heating curve 5: -10°C"
+        "name": "Adaptive heating curve 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Custom heating curve 6: -20°C"
+        "name": "Adaptive heating curve 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Custom heating curve 7: -30°C"
+        "name": "Adaptive heating curve 7: -30°C"
       },
       "custom_curve_adjustment": {
-        "name": "Custom heating curve: adjustment"
+        "name": "Adaptive heating curve: adjustment"
       },
       "custom_curve_deviation": {
-        "name": "Custom heating curve: deviation"
+        "name": "Adaptive heating curve: deviation"
       },
       "custom_curve_solar_model": {
-        "name": "Custom heating curve: solar model"
+        "name": "Adaptive heating curve: solar model"
       }
     },
     "number": {
@@ -838,7 +838,7 @@
     },
     "set_curve_control": {
       "name": "Set curve control",
-      "description": "Custom heating curve control mode",
+      "description": "Adaptive heating curve control mode",
       "fields": {
         "mode": {
           "name": "Mode",

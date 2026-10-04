@@ -101,7 +101,7 @@
         "name": "Semesterläge"
       },
       "custom_curve_control": {
-        "name": "Egen värmekurva: styrning"
+        "name": "Adaptiv värmekurva: styrning"
       }
     },
     "button": {
@@ -585,34 +585,34 @@
         "name": "Larm 5-kod"
       },
       "custom_curve_30": {
-        "name": "Egen värmekurva 1: 30°C"
+        "name": "Adaptiv värmekurva 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Egen värmekurva 2: 20°C"
+        "name": "Adaptiv värmekurva 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Egen värmekurva 3: 10°C"
+        "name": "Adaptiv värmekurva 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Egen värmekurva 4: 0°C"
+        "name": "Adaptiv värmekurva 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Egen värmekurva 5: -10°C"
+        "name": "Adaptiv värmekurva 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Egen värmekurva 6: -20°C"
+        "name": "Adaptiv värmekurva 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Egen värmekurva 7: -30°C"
+        "name": "Adaptiv värmekurva 7: -30°C"
       },
       "custom_curve_adjustment": {
-        "name": "Egen värmekurva: justering"
+        "name": "Adaptiv värmekurva: justering"
       },
       "custom_curve_deviation": {
-        "name": "Egen värmekurva: avvikelse"
+        "name": "Adaptiv värmekurva: avvikelse"
       },
       "custom_curve_solar_model": {
-        "name": "Egen värmekurva: solmodell"
+        "name": "Adaptiv värmekurva: solmodell"
       }
     },
     "number": {
@@ -838,7 +838,7 @@
     },
     "set_curve_control": {
       "name": "Ställ in kurvstyrning",
-      "description": "Läge för egen värmekurva",
+      "description": "Läge för adaptiv värmekurva",
       "fields": {
         "mode": {
           "name": "Läge",

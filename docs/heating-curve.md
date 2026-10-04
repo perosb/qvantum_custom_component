@@ -148,7 +148,7 @@ Writing 23 from HA **does** change Auto `cal_heat_temp` on Modbus. It is
 not the same as the app’s DUT fields. HA cannot reproduce the DUT
 generator.
 
-## Custom curve control
+## Adaptive curve control
 
 **Modbus-only** and requires the Modbus write option. The module freezes the
 pump's current seven-point table (holding 24–30) as the baseline and computes

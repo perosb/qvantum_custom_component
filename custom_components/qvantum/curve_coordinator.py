@@ -652,7 +652,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         # the next cycle and silently undo this activation.
         self._revert_pending = False
         await self._async_persist()
-        _LOGGER.info("Custom heating curve active (holding 22 = User defined)")
+        _LOGGER.info("Adaptive heating curve active (holding 22 = User defined)")
 
     async def _async_revert(self) -> None:
         """Safety fallback: write holding 22 back to Auto, stop writing."""
@@ -1202,7 +1202,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if not changed:
             return
         _LOGGER.info(
-            "Custom-curve trims updated from %s indoor-error hours",
+            "Adaptive-curve trims updated from %s indoor-error hours",
             len(observations),
         )
         await self._async_persist()
@@ -1335,7 +1335,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             if clamped != self._clamped_state:
                 if clamped:
                     _LOGGER.warning(
-                        "Custom-curve points clamped to the pump's supply "
+                        "Adaptive-curve points clamped to the pump's supply "
                         "limits (%.0f–%.0f °C)",
                         low,
                         high,

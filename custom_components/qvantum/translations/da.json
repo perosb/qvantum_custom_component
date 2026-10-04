@@ -57,7 +57,7 @@
         "name": "Ferietilstand"
       },
       "custom_curve_control": {
-        "name": "Egen varmekurve: styring"
+        "name": "Adaptiv varmekurve: styring"
       }
     },
     "select": {
@@ -585,34 +585,34 @@
         "name": "Alarm 5-kode"
       },
       "custom_curve_30": {
-        "name": "Egen varmekurve 1: 30°C"
+        "name": "Adaptiv varmekurve 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Egen varmekurve 2: 20°C"
+        "name": "Adaptiv varmekurve 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Egen varmekurve 3: 10°C"
+        "name": "Adaptiv varmekurve 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Egen varmekurve 4: 0°C"
+        "name": "Adaptiv varmekurve 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Egen varmekurve 5: -10°C"
+        "name": "Adaptiv varmekurve 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Egen varmekurve 6: -20°C"
+        "name": "Adaptiv varmekurve 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Egen varmekurve 7: -30°C"
+        "name": "Adaptiv varmekurve 7: -30°C"
       },
       "custom_curve_adjustment": {
-        "name": "Egen varmekurve: justering"
+        "name": "Adaptiv varmekurve: justering"
       },
       "custom_curve_deviation": {
-        "name": "Egen varmekurve: afvigelse"
+        "name": "Adaptiv varmekurve: afvigelse"
       },
       "custom_curve_solar_model": {
-        "name": "Egen varmekurve: solmodel"
+        "name": "Adaptiv varmekurve: solmodel"
       }
     },
     "number": {
@@ -838,7 +838,7 @@
     },
     "set_curve_control": {
       "name": "Indstil kurvestyring",
-      "description": "Styringstilstand for egen varmekurve",
+      "description": "Styringstilstand for adaptiv varmekurve",
       "fields": {
         "mode": {
           "name": "Tilstand",
