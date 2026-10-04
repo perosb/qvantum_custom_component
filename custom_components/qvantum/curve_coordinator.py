@@ -3,8 +3,10 @@
 On a slow interval this coordinator fetches the Open-Meteo forecast, reads
 long-term recorder statistics for the calibration window, freezes the Auto
 baseline, fits the self-calibrating solar model and computes the shadow
-curve. The seven points are logged and compared against the pump's
-``cal_heat_temp`` — this module never writes to the heat pump.
+curve. In shadow mode the seven points are only logged and compared against
+the pump's ``cal_heat_temp``. In active mode (manual switch or service) the
+coordinator writes changed points and holds holding 22 = User defined, with
+a safety reversion to Auto on any failure.
 
 Failures degrade to the last good snapshot (a ``blocker`` names the missing
 signal) instead of failing the update, so a missing forecast can never block
@@ -25,16 +27,20 @@ from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from .client.models import result_applied
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
 from .const import DOMAIN, HP_STATUS_HEATING, HeatingCurveType, SensorMode
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .heating_curve import (
+    MAX_SUPPLY_C,
+    MIN_SUPPLY_C,
     DayPhase,
     compute_curve,
     interpolate_supply,
@@ -65,6 +71,12 @@ READY_MIN_COVERAGE = 0.9
 READY_MEDIAN_MAX_C = 1.0
 READY_MAX_ABS_C = 3.0
 STORAGE_VERSION = 1
+
+#: Pause between single-point Modbus writes so one cycle is not a burst.
+WRITE_PAUSE_SECONDS = 1.0
+#: Minimum change in °C before a point is rewritten.
+MIN_WRITE_DELTA_C = 1.0
+CONTROL_MODES = ("shadow", "active")
 
 
 @dataclass(frozen=True)
@@ -183,6 +195,28 @@ def curve_deviation_c(
     return interpolate_supply(pairs, outdoor_c) - cal_heat_temp_c
 
 
+def points_within_limits(points: Mapping[str, float]) -> bool:
+    """True when all seven points are 10–80 °C and fall toward warmer outdoors.
+
+    Used as the last gate before writing; a violation triggers the safety
+    reversion instead of writing a table the firmware must not follow.
+    """
+    if any(key not in points for key in CURVE_KEYS):
+        return False
+    previous: float | None = None
+    for key in CURVE_KEYS:  # +30 … −30: supply must be non-decreasing
+        value = points[key]
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return False
+        value = float(value)
+        if value < MIN_SUPPLY_C - 1e-9 or value > MAX_SUPPLY_C + 1e-9:
+            return False
+        if previous is not None and value < previous - 1e-9:
+            return False
+        previous = value
+    return True
+
+
 def assess_readiness(
     hourly_deviations: Mapping[int, float],
     now_ts: int,
@@ -298,6 +332,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             maxlen=INDOOR_MARGIN_CYCLES
         )
         self._powers: deque[float] = deque(maxlen=POWER_CYCLES)
+        self._mode = "shadow"
+        self._revert_pending = False
+        self._control_lock = asyncio.Lock()
 
         super().__init__(
             hass,
@@ -317,6 +354,17 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return self._model
 
     @property
+    def active(self) -> bool:
+        """True when the curve writes the pump (holding 22 is ours)."""
+        return self._mode == "active"
+
+    @property
+    def writable(self) -> bool:
+        """True when the Modbus client accepts holding writes."""
+        client = getattr(self._main, "client", None)
+        return bool(getattr(client, "writable", False))
+
+    @property
     def session(self) -> Any:
         if self._session is None:
             self._session = async_get_clientsession(self.hass)
@@ -331,6 +379,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "calibrated_at": self._calibrated_at,
             "calibrated_ts": self._last_calibration_ts,
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
+            "mode": self._mode,
+            "revert_pending": self._revert_pending,
         }
 
     async def _async_persist(self) -> None:
@@ -380,6 +430,239 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     and isinstance(item[1], (int, float))
                 ):
                     self._indoor_margins.append((float(item[0]), float(item[1])))
+        if self._baseline is not None and data.get("mode") in CONTROL_MODES:
+            self._mode = str(data.get("mode"))
+        elif data.get("mode") == "shadow":
+            self._mode = "shadow"
+        self._revert_pending = bool(data.get("revert_pending", False))
+
+    async def async_set_control_mode(self, mode: str) -> None:
+        """Switch between shadow (no writes) and active curve control."""
+        if mode not in CONTROL_MODES:
+            raise ValueError(f"unknown curve control mode: {mode!r}")
+        async with self._control_lock:
+            if mode == "active":
+                await self._async_activate()
+            elif self.active:
+                await self._async_revert()
+            else:
+                # Already shadow: never touch a table this module does not
+                # own; only retry a latched safety reversion.
+                await self._async_retry_revert()
+        self.async_update_listeners()
+
+    def _integer_points(self) -> dict[str, int]:
+        """Whole-degree targets from the last snapshot."""
+        snapshot = self.data
+        if snapshot is None:
+            return {}
+        return {
+            key: int(math.floor(value + 0.5))
+            for key, value in snapshot.points.items()
+        }
+
+    async def _async_read_pump_settings(self) -> dict[str, Any]:
+        device_id = getattr(self._main, "device_id", None)
+        if not device_id:
+            return {}
+        payload = await self._main.client.get_settings(device_id)
+        return self._main._process_settings_data(payload)
+
+    async def _async_write_or_revert(
+        self, awaitable: Any, *, label: str
+    ) -> Any | None:
+        """Await a curve write; on failure revert to Auto and stop active."""
+        try:
+            response = await awaitable
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa: BLE001 — transport failures revert
+            _LOGGER.warning("Curve write %s failed: %s", label, err)
+            await self._async_revert()
+            return None
+        if not result_applied(response):
+            _LOGGER.warning("Curve write %s was not applied: %s", label, response)
+            await self._async_revert()
+            return None
+        return response
+
+    async def _async_activate(self) -> None:
+        """Manual activation: points first (Auto ignores them), 22 last."""
+        if self._mode == "active":
+            return
+        if self._baseline is None:
+            raise HomeAssistantError("No frozen curve baseline yet")
+        if not self.writable:
+            raise HomeAssistantError("Modbus writes are not enabled")
+        device_id = getattr(self._main, "device_id", None)
+        if not device_id:
+            raise HomeAssistantError("No Qvantum device id available")
+        points = self._integer_points()
+        if not points or not points_within_limits(points):
+            raise HomeAssistantError("No writable curve points yet")
+
+        client = self._main.client
+        values = self._main_values()
+        if values.get("curve_type_heating") != HeatingCurveType.AUTO:
+            response = await self._async_write_or_revert(
+                client.set_curve_type_heating(device_id, int(HeatingCurveType.AUTO)),
+                label="curve_type_heating=Auto",
+            )
+            if response is None:
+                raise HomeAssistantError("Could not switch the pump to Auto")
+            await handle_setting_update_response(
+                response,
+                self._main,
+                "values",
+                "curve_type_heating",
+                int(HeatingCurveType.AUTO),
+            )
+        for key, value in points.items():
+            response = await self._async_write_or_revert(
+                client.set_heating_curve_point(device_id, key, value),
+                label=f"{key}={value}",
+            )
+            if response is None:
+                raise HomeAssistantError(f"Could not write {key}")
+            await handle_setting_update_response(
+                response, self._main, "values", key, value
+            )
+            await asyncio.sleep(WRITE_PAUSE_SECONDS)
+        response = await self._async_write_or_revert(
+            client.set_indoor_temperature_offset(device_id, 0),
+            label="offset=0",
+        )
+        if response is None:
+            raise HomeAssistantError("Could not zero the curve offset")
+        await handle_setting_update_response(
+            response, self._main, "values", "indoor_temperature_offset", 0
+        )
+
+        try:
+            readback = await self._async_read_pump_settings()
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa: BLE001 — verification is mandatory
+            await self._async_revert()
+            raise HomeAssistantError(f"Could not verify curve points: {err}") from err
+        for key, value in points.items():
+            reported = readback.get(key)
+            if (
+                not isinstance(reported, (int, float))
+                or isinstance(reported, bool)
+                or int(math.floor(float(reported) + 0.5)) != value
+            ):
+                await self._async_revert()
+                raise HomeAssistantError(f"Curve point {key} did not stick")
+
+        response = await self._async_write_or_revert(
+            client.set_curve_type_heating(
+                device_id, int(HeatingCurveType.USER_DEFINED)
+            ),
+            label="curve_type_heating=User defined",
+        )
+        if response is None:
+            raise HomeAssistantError("Could not enable the user-defined curve")
+        await handle_setting_update_response(
+            response,
+            self._main,
+            "values",
+            "curve_type_heating",
+            int(HeatingCurveType.USER_DEFINED),
+        )
+        self._mode = "active"
+        await self._async_persist()
+        _LOGGER.info("Custom heating curve active (holding 22 = User defined)")
+
+    async def _async_revert(self) -> None:
+        """Safety fallback: write holding 22 back to Auto, stop writing."""
+        was_active = self._mode == "active"
+        self._mode = "shadow"
+        device_id = getattr(self._main, "device_id", None)
+        client = getattr(self._main, "client", None)
+        if self.writable and device_id and client is not None:
+            try:
+                response = await client.set_curve_type_heating(
+                    device_id, int(HeatingCurveType.AUTO)
+                )
+                if result_applied(response):
+                    await handle_setting_update_response(
+                        response,
+                        self._main,
+                        "values",
+                        "curve_type_heating",
+                        int(HeatingCurveType.AUTO),
+                    )
+                    self._revert_pending = False
+                else:
+                    self._revert_pending = True
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001 — connection may be gone
+                self._revert_pending = True
+        elif was_active:
+            self._revert_pending = True
+        await self._async_persist()
+        self.async_update_listeners()
+
+    async def _async_retry_revert(self) -> None:
+        """Retry a failed safety reversion once the pump is reachable."""
+        if not self._revert_pending or not self.writable:
+            return
+        device_id = getattr(self._main, "device_id", None)
+        if not device_id:
+            return
+        try:
+            response = await self._main.client.set_curve_type_heating(
+                device_id, int(HeatingCurveType.AUTO)
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 — retry next cycle
+            return
+        if result_applied(response):
+            self._revert_pending = False
+            await self._async_persist()
+
+    async def _async_apply_active(self, result: Any) -> None:
+        """Write changed points while active; a failure reverts to Auto."""
+        if not self.writable:
+            await self._async_revert()
+            return
+        device_id = getattr(self._main, "device_id", None)
+        if not device_id:
+            await self._async_revert()
+            return
+        values = self._main_values()
+        if values.get("curve_type_heating") != HeatingCurveType.USER_DEFINED:
+            # Someone moved the pump off User defined; stop claiming control.
+            self._mode = "shadow"
+            await self._async_persist()
+            self.async_update_listeners()
+            return
+        if not points_within_limits(dict(result.points)):
+            await self._async_revert()
+            return
+
+        client = self._main.client
+        for key, value in result.integer_points():
+            current = values.get(key)
+            if (
+                isinstance(current, (int, float))
+                and not isinstance(current, bool)
+                and abs(float(value) - float(current)) < MIN_WRITE_DELTA_C
+            ):
+                continue
+            response = await self._async_write_or_revert(
+                client.set_heating_curve_point(device_id, key, value),
+                label=f"{key}={value}",
+            )
+            if response is None:
+                return
+            await handle_setting_update_response(
+                response, self._main, "values", key, value
+            )
+            await asyncio.sleep(WRITE_PAUSE_SECONDS)
 
     async def _async_update_data(self) -> CurveSnapshot:
         """Never fail the coordinator: degrade to the last good snapshot."""
@@ -722,6 +1005,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 indoor_target_c=indoor_target,
                 q_actual_w=q_actual,
             )
+
+        async with self._control_lock:
+            if self._revert_pending:
+                await self._async_retry_revert()
+            if self.active and result is not None:
+                await self._async_apply_active(result)
 
         shadow = values.get("curve_type_heating") != HeatingCurveType.USER_DEFINED
         deviation = None

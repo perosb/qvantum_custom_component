@@ -55,6 +55,9 @@
       },
       "vacation_mode": {
         "name": "Režim dovolené"
+      },
+      "custom_curve_control": {
+        "name": "Vlastní topná křivka: ovládání"
       }
     },
     "select": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Minuty",
           "description": "Minuty pro výrobu extra teplé vody (0 minut vypne)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Nastavit ovládání křivky",
+      "description": "Režim ovládání vlastní topné křivky",
+      "fields": {
+        "mode": {
+          "name": "Režim",
+          "description": "shadow = pouze výpočet, active = zápis křivky"
         }
       }
     }

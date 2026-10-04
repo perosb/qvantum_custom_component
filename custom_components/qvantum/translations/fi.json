@@ -55,6 +55,9 @@
       },
       "vacation_mode": {
         "name": "Lomatila"
+      },
+      "custom_curve_control": {
+        "name": "Oma lämmityskäyrä: ohjaus"
       }
     },
     "select": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Minuutit",
           "description": "Minuutteja lisälämpimän käyttöveden tuottamiseen (0 minuuttia kytkee pois päältä)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Aseta käyrän ohjaus",
+      "description": "Oman lämmityskäyrän ohjaustila",
+      "fields": {
+        "mode": {
+          "name": "Tila",
+          "description": "shadow = vain laskenta, active = kirjoita käyrä"
         }
       }
     }

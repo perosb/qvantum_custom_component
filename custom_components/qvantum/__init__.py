@@ -142,6 +142,7 @@ async def _async_sync_extra_hot_water_service(
         return
     if registered:
         hass.services.async_remove(DOMAIN, "extra_hot_water")
+        hass.services.async_remove(DOMAIN, "set_curve_control")
 
 
 def _modbus_write_enabled(config_entry: ConfigEntry) -> bool:
@@ -398,10 +399,23 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
 
     extra_dhw = runtime.extra_dhw
     client = runtime.client
-    if extra_dhw is not None and isinstance(client, QvantumModbusClient):
+    if isinstance(client, QvantumModbusClient):
         write_enabled = _modbus_write_enabled(config_entry)
         if client.writable and not write_enabled:
-            extra_dhw.cancel(clear_store=True)
+            if extra_dhw is not None:
+                extra_dhw.cancel(clear_store=True)
+            curve = getattr(runtime, "curve_coordinator", None)
+            if curve is not None and curve.active:
+                # Revert holding 22 while writes are still possible; once the
+                # option is off the pump would keep the custom table
+                # unsupervised.
+                try:
+                    await curve.async_set_control_mode("shadow")
+                except Exception as err:
+                    _LOGGER.debug(
+                        "Could not revert custom curve while disabling writes: %s",
+                        err,
+                    )
         client.writable = write_enabled
 
     changed = runtime.coordinator.apply_poll_interval(config_entry)

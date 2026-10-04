@@ -4,13 +4,14 @@ import logging
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .curve_coordinator import QvantumCurveCoordinator
 from .entity import QvantumEntity, finalize_platform_setup
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,12 +46,22 @@ async def async_setup_entry(
         if switch_name in coordinator.data.get("values", {}):
             sensors.append(QvantumSwitchEntity(coordinator, switch_name, device))
 
+    curve_coordinator = getattr(config_entry.runtime_data, "curve_coordinator", None)
+    switch_metrics = set(switch_names)
+    if coordinator.modbus_enabled and isinstance(
+        curve_coordinator, QvantumCurveCoordinator
+    ):
+        sensors.append(
+            QvantumCurveControlSwitch(coordinator, curve_coordinator, device)
+        )
+        switch_metrics.add("custom_curve_control")
+
     finalize_platform_setup(
         hass,
         coordinator,
         async_add_entities,
         sensors,
-        set(switch_names),
+        switch_metrics,
         "switch",
     )
 
@@ -152,3 +163,64 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
                     values.get(self._metric_key) is not None
                     and self._has_write_access
                 )
+
+
+class QvantumCurveControlSwitch(QvantumEntity, SwitchEntity):
+    """Enable active custom-curve writing; off is shadow mode.
+
+    The switch is the only user-facing source of truth for whether the curve
+    module may write. It is bound to the main coordinator for write access
+    but reflects the curve coordinator's control mode.
+    """
+
+    _attr_device_class = SwitchDeviceClass.SWITCH
+    _attr_icon = "mdi:chart-bell-curve"
+
+    def __init__(
+        self,
+        coordinator: QvantumDataUpdateCoordinator,
+        curve_coordinator: QvantumCurveCoordinator,
+        device: DeviceInfo,
+    ) -> None:
+        super().__init__(coordinator, "custom_curve_control", device)
+        self._curve = curve_coordinator
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        """Stable English slug."""
+        return "custom_curve_control"
+
+    async def async_added_to_hass(self) -> None:
+        """Follow control-mode changes from the curve coordinator."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self._curve.async_add_listener(self._handle_curve_update)
+        )
+
+    @callback
+    def _handle_curve_update(self) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def is_on(self) -> bool:
+        return self._curve.active
+
+    @property
+    def available(self) -> bool:
+        """Only offer the switch when a write could actually succeed."""
+        if not super().available:
+            return False
+        if not getattr(self._curve, "last_update_success", True):
+            return False
+        return self._has_write_access
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Activate writing: points first, holding 22 last."""
+        self._require_write_access()
+        await self._curve.async_set_control_mode("active")
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Return to shadow mode and holding 22 Auto."""
+        self._require_write_access()
+        await self._curve.async_set_control_mode("shadow")
+

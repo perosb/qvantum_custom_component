@@ -55,6 +55,9 @@
       },
       "vacation_mode": {
         "name": "Mode vacances"
+      },
+      "custom_curve_control": {
+        "name": "Courbe de chauffage personnalisée : contrôle"
       }
     },
     "select": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Minutes",
           "description": "Minutes de production d'eau chaude extra (0 minutes arrête)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Définir le contrôle de la courbe",
+      "description": "Mode de contrôle de la courbe de chauffage personnalisée",
+      "fields": {
+        "mode": {
+          "name": "Mode",
+          "description": "shadow = calcul uniquement, active = écrire la courbe"
         }
       }
     }

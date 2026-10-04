@@ -3,7 +3,7 @@
 import sys
 import types
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 # Import real functions before mocking
 from custom_components.qvantum import (
@@ -105,7 +105,10 @@ class TestSetupDeviceRequirements:
         hass.services.has_service = MagicMock(return_value=True)
         hass.services.async_remove = MagicMock()
         await _async_sync_extra_hot_water_service(hass, skip_entry_id="modbus")
-        hass.services.async_remove.assert_called_once_with("qvantum", "extra_hot_water")
+        assert hass.services.async_remove.call_args_list == [
+            call("qvantum", "extra_hot_water"),
+            call("qvantum", "set_curve_control"),
+        ]
 
     @pytest.mark.asyncio
     async def test_sync_extra_hot_water_ignores_unloaded_cloud_entry(self, hass):
@@ -594,6 +597,99 @@ class TestIntegrationSetup:
         hass.config_entries.async_reload.assert_not_called()
         extra_dhw.cancel.assert_called_once_with(clear_store=True)
         assert mock_api.writable is False
+
+    @pytest.mark.asyncio
+    async def test_async_update_listener_reverts_curve_when_writes_disabled(
+        self, hass, mock_config_entry
+    ):
+        """An active custom curve must return to Auto before writes go away."""
+        from tests.conftest import make_client_mock
+
+        hass.config_entries.async_reload = AsyncMock()
+
+        mock_api = make_client_mock(modbus=True)
+        mock_api._modbus_tcp = True
+        mock_api._modbus_write = True
+        mock_api._modbus_host = "Qvantum-HP"
+        mock_api._modbus_port = 502
+        mock_api._modbus_unit_id = 1
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.client = mock_api
+        mock_coordinator.apply_poll_interval = MagicMock(return_value=False)
+
+        curve = MagicMock()
+        curve.active = True
+        curve.async_set_control_mode = AsyncMock()
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = mock_coordinator
+        mock_config_entry.runtime_data.client = mock_api
+        mock_config_entry.runtime_data.extra_dhw = MagicMock()
+        mock_config_entry.runtime_data.curve_coordinator = curve
+        mock_config_entry.runtime_data.modbus_host = "Qvantum-HP"
+        mock_config_entry.runtime_data.modbus_port = 502
+        mock_config_entry.runtime_data.modbus_unit_id = 1
+        mock_api.writable = True
+        mock_config_entry.options = {
+            "modbus_tcp": True,
+            "modbus_host": "Qvantum-HP",
+            "modbus_scan_interval": 10,
+            "modbus_write": False,
+        }
+        mock_config_entry.data = {}
+
+        await _async_update_listener(hass, mock_config_entry)
+
+        curve.async_set_control_mode.assert_awaited_once_with("shadow")
+        assert mock_api.writable is False
+
+    @pytest.mark.asyncio
+    async def test_async_update_listener_leaves_shadow_curve_alone(
+        self, hass, mock_config_entry
+    ):
+        """Disabling writes must not touch a curve that is not active."""
+        from tests.conftest import make_client_mock
+
+        hass.config_entries.async_reload = AsyncMock()
+
+        mock_api = make_client_mock(modbus=True)
+        mock_api._modbus_tcp = True
+        mock_api._modbus_write = True
+        mock_api._modbus_host = "Qvantum-HP"
+        mock_api._modbus_port = 502
+        mock_api._modbus_unit_id = 1
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.client = mock_api
+        mock_coordinator.apply_poll_interval = MagicMock(return_value=False)
+
+        curve = MagicMock()
+        curve.active = False
+        curve.async_set_control_mode = AsyncMock()
+
+        mock_config_entry.runtime_data = MagicMock()
+        mock_config_entry.runtime_data.coordinator = mock_coordinator
+        mock_config_entry.runtime_data.client = mock_api
+        mock_config_entry.runtime_data.extra_dhw = MagicMock()
+        mock_config_entry.runtime_data.curve_coordinator = curve
+        mock_config_entry.runtime_data.modbus_host = "Qvantum-HP"
+        mock_config_entry.runtime_data.modbus_port = 502
+        mock_config_entry.runtime_data.modbus_unit_id = 1
+        mock_api.writable = True
+        mock_config_entry.options = {
+            "modbus_tcp": True,
+            "modbus_host": "Qvantum-HP",
+            "modbus_scan_interval": 10,
+            "modbus_write": False,
+        }
+        mock_config_entry.data = {}
+
+        await _async_update_listener(hass, mock_config_entry)
+
+        curve.async_set_control_mode.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_async_update_listener_reloads_on_modbus_host_change(
