@@ -297,6 +297,19 @@ def test_smooth_ghi_missing_hours_and_degenerate_options() -> None:
     assert smooth_ghi({now_hour - 3600: 1000.0}, NOW, tau_hours=0.0) == 0.0
 
 
+def test_smooth_ghi_skips_non_finite_hours() -> None:
+    now_hour = NOW - (NOW % 3600)
+    flat = {now_hour + step * 3600: 200.0 for step in range(-6, 7)}
+
+    nan = dict(flat)
+    nan[now_hour] = float("nan")
+    assert smooth_ghi(nan, NOW) == pytest.approx(200.0)
+
+    infinite = dict(flat)
+    infinite[now_hour] = float("inf")
+    assert smooth_ghi(infinite, NOW) == pytest.approx(200.0)
+
+
 def test_trust_from_t_stat_is_bounded_and_monotonic() -> None:
     assert _trust_from_t_stat(0.0) == 0.0
     assert _trust_from_t_stat(-1.0) == 0.0

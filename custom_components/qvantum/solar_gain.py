@@ -111,11 +111,16 @@ def smooth_ghi(
         value = hourly_ghi.get(now_hour + step * 3600)
         if value is None:
             continue
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            # A corrupt hour must renormalise like a missing one, not clamp
+            # NaN to 0 W/m² or drag the average to inf.
+            continue
         if tau_hours > 0.0:
             weight = math.exp(-abs(step) / tau_hours)
         else:
             weight = float(step == 0)
-        total += weight * max(0.0, float(value))
+        total += weight * max(0.0, numeric)
         total_w += weight
     if total_w <= 0.0:
         return 0.0
