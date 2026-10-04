@@ -20,7 +20,7 @@ import logging
 import math
 import time
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo
@@ -41,11 +41,15 @@ from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_res
 from .heating_curve import (
     MAX_SUPPLY_C,
     MIN_SUPPLY_C,
+    TOTAL_MAX_C,
+    TRIM_MAX_C,
     DayPhase,
     compute_curve,
     corrected_baseline,
+    effective_supply_bounds,
     interpolate_supply,
     normalize_baseline,
+    trim_residuals,
 )
 from .open_meteo import (
     OpenMeteoError,
@@ -69,6 +73,12 @@ MIN_SAMPLE_Q_W = 50.0
 BASELINE_LEARN_DAYS = 7
 #: Minimum time between baseline-correction statistics fetches.
 BASELINE_LEARN_REFRESH_HOURS = 6.0
+#: Rolling window of indoor-error hours behind the active trims.
+TRIM_WINDOW_DAYS = 7
+#: Minimum time between trim updates.
+TRIM_REFRESH_HOURS = 24.0
+#: Fraction of the indicated residual applied per update (damped loop).
+TRIM_UPDATE_GAIN = 0.3
 INDOOR_MARGIN_CYCLES = 96  # 24 h at 15 min
 POWER_CYCLES = 4  # 1 h at 15 min
 READY_WINDOW_DAYS = 3
@@ -117,6 +127,11 @@ class CurveSnapshot:
     model: SolarModel | None
     calibrated_at: str | None
     baseline_auto: bool = False
+    trims: Mapping[str, float] = field(default_factory=dict)
+    clamped: bool = False
+    baseline_learned_hours: int | None = None
+    baseline_outdoor_min_c: float | None = None
+    baseline_outdoor_max_c: float | None = None
 
 
 def freeze_baseline(settings: Mapping[str, Any]) -> dict[str, float] | None:
@@ -201,11 +216,17 @@ def curve_deviation_c(
     return interpolate_supply(pairs, outdoor_c) - cal_heat_temp_c
 
 
-def points_within_limits(points: Mapping[str, float]) -> bool:
-    """True when all seven points are 10–80 °C and fall toward warmer outdoors.
+def points_within_limits(
+    points: Mapping[str, float],
+    *,
+    min_supply_c: float = MIN_SUPPLY_C,
+    max_supply_c: float = MAX_SUPPLY_C,
+) -> bool:
+    """True when all seven points lie within the effective supply limits.
 
-    Used as the last gate before writing; a violation triggers the safety
-    reversion instead of writing a table the firmware must not follow.
+    ``min_supply_c``/``max_supply_c`` are the pump's own limits when known
+    (holding 19/20), otherwise the register range. A violation triggers the
+    safety reversion instead of writing a table the firmware must not follow.
     """
     if any(key not in points for key in CURVE_KEYS):
         return False
@@ -215,7 +236,7 @@ def points_within_limits(points: Mapping[str, float]) -> bool:
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             return False
         value = float(value)
-        if value < MIN_SUPPLY_C - 1e-9 or value > MAX_SUPPLY_C + 1e-9:
+        if value < min_supply_c - 1e-9 or value > max_supply_c + 1e-9:
             return False
         if previous is not None and value < previous - 1e-9:
             return False
@@ -334,6 +355,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._last_calibration_ts: float | None = None
         self._last_baseline_learn_ts: float | None = None
         self._last_active_ts: float | None = None
+        self._trims: dict[str, float] = {}
+        self._last_trim_ts: float | None = None
+        self._baseline_stats: dict[str, Any] | None = None
+        self._clamped_state = False
         self._forecast: WeatherForecast | None = None
         self._forecast_ok = False
         self._indoor_margins: deque[tuple[float, float]] = deque(
@@ -387,6 +412,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "calibrated_at": self._calibrated_at,
             "calibrated_ts": self._last_calibration_ts,
             "last_active_ts": self._last_active_ts,
+            "trims": dict(self._trims),
+            "baseline_stats": self._baseline_stats,
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "mode": self._mode,
             "revert_pending": self._revert_pending,
@@ -443,6 +470,20 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             last_active_ts, bool
         ):
             self._last_active_ts = float(last_active_ts)
+        trims = data.get("trims")
+        if isinstance(trims, dict):
+            for key, value in trims.items():
+                if (
+                    key in CURVE_KEYS
+                    and isinstance(value, (int, float))
+                    and not isinstance(value, bool)
+                ):
+                    self._trims[key] = float(value)
+        stats = data.get("baseline_stats")
+        if isinstance(stats, dict):
+            self._baseline_stats = {
+                key: stats.get(key) for key in ("hours", "min_c", "max_c", "corrected")
+            }
         margins = data.get("indoor_margins")
         if isinstance(margins, list):
             for item in margins:
@@ -549,6 +590,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 "curve_type_heating",
                 int(HeatingCurveType.AUTO),
             )
+        low, high = self._supply_bounds(live)
+        if not points_within_limits(points, min_supply_c=low, max_supply_c=high):
+            raise HomeAssistantError("Curve points outside the pump's supply limits")
         for key, value in points.items():
             response = await self._async_write_or_revert(
                 client.set_heating_curve_point(device_id, key, value),
@@ -616,6 +660,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._mode = "shadow"
         if was_active:
             self._mark_active_ended()
+            # Active trims belong to the active period; the next activation
+            # relearns them against whatever baseline is current then.
+            self._trims = {}
+            self._last_trim_ts = None
         device_id = getattr(self._main, "device_id", None)
         client = getattr(self._main, "client", None)
         if self.writable and device_id and client is not None:
@@ -676,10 +724,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             # Someone moved the pump off User defined; stop claiming control.
             self._mode = "shadow"
             self._mark_active_ended()
+            self._trims = {}
+            self._last_trim_ts = None
             await self._async_persist()
             self.async_update_listeners()
             return
-        if not points_within_limits(dict(result.points)):
+        low, high = self._supply_bounds(values)
+        if not points_within_limits(
+            dict(result.points), min_supply_c=low, max_supply_c=high
+        ):
             await self._async_revert()
             return
 
@@ -733,6 +786,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             model=self._model,
             calibrated_at=self._calibrated_at,
             baseline_auto=bool(self._baseline_auto),
+            trims={},
+            clamped=False,
         )
 
     def _main_values(self) -> dict:
@@ -745,6 +800,37 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         data = self._main.data if isinstance(self._main.data, dict) else {}
         values = data.get("values")
         return values if isinstance(values, dict) else {}
+
+    def _supply_bounds(self, values: Mapping[str, Any]) -> tuple[float, float]:
+        """Effective pump supply limits, falling back to the register range."""
+        return effective_supply_bounds(
+            values.get("min_heating_supply"), values.get("max_heating_supply")
+        )
+
+    def _baseline_stats_values(self) -> tuple[int | None, float | None, float | None]:
+        """Validated ``(hours, outdoor min, outdoor max)`` from the last fit."""
+        stats = self._baseline_stats or {}
+        hours = stats.get("hours")
+        outdoor_min = stats.get("min_c")
+        outdoor_max = stats.get("max_c")
+        valid_hours = (
+            int(hours)
+            if isinstance(hours, (int, float)) and not isinstance(hours, bool)
+            else None
+        )
+        valid_min = (
+            float(outdoor_min)
+            if isinstance(outdoor_min, (int, float))
+            and not isinstance(outdoor_min, bool)
+            else None
+        )
+        valid_max = (
+            float(outdoor_max)
+            if isinstance(outdoor_max, (int, float))
+            and not isinstance(outdoor_max, bool)
+            else None
+        )
+        return valid_hours, valid_min, valid_max
 
     def _ensure_baseline(self, values: Mapping[str, Any]) -> bool:
         """Freeze the pump's seven points once; ``True`` when newly frozen."""
@@ -1015,17 +1101,114 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return
         if not observations:
             return
+        outdoors = [float(outdoor) for outdoor, _ in observations]
         candidate = corrected_baseline(self._baseline, observations)
+        self._baseline_stats = {
+            "hours": len(observations),
+            "min_c": min(outdoors),
+            "max_c": max(outdoors),
+            "corrected": candidate is not None,
+        }
         if candidate is None:
+            await self._async_persist()
             return
         self._baseline = candidate
+        # The shape changed: any active trims learned against the old baseline
+        # are stale (they are only recomputed while active, so clear them here).
+        self._trims = {}
         _LOGGER.info(
             "Heating-curve baseline corrected from %s observed Auto hours",
             len(observations),
         )
         await self._async_persist()
 
+    async def _async_trim_observations(self) -> list[tuple[int, float, float]]:
+        """Hourly ``(ts, BT1, indoor − target)`` pairs from recorder statistics.
+
+        The target is not a long-term statistic, so the current target is
+        applied to the whole window; it changes rarely and a target change only
+        slows convergence for a day.
+        """
+        resolved = self._resolve_statistic_ids()
+        outdoor_id = resolved.get("bt1")
+        indoor_key = self._indoor_metric_key(resolved)
+        indoor_id = resolved.get(indoor_key) if indoor_key else None
+        if not outdoor_id or not indoor_id:
+            return []
+        target = self._main_values().get("indoor_temperature_target")
+        if not isinstance(target, (int, float)) or isinstance(target, bool):
+            return []
+        rows = await self._async_statistics(
+            {outdoor_id, indoor_id},
+            dt_util.utcnow() - timedelta(days=TRIM_WINDOW_DAYS),
+        )
+
+        def _series(entity_id: str) -> dict[int, float]:
+            series: dict[int, float] = {}
+            for row in rows.get(entity_id, []):
+                mean = row.get("mean")
+                start = row.get("start")
+                if mean is None or start is None:
+                    continue
+                series[int(start)] = float(mean)
+            return series
+
+        outdoor = _series(outdoor_id)
+        indoor = _series(indoor_id)
+        target_c = float(target)
+        return [
+            (ts, outdoor[ts], indoor[ts] - target_c)
+            for ts in sorted(set(outdoor) & set(indoor))
+        ]
+
+    async def _async_update_trims(self, result: Any, now_ts: float) -> None:
+        """Slowly fold indoor-error residuals into per-point trims.
+
+        Runs only while active: in shadow the baseline learning owns the
+        shape, and adding trims there would double-correct. The update is a
+        damped step toward the indicated residual, so it converges and stops
+        when the error is gone; the indoor cap and the shared-adjustment clamp
+        are respected rather than fought.
+        """
+        if self._baseline is None or not self.active or result is None:
+            return
+        if result.capped_by_indoor or abs(result.adjustment_c) >= TOTAL_MAX_C - 1e-9:
+            return
+        if (
+            self._last_trim_ts is not None
+            and now_ts - self._last_trim_ts < TRIM_REFRESH_HOURS * 3600.0
+        ):
+            return
+        self._last_trim_ts = now_ts
+        try:
+            observations = await self._async_trim_observations()
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa: BLE001 — trims are best effort
+            _LOGGER.debug("Trim update unavailable: %s", err)
+            return
+        if not observations:
+            return
+        residual = trim_residuals(self._baseline, observations, int(now_ts))
+        if residual is None:
+            return
+        changed = False
+        for key, value in residual.items():
+            old = self._trims.get(key, 0.0)
+            new = max(-TRIM_MAX_C, min(TRIM_MAX_C, old + TRIM_UPDATE_GAIN * value))
+            if abs(new - old) > 1e-9:
+                self._trims[key] = new
+                changed = True
+        if not changed:
+            return
+        _LOGGER.info(
+            "Custom-curve trims updated from %s indoor-error hours",
+            len(observations),
+        )
+        await self._async_persist()
+
     def _indoor_value(self, values: Mapping[str, Any]) -> float | None:
+        """Indoor temperature from the configured sensor, else BT2."""
         mode = values.get("sensor_mode")
         if mode is None:
             mode = values.get("use_operation_sensor")
@@ -1131,6 +1314,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         )
 
         result = None
+        low, high = self._supply_bounds(values)
         if self._baseline is not None:
             result = compute_curve(
                 baseline=self._baseline,
@@ -1142,13 +1326,31 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 indoor_margin_c=indoor_margin,
                 indoor_target_c=indoor_target,
                 q_actual_w=q_actual,
+                point_trims=self._trims if self.active else None,
+                min_supply_c=low,
+                max_supply_c=high,
             )
+        if result is not None:
+            clamped = self.active and result.clamped
+            if clamped != self._clamped_state:
+                if clamped:
+                    _LOGGER.warning(
+                        "Custom-curve points clamped to the pump's supply "
+                        "limits (%.0f–%.0f °C)",
+                        low,
+                        high,
+                    )
+                self._clamped_state = clamped
 
         async with self._control_lock:
             if self._revert_pending:
                 await self._async_retry_revert()
             if self.active and result is not None:
                 await self._async_apply_active(result)
+            # Serialized with deactivation: a revert clears the trims, and an
+            # update awaited outside this lock could resurrect them.
+            if result is not None:
+                await self._async_update_trims(result, now_ts)
 
         shadow = values.get("curve_type_heating") != HeatingCurveType.USER_DEFINED
         deviation = None
@@ -1185,6 +1387,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
 
         points = result.as_dict() if result is not None else {}
         baseline = dict(self._baseline) if self._baseline else {}
+        learned_hours, learned_min, learned_max = self._baseline_stats_values()
+        active_trims = (
+            dict(result.trims) if self.active and result is not None else {}
+        )
         return CurveSnapshot(
             shadow=shadow,
             points=points,
@@ -1204,4 +1410,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             model=self._model,
             calibrated_at=self._calibrated_at,
             baseline_auto=bool(self._baseline_auto),
+            trims=active_trims,
+            clamped=bool(result is not None and result.clamped),
+            baseline_learned_hours=learned_hours,
+            baseline_outdoor_min_c=learned_min,
+            baseline_outdoor_max_c=learned_max,
         )

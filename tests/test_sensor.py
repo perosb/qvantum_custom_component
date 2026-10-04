@@ -538,7 +538,11 @@ class TestQvantumCurveSensors:
 
         assert entity.native_value == 26.0
         assert entity.available is True
-        assert entity.extra_state_attributes == {"baseline": 25.0, "adjustment": 1.0}
+        assert entity.extra_state_attributes == {
+            "baseline": 25.0,
+            "adjustment": 1.0,
+            "trim": 0.0,
+        }
         assert entity.suggested_object_id == "custom_curve_01_30"
         assert entity._attr_unique_id == "qvantum_custom_curve_30_test_device_123"
 
@@ -563,6 +567,8 @@ class TestQvantumCurveSensors:
             "solar_c": -0.4,
             "load_c": 0.9,
             "capped_by_indoor": False,
+            "trims": {},
+            "clamped": False,
         }
 
         empty = QvantumCurveAdjustmentSensor(
@@ -571,6 +577,19 @@ class TestQvantumCurveSensors:
             mock_device,
         )
         assert empty.available is False
+
+    def test_point_sensor_exposes_active_trim(self, mock_device):
+        coordinator = _curve_coordinator(
+            _curve_snapshot(trims={"curve_30": 0.4}, clamped=True)
+        )
+        point = QvantumCurvePointSensor(coordinator, "custom_curve_30", mock_device)
+        adjustment = QvantumCurveAdjustmentSensor(
+            coordinator, "custom_curve_adjustment", mock_device
+        )
+
+        assert point.extra_state_attributes["trim"] == 0.4
+        assert adjustment.extra_state_attributes["trims"] == {"curve_30": 0.4}
+        assert adjustment.extra_state_attributes["clamped"] is True
 
     def test_point_slugs_sort_like_the_pump_numbers(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())
@@ -622,6 +641,23 @@ class TestQvantumCurveSensors:
         assert entity.extra_state_attributes["blocker"] is None
         assert entity.extra_state_attributes["window_hours"] == 84.0
         assert entity.extra_state_attributes["baseline_auto"] is True
+
+    def test_deviation_sensor_exposes_baseline_learning(self, mock_device):
+        coordinator = _curve_coordinator(
+            _curve_snapshot(
+                baseline_learned_hours=120,
+                baseline_outdoor_min_c=-7.5,
+                baseline_outdoor_max_c=12.0,
+            )
+        )
+        entity = QvantumCurveDeviationSensor(
+            coordinator, "custom_curve_deviation", mock_device
+        )
+
+        attributes = entity.extra_state_attributes
+        assert attributes["baseline_learned_hours"] == 120
+        assert attributes["baseline_outdoor_min_c"] == -7.5
+        assert attributes["baseline_outdoor_max_c"] == 12.0
 
     def test_deviation_sensor_unavailable_without_value(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot(deviation_c=None))

@@ -33,7 +33,7 @@ returns the seven supply temperatures plus the term breakdown.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
@@ -82,6 +82,15 @@ BASELINE_MIN_CORRECTION_C = 1.0
 #: Never move a baseline point by more than this.
 BASELINE_MAX_CORRECTION_C = 8.0
 
+#: Recency half-life for the indoor-error trim observations.
+TRIM_HALF_LIFE_DAYS = 2.0
+#: Hourly observations in an outdoor bucket before it carries evidence.
+TRIM_MIN_BUCKET_HOURS = 6
+#: A reference point with no qualifying bucket within this distance stays at 0.
+TRIM_MAX_DISTANCE_C = 7.5
+#: Cap on the accumulated trim per point and on a single indicated residual.
+TRIM_MAX_C = 2.0
+
 #: Hard clamp on the total adjustment.
 TOTAL_MAX_C = 3.0
 
@@ -111,6 +120,8 @@ class CurveResult:
     solar_c: float
     load_c: float
     capped_by_indoor: bool
+    trims: Mapping[str, float] = field(default_factory=dict)
+    clamped: bool = False
 
     def as_dict(self) -> dict[str, float]:
         return {key: round(supply, 2) for key, supply in self.points}
@@ -124,6 +135,26 @@ class CurveResult:
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
+
+
+def effective_supply_bounds(
+    min_supply_c: float | None = None,
+    max_supply_c: float | None = None,
+) -> tuple[float, float]:
+    """Pump min/max heating supply limits, sanitized.
+
+    Falls back to the register range 10–80 °C when a limit is missing,
+    non-numeric, or contradictory. Keeping the effective bounds tight means a
+    computed point is never written above what the firmware will actually use.
+    """
+    low, high = MIN_SUPPLY_C, MAX_SUPPLY_C
+    if isinstance(min_supply_c, (int, float)) and not isinstance(min_supply_c, bool):
+        low = _clamp(float(min_supply_c), MIN_SUPPLY_C, MAX_SUPPLY_C)
+    if isinstance(max_supply_c, (int, float)) and not isinstance(max_supply_c, bool):
+        high = _clamp(float(max_supply_c), MIN_SUPPLY_C, MAX_SUPPLY_C)
+    if high <= low:
+        return MIN_SUPPLY_C, MAX_SUPPLY_C
+    return low, high
 
 
 def normalize_baseline(
@@ -403,6 +434,86 @@ def corrected_baseline(
     return {key: supply for key, (_, supply) in zip(CURVE_KEYS, repaired)}
 
 
+def _weighted_median(values: Sequence[tuple[float, float]]) -> float:
+    """Median of ``(value, weight)`` pairs; weights need not be normalized."""
+    ordered = sorted(values)
+    threshold = sum(weight for _, weight in ordered) / 2.0
+    cumulative = 0.0
+    for value, weight in ordered:
+        cumulative += weight
+        if cumulative >= threshold:
+            return value
+    return ordered[-1][0]
+
+
+def trim_residuals(
+    baseline: Mapping[str, float],
+    observations: Sequence[tuple[int, float, float]],
+    now_ts: int,
+    *,
+    half_life_days: float = TRIM_HALF_LIFE_DAYS,
+    min_bucket_hours: int = TRIM_MIN_BUCKET_HOURS,
+    max_distance_c: float = TRIM_MAX_DISTANCE_C,
+    max_residual_c: float = TRIM_MAX_C,
+) -> dict[str, float] | None:
+    """Per-point supply corrections indicated by indoor-error history.
+
+    ``observations`` are hourly ``(hour_ts, outdoor BT1, indoor − target)``.
+    The indoor error is converted to supply degrees through the local curve
+    slope (the same conversion the solar term uses) and median-bucketed by
+    outdoor with recency weights, so only weather the house has actually seen
+    produces a trim. A reference point without a qualifying bucket within
+    ``max_distance_c`` stays at 0 — no evidence, no correction — and the line
+    fit keeps the shape beyond the observed range. Returns ``None`` when there
+    is not enough evidence for any point.
+    """
+    try:
+        base = normalize_baseline(baseline)
+    except (TypeError, ValueError):
+        return None
+
+    buckets: dict[int, list[tuple[float, float]]] = {}
+    for hour_ts, outdoor, error in observations:
+        outdoor_c = float(outdoor)
+        error_c = float(error)
+        if not (math.isfinite(outdoor_c) and math.isfinite(error_c)):
+            continue
+        value = curve_slope(base, outdoor_c) * error_c
+        if not math.isfinite(value):
+            continue
+        weight = 1.0
+        if half_life_days > 0.0:
+            age_days = max(0.0, (float(now_ts) - float(hour_ts)) / 86400.0)
+            weight = 0.5 ** (age_days / half_life_days)
+        buckets.setdefault(round(outdoor_c), []).append((value, weight))
+
+    qualifying = {
+        outdoor: values
+        for outdoor, values in buckets.items()
+        if len(values) >= min_bucket_hours
+    }
+    if len(qualifying) < 2:
+        return None
+    bucket_x = sorted(qualifying)
+    slope, intercept = _fit_line(
+        [float(x) for x in bucket_x],
+        [_weighted_median(qualifying[x]) for x in bucket_x],
+    )
+
+    trims: dict[str, float] = {}
+    any_evidence = False
+    for key, outdoor in HEATING_CURVE_OUTDOOR_TEMPS.items():
+        nearest = min(abs(outdoor - x) for x in bucket_x)
+        if nearest > max_distance_c:
+            trims[key] = 0.0
+            continue
+        value = _clamp(slope * outdoor + intercept, -max_residual_c, max_residual_c)
+        trims[key] = value
+        if abs(value) > 1e-9:
+            any_evidence = True
+    return trims if any_evidence else None
+
+
 def compute_curve(
     *,
     baseline: Mapping[str, float],
@@ -415,8 +526,17 @@ def compute_curve(
     indoor_target_c: float | None = None,
     q_actual_w: float | None = None,
     outdoor_horizon_hours: int = DEFAULT_OUTDOOR_HORIZON_H,
+    point_trims: Mapping[str, float] | None = None,
+    min_supply_c: float | None = None,
+    max_supply_c: float | None = None,
 ) -> CurveResult:
-    """Baseline + outdoor + night/day + solar + load → seven supply points."""
+    """Baseline + outdoor + night/day + solar + load → seven supply points.
+
+    ``point_trims`` adds a per-point correction on top of the shared
+    adjustment (active-mode indoor-error trims); ``min_supply_c`` /
+    ``max_supply_c`` are the pump's effective supply limits, applied instead
+    of the register range when known.
+    """
     points = normalize_baseline(baseline)
     now_hour = now_ts - (now_ts % 3600)
     forecast_now = forecast_temperature.get(now_hour)
@@ -461,16 +581,31 @@ def compute_curve(
                 total = floor
                 capped_by_indoor = True
 
-    supplies = tuple(
-        (key, _clamp(supply + total, MIN_SUPPLY_C, MAX_SUPPLY_C))
-        for key, (_, supply) in zip(CURVE_KEYS, points)
-    )
+    low, high = effective_supply_bounds(min_supply_c, max_supply_c)
+    effective_trims: dict[str, float] = {}
+    supplies: list[tuple[str, float]] = []
+    clamped = False
+    for key, (_, supply) in zip(CURVE_KEYS, points):
+        trim = 0.0
+        if point_trims is not None:
+            candidate = float(point_trims.get(key, 0.0))
+            if math.isfinite(candidate):
+                trim = candidate
+        effective_trims[key] = trim
+        value = supply + total + trim
+        bounded = _clamp(value, low, high)
+        if abs(bounded - value) > 1e-9:
+            clamped = True
+        supplies.append((key, bounded))
+
     return CurveResult(
-        points=supplies,
+        points=tuple(supplies),
         adjustment_c=total,
         outdoor_c=outdoor_c,
         night_day_c=night_day_c,
         solar_c=solar_c,
         load_c=load_c,
         capped_by_indoor=capped_by_indoor,
+        trims=effective_trims,
+        clamped=clamped,
     )

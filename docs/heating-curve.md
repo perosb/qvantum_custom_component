@@ -176,17 +176,38 @@ correction self-stabilises: once it matches, the residual falls under the noise
 threshold and nothing more is written. This is why `ready` can become true even
 when the cached table initially disagrees with Auto.
 
+### Active trims
+
+While the curve is active the module also learns slow **per-point trims** from
+the indoor error: hourly `(BT1, indoor − target)` from recorder statistics is
+bucketed by outdoor temperature and converted to supply degrees through the
+local curve slope, with recency weighting. A reference point with no observed
+hours within 7.5 °C stays at 0 — no evidence, no correction — each trim is
+capped at ±2 °C and updated at most once a day with a damped step, so it
+converges and stops when the error is gone. Trims are only applied while
+active (in shadow the baseline learning owns the curve shape) and are cleared
+on reversion or when the baseline is re-learned. This is what keeps a
+mid-autumn activation working through winter: the part of the curve October
+could not observe is corrected by the weather the house actually sees.
+
+Computed points are clamped to the pump's own min/max heating supply (holding
+19/20) when those are known, not just the register range 10–80 °C, so a point
+is never written above what the firmware will actually use.
+
 Entities:
 
 - `sensor.qvantum_custom_curve_01_30` … `sensor.qvantum_custom_curve_07_minus_30` —
   the computed shadow points, numbered 1–7 (+30 … −30) like the pump's own
-  curve numbers so they sort together, with `baseline` and `adjustment`
-  attributes.
+  curve numbers so they sort together, with `baseline`, `adjustment` and
+  `trim` attributes.
 - `sensor.qvantum_custom_curve_adjustment` — the shared adjustment, with
-  `outdoor_c`, `night_day_c`, `solar_c`, `load_c` attributes.
+  `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `trims` and `clamped`
+  attributes.
 - `sensor.qvantum_custom_curve_deviation` — computed supply at the measured
   outdoor minus `cal_heat_temp` (input 35), with `shadow`, `ready`, `blocker`
-  and `baseline_auto` (baseline frozen while the pump was on Auto) attributes.
+  and `baseline_auto` (baseline frozen while the pump was on Auto) attributes,
+  plus `baseline_learned_hours`, `baseline_outdoor_min_c` and
+  `baseline_outdoor_max_c` from the last baseline fit.
 - `sensor.qvantum_custom_curve_solar_model` — model trust in %, with
   `a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque` and `r2_solar` diagnostics.
 - `switch.qvantum_custom_curve_control` — off = shadow, on = active writing.
@@ -232,6 +253,25 @@ temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily.
 are computed from your house's data — nothing is hand-tuned. Weak evidence
 keeps the solar term tiny automatically, and GHI is smoothed with an
 exponential kernel so one cloud cannot swing the curve.
+
+## Seasonality
+
+The baseline is frozen when the curve is activated; while active it never
+re-learns shape from Auto (there is no Auto to compare against). What moves
+with the season is the shared adjustment and the trims:
+
+- **Autumn activation:** the cold end of the baseline is partly extrapolated
+  from mild weather. The trims converge as soon as cold weather is observed.
+- **Winter:** the solar term shrinks with the low sun, the night/day amplitude
+  grows with the larger diurnal swing, the outdoor term catches cold snaps,
+  and the trims correct any remaining end-of-curve error from the indoor
+  response.
+- **Spring and summer:** the solar term grows again, night/day shrinks, and
+  the load term holds the curve back when the house is already warm.
+
+Once the switch is on, no user action is needed; the module adapts by itself.
+`baseline_learned_hours` and the observed outdoor span on the deviation sensor
+show how much of the curve the baseline fit has actually seen.
 
 ## Practical notes
 

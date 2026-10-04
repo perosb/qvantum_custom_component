@@ -15,18 +15,21 @@ from custom_components.qvantum.heating_curve import (
     OUTDOOR_MAX_C,
     SOLAR_MAX_C,
     TOTAL_MAX_C,
+    TRIM_MAX_C,
     CurveResult,
     DayPhase,
     compute_curve,
     corrected_baseline,
     curve_slope,
     diurnal_swing_c,
+    effective_supply_bounds,
     interpolate_supply,
     load_adjustment_c,
     night_day_adjustment_c,
     normalize_baseline,
     outdoor_adjustment_c,
     solar_adjustment_c,
+    trim_residuals,
 )
 from custom_components.qvantum.solar_gain import SolarModel
 
@@ -322,6 +325,95 @@ def test_corrected_baseline_fits_a_tilt() -> None:
     assert learned is not None
     assert learned["curve_30"] < learned["curve_minus_30"]
     assert learned["curve_minus_30"] == pytest.approx(60.0 + 0.2 * 30.0, abs=0.5)
+
+
+def test_effective_supply_bounds_sanitizes_and_falls_back() -> None:
+    assert effective_supply_bounds(None, None) == (MIN_SUPPLY_C, MAX_SUPPLY_C)
+    assert effective_supply_bounds(20, 60) == (20.0, 60.0)
+    assert effective_supply_bounds(5, 90) == (MIN_SUPPLY_C, MAX_SUPPLY_C)
+    assert effective_supply_bounds(70, 60) == (MIN_SUPPLY_C, MAX_SUPPLY_C)
+    assert effective_supply_bounds(True, "60") == (MIN_SUPPLY_C, MAX_SUPPLY_C)
+    assert effective_supply_bounds(None, 55) == (MIN_SUPPLY_C, 55.0)
+
+
+def _trim_observations(
+    error: float,
+    *,
+    hour: int = BASE_HOUR,
+    count: int = 8,
+) -> list[tuple[int, float, float]]:
+    outlets = (-5.0, 5.0)
+    return [
+        (hour - index * 3600, outdoor, error)
+        for outdoor in outlets
+        for index in range(count)
+    ]
+
+
+def test_trim_residuals_maps_indoor_error_to_supply() -> None:
+    trims = trim_residuals(BASELINE, _trim_observations(-1.0), BASE_HOUR)
+
+    assert trims is not None
+    # slope ≈ −0.6; a 1 °C indoor shortfall needs ≈ +0.6 °C supply where the
+    # house has been observed (+/-10 °C), nothing at the extrapolated ends.
+    assert trims["curve_10"] == pytest.approx(0.6)
+    assert trims["curve_minus_10"] == pytest.approx(0.6)
+    assert trims["curve_30"] == 0.0
+    assert trims["curve_minus_30"] == 0.0
+
+    warm = trim_residuals(BASELINE, _trim_observations(1.0), BASE_HOUR)
+    assert warm is not None
+    assert warm["curve_10"] == pytest.approx(-0.6)
+
+
+def test_trim_residuals_needs_evidence_and_clamps() -> None:
+    assert trim_residuals(BASELINE, _trim_observations(-1.0, count=3), BASE_HOUR) is None
+    one_bucket = [
+        (BASE_HOUR - index * 3600, -5.0, -1.0) for index in range(8)
+    ]
+    assert trim_residuals(BASELINE, one_bucket, BASE_HOUR) is None
+    assert trim_residuals(BASELINE, _trim_observations(0.0), BASE_HOUR) is None
+
+    strong = trim_residuals(BASELINE, _trim_observations(-10.0), BASE_HOUR)
+    assert strong is not None
+    assert strong["curve_10"] == pytest.approx(TRIM_MAX_C)
+
+
+def test_trim_residuals_filters_corrupt_input() -> None:
+    assert trim_residuals({"curve_0": 42.0}, _trim_observations(-1.0), BASE_HOUR) is None
+
+    noisy = [(BASE_HOUR, float("nan"), -1.0)] + _trim_observations(-1.0)
+    trims = trim_residuals(BASELINE, noisy, BASE_HOUR)
+
+    assert trims is not None
+    assert trims["curve_10"] == pytest.approx(0.6)
+
+
+def test_compute_curve_applies_trims_and_pump_bounds() -> None:
+    result = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature=forecast_map(10.0),
+        ghi_by_hour={},
+        point_trims={"curve_minus_30": 5.0},
+        min_supply_c=20.0,
+        max_supply_c=60.0,
+    )
+
+    assert result.trims["curve_minus_30"] == 5.0
+    assert result.points[-1] == ("curve_minus_30", 60.0)
+    assert result.clamped
+
+    unclamped = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature=forecast_map(10.0),
+        ghi_by_hour={},
+        min_supply_c=20.0,
+        max_supply_c=70.0,
+    )
+    assert not unclamped.clamped
+    assert unclamped.trims == {key: 0.0 for key in BASELINE}
 
 
 def test_compute_curve_cold_trend_raises_all_points() -> None:
