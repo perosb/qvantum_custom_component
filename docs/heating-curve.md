@@ -167,8 +167,10 @@ clamped to 10–80 °C and fall toward warmer outdoors.
 
 Entities:
 
-- `sensor.qvantum_custom_curve_30` … `sensor.qvantum_custom_curve_minus_30` —
-  the computed shadow points, with `baseline` and `adjustment` attributes.
+- `sensor.qvantum_custom_curve_01_30` … `sensor.qvantum_custom_curve_07_minus_30` —
+  the computed shadow points, numbered 1–7 (+30 … −30) like the pump's own
+  curve numbers so they sort together, with `baseline` and `adjustment`
+  attributes.
 - `sensor.qvantum_custom_curve_adjustment` — the shared adjustment, with
   `outdoor_c`, `night_day_c`, `solar_c`, `load_c` attributes.
 - `sensor.qvantum_custom_curve_deviation` — computed supply at the measured

@@ -585,25 +585,25 @@
         "name": "Alarm 5-kode"
       },
       "custom_curve_30": {
-        "name": "Egen varmekurve: +30°C"
+        "name": "Egen varmekurve 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Egen varmekurve: +20°C"
+        "name": "Egen varmekurve 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Egen varmekurve: +10°C"
+        "name": "Egen varmekurve 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Egen varmekurve: 0°C"
+        "name": "Egen varmekurve 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Egen varmekurve: -10°C"
+        "name": "Egen varmekurve 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Egen varmekurve: -20°C"
+        "name": "Egen varmekurve 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Egen varmekurve: -30°C"
+        "name": "Egen varmekurve 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Egen varmekurve: justering"

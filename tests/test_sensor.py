@@ -538,7 +538,7 @@ class TestQvantumCurveSensors:
         assert entity.native_value == 26.0
         assert entity.available is True
         assert entity.extra_state_attributes == {"baseline": 25.0, "adjustment": 1.0}
-        assert entity.suggested_object_id == "custom_curve_30"
+        assert entity.suggested_object_id == "custom_curve_01_30"
         assert entity._attr_unique_id == "qvantum_custom_curve_30_test_device_123"
 
     def test_point_sensor_unavailable_without_point(self, mock_device):
@@ -570,6 +570,32 @@ class TestQvantumCurveSensors:
             mock_device,
         )
         assert empty.available is False
+
+    def test_point_slugs_sort_like_the_pump_numbers(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        slugs = [
+            QvantumCurvePointSensor(coordinator, key, mock_device).suggested_object_id
+            for key in (
+                "custom_curve_30",
+                "custom_curve_20",
+                "custom_curve_10",
+                "custom_curve_0",
+                "custom_curve_minus_10",
+                "custom_curve_minus_20",
+                "custom_curve_minus_30",
+            )
+        ]
+
+        assert slugs == [
+            "custom_curve_01_30",
+            "custom_curve_02_20",
+            "custom_curve_03_10",
+            "custom_curve_04_0",
+            "custom_curve_05_minus_10",
+            "custom_curve_06_minus_20",
+            "custom_curve_07_minus_30",
+        ]
+        assert slugs == sorted(slugs)
 
     def test_all_curve_sensors_have_stable_slugs(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())

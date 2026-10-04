@@ -585,25 +585,25 @@
         "name": "Alarm 5 Code"
       },
       "custom_curve_30": {
-        "name": "Eigene Heizkurve: +30°C"
+        "name": "Eigene Heizkurve 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Eigene Heizkurve: +20°C"
+        "name": "Eigene Heizkurve 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Eigene Heizkurve: +10°C"
+        "name": "Eigene Heizkurve 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Eigene Heizkurve: 0°C"
+        "name": "Eigene Heizkurve 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Eigene Heizkurve: -10°C"
+        "name": "Eigene Heizkurve 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Eigene Heizkurve: -20°C"
+        "name": "Eigene Heizkurve 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Eigene Heizkurve: -30°C"
+        "name": "Eigene Heizkurve 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Eigene Heizkurve: Anpassung"

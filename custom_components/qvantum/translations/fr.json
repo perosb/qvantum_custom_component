@@ -585,25 +585,25 @@
         "name": "Code d'alarme 5"
       },
       "custom_curve_30": {
-        "name": "Courbe de chauffage personnalisée: +30°C"
+        "name": "Courbe de chauffage personnalisée 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Courbe de chauffage personnalisée: +20°C"
+        "name": "Courbe de chauffage personnalisée 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Courbe de chauffage personnalisée: +10°C"
+        "name": "Courbe de chauffage personnalisée 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Courbe de chauffage personnalisée: 0°C"
+        "name": "Courbe de chauffage personnalisée 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Courbe de chauffage personnalisée: -10°C"
+        "name": "Courbe de chauffage personnalisée 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Courbe de chauffage personnalisée: -20°C"
+        "name": "Courbe de chauffage personnalisée 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Courbe de chauffage personnalisée: -30°C"
+        "name": "Courbe de chauffage personnalisée 7: -30°C"
       },
       "custom_curve_adjustment": {
         "name": "Courbe de chauffage personnalisée: ajustement"
