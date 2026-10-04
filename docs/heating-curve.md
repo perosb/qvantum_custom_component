@@ -151,9 +151,8 @@ generator.
 ## Custom curve control
 
 **Modbus-only** and requires the Modbus write option. The module freezes the
-pump's current Auto table (holding 24–30, read while 22 is Auto) as the
-baseline and computes **one** shared adjustment in °C, applied to all seven
-points:
+pump's current seven-point table (holding 24–30) as the baseline and computes
+**one** shared adjustment in °C, applied to all seven points:
 
 | Term | Source |
 |---|---|

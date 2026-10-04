@@ -68,12 +68,12 @@ action:
 #### Custom heating curve
 
 Modbus-only, and **Enable writing via Modbus** must be on. The integration
-freezes the pump's current Auto curve as a baseline and computes one shared
-adjustment in °C from the Open-Meteo forecast, the local daylight rhythm, a
-self-calibrating solar model and the measured heating power. The seven
-resulting supply points are exposed as `sensor.qvantum_custom_curve_*`
-(plus `sensor.qvantum_custom_curve_adjustment` and
-`sensor.qvantum_custom_curve_deviation`).
+freezes the pump's current seven-point table (holding 24–30) as a baseline and
+computes one shared adjustment in °C from the Open-Meteo forecast, the local
+daylight rhythm, a self-calibrating solar model and the measured heating
+power. The seven resulting supply points are exposed as
+`sensor.qvantum_custom_curve_*` (plus `sensor.qvantum_custom_curve_adjustment`
+and `sensor.qvantum_custom_curve_deviation`).
 
 It starts in **shadow mode**: nothing is written and the computed curve is
 compared with the pump's own `cal_heat_temp`. `switch.qvantum_custom_curve_control`
