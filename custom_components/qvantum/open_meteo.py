@@ -17,7 +17,7 @@ import asyncio
 import math
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, Mapping
 from urllib.parse import urlencode
 
 import aiohttp
@@ -78,6 +78,12 @@ def _safe_hour_ts(timestamp: Any) -> int | None:
         return None
 
 
+def _series(hourly: Mapping[str, Any], key: str) -> list:
+    """Return a JSON array field, or ``[]`` for a missing/corrupt container."""
+    value = hourly.get(key)
+    return value if isinstance(value, list) else []
+
+
 def _finite_float(value: Any) -> float | None:
     """Coerce a wire value to a finite float; ``None`` for corrupt input."""
     try:
@@ -131,9 +137,9 @@ def parse_forecast(payload: Any) -> WeatherForecast:
     if not isinstance(hourly, dict):
         raise OpenMeteoError("missing hourly block")
 
-    times = hourly.get("time") or []
-    temperatures = hourly.get("temperature_2m") or []
-    irradiances = hourly.get("shortwave_radiation") or []
+    times = _series(hourly, "time")
+    temperatures = _series(hourly, "temperature_2m")
+    irradiances = _series(hourly, "shortwave_radiation")
     points: dict[int, HourlyWeather] = {}
     for ts_raw, temperature, ghi in zip(times, temperatures, irradiances):
         if ts_raw is None or temperature is None or ghi is None:
@@ -185,8 +191,8 @@ def parse_ghi_history(payload: Any) -> dict[int, float]:
     if not isinstance(hourly, dict):
         raise OpenMeteoError("missing hourly block")
 
-    times = hourly.get("time") or []
-    values = hourly.get("shortwave_radiation") or []
+    times = _series(hourly, "time")
+    values = _series(hourly, "shortwave_radiation")
     series: dict[int, float] = {}
     for ts_raw, value in zip(times, values):
         if ts_raw is None or value is None:

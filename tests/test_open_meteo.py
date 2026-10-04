@@ -204,6 +204,17 @@ def test_parse_forecast_non_numeric_current_is_ignored() -> None:
     assert parse_forecast(payload).at(BASE) == HourlyWeather(BASE, 1.0, 90.0)
 
 
+def test_parse_forecast_rejects_non_list_series() -> None:
+    with pytest.raises(OpenMeteoError, match="no hourly forecast"):
+        parse_forecast(
+            {"hourly": {"time": 1, "temperature_2m": True, "shortwave_radiation": 5}}
+        )
+    with pytest.raises(OpenMeteoError, match="no hourly forecast"):
+        parse_forecast(
+            {"hourly": {"time": {}, "temperature_2m": {}, "shortwave_radiation": {}}}
+        )
+
+
 def test_parse_forecast_rejects_unusable_payloads() -> None:
     with pytest.raises(OpenMeteoError, match="missing hourly"):
         parse_forecast(["not", "a", "dict"])
@@ -246,6 +257,12 @@ def test_parse_ghi_history_skips_non_numeric() -> None:
     }
 
     assert parse_ghi_history(payload) == {BASE: 10.0}
+
+
+def test_parse_ghi_history_non_list_series_is_empty() -> None:
+    assert (
+        parse_ghi_history({"hourly": {"time": 1, "shortwave_radiation": True}}) == {}
+    )
 
 
 def test_parse_ghi_history_rejects_unusable_payloads() -> None:
