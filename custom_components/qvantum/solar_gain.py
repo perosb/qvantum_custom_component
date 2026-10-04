@@ -271,6 +271,17 @@ def fit_solar_model(
     singular, or when the fitted ``a`` is non-positive. Callers then apply
     no solar correction at all.
     """
+    # One corrupt (NaN/inf) sensor hour must never poison the fit: a non-finite
+    # row would make the LS sums non-finite and slip past the a <= 0 gate (or
+    # collapse b to zero while r2 reads as perfect).
+    samples = [
+        sample
+        for sample in samples
+        if math.isfinite(sample.delta_t_k)
+        and math.isfinite(sample.ghi_wm2)
+        and math.isfinite(sample.q_heat_w)
+    ]
+
     if now_ts is None:
         now_ts = max((s.hour_ts for s in samples), default=0)
 
@@ -304,6 +315,8 @@ def fit_solar_model(
         return SolarModel(**empty, notes=f"opaque fit failed: {err}")
     if a <= 0.0:
         return SolarModel(**{**empty, "a_w_per_k": a, "c_w": c}, notes="a ≤ 0")
+    if not (math.isfinite(a) and math.isfinite(c)):
+        return SolarModel(**empty, notes="non-finite fit")
 
     pred_opaque = [a * xi + c for xi in x_opaque]
     r2_opaque = _weighted_r2(y_opaque, pred_opaque, robust_w)

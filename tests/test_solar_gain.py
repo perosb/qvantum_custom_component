@@ -339,3 +339,45 @@ def test_module_has_no_home_assistant_imports() -> None:
     assert not [name for name in imported if name.startswith("homeassistant")]
     assert not [name for name in imported if name.startswith("custom_components")]
     assert math.isfinite(math.pi)
+
+
+def test_non_finite_rows_are_ignored() -> None:
+    clean = make_samples(n_solar=60, noise=15.0, seed=13)
+    base = fit_solar_model(clean, now_ts=NOW)
+
+    dirty = clean + [
+        SolarSample(
+            hour_ts=NOW - 3600, delta_t_k=20.0, ghi_wm2=200.0, q_heat_w=float("nan")
+        ),
+        SolarSample(
+            hour_ts=NOW - 7200, delta_t_k=float("nan"), ghi_wm2=5.0, q_heat_w=3000.0
+        ),
+        SolarSample(
+            hour_ts=NOW - 10800, delta_t_k=15.0, ghi_wm2=float("inf"), q_heat_w=2500.0
+        ),
+    ]
+    polluted = fit_solar_model(dirty, now_ts=NOW)
+
+    assert polluted.valid
+    assert math.isfinite(polluted.a_w_per_k)
+    assert math.isfinite(polluted.c_w)
+    assert polluted.a_w_per_k == pytest.approx(base.a_w_per_k)
+    assert polluted.b_m2 == pytest.approx(base.b_m2)
+    assert polluted.trust == pytest.approx(base.trust)
+
+
+def test_all_opaque_rows_non_finite_is_invalid() -> None:
+    samples = [
+        SolarSample(
+            hour_ts=NOW - index * 3600,
+            delta_t_k=float("nan"),
+            ghi_wm2=5.0,
+            q_heat_w=3000.0,
+        )
+        for index in range(10)
+    ]
+
+    model = fit_solar_model(samples, now_ts=NOW)
+
+    assert not model.valid
+    assert "opaque rows" in model.notes
