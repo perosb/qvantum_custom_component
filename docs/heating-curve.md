@@ -197,9 +197,10 @@ Turning the switch on:
 4. only then writes holding 22 to User defined
 
 Active cycles write only points that changed by ≥ 1 °C, one at a time with a
-pause. Any failed write, an out-of-range or non-monotone table, a lost
-connection, or the pump being moved off User defined writes holding 22 back to
-Auto and turns the switch off. A revert that cannot be written is latched and
+pause. Any failed write, an out-of-range or non-monotone table, or a lost
+connection writes holding 22 back to Auto and turns the switch off. If the
+pump is instead moved off User defined, the coordinator returns to shadow
+without touching holding 22. A revert that cannot be written is latched and
 retried, so a lost connection cannot leave the integration claiming control.
 
 **One writer:** disable Home Assistant automations that write the curve offset
