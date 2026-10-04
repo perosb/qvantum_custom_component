@@ -55,6 +55,9 @@
       },
       "vacation_mode": {
         "name": "Tryb wakacyjny"
+      },
+      "custom_curve_control": {
+        "name": "Własna krzywa grzewcza: sterowanie"
       }
     },
     "select": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Minuty",
           "description": "Minuty produkcji extra ciepłej wody (0 minut wyłącza)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Ustaw sterowanie krzywą",
+      "description": "Tryb sterowania własną krzywą grzewczą",
+      "fields": {
+        "mode": {
+          "name": "Tryb",
+          "description": "shadow = tylko obliczenia, active = zapis krzywej"
         }
       }
     }

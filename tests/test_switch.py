@@ -9,9 +9,16 @@ class MockCoordinatorEntity:
     def __init__(self, coordinator):
         self.coordinator = coordinator
 
+    async def async_added_to_hass(self):
+        return None
+
+    def async_on_remove(self, func):
+        self._on_remove = func
+
 
 class MockSwitchEntity:
-    pass
+    def async_write_ha_state(self):
+        pass
 
 
 # Mock SwitchDeviceClass
@@ -41,6 +48,7 @@ with patch(
                         from homeassistant.helpers.device_registry import DeviceInfo
 
                         from custom_components.qvantum.switch import (
+                            QvantumCurveControlSwitch,
                             QvantumDataUpdateCoordinator,
                             QvantumSwitchEntity,
                         )
@@ -602,3 +610,91 @@ class TestSwitchAvailabilityAndWriteGuard:
         mock_coordinator.client.update_setting.assert_called_once_with(
             "test_device_123", "vacation_mode", True
         )
+
+
+class TestQvantumCurveControlSwitch:
+    """Test the custom-curve control switch."""
+
+    def _make(self, mock_coordinator, mock_device, *, active=False, success=True):
+        curve = MagicMock()
+        curve.active = active
+        curve.last_update_success = success
+        curve.async_set_control_mode = AsyncMock()
+        entity = QvantumCurveControlSwitch(mock_coordinator, curve, mock_device)
+        return entity, curve
+
+    def test_init(self, mock_coordinator, mock_device):
+        entity, _curve = self._make(mock_coordinator, mock_device)
+
+        assert entity._metric_key == "custom_curve_control"
+        assert entity._attr_unique_id == "qvantum_custom_curve_control_test_device_123"
+        assert entity._attr_translation_key == "custom_curve_control"
+        assert entity.suggested_object_id == "custom_curve_control"
+
+    def test_is_on_follows_curve_mode(self, mock_coordinator, mock_device):
+        entity, _curve = self._make(mock_coordinator, mock_device, active=False)
+        assert entity.is_on is False
+
+        entity, _curve = self._make(mock_coordinator, mock_device, active=True)
+        assert entity.is_on is True
+
+    def test_available_requires_write_access_and_curve(self, mock_coordinator, mock_device):
+        entity, _curve = self._make(mock_coordinator, mock_device)
+        assert entity.available is True
+
+        entity, _curve = self._make(mock_coordinator, mock_device, success=False)
+        assert entity.available is False
+
+        mock_coordinator.config_entry.runtime_data.maintenance_coordinator.data = {
+            "access_level": {"writeAccessLevel": 0}
+        }
+        entity, _curve = self._make(mock_coordinator, mock_device)
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_turn_on_activates(self, mock_coordinator, mock_device):
+        entity, curve = self._make(mock_coordinator, mock_device)
+
+        await entity.async_turn_on()
+
+        curve.async_set_control_mode.assert_awaited_once_with("active")
+
+    @pytest.mark.asyncio
+    async def test_turn_off_returns_to_shadow(self, mock_coordinator, mock_device):
+        entity, curve = self._make(mock_coordinator, mock_device, active=True)
+
+        await entity.async_turn_off()
+
+        curve.async_set_control_mode.assert_awaited_once_with("shadow")
+
+    @pytest.mark.asyncio
+    async def test_turn_on_denied_without_write_access(
+        self, mock_coordinator, mock_device
+    ):
+        from homeassistant.exceptions import HomeAssistantError
+
+        mock_coordinator.config_entry.runtime_data.maintenance_coordinator.data = {
+            "access_level": {"writeAccessLevel": 0}
+        }
+        entity, curve = self._make(mock_coordinator, mock_device)
+
+        with pytest.raises(HomeAssistantError):
+            await entity.async_turn_on()
+
+        curve.async_set_control_mode.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_async_added_subscribes_to_curve_updates(
+        self, mock_coordinator, mock_device
+    ):
+        entity, curve = self._make(mock_coordinator, mock_device)
+        curve.async_add_listener = MagicMock(return_value=MagicMock())
+
+        await entity.async_added_to_hass()
+
+        curve.async_add_listener.assert_called_once()
+        assert callable(curve.async_add_listener.call_args.args[0])
+
+        entity.async_write_ha_state = MagicMock()
+        entity._handle_curve_update()
+        entity.async_write_ha_state.assert_called_once()

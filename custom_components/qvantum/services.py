@@ -41,6 +41,12 @@ EXTRA_TAP_WATER_SCHEMA = vol.Schema(
     }
 )
 
+SET_CURVE_CONTROL_SCHEMA = vol.Schema(
+    {
+        vol.Required("mode"): vol.In(["shadow", "active"]),
+    }
+)
+
 
 async def async_setup_services(hass: HomeAssistant):
     _LOGGER.debug("Setting up services")
@@ -96,5 +102,38 @@ async def async_setup_services(hass: HomeAssistant):
         service="extra_hot_water",
         service_func=extra_hot_water,
         schema=EXTRA_TAP_WATER_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    async def set_curve_control(service_call: ServiceCall) -> Any:
+        """Shadow or active custom heating-curve control (Modbus only)."""
+        data = service_call.data
+        mode = data["mode"]
+        curve_coordinator = None
+        for entry in service_call.hass.config_entries.async_entries(DOMAIN):
+            runtime = getattr(entry, "runtime_data", None)
+            candidate = getattr(runtime, "curve_coordinator", None)
+            if candidate is not None:
+                curve_coordinator = candidate
+                break
+        if curve_coordinator is None:
+            return {
+                "qvantum": {
+                    "exception": "unknown_error",
+                    "details": "Custom curve control is only available in Modbus mode",
+                }
+            }
+        try:
+            await curve_coordinator.async_set_control_mode(mode)
+        except Exception as err:
+            _LOGGER.error("Failed to set curve control mode %s: %s", mode, err)
+            return {"qvantum": {"exception": "unknown_error", "details": str(err)}}
+        return {"qvantum": {"mode": mode, "active": curve_coordinator.active}}
+
+    hass.services.async_register(
+        domain=DOMAIN,
+        service="set_curve_control",
+        service_func=set_curve_control,
+        schema=SET_CURVE_CONTROL_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )

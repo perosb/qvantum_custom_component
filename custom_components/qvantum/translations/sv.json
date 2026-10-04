@@ -99,6 +99,9 @@
       },
       "vacation_mode": {
         "name": "Semesterläge"
+      },
+      "custom_curve_control": {
+        "name": "Egen värmekurva: styrning"
       }
     },
     "button": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Minuter",
           "description": "Antal minuter att producera extra varmvatten (0 minuter stänger av)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Ställ in kurvstyrning",
+      "description": "Läge för egen värmekurva",
+      "fields": {
+        "mode": {
+          "name": "Läge",
+          "description": "shadow = endast beräkning, active = skriv kurvan"
         }
       }
     }

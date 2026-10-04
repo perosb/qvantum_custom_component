@@ -55,6 +55,9 @@
       },
       "vacation_mode": {
         "name": "Vacation mode"
+      },
+      "custom_curve_control": {
+        "name": "Custom heating curve: control"
       }
     },
     "select": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Minutes",
           "description": "Minutes to produce extra hot water (0 minutes turns off)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Set curve control",
+      "description": "Custom heating curve control mode",
+      "fields": {
+        "mode": {
+          "name": "Mode",
+          "description": "shadow = compute only, active = write the curve"
         }
       }
     }

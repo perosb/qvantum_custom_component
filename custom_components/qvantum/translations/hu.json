@@ -55,6 +55,9 @@
       },
       "vacation_mode": {
         "name": "Szabadság üzemmód"
+      },
+      "custom_curve_control": {
+        "name": "Saját fűtési görbe: vezérlés"
       }
     },
     "select": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Percek",
           "description": "Percek száma extra melegvíz előállításához (0 perc kikapcsol)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Görbevezérlés beállítása",
+      "description": "Saját fűtési görbe vezérlési módja",
+      "fields": {
+        "mode": {
+          "name": "Mód",
+          "description": "shadow = csak számítás, active = a görbe írása"
         }
       }
     }

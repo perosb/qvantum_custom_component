@@ -55,6 +55,9 @@
       },
       "vacation_mode": {
         "name": "Ferietilstand"
+      },
+      "custom_curve_control": {
+        "name": "Egen varmekurve: styring"
       }
     },
     "select": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Minutter",
           "description": "Minutter til at producere ekstra varmt vand (0 minutter slukker)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Indstil kurvestyring",
+      "description": "Styringstilstand for egen varmekurve",
+      "fields": {
+        "mode": {
+          "name": "Tilstand",
+          "description": "shadow = kun beregning, active = skriv kurven"
         }
       }
     }

@@ -36,6 +36,7 @@ class MockSupportsResponse:
 with patch("homeassistant.core.SupportsResponse", MockSupportsResponse):
     from custom_components.qvantum.services import (
         EXTRA_TAP_WATER_SCHEMA,
+        SET_CURVE_CONTROL_SCHEMA,
         async_setup_services,
     )
     from custom_components.qvantum.const import DOMAIN
@@ -71,8 +72,8 @@ class TestQvantumServices:
 
         await async_setup_services(mock_hass)
 
-        # Verify services were registered
-        assert mock_hass.services.async_register.call_count == 1
+        # Verify both services were registered
+        assert mock_hass.services.async_register.call_count == 2
 
         # Check first call (extra_hot_water)
         first_call = mock_hass.services.async_register.call_args_list[0]
@@ -80,6 +81,13 @@ class TestQvantumServices:
         assert first_call[1]["service"] == "extra_hot_water"
         assert "service_func" in first_call[1]
         assert "schema" in first_call[1]
+
+        # Check second call (set_curve_control)
+        second_call = mock_hass.services.async_register.call_args_list[1]
+        assert second_call[1]["domain"] == DOMAIN
+        assert second_call[1]["service"] == "set_curve_control"
+        assert "service_func" in second_call[1]
+        assert "schema" in second_call[1]
 
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_success(self, mock_hass, mock_api):
@@ -321,3 +329,108 @@ class TestExtraTapWaterSchema:
         """Empty, boolean, and null ids are rejected."""
         with pytest.raises(vol.Invalid):
             EXTRA_TAP_WATER_SCHEMA({"device_id": value, "minutes": 60})
+
+class TestSetCurveControlService:
+    """Custom curve control service (shadow / active)."""
+
+    def _register(self, mock_hass, curve):
+        entry = MagicMock()
+        entry.runtime_data.coordinator = MagicMock()
+        entry.runtime_data.curve_coordinator = curve
+        mock_hass.config_entries.async_entries.return_value = [entry]
+
+    async def _service_func(self, mock_hass):
+        await async_setup_services(mock_hass)
+        second_call = mock_hass.services.async_register.call_args_list[1]
+        assert second_call[1]["service"] == "set_curve_control"
+        return second_call[1]["service_func"]
+
+    @pytest.mark.asyncio
+    async def test_sets_active_mode(self, mock_hass):
+        curve = MagicMock()
+        curve.active = True
+        curve.async_set_control_mode = AsyncMock()
+        self._register(mock_hass, curve)
+        service_func = await self._service_func(mock_hass)
+
+        service_call = MagicMock()
+        service_call.data = {"mode": "active"}
+        service_call.hass = mock_hass
+
+        result = await service_func(service_call)
+
+        curve.async_set_control_mode.assert_awaited_once_with("active")
+        assert result == {"qvantum": {"mode": "active", "active": True}}
+
+    @pytest.mark.asyncio
+    async def test_sets_shadow_mode(self, mock_hass):
+        curve = MagicMock()
+        curve.active = False
+        curve.async_set_control_mode = AsyncMock()
+        self._register(mock_hass, curve)
+        service_func = await self._service_func(mock_hass)
+
+        service_call = MagicMock()
+        service_call.data = {"mode": "shadow"}
+        service_call.hass = mock_hass
+
+        result = await service_func(service_call)
+
+        curve.async_set_control_mode.assert_awaited_once_with("shadow")
+        assert result == {"qvantum": {"mode": "shadow", "active": False}}
+
+    @pytest.mark.asyncio
+    async def test_reports_unknown_error_on_failure(self, mock_hass):
+        curve = MagicMock()
+        curve.async_set_control_mode = AsyncMock(side_effect=Exception("boom"))
+        self._register(mock_hass, curve)
+        service_func = await self._service_func(mock_hass)
+
+        service_call = MagicMock()
+        service_call.data = {"mode": "active"}
+        service_call.hass = mock_hass
+
+        result = await service_func(service_call)
+
+        assert result["qvantum"]["exception"] == "unknown_error"
+        assert result["qvantum"]["details"] == "boom"
+
+    @pytest.mark.asyncio
+    async def test_requires_modbus_curve_coordinator(self, mock_hass):
+        self._register(mock_hass, None)
+        service_func = await self._service_func(mock_hass)
+
+        service_call = MagicMock()
+        service_call.data = {"mode": "active"}
+        service_call.hass = mock_hass
+
+        result = await service_func(service_call)
+
+        assert result["qvantum"]["exception"] == "unknown_error"
+        assert "Modbus" in result["qvantum"]["details"]
+
+    @pytest.mark.asyncio
+    async def test_without_entries(self, mock_hass):
+        mock_hass.config_entries.async_entries.return_value = []
+        service_func = await self._service_func(mock_hass)
+
+        service_call = MagicMock()
+        service_call.data = {"mode": "shadow"}
+        service_call.hass = mock_hass
+
+        result = await service_func(service_call)
+
+        assert result["qvantum"]["exception"] == "unknown_error"
+
+
+class TestSetCurveControlSchema:
+    """Validate the service schema without invoking the service handler."""
+
+    @pytest.mark.parametrize("mode", ["shadow", "active"])
+    def test_accepts_known_modes(self, mode):
+        assert SET_CURVE_CONTROL_SCHEMA({"mode": mode}) == {"mode": mode}
+
+    def test_rejects_unknown_mode(self):
+        with pytest.raises(vol.Invalid):
+            SET_CURVE_CONTROL_SCHEMA({"mode": "on"})
+

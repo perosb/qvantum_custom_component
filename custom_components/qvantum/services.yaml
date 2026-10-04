@@ -10,3 +10,19 @@ extra_hot_water:
     minutes:
       description: Minutes to produce extra hot water (0 minutes turns off)
       example: "120"
+
+set_curve_control:
+  name: set_curve_control
+  description: >-
+    Custom heating-curve control mode. "shadow" only computes and logs the
+    curve; "active" writes the seven points and switches the pump to User
+    defined. Modbus only, and only one of the two modes is ever active.
+  fields:
+    mode:
+      description: Mode to apply
+      example: shadow
+      selector:
+        select:
+          options:
+            - shadow
+            - active

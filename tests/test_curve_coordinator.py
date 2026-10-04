@@ -6,16 +6,19 @@ import asyncio
 import time
 from collections import deque
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.qvantum import curve_coordinator as cc
 from custom_components.qvantum.const import HP_STATUS_HEATING
+from custom_components.qvantum.heating_curve import CurveResult
 from custom_components.qvantum.curve_coordinator import (
     INDOOR_MARGIN_CYCLES,
     POWER_CYCLES,
+    CurveSnapshot,
     QvantumCurveCoordinator,
     _median_sorted,
     _model_from_state,
@@ -24,6 +27,7 @@ from custom_components.qvantum.curve_coordinator import (
     build_samples,
     curve_deviation_c,
     freeze_baseline,
+    points_within_limits,
     signal_blocker,
 )
 from custom_components.qvantum.open_meteo import (
@@ -101,6 +105,10 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._forecast_ok = False
     coordinator._indoor_margins = deque(maxlen=INDOOR_MARGIN_CYCLES)
     coordinator._powers = deque(maxlen=POWER_CYCLES)
+    coordinator._mode = "shadow"
+    coordinator._revert_pending = False
+    coordinator._control_lock = asyncio.Lock()
+    coordinator._listeners = {}
     coordinator.data = None
     coordinator.hass = MagicMock()
     coordinator.hass.config.latitude = 59.3
@@ -816,3 +824,375 @@ async def test_snapshot_deviation_falls_back_to_forecast_outdoor() -> None:
     snapshot = await coordinator._async_compute_snapshot()
 
     assert snapshot.deviation_c is None
+
+
+
+def make_result(points=None) -> CurveResult:
+    chosen = dict(points) if points is not None else dict(BASELINE)
+    return CurveResult(
+        points=tuple(chosen.items()),
+        adjustment_c=0.0,
+        outdoor_c=0.0,
+        night_day_c=0.0,
+        solar_c=0.0,
+        load_c=0.0,
+        capped_by_indoor=False,
+    )
+
+def make_snapshot(points=None, **overrides) -> CurveSnapshot:
+    values = dict(
+        shadow=True,
+        points=dict(points) if points is not None else dict(BASELINE),
+        baseline=dict(BASELINE),
+        adjustment_c=0.0,
+        outdoor_c=0.0,
+        night_day_c=0.0,
+        solar_c=0.0,
+        load_c=0.0,
+        capped_by_indoor=False,
+        deviation_c=None,
+        ready=False,
+        blocker=None,
+        median_abs_c=None,
+        max_abs_c=None,
+        window_hours=0.0,
+        model=None,
+        calibrated_at=None,
+    )
+    values.update(overrides)
+    return CurveSnapshot(**values)
+
+
+def make_writable_coordinator(
+    *, points=None, settings=None, snapshot=None, live_curve_type=None
+):
+    merged = {**SETTINGS, **(settings or {})}
+    coordinator = make_coordinator(values=VALUES, settings=merged)
+    expected = points if points is not None else BASELINE
+    curve_type = (
+        live_curve_type
+        if live_curve_type is not None
+        else merged["curve_type_heating"]
+    )
+    client = MagicMock()
+    client.writable = True
+    client.set_heating_curve_point = AsyncMock(return_value={"status": "APPLIED"})
+    client.set_curve_type_heating = AsyncMock(return_value={"status": "APPLIED"})
+    client.set_indoor_temperature_offset = AsyncMock(
+        return_value={"status": "APPLIED"}
+    )
+    client.get_settings = AsyncMock(
+        return_value={
+            "settings": [
+                {"name": key, "value": value} for key, value in expected.items()
+            ]
+            + [{"name": "curve_type_heating", "value": curve_type}]
+        }
+    )
+    coordinator._main.client = client
+    coordinator._main._process_settings_data.side_effect = lambda payload: {
+        item["name"]: item["value"] for item in payload["settings"]
+    }
+    coordinator._baseline = dict(BASELINE)
+    coordinator.data = snapshot or make_snapshot(points)
+    return coordinator, client
+
+
+def test_points_within_limits_validation() -> None:
+    assert points_within_limits(BASELINE)
+    assert not points_within_limits({**BASELINE, "curve_30": 9})
+    assert not points_within_limits({**BASELINE, "curve_minus_30": 81})
+    assert not points_within_limits({**BASELINE, "curve_30": 50})
+    assert not points_within_limits(
+        {key: value for key, value in BASELINE.items() if key != "curve_0"}
+    )
+    assert not points_within_limits({**BASELINE, "curve_0": True})
+
+
+async def test_set_control_mode_rejects_unknown() -> None:
+    coordinator = make_coordinator()
+
+    with pytest.raises(ValueError):
+        await coordinator.async_set_control_mode("on")
+
+
+async def test_activate_requires_baseline_and_write_access() -> None:
+    coordinator, _client = make_writable_coordinator()
+    coordinator._baseline = None
+
+    with pytest.raises(HomeAssistantError):
+        await coordinator.async_set_control_mode("active")
+    assert not coordinator.active
+
+    coordinator, _client = make_writable_coordinator()
+    coordinator._main.client.writable = False
+
+    with pytest.raises(HomeAssistantError):
+        await coordinator.async_set_control_mode("active")
+
+
+async def test_shadow_mode_never_touches_pump_settings() -> None:
+    coordinator, client = make_writable_coordinator()
+
+    await coordinator.async_set_control_mode("shadow")
+
+    assert not coordinator.active
+    assert client.set_curve_type_heating.await_args_list == []
+    assert client.set_heating_curve_point.await_args_list == []
+
+
+async def test_activate_updates_main_values_optimistically() -> None:
+    coordinator, _client = make_writable_coordinator()
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    values = coordinator._main.data["values"]
+    assert values["curve_30"] == 25
+    assert values["curve_minus_30"] == 60
+    assert values["indoor_temperature_offset"] == 0
+    assert values["curve_type_heating"] == 1
+
+
+async def test_activate_writes_points_offset_then_curve_type() -> None:
+    coordinator, client = make_writable_coordinator()
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    assert coordinator.active
+    point_calls = client.set_heating_curve_point.call_args_list
+    assert [call.args[1] for call in point_calls] == list(BASELINE)
+    assert [call.args[2] for call in point_calls] == [int(v) for v in BASELINE.values()]
+    client.set_indoor_temperature_offset.assert_awaited_once_with(
+        "test_device_123", 0
+    )
+    assert client.set_curve_type_heating.await_args_list[-1].args == (
+        "test_device_123",
+        1,
+    )
+    assert len(client.set_curve_type_heating.await_args_list) == 1
+    assert coordinator.active
+
+
+
+async def test_activate_reads_live_curve_type_not_the_cache() -> None:
+    coordinator, client = make_writable_coordinator(live_curve_type=1)
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    assert client.set_curve_type_heating.await_args_list[0].args == (
+        "test_device_123",
+        0,
+    )
+    assert coordinator.active
+
+
+async def test_activate_falls_back_to_cached_curve_type_on_read_failure() -> None:
+    coordinator, client = make_writable_coordinator()
+    readback = client.get_settings.return_value
+    client.get_settings = AsyncMock(side_effect=[RuntimeError("offline"), readback])
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    # Cached Auto skips the Auto-first write; activation still completes.
+    assert client.set_curve_type_heating.await_args_list[-1].args == (
+        "test_device_123",
+        1,
+    )
+    assert coordinator.active
+
+
+async def test_activate_switches_to_auto_first_when_pump_is_user_defined() -> None:
+    coordinator, client = make_writable_coordinator(settings={"curve_type_heating": 1})
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    assert client.set_curve_type_heating.await_args_list[0].args == (
+        "test_device_123",
+        0,
+    )
+    assert client.set_curve_type_heating.await_args_list[-1].args == (
+        "test_device_123",
+        1,
+    )
+
+
+async def test_activate_reverts_and_raises_on_write_failure() -> None:
+    coordinator, client = make_writable_coordinator()
+    client.set_heating_curve_point.side_effect = RuntimeError("transport down")
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        with pytest.raises(HomeAssistantError):
+            await coordinator.async_set_control_mode("active")
+
+    assert not coordinator.active
+    assert client.set_curve_type_heating.await_args_list[-1].args == (
+        "test_device_123",
+        0,
+    )
+
+
+async def test_activate_reverts_on_readback_mismatch() -> None:
+    coordinator, client = make_writable_coordinator()
+    client.get_settings = AsyncMock(
+        return_value={
+            "settings": [
+                {"name": "curve_30", "value": 99},
+                {"name": "curve_20", "value": 30},
+            ]
+        }
+    )
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        with pytest.raises(HomeAssistantError):
+            await coordinator.async_set_control_mode("active")
+
+    assert not coordinator.active
+    assert client.set_curve_type_heating.await_args_list[-1].args == (
+        "test_device_123",
+        0,
+    )
+
+
+async def test_activation_clears_stale_revert_latch() -> None:
+    coordinator, client = make_writable_coordinator()
+    coordinator._revert_pending = True
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    assert coordinator.active
+    assert not coordinator._revert_pending
+
+    client.set_curve_type_heating.reset_mock()
+    await coordinator._async_retry_revert()
+    client.set_curve_type_heating.assert_not_awaited()
+
+
+async def test_deactivate_writes_auto() -> None:
+    coordinator, client = make_writable_coordinator()
+    coordinator._mode = "active"
+
+    await coordinator.async_set_control_mode("shadow")
+
+    assert not coordinator.active
+    assert client.set_curve_type_heating.await_args_list == [
+        call("test_device_123", 0)
+    ]
+
+
+async def test_revert_pending_retries_until_reachable() -> None:
+    coordinator, client = make_writable_coordinator()
+    coordinator._mode = "active"
+    client.writable = False
+
+    await coordinator.async_set_control_mode("shadow")
+
+    assert not coordinator.active
+    assert coordinator._revert_pending
+    assert client.set_curve_type_heating.await_args_list == []
+
+    client.writable = True
+    await coordinator._async_retry_revert()
+
+    assert not coordinator._revert_pending
+    assert client.set_curve_type_heating.await_args_list[-1].args == (
+        "test_device_123",
+        0,
+    )
+
+
+async def test_apply_active_writes_only_changed_points() -> None:
+    target = {key: value + 1.0 for key, value in BASELINE.items()}
+    current = {**BASELINE, "curve_30": 26.0}
+    coordinator, client = make_writable_coordinator(
+        points=target, settings={"curve_type_heating": 1, **current}
+    )
+    coordinator._mode = "active"
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator._async_apply_active(make_result(target))
+
+    written = [call.args[1] for call in client.set_heating_curve_point.call_args_list]
+    assert written == list(BASELINE)[1:]
+    assert coordinator._main.data["values"]["curve_minus_30"] == 61
+
+
+async def test_apply_active_without_user_defined_goes_shadow() -> None:
+    coordinator, client = make_writable_coordinator(
+        settings={"curve_type_heating": 0}
+    )
+    coordinator._mode = "active"
+
+    await coordinator._async_apply_active(make_result())
+
+    assert not coordinator.active
+    assert client.set_heating_curve_point.await_args_list == []
+
+
+async def test_apply_active_reverts_on_failure() -> None:
+    coordinator, client = make_writable_coordinator(settings={"curve_type_heating": 1})
+    coordinator._mode = "active"
+    client.set_heating_curve_point.side_effect = RuntimeError("gone")
+    target = {key: value + 1.0 for key, value in BASELINE.items()}
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator._async_apply_active(make_result(target))
+
+    assert not coordinator.active
+    assert client.set_curve_type_heating.await_args_list[-1].args == (
+        "test_device_123",
+        0,
+    )
+
+
+async def test_apply_active_reverts_on_invalid_points() -> None:
+    coordinator, client = make_writable_coordinator(settings={"curve_type_heating": 1})
+    coordinator._mode = "active"
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator._async_apply_active(
+            make_result(points={**BASELINE, "curve_30": 5})
+        )
+
+    assert not coordinator.active
+    assert client.set_heating_curve_point.await_args_list == []
+
+
+async def test_restore_loads_control_mode() -> None:
+    store = FakeStore(
+        {"baseline": BASELINE, "mode": "active", "revert_pending": True}
+    )
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator.active
+    assert coordinator._revert_pending
+
+    # Active mode without a restored baseline must fall back to shadow.
+    coordinator = make_coordinator(store=FakeStore({"mode": "active"}))
+    await coordinator.async_restore()
+    assert not coordinator.active
+
+
+async def test_update_data_retries_pending_revert_on_cycle() -> None:
+    coordinator, client = make_writable_coordinator()
+    coordinator._revert_pending = True
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._daylight = MagicMock(return_value=None)
+
+    await coordinator._async_compute_snapshot()
+
+    assert not coordinator._revert_pending
+    assert client.set_curve_type_heating.await_args_list[-1].args == (
+        "test_device_123",
+        0,
+    )
+

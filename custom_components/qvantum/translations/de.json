@@ -55,6 +55,9 @@
       },
       "vacation_mode": {
         "name": "Urlaubsmodus"
+      },
+      "custom_curve_control": {
+        "name": "Eigene Heizkurve: Steuerung"
       }
     },
     "select": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Minuten",
           "description": "Minuten zum Produzieren von extra heißem Wasser (0 Minuten schaltet aus)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Kurvensteuerung einstellen",
+      "description": "Steuerungsmodus der eigenen Heizkurve",
+      "fields": {
+        "mode": {
+          "name": "Modus",
+          "description": "shadow = nur berechnen, active = Kurve schreiben"
         }
       }
     }

@@ -55,6 +55,9 @@
       },
       "vacation_mode": {
         "name": "Vakantiemodus"
+      },
+      "custom_curve_control": {
+        "name": "Eigen stooklijn: regeling"
       }
     },
     "select": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Minuten",
           "description": "Minuten om extra warm water te produceren (0 minuten schakelt uit)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Curveregeling instellen",
+      "description": "Regelmodus voor eigen stooklijn",
+      "fields": {
+        "mode": {
+          "name": "Modus",
+          "description": "shadow = alleen berekenen, active = curve schrijven"
         }
       }
     }

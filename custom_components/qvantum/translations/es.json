@@ -55,6 +55,9 @@
       },
       "vacation_mode": {
         "name": "Modo vacaciones"
+      },
+      "custom_curve_control": {
+        "name": "Curva de calefacción propia: control"
       }
     },
     "select": {
@@ -830,6 +833,16 @@
         "minutes": {
           "name": "Minutos",
           "description": "Minutos para producir agua caliente extra (0 minutos desactiva)"
+        }
+      }
+    },
+    "set_curve_control": {
+      "name": "Establecer control de curva",
+      "description": "Modo de control de la curva de calefacción propia",
+      "fields": {
+        "mode": {
+          "name": "Modo",
+          "description": "shadow = solo cálculo, active = escribir la curva"
         }
       }
     }
