@@ -413,7 +413,7 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
                     await curve.async_set_control_mode("shadow")
                 except Exception as err:
                     _LOGGER.debug(
-                        "Could not revert custom curve while disabling writes: %s",
+                        "Could not revert adaptive curve while disabling writes: %s",
                         err,
                     )
         client.writable = write_enabled

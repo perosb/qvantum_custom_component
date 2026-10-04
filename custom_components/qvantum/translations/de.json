@@ -57,7 +57,7 @@
         "name": "Urlaubsmodus"
       },
       "custom_curve_control": {
-        "name": "Eigene Heizkurve: Steuerung"
+        "name": "Adaptive Heizkurve: Steuerung"
       }
     },
     "select": {
@@ -585,34 +585,34 @@
         "name": "Alarm 5 Code"
       },
       "custom_curve_30": {
-        "name": "Eigene Heizkurve 1: 30°C"
+        "name": "Adaptive Heizkurve 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Eigene Heizkurve 2: 20°C"
+        "name": "Adaptive Heizkurve 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Eigene Heizkurve 3: 10°C"
+        "name": "Adaptive Heizkurve 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Eigene Heizkurve 4: 0°C"
+        "name": "Adaptive Heizkurve 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Eigene Heizkurve 5: -10°C"
+        "name": "Adaptive Heizkurve 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Eigene Heizkurve 6: -20°C"
+        "name": "Adaptive Heizkurve 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Eigene Heizkurve 7: -30°C"
+        "name": "Adaptive Heizkurve 7: -30°C"
       },
       "custom_curve_adjustment": {
-        "name": "Eigene Heizkurve: Anpassung"
+        "name": "Adaptive Heizkurve: Anpassung"
       },
       "custom_curve_deviation": {
-        "name": "Eigene Heizkurve: Abweichung"
+        "name": "Adaptive Heizkurve: Abweichung"
       },
       "custom_curve_solar_model": {
-        "name": "Eigene Heizkurve: Solarmodell"
+        "name": "Adaptive Heizkurve: Solarmodell"
       }
     },
     "number": {
@@ -838,7 +838,7 @@
     },
     "set_curve_control": {
       "name": "Kurvensteuerung einstellen",
-      "description": "Steuerungsmodus der eigenen Heizkurve",
+      "description": "Steuerungsmodus der adaptiven Heizkurve",
       "fields": {
         "mode": {
           "name": "Modus",

@@ -57,7 +57,7 @@
         "name": "Mode vacances"
       },
       "custom_curve_control": {
-        "name": "Courbe de chauffage personnalisée : contrôle"
+        "name": "Courbe de chauffage adaptative : contrôle"
       }
     },
     "select": {
@@ -585,34 +585,34 @@
         "name": "Code d'alarme 5"
       },
       "custom_curve_30": {
-        "name": "Courbe de chauffage personnalisée 1: 30°C"
+        "name": "Courbe de chauffage adaptative 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Courbe de chauffage personnalisée 2: 20°C"
+        "name": "Courbe de chauffage adaptative 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Courbe de chauffage personnalisée 3: 10°C"
+        "name": "Courbe de chauffage adaptative 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Courbe de chauffage personnalisée 4: 0°C"
+        "name": "Courbe de chauffage adaptative 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Courbe de chauffage personnalisée 5: -10°C"
+        "name": "Courbe de chauffage adaptative 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Courbe de chauffage personnalisée 6: -20°C"
+        "name": "Courbe de chauffage adaptative 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Courbe de chauffage personnalisée 7: -30°C"
+        "name": "Courbe de chauffage adaptative 7: -30°C"
       },
       "custom_curve_adjustment": {
-        "name": "Courbe de chauffage personnalisée: ajustement"
+        "name": "Courbe de chauffage adaptative: ajustement"
       },
       "custom_curve_deviation": {
-        "name": "Courbe de chauffage personnalisée: écart"
+        "name": "Courbe de chauffage adaptative: écart"
       },
       "custom_curve_solar_model": {
-        "name": "Courbe de chauffage personnalisée: modèle solaire"
+        "name": "Courbe de chauffage adaptative: modèle solaire"
       }
     },
     "number": {
@@ -838,7 +838,7 @@
     },
     "set_curve_control": {
       "name": "Définir le contrôle de la courbe",
-      "description": "Mode de contrôle de la courbe de chauffage personnalisée",
+      "description": "Mode de contrôle de la courbe de chauffage adaptative",
       "fields": {
         "mode": {
           "name": "Mode",

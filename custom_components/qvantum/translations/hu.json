@@ -57,7 +57,7 @@
         "name": "Szabadság üzemmód"
       },
       "custom_curve_control": {
-        "name": "Saját fűtési görbe: vezérlés"
+        "name": "Adaptív fűtési görbe: vezérlés"
       }
     },
     "select": {
@@ -585,34 +585,34 @@
         "name": "5. riasztáskód"
       },
       "custom_curve_30": {
-        "name": "Saját fűtési görbe 1: 30°C"
+        "name": "Adaptív fűtési görbe 1: 30°C"
       },
       "custom_curve_20": {
-        "name": "Saját fűtési görbe 2: 20°C"
+        "name": "Adaptív fűtési görbe 2: 20°C"
       },
       "custom_curve_10": {
-        "name": "Saját fűtési görbe 3: 10°C"
+        "name": "Adaptív fűtési görbe 3: 10°C"
       },
       "custom_curve_0": {
-        "name": "Saját fűtési görbe 4: 0°C"
+        "name": "Adaptív fűtési görbe 4: 0°C"
       },
       "custom_curve_minus_10": {
-        "name": "Saját fűtési görbe 5: -10°C"
+        "name": "Adaptív fűtési görbe 5: -10°C"
       },
       "custom_curve_minus_20": {
-        "name": "Saját fűtési görbe 6: -20°C"
+        "name": "Adaptív fűtési görbe 6: -20°C"
       },
       "custom_curve_minus_30": {
-        "name": "Saját fűtési görbe 7: -30°C"
+        "name": "Adaptív fűtési görbe 7: -30°C"
       },
       "custom_curve_adjustment": {
-        "name": "Saját fűtési görbe: korrekció"
+        "name": "Adaptív fűtési görbe: korrekció"
       },
       "custom_curve_deviation": {
-        "name": "Saját fűtési görbe: eltérés"
+        "name": "Adaptív fűtési görbe: eltérés"
       },
       "custom_curve_solar_model": {
-        "name": "Saját fűtési görbe: szoláris modell"
+        "name": "Adaptív fűtési görbe: szoláris modell"
       }
     },
     "number": {
@@ -838,7 +838,7 @@
     },
     "set_curve_control": {
       "name": "Görbevezérlés beállítása",
-      "description": "Saját fűtési görbe vezérlési módja",
+      "description": "Adaptív fűtési görbe vezérlési módja",
       "fields": {
         "mode": {
           "name": "Mód",

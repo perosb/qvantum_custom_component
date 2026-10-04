@@ -42,7 +42,7 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **Device automations:** Triggers and conditions for defrost, compressor blocking, freeze protection, Wi-Fi/cloud connectivity, and a ventilation filter due in under 48 hours.
 - **External room sensor:** When configured by the pump, a Modbus number entity can mirror an external temperature into the control setpoint.
 - **Modbus writes:** Optional local writes for supported targets, DHW, fan, operation, room compensation, and sensor settings.
-- **Custom heating curve (Modbus):** A self-learning curve based on the weather forecast and the pump's own data. It starts in shadow mode and replaces the pump's Auto curve once you switch it on; see [docs/heating-curve.md](docs/heating-curve.md).
+- **Adaptive heating curve (Modbus):** A self-learning curve based on the weather forecast and the pump's own data. It starts in shadow mode and replaces the pump's Auto curve once you switch it on; see [docs/heating-curve.md](docs/heating-curve.md).
 
 #### Device automation details
 
@@ -65,7 +65,7 @@ action:
       value: "{{ states('sensor.some_external_room_temperature') | float }}"
 ```
 
-#### Custom heating curve
+#### Adaptive heating curve
 
 Modbus-only, and **Enable writing via Modbus** must be enabled. Instead of
 using the pump's fixed Auto curve, the integration learns how your house
@@ -107,7 +107,7 @@ Cloud extra ventilation is a timed boost; local Modbus fan extra is a sticky pre
 
 #### `qvantum.set_curve_control`
 
-The custom heating curve from an automation; `mode` is `shadow` or `active`.
+The adaptive heating curve from an automation; `mode` is `shadow` or `active`.
 The switch remains the only user-facing source of truth.
 
 ```yaml
