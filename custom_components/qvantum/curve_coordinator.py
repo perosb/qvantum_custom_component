@@ -451,13 +451,17 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return await fetch_forecast(self.session, latitude, longitude)
 
     def _calibration_due(self, now_ts: float) -> bool:
-        if self._model is None or not self._model.valid:
-            return True
+        """Throttle calibration attempts, not only successful ones."""
         if self._last_calibration_ts is None:
             return True
         return now_ts - self._last_calibration_ts >= CALIBRATION_REFRESH_HOURS * 3600
 
     async def _async_calibrate(self, now_ts: float) -> None:
+        # Record the attempt before any IO: a failed or skipped calibration
+        # (fresh install, no history, invalid fit) must not re-fetch 60 days
+        # of archive plus statistics on every 15-minute cycle.
+        self._last_calibration_ts = now_ts
+        await self._async_persist()
         latitude = self.hass.config.latitude
         longitude = self.hass.config.longitude
         if latitude is None or longitude is None:
@@ -495,7 +499,6 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return
         self._model = model
         self._calibrated_at = dt_util.utcnow().isoformat()
-        self._last_calibration_ts = now_ts
         _LOGGER.info(
             "Solar model calibrated: a=%.1f W/K b=%.3f m² trust=%.2f (%s samples)",
             model.a_w_per_k,

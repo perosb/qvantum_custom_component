@@ -613,6 +613,21 @@ async def test_calibrate_keeps_previous_model_on_invalid_fit() -> None:
     assert coordinator.model is previous
 
 
+async def test_calibration_attempt_is_throttled_after_failure() -> None:
+    coordinator = make_coordinator(store=FakeStore())
+    with patch.object(
+        cc, "fetch_ghi_history", AsyncMock(side_effect=OpenMeteoError("down"))
+    ):
+        await coordinator._async_calibrate(2000.0)
+
+    assert coordinator._last_calibration_ts == 2000.0
+    assert not coordinator._calibration_due(2000.0 + 3600.0)
+    assert coordinator._calibration_due(
+        2000.0 + cc.CALIBRATION_REFRESH_HOURS * 3600.0
+    )
+    assert coordinator._store.saved is not None
+
+
 def test_calibration_due_rules() -> None:
     coordinator = make_coordinator()
 
