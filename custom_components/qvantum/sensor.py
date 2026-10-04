@@ -547,6 +547,7 @@ class QvantumCurvePointSensor(QvantumCurveSensorEntity):
         return {
             "baseline": snapshot.baseline.get(self._curve_key),
             "adjustment": snapshot.adjustment_c,
+            "trim": snapshot.trims.get(self._curve_key, 0.0),
         }
 
 
@@ -582,6 +583,8 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
             "solar_c": snapshot.solar_c,
             "load_c": snapshot.load_c,
             "capped_by_indoor": snapshot.capped_by_indoor,
+            "trims": dict(snapshot.trims),
+            "clamped": snapshot.clamped,
         }
 
 
@@ -618,6 +621,9 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             "max_abs_c": snapshot.max_abs_c,
             "window_hours": snapshot.window_hours,
             "baseline_auto": snapshot.baseline_auto,
+            "baseline_learned_hours": snapshot.baseline_learned_hours,
+            "baseline_outdoor_min_c": snapshot.baseline_outdoor_min_c,
+            "baseline_outdoor_max_c": snapshot.baseline_outdoor_max_c,
         }
 
 

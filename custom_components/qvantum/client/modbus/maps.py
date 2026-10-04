@@ -192,6 +192,8 @@ MODBUS_HOLDING_TO_SETTINGS_MAP = {
     "dhw_stop_extra": "dhw_stop_extra",
     "room_temp_external": "room_temp_external",
     "stop_heating": "stop_heating",
+    "max_heating_supply": "max_heating_supply",
+    "min_heating_supply": "min_heating_supply",
     "curve_type_heating": "curve_type_heating",
     "temp_compensation_curve": "temp_compensation_curve",
     "curve_minus_30": "curve_minus_30",

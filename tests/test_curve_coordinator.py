@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import deque
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, call, patch
 from zoneinfo import ZoneInfo
@@ -15,6 +16,7 @@ from homeassistant.exceptions import HomeAssistantError
 from custom_components.qvantum import curve_coordinator as cc
 from custom_components.qvantum.const import HP_STATUS_HEATING
 from custom_components.qvantum.heating_curve import (
+    TOTAL_MAX_C,
     CurveResult,
     interpolate_supply,
     normalize_baseline,
@@ -108,6 +110,10 @@ def make_coordinator(*, values=None, settings=None, store=None):
     # Throttle baseline learning off by default; dedicated tests re-enable it.
     coordinator._last_baseline_learn_ts = float("inf")
     coordinator._last_active_ts = None
+    coordinator._trims = {}
+    coordinator._last_trim_ts = None
+    coordinator._baseline_stats = None
+    coordinator._clamped_state = False
     coordinator._forecast = None
     coordinator._forecast_ok = False
     coordinator._indoor_margins = deque(maxlen=INDOOR_MARGIN_CYCLES)
@@ -309,6 +315,167 @@ async def test_learn_baseline_throttles_and_swallows_failures() -> None:
     assert coordinator.baseline == BASELINE
 
 
+def _trim_hours(
+    error: float, *, hour: int = 1_000_000, count: int = 8
+) -> list[tuple[int, float, float]]:
+    return [
+        (hour - index * 3600, outdoor, error)
+        for outdoor in (-5.0, 5.0)
+        for index in range(count)
+    ]
+
+
+def test_supply_bounds_from_values() -> None:
+    coordinator = make_coordinator(
+        values={"min_heating_supply": 20, "max_heating_supply": 60}
+    )
+    assert coordinator._supply_bounds(coordinator._main_values()) == (20.0, 60.0)
+
+    fallback = make_coordinator()
+    assert fallback._supply_bounds(fallback._main_values()) == (10.0, 80.0)
+
+
+async def test_trim_observations_join_and_subtract_target() -> None:
+    coordinator = make_coordinator(
+        values={"bt2": 21.0, "indoor_temperature_target": 20.0}
+    )
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "bt2": "sensor.i"}
+    )
+    coordinator._async_statistics = AsyncMock(
+        return_value={
+            "sensor.t": [{"start": 100, "mean": 5.0}, {"start": 200, "mean": 6.0}],
+            "sensor.i": [{"start": 100, "mean": 21.0}, {"start": 300, "mean": 22.0}],
+        }
+    )
+
+    observations = await coordinator._async_trim_observations()
+
+    assert observations == [(100, 5.0, 1.0)]
+    coordinator._async_statistics.assert_awaited_once()
+
+
+async def test_trim_observations_require_target_and_indoor() -> None:
+    coordinator = make_coordinator(values={"bt2": 21.0})
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "bt2": "sensor.i"}
+    )
+    assert await coordinator._async_trim_observations() == []
+
+    coordinator = make_coordinator(values={"indoor_temperature_target": 20.0})
+    coordinator._resolve_statistic_ids = MagicMock(return_value={"bt1": "sensor.t"})
+    assert await coordinator._async_trim_observations() == []
+
+
+async def test_update_trims_applies_damped_step() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._mode = "active"
+    coordinator._async_trim_observations = AsyncMock(return_value=_trim_hours(-1.0))
+    coordinator._last_trim_ts = None
+
+    await coordinator._async_update_trims(make_result(), 1_000_000.0)
+
+    assert coordinator._trims["curve_10"] == pytest.approx(
+        cc.TRIM_UPDATE_GAIN * 0.6
+    )
+    assert coordinator._trims["curve_minus_10"] == pytest.approx(
+        cc.TRIM_UPDATE_GAIN * 0.6
+    )
+    assert coordinator._last_trim_ts == 1_000_000.0
+
+
+async def test_update_trims_skips_inactive_capped_and_throttled() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_trim_observations = AsyncMock(return_value=_trim_hours(-1.0))
+    coordinator._last_trim_ts = None
+
+    await coordinator._async_update_trims(make_result(), 1000.0)
+    coordinator._async_trim_observations.assert_not_awaited()
+
+    coordinator._mode = "active"
+    await coordinator._async_update_trims(
+        replace(make_result(), capped_by_indoor=True), 2000.0
+    )
+    coordinator._async_trim_observations.assert_not_awaited()
+
+    await coordinator._async_update_trims(
+        replace(make_result(), adjustment_c=TOTAL_MAX_C), 3000.0
+    )
+    coordinator._async_trim_observations.assert_not_awaited()
+
+    await coordinator._async_update_trims(make_result(), 4000.0)
+    assert coordinator._async_trim_observations.await_count == 1
+    await coordinator._async_update_trims(make_result(), 4000.0 + 3600.0)
+    assert coordinator._async_trim_observations.await_count == 1
+    await coordinator._async_update_trims(
+        make_result(), 4000.0 + cc.TRIM_REFRESH_HOURS * 3600.0
+    )
+    assert coordinator._async_trim_observations.await_count == 2
+
+
+async def test_update_trims_swallows_failures_and_empty_residual() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._mode = "active"
+    coordinator._last_trim_ts = None
+    coordinator._async_trim_observations = AsyncMock(
+        side_effect=RuntimeError("recorder down")
+    )
+
+    await coordinator._async_update_trims(make_result(), 1000.0)
+
+    assert coordinator._trims == {}
+    assert coordinator._last_trim_ts == 1000.0
+
+    coordinator._last_trim_ts = None
+    coordinator._async_trim_observations = AsyncMock(return_value=_trim_hours(0.0))
+    await coordinator._async_update_trims(make_result(), 2000.0)
+
+    assert coordinator._trims == {}
+
+    # Already at the cap in the same direction: no change, no write.
+    coordinator._last_trim_ts = None
+    coordinator._trims = {key: cc.TRIM_MAX_C for key in BASELINE}
+    coordinator._async_trim_observations = AsyncMock(return_value=_trim_hours(-10.0))
+    await coordinator._async_update_trims(make_result(), 3000.0)
+
+    assert all(value == cc.TRIM_MAX_C for value in coordinator._trims.values())
+    assert coordinator._last_trim_ts == 3000.0
+
+
+async def test_learn_baseline_clears_trims_only_when_corrected() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._trims = {"curve_0": 0.5}
+    coordinator._async_baseline_observations = AsyncMock(
+        return_value=_curve_observations(-3.0)
+    )
+    coordinator._last_baseline_learn_ts = None
+
+    await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, 1000.0)
+
+    assert coordinator._trims == {}
+    assert coordinator._baseline_stats == {
+        "hours": 42,
+        "min_c": 0.0,
+        "max_c": 20.0,
+        "corrected": True,
+    }
+
+    coordinator._trims = {"curve_0": 0.5}
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_baseline_observations = AsyncMock(
+        return_value=_curve_observations(-0.2)
+    )
+    coordinator._last_baseline_learn_ts = None
+    await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, 2000.0)
+
+    assert coordinator._trims == {"curve_0": 0.5}
+    assert coordinator._baseline_stats["corrected"] is False
+
+
 def test_build_samples_joins_and_filters() -> None:
     q = {100: 500.0, 200: 30.0, 300: 900.0, 400: 800.0}
     indoor = {100: 20.0, 200: 21.0, 300: 22.0, 400: 21.0}
@@ -499,6 +666,40 @@ async def test_snapshot_learns_baseline_while_auto() -> None:
     assert snapshot.baseline_auto is True
 
 
+async def test_snapshot_clamps_to_pump_supply_limits() -> None:
+    values = {**VALUES, "min_heating_supply": 20, "max_heating_supply": 45}
+    coordinator = make_coordinator(values=values, settings=SETTINGS)
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.clamped
+    assert snapshot.trims == {}
+    assert all(20.0 <= value <= 45.0 for value in snapshot.points.values())
+
+
+async def test_snapshot_active_records_clamp() -> None:
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}, live_curve_type=1
+    )
+    coordinator._main.data["values"]["max_heating_supply"] = 45
+    coordinator._mode = "active"
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._daylight = MagicMock(return_value=None)
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.clamped
+    assert coordinator._clamped_state is True
+
+
 async def test_update_data_degrades_on_failure() -> None:
     coordinator = make_coordinator()
 
@@ -542,6 +743,13 @@ async def test_async_restore_loads_state() -> None:
             "calibrated_at": "2026-03-01T00:00:00+00:00",
             "calibrated_ts": 1_770_000_000.0,
             "last_active_ts": 1_770_000_500.0,
+            "trims": {"curve_0": 0.5, "not_a_point": 1.0, "curve_10": True},
+            "baseline_stats": {
+                "hours": 90,
+                "min_c": -5.0,
+                "max_c": 8.0,
+                "corrected": True,
+            },
             "indoor_margins": [[1_770_000_000.0, 0.4], ["bad"], [1_770_000_100.0, -0.2]],
         }
     )
@@ -554,6 +762,13 @@ async def test_async_restore_loads_state() -> None:
     assert coordinator._calibrated_at == "2026-03-01T00:00:00+00:00"
     assert coordinator._last_calibration_ts == 1_770_000_000.0
     assert coordinator._last_active_ts == 1_770_000_500.0
+    assert coordinator._trims == {"curve_0": 0.5}
+    assert coordinator._baseline_stats == {
+        "hours": 90,
+        "min_c": -5.0,
+        "max_c": 8.0,
+        "corrected": True,
+    }
     assert list(coordinator._indoor_margins) == [
         (1_770_000_000.0, 0.4),
         (1_770_000_100.0, -0.2),
@@ -1096,6 +1311,11 @@ def test_points_within_limits_validation() -> None:
     )
     assert not points_within_limits({**BASELINE, "curve_0": True})
 
+    # Effective pump limits are tighter than the register range.
+    assert not points_within_limits(BASELINE, max_supply_c=45.0)
+    assert points_within_limits(BASELINE, min_supply_c=20.0, max_supply_c=60.0)
+    assert not points_within_limits(BASELINE, min_supply_c=50.0)
+
 
 async def test_set_control_mode_rejects_unknown() -> None:
     coordinator = make_coordinator()
@@ -1276,12 +1496,16 @@ async def test_deactivate_writes_auto() -> None:
 async def test_revert_records_last_active() -> None:
     coordinator, _client = make_writable_coordinator()
     coordinator._mode = "active"
+    coordinator._trims = {"curve_0": 0.5}
+    coordinator._last_trim_ts = 42.0
 
     before = time.time()
     await coordinator.async_set_control_mode("shadow")
 
     assert coordinator._last_active_ts is not None
     assert coordinator._last_active_ts >= before
+    assert coordinator._trims == {}
+    assert coordinator._last_trim_ts is None
 
 
 async def test_revert_from_shadow_does_not_record_last_active() -> None:
@@ -1348,6 +1572,8 @@ async def test_apply_active_demotion_records_last_active() -> None:
     )
     coordinator._mode = "active"
     coordinator._last_active_ts = None
+    coordinator._trims = {"curve_0": 0.5}
+    coordinator._last_trim_ts = 42.0
 
     before = time.time()
     await coordinator._async_apply_active(make_result())
@@ -1355,6 +1581,8 @@ async def test_apply_active_demotion_records_last_active() -> None:
     assert not coordinator.active
     assert coordinator._last_active_ts is not None
     assert coordinator._last_active_ts >= before
+    assert coordinator._trims == {}
+    assert coordinator._last_trim_ts is None
 
 
 async def test_apply_active_reverts_on_failure() -> None:
