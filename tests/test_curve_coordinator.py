@@ -700,6 +700,41 @@ async def test_snapshot_active_records_clamp() -> None:
     assert coordinator._clamped_state is True
 
 
+async def test_snapshot_trim_update_serializes_with_deactivation() -> None:
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}, live_curve_type=1
+    )
+    coordinator._mode = "active"
+    coordinator._last_trim_ts = None
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_observations():
+        started.set()
+        await release.wait()
+        return _trim_hours(-1.0)
+
+    coordinator._async_trim_observations = slow_observations
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._daylight = MagicMock(return_value=None)
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        snapshot_task = asyncio.create_task(coordinator._async_compute_snapshot())
+        await started.wait()
+        revert_task = asyncio.create_task(
+            coordinator.async_set_control_mode("shadow")
+        )
+        await asyncio.sleep(0)
+        release.set()
+        await snapshot_task
+        await revert_task
+
+    assert not coordinator.active
+    assert coordinator._trims == {}
+
+
 async def test_update_data_degrades_on_failure() -> None:
     coordinator = make_coordinator()
 

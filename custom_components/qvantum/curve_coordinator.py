@@ -1347,8 +1347,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 await self._async_retry_revert()
             if self.active and result is not None:
                 await self._async_apply_active(result)
-        if result is not None:
-            await self._async_update_trims(result, now_ts)
+            # Serialized with deactivation: a revert clears the trims, and an
+            # update awaited outside this lock could resurrect them.
+            if result is not None:
+                await self._async_update_trims(result, now_ts)
 
         shadow = values.get("curve_type_heating") != HeatingCurveType.USER_DEFINED
         deviation = None
