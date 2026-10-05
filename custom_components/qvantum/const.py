@@ -121,8 +121,8 @@ CONF_MODBUS_SCAN_INTERVAL = "modbus_scan_interval"
 # mode: the pump drops the mode and raises alarm 8 when the fed value is older
 # than ~5 minutes.
 CONF_EXTERNAL_ROOM_TEMP_ENTITY = "external_room_temp_entity"
-# EMA time constant (seconds) for the fed value. Matches the 5-minute low-pass
-# filter this feature replaces, so the pump sees the same smoothing as before.
+# EMA time constant (seconds) for the fed value: smooths sensor noise while
+# still following the room temperature within minutes.
 EXTERNAL_ROOM_TEMP_EMA_TAU = 300.0
 # Upper bound (seconds) for the feed cadence. The pump treats the external
 # sensor as unavailable when the value is older than ~5 minutes, so the feed

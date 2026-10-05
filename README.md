@@ -64,13 +64,12 @@ Enable the built-in feed (Modbus mode, **Enable writing via Modbus** on):
    (e.g. an average of your room sensors).
 3. Select **Ext Modbus** (or **Alla**) in the Qvantum app.
 
-The integration then writes an EMA-smoothed value (5-minute time constant,
-matching the low-pass filter this feature replaces) on its own schedule,
-refreshed even when the value has not changed. It is never slower than every
-4 minutes, regardless of the configured poll interval, so the pump's watchdog
-stays satisfied. Manual writes to the feed's number entity are overwritten by
-the next refresh while the feed is active. Clear the picker to turn the feed
-off.
+The integration then writes a smoothed value (5-minute time constant) on its
+own schedule, refreshed even when the value has not changed. It is never
+slower than every 4 minutes, regardless of the configured poll interval, so
+the pump's watchdog stays satisfied. Manual writes to the feed's number entity
+are overwritten by the next refresh while the feed is active. Clear the picker
+to turn the feed off.
 
 Find the feed's number entity under **Settings → Devices & Services →
 Entities**: its entity id follows your language and device name (look for the
