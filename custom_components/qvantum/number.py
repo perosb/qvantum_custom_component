@@ -39,7 +39,9 @@ def _as_int(value: object) -> int | None:
 # Entities for these metrics show as unavailable when "Enable writing via Modbus" is off.
 MODBUS_WRITE_METRICS = {
     "dhw_stop_extra",
-    "room_temp_external",  # Written via Modbus and only relevant when the external room sensor mode is enabled.
+    # Written via Modbus. Stays writable in every sensor mode so a dropped
+    # sensor source can be recovered and the feed can keep writing.
+    "room_temp_external",
     "temp_compensation_curve",  # Holding 23; cloud Auto uses DUT fields instead.
 }
 
