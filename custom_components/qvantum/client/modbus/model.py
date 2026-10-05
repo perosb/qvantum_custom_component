@@ -10,6 +10,7 @@ from __future__ import annotations
 from modbus_connection.model import Component, bit, gauge, integer
 
 from .maps import (
+    MODBUS_HOLDING_RANGE,
     MODBUS_HOLDING_REGISTER_MAP,
     MODBUS_IDENTITY_REGISTER_MAP,
     MODBUS_INPUT_REGISTER_MAP,
@@ -19,13 +20,20 @@ from .maps import (
 _RELAYS_BITMASK_ADDRESS = MODBUS_INPUT_REGISTER_MAP["relays_bitmask"][0]
 
 
-def _write_validator(signed: bool, scale: float):
+def _write_validator(
+    signed: bool,
+    scale: float,
+    value_range: tuple[float, float] | None = None,
+):
     """Return a write validator rejecting values the register cannot hold.
 
     ``encode_int`` only checks the 16-bit width, so the scaled raw value can
     still wrap: a negative value on an unsigned register becomes a large
     positive one, and a value above the signed range becomes negative. Bound
     the raw value the same way ``NumberField.encode`` computes it.
+
+    ``value_range`` is the datasheet MIN/MAX in engineering units; when set,
+    an out-of-range value fails here instead of on the wire as exception 0x03.
     """
     low, high = (-32768, 32767) if signed else (0, 65535)
     kind = "signed" if signed else "unsigned"
@@ -37,6 +45,13 @@ def _write_validator(signed: bool, scale: float):
             return value
         if not isinstance(value, (int, float)):
             raise ValueError(f"value {value!r} is not numeric")
+        if value_range is not None:
+            range_low, range_high = value_range
+            if not range_low <= float(value) <= range_high:
+                raise ValueError(
+                    f"value {value} is outside the documented range "
+                    f"{range_low}..{range_high}"
+                )
         raw = round(round(float(value), decimals) / scale)
         if not low <= raw <= high:
             raise ValueError(
@@ -48,11 +63,18 @@ def _write_validator(signed: bool, scale: float):
 
 
 def _register_field(
-    data_type: str, address: int, scale: float, *, writable: bool = False
+    data_type: str,
+    address: int,
+    scale: float,
+    *,
+    writable: bool = False,
+    value_range: tuple[float, float] | None = None,
 ):
     """Return a gauge or integer field matching a register-map tuple."""
     signed = data_type == "int16"
-    write_arg = _write_validator(signed, scale) if writable else False
+    write_arg = (
+        _write_validator(signed, scale, value_range) if writable else False
+    )
     if scale == 1.0:
         return integer(address, signed=signed, writable=write_arg)
     return gauge(address, scale, signed=signed, writable=write_arg)
@@ -68,6 +90,7 @@ def _component_from_map(
     skip: frozenset[str] = frozenset(),
     max_gap: int = 16,
     register_ranges: tuple[tuple[int, int], ...] | None = None,
+    range_map: dict | None = None,
 ) -> type[Component]:
     # max_gap=16 matches a live Qvantum-HP probe: documented holes answer.
     # register_ranges keep reads off the refused QGM1/QGM2 span 119-146.
@@ -77,8 +100,11 @@ def _component_from_map(
     for field_name, (address, data_type, scale) in register_map.items():
         if field_name in skip:
             continue
+        value_range = None
+        if writable and range_map is not None:
+            value_range = range_map.get(field_name)
         attrs[field_name] = _register_field(
-            data_type, address, scale, writable=writable
+            data_type, address, scale, writable=writable, value_range=value_range
         )
     if extra:
         attrs.update(extra)
@@ -105,6 +131,7 @@ QvantumSettings = _component_from_map(
     "holding",
     MODBUS_HOLDING_REGISTER_MAP,
     writable=True,
+    range_map=MODBUS_HOLDING_RANGE,
     # Live probe: the mapped holding span 0-88 answers as one block.
     register_ranges=((0, 88),),
 )

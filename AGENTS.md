@@ -61,9 +61,10 @@ writes: coordinator helpers (`async_set_extra_tap_water`, `async_write_metric`,
   `APIAuthError`, `APIConnectionError`, `APIRateLimitError`. Do not name a class
   `ConnectionError`.
 - Modbus client: every operation is bounded by an operation timeout and maps
-  failures to `TransportError`; holding writes are validated for signedness in
-  `client/modbus/model.py` before encoding. Never invent registers or ranges —
-  the maps under `client/modbus/maps.py` are the datasheet.
+  failures to `TransportError`; holding writes are validated for signedness and
+  the datasheet MIN/MAX (`MODBUS_HOLDING_RANGE`) in `client/modbus/model.py`
+  before encoding. Never invent registers or ranges — the maps under
+  `client/modbus/maps.py` are the datasheet.
 
 ## Git
 

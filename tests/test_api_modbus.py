@@ -493,10 +493,20 @@ class TestWriteHoldingRegister:
         api = self._make_api(mock_session)
         _connection, device = attach_mock_modbus(api)
 
-        result = await api.write_metric("dev1", "room_comp_factor", 2.5)
+        result = await api.write_metric("dev1", "room_comp_factor", 1.5)
 
         assert result == {"status": "APPLIED"}
-        assert device.unit.holding[13] == 25
+        assert device.unit.holding[13] == 15
+
+    @pytest.mark.asyncio
+    async def test_write_metric_rejects_out_of_range(self, mock_session):
+        api = self._make_api(mock_session)
+        _connection, device = attach_mock_modbus(api)
+
+        with pytest.raises(ValueError, match="documented range"):
+            await api.write_metric("dev1", "room_comp_factor", 2.5)
+
+        assert 13 not in device.unit.holding
 
     @pytest.mark.asyncio
     async def test_write_metric_room_temp_external_scaling(self, mock_session):

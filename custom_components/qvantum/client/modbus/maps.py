@@ -217,6 +217,59 @@ HEATING_CURVE_OUTDOOR_TEMPS: dict[str, int] = {
     "curve_minus_30": -30,
 }
 
+# Documented MIN/MAX per holding field (QAD EN 2609-AXC), in engineering
+# units after ``scale``. ``model`` uses these to reject out-of-range writes in
+# the client instead of letting the pump answer Modbus exception 0x03.
+# ``dhw_outlet_temp`` is omitted: the datasheet row mixes a 40-60 min/max with
+# a 0/1/2 status enum.
+MODBUS_HOLDING_RANGE: dict[str, tuple[float, float]] = {
+    "unit_on_off": (0, 1),
+    "operation_mode": (0, 2),
+    "allow_heating": (0, 1),
+    "allow_cooling": (0, 1),
+    "allow_addition": (0, 1),
+    "allow_dhw": (0, 1),
+    "time_between_modes": (0, 48),
+    "allow_addition_temp": (-29, 30),
+    "filtertime_outdoor": (0, 48),
+    "use_operation_sensor": (0, 4),
+    "desired_indoor_temp": (15, 25),
+    "room_compensation": (0.5, 2),
+    "room_temp_external": (-5, 40),
+    "heating_offset": (-9, 9),
+    "stop_heating": (-30, 30),
+    "max_heating_supply": (20, 80),
+    "min_heating_supply": (10, 80),
+    "curve_type_heating": (0, 1),
+    "temp_compensation_curve": (1, 50),
+    "cooling_offset": (-9, 9),
+    "start_cooling_temp": (-30, 30),
+    "dew_point_protection": (0, 1),
+    "min_cooling_supply": (7, 30),
+    "dhw_mode": (0, 3),
+    "dhw_start_normal": (20, 80),
+    "dhw_stop_normal": (20, 80),
+    "dhw_start_extra": (20, 80),
+    "dhw_stop_extra": (20, 80),
+    "dhw_uninterrupted_cooling": (0, 1),
+    "pump_speed_heating": (1, 100),
+    "pump_speed_cooling": (1, 100),
+    "pump_speed_dhw": (1, 100),
+    "pump_idle_speed": (1, 100),
+    "ventilation_state": (0, 3),
+    "fan_speed_reduced": (0, 100),
+    "fan_speed_normal": (0, 100),
+    "fan_speed_extra": (0, 100),
+    "compressor_fan_speed": (0, 100),
+    "heating_priority_time": (0, 180),
+    "cooling_priority_time": (0, 180),
+    "dhw_priority_time": (0, 180),
+    "bt12_mounted": (0, 1),
+    "qs_unit_connected": (0, 1),
+    "sg_enabled": (0, 1),
+    **{key: (10, 80) for key in HEATING_CURVE_OUTDOOR_TEMPS},
+}
+
 
 def heating_curve_points(values: dict) -> list[list[int]]:
     """Return ``[outdoor, supply]`` pairs from +30 °C down to -30 °C."""

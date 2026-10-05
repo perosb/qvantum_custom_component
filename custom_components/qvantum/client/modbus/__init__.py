@@ -11,9 +11,11 @@ from .device import (
     decode_serial_number,
     decode_sw_version,
     holding_field_for_metric,
+    metric_range,
 )
 from .maps import (
     HEATING_CURVE_OUTDOOR_TEMPS,
+    MODBUS_HOLDING_RANGE,
     MODBUS_HOLDING_REGISTER_MAP,
     MODBUS_HOLDING_TO_SETTINGS_MAP,
     MODBUS_IDENTITY_REGISTER_MAP,
@@ -26,6 +28,7 @@ from .model import QvantumIdentity, QvantumInputs, QvantumSettings
 __all__ = [
     "HEATING_CURVE_OUTDOOR_TEMPS",
     "IdentityProbeError",
+    "MODBUS_HOLDING_RANGE",
     "MODBUS_HOLDING_REGISTER_MAP",
     "MODBUS_HOLDING_TO_SETTINGS_MAP",
     "MODBUS_IDENTITY_REGISTER_MAP",
@@ -44,4 +47,5 @@ __all__ = [
     "decode_sw_version",
     "heating_curve_points",
     "holding_field_for_metric",
+    "metric_range",
 ]

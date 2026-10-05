@@ -9,6 +9,7 @@ from custom_components.qvantum.const import (
 )
 from custom_components.qvantum.client.modbus.maps import (
     HEATING_CURVE_OUTDOOR_TEMPS,
+    MODBUS_HOLDING_RANGE,
     MODBUS_HOLDING_REGISTER_MAP,
     MODBUS_IDENTITY_REGISTER_MAP,
     MODBUS_INPUT_REGISTER_MAP,
@@ -23,6 +24,7 @@ from custom_components.qvantum.client.modbus.device import (
     build_settings_payload,
     component_values,
     holding_field_for_metric,
+    metric_range,
 )
 from custom_components.qvantum.client.modbus.model import (
     QvantumIdentity,
@@ -84,9 +86,15 @@ class TestRegisterMapAlignment:
             # Writable fields carry a signedness validator, not a bare True.
             assert field.writable
 
+    def test_every_writable_holding_has_a_documented_range(self):
+        """Adding a holding to the map means adding its datasheet MIN/MAX."""
+        assert set(MODBUS_HOLDING_RANGE) == set(MODBUS_HOLDING_REGISTER_MAP) - {
+            "dhw_outlet_temp"
+        }
+
     def test_unsigned_holding_rejects_negative_value(self):
         """A negative value must not silently wrap an unsigned register."""
-        field = QvantumSettings.declared_fields["dhw_mode"]
+        field = QvantumSettings.declared_fields["dhw_outlet_temp"]
         assert field.signed is False
         with pytest.raises(ValueError, match="unsigned"):
             field.writable(-1)
@@ -95,14 +103,25 @@ class TestRegisterMapAlignment:
         signed_field = QvantumSettings.declared_fields["stop_heating"]
         assert signed_field.writable(-15) == -15
 
-    def test_signed_holding_rejects_overflowing_value(self):
-        """A raw value above the signed range must not wrap negative."""
+    def test_holding_rejects_out_of_datasheet_range(self):
+        """The documented MIN/MAX rejects before the 16-bit guard runs."""
         field = QvantumSettings.declared_fields["desired_indoor_temp"]
-        assert field.signed is True
-        with pytest.raises(ValueError, match="signed"):
+        with pytest.raises(ValueError, match=r"documented range 15\.\.25"):
             field.writable(4000)
-        # The top of the representable range is still accepted.
-        assert field.writable(3276.7) == 3276.7
+        assert field.writable(25) == 25
+
+    def test_signed_holding_rejects_overflowing_value(self):
+        """A raw value above the signed range must not wrap negative.
+
+        Every ranged holding fails on its datasheet range first, so the
+        16-bit guard is exercised through the validator factory directly.
+        """
+        from custom_components.qvantum.client.modbus.model import _write_validator
+
+        validator = _write_validator(True, 0.1)
+        with pytest.raises(ValueError, match="signed"):
+            validator(4000)
+        assert validator(3276.7) == 3276.7
 
     def test_holding_validator_rejects_non_numeric(self):
         field = QvantumSettings.declared_fields["dhw_mode"]
@@ -264,13 +283,13 @@ class TestComponentDecode:
     @pytest.mark.asyncio
     async def test_settings_write_applies_scale(self):
         _, unit, device = _device()
-        await device.write_metric("room_comp_factor", 2.5)
+        await device.write_metric("room_comp_factor", 1.5)
         await device.write_metric("room_temp_external", 21.5)
         await device.write_metric("dhw_stop_extra", 75)
         await device.write_metric("stop_heating", -15)
         await device.write_metric("curve_minus_30", 48)
 
-        assert unit.holding[13] == 25
+        assert unit.holding[13] == 15
         assert unit.holding[14] == 215
         assert unit.holding[59] == 75
         assert unit.holding[18] == 0xFFF1  # int16 -15
@@ -282,6 +301,28 @@ class TestComponentDecode:
         _, unit, device = _device()
         await device.write_metric("room_comp_factor", 0.5)
         assert unit.holding[13] == 5
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("metric", "value"),
+        [
+            ("room_comp_factor", 2.5),
+            ("indoor_temperature_offset", 10),
+            ("room_temp_external", -6),
+            ("dhw_stop_extra", 19),
+            ("curve_minus_30", 81),
+        ],
+    )
+    async def test_settings_write_rejects_out_of_range(self, metric, value):
+        """The datasheet MIN/MAX fails in the client, not as 0x03 on the wire."""
+        _, unit, device = _device()
+        writes: list = []
+        unit.on_write(writes.append)
+
+        with pytest.raises(ValueError, match="documented range"):
+            await device.write_metric(metric, value)
+
+        assert writes == []
 
     @pytest.mark.asyncio
     async def test_raw_holding_write(self):
@@ -445,6 +486,15 @@ class TestPayloadAdapter:
         assert holding_field_for_metric("stop_heating") == "stop_heating"
         assert holding_field_for_metric("curve_type_heating") == "curve_type_heating"
         assert holding_field_for_metric("curve_minus_30") == "curve_minus_30"
+
+    def test_metric_range_resolves_canonical_names(self):
+        assert metric_range("room_comp_factor") == (0.5, 2)
+        assert metric_range("indoor_temperature_offset") == (-9, 9)
+        assert metric_range("room_temp_external") == (-5, 40)
+        assert metric_range("room_compensation") == (0.5, 2)
+        # No holding register or no documented range.
+        assert metric_range("tap_water_capacity_target") is None
+        assert metric_range("not_a_real_metric") is None
 
     def test_heating_curve_point_registers(self):
         """User-defined curve points sit on holdings 24-30 at 10 °C outdoor steps."""
