@@ -256,11 +256,31 @@ class QvantumCurveCard extends HTMLElement {
     return Object.values(entities);
   }
 
+  _entryId(entry) {
+    return entry?.entity_id ?? entry?.ei ?? null;
+  }
+
+  /**
+   * Metric for a registry entry, or null.
+   *
+   * HA 2026.9+ exposes the display registry as `hass.entities`: entries carry
+   * `platform` and `translation_key` but no `unique_id` (HA core encodes
+   * `pl`/`tk`/`ei`). Older frontends and tests expose the full entry with
+   * `unique_id`, so both shapes are accepted.
+   */
   _metricOf(entry) {
-    const uid = entry?.unique_id;
-    if (!uid || !uid.startsWith("qvantum_")) return null;
-    for (const metric of KNOWN_METRICS) {
-      if (uid.startsWith(`qvantum_${metric}_`)) return metric;
+    if (!entry) return null;
+    const platform = entry.platform ?? entry.pl;
+    if (platform && platform !== "qvantum") return null;
+    const translationKey = entry.translation_key ?? entry.tk;
+    if (translationKey && KNOWN_METRICS.includes(translationKey)) {
+      return translationKey;
+    }
+    const uid = entry.unique_id;
+    if (uid && uid.startsWith("qvantum_")) {
+      for (const metric of KNOWN_METRICS) {
+        if (uid.startsWith(`qvantum_${metric}_`)) return metric;
+      }
     }
     return null;
   }
@@ -269,8 +289,20 @@ class QvantumCurveCard extends HTMLElement {
   _resolveEntities() {
     const hass = this._hass;
     if (!hass) return { anchor: null, map: {} };
-    const entries = this._registryEntries();
 
+    // The registry object is stable between registry updates, so reuse the
+    // resolution instead of walking it on every `hass` push.
+    const source = hass.entities || null;
+    if (
+      this._resolved &&
+      this._resolvedSource === source &&
+      this._resolvedEntity === this._config.entity &&
+      this._resolvedOverrides === this._config.entities
+    ) {
+      return this._resolved;
+    }
+
+    const entries = this._registryEntries();
     const map = {};
     // Explicit overrides win.
     if (this._config.entities) {
@@ -279,19 +311,20 @@ class QvantumCurveCard extends HTMLElement {
       }
     }
 
-    // `single_config_entry`: there is exactly one Qvantum device, so a known
-    // metric unique_id is unambiguous and needs no device scoping.
+    // `single_config_entry`: exactly one Qvantum device, so a known metric is
+    // unambiguous and needs no device scoping.
     for (const entry of entries) {
       const metric = this._metricOf(entry);
-      if (metric && !map[metric]) map[metric] = entry.entity_id;
+      const id = this._entryId(entry);
+      if (metric && id && !map[metric]) map[metric] = id;
     }
 
-    // Old frontend without `hass.entities`: match state entity ids by slug.
-    if (!entries.length) {
+    // No registry (or nothing matched): match state entity ids by slug.
+    if (!Object.keys(map).length) {
       const stateIds = Object.keys(hass.states);
       for (const metric of KNOWN_METRICS) {
         const slug = METRIC_SLUGS[metric];
-        if (map[metric] || !slug) continue;
+        if (!slug || map[metric]) continue;
         const hit = stateIds.find((id) => id.includes(slug));
         if (hit) map[metric] = hit;
       }
@@ -306,10 +339,13 @@ class QvantumCurveCard extends HTMLElement {
           id.includes("adaptive_curve_adjustment"),
         ) || null;
     }
-    if (!anchor) {
-      anchor = Object.values(map)[0] || null;
-    }
-    return { anchor, map };
+    if (!anchor) anchor = Object.values(map)[0] || null;
+
+    this._resolved = { anchor, map };
+    this._resolvedSource = source;
+    this._resolvedEntity = this._config.entity;
+    this._resolvedOverrides = this._config.entities;
+    return this._resolved;
   }
 
   _signature(anchor, map) {
