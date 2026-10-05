@@ -1008,7 +1008,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return maps
 
     async def _async_deviation_hours(self) -> dict[int, float]:
-        entity_id = self._resolve_curve_entity_id("custom_curve_deviation")
+        entity_id = self._resolve_curve_entity_id("adaptive_curve_deviation")
         if not entity_id:
             return {}
         rows = await self._async_statistics(

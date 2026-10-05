@@ -54,7 +54,7 @@ async def async_setup_entry(
         sensors.append(
             QvantumCurveControlSwitch(coordinator, curve_coordinator, device)
         )
-        switch_metrics.add("custom_curve_control")
+        switch_metrics.add("adaptive_curve_control")
 
     finalize_platform_setup(
         hass,
@@ -182,13 +182,13 @@ class QvantumCurveControlSwitch(QvantumEntity, SwitchEntity):
         curve_coordinator: QvantumCurveCoordinator,
         device: DeviceInfo,
     ) -> None:
-        super().__init__(coordinator, "custom_curve_control", device)
+        super().__init__(coordinator, "adaptive_curve_control", device)
         self._curve = curve_coordinator
 
     @property
     def suggested_object_id(self) -> str | None:
         """Stable English slug."""
-        return "custom_curve_control"
+        return "adaptive_curve_control"
 
     async def async_added_to_hass(self) -> None:
         """Follow control-mode changes from the curve coordinator."""

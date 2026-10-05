@@ -75,7 +75,7 @@ the heat the pump delivers — and calculates its own version of the curve.
 It always starts in **shadow mode**: nothing is written, and the calculated
 curve is only compared with the pump's own curve. When the comparison has
 looked good for a few days, the deviation sensor reports `ready` and you can
-turn on `switch.qvantum_custom_curve_control`. The integration then takes over
+turn on `switch.qvantum_adaptive_curve_control`. The integration then takes over
 the curve; turning the switch off — or a failed write, or a lost connection —
 hands control straight back to the pump's Auto curve.
 
