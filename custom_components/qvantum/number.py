@@ -69,10 +69,15 @@ async def async_setup_entry(
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
     device: DeviceInfo = config_entry.runtime_data.device
 
-    # Configuration for number entities: metric_key -> (min, max, step)
+    # Configuration for number entities: metric_key -> (min, max, step).
+    # Holding 13 (QAD EN 2609-AXC) is min 0.5 / max 2 / scale 10. The cloud
+    # accepts a wider 0-10 range for the same setting.
+    room_comp_factor_range = (
+        (0.5, 2.0, 0.5) if coordinator.modbus_enabled else (0, 10, 0.5)
+    )
     NUMBER_CONFIG = {
         "tap_water_capacity_target": (1, 7, 1),
-        "room_comp_factor": (0, 10, 0.5),
+        "room_comp_factor": room_comp_factor_range,
         "indoor_temperature_offset": (-10, 10, 1),
         "tap_water_stop": (TAP_WATER_TEMP_MIN, TAP_WATER_TEMP_MAX, TAP_WATER_TEMP_STEP),
         "tap_water_start": (TAP_WATER_TEMP_MIN, TAP_WATER_TEMP_MAX, TAP_WATER_TEMP_STEP),
@@ -198,7 +203,13 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 response = await self.coordinator.client.set_tap_water(
                     self._hpid, start=coordinator_update_value
                 )
-            case "room_comp_factor" | "fan_normal" | "fan_speed_2" | "stop_heating":
+            case "room_comp_factor":
+                # Fractional factors are valid (0.5 steps); Modbus holding 13
+                # encodes them ×10, so do not truncate.
+                response = await self.coordinator.client.update_setting(
+                    self._hpid, self._metric_key, value
+                )
+            case "fan_normal" | "fan_speed_2" | "stop_heating":
                 coordinator_update_value = int(value)
                 response = await self.coordinator.client.update_setting(
                     self._hpid, self._metric_key, coordinator_update_value
