@@ -282,3 +282,65 @@ show how much of the curve the baseline fit has actually seen.
   the point numbers look unchanged.
 - Do not map 23 to DUT or to a temperature unit. Datasheet range is 1–50
   with unit “-”.
+
+## Lovelace card
+
+The integration ships a dependency-free Lovelace card
+(`qvantum-curve-card`) that draws the whole adaptive curve in one place:
+the frozen baseline, the computed shadow curve, the seven points actually
+written to the pump, the ±write-threshold band, the optional operating
+point and the shared adjustment term breakdown.
+
+### Enabling the card
+
+The integration serves the module at `/qvantum/qvantum-curve-card.js`.
+Add it once as a dashboard resource:
+
+1. **Settings → Dashboards → ⋮ → Resources → Add resource**
+2. URL: `/qvantum/qvantum-curve-card.js`
+3. Resource type: **JavaScript module**
+4. Save and reload the dashboard.
+
+Then add the card (visual picker: "Qvantum Curve Card", or manually):
+
+```yaml
+type: custom:qvantum-curve-card
+entity: sensor.qvantum_adaptive_curve_adjustment   # any curve entity; optional
+title: Värmekurva
+min_outdoor: -30
+max_outdoor: 30
+show_baseline: true
+show_shadow: true
+show_pump: true
+show_band: true
+operating_point:
+  outdoor: sensor.qvantum_bt1
+  supply: sensor.qvantum_cal_heat_temp
+language: auto        # auto | sv | en
+```
+
+`entity` may be any entity of the pump device; the card resolves the other
+curve entities (and the pump's written table via `curve_type_heating`) from
+the entity registry. Omitting `entity` auto-discovers the adjustment sensor.
+
+Fallback if static serving is unavailable: copy
+`custom_components/qvantum/www/qvantum-curve-card.js` to `config/www/` and
+use `/local/qvantum-curve-card.js` as the resource URL.
+
+### What the card shows
+
+- **Baseline (frozen)** — dashed; the seven-point table frozen at activation.
+- **Computed (shadow)** — solid with dots; what the module would write now.
+- **Pump table** — diamonds; holdings 24–30 as currently written (markers
+  only appear while the select is available, i.e. Modbus writes enabled).
+- **±band** — shaded strip of `band` °C around the shadow curve; this is the
+  ≥1 °C write-threshold visualized.
+- **Operating point** — ring, only when `operating_point` is configured.
+- **Status chips** — Active/Shadow (switch), Ready/blocker, Pump
+  User-defined/Auto, clamped to supply limits, indoor cap, solar-model trust.
+- **Term chips** — outdoor, night/day, solar, load, trims and total, all in K
+  (they are temperature *differences*, not absolute temperatures).
+
+In cloud mode, with the Modbus write option off, or before the first curve
+snapshot the card degrades to a message instead of failing.
+

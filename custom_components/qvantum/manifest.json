@@ -2,6 +2,7 @@
     "domain": "qvantum",
     "name": "Qvantum Heat Pump",
     "after_dependencies": [
+        "http",
         "recorder"
     ],
     "codeowners": [
