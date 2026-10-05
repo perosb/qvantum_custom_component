@@ -48,8 +48,6 @@ DHW_MODE_TO_OPERATION = {
     DHW_MODE_SMART: OPERATION_SMART,
 }
 
-OPERATION_TO_DHW_MODE = {v: k for k, v in DHW_MODE_TO_OPERATION.items()}
-
 # Prefer tank top sensor, then other VV tank sensors (not cold inlet bt33).
 CURRENT_TEMPERATURE_KEYS = ("bt30", "bt31", "bt34")
 
@@ -172,9 +170,7 @@ class QvantumWaterHeaterEntity(
 
     @property
     def operation_list(self) -> list[str]:
-        return operation_modes_for_values(
-            self._values, modbus_enabled=bool(self.coordinator.modbus_enabled)
-        )
+        return operation_modes_for_values(self._values)
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Write tap_water_stop via the existing set_tap_water path."""
@@ -205,14 +201,6 @@ class QvantumWaterHeaterEntity(
     async def async_set_operation_mode(self, operation_mode: str) -> None:
         """Map HA operation mode onto existing DHW write helpers."""
         self._require_write_access()
-        if (
-            operation_mode in (OPERATION_ECO, OPERATION_SMART)
-            and not self.coordinator.modbus_enabled
-        ):
-            # Cloud has no dhw_mode setter; Eco/Smart are Modbus-only.
-            raise HomeAssistantError(
-                f"DHW mode '{operation_mode}' requires Modbus (dhw_mode holding)"
-            )
         if operation_mode not in self.operation_list:
             raise HomeAssistantError(
                 f"Unsupported DHW operation mode: {operation_mode}"
@@ -228,8 +216,6 @@ class QvantumWaterHeaterEntity(
                 await self._async_clear_extra_dhw_timer()
             return
 
-        applied = False
-
         if operation_mode == OPERATION_EXTRA:
             response = await self.coordinator.async_set_extra_tap_water(
                 self._hpid, EXTRA_DHW_INDEFINITE_MINUTES
@@ -239,34 +225,13 @@ class QvantumWaterHeaterEntity(
             )
             if applied:
                 self._optimistic_dhw_mode(DHW_MODE_EXTRA)
-
-        elif operation_mode == OPERATION_NORMAL:
+        else:  # OPERATION_NORMAL
             response = await self.coordinator.async_set_extra_tap_water(self._hpid, 0)
             applied = await handle_setting_update_response(
                 response, self.coordinator, "values", "extra_tap_water", "off"
             )
             if applied:
                 self._optimistic_dhw_mode(DHW_MODE_NORMAL)
-
-        else:
-            # Eco / Smart require writing holding 53 (dhw_mode); Modbus only.
-            dhw_mode = OPERATION_TO_DHW_MODE[operation_mode]
-            response = await self.coordinator.async_write_metric(
-                self._hpid, "extra_tap_water", dhw_mode
-            )
-            applied = await handle_setting_update_response(
-                response,
-                self.coordinator,
-                "values",
-                "extra_tap_water",
-                "on" if dhw_mode == DHW_MODE_EXTRA else "off",
-            )
-            if applied:
-                self._optimistic_dhw_mode(dhw_mode)
-                # Clear a pending timed Extra->Normal restore only once the new
-                # mode is on the pump. Clearing earlier would drop the HA timer
-                # on a failed write and leave the pump in Extra indefinitely.
-                await self._async_clear_extra_dhw_timer()
 
         # Leaving Off re-enables DHW in manual mode, but only once the mode
         # write succeeded so a failure cannot leave a half-applied state.
@@ -322,23 +287,14 @@ def map_operation_mode(values: dict[str, Any]) -> str | None:
     return OPERATION_NORMAL
 
 
-def operation_modes_for_values(
-    values: dict[str, Any], *, modbus_enabled: bool
-) -> list[str]:
-    """Return supported operation modes for the current transport/data.
+def operation_modes_for_values(values: dict[str, Any]) -> list[str]:
+    """Return supported operation modes for the current data.
 
-    Eco/Smart need ``dhw_mode`` (Modbus holding 53); the cloud API has no
-    setter for them, so they are offered only on Modbus.
+    Normal/Extra are the only DHW modes both transports accept. Eco/Smart were
+    Modbus-only via holding 53, but QSG EN 2613-A narrowed that register to
+    1=Normal, 2=Extra, so the pump rejects them.
     """
-    if modbus_enabled:
-        modes: list[str] = [
-            OPERATION_ECO,
-            OPERATION_NORMAL,
-            OPERATION_EXTRA,
-            OPERATION_SMART,
-        ]
-    else:
-        modes = [OPERATION_NORMAL, OPERATION_EXTRA]
+    modes: list[str] = [OPERATION_NORMAL, OPERATION_EXTRA]
     if "op_man_dhw" in values:
         modes = [*modes, OPERATION_OFF]
     return modes

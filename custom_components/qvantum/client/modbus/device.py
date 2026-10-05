@@ -143,7 +143,7 @@ class IdentityProbeError(Exception):
 def decode_serial_number(identity: QvantumIdentity) -> str | None:
     """Join the five identity words into a serial string.
 
-    QAD EN 2609-AXC lists the words but not the packing. The first word is
+    QSG EN 2613-A lists the words but not the packing. The first word is
     used as-is; the rest are zero-padded to three digits.
     """
     words = [
