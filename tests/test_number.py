@@ -716,15 +716,19 @@ class TestNumberSetup:
         assert by_key["tap_water_stop"]._attr_native_min_value == 50
         assert by_key["tap_water_stop"]._attr_native_max_value == 80
         assert by_key["tap_water_stop"].native_min_value == 56
+        # Cloud keeps the wider +/-10 offset range.
+        assert by_key["indoor_temperature_offset"]._attr_native_min_value == -10
+        assert by_key["indoor_temperature_offset"]._attr_native_max_value == 10
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry_modbus_room_comp_factor_bounds(
+    async def test_async_setup_entry_modbus_bounds(
         self, hass, mock_config_entry, mock_coordinator, mock_device
     ):
-        """Modbus uses holding 13's documented 0.5-2 range, not the cloud range."""
+        """Modbus uses each holding's documented range, not the cloud range."""
         from custom_components.qvantum import RuntimeData
 
         mock_coordinator.modbus_enabled = True
+        mock_coordinator.data["values"]["room_temp_external"] = 20.0
 
         mock_config_entry.runtime_data = RuntimeData(
             coordinator=mock_coordinator, device=mock_device, client=MagicMock())
@@ -739,6 +743,15 @@ class TestNumberSetup:
         assert room_comp._attr_native_min_value == 0.5
         assert room_comp._attr_native_max_value == 2.0
         assert room_comp._attr_native_step == 0.5
+        # Holding 15 (offset): -9..9, narrower than the cloud +/-10.
+        offset = by_key["indoor_temperature_offset"]
+        assert offset._attr_native_min_value == -9
+        assert offset._attr_native_max_value == 9
+        # Holding 14 (external room temp): -5..40.
+        room_temp = by_key["room_temp_external"]
+        assert room_temp._attr_native_min_value == -5
+        assert room_temp._attr_native_max_value == 40
+        assert room_temp._attr_native_step == 0.1
 
 
 class TestRoomTempExternal:
