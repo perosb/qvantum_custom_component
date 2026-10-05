@@ -14,13 +14,25 @@ const CARD_VERSION = "1.0.0";
 
 /** Metric keys (unique_id suffix) → outdoor temperature for the seven points. */
 const POINT_METRICS = [
-  { metric: "adaptive_curve_30", outdoor: 30 },
-  { metric: "adaptive_curve_20", outdoor: 20 },
-  { metric: "adaptive_curve_10", outdoor: 10 },
-  { metric: "adaptive_curve_0", outdoor: 0 },
-  { metric: "adaptive_curve_minus_10", outdoor: -10 },
-  { metric: "adaptive_curve_minus_20", outdoor: -20 },
-  { metric: "adaptive_curve_minus_30", outdoor: -30 },
+  { metric: "adaptive_curve_30", outdoor: 30, slug: "adaptive_curve_01_30" },
+  { metric: "adaptive_curve_20", outdoor: 20, slug: "adaptive_curve_02_20" },
+  { metric: "adaptive_curve_10", outdoor: 10, slug: "adaptive_curve_03_10" },
+  { metric: "adaptive_curve_0", outdoor: 0, slug: "adaptive_curve_04_0" },
+  {
+    metric: "adaptive_curve_minus_10",
+    outdoor: -10,
+    slug: "adaptive_curve_05_minus_10",
+  },
+  {
+    metric: "adaptive_curve_minus_20",
+    outdoor: -20,
+    slug: "adaptive_curve_06_minus_20",
+  },
+  {
+    metric: "adaptive_curve_minus_30",
+    outdoor: -30,
+    slug: "adaptive_curve_07_minus_30",
+  },
 ];
 
 const ADJUSTMENT_METRIC = "adaptive_curve_adjustment";
@@ -37,6 +49,19 @@ const KNOWN_METRICS = [
   SWITCH_METRIC,
   SELECT_METRIC,
 ];
+
+/**
+ * Stable entity-id slug per metric, used only when the entity registry is not
+ * exposed to the card (older frontend). The select uses a translated slug, so
+ * it is intentionally absent here and resolved via the registry.
+ */
+const METRIC_SLUGS = {
+  ...Object.fromEntries(POINT_METRICS.map((p) => [p.metric, p.slug])),
+  [ADJUSTMENT_METRIC]: "adaptive_curve_adjustment",
+  [DEVIATION_METRIC]: "adaptive_curve_deviation",
+  [SOLAR_METRIC]: "adaptive_curve_solar_model",
+  [SWITCH_METRIC]: "adaptive_curve_control",
+};
 
 const STRINGS = {
   en: {
@@ -246,31 +271,6 @@ class QvantumCurveCard extends HTMLElement {
     if (!hass) return { anchor: null, map: {} };
     const entries = this._registryEntries();
 
-    let anchor = this._config.entity || "";
-    if (anchor && !hass.states[anchor]) {
-      const byConfig = entries.find((e) => e.entity_id === anchor);
-      if (!byConfig) anchor = "";
-    }
-    if (!anchor) {
-      const hit = entries.find((e) => this._metricOf(e) === ADJUSTMENT_METRIC);
-      if (hit) anchor = hit.entity_id;
-    }
-    if (!anchor) {
-      anchor =
-        Object.keys(hass.states).find((id) =>
-          id.includes("adaptive_curve_adjustment"),
-        ) || null;
-    }
-    if (!anchor) return { anchor: null, map: {} };
-
-    const anchorEntry = entries.find((e) => e.entity_id === anchor);
-    const hpid = anchorEntry?.unique_id?.startsWith(
-      `qvantum_${ADJUSTMENT_METRIC}_`,
-    )
-      ? anchorEntry.unique_id.slice(`qvantum_${ADJUSTMENT_METRIC}_`.length)
-      : null;
-    const deviceId = anchorEntry?.device_id || null;
-
     const map = {};
     // Explicit overrides win.
     if (this._config.entities) {
@@ -278,15 +278,36 @@ class QvantumCurveCard extends HTMLElement {
         if (entityId) map[metric] = entityId;
       }
     }
+
+    // `single_config_entry`: there is exactly one Qvantum device, so a known
+    // metric unique_id is unambiguous and needs no device scoping.
     for (const entry of entries) {
       const metric = this._metricOf(entry);
-      if (!metric) continue;
-      const sameDevice =
-        !hpid && !deviceId
-          ? true // single config entry: a metric match is unambiguous
-          : (hpid && entry.unique_id.endsWith(`_${hpid}`)) ||
-            (deviceId && entry.device_id === deviceId);
-      if (sameDevice && !map[metric]) map[metric] = entry.entity_id;
+      if (metric && !map[metric]) map[metric] = entry.entity_id;
+    }
+
+    // Old frontend without `hass.entities`: match state entity ids by slug.
+    if (!entries.length) {
+      const stateIds = Object.keys(hass.states);
+      for (const metric of KNOWN_METRICS) {
+        const slug = METRIC_SLUGS[metric];
+        if (map[metric] || !slug) continue;
+        const hit = stateIds.find((id) => id.includes(slug));
+        if (hit) map[metric] = hit;
+      }
+    }
+
+    let anchor = this._config.entity || null;
+    if (anchor && !hass.states[anchor]) anchor = null;
+    if (!anchor) anchor = map[ADJUSTMENT_METRIC] || null;
+    if (!anchor) {
+      anchor =
+        Object.keys(hass.states).find((id) =>
+          id.includes("adaptive_curve_adjustment"),
+        ) || null;
+    }
+    if (!anchor) {
+      anchor = Object.values(map)[0] || null;
     }
     return { anchor, map };
   }
