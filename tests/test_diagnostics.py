@@ -230,6 +230,27 @@ async def test_modbus_mode_structure(hass):
 
 
 @pytest.mark.asyncio
+async def test_external_room_feed_state(hass):
+    coordinator = _coordinator()
+    coordinator.modbus_enabled = True
+    coordinator.client = SimpleNamespace(writable=True)
+    coordinator.external_room_temp_entity_id = "sensor.room"
+    coordinator._external_room_last_value = 20.6
+    coordinator._external_room_last_write_ts = "2026-10-05T19:00:00+00:00"
+    coordinator._external_room_write_errors = 2
+    runtime = _runtime(coordinator, client=coordinator.client)
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime, data={}))
+
+    assert result["coordinator"]["external_room_feed"] == {
+        "entity_id": "sensor.room",
+        "last_value": 20.6,
+        "last_write": "2026-10-05T19:00:00+00:00",
+        "write_errors": 2,
+    }
+    json.dumps(result)
+
+
+@pytest.mark.asyncio
 async def test_secrets_and_expiry_are_redacted(hass):
     runtime = _runtime(_coordinator(), maintenance=_maintenance())
     entry = _entry(

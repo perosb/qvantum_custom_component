@@ -809,12 +809,14 @@
           "modbus_port": "Poort",
           "modbus_unit_id": "Unit-ID",
           "modbus_scan_interval": "Modbus-scaninterval (seconden)",
-          "modbus_write": "Schrijven via Modbus inschakelen"
+          "modbus_write": "Schrijven via Modbus inschakelen",
+          "external_room_temp_entity": "Bron voor externe kamertemperatuur"
         },
         "data_description": {
           "modbus_scan_interval": "Hoe vaak de warmtepomp via Modbus TCP wordt gepolld. Lagere waarden geven bijna realtime debiet- en volumenauwkeurigheid. Minimum is 5 seconden. Standaard is 15 seconden.",
           "modbus_write": "Door het activeren van Modbus-schrijven aanvaardt u volledige verantwoordelijkheid voor alle waarden die via de interface worden geschreven. De fabrikant is niet aansprakelijk voor problemen veroorzaakt door onjuiste of buiten bereik vallende waarden, en dergelijke acties kunnen de garantie en/of de levensduur en prestaties van het product beïnvloeden.",
-          "scan_interval": "Hoe vaak de Qvantum-cloud-API wordt gepolld. Standaard is 120 seconden."
+          "scan_interval": "Hoe vaak de Qvantum-cloud-API wordt gepolld. Standaard is 120 seconden.",
+          "external_room_temp_entity": "Sensor waarvan de waarde bij elke poll als externe kamertemperatuur naar de warmtepomp wordt geschreven wanneer Modbus-schrijven is ingeschakeld. Vereist door de externe sensormodus in de app; leeg laten om uit te schakelen."
         },
         "description": "Instellingen voor de huidige verbindingsmodus. Gebruik herconfiguratie om te wisselen tussen cloud en Modbus.",
         "title": "Opties"

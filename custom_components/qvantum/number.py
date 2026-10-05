@@ -13,7 +13,6 @@ from . import MyConfigEntry
 from .client.modbus import HEATING_CURVE_OUTDOOR_TEMPS, metric_range
 from .const import (
     HeatingCurveType,
-    SensorMode,
     TAP_WATER_CAPACITY_MAPPINGS,
     TAP_WATER_TEMP_MAX,
     TAP_WATER_TEMP_MIN,
@@ -270,12 +269,6 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
             )
             and self._values.get(self._metric_key) is not None
             and self._has_write_access
-            and (
-                # `room_temp_external` is only meaningful when the heat pump is
-                # configured to use the external operation sensor.
-                self._metric_key != "room_temp_external"
-                or self._values.get("use_operation_sensor") == SensorMode.EXTERNAL
-            )
             and (
                 # User-defined curve points only apply when holding 22 is User defined.
                 self._metric_key not in HEATING_CURVE_OUTDOOR_TEMPS

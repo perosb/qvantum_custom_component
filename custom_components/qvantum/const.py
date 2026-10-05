@@ -116,6 +116,14 @@ CONF_MODBUS_HOST = "modbus_host"
 CONF_MODBUS_PORT = "modbus_port"
 CONF_MODBUS_UNIT_ID = "modbus_unit_id"
 CONF_MODBUS_SCAN_INTERVAL = "modbus_scan_interval"
+# HA sensor the integration feeds to holding 14 (room_temp_external) every
+# poll while Modbus writing is enabled. Realizes the app's "ext modbus" sensor
+# mode: the pump drops the mode and raises alarm 8 when the fed value is older
+# than ~5 minutes.
+CONF_EXTERNAL_ROOM_TEMP_ENTITY = "external_room_temp_entity"
+# EMA time constant (seconds) for the fed value. Matches the 5-minute low-pass
+# filter this feature replaces, so the pump sees the same smoothing as before.
+EXTERNAL_ROOM_TEMP_EMA_TAU = 300.0
 DEFAULT_MODBUS_HOST = "Qvantum-HP"
 DEFAULT_MODBUS_PORT = 502
 DEFAULT_MODBUS_UNIT_ID = 1

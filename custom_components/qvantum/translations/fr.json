@@ -809,12 +809,14 @@
           "modbus_port": "Port",
           "modbus_unit_id": "ID d'unité",
           "modbus_scan_interval": "Intervalle de scan Modbus (secondes)",
-          "modbus_write": "Activer l'écriture via Modbus"
+          "modbus_write": "Activer l'écriture via Modbus",
+          "external_room_temp_entity": "Source de température ambiante externe"
         },
         "data_description": {
           "modbus_scan_interval": "Fréquence d'interrogation de la pompe à chaleur via Modbus TCP. Des valeurs plus basses offrent une précision quasi temps réel du débit et du volume. Minimum 5 secondes. Par défaut 15 secondes.",
           "modbus_write": "En activant l'écriture Modbus, vous acceptez l'entière responsabilité de toutes les valeurs écrites via l'interface. Le fabricant n'est pas responsable des problèmes causés par des valeurs incorrectes ou hors limites, et de telles actions peuvent annuler la garantie et/ou affecter le cycle de vie et les performances du produit.",
-          "scan_interval": "Fréquence d'interrogation de l'API cloud Qvantum. Par défaut : 120 secondes."
+          "scan_interval": "Fréquence d'interrogation de l'API cloud Qvantum. Par défaut : 120 secondes.",
+          "external_room_temp_entity": "Capteur dont la valeur est transmise à la pompe à chaleur comme température ambiante externe à chaque interrogation lorsque l'écriture Modbus est activée. Requis par le mode capteur externe de l'application ; laisser vide pour désactiver."
         },
         "description": "Paramètres du mode de connexion actuel. Utilisez la reconfiguration pour basculer entre le cloud et Modbus.",
         "title": "Options"

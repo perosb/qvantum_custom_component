@@ -809,12 +809,14 @@
           "modbus_port": "Portti",
           "modbus_unit_id": "Yksikkö-ID",
           "modbus_scan_interval": "Modbus-skannausväli (sekuntia)",
-          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta"
+          "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta",
+          "external_room_temp_entity": "Ulkoisen huonelämpötilan lähde"
         },
         "data_description": {
           "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia.",
           "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn.",
-          "scan_interval": "Kuinka usein Qvantum-pilvi-API:a kysellään. Oletus on 120 sekuntia."
+          "scan_interval": "Kuinka usein Qvantum-pilvi-API:a kysellään. Oletus on 120 sekuntia.",
+          "external_room_temp_entity": "Anturi, jonka arvo lähetetään lämpöpumpulle ulkoisena huonelämpötilana jokaisella kyselyllä, kun Modbus-kirjoitus on käytössä. Sovelluksen ulkoisen huoneanturin tila edellyttää tätä; jätä tyhjäksi poistaaksesi käytöstä."
         },
         "description": "Nykyisen yhteystilan asetukset. Käytä uudelleenmääritystä vaihtaaksesi pilven ja Modbusin välillä.",
         "title": "Asetukset"

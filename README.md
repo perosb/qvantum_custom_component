@@ -40,7 +40,7 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **Hot water (`water_heater`):** Tank temperature and DHW stop target with Eco, Normal, Extra, Smart, and Off modes.
 - **Energy Dashboard:** Compressor, heating, DHW, additional, and total energy sensors are ready for one-click setup.
 - **Device automations:** Triggers and conditions for defrost, compressor blocking, freeze protection, Wi-Fi/cloud connectivity, and a ventilation filter due in under 48 hours.
-- **External room sensor:** When configured by the pump, a Modbus number entity can mirror an external temperature into the control setpoint.
+- **External room sensor:** The integration can feed a Home Assistant temperature sensor to the pump as the external room temperature on every poll, so the app's external room sensor mode stays fed.
 - **Modbus writes:** Optional local writes for supported targets, DHW, fan, operation, room compensation, and sensor settings.
 - **Adaptive heating curve (Modbus):** A self-learning curve based on the weather forecast and the pump's own data. It starts in shadow mode and replaces the pump's Auto curve once you switch it on; see [docs/heating-curve.md](docs/heating-curve.md).
 - **Curve card:** A bundled Lovelace card (`qvantum-curve-card`) that graphs the baseline, shadow curve, written pump table and adjustment terms.
@@ -49,21 +49,46 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 
 Available triggers and conditions depend on the entities present. They cover defrosting, compressor blocking, freeze protection, Wi-Fi/cloud disconnection, and a ventilation filter with fewer than 48 hours remaining.
 
-#### External room sensor example
+#### External room temperature feed
 
-When the pump uses an external room sensor, enable Modbus writing and mirror the sensor as follows:
+The Qvantum app's sensor settings (**Av / Alla / BT2 / Ext Modbus**) can use an
+external room temperature that Home Assistant supplies. The pump requires a
+fresh external room temperature at least every ~5 minutes: when the value goes
+stale, the pump drops the sensor source and raises alarm 8
+("Controlling room temperature sensor(s) unavailable").
+
+Enable the built-in feed (Modbus mode, **Enable writing via Modbus** on):
+
+1. Open the integration **Configure** dialog.
+2. Pick the HA temperature sensor under **External room temperature source**
+   (e.g. an average of your room sensors).
+3. Select **Ext Modbus** (or **Alla**) in the Qvantum app.
+
+The integration then writes an EMA-smoothed value (5-minute time constant,
+matching the low-pass filter this feature replaces) on every poll — default
+every 15 seconds. The value is written on every poll even when it has not
+changed, which the pump's watchdog requires.
+The `number.qvantum_..._extern_inomhustemperatur` entity shows the last written
+value; manual writes to it are overwritten on the next poll while the feed is
+active. Clear the picker to turn the feed off.
+
+> [!NOTE]
+> A manual automation must write on a **fixed interval** (`time_pattern`), not
+> on sensor state changes: a state-triggered write stops when the temperature
+> is stable, and the pump then treats the sensor as unavailable.
 
 ```yaml
+# Legacy manual alternative (the built-in feed above is preferred)
 alias: "Qvantum: Update external room temperature"
-trigger:
-  - platform: state
-    entity_id: sensor.some_external_room_temperature
-action:
-  - service: number.set_value
+triggers:
+  - trigger: time_pattern
+    minutes: "/1"
+actions:
+  - action: number.set_value
     target:
-      entity_id: number.qvantum_room_temp_external_<device_id>
+      entity_id: number.qvantum_extern_inomhustemperatur
     data:
-      value: "{{ states('sensor.some_external_room_temperature') | float }}"
+      value: "{{ states('sensor.some_external_room_temperature') | float(20.8) }}"
 ```
 
 #### Adaptive heating curve

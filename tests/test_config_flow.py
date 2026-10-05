@@ -39,6 +39,17 @@ def _schema_defaults(result):
     return defaults
 
 
+def _schema_suggested(result):
+    """Return the suggested values of a form result's data schema."""
+    suggested = {}
+    for key in result["data_schema"].schema:
+        name = key.schema if hasattr(key, "schema") else key
+        description = getattr(key, "description", None)
+        if isinstance(description, dict) and "suggested_value" in description:
+            suggested[name] = description["suggested_value"]
+    return suggested
+
+
 class TestValidateInput:
     """Test the validate_input function."""
 
@@ -584,6 +595,41 @@ class TestQvantumConfigFlow:
         assert mock_update.call_args.kwargs["data"]["modbus_tcp"] is True
         assert mock_update.call_args.kwargs["options"]["modbus_host"] == "hp.local"
 
+    @pytest.mark.asyncio
+    async def test_reconfigure_modbus_preserves_external_room_temp_entity(
+        self, hass, config_flow
+    ):
+        config_entry = MagicMock()
+        config_entry.data = {}
+        config_entry.options = {"external_room_temp_entity": "sensor.mean"}
+        config_entry.unique_id = "test_unique_id"
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_get_entry.return_value = config_entry
+        config_flow.context = {"entry_id": "test_entry_id"}
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_modbus",
+                AsyncMock(return_value={"title": "Qvantum (1)", "serial": "1"}),
+            ),
+            patch.object(
+                config_flow, "async_update_reload_and_abort"
+            ) as mock_update,
+        ):
+            mock_update.return_value = {"type": "abort"}
+            await config_flow.async_step_reconfigure_modbus(
+                {
+                    "modbus_host": "hp.local",
+                    "modbus_port": 502,
+                    "modbus_unit_id": 1,
+                    "modbus_scan_interval": 5,
+                }
+            )
+        assert (
+            mock_update.call_args.kwargs["options"]["external_room_temp_entity"]
+            == "sensor.mean"
+        )
+
     def _prepare_reconfigure(self, hass, config_flow, data=None, options=None):
         config_entry = MagicMock()
         config_entry.data = data or {}
@@ -862,4 +908,81 @@ class TestQvantumOptionsFlow:
         assert result["type"] == "form"
         assert result["step_id"] == "init"
         assert _schema_defaults(result)["scan_interval"] == 60
+
+    @pytest.mark.asyncio
+    async def test_modbus_options_form_lists_external_room_temp_entity(self, hass):
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        flow = QvantumOptionsFlowHandler(self._entry(modbus_tcp=True))
+        result = await flow.async_step_init()
+        names = {
+            key.schema if hasattr(key, "schema") else key
+            for key in result["data_schema"].schema
+        }
+        assert "external_room_temp_entity" in names
+        assert "external_room_temp_entity" not in _schema_suggested(result)
+
+    @pytest.mark.asyncio
+    async def test_modbus_options_prefills_external_room_temp_entity(self, hass):
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        flow = QvantumOptionsFlowHandler(
+            self._entry(modbus_tcp=True, external_room_temp_entity=" sensor.mean ")
+        )
+        result = await flow.async_step_init()
+        suggested = _schema_suggested(result)
+        assert suggested["external_room_temp_entity"] == "sensor.mean"
+
+    @pytest.mark.asyncio
+    async def test_modbus_options_saves_external_room_temp_entity(self, hass):
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        flow = QvantumOptionsFlowHandler(self._entry(modbus_tcp=True))
+        with patch.object(flow, "async_create_entry") as mock_create_entry:
+            mock_create_entry.return_value = {"type": "create_entry"}
+            result = await flow.async_step_init(
+                {
+                    "modbus_host": "hp.local",
+                    "modbus_port": 502,
+                    "modbus_unit_id": 1,
+                    "modbus_scan_interval": 15,
+                    "external_room_temp_entity": "  sensor.mean  ",
+                }
+            )
+        assert result == {"type": "create_entry"}
+        data = mock_create_entry.call_args.kwargs["data"]
+        assert data["external_room_temp_entity"] == "sensor.mean"
+
+    @pytest.mark.asyncio
+    async def test_modbus_options_clears_external_room_temp_entity(self, hass):
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        flow = QvantumOptionsFlowHandler(
+            self._entry(modbus_tcp=True, external_room_temp_entity="sensor.mean")
+        )
+        with patch.object(flow, "async_create_entry") as mock_create_entry:
+            mock_create_entry.return_value = {"type": "create_entry"}
+            await flow.async_step_init(
+                {
+                    "modbus_host": "hp.local",
+                    "modbus_port": 502,
+                    "modbus_unit_id": 1,
+                    "modbus_scan_interval": 15,
+                }
+            )
+        data = mock_create_entry.call_args.kwargs["data"]
+        assert "external_room_temp_entity" not in data
+
+    @pytest.mark.asyncio
+    async def test_cloud_options_drops_stale_external_room_temp_entity(self, hass):
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        flow = QvantumOptionsFlowHandler(
+            self._entry(scan_interval=120, external_room_temp_entity="sensor.mean")
+        )
+        with patch.object(flow, "async_create_entry") as mock_create_entry:
+            mock_create_entry.return_value = {"type": "create_entry"}
+            await flow.async_step_init({"scan_interval": 300})
+        data = mock_create_entry.call_args.kwargs["data"]
+        assert "external_room_temp_entity" not in data
 

@@ -809,12 +809,14 @@
           "modbus_port": "Port",
           "modbus_unit_id": "Unit ID",
           "modbus_scan_interval": "Modbus scan interval (seconds)",
-          "modbus_write": "Enable writing via Modbus"
+          "modbus_write": "Enable writing via Modbus",
+          "external_room_temp_entity": "External room temperature source"
         },
         "data_description": {
           "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds.",
           "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
-          "scan_interval": "How often to poll the Qvantum cloud API. Default is 120 seconds."
+          "scan_interval": "How often to poll the Qvantum cloud API. Default is 120 seconds.",
+          "external_room_temp_entity": "Sensor whose value is sent to the heat pump as the external room temperature on every poll while Modbus writing is enabled. Required by the app's external room sensor mode; leave empty to disable."
         },
         "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
         "title": "Options"

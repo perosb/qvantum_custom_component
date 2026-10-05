@@ -809,12 +809,14 @@
           "modbus_port": "Port",
           "modbus_unit_id": "ID jednostki",
           "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)",
-          "modbus_write": "Włącz zapis przez Modbus"
+          "modbus_write": "Włącz zapis przez Modbus",
+          "external_room_temp_entity": "Źródło zewnętrznej temperatury pokojowej"
         },
         "data_description": {
           "modbus_scan_interval": "Jak często odpytywać pompę ciepła przez Modbus TCP. Niższe wartości dają prawie rzeczywistą dokładność przepływu i objętości. Minimum to 5 sekund. Domyślnie 15 sekund.",
           "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu.",
-          "scan_interval": "Jak często odpytywane jest API chmury Qvantum. Domyślnie 120 sekund."
+          "scan_interval": "Jak często odpytywane jest API chmury Qvantum. Domyślnie 120 sekund.",
+          "external_room_temp_entity": "Czujnik, którego wartość jest przesyłana do pompy ciepła jako zewnętrzna temperatura pokojowa przy każdym odpytywaniu, gdy zapis przez Modbus jest włączony. Wymagany przez tryb czujnika zewnętrznego w aplikacji; pozostaw puste, aby wyłączyć."
         },
         "description": "Ustawienia bieżącego trybu połączenia. Użyj rekonfiguracji, aby przełączyć między chmurą a Modbusem.",
         "title": "Opcje"

@@ -780,12 +780,28 @@ class TestRoomTempExternal:
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
 
-    def test_available_when_use_operation_sensor_external(
-        self, mock_coordinator, mock_device
+    @pytest.mark.parametrize(
+        "sensor_mode",
+        [
+            SensorMode.DISABLED,
+            SensorMode.BT2,
+            SensorMode.BT3,
+            SensorMode.AUX,
+            SensorMode.EXTERNAL,
+            None,
+        ],
+    )
+    def test_available_in_every_sensor_mode(
+        self, mock_coordinator, mock_device, sensor_mode
     ):
-        """Test entity is available when sensor mode is EXTERNAL and Modbus write on."""
+        """The feed entity must stay writable while the pump is in any mode.
+
+        Availability previously required sensor mode EXTERNAL; that locked the
+        entity out exactly when the pump dropped the sensor source (alarm 8),
+        so the feed could never recover. Write access is the only gate now.
+        """
         mock_coordinator.data["values"]["room_temp_external"] = 20.0
-        mock_coordinator.data["values"]["use_operation_sensor"] = SensorMode.EXTERNAL
+        mock_coordinator.data["values"]["use_operation_sensor"] = sensor_mode
         mock_coordinator.config_entry.options = {
             "modbus_write": True,
             "modbus_tcp": True,
@@ -794,28 +810,6 @@ class TestRoomTempExternal:
             mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
         )
         assert entity.available is True
-
-    def test_unavailable_when_use_operation_sensor_not_external(
-        self, mock_coordinator, mock_device
-    ):
-        """Test entity is unavailable when sensor mode is not EXTERNAL."""
-        mock_coordinator.data["values"]["room_temp_external"] = 20.0
-        mock_coordinator.config_entry.options = {
-            "modbus_write": True,
-            "modbus_tcp": True,
-        }
-        entity = QvantumNumberEntity(
-            mock_coordinator, "room_temp_external", 10, 40, 0.1, mock_device
-        )
-        for val in [
-            SensorMode.DISABLED,
-            SensorMode.BT2,
-            SensorMode.BT3,
-            SensorMode.AUX,
-            None,
-        ]:
-            mock_coordinator.data["values"]["use_operation_sensor"] = val
-            assert entity.available is False, f"Expected unavailable for sensor={val}"
 
     def test_unavailable_when_modbus_write_disabled(
         self, mock_coordinator, mock_device
