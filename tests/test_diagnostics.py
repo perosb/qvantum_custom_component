@@ -8,10 +8,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from custom_components.qvantum.curve_coordinator import CurveSnapshot
 from custom_components.qvantum.diagnostics import (
     TO_REDACT,
     async_get_config_entry_diagnostics,
 )
+from custom_components.qvantum.solar_gain import SolarModel
 
 REDACTED = "**REDACTED**"
 # Same length/format as a real Qvantum serial number.
@@ -66,6 +68,7 @@ def _runtime(
     *,
     maintenance: SimpleNamespace | None = None,
     extra_dhw: SimpleNamespace | None = None,
+    curve: SimpleNamespace | None = None,
     client: object | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
@@ -73,9 +76,79 @@ def _runtime(
         client=client if client is not None else SimpleNamespace(),
         maintenance_coordinator=maintenance,
         extra_dhw=extra_dhw,
+        curve_coordinator=curve,
         modbus_host="Qvantum-HP",
         modbus_port=502,
         modbus_unit_id=1,
+    )
+
+
+def _curve_coordinator() -> SimpleNamespace:
+    snapshot = CurveSnapshot(
+        shadow=False,
+        points={"curve_30": 30.0, "curve_minus_30": 55.0},
+        baseline={"curve_30": 28.0, "curve_minus_30": 52.0},
+        adjustment_c=1.5,
+        outdoor_c=0.4,
+        night_day_c=0.3,
+        solar_c=0.5,
+        load_c=0.3,
+        capped_by_indoor=False,
+        deviation_c=0.2,
+        ready=True,
+        blocker=None,
+        median_abs_c=0.4,
+        max_abs_c=1.1,
+        window_hours=72.0,
+        model=_solar_model(),
+        calibrated_at="2026-09-25T10:00:00+00:00",
+        baseline_auto=True,
+        trims={"curve_30": 0.1},
+        clamped=False,
+        baseline_learned_hours=48,
+        baseline_outdoor_min_c=-2.0,
+        baseline_outdoor_max_c=11.0,
+    )
+    return SimpleNamespace(
+        data=snapshot,
+        active=True,
+        writable=True,
+        _mode="active",
+        _revert_pending=False,
+        _forecast_ok=True,
+        _baseline={"curve_30": 28.0, "curve_minus_30": 52.0},
+        _baseline_auto=True,
+        _curve_23=20,
+        _baseline_stats={
+            "hours": 48,
+            "min_c": -2.0,
+            "max_c": 11.0,
+            "corrected": True,
+        },
+        _trims={"curve_30": 0.1},
+        _model=_solar_model(),
+        _calibrated_at="2026-09-25T10:00:00+00:00",
+        _last_calibration_ts=1758794400.0,
+        _last_baseline_learn_ts=1758794400.0,
+        _last_active_ts=None,
+        _last_trim_ts=1758794400.0,
+        _indoor_margins=[(1758794400.0, 0.5)],
+        _powers=[1200.0, 1300.0],
+    )
+
+
+def _solar_model() -> SolarModel:
+    return SolarModel(
+        a_w_per_k=120.0,
+        b_m2=2.5,
+        c_w=900.0,
+        trust=0.8,
+        r2_opaque=0.9,
+        r2_solar=0.7,
+        b_std_err=0.3,
+        n_opaque=40,
+        n_solar=30,
+        valid=True,
     )
 
 
@@ -321,3 +394,79 @@ async def test_entity_counts_report_total_and_enabled(hass):
         )
 
     assert result["entities"] == {"total": 3, "enabled": 2}
+
+
+@pytest.mark.asyncio
+async def test_curve_diagnostics_exports_adaptive_state(hass):
+    runtime = _runtime(_coordinator(), curve=_curve_coordinator())
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    curve = result["curve"]
+    assert curve["active"] is True
+    assert curve["writable"] is True
+    assert curve["mode"] == "active"
+    assert curve["shadow"] is False
+    assert curve["revert_pending"] is False
+    assert curve["forecast_ok"] is True
+    assert curve["baseline"]["curve_30"] == 28.0
+    assert curve["baseline_auto"] is True
+    assert curve["temp_compensation_curve"] == 20
+    assert curve["baseline_stats"] == {
+        "hours": 48,
+        "min_c": -2.0,
+        "max_c": 11.0,
+        "corrected": True,
+    }
+    assert curve["points"]["curve_minus_30"] == 55.0
+    assert curve["trims"] == {"curve_30": 0.1}
+    assert curve["adjustment_c"] == 1.5
+    assert curve["outdoor_c"] == 0.4
+    assert curve["night_day_c"] == 0.3
+    assert curve["solar_c"] == 0.5
+    assert curve["load_c"] == 0.3
+    assert curve["capped_by_indoor"] is False
+    assert curve["clamped"] is False
+    assert curve["deviation_c"] == 0.2
+    assert curve["ready"] is True
+    assert curve["blocker"] is None
+    assert curve["median_abs_c"] == 0.4
+    assert curve["max_abs_c"] == 1.1
+    assert curve["window_hours"] == 72.0
+    assert curve["baseline_learned_hours"] == 48
+    assert curve["baseline_outdoor_min_c"] == -2.0
+    assert curve["baseline_outdoor_max_c"] == 11.0
+    assert curve["model"]["trust"] == 0.8
+    assert curve["model"]["b_m2"] == 2.5
+    assert curve["calibrated_at"] == "2026-09-25T10:00:00+00:00"
+    assert curve["timestamps"]["last_trim_ts"] == 1758794400.0
+    assert curve["timestamps"]["last_active_ts"] is None
+    assert curve["indoor_margins"] == [[1758794400.0, 0.5]]
+    assert curve["power_samples"] == [1200.0, 1300.0]
+    json.dumps(result)
+
+
+@pytest.mark.asyncio
+async def test_curve_diagnostics_absent_in_cloud_mode(hass):
+    runtime = _runtime(_coordinator(), maintenance=_maintenance())
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    assert result["curve"] is None
+
+
+@pytest.mark.asyncio
+async def test_curve_diagnostics_tolerates_malformed_state(hass):
+    curve = SimpleNamespace(data=None)
+    runtime = _runtime(_coordinator(), curve=curve)
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    curve_result = result["curve"]
+    assert curve_result["active"] is False
+    assert curve_result["writable"] is False
+    assert curve_result["points"] == {}
+    assert curve_result["baseline"] == {}
+    assert curve_result["trims"] == {}
+    assert curve_result["model"] is None
+    assert curve_result["adjustment_c"] is None
+    assert curve_result["indoor_margins"] == []
+    assert curve_result["power_samples"] == []
+    json.dumps(result)
