@@ -51,7 +51,7 @@ Available triggers and conditions depend on the entities present. They cover def
 
 #### External room temperature feed
 
-The Qvantum app's sensor settings (**Av / Alla / BT2 / Ext Modbus**) can use an
+The Qvantum app's sensor settings (**Off / All / BT2 / External Modbus**) can use an
 external room temperature that Home Assistant supplies. The pump requires a
 fresh external room temperature at least every ~5 minutes: when the value goes
 stale, the pump drops the sensor source and raises alarm 8
@@ -62,7 +62,7 @@ Enable the built-in feed (Modbus mode, **Enable writing via Modbus** on):
 1. Open the integration **Configure** dialog.
 2. Pick the HA temperature sensor under **External room temperature source**
    (e.g. an average of your room sensors).
-3. Select **Ext Modbus** (or **Alla**) in the Qvantum app.
+3. Select **External** as "Source for indoor temperature".
 
 The integration then writes a smoothed value (5-minute time constant) on its
 own schedule, refreshed even when the value has not changed. It is never
@@ -71,30 +71,6 @@ the pump's watchdog stays satisfied. Manual writes to the feed's number entity
 are overwritten by the next refresh while the feed is active. Clear the picker
 to turn the feed off.
 
-Find the feed's number entity under **Settings → Devices & Services →
-Entities**: its entity id follows your language and device name (look for the
-translated **External room temperature** name).
-
-> [!NOTE]
-> A manual automation must write on a **fixed interval** (`time_pattern`), not
-> on sensor state changes: a state-triggered write stops when the temperature
-> is stable, and the pump then treats the sensor as unavailable.
-
-```yaml
-# Legacy manual alternative (the built-in feed above is preferred)
-alias: "Qvantum: Update external room temperature"
-triggers:
-  - trigger: time_pattern
-    minutes: "/1"
-actions:
-  - action: number.set_value
-    target:
-      # Replace with your feed's entity id (settings → entities; follows
-      # your language and device name)
-      entity_id: number.qvantum_external_room_temperature
-    data:
-      value: "{{ states('sensor.some_external_room_temperature') | float(20.8) }}"
-```
 
 #### Adaptive heating curve
 
