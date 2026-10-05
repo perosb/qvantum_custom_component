@@ -809,12 +809,14 @@
           "modbus_port": "Port",
           "modbus_unit_id": "Enheds-ID",
           "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)",
-          "modbus_write": "Aktivér skrivning via Modbus"
+          "modbus_write": "Aktivér skrivning via Modbus",
+          "external_room_temp_entity": "Kilde til ekstern rumtemperatur"
         },
         "data_description": {
           "modbus_scan_interval": "Hvor ofte varmepumpen skal forespørges over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder.",
           "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne.",
-          "scan_interval": "Hvor ofte Qvantum-cloud-API'et polles. Standard er 120 sekunder."
+          "scan_interval": "Hvor ofte Qvantum-cloud-API'et polles. Standard er 120 sekunder.",
+          "external_room_temp_entity": "Sensor, hvis værdi sendes til varmepumpen som ekstern rumtemperatur ved hver poll, når Modbus-skrivning er aktiveret. Kræves af appens tilstand for ekstern rumtemperatur; lad feltet stå tomt for at deaktivere."
         },
         "description": "Indstillinger for den aktuelle forbindelsestilstand. Brug genkonfiguration til at skifte mellem sky og Modbus.",
         "title": "Indstillinger"

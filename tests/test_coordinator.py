@@ -14,10 +14,15 @@ from custom_components.qvantum.coordinator import (
     _firmware_metadata_from_sw_version,
 )
 from tests.conftest import make_client_mock
-from custom_components.qvantum.client.exceptions import APIAuthError, RateLimitError
+from custom_components.qvantum.client.exceptions import (
+    APIAuthError,
+    RateLimitError,
+    TransportError,
+)
 from custom_components.qvantum.const import (
     DHW_MODE_EXTRA,
     DHW_MODE_NORMAL,
+    CONF_EXTERNAL_ROOM_TEMP_ENTITY,
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     DEFAULT_ENABLED_HTTP_METRICS,
@@ -4758,3 +4763,238 @@ class TestPollAndRestoreHardening:
         coordinator._dhw_store = store
 
         await coordinator.async_restore_dhw_state()
+
+
+class TestExternalRoomTempFeed:
+    """The external room temperature feed writes holding 14 on its own timer."""
+
+    def _make_coordinator(self, options=None, sensor_state="20.5"):
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            mock_hass = MagicMock()
+            mock_hass.data = {DOMAIN: MagicMock()}
+            mock_config_entry = MagicMock()
+            mock_config_entry.options = {CONF_MODBUS_TCP: True, **(options or {})}
+            mock_config_entry.data = {}
+            mock_config_entry.unique_id = "test_device_123"
+            coordinator = QvantumDataUpdateCoordinator(
+                mock_hass, mock_config_entry, client=make_client_mock(modbus=True)
+            )
+        coordinator.hass = mock_hass
+        coordinator._device = {"id": "dev1"}
+        coordinator.data = {"values": {}}
+        state = None if sensor_state is None else MagicMock(state=sensor_state)
+        mock_hass.states.get.return_value = state
+        coordinator.client.write_metric = AsyncMock(return_value={"status": "APPLIED"})
+        return coordinator
+
+    @pytest.mark.asyncio
+    async def test_writes_ema_smoothed_value(self):
+        """First tick writes the raw value, later ticks move the EMA toward it."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"}
+        )
+        with patch(
+            "custom_components.qvantum.coordinator.time.monotonic",
+            side_effect=[100.0, 115.0],
+        ):
+            await coordinator._async_feed_external_room_temp()
+            coordinator.hass.states.get.return_value = MagicMock(state="22.0")
+            await coordinator._async_feed_external_room_temp()
+
+        calls = coordinator.client.write_metric.await_args_list
+        assert calls[0].args == ("dev1", "room_temp_external", 20.5)
+        # alpha = 1 - exp(-15/300) ≈ 0.0488: 20.5 + 0.0488 * 1.5 ≈ 20.6
+        assert calls[1].args == ("dev1", "room_temp_external", 20.6)
+        assert coordinator.data["values"]["room_temp_external"] == 20.6
+        assert coordinator._external_room_last_value == 20.6
+        assert coordinator._external_room_last_write_ts is not None
+        assert coordinator._external_room_write_errors == 0
+
+    @pytest.mark.asyncio
+    async def test_writes_even_when_value_is_unchanged(self):
+        """The pump's watchdog needs fresh writes, not fresh values."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"}
+        )
+        with patch(
+            "custom_components.qvantum.coordinator.time.monotonic",
+            side_effect=[100.0, 115.0],
+        ):
+            await coordinator._async_feed_external_room_temp()
+            await coordinator._async_feed_external_room_temp()
+
+        values = [
+            call.args[2] for call in coordinator.client.write_metric.await_args_list
+        ]
+        assert values == [20.5, 20.5]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("sensor_state", "expected"),
+        [("99.9", 40.0), ("-12.0", -5.0)],
+    )
+    async def test_clamps_to_datasheet_range(self, sensor_state, expected):
+        """Values outside holding 14's documented range are clamped."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"},
+            sensor_state=sensor_state,
+        )
+        await coordinator._async_feed_external_room_temp()
+        assert coordinator.client.write_metric.await_args.args == (
+            "dev1",
+            "room_temp_external",
+            expected,
+        )
+
+    @pytest.mark.asyncio
+    async def test_disabled_when_option_unset(self):
+        """No configured source means no writes."""
+        coordinator = self._make_coordinator()
+        await coordinator._async_feed_external_room_temp()
+        coordinator.client.write_metric.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_disabled_when_modbus_writing_is_off(self):
+        """The feed is a write; it stays off when Modbus writing is off."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"}
+        )
+        coordinator.client.writable = False
+        await coordinator._async_feed_external_room_temp()
+        coordinator.client.write_metric.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_disabled_in_cloud_mode(self):
+        """The feed never touches the cloud transport."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"}
+        )
+        coordinator.modbus_enabled = False
+        await coordinator._async_feed_external_room_temp()
+        coordinator.client.write_metric.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_skips_missing_sensor(self):
+        """A removed source entity skips the write instead of raising."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"},
+            sensor_state=None,
+        )
+        await coordinator._async_feed_external_room_temp()
+        coordinator.client.write_metric.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_skips_non_numeric_sensor_state(self):
+        """`unavailable`/`unknown` skip the write instead of raising."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"},
+            sensor_state="unknown",
+        )
+        await coordinator._async_feed_external_room_temp()
+        coordinator.client.write_metric.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_skips_non_finite_sensor_state(self):
+        """NaN/inf sensor states skip the write; they are not valid temperatures."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"},
+            sensor_state="nan",
+        )
+        await coordinator._async_feed_external_room_temp()
+        coordinator.client.write_metric.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_write_failure_is_counted_and_does_not_raise(self):
+        """A failed write is telemetry; the timer must keep running."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"}
+        )
+        coordinator.client.write_metric = AsyncMock(
+            side_effect=TransportError(None, "bus down")
+        )
+        await coordinator._async_feed_external_room_temp()
+
+        assert coordinator._external_room_write_errors == 1
+        assert "room_temp_external" not in coordinator.data["values"]
+        assert coordinator._external_room_last_value is None
+        assert coordinator._external_room_last_write_ts is None
+
+    def test_entity_id_option_is_trimmed_and_blank_is_unset(self):
+        """The option is normalized; blank or non-string values disable the feed."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "  sensor.room  "}
+        )
+        assert coordinator.external_room_temp_entity_id == "sensor.room"
+
+        for blank in ("   ", None, 4):
+            coordinator._config_entry.options = {
+                CONF_EXTERNAL_ROOM_TEMP_ENTITY: blank
+            }
+            assert coordinator.external_room_temp_entity_id is None
+
+    def test_feed_interval_bound_below_watchdog(self):
+        """A deliberately slow poll interval cannot slow the feed past 240 s."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"}
+        )
+        coordinator.poll_interval = 900
+        assert coordinator.external_room_feed_interval == 240.0
+        coordinator.poll_interval = 30
+        assert coordinator.external_room_feed_interval == 30.0
+
+    def test_feed_interval_none_when_disabled(self):
+        """No source, no write access, or cloud mode all disable the timer."""
+        coordinator = self._make_coordinator()
+        assert coordinator.external_room_feed_interval is None
+
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"}
+        )
+        coordinator.client.writable = False
+        assert coordinator.external_room_feed_interval is None
+
+        coordinator.client.writable = True
+        coordinator.modbus_enabled = False
+        assert coordinator.external_room_feed_interval is None
+
+    def test_configure_restarts_and_stops_the_timer(self):
+        """Each configure cycle cancels the previous timer before starting one."""
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.room"}
+        )
+        coordinator.poll_interval = 30
+        first_unsub = MagicMock()
+        second_unsub = MagicMock()
+        with patch(
+            "custom_components.qvantum.coordinator.async_track_time_interval",
+            side_effect=[first_unsub, second_unsub],
+        ) as track:
+            coordinator.async_configure_external_room_feed()
+            assert track.call_args.args[0] is coordinator.hass
+            assert track.call_args.args[1] == coordinator._async_feed_external_room_temp
+            assert track.call_args.args[2] == timedelta(seconds=30)
+
+            # Restart: previous unsubscribe runs before the new timer starts.
+            coordinator.poll_interval = 120
+            coordinator.async_configure_external_room_feed()
+            first_unsub.assert_called_once()
+            assert track.call_args.args[2] == timedelta(seconds=120)
+
+            # Clearing the source stops the timer entirely.
+            coordinator._config_entry.options = {}
+            coordinator.async_configure_external_room_feed()
+            second_unsub.assert_called_once()
+            assert coordinator._external_room_feed_unsub is None
+
+    def test_configure_skips_timer_when_disabled(self):
+        """No timer is created while the feed is disabled."""
+        coordinator = self._make_coordinator()
+        with patch(
+            "custom_components.qvantum.coordinator.async_track_time_interval"
+        ) as track:
+            coordinator.async_configure_external_room_feed()
+        track.assert_not_called()
+        assert coordinator._external_room_feed_unsub is None

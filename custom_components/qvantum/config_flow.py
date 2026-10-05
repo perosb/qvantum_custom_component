@@ -22,6 +22,10 @@ from homeassistant.const import (
 from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+)
 
 from .client.cloud import QvantumCloudClient
 from .client.exceptions import APIAuthError, APIConnectionError, APIRateLimitError
@@ -37,6 +41,7 @@ from .const import (
     MIN_SCAN_INTERVAL,
     VERSION,
     CONFIG_VERSION,
+    CONF_EXTERNAL_ROOM_TEMP_ENTITY,
     CONF_MODBUS_HOST,
     CONF_MODBUS_PORT,
     CONF_MODBUS_SCAN_INTERVAL,
@@ -93,6 +98,38 @@ def _normalize_modbus_host(value: Any) -> str:
     """Strip host whitespace and fall back to the default when empty."""
     host = str(value or "").strip()
     return host or DEFAULT_MODBUS_HOST
+
+
+def _external_room_temp_selector() -> EntitySelector:
+    """Single temperature-sensor picker for the external room temperature feed."""
+    return EntitySelector(
+        EntitySelectorConfig(domain="sensor", device_class="temperature")
+    )
+
+
+def _normalize_external_room_temp_entity(value: Any) -> str | None:
+    """Return a stripped entity id, or None when the picker was cleared."""
+    if not isinstance(value, str):
+        return None
+    entity_id = value.strip()
+    return entity_id or None
+
+
+def _apply_external_room_temp_option(
+    result: dict[str, Any], value: Any
+) -> dict[str, Any]:
+    """Set or drop the external room temperature feed option in an options dict.
+
+    An empty picker must remove the key entirely: the coordinator treats a
+    present-but-empty value as unset, but a stale entry would keep showing up
+    in exports and diagnostics.
+    """
+    entity_id = _normalize_external_room_temp_entity(value)
+    if entity_id:
+        result[CONF_EXTERNAL_ROOM_TEMP_ENTITY] = entity_id
+    else:
+        result.pop(CONF_EXTERNAL_ROOM_TEMP_ENTITY, None)
+    return result
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -438,6 +475,14 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 self.hass, host, port, unit_id, errors
             )
             if info is not None:
+                reconfigure_options = {
+                    CONF_MODBUS_TCP: True,
+                    CONF_MODBUS_WRITE: write_enabled,
+                    CONF_MODBUS_HOST: host,
+                    CONF_MODBUS_PORT: port,
+                    CONF_MODBUS_UNIT_ID: unit_id,
+                    CONF_MODBUS_SCAN_INTERVAL: interval,
+                }
                 return self.async_update_reload_and_abort(
                     config_entry,
                     unique_id=info["serial"],
@@ -448,14 +493,10 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_MODBUS_PORT: port,
                         CONF_MODBUS_UNIT_ID: unit_id,
                     },
-                    options={
-                        CONF_MODBUS_TCP: True,
-                        CONF_MODBUS_WRITE: write_enabled,
-                        CONF_MODBUS_HOST: host,
-                        CONF_MODBUS_PORT: port,
-                        CONF_MODBUS_UNIT_ID: unit_id,
-                        CONF_MODBUS_SCAN_INTERVAL: interval,
-                    },
+                    options=_apply_external_room_temp_option(
+                        reconfigure_options,
+                        config_entry.options.get(CONF_EXTERNAL_ROOM_TEMP_ENTITY),
+                    ),
                     reason="reconfigure_successful",
                 )
         return self.async_show_form(
@@ -520,7 +561,11 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                         CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                     ),
                 }
-            return self.async_create_entry(title="", data={**self.options, **normalized})
+            result = _apply_external_room_temp_option(
+                {**self.options, **normalized},
+                user_input.get(CONF_EXTERNAL_ROOM_TEMP_ENTITY),
+            )
+            return self.async_create_entry(title="", data=result)
 
         entry = self._source_entry()
         if self._modbus_enabled():
@@ -568,6 +613,9 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                             )
                         ),
                     ): bool,
+                    vol.Optional(CONF_EXTERNAL_ROOM_TEMP_ENTITY): (
+                        _external_room_temp_selector()
+                    ),
                 }
             )
         else:
@@ -580,6 +628,18 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                         ),
                     ): vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL)),
                 }
+            )
+
+        # Prefill (not default) the entity picker so clearing it omits the key
+        # from the submitted form and removes the option; a vol default would
+        # resurrect the old value on every save.
+        existing_room_temp_entity = _normalize_external_room_temp_entity(
+            self.options.get(CONF_EXTERNAL_ROOM_TEMP_ENTITY)
+        )
+        if existing_room_temp_entity:
+            data_schema = self.add_suggested_values_to_schema(
+                data_schema,
+                {CONF_EXTERNAL_ROOM_TEMP_ENTITY: existing_room_temp_entity},
             )
 
         return self.async_show_form(step_id="init", data_schema=data_schema)

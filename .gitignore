@@ -27,3 +27,4 @@ dmypy.json
 *.pdf
 docs/*.json
 .opencode/
+.ha-token

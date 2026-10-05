@@ -20,8 +20,10 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
 from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 
 from .client.cloud import QvantumCloudClient
 from .client.exceptions import (
@@ -30,7 +32,7 @@ from .client.exceptions import (
     TransportError as APIConnectionError,
 )
 from .client.models import result_applied
-from .client.modbus import QvantumModbusClient
+from .client.modbus import QvantumModbusClient, metric_range
 from .client.protocol import (
     QvantumCloudClientProtocol,
     QvantumModbusClientProtocol,
@@ -57,8 +59,11 @@ from .const import (
     MODBUS_SW_VERSION_REFRESH_INTERVAL,
     REQUIRED_METRICS,
     REQUIRED_MODBUS_METRICS,
+    CONF_EXTERNAL_ROOM_TEMP_ENTITY,
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
+    EXTERNAL_ROOM_TEMP_EMA_TAU,
+    EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
     TAP_WATER_CAPACITY_MAPPINGS,
     default_metric_creates_entity,
@@ -259,6 +264,17 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             hass, 1, f"{DOMAIN}.device.{config_entry.entry_id}"
         )
         self._store_account_mismatch = False
+
+        # External room temperature feed (Modbus holding 14). The EMA smooths
+        # the configured HA sensor; `_external_room_*` fields are telemetry for
+        # diagnostics only. The feed runs on its own timer, independent of the
+        # poll cadence.
+        self._external_room_ema_value: float | None = None
+        self._external_room_ema_ts: float | None = None
+        self._external_room_last_value: float | None = None
+        self._external_room_last_write_ts: str | None = None
+        self._external_room_write_errors: int = 0
+        self._external_room_feed_unsub: Callable[[], None] | None = None
 
         super().__init__(
             hass,
@@ -637,6 +653,143 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         if self._device:
             return self._device.get("id")
         return None
+
+    @property
+    def external_room_temp_entity_id(self) -> str | None:
+        """Return the configured external room temperature source sensor.
+
+        None when the feed is disabled (option unset or cleared).
+        """
+        option = self._config_entry.options.get(CONF_EXTERNAL_ROOM_TEMP_ENTITY)
+        if not isinstance(option, str):
+            return None
+        entity_id = option.strip()
+        return entity_id or None
+
+    @property
+    def external_room_feed_interval(self) -> float | None:
+        """Return the feed cadence in seconds, or None when disabled.
+
+        The Qvantum app's external sensor mode treats the value as unavailable
+        when it is older than ~5 minutes, so the cadence is capped at
+        `EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL` (240 s): a deliberately slow
+        poll interval can never starve the feed.
+        """
+        if not self.modbus_enabled or self.external_room_temp_entity_id is None:
+            return None
+        if not bool(getattr(self.client, "writable", False)):
+            return None
+        return float(
+            min(int(self.poll_interval), int(EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL))
+        )
+
+    @callback
+    def async_configure_external_room_feed(self) -> None:
+        """Start, restart, or stop the external room temperature feed timer.
+
+        Call after any change that affects `external_room_feed_interval`: the
+        feed option, Modbus write access, or the poll interval.
+        """
+        self.async_cancel_external_room_feed()
+        interval = self.external_room_feed_interval
+        if interval is None:
+            return
+        self._external_room_feed_unsub = async_track_time_interval(
+            self.hass,
+            self._async_feed_external_room_temp,
+            timedelta(seconds=interval),
+            name=f"{DOMAIN} external room temperature",
+        )
+        _LOGGER.debug("External room temperature feed active every %ss", interval)
+
+    @callback
+    def async_cancel_external_room_feed(self) -> None:
+        """Stop the external room temperature feed timer if it is running."""
+        unsub = self._external_room_feed_unsub
+        if unsub is None:
+            return
+        self._external_room_feed_unsub = None
+        unsub()
+
+    async def _async_feed_external_room_temp(
+        self, _now: datetime | None = None
+    ) -> None:
+        """Feed the configured HA sensor to the external room temperature.
+
+        The Qvantum app's external sensor mode expects a room temperature at
+        least every ~5 minutes; the pump drops the sensor source and raises
+        alarm 8 when the value goes stale. The feed runs on its own timer
+        (`external_room_feed_interval`) instead of the poll, so a slow poll
+        interval cannot starve it, and it writes even when the value is
+        unchanged. It works while the pump is in any sensor mode, so the mode
+        can be re-selected in the app at any time.
+
+        Failures are logged and counted but never raise; the next tick retries.
+        """
+        device_id = self.device_id
+        if not self.modbus_enabled or device_id is None:
+            return
+        entity_id = self.external_room_temp_entity_id
+        if not entity_id or not self.client.writable:
+            return
+
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            _LOGGER.debug(
+                "External room temperature feed source %s is missing", entity_id
+            )
+            return
+        try:
+            sensor_value = float(state.state)
+        except (TypeError, ValueError):
+            _LOGGER.debug(
+                "External room temperature feed source %s has non-numeric state %s",
+                entity_id,
+                state.state,
+            )
+            return
+        if not math.isfinite(sensor_value):
+            return
+
+        now = time.monotonic()
+        if self._external_room_ema_value is None or self._external_room_ema_ts is None:
+            ema = sensor_value
+        else:
+            elapsed = max(0.0, now - self._external_room_ema_ts)
+            alpha = 1.0 - math.exp(-elapsed / EXTERNAL_ROOM_TEMP_EMA_TAU)
+            ema = self._external_room_ema_value + alpha * (
+                sensor_value - self._external_room_ema_value
+            )
+        self._external_room_ema_value = ema
+        self._external_room_ema_ts = now
+
+        value = round(ema, 1)
+        documented = metric_range("room_temp_external")
+        if documented is not None:
+            minimum, maximum = documented
+            value = min(max(value, minimum), maximum)
+
+        try:
+            await self.async_write_metric(device_id, "room_temp_external", value)
+        except (HomeAssistantError, APIConnectionError) as err:
+            self._external_room_write_errors += 1
+            _LOGGER.warning(
+                "Failed to feed external room temperature %s to device %s: %s",
+                value,
+                device_id,
+                err,
+            )
+            return
+
+        self._external_room_last_value = value
+        self._external_room_last_write_ts = dt_util.utcnow().isoformat()
+        # Mirror into the last poll result (no listener notify: calling
+        # async_set_updated_data would restart the poll schedule from the feed
+        # timer). The next poll reads the value back from the pump anyway.
+        if isinstance(self.data, dict):
+            values = self.data.get("values")
+            if isinstance(values, dict):
+                values["room_temp_external"] = value
 
     def _get_enabled_metrics(self, device_id: str) -> list[str]:
         """Return enabled metrics for a device, cached until a registry changes."""

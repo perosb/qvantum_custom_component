@@ -196,6 +196,12 @@ def _coordinator_diagnostics(coordinator: Any) -> dict[str, Any]:
         "shower_event_history_count": len(
             getattr(coordinator, "_shower_event_history", None) or []
         ),
+        "external_room_feed": {
+            "entity_id": getattr(coordinator, "external_room_temp_entity_id", None),
+            "last_value": getattr(coordinator, "_external_room_last_value", None),
+            "last_write": getattr(coordinator, "_external_room_last_write_ts", None),
+            "write_errors": getattr(coordinator, "_external_room_write_errors", None),
+        },
     }
 
 

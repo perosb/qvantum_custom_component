@@ -809,12 +809,14 @@
           "modbus_port": "Puerto",
           "modbus_unit_id": "ID de unidad",
           "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)",
-          "modbus_write": "Activar escritura mediante Modbus"
+          "modbus_write": "Activar escritura mediante Modbus",
+          "external_room_temp_entity": "Fuente de temperatura ambiente externa"
         },
         "data_description": {
           "modbus_scan_interval": "Con qué frecuencia se consulta la bomba de calor por Modbus TCP. Valores más bajos dan precisión casi en tiempo real de caudal y volumen. El mínimo es 5 segundos. El valor predeterminado es 15 segundos.",
           "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto.",
-          "scan_interval": "Con qué frecuencia se consulta la API en la nube de Qvantum. Predeterminado: 120 segundos."
+          "scan_interval": "Con qué frecuencia se consulta la API en la nube de Qvantum. Predeterminado: 120 segundos.",
+          "external_room_temp_entity": "Sensor cuyo valor se envía a la bomba de calor como temperatura ambiente externa en cada sondeo cuando la escritura Modbus está activada. Requerido por el modo de sensor externo de la aplicación; déjalo vacío para desactivarlo."
         },
         "description": "Ajustes del modo de conexión actual. Usa reconfigurar para cambiar entre nube y Modbus.",
         "title": "Opciones"

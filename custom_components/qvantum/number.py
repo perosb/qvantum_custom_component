@@ -13,7 +13,6 @@ from . import MyConfigEntry
 from .client.modbus import HEATING_CURVE_OUTDOOR_TEMPS, metric_range
 from .const import (
     HeatingCurveType,
-    SensorMode,
     TAP_WATER_CAPACITY_MAPPINGS,
     TAP_WATER_TEMP_MAX,
     TAP_WATER_TEMP_MIN,
@@ -40,7 +39,9 @@ def _as_int(value: object) -> int | None:
 # Entities for these metrics show as unavailable when "Enable writing via Modbus" is off.
 MODBUS_WRITE_METRICS = {
     "dhw_stop_extra",
-    "room_temp_external",  # Written via Modbus and only relevant when the external room sensor mode is enabled.
+    # Written via Modbus. Stays writable in every sensor mode so a dropped
+    # sensor source can be recovered and the feed can keep writing.
+    "room_temp_external",
     "temp_compensation_curve",  # Holding 23; cloud Auto uses DUT fields instead.
 }
 
@@ -270,12 +271,6 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
             )
             and self._values.get(self._metric_key) is not None
             and self._has_write_access
-            and (
-                # `room_temp_external` is only meaningful when the heat pump is
-                # configured to use the external operation sensor.
-                self._metric_key != "room_temp_external"
-                or self._values.get("use_operation_sensor") == SensorMode.EXTERNAL
-            )
             and (
                 # User-defined curve points only apply when holding 22 is User defined.
                 self._metric_key not in HEATING_CURVE_OUTDOOR_TEMPS
