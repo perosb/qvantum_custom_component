@@ -1097,7 +1097,7 @@ def test_resolve_statistic_ids_uses_registry() -> None:
 
     with patch.object(cc.er, "async_get", return_value=registry):
         resolved = coordinator._resolve_statistic_ids()
-        entity_id = coordinator._resolve_curve_entity_id("custom_curve_deviation")
+        entity_id = coordinator._resolve_curve_entity_id("adaptive_curve_deviation")
 
     assert resolved == {"heatingpower": "sensor.qvantum_heatingpower"}
     assert entity_id is None
@@ -1108,7 +1108,7 @@ def test_resolve_without_device_id_returns_empty() -> None:
     coordinator._main.device_id = None
 
     assert coordinator._resolve_statistic_ids() == {}
-    assert coordinator._resolve_curve_entity_id("custom_curve_deviation") is None
+    assert coordinator._resolve_curve_entity_id("adaptive_curve_deviation") is None
 
 
 async def test_statistics_returns_empty_without_ids_or_recorder() -> None:

@@ -56,7 +56,7 @@
       "vacation_mode": {
         "name": "Mode vacances"
       },
-      "custom_curve_control": {
+      "adaptive_curve_control": {
         "name": "Courbe de chauffage adaptative : contrôle"
       }
     },
@@ -584,34 +584,34 @@
       "alarm_5_code": {
         "name": "Code d'alarme 5"
       },
-      "custom_curve_30": {
+      "adaptive_curve_30": {
         "name": "Courbe de chauffage adaptative 1: 30°C"
       },
-      "custom_curve_20": {
+      "adaptive_curve_20": {
         "name": "Courbe de chauffage adaptative 2: 20°C"
       },
-      "custom_curve_10": {
+      "adaptive_curve_10": {
         "name": "Courbe de chauffage adaptative 3: 10°C"
       },
-      "custom_curve_0": {
+      "adaptive_curve_0": {
         "name": "Courbe de chauffage adaptative 4: 0°C"
       },
-      "custom_curve_minus_10": {
+      "adaptive_curve_minus_10": {
         "name": "Courbe de chauffage adaptative 5: -10°C"
       },
-      "custom_curve_minus_20": {
+      "adaptive_curve_minus_20": {
         "name": "Courbe de chauffage adaptative 6: -20°C"
       },
-      "custom_curve_minus_30": {
+      "adaptive_curve_minus_30": {
         "name": "Courbe de chauffage adaptative 7: -30°C"
       },
-      "custom_curve_adjustment": {
+      "adaptive_curve_adjustment": {
         "name": "Courbe de chauffage adaptative: ajustement"
       },
-      "custom_curve_deviation": {
+      "adaptive_curve_deviation": {
         "name": "Courbe de chauffage adaptative: écart"
       },
-      "custom_curve_solar_model": {
+      "adaptive_curve_solar_model": {
         "name": "Courbe de chauffage adaptative: modèle solaire"
       }
     },

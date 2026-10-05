@@ -81,23 +81,23 @@ _TOTAL_INCREASING_SENSORS = frozenset(
 # slugs keep dashboards and automations working across locales.
 _CURVE_POINT_METRICS: dict[str, str] = {
     (
-        f"custom_curve_minus_{abs(outdoor)}" if outdoor < 0 else f"custom_curve_{outdoor}"
+        f"adaptive_curve_minus_{abs(outdoor)}" if outdoor < 0 else f"adaptive_curve_{outdoor}"
     ): metric_key
     for metric_key, outdoor in HEATING_CURVE_OUTDOOR_TEMPS.items()
 }
 _CURVE_SENSOR_KEYS = frozenset(
     {
         *_CURVE_POINT_METRICS,
-        "custom_curve_adjustment",
-        "custom_curve_deviation",
-        "custom_curve_solar_model",
+        "adaptive_curve_adjustment",
+        "adaptive_curve_deviation",
+        "adaptive_curve_solar_model",
     }
 )
 
 # Numeric prefix so the seven points sort 1→7 (+30 … −30) like the pump's own
 # curve numbers in any entity list, independent of locale.
 _CURVE_POINT_SLUGS: dict[str, str] = {
-    sensor_key: f"custom_curve_{index:02d}_{sensor_key.removeprefix('custom_curve_')}"
+    sensor_key: f"adaptive_curve_{index:02d}_{sensor_key.removeprefix('adaptive_curve_')}"
     for index, sensor_key in enumerate(_CURVE_POINT_METRICS, start=1)
 }
 
@@ -187,17 +187,17 @@ async def async_setup_entry(
                 )
             sensors.append(
                 QvantumCurveAdjustmentSensor(
-                    curve_coordinator, "custom_curve_adjustment", device
+                    curve_coordinator, "adaptive_curve_adjustment", device
                 )
             )
             sensors.append(
                 QvantumCurveDeviationSensor(
-                    curve_coordinator, "custom_curve_deviation", device
+                    curve_coordinator, "adaptive_curve_deviation", device
                 )
             )
             sensors.append(
                 QvantumCurveSolarModelSensor(
-                    curve_coordinator, "custom_curve_solar_model", device
+                    curve_coordinator, "adaptive_curve_solar_model", device
                 )
             )
     else:

@@ -56,7 +56,7 @@
       "vacation_mode": {
         "name": "Urlaubsmodus"
       },
-      "custom_curve_control": {
+      "adaptive_curve_control": {
         "name": "Adaptive Heizkurve: Steuerung"
       }
     },
@@ -584,34 +584,34 @@
       "alarm_5_code": {
         "name": "Alarm 5 Code"
       },
-      "custom_curve_30": {
+      "adaptive_curve_30": {
         "name": "Adaptive Heizkurve 1: 30°C"
       },
-      "custom_curve_20": {
+      "adaptive_curve_20": {
         "name": "Adaptive Heizkurve 2: 20°C"
       },
-      "custom_curve_10": {
+      "adaptive_curve_10": {
         "name": "Adaptive Heizkurve 3: 10°C"
       },
-      "custom_curve_0": {
+      "adaptive_curve_0": {
         "name": "Adaptive Heizkurve 4: 0°C"
       },
-      "custom_curve_minus_10": {
+      "adaptive_curve_minus_10": {
         "name": "Adaptive Heizkurve 5: -10°C"
       },
-      "custom_curve_minus_20": {
+      "adaptive_curve_minus_20": {
         "name": "Adaptive Heizkurve 6: -20°C"
       },
-      "custom_curve_minus_30": {
+      "adaptive_curve_minus_30": {
         "name": "Adaptive Heizkurve 7: -30°C"
       },
-      "custom_curve_adjustment": {
+      "adaptive_curve_adjustment": {
         "name": "Adaptive Heizkurve: Anpassung"
       },
-      "custom_curve_deviation": {
+      "adaptive_curve_deviation": {
         "name": "Adaptive Heizkurve: Abweichung"
       },
-      "custom_curve_solar_model": {
+      "adaptive_curve_solar_model": {
         "name": "Adaptive Heizkurve: Solarmodell"
       }
     },

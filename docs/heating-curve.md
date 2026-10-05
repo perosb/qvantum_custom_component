@@ -196,21 +196,21 @@ is never written above what the firmware will actually use.
 
 Entities:
 
-- `sensor.qvantum_custom_curve_01_30` … `sensor.qvantum_custom_curve_07_minus_30` —
+- `sensor.qvantum_adaptive_curve_01_30` … `sensor.qvantum_adaptive_curve_07_minus_30` —
   the computed shadow points, numbered 1–7 (+30 … −30) like the pump's own
   curve numbers so they sort together, with `baseline`, `adjustment` and
   `trim` attributes.
-- `sensor.qvantum_custom_curve_adjustment` — the shared adjustment, with
+- `sensor.qvantum_adaptive_curve_adjustment` — the shared adjustment, with
   `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `trims` and `clamped`
   attributes.
-- `sensor.qvantum_custom_curve_deviation` — computed supply at the measured
+- `sensor.qvantum_adaptive_curve_deviation` — computed supply at the measured
   outdoor minus `cal_heat_temp` (input 35), with `shadow`, `ready`, `blocker`
   and `baseline_auto` (baseline frozen while the pump was on Auto) attributes,
   plus `baseline_learned_hours`, `baseline_outdoor_min_c` and
   `baseline_outdoor_max_c` from the last baseline fit.
-- `sensor.qvantum_custom_curve_solar_model` — model trust in %, with
+- `sensor.qvantum_adaptive_curve_solar_model` — model trust in %, with
   `a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque` and `r2_solar` diagnostics.
-- `switch.qvantum_custom_curve_control` — off = shadow, on = active writing.
+- `switch.qvantum_adaptive_curve_control` — off = shadow, on = active writing.
   `qvantum.set_curve_control` with `mode: shadow|active` does the same from an
   automation.
 

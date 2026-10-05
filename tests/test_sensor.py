@@ -534,7 +534,7 @@ class TestQvantumCurveSensors:
 
     def test_point_sensor_value_and_attributes(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())
-        entity = QvantumCurvePointSensor(coordinator, "custom_curve_30", mock_device)
+        entity = QvantumCurvePointSensor(coordinator, "adaptive_curve_30", mock_device)
 
         assert entity.native_value == 26.0
         assert entity.available is True
@@ -543,12 +543,12 @@ class TestQvantumCurveSensors:
             "adjustment": 1.0,
             "trim": 0.0,
         }
-        assert entity.suggested_object_id == "custom_curve_01_30"
-        assert entity._attr_unique_id == "qvantum_custom_curve_30_test_device_123"
+        assert entity.suggested_object_id == "adaptive_curve_01_30"
+        assert entity._attr_unique_id == "qvantum_adaptive_curve_30_test_device_123"
 
     def test_point_sensor_unavailable_without_point(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot(points={}))
-        entity = QvantumCurvePointSensor(coordinator, "custom_curve_minus_30", mock_device)
+        entity = QvantumCurvePointSensor(coordinator, "adaptive_curve_minus_30", mock_device)
 
         assert entity.native_value is None
         assert entity.available is False
@@ -557,7 +557,7 @@ class TestQvantumCurveSensors:
     def test_adjustment_sensor_breakdown(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())
         entity = QvantumCurveAdjustmentSensor(
-            coordinator, "custom_curve_adjustment", mock_device
+            coordinator, "adaptive_curve_adjustment", mock_device
         )
 
         assert entity.native_value == 1.0
@@ -573,7 +573,7 @@ class TestQvantumCurveSensors:
 
         empty = QvantumCurveAdjustmentSensor(
             _curve_coordinator(_curve_snapshot(points={})),
-            "custom_curve_adjustment",
+            "adaptive_curve_adjustment",
             mock_device,
         )
         assert empty.available is False
@@ -582,9 +582,9 @@ class TestQvantumCurveSensors:
         coordinator = _curve_coordinator(
             _curve_snapshot(trims={"curve_30": 0.4}, clamped=True)
         )
-        point = QvantumCurvePointSensor(coordinator, "custom_curve_30", mock_device)
+        point = QvantumCurvePointSensor(coordinator, "adaptive_curve_30", mock_device)
         adjustment = QvantumCurveAdjustmentSensor(
-            coordinator, "custom_curve_adjustment", mock_device
+            coordinator, "adaptive_curve_adjustment", mock_device
         )
 
         assert point.extra_state_attributes["trim"] == 0.4
@@ -596,33 +596,33 @@ class TestQvantumCurveSensors:
         slugs = [
             QvantumCurvePointSensor(coordinator, key, mock_device).suggested_object_id
             for key in (
-                "custom_curve_30",
-                "custom_curve_20",
-                "custom_curve_10",
-                "custom_curve_0",
-                "custom_curve_minus_10",
-                "custom_curve_minus_20",
-                "custom_curve_minus_30",
+                "adaptive_curve_30",
+                "adaptive_curve_20",
+                "adaptive_curve_10",
+                "adaptive_curve_0",
+                "adaptive_curve_minus_10",
+                "adaptive_curve_minus_20",
+                "adaptive_curve_minus_30",
             )
         ]
 
         assert slugs == [
-            "custom_curve_01_30",
-            "custom_curve_02_20",
-            "custom_curve_03_10",
-            "custom_curve_04_0",
-            "custom_curve_05_minus_10",
-            "custom_curve_06_minus_20",
-            "custom_curve_07_minus_30",
+            "adaptive_curve_01_30",
+            "adaptive_curve_02_20",
+            "adaptive_curve_03_10",
+            "adaptive_curve_04_0",
+            "adaptive_curve_05_minus_10",
+            "adaptive_curve_06_minus_20",
+            "adaptive_curve_07_minus_30",
         ]
         assert slugs == sorted(slugs)
 
     def test_all_curve_sensors_have_stable_slugs(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())
         cases = (
-            (QvantumCurveAdjustmentSensor, "custom_curve_adjustment"),
-            (QvantumCurveDeviationSensor, "custom_curve_deviation"),
-            (QvantumCurveSolarModelSensor, "custom_curve_solar_model"),
+            (QvantumCurveAdjustmentSensor, "adaptive_curve_adjustment"),
+            (QvantumCurveDeviationSensor, "adaptive_curve_deviation"),
+            (QvantumCurveSolarModelSensor, "adaptive_curve_solar_model"),
         )
 
         for sensor_cls, key in cases:
@@ -632,7 +632,7 @@ class TestQvantumCurveSensors:
     def test_deviation_sensor_shadow_attributes(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())
         entity = QvantumCurveDeviationSensor(
-            coordinator, "custom_curve_deviation", mock_device
+            coordinator, "adaptive_curve_deviation", mock_device
         )
 
         assert entity.native_value == 0.5
@@ -651,7 +651,7 @@ class TestQvantumCurveSensors:
             )
         )
         entity = QvantumCurveDeviationSensor(
-            coordinator, "custom_curve_deviation", mock_device
+            coordinator, "adaptive_curve_deviation", mock_device
         )
 
         attributes = entity.extra_state_attributes
@@ -662,7 +662,7 @@ class TestQvantumCurveSensors:
     def test_deviation_sensor_unavailable_without_value(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot(deviation_c=None))
         entity = QvantumCurveDeviationSensor(
-            coordinator, "custom_curve_deviation", mock_device
+            coordinator, "adaptive_curve_deviation", mock_device
         )
 
         assert entity.available is False
@@ -670,7 +670,7 @@ class TestQvantumCurveSensors:
     def test_solar_model_sensor_reports_trust_and_coefficients(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())
         entity = QvantumCurveSolarModelSensor(
-            coordinator, "custom_curve_solar_model", mock_device
+            coordinator, "adaptive_curve_solar_model", mock_device
         )
 
         assert entity.native_value == 25
@@ -683,7 +683,7 @@ class TestQvantumCurveSensors:
     def test_solar_model_sensor_unavailable_without_model(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot(model=None))
         entity = QvantumCurveSolarModelSensor(
-            coordinator, "custom_curve_solar_model", mock_device
+            coordinator, "adaptive_curve_solar_model", mock_device
         )
 
         assert entity.native_value is None
@@ -692,15 +692,15 @@ class TestQvantumCurveSensors:
 
     def test_curve_sensors_handle_missing_snapshot(self, mock_device):
         coordinator = _curve_coordinator(None)
-        point = QvantumCurvePointSensor(coordinator, "custom_curve_30", mock_device)
+        point = QvantumCurvePointSensor(coordinator, "adaptive_curve_30", mock_device)
         adjustment = QvantumCurveAdjustmentSensor(
-            coordinator, "custom_curve_adjustment", mock_device
+            coordinator, "adaptive_curve_adjustment", mock_device
         )
         deviation = QvantumCurveDeviationSensor(
-            coordinator, "custom_curve_deviation", mock_device
+            coordinator, "adaptive_curve_deviation", mock_device
         )
         model = QvantumCurveSolarModelSensor(
-            coordinator, "custom_curve_solar_model", mock_device
+            coordinator, "adaptive_curve_solar_model", mock_device
         )
 
         assert point.native_value is None
@@ -994,11 +994,11 @@ class TestSensorSetup:
         assert "hpid" in allowed
         assert "tap_stop" in allowed
         assert "display_fw_version" in allowed
-        assert "custom_curve_30" in allowed
-        assert "custom_curve_minus_30" in allowed
-        assert "custom_curve_adjustment" in allowed
-        assert "custom_curve_deviation" in allowed
-        assert "custom_curve_solar_model" in allowed
+        assert "adaptive_curve_30" in allowed
+        assert "adaptive_curve_minus_30" in allowed
+        assert "adaptive_curve_adjustment" in allowed
+        assert "adaptive_curve_deviation" in allowed
+        assert "adaptive_curve_solar_model" in allowed
         assert "expiresAt" not in allowed
         assert "firmware_last_check" not in allowed
 
@@ -1096,17 +1096,17 @@ class TestSensorSetup:
         assert len(points) == 7
         assert {(e._attr_unique_id, e._attr_translation_key) for e in points} == {
             (
-                f"qvantum_custom_curve_{key}_test_device_123",
-                f"custom_curve_{key}",
+                f"qvantum_adaptive_curve_{key}_test_device_123",
+                f"adaptive_curve_{key}",
             )
             for key in ("30", "20", "10", "0", "minus_10", "minus_20", "minus_30")
         }
         assert len(adjustments) == len(deviations) == len(models) == 1
         assert adjustments[0]._attr_unique_id == (
-            "qvantum_custom_curve_adjustment_test_device_123"
+            "qvantum_adaptive_curve_adjustment_test_device_123"
         )
-        assert deviations[0]._attr_translation_key == "custom_curve_deviation"
-        assert models[0]._attr_translation_key == "custom_curve_solar_model"
+        assert deviations[0]._attr_translation_key == "adaptive_curve_deviation"
+        assert models[0]._attr_translation_key == "adaptive_curve_solar_model"
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_http_does_not_create_curve_sensors(

@@ -56,7 +56,7 @@
       "vacation_mode": {
         "name": "Tryb wakacyjny"
       },
-      "custom_curve_control": {
+      "adaptive_curve_control": {
         "name": "Adaptacyjna krzywa grzewcza: sterowanie"
       }
     },
@@ -584,34 +584,34 @@
       "alarm_5_code": {
         "name": "Kod alarmu 5"
       },
-      "custom_curve_30": {
+      "adaptive_curve_30": {
         "name": "Adaptacyjna krzywa grzewcza 1: 30°C"
       },
-      "custom_curve_20": {
+      "adaptive_curve_20": {
         "name": "Adaptacyjna krzywa grzewcza 2: 20°C"
       },
-      "custom_curve_10": {
+      "adaptive_curve_10": {
         "name": "Adaptacyjna krzywa grzewcza 3: 10°C"
       },
-      "custom_curve_0": {
+      "adaptive_curve_0": {
         "name": "Adaptacyjna krzywa grzewcza 4: 0°C"
       },
-      "custom_curve_minus_10": {
+      "adaptive_curve_minus_10": {
         "name": "Adaptacyjna krzywa grzewcza 5: -10°C"
       },
-      "custom_curve_minus_20": {
+      "adaptive_curve_minus_20": {
         "name": "Adaptacyjna krzywa grzewcza 6: -20°C"
       },
-      "custom_curve_minus_30": {
+      "adaptive_curve_minus_30": {
         "name": "Adaptacyjna krzywa grzewcza 7: -30°C"
       },
-      "custom_curve_adjustment": {
+      "adaptive_curve_adjustment": {
         "name": "Adaptacyjna krzywa grzewcza: korekta"
       },
-      "custom_curve_deviation": {
+      "adaptive_curve_deviation": {
         "name": "Adaptacyjna krzywa grzewcza: odchylenie"
       },
-      "custom_curve_solar_model": {
+      "adaptive_curve_solar_model": {
         "name": "Adaptacyjna krzywa grzewcza: model słoneczny"
       }
     },

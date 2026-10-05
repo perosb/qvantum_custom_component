@@ -626,10 +626,10 @@ class TestQvantumCurveControlSwitch:
     def test_init(self, mock_coordinator, mock_device):
         entity, _curve = self._make(mock_coordinator, mock_device)
 
-        assert entity._metric_key == "custom_curve_control"
-        assert entity._attr_unique_id == "qvantum_custom_curve_control_test_device_123"
-        assert entity._attr_translation_key == "custom_curve_control"
-        assert entity.suggested_object_id == "custom_curve_control"
+        assert entity._metric_key == "adaptive_curve_control"
+        assert entity._attr_unique_id == "qvantum_adaptive_curve_control_test_device_123"
+        assert entity._attr_translation_key == "adaptive_curve_control"
+        assert entity.suggested_object_id == "adaptive_curve_control"
 
     def test_is_on_follows_curve_mode(self, mock_coordinator, mock_device):
         entity, _curve = self._make(mock_coordinator, mock_device, active=False)
