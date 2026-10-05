@@ -84,9 +84,6 @@ hands control straight back to the pump's Auto curve.
 
 - Enable Modbus writing.
 - Wait until the deviation sensor reports `ready` (a few days of shadow data).
-- Turn off any existing Home Assistant automation that adjusts the curve
-  offset ("Förskjutning av värmekurva") before switching on, otherwise the
-  adjustment is applied twice.
 - Flip the switch yourself; the integration never does.
 
 A bundled Lovelace card visualizes the curve. Add
@@ -95,18 +92,16 @@ resource, then add the card:
 
 ```yaml
 type: custom:qvantum-curve-card
-entity: sensor.qvantum_adaptive_curve_adjustment   # optional
-title: Värmekurva
-operating_point:
-  outdoor: sensor.qvantum_bt1
-  supply: sensor.qvantum_cal_heat_temp
 ```
 
 It draws the frozen baseline, the computed shadow curve, the seven points
 written to the pump, the ±1 °C write band, the optional operating point and
 the adjustment term breakdown (outdoor, night/day, solar, load, trims).
 
-Details: [docs/heating-curve.md](docs/heating-curve.md).
+Details: [docs/heating-curve.md](docs/heating-curve.md).  
+
+<img width="250" alt="Adaptive Curve" src="https://github.com/user-attachments/assets/03bed4aa-1816-4597-9c3c-fe3faf06ecd6" />
+
 
 ### Services and Elevate Access
 
@@ -122,17 +117,6 @@ data:
 ```
 
 Cloud extra ventilation is a timed boost; local Modbus fan extra is a sticky preset. The extra-DHW switch and timer are also available, and the service works in both modes.
-
-#### `qvantum.set_curve_control`
-
-The adaptive heating curve from an automation; `mode` is `shadow` or `active`.
-The switch remains the only user-facing source of truth.
-
-```yaml
-service: qvantum.set_curve_control
-data:
-  mode: active
-```
 
 #### Elevate Access
 
