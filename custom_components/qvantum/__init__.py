@@ -100,7 +100,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
     try:
         await hass.http.async_register_static_paths(
-            [StaticPathConfig(_CARD_URL_PATH, str(card_path), True)]
+            [StaticPathConfig(_CARD_URL_PATH, str(card_path), False)]
         )
         _CARD_REGISTERED = True
     except Exception as err:  # noqa: BLE001 — never block setup on asset errors
