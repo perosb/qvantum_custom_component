@@ -51,6 +51,14 @@ _DHW_EMA_FIELDS = (
     "_tap_water_cap_reheating_floor_mode",
 )
 
+# Curve-coordinator timestamps worth surfacing to support (epoch seconds).
+_CURVE_TIMESTAMP_FIELDS = (
+    "_last_calibration_ts",
+    "_last_baseline_learn_ts",
+    "_last_active_ts",
+    "_last_trim_ts",
+)
+
 
 def _sensitive_identifiers(config_entry: ConfigEntry, runtime: Any) -> set[str]:
     """Return device identifiers (serial/hpid) that must not leave the instance.
@@ -232,6 +240,91 @@ def _maintenance_diagnostics(coordinator: Any) -> dict[str, Any] | None:
     }
 
 
+def _curve_model_diagnostics(model: Any) -> dict[str, Any] | None:
+    """Return the fitted solar-model coefficients and confidence."""
+    if model is None:
+        return None
+    return {
+        "a_w_per_k": getattr(model, "a_w_per_k", None),
+        "b_m2": getattr(model, "b_m2", None),
+        "c_w": getattr(model, "c_w", None),
+        "trust": getattr(model, "trust", None),
+        "r2_opaque": getattr(model, "r2_opaque", None),
+        "r2_solar": getattr(model, "r2_solar", None),
+        "b_std_err": getattr(model, "b_std_err", None),
+        "n_opaque": getattr(model, "n_opaque", None),
+        "n_solar": getattr(model, "n_solar", None),
+        "valid": getattr(model, "valid", None),
+        "notes": getattr(model, "notes", None),
+    }
+
+
+def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
+    """Return adaptive heating-curve state (Modbus only).
+
+    Mirrors the persisted curve state plus the live computed snapshot, so a
+    support dump shows the frozen baseline, the shared adjustment and its
+    terms, the solar model, the active trims and the activation blocker.
+    """
+    if coordinator is None:
+        return None
+
+    snapshot = getattr(coordinator, "data", None)
+    points = getattr(snapshot, "points", None)
+    trims = getattr(coordinator, "_trims", None)
+    baseline = getattr(coordinator, "_baseline", None)
+    baseline_stats = getattr(coordinator, "_baseline_stats", None)
+    margins = getattr(coordinator, "_indoor_margins", None)
+    powers = getattr(coordinator, "_powers", None)
+
+    return {
+        "active": bool(getattr(coordinator, "active", False)),
+        "writable": bool(getattr(coordinator, "writable", False)),
+        "mode": getattr(coordinator, "_mode", None),
+        "shadow": None if snapshot is None else getattr(snapshot, "shadow", None),
+        "revert_pending": bool(getattr(coordinator, "_revert_pending", False)),
+        "forecast_ok": bool(getattr(coordinator, "_forecast_ok", False)),
+        "baseline": dict(baseline) if isinstance(baseline, dict) else {},
+        "baseline_auto": getattr(coordinator, "_baseline_auto", None),
+        "temp_compensation_curve": getattr(coordinator, "_curve_23", None),
+        "baseline_stats": dict(baseline_stats)
+        if isinstance(baseline_stats, dict)
+        else {},
+        "points": dict(points) if isinstance(points, dict) else {},
+        "trims": dict(trims) if isinstance(trims, dict) else {},
+        "adjustment_c": getattr(snapshot, "adjustment_c", None),
+        "outdoor_c": getattr(snapshot, "outdoor_c", None),
+        "night_day_c": getattr(snapshot, "night_day_c", None),
+        "solar_c": getattr(snapshot, "solar_c", None),
+        "load_c": getattr(snapshot, "load_c", None),
+        "capped_by_indoor": getattr(snapshot, "capped_by_indoor", None),
+        "clamped": getattr(snapshot, "clamped", None),
+        "deviation_c": getattr(snapshot, "deviation_c", None),
+        "ready": getattr(snapshot, "ready", None),
+        "blocker": getattr(snapshot, "blocker", None),
+        "median_abs_c": getattr(snapshot, "median_abs_c", None),
+        "max_abs_c": getattr(snapshot, "max_abs_c", None),
+        "window_hours": getattr(snapshot, "window_hours", None),
+        "baseline_learned_hours": getattr(snapshot, "baseline_learned_hours", None),
+        "baseline_outdoor_min_c": getattr(snapshot, "baseline_outdoor_min_c", None),
+        "baseline_outdoor_max_c": getattr(snapshot, "baseline_outdoor_max_c", None),
+        "model": _curve_model_diagnostics(getattr(coordinator, "_model", None)),
+        "calibrated_at": getattr(coordinator, "_calibrated_at", None),
+        "timestamps": {
+            field.removeprefix("_"): getattr(coordinator, field, None)
+            for field in _CURVE_TIMESTAMP_FIELDS
+        },
+        "indoor_margins": [
+            [ts, margin]
+            for ts, margin in (margins or [])
+            if isinstance(ts, (int, float)) and isinstance(margin, (int, float))
+        ],
+        "power_samples": [
+            power for power in (powers or []) if isinstance(power, (int, float))
+        ],
+    }
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, config_entry: ConfigEntry
 ) -> dict[str, Any]:
@@ -258,6 +351,9 @@ async def async_get_config_entry_diagnostics(
     )
     diagnostics["maintenance"] = _maintenance_diagnostics(
         getattr(runtime, "maintenance_coordinator", None)
+    )
+    diagnostics["curve"] = _curve_diagnostics(
+        getattr(runtime, "curve_coordinator", None)
     )
     diagnostics["modbus_link"] = (
         {
