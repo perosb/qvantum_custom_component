@@ -15,7 +15,7 @@ from ..constants import (
     FAN_SPEED_STATE_OFF,
     RELAY_STAGE_POWER_MAP,
 )
-from .maps import MODBUS_HOLDING_TO_SETTINGS_MAP
+from .maps import MODBUS_HOLDING_RANGE, MODBUS_HOLDING_TO_SETTINGS_MAP
 from .model import QvantumIdentity, QvantumInputs, QvantumSettings
 
 if TYPE_CHECKING:
@@ -189,6 +189,19 @@ def holding_field_for_metric(metric_key: str) -> str:
     if holding_key in QvantumSettings.declared_fields:
         return holding_key
     raise ValueError(f"No Modbus holding register mapping found for metric '{metric_key}'")
+
+
+def metric_range(metric_key: str) -> tuple[float, float] | None:
+    """Return the datasheet MIN/MAX for a canonical metric, if documented.
+
+    Accepts both holding field names and HTTP/settings metric names. Returns
+    ``None`` for metrics with no holding register or no documented range.
+    """
+    try:
+        field_name = holding_field_for_metric(metric_key)
+    except ValueError:
+        return None
+    return MODBUS_HOLDING_RANGE.get(field_name)
 
 
 class QvantumModbusDevice:
