@@ -49,6 +49,7 @@ const STRINGS = {
     shadowMode: "Shadow",
     ready: "Ready",
     notReady: "Not ready",
+    noData: "No data",
     blocker: "blocker",
     pumpUser: "Pump: User defined",
     pumpAuto: "Pump: Auto",
@@ -78,6 +79,7 @@ const STRINGS = {
     shadowMode: "Skugga",
     ready: "Redo",
     notReady: "Inte redo",
+    noData: "Ingen data",
     blocker: "blockerare",
     pumpUser: "Pump: User defined",
     pumpAuto: "Pump: Auto",
@@ -336,7 +338,11 @@ class QvantumCurveCard extends HTMLElement {
     const model = this._collect(map);
     const chart = model.pointCount
       ? this._svg(model)
-      : `<div class="pad muted waiting">${esc(t.waiting)}</div>`;
+      : `<div class="pad muted waiting">${esc(t.waiting)}${
+          model.blocker
+            ? ` <span class="blocker">(${esc(t.blocker)}: ${esc(model.blocker)})</span>`
+            : ""
+        }</div>`;
 
     root.innerHTML = `
       <style>${this._style()}</style>
@@ -385,12 +391,23 @@ class QvantumCurveCard extends HTMLElement {
 
     const shadowValues = points.map((p) => p.value).filter((v) => v !== null);
     const pointCount = shadowValues.length;
+    const known = (metric) => {
+      const s = map[metric] ? hass.states[map[metric]] : undefined;
+      return !!s && s.state !== "unavailable" && s.state !== "unknown";
+    };
 
     return {
       points: points.filter((p) => p.value !== null),
       allPoints: points,
       pump,
       pointCount,
+      known: {
+        switch: known(SWITCH_METRIC),
+        deviation: known(DEVIATION_METRIC),
+        adjustment: known(ADJUSTMENT_METRIC),
+        select: known(SELECT_METRIC),
+        solar: known(SOLAR_METRIC),
+      },
       adjustment: {
         total: num(adj?.state),
         outdoor: num(attr(adj, "outdoor_c")),
@@ -672,25 +689,29 @@ class QvantumCurveCard extends HTMLElement {
   _status(model, t) {
     const chips = [];
     chips.push(
-      `<span class="chip ${model.active ? "ok" : ""}"><i class="dot"></i>${esc(
-        model.active ? t.active : t.shadowMode,
-      )}</span>`,
+      model.known.switch
+        ? `<span class="chip ${model.active ? "ok" : ""}"><i class="dot"></i>${esc(
+            model.active ? t.active : t.shadowMode,
+          )}</span>`
+        : `<span class="chip">${esc(t.noData)}</span>`,
     );
-    chips.push(
-      `<span class="chip ${model.ready ? "ok" : "warn"}">${esc(
-        model.ready ? t.ready : t.notReady,
-      )}${model.blocker ? `: ${esc(t.blocker)} ${esc(model.blocker)}` : ""}</span>`,
-    );
-    chips.push(
-      `<span class="chip ${model.shadow ? "" : "ok"}">${esc(
-        model.shadow ? t.pumpAuto : t.pumpUser,
-      )}</span>`,
-    );
-    if (model.adjustment.clamped)
+    if (model.known.deviation) {
+      chips.push(
+        `<span class="chip ${model.ready ? "ok" : "warn"}">${esc(
+          model.ready ? t.ready : t.notReady,
+        )}${model.blocker ? `: ${esc(t.blocker)} ${esc(model.blocker)}` : ""}</span>`,
+      );
+      chips.push(
+        `<span class="chip ${model.shadow ? "" : "ok"}">${esc(
+          model.shadow ? t.pumpAuto : t.pumpUser,
+        )}</span>`,
+      );
+    }
+    if (model.known.adjustment && model.adjustment.clamped)
       chips.push(`<span class="chip warn">${esc(t.clamped)}</span>`);
-    if (model.adjustment.capped)
+    if (model.known.adjustment && model.adjustment.capped)
       chips.push(`<span class="chip warn">${esc(t.capped)}</span>`);
-    if (model.trust !== null)
+    if (model.known.solar && model.trust !== null)
       chips.push(
         `<span class="chip">${esc(t.trust)} ${fmt(model.trust, 0)} %</span>`,
       );
