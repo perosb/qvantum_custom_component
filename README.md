@@ -40,7 +40,7 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **Hot water (`water_heater`):** Tank temperature and DHW stop target with Eco, Normal, Extra, Smart, and Off modes.
 - **Energy Dashboard:** Compressor, heating, DHW, additional, and total energy sensors are ready for one-click setup.
 - **Device automations:** Triggers and conditions for defrost, compressor blocking, freeze protection, Wi-Fi/cloud connectivity, and a ventilation filter due in under 48 hours.
-- **External room sensor:** The integration can feed a Home Assistant temperature sensor to the pump as the external room temperature on every poll, so the app's external room sensor mode stays fed.
+- **External room sensor:** The integration can feed a Home Assistant temperature sensor to the pump as the external room temperature, refreshed continuously (never slower than every 4 minutes) so the app's external room sensor mode stays fed.
 - **Modbus writes:** Optional local writes for supported targets, DHW, fan, operation, room compensation, and sensor settings.
 - **Adaptive heating curve (Modbus):** A self-learning curve based on the weather forecast and the pump's own data. It starts in shadow mode and replaces the pump's Auto curve once you switch it on; see [docs/heating-curve.md](docs/heating-curve.md).
 - **Curve card:** A bundled Lovelace card (`qvantum-curve-card`) that graphs the baseline, shadow curve, written pump table and adjustment terms.
@@ -65,12 +65,16 @@ Enable the built-in feed (Modbus mode, **Enable writing via Modbus** on):
 3. Select **Ext Modbus** (or **Alla**) in the Qvantum app.
 
 The integration then writes an EMA-smoothed value (5-minute time constant,
-matching the low-pass filter this feature replaces) on every poll — default
-every 15 seconds. The value is written on every poll even when it has not
-changed, which the pump's watchdog requires.
-The `number.qvantum_..._extern_inomhustemperatur` entity shows the last written
-value; manual writes to it are overwritten on the next poll while the feed is
-active. Clear the picker to turn the feed off.
+matching the low-pass filter this feature replaces) on its own schedule,
+refreshed even when the value has not changed. It is never slower than every
+4 minutes, regardless of the configured poll interval, so the pump's watchdog
+stays satisfied. Manual writes to the feed's number entity are overwritten by
+the next refresh while the feed is active. Clear the picker to turn the feed
+off.
+
+Find the feed's number entity under **Settings → Devices & Services →
+Entities**: its entity id follows your language and device name (look for the
+translated **External room temperature** name).
 
 > [!NOTE]
 > A manual automation must write on a **fixed interval** (`time_pattern`), not
@@ -86,7 +90,9 @@ triggers:
 actions:
   - action: number.set_value
     target:
-      entity_id: number.qvantum_extern_inomhustemperatur
+      # Replace with your feed's entity id (settings → entities; follows
+      # your language and device name)
+      entity_id: number.qvantum_external_room_temperature
     data:
       value: "{{ states('sensor.some_external_room_temperature') | float(20.8) }}"
 ```

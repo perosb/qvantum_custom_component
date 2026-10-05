@@ -124,6 +124,10 @@ CONF_EXTERNAL_ROOM_TEMP_ENTITY = "external_room_temp_entity"
 # EMA time constant (seconds) for the fed value. Matches the 5-minute low-pass
 # filter this feature replaces, so the pump sees the same smoothing as before.
 EXTERNAL_ROOM_TEMP_EMA_TAU = 300.0
+# Upper bound (seconds) for the feed cadence. The pump treats the external
+# sensor as unavailable when the value is older than ~5 minutes, so the feed
+# must never be slower than this even if the poll interval is set slower.
+EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL = 240.0
 DEFAULT_MODBUS_HOST = "Qvantum-HP"
 DEFAULT_MODBUS_PORT = 502
 DEFAULT_MODBUS_UNIT_ID = 1

@@ -20,6 +20,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
 from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
@@ -62,6 +63,7 @@ from .const import (
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     EXTERNAL_ROOM_TEMP_EMA_TAU,
+    EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
     TAP_WATER_CAPACITY_MAPPINGS,
     default_metric_creates_entity,
@@ -265,12 +267,14 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
         # External room temperature feed (Modbus holding 14). The EMA smooths
         # the configured HA sensor; `_external_room_*` fields are telemetry for
-        # diagnostics only.
+        # diagnostics only. The feed runs on its own timer, independent of the
+        # poll cadence.
         self._external_room_ema_value: float | None = None
         self._external_room_ema_ts: float | None = None
         self._external_room_last_value: float | None = None
         self._external_room_last_write_ts: str | None = None
         self._external_room_write_errors: int = 0
+        self._external_room_feed_unsub: Callable[[], None] | None = None
 
         super().__init__(
             hass,
@@ -662,23 +666,71 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         entity_id = option.strip()
         return entity_id or None
 
-    async def _async_feed_external_room_temp(
-        self, device_id: str, values: dict[str, Any]
-    ) -> None:
-        """Feed the configured HA sensor to holding 14 (room_temp_external).
+    @property
+    def external_room_feed_interval(self) -> float | None:
+        """Return the feed cadence in seconds, or None when disabled.
 
-        The Qvantum app's "ext modbus" sensor mode expects a room temperature
-        on holding 14 at least every ~5 minutes; the pump drops the sensor mode
-        and raises alarm 8 when the value goes stale. Writing on every poll
-        (default 15 s) keeps the pump fed regardless of how still the source
-        value is, and works while the pump is in any sensor mode, so the mode
+        The Qvantum app's external sensor mode treats the value as unavailable
+        when it is older than ~5 minutes, so the cadence is capped at
+        `EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL` (240 s): a deliberately slow
+        poll interval can never starve the feed.
+        """
+        if not self.modbus_enabled or self.external_room_temp_entity_id is None:
+            return None
+        if not bool(getattr(self.client, "writable", False)):
+            return None
+        return float(
+            min(int(self.poll_interval), int(EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL))
+        )
+
+    @callback
+    def async_configure_external_room_feed(self) -> None:
+        """Start, restart, or stop the external room temperature feed timer.
+
+        Call after any change that affects `external_room_feed_interval`: the
+        feed option, Modbus write access, or the poll interval.
+        """
+        self.async_cancel_external_room_feed()
+        interval = self.external_room_feed_interval
+        if interval is None:
+            return
+        self._external_room_feed_unsub = async_track_time_interval(
+            self.hass,
+            self._async_feed_external_room_temp,
+            timedelta(seconds=interval),
+            name=f"{DOMAIN} external room temperature",
+        )
+        _LOGGER.debug("External room temperature feed active every %ss", interval)
+
+    @callback
+    def async_cancel_external_room_feed(self) -> None:
+        """Stop the external room temperature feed timer if it is running."""
+        unsub = self._external_room_feed_unsub
+        if unsub is None:
+            return
+        self._external_room_feed_unsub = None
+        unsub()
+
+    async def _async_feed_external_room_temp(
+        self, _now: datetime | None = None
+    ) -> None:
+        """Feed the configured HA sensor to the external room temperature.
+
+        The Qvantum app's external sensor mode expects a room temperature at
+        least every ~5 minutes; the pump drops the sensor source and raises
+        alarm 8 when the value goes stale. The feed runs on its own timer
+        (`external_room_feed_interval`) instead of the poll, so a slow poll
+        interval cannot starve it, and it writes even when the value is
+        unchanged. It works while the pump is in any sensor mode, so the mode
         can be re-selected in the app at any time.
 
-        Failures are logged and counted but never fail the poll: reads already
-        succeeded, and a temporary write failure heals on the next cycle.
+        Failures are logged and counted but never raise; the next tick retries.
         """
+        device_id = self.device_id
+        if not self.modbus_enabled or device_id is None:
+            return
         entity_id = self.external_room_temp_entity_id
-        if not self.modbus_enabled or not entity_id or not self.client.writable:
+        if not entity_id or not self.client.writable:
             return
 
         state = self.hass.states.get(entity_id)
@@ -731,7 +783,13 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
         self._external_room_last_value = value
         self._external_room_last_write_ts = dt_util.utcnow().isoformat()
-        values["room_temp_external"] = value
+        # Mirror into the last poll result (no listener notify: calling
+        # async_set_updated_data would restart the poll schedule from the feed
+        # timer). The next poll reads the value back from the pump anyway.
+        if isinstance(self.data, dict):
+            values = self.data.get("values")
+            if isinstance(values, dict):
+                values["room_temp_external"] = value
 
     def _get_enabled_metrics(self, device_id: str) -> list[str]:
         """Return enabled metrics for a device, cached until a registry changes."""
@@ -1158,7 +1216,6 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._calculate_dhw_power(values)
                 self._calculate_tap_water_cap(values)
                 self._persist_dhw_state()
-                await self._async_feed_external_room_temp(device_id, values)
 
             _LOGGER.debug("Final values: %s", values)
 

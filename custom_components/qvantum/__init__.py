@@ -389,6 +389,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         modbus_port=modbus_port,
         modbus_unit_id=modbus_unit_id,
     )
+    # External room temperature feed (Modbus only) runs on its own timer so a
+    # slow poll interval cannot starve the pump's sensor watchdog.
+    coordinator.async_configure_external_room_feed()
+    config_entry.async_on_unload(coordinator.async_cancel_external_room_feed)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True
@@ -461,6 +465,10 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: ConfigEntry)
             runtime.coordinator.poll_interval,
             config_entry.title or config_entry.entry_id,
         )
+
+    # The feed option, write access, or interval may have changed: restart or
+    # stop the feed timer accordingly. No-op when the feed is not configured.
+    runtime.coordinator.async_configure_external_room_feed()
 
 
 async def async_remove_config_entry_device(
