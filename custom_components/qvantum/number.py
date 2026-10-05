@@ -70,25 +70,28 @@ async def async_setup_entry(
     device: DeviceInfo = config_entry.runtime_data.device
 
     # Configuration for number entities: metric_key -> (min, max, step).
-    # Holding 13 (QAD EN 2609-AXC) is min 0.5 / max 2 / scale 10. The cloud
-    # accepts a wider 0-10 range for the same setting.
-    room_comp_factor_range = (
-        (0.5, 2.0, 0.5) if coordinator.modbus_enabled else (0, 10, 0.5)
-    )
+    # Ranges mirror the QAD EN 2609-AXC holding-register table; the cloud
+    # accepts a wider range for room_comp_factor and indoor_temperature_offset.
     NUMBER_CONFIG = {
         "tap_water_capacity_target": (1, 7, 1),
-        "room_comp_factor": room_comp_factor_range,
+        "room_comp_factor": (0, 10, 0.5),
         "indoor_temperature_offset": (-10, 10, 1),
         "tap_water_stop": (TAP_WATER_TEMP_MIN, TAP_WATER_TEMP_MAX, TAP_WATER_TEMP_STEP),
         "tap_water_start": (TAP_WATER_TEMP_MIN, TAP_WATER_TEMP_MAX, TAP_WATER_TEMP_STEP),
         "dhw_stop_extra": (60, 80, 5),
         "fan_normal": (0, 100, 5),
         "fan_speed_2": (0, 100, 5),
-        "room_temp_external": (10, 40, 0.1),
+        # Holding 14: min -5 / max 40 / scale 10; only writable over Modbus.
+        "room_temp_external": (-5, 40, 0.1),
         "stop_heating": (-30, 30, 1),
         "temp_compensation_curve": (1, 50, 1),
         **{key: _HEATING_CURVE_POINT_RANGE for key in HEATING_CURVE_OUTDOOR_TEMPS},
     }
+    if coordinator.modbus_enabled:
+        # Holding 13: 0.5-2 (scale 10); holding 15: -9..9. The cloud allows
+        # 0-10 and +/-10 respectively for the same settings.
+        NUMBER_CONFIG["room_comp_factor"] = (0.5, 2.0, 0.5)
+        NUMBER_CONFIG["indoor_temperature_offset"] = (-9, 9, 1)
 
     # Only create number entities for metrics present in the coordinator's current data.
     # tap_water_capacity_target exists in both cloud and Modbus (derived from
