@@ -277,6 +277,13 @@ class TestComponentDecode:
         assert unit.holding[24] == 48
 
     @pytest.mark.asyncio
+    async def test_settings_write_room_comp_factor_fractional(self):
+        """0.5 (datasheet minimum) must not be truncated to raw 0."""
+        _, unit, device = _device()
+        await device.write_metric("room_comp_factor", 0.5)
+        assert unit.holding[13] == 5
+
+    @pytest.mark.asyncio
     async def test_raw_holding_write(self):
         _, unit, device = _device()
         await device.write_holding_register(9, 4)

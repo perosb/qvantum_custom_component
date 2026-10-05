@@ -372,10 +372,10 @@ class TestQvantumNumberEntity:
             return_value={"status": "APPLIED"}
         )
 
-        await entity.async_set_native_value(3.5)
+        await entity.async_set_native_value(0.5)
 
         mock_coordinator.client.update_setting.assert_called_once_with(
-            "test_device_123", "room_comp_factor", 3
+            "test_device_123", "room_comp_factor", 0.5
         )
         # Note: async_set_updated_data would be called if the API response status was correct
 
@@ -716,6 +716,29 @@ class TestNumberSetup:
         assert by_key["tap_water_stop"]._attr_native_min_value == 50
         assert by_key["tap_water_stop"]._attr_native_max_value == 80
         assert by_key["tap_water_stop"].native_min_value == 56
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_room_comp_factor_bounds(
+        self, hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Modbus uses holding 13's documented 0.5-2 range, not the cloud range."""
+        from custom_components.qvantum import RuntimeData
+
+        mock_coordinator.modbus_enabled = True
+
+        mock_config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator, device=mock_device, client=MagicMock())
+
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        by_key = {entity._metric_key: entity for entity in entities}
+        room_comp = by_key["room_comp_factor"]
+        assert room_comp._attr_native_min_value == 0.5
+        assert room_comp._attr_native_max_value == 2.0
+        assert room_comp._attr_native_step == 0.5
 
 
 class TestRoomTempExternal:
