@@ -110,6 +110,16 @@ class TestRegisterMapAlignment:
             field.writable(4000)
         assert field.writable(25) == 25
 
+    def test_dhw_mode_accepts_only_normal_and_extra(self):
+        """QSG EN 2613-A narrowed holding 53; Eco/Smart fail before the wire."""
+        field = QvantumSettings.declared_fields["dhw_mode"]
+        assert field.writable(1) == 1  # Normal
+        assert field.writable(2) == 2  # Extra
+        with pytest.raises(ValueError, match=r"documented range 1\.\.2"):
+            field.writable(0)  # Eco
+        with pytest.raises(ValueError, match=r"documented range 1\.\.2"):
+            field.writable(3)  # Smart
+
     def test_signed_holding_rejects_overflowing_value(self):
         """A raw value above the signed range must not wrap negative.
 

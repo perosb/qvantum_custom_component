@@ -131,22 +131,22 @@ class TestMapOperationMode:
 
 
 class TestOperationModesForValues:
-    def test_cloud_without_dhw_mode(self):
-        assert operation_modes_for_values({}, modbus_enabled=False) == [
+    def test_modes_without_op_man(self):
+        assert operation_modes_for_values({}) == [
             OPERATION_NORMAL,
             OPERATION_EXTRA,
         ]
 
-    def test_modbus_includes_eco_smart(self):
-        assert operation_modes_for_values({}, modbus_enabled=True) == [
-            OPERATION_ECO,
-            OPERATION_NORMAL,
-            OPERATION_EXTRA,
-            OPERATION_SMART,
-        ]
+    def test_eco_smart_not_offered(self):
+        """QSG EN 2613-A holding 53 only accepts Normal/Extra; the pump
+        rejects Eco/Smart, so they are never offered."""
+        modes = operation_modes_for_values({"dhw_mode": DHW_MODE_SMART})
+        assert modes == [OPERATION_NORMAL, OPERATION_EXTRA]
+        assert OPERATION_ECO not in modes
+        assert OPERATION_SMART not in modes
 
     def test_off_when_op_man_present(self):
-        modes = operation_modes_for_values({"op_man_dhw": 1}, modbus_enabled=False)
+        modes = operation_modes_for_values({"op_man_dhw": 1})
         assert OPERATION_OFF in modes
 
 
@@ -202,10 +202,8 @@ class TestQvantumWaterHeaterEntity:
     def test_operation_list_modbus(self, mock_modbus_coordinator, mock_device):
         entity = QvantumWaterHeaterEntity(mock_modbus_coordinator, mock_device)
         assert entity.operation_list == [
-            OPERATION_ECO,
             OPERATION_NORMAL,
             OPERATION_EXTRA,
-            OPERATION_SMART,
             OPERATION_OFF,
         ]
 
@@ -275,26 +273,24 @@ class TestQvantumWaterHeaterEntity:
         )
 
     @pytest.mark.asyncio
-    async def test_set_operation_eco_modbus(self, mock_modbus_coordinator, mock_device):
-        entity = QvantumWaterHeaterEntity(mock_modbus_coordinator, mock_device)
-        await entity.async_set_operation_mode(OPERATION_ECO)
-        mock_modbus_coordinator.extra_dhw.async_clear.assert_awaited_once()
-        mock_modbus_coordinator.async_write_metric.assert_awaited_once_with(
-            "test_device_123", "extra_tap_water", DHW_MODE_ECO
-        )
-        assert mock_modbus_coordinator.data["values"]["dhw_mode"] == DHW_MODE_ECO
-
-    @pytest.mark.asyncio
-    async def test_set_operation_smart_modbus_clears_extra_timer(
+    async def test_set_operation_eco_modbus_rejected(
         self, mock_modbus_coordinator, mock_device
     ):
-        """Timed Extra must not snap Smart back to Normal."""
+        """QSG EN 2613-A: holding 53 rejects Eco; do not attempt the write."""
         entity = QvantumWaterHeaterEntity(mock_modbus_coordinator, mock_device)
-        await entity.async_set_operation_mode(OPERATION_SMART)
-        mock_modbus_coordinator.extra_dhw.async_clear.assert_awaited_once()
-        mock_modbus_coordinator.async_write_metric.assert_awaited_once_with(
-            "test_device_123", "extra_tap_water", DHW_MODE_SMART
-        )
+        with pytest.raises(HomeAssistantError, match="Unsupported DHW operation mode"):
+            await entity.async_set_operation_mode(OPERATION_ECO)
+        mock_modbus_coordinator.async_write_metric.assert_not_called()
+        mock_modbus_coordinator.extra_dhw.async_clear.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_set_operation_smart_modbus_rejected(
+        self, mock_modbus_coordinator, mock_device
+    ):
+        entity = QvantumWaterHeaterEntity(mock_modbus_coordinator, mock_device)
+        with pytest.raises(HomeAssistantError, match="Unsupported DHW operation mode"):
+            await entity.async_set_operation_mode(OPERATION_SMART)
+        mock_modbus_coordinator.async_write_metric.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_set_operation_eco_cloud_raises(self, mock_coordinator, mock_device):
@@ -470,12 +466,13 @@ class TestWriteFeatureGating:
         assert entity.supported_features & MockWaterHeaterEntityFeature.OPERATION_MODE
 
 
-class TestEcoSmartModbusOnly:
-    """H10: Eco/Smart are Modbus-only; cloud never offers or writes them."""
+class TestEcoSmartRejected:
+    """QSG EN 2613-A narrowed DHW holding 53 to Normal/Extra; Eco/Smart are
+    rejected on every transport and never written."""
 
-    def test_operation_modes_cloud_ignores_dhw_mode(self):
+    def test_operation_modes_ignore_legacy_dhw_mode(self):
         modes = operation_modes_for_values(
-            {"dhw_mode": DHW_MODE_ECO, "op_man_dhw": 1}, modbus_enabled=False
+            {"dhw_mode": DHW_MODE_ECO, "op_man_dhw": 1}
         )
         assert modes == [OPERATION_NORMAL, OPERATION_EXTRA, OPERATION_OFF]
         assert OPERATION_ECO not in modes
@@ -488,7 +485,7 @@ class TestEcoSmartModbusOnly:
         mock_coordinator.data["values"]["op_man_dhw"] = 0
         entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
 
-        with pytest.raises(HomeAssistantError, match="requires Modbus"):
+        with pytest.raises(HomeAssistantError, match="Unsupported DHW operation mode"):
             await entity.async_set_operation_mode(OPERATION_ECO)
 
         mock_coordinator.client.update_setting.assert_not_called()
@@ -533,21 +530,6 @@ class TestEcoSmartModbusOnly:
 
         with pytest.raises(HomeAssistantError, match="Unsupported DHW operation mode"):
             await entity.async_set_operation_mode("bogus")
-
-    @pytest.mark.asyncio
-    async def test_failed_eco_write_keeps_extra_timer_and_mode(
-        self, mock_modbus_coordinator, mock_device
-    ):
-        """A failed Eco write must not drop the restore timer or fake the mode."""
-        mock_modbus_coordinator.async_write_metric = AsyncMock(
-            return_value={"status": "FAILED"}
-        )
-        entity = QvantumWaterHeaterEntity(mock_modbus_coordinator, mock_device)
-
-        await entity.async_set_operation_mode(OPERATION_ECO)
-
-        mock_modbus_coordinator.extra_dhw.async_clear.assert_not_called()
-        assert mock_modbus_coordinator.data["values"]["dhw_mode"] == DHW_MODE_NORMAL
 
     @pytest.mark.asyncio
     async def test_failed_extra_write_keeps_dhw_mode(

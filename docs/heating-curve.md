@@ -4,8 +4,8 @@ How Qvantum Auto vs User defined heating curves map to Modbus holdings and
 the cloud HTTP `update_settings` command, what the official app does, and
 what this integration exposes.
 
-Source for register names and ranges: *Modbus Communication* addendum
-QAD EN 2609-AXC (D100041). Behaviour below is from live dumps on one
+Source for register names and ranges: *Modbus Communication* quick-start
+guide QSG EN 2613-A (D100041). Behaviour below is from live dumps on one
 unit (holdings 22–30 and input 35 `cal_heat_temp`), not from Qvantum
 firmware source.
 

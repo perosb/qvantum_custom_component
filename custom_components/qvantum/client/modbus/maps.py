@@ -85,7 +85,7 @@ MODBUS_INPUT_REGISTER_MAP = {
     "vacation_mode": (170, "uint16", 1.0),
 }
 
-# Device identity (QAD EN 2609-AXC input 180-193). Kept off the metrics map so
+# Device identity (QSG EN 2613-A input 180-193). Kept off the metrics map so
 # a refused identity block cannot fail the 0-104 / 150-170 poll.
 MODBUS_IDENTITY_REGISTER_MAP = {
     "serial_1": (180, "uint16", 1.0),
@@ -217,7 +217,7 @@ HEATING_CURVE_OUTDOOR_TEMPS: dict[str, int] = {
     "curve_minus_30": -30,
 }
 
-# Documented MIN/MAX per holding field (QAD EN 2609-AXC), in engineering
+# Documented MIN/MAX per holding field (QSG EN 2613-A), in engineering
 # units after ``scale``. ``model`` uses these to reject out-of-range writes in
 # the client instead of letting the pump answer Modbus exception 0x03.
 # ``dhw_outlet_temp`` is omitted: the datasheet row mixes a 40-60 min/max with
@@ -246,7 +246,9 @@ MODBUS_HOLDING_RANGE: dict[str, tuple[float, float]] = {
     "start_cooling_temp": (-30, 30),
     "dew_point_protection": (0, 1),
     "min_cooling_supply": (7, 30),
-    "dhw_mode": (0, 3),
+    # QSG EN 2613-A narrowed holding 53 to 1=Normal, 2=Extra; the pump rejects
+    # the older 0=Eco / 3=Smart values with Modbus exception 0x03.
+    "dhw_mode": (1, 2),
     "dhw_start_normal": (20, 80),
     "dhw_stop_normal": (20, 80),
     "dhw_start_extra": (20, 80),

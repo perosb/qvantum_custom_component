@@ -9,7 +9,9 @@ FAN_SPEED_VALUE_OFF = 0
 FAN_SPEED_VALUE_NORMAL = 1
 FAN_SPEED_VALUE_EXTRA = 2
 
-# QAD EN 2609-AXC holding 53 (DHW Mode).
+# QSG EN 2613-A holding 53 (DHW Mode). Only Normal/Extra are writable; the
+# pump rejects 0=Eco / 3=Smart with Modbus exception 0x03. They remain so a
+# unit that still reports them can be displayed.
 DHW_MODE_ECO = 0
 DHW_MODE_NORMAL = 1
 DHW_MODE_EXTRA = 2
