@@ -43,6 +43,7 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **External room sensor:** When configured by the pump, a Modbus number entity can mirror an external temperature into the control setpoint.
 - **Modbus writes:** Optional local writes for supported targets, DHW, fan, operation, room compensation, and sensor settings.
 - **Adaptive heating curve (Modbus):** A self-learning curve based on the weather forecast and the pump's own data. It starts in shadow mode and replaces the pump's Auto curve once you switch it on; see [docs/heating-curve.md](docs/heating-curve.md).
+- **Curve card:** A bundled Lovelace card (`qvantum-curve-card`) that graphs the baseline, shadow curve, written pump table and adjustment terms.
 
 #### Device automation details
 
@@ -87,6 +88,23 @@ hands control straight back to the pump's Auto curve.
   offset ("Förskjutning av värmekurva") before switching on, otherwise the
   adjustment is applied twice.
 - Flip the switch yourself; the integration never does.
+
+A bundled Lovelace card visualizes the curve. Add
+`/qvantum/qvantum-curve-card.js` as a **JavaScript module** dashboard
+resource, then add the card:
+
+```yaml
+type: custom:qvantum-curve-card
+entity: sensor.qvantum_adaptive_curve_adjustment   # optional
+title: Värmekurva
+operating_point:
+  outdoor: sensor.qvantum_bt1
+  supply: sensor.qvantum_cal_heat_temp
+```
+
+It draws the frozen baseline, the computed shadow curve, the seven points
+written to the pump, the ±1 °C write band, the optional operating point and
+the adjustment term breakdown (outdoor, night/day, solar, load, trims).
 
 Details: [docs/heating-curve.md](docs/heating-curve.md).
 

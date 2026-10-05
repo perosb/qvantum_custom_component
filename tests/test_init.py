@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 # Import real functions before mocking
 from custom_components.qvantum import (
     async_setup_entry,
+    async_setup,
     async_unload_entry,
     async_remove_config_entry_device,
     async_migrate_entry,
@@ -19,10 +20,64 @@ from custom_components.qvantum import (
     _device_sw_version,
     _modbus_link_settings,
     _async_sync_extra_hot_water_service,
+    _CARD_URL_PATH,
 )
+import custom_components.qvantum as qvantum_module
 
 # Mock HA imports after importing real functions
 # sys.modules['custom_components.qvantum'] = MagicMock()
+
+
+class TestCardAssetSetup:
+    """Tests for serving the bundled Lovelace card asset."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_flag(self, monkeypatch):
+        monkeypatch.setattr(qvantum_module, "_CARD_REGISTERED", False)
+
+    @pytest.mark.asyncio
+    async def test_registers_static_path_when_http_present(self):
+        hass = MagicMock()
+        hass.config.components = {"http"}
+        hass.http.async_register_static_paths = AsyncMock()
+
+        assert await async_setup(hass, {}) is True
+
+        hass.http.async_register_static_paths.assert_awaited_once()
+        (paths,), _kwargs = hass.http.async_register_static_paths.call_args
+        assert paths[0].url_path == _CARD_URL_PATH
+        assert paths[0].path.endswith("www/qvantum-curve-card.js")
+        assert qvantum_module._CARD_REGISTERED is True
+
+    @pytest.mark.asyncio
+    async def test_skips_without_http_component(self):
+        hass = MagicMock()
+        hass.config.components = set()
+        hass.http.async_register_static_paths = AsyncMock()
+
+        assert await async_setup(hass, {}) is True
+        hass.http.async_register_static_paths.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_skips_when_already_registered(self, monkeypatch):
+        monkeypatch.setattr(qvantum_module, "_CARD_REGISTERED", True)
+        hass = MagicMock()
+        hass.config.components = {"http"}
+        hass.http.async_register_static_paths = AsyncMock()
+
+        assert await async_setup(hass, {}) is True
+        hass.http.async_register_static_paths.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_registration_failure_is_non_fatal(self):
+        hass = MagicMock()
+        hass.config.components = {"http"}
+        hass.http.async_register_static_paths = AsyncMock(
+            side_effect=RuntimeError("boom")
+        )
+
+        assert await async_setup(hass, {}) is True
+        assert qvantum_module._CARD_REGISTERED is False
 
 
 class TestSetupDeviceRequirements:

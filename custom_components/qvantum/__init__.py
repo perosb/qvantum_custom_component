@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import dataclass
 import inspect
 import logging
+from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
@@ -70,6 +71,41 @@ PLATFORMS: list[Platform] = [
 ]
 
 type MyConfigEntry = ConfigEntry[RuntimeData]
+
+#: Bundled Lovelace card, served so the HACS zip needs no separate repo.
+_CARD_URL_PATH = "/qvantum/qvantum-curve-card.js"
+_CARD_REGISTERED = False
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Register the bundled Lovelace card asset once per Home Assistant run.
+
+    The card is enabled by adding a Lovelace resource pointing at
+    ``_CARD_URL_PATH``; this only serves the JavaScript module. Registration is
+    best-effort and must never block config-entry setup.
+    """
+    global _CARD_REGISTERED
+    if _CARD_REGISTERED:
+        return True
+    components = getattr(getattr(hass, "config", None), "components", None)
+    if not isinstance(
+        components, (set, frozenset, list, tuple)
+    ) or "http" not in components:
+        return True
+    card_path = Path(__file__).parent / "www" / "qvantum-curve-card.js"
+    if not card_path.is_file():
+        return True
+
+    from homeassistant.components.http import StaticPathConfig
+
+    try:
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(_CARD_URL_PATH, str(card_path), False)]
+        )
+        _CARD_REGISTERED = True
+    except Exception as err:  # noqa: BLE001 — never block setup on asset errors
+        _LOGGER.debug("Could not register Qvantum curve card asset: %s", err)
+    return True
 
 
 def _modbus_link_settings(config_entry: ConfigEntry) -> tuple[bool, str, int, int]:
