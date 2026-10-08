@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -228,6 +229,45 @@ def test_truncation_is_reported(review_module, monkeypatch):
     ]
     posted, _ = _capture_post_review(review_module, monkeypatch, comments, set())
     assert "5 further comment(s) omitted" in posted["body"]
+
+
+def test_null_suggestion_has_no_block(review_module):
+    body = review_module.suggestion_body({"comment": "x", "suggestion": None})
+    assert "```" not in body
+    assert body == "x"
+
+
+def test_main_success_posts_review(review_module, monkeypatch, tmp_path):
+    events = tmp_path / "events.jsonl"
+    events.write_text('{"type":"agent_start"}\n')
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr(
+        review_module, "extract_assistant_text", lambda path: '{"overview":"o","comments":[]}'
+    )
+    monkeypatch.setattr(
+        review_module,
+        "post_review",
+        lambda number, head_sha, review: captured.update(number=number, head_sha=head_sha, review=review),
+    )
+    monkeypatch.setattr(sys, "argv", ["post_review.py", str(events), "5", "--head-sha", "abc"])
+    review_module.main()
+    assert captured["number"] == 5
+    assert captured["head_sha"] == "abc"
+
+
+def test_main_parse_failure_posts_fallback(review_module, monkeypatch, tmp_path):
+    events = tmp_path / "events.jsonl"
+    events.write_text('{"type":"agent_start"}\n')
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr(review_module, "extract_assistant_text", lambda path: "not json")
+    monkeypatch.setattr(
+        review_module, "post_fallback_comment", lambda number, raw: captured.update(number=number, raw=raw)
+    )
+    monkeypatch.setattr(sys, "argv", ["post_review.py", str(events), "5"])
+    with pytest.raises(SystemExit):
+        review_module.main()
+    assert captured["number"] == 5
+    assert captured["raw"] == "not json"
 
 
 def test_single_line_suggestion_omits_start_line(review_module, monkeypatch):

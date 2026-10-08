@@ -95,7 +95,9 @@ def parse_review_json(raw: str) -> dict:
 def suggestion_body(comment: dict) -> str | None:
     """Return the comment body, with a suggestion block when applicable."""
     text = str(comment.get("comment") or "").strip()
-    if "suggestion" not in comment:
+    # A null/absent suggestion means "no drop-in fix"; only an explicit string
+    # (including "") should render an apply-able block.
+    if comment.get("suggestion") is None:
         return text
     suggestion = str(comment.get("suggestion") or "")
     # Nested code fences need an outer 4-backtick fence.
@@ -204,11 +206,7 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
 
     for comment in unique[:MAX_COMMENTS]:
         path = str(comment.get("path") or "").strip()
-        try:
-            line = int(comment.get("line"))
-        except (TypeError, ValueError):
-            dropped.append((path, None, "missing/invalid line number"))
-            continue
+        line = int(comment.get("line"))
         severity = severity_of(comment)
         body_text = f"{SEVERITY_LABEL[severity]}\n\n{suggestion_body(comment) or 'No comment text.'}"
         entry = {
@@ -260,13 +258,15 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
         else:
             dropped.append((entry["path"], entry.get("line"), "outside the diff"))
 
-    if dropped or kept:
+    if dropped:
         body += "\n### Could not anchor these to the diff\n\n"
         for path, line, reason in dropped:
             body += f"- `{path}:{line or '?'}` ({reason})\n"
+    if kept:
+        body += "\n### Posted inline\n\n"
         for entry in kept:
-            body += f"- `{entry['path']}:{entry['line']}` — posted inline\n"
-    else:
+            body += f"- `{entry['path']}:{entry['line']}`\n"
+    if not dropped and not kept:
         body = f"{overview}\n\n_(No inline comments could be posted.)_\n"
 
     code, _ = gh_api(f"repos/{repo}/pulls/{number}/reviews", {"event": "COMMENT", "body": body})
