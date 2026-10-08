@@ -185,7 +185,7 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
         try:
             line = int(comment.get("line"))
         except (TypeError, ValueError):
-            unique.append(comment)
+            dropped.append((path, None, "missing/invalid line number"))
             continue
         severity = str(comment.get("severity") or "medium").lower()
         body_text = f"{SEVERITY_LABEL.get(severity, '💬 Low')}\n\n{suggestion_body(comment) or 'No comment text.'}"
@@ -224,10 +224,9 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
     payload = {"event": "COMMENT", "body": body, "comments": inline}
     if head_sha:
         payload["commit_id"] = head_sha
-    code, response = gh_api(f"repos/{repo}/pulls/{number}/reviews", payload)
+    code, _ = gh_api(f"repos/{repo}/pulls/{number}/reviews", payload)
     if code == 0:
-        accepted = len(response.get("comments") or [])
-        print(f"Posted review with {accepted} inline comment(s) ({skipped} duplicate(s) skipped).")
+        print(f"Posted review with {len(inline)} inline comment(s) ({skipped} duplicate(s) skipped).")
         post_unanchorable(repo, number, dropped)
         return
 
