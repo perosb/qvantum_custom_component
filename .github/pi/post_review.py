@@ -28,6 +28,12 @@ SEVERITY_LABEL = {
 }
 
 
+def severity_of(comment: dict) -> str:
+    """Normalize a comment's severity so sorting and labelling agree."""
+    severity = str(comment.get("severity") or "").strip().lower()
+    return severity if severity in SEVERITY_ORDER else "medium"
+
+
 def extract_assistant_text(events_path: str) -> str:
     """Return the text of the last assistant message that contains text.
 
@@ -164,7 +170,7 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
     if isinstance(raw_comments, dict):
         raw_comments = list(raw_comments.values())
     raw_comments = [item for item in raw_comments if isinstance(item, dict)]
-    raw_comments.sort(key=lambda item: (SEVERITY_ORDER.get(str(item.get("severity", "low")).lower(), 9)))
+    raw_comments.sort(key=lambda item: SEVERITY_ORDER[severity_of(item)])
 
     overview = str(review.get("overview") or "").strip() or "Clean diff."
     body = f"{overview}\n"
@@ -185,12 +191,16 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
         except (TypeError, ValueError):
             dropped.append((path, None, "missing/invalid line number"))
             continue
-        severity = str(comment.get("severity") or "medium").lower()
-        body_text = f"{SEVERITY_LABEL.get(severity, '💬 Low')}\n\n{suggestion_body(comment) or 'No comment text.'}"
+        severity = severity_of(comment)
+        body_text = f"{SEVERITY_LABEL[severity]}\n\n{suggestion_body(comment) or 'No comment text.'}"
         if (path, body_text) in already_posted:
             skipped += 1
             continue
         unique.append(comment)
+
+    omitted = len(unique) - MAX_COMMENTS
+    if omitted > 0:
+        body += f"\n_{omitted} further comment(s) omitted (cap {MAX_COMMENTS})._\n"
 
     for comment in unique[:MAX_COMMENTS]:
         path = str(comment.get("path") or "").strip()
@@ -199,8 +209,8 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
         except (TypeError, ValueError):
             dropped.append((path, None, "missing/invalid line number"))
             continue
-        severity = str(comment.get("severity") or "medium").lower()
-        body_text = f"{SEVERITY_LABEL.get(severity, '💬 Low')}\n\n{suggestion_body(comment) or 'No comment text.'}"
+        severity = severity_of(comment)
+        body_text = f"{SEVERITY_LABEL[severity]}\n\n{suggestion_body(comment) or 'No comment text.'}"
         entry = {
             "path": path,
             "line": line,
@@ -234,7 +244,6 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
     kept = []
     for entry in inline:
         single = {
-            "event": "COMMENT",
             "body": entry["body"],
             "path": entry["path"],
             "line": entry["line"],

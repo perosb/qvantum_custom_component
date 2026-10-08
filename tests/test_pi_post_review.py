@@ -215,6 +215,21 @@ def test_post_fallback_comment_uses_issue_endpoint(review_module, monkeypatch):
     assert "raw model text" in captured[0][1]["body"]
 
 
+def test_severity_defaults_are_consistent(review_module):
+    assert review_module.severity_of({}) == "medium"
+    assert review_module.severity_of({"severity": "HIGH"}) == "high"
+    assert review_module.severity_of({"severity": "bogus"}) == "medium"
+
+
+def test_truncation_is_reported(review_module, monkeypatch):
+    comments = [
+        {"path": "a.py", "line": i + 1, "severity": "low", "comment": f"c{i}"}
+        for i in range(review_module.MAX_COMMENTS + 5)
+    ]
+    posted, _ = _capture_post_review(review_module, monkeypatch, comments, set())
+    assert "5 further comment(s) omitted" in posted["body"]
+
+
 def test_single_line_suggestion_omits_start_line(review_module, monkeypatch):
     comments = [
         {"path": "a.py", "line": 7, "start_line": 7, "severity": "low", "comment": "x"},
