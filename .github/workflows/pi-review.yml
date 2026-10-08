@@ -31,7 +31,6 @@ jobs:
       - name: Install pi
         run: npm install -g @earendil-works/pi-coding-agent@latest
 
-      # The guardrails extension is repo-owned so CI matches local review runs:
       # Repo-owned extension so CI matches local review runs: it references the
       # OpenRouter account preset ("perosb") for ZDR/price-sorted routing and
       # caps max_completion_tokens so cheap providers (e.g. Relace) stay

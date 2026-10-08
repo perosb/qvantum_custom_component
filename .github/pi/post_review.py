@@ -177,7 +177,24 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
     inline = []
     dropped = []
     skipped = 0
-    for comment in raw_comments[:MAX_COMMENTS]:
+    # Drop duplicates and unanchorable entries before applying MAX_COMMENTS so a
+    # duplicate-heavy head cannot hide real comments further down the list.
+    unique = []
+    for comment in raw_comments:
+        path = str(comment.get("path") or "").strip()
+        try:
+            line = int(comment.get("line"))
+        except (TypeError, ValueError):
+            unique.append(comment)
+            continue
+        severity = str(comment.get("severity") or "medium").lower()
+        body_text = f"{SEVERITY_LABEL.get(severity, '💬 Low')}\n\n{suggestion_body(comment) or 'No comment text.'}"
+        if (path, line, body_text[:120]) in already_posted:
+            skipped += 1
+            continue
+        unique.append(comment)
+
+    for comment in unique[:MAX_COMMENTS]:
         path = str(comment.get("path") or "").strip()
         try:
             line = int(comment.get("line"))
@@ -186,9 +203,6 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
             continue
         severity = str(comment.get("severity") or "medium").lower()
         body_text = f"{SEVERITY_LABEL.get(severity, '💬 Low')}\n\n{suggestion_body(comment) or 'No comment text.'}"
-        if (path, line, body_text[:120]) in already_posted:
-            skipped += 1
-            continue
         entry = {
             "path": path,
             "line": line,
