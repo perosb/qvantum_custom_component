@@ -200,6 +200,29 @@ def test_gh_api_tolerates_non_json_output(review_module, monkeypatch):
     assert review_module.gh_api("repos/x/y") == (0, {})
 
 
+def test_gh_api_write_path_pipes_payload(review_module, monkeypatch):
+    calls: dict[str, Any] = {}
+
+    class Result:
+        returncode = 0
+        stdout = '{"ok":true}'
+
+    def fake_run(cmd, **kwargs):
+        calls["cmd"] = cmd
+        calls["input"] = kwargs.get("input")
+        return Result()
+
+    monkeypatch.setattr(review_module.subprocess, "run", fake_run)
+
+    assert review_module.gh_api("repos/x/y/comments", {"body": "hi"}) == (0, {"ok": True})
+    assert "--input" in calls["cmd"]
+    assert json.loads(calls["input"]) == {"body": "hi"}
+
+    calls.clear()
+    review_module.gh_api("repos/x/y")
+    assert "--input" not in calls["cmd"]
+
+
 def test_existing_review_comments_empty_on_error(review_module, monkeypatch):
     monkeypatch.setattr(review_module, "gh_api", lambda *a, **k: (1, {}))
     assert review_module.existing_review_comments("owner/repo", 1) == set()
