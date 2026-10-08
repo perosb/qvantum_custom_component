@@ -19,6 +19,12 @@ import sys
 
 SUGGESTION_FENCE = "```"
 MAX_COMMENTS = 20
+
+# Only comments at or above this severity are posted. The review prompt asks
+# for critical/high only; this is the enforcing backstop so low/medium nits
+# cannot re-open resolved threads on every push. Override via
+# PI_REVIEW_MIN_SEVERITY.
+DEFAULT_MIN_SEVERITY = "high"
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 SEVERITY_LABEL = {
     "critical": "🚨 **Critical**",
@@ -179,10 +185,15 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
 
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     already_posted = existing_review_comments(repo, number)
+    min_severity = (os.environ.get("PI_REVIEW_MIN_SEVERITY") or DEFAULT_MIN_SEVERITY).strip().lower()
+    if min_severity not in SEVERITY_ORDER:
+        min_severity = DEFAULT_MIN_SEVERITY
+    min_rank = SEVERITY_ORDER[min_severity]
 
     inline = []
     dropped = []
     skipped = 0
+    below_threshold = 0
     # Drop duplicates and unanchorable entries before applying MAX_COMMENTS so a
     # duplicate-heavy head cannot hide real comments further down the list.
     unique = []
@@ -194,11 +205,17 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
             dropped.append((path, None, "missing/invalid line number"))
             continue
         severity = severity_of(comment)
+        if SEVERITY_ORDER[severity] > min_rank:
+            below_threshold += 1
+            continue
         body_text = f"{SEVERITY_LABEL[severity]}\n\n{suggestion_body(comment) or 'No comment text.'}"
         if (path, body_text) in already_posted:
             skipped += 1
             continue
         unique.append(comment)
+
+    if below_threshold:
+        body += f"\n_{below_threshold} comment(s) below {min_severity} severity omitted._\n"
 
     omitted = len(unique) - MAX_COMMENTS
     if omitted > 0:

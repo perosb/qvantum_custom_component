@@ -112,7 +112,7 @@ def test_duplicates_do_not_consume_the_comment_cap(review_module, monkeypatch):
         {
             "path": "a.py",
             "line": 10 + i,
-            "severity": "low",
+            "severity": "high",
             "comment": "duplicate",
             "suggestion": "x = 1",
         }
@@ -123,7 +123,7 @@ def test_duplicates_do_not_consume_the_comment_cap(review_module, monkeypatch):
 
     already = set()
     for comment in duplicates:
-        body = f"{review_module.SEVERITY_LABEL['low']}\n\n{review_module.suggestion_body(comment)}"
+        body = f"{review_module.SEVERITY_LABEL['high']}\n\n{review_module.suggestion_body(comment)}"
         already.add((comment["path"], body))
 
     posted, _ = _capture_post_review(review_module, monkeypatch, review["comments"], already)
@@ -247,7 +247,7 @@ def test_severity_defaults_are_consistent(review_module):
 
 def test_truncation_is_reported(review_module, monkeypatch):
     comments = [
-        {"path": "a.py", "line": i + 1, "severity": "low", "comment": f"c{i}"}
+        {"path": "a.py", "line": i + 1, "severity": "high", "comment": f"c{i}"}
         for i in range(review_module.MAX_COMMENTS + 5)
     ]
     posted, _ = _capture_post_review(review_module, monkeypatch, comments, set())
@@ -293,10 +293,20 @@ def test_main_parse_failure_posts_fallback(review_module, monkeypatch, tmp_path)
     assert captured["raw"] == "not json"
 
 
+def test_below_threshold_comments_are_omitted(review_module, monkeypatch):
+    comments = [
+        {"path": "a.py", "line": 1, "severity": "medium", "comment": "medium nit"},
+        {"path": "a.py", "line": 2, "severity": "high", "comment": "real issue"},
+    ]
+    posted, _ = _capture_post_review(review_module, monkeypatch, comments, set())
+    assert [c["line"] for c in posted["comments"]] == [2]
+    assert "below high severity omitted" in posted["body"]
+
+
 def test_single_line_suggestion_omits_start_line(review_module, monkeypatch):
     comments = [
-        {"path": "a.py", "line": 7, "start_line": 7, "severity": "low", "comment": "x"},
-        {"path": "a.py", "line": 12, "start_line": 10, "severity": "low", "comment": "y"},
+        {"path": "a.py", "line": 7, "start_line": 7, "severity": "high", "comment": "x"},
+        {"path": "a.py", "line": 12, "start_line": 10, "severity": "high", "comment": "y"},
     ]
     posted, _ = _capture_post_review(review_module, monkeypatch, comments, set())
 

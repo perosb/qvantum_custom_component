@@ -24,11 +24,31 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Tooling-only PRs (just .github/**) skip the review: the reviewer would
+      # otherwise review its own workflow/extension changes and re-open nits.
+      - name: Check changed paths
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          tooling_only=true
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              .github/*) ;;
+              *) tooling_only=false ;;
+            esac
+          done < <(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")
+          echo "tooling_only=$tooling_only" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-node@v6
+        if: steps.changed.outputs.tooling_only != 'true'
         with:
           node-version: "24"
 
       - name: Install pi
+        if: steps.changed.outputs.tooling_only != 'true'
         run: npm install -g @earendil-works/pi-coding-agent@1.1.0
 
       # Repo-owned extension so CI matches local review runs: it references the
@@ -36,17 +56,20 @@ jobs:
       # caps max_completion_tokens so cheap providers (e.g. Relace) stay
       # eligible over 1M-context ones.
       - name: Install OpenRouter extension
+        if: steps.changed.outputs.tooling_only != 'true'
         run: |
           mkdir -p ~/.pi/agent/extensions
           cp .github/pi/openrouter-guardrails.ts ~/.pi/agent/extensions/
 
       - name: Build PR diff
+        if: steps.changed.outputs.tooling_only != 'true'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: git diff --unified=8 "${BASE_SHA}...${HEAD_SHA}" > /tmp/pr.diff
 
       - name: Run pi review
+        if: steps.changed.outputs.tooling_only != 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           # Same cost heuristic as the old opencode review: the full model only
@@ -62,10 +85,12 @@ jobs:
           [ -s /tmp/pi-events.jsonl ]
 
       - name: Post GitHub review
+        if: steps.changed.outputs.tooling_only != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PI_REVIEW_MIN_SEVERITY: high
         run: |
           python3 .github/pi/post_review.py /tmp/pi-events.jsonl \
             "${{ github.event.pull_request.number }}" --head-sha "$HEAD_SHA"

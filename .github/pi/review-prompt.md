@@ -8,7 +8,10 @@ changed lines (the RIGHT side of the diff).
 
 ## What to flag
 
-Max substance: correctness. Do not invent nits. Specifically watch for:
+Only report issues that would block the PR: **critical** or **high**
+severity. Skip style, naming, coverage and other low/medium nits — the
+repository already has review automation for those. Max substance:
+correctness. Do not invent nits. Specifically watch for:
 
 - Wrong Modbus register, or holding vs input mix-up.
 - Cloud-only entities/features created in Modbus mode, or the reverse.
@@ -36,7 +39,7 @@ Respond with ONLY a JSON object — no prose before or after, no code fences:
       "path": "relative/path/to/file.py",
       "start_line": 40,
       "line": 42,
-      "severity": "critical | high | medium | low",
+      "severity": "critical | high",
       "comment": "One or two sentences of why, then a concrete fix.",
       "suggestion": "Exact replacement text for lines start_line..line (RIGHT side). Use \n for newlines. Empty string means delete those lines. Omit this key entirely when there is no drop-in fix."
     }
@@ -46,7 +49,10 @@ Respond with ONLY a JSON object — no prose before or after, no code fences:
 
 ## Hard rules for comments
 
-1. `line` (and `start_line`, when the comment spans multiple lines) MUST refer
+1. Only `critical` and `high` severity comments are posted; anything lower is
+dropped by the pipeline. If nothing rises to that bar, return an empty
+   `comments` array.
+2. `line` (and `start_line`, when the comment spans multiple lines) MUST refer
    to line numbers in the NEW file version and MUST be within the `@@` hunks of
    the provided diff. Never reference lines outside the diff.
 2. `path` must exactly match a path in the diff.
@@ -54,4 +60,5 @@ Respond with ONLY a JSON object — no prose before or after, no code fences:
    must be a drop-in replacement — no leading/trailing commentary inside it.
 4. Omit `suggestion` when the fix spans files or needs more than the highlighted
    lines — put the guidance in `comment` instead.
-5. Maximum 20 comments, most important first. `overview` stays short.
+6. Maximum 5 comments, most important first. `overview` stays short and may
+   note that no blocking issues were found.
