@@ -98,7 +98,7 @@ function toChatModels(payload: unknown): ProviderConfig["models"] {
       ),
       contextWindow,
       ...(maxCompletionTokens > 0
-        ? { maxTokens: Math.min(maxCompletionTokens, maxTokensCap) }
+        ? { maxTokens: Math.min(maxCompletionTokens, maxTokensCap, contextWindow) }
         : {}),
       cost: {
         input: pricePerMillion(model.pricing?.prompt),

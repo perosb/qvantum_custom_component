@@ -164,11 +164,12 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
         single = {
             "event": "COMMENT",
             "body": entry["body"],
-            "commit_id": head_sha,
             "path": entry["path"],
             "line": entry["line"],
             "side": entry["side"],
         }
+        if head_sha:
+            single["commit_id"] = head_sha
         if "start_line" in entry:
             single["start_line"] = entry["start_line"]
             single["start_side"] = entry["start_side"]

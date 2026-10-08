@@ -17,6 +17,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -46,9 +47,9 @@ jobs:
           git diff --unified=8 "${BASE_SHA}...${HEAD_SHA}" > /tmp/pr.diff
           {
             cat .github/pi/review-prompt.md
-            printf '\n\n## PR diff (%s → %s)\n\n```diff\n' "$BASE_SHA" "$HEAD_SHA"
+            printf '\n\n## PR diff (%s → %s)\n\n````diff\n' "$BASE_SHA" "$HEAD_SHA"
             cat /tmp/pr.diff
-            printf '\n```\n'
+            printf '\n````\n'
           } > /tmp/pi-review-prompt.txt
 
       - name: Run pi review
