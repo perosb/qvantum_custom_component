@@ -111,6 +111,42 @@ def gh_api(endpoint: str, payload: dict | None = None, method: str | None = None
     return result.returncode, body
 
 
+def existing_review_comments(repo: str, number: int) -> set[tuple[str, int, str]]:
+    """Return (path, line, body-prefix) of comments already posted on the PR.
+
+    The review agent sees the full cumulative diff on every push and tends to
+    re-emit comments that were already fixed in earlier pushes; skip those.
+    """
+    code, comments = gh_api(f"repos/{repo}/pulls/{number}/comments?per_page=100")
+    if code != 0 or not isinstance(comments, list):
+        return set()
+    seen = set()
+    for item in comments:
+        if not isinstance(item, dict):
+            continue
+        path = str(item.get("path") or "")
+        try:
+            line = int(item.get("line") or 0)
+        except (TypeError, ValueError):
+            continue
+        body = str(item.get("body") or "").strip()
+        seen.add((path, line, body[:120]))
+    return seen
+
+
+def post_unanchorable(repo: str, number: int, dropped: list[tuple[str, int | None, str]]) -> None:
+    """Surface comments that could not be anchored as an issue comment."""
+    if not dropped:
+        return
+    lines = "\n".join(
+        f"- `{path}:{line or '?'}` ({reason})" for path, line, reason in dropped
+    )
+    gh_api(
+        f"repos/{repo}/issues/{number}/comments",
+        {"body": f"⚠️ Pi review could not anchor these to the diff:\n\n{lines}"},
+    )
+
+
 def post_review(number: int, head_sha: str, review: dict) -> None:
     raw_comments = review.get("comments") or []
     if isinstance(raw_comments, dict):
@@ -121,8 +157,12 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
     overview = str(review.get("overview") or "").strip() or "Clean diff."
     body = f"{overview}\n"
 
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    already_posted = existing_review_comments(repo, number)
+
     inline = []
     dropped = []
+    skipped = 0
     for comment in raw_comments[:MAX_COMMENTS]:
         path = str(comment.get("path") or "").strip()
         try:
@@ -131,11 +171,15 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
             dropped.append((path, None, "missing/invalid line number"))
             continue
         severity = str(comment.get("severity") or "medium").lower()
+        body_text = f"{SEVERITY_LABEL.get(severity, '💬 Low')}\n\n{suggestion_body(comment) or 'No comment text.'}"
+        if (path, line, body_text[:120]) in already_posted:
+            skipped += 1
+            continue
         entry = {
             "path": path,
             "line": line,
             "side": "RIGHT",
-            "body": f"{SEVERITY_LABEL.get(severity, '💬 Low')}\n\n{suggestion_body(comment) or 'No comment text.'}",
+            "body": body_text,
         }
         if comment.get("start_line") is not None:
             try:
@@ -148,12 +192,11 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
     payload = {"event": "COMMENT", "body": body, "comments": inline}
     if head_sha:
         payload["commit_id"] = head_sha
-
-    repo = os.environ.get("GITHUB_REPOSITORY", "")
     code, response = gh_api(f"repos/{repo}/pulls/{number}/reviews", payload)
     if code == 0:
         accepted = len(response.get("comments") or [])
-        print(f"Posted review with {accepted} inline comment(s).")
+        print(f"Posted review with {accepted} inline comment(s) ({skipped} duplicate(s) skipped).")
+        post_unanchorable(repo, number, dropped)
         return
 
     # GitHub rejected the whole batch — retry comment by comment so valid ones
