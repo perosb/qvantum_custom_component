@@ -58,7 +58,7 @@ def extract_assistant_text(events_path: str) -> str:
                         if isinstance(block, dict) and block.get("type") == "text":
                             chunks.append(block.get("text") or "")
                 if chunks:
-                    text = "\n".join(chunks)
+                    text = "\n".join(chunks) or text
     if not text:
         raise RuntimeError("pi produced no completed assistant message")
     return text
@@ -125,11 +125,13 @@ def gh_api(endpoint: str, payload: dict | None = None, method: str | None = None
     return result.returncode, body
 
 
-def existing_review_comments(repo: str, number: int) -> set[tuple[str, int, str]]:
-    """Return (path, line, body-prefix) of comments already posted on the PR.
+def existing_review_comments(repo: str, number: int) -> set[tuple[str, str]]:
+    """Return (path, body) of comments already posted on the PR.
 
     The review agent sees the full cumulative diff on every push and tends to
-    re-emit comments that were already fixed in earlier pushes; skip those.
+    re-emit comments that were already fixed in earlier pushes; skip those. The
+    line number is deliberately not part of the key: GitHub re-anchors comments
+    as the file changes, so the same finding moves lines between pushes.
     """
     code, comments = gh_api(f"repos/{repo}/pulls/{number}/comments?per_page=100", paginate=True)
     if code != 0 or not isinstance(comments, list):
@@ -139,12 +141,8 @@ def existing_review_comments(repo: str, number: int) -> set[tuple[str, int, str]
         if not isinstance(item, dict):
             continue
         path = str(item.get("path") or "")
-        try:
-            line = int(item.get("line") or 0)
-        except (TypeError, ValueError):
-            continue
         body = str(item.get("body") or "").strip()
-        seen.add((path, line, body))
+        seen.add((path, body))
     return seen
 
 
@@ -189,7 +187,7 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
             continue
         severity = str(comment.get("severity") or "medium").lower()
         body_text = f"{SEVERITY_LABEL.get(severity, '💬 Low')}\n\n{suggestion_body(comment) or 'No comment text.'}"
-        if (path, line, body_text) in already_posted:
+        if (path, body_text) in already_posted:
             skipped += 1
             continue
         unique.append(comment)
@@ -253,12 +251,13 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
         else:
             dropped.append((entry["path"], entry.get("line"), "outside the diff"))
 
-    body += "\n### Could not anchor these to the diff\n\n"
-    for path, line, reason in dropped:
-        body += f"- `{path}:{line or '?'}` ({reason})\n"
-    for entry in kept:
-        body += f"- `{entry['path']}:{entry['line']}` — posted inline\n"
-    if not dropped and not kept:
+    if dropped or kept:
+        body += "\n### Could not anchor these to the diff\n\n"
+        for path, line, reason in dropped:
+            body += f"- `{path}:{line or '?'}` ({reason})\n"
+        for entry in kept:
+            body += f"- `{entry['path']}:{entry['line']}` — posted inline\n"
+    else:
         body = f"{overview}\n\n_(No inline comments could be posted.)_\n"
 
     code, _ = gh_api(f"repos/{repo}/pulls/{number}/reviews", {"event": "COMMENT", "body": body})

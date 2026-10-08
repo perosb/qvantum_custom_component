@@ -123,7 +123,7 @@ def test_duplicates_do_not_consume_the_comment_cap(review_module, monkeypatch):
     already = set()
     for comment in duplicates:
         body = f"{review_module.SEVERITY_LABEL['low']}\n\n{review_module.suggestion_body(comment)}"
-        already.add((comment["path"], comment["line"], body))
+        already.add((comment["path"], body))
 
     posted, _ = _capture_post_review(review_module, monkeypatch, review["comments"], already)
 
@@ -172,6 +172,47 @@ def test_batch_rejection_retries_per_comment(review_module, monkeypatch):
     ]
     assert fallback_bodies, "expected a body-only fallback review"
     assert "a.py:5" in fallback_bodies[-1]
+
+
+def test_extract_assistant_text_keeps_earlier_text_over_empty_block(review_module, tmp_path):
+    events = tmp_path / "events.jsonl"
+    events.write_text(
+        "\n".join(
+            [
+                '{"type":"message_end","message":{"role":"assistant","stopReason":"stop",'
+                '"content":[{"type":"text","text":"{\\"overview\\":\\"kept\\",\\"comments\\":[]}"}]}}',
+                '{"type":"message_end","message":{"role":"assistant","stopReason":"stop",'
+                '"content":[{"type":"text","text":""}]}}',
+            ]
+        )
+        + "\n"
+    )
+    assert "kept" in review_module.extract_assistant_text(str(events))
+
+
+def test_gh_api_tolerates_non_json_output(review_module, monkeypatch):
+    class Result:
+        returncode = 0
+        stdout = "not json"
+
+    monkeypatch.setattr(review_module.subprocess, "run", lambda *a, **k: Result())
+    assert review_module.gh_api("repos/x/y") == (0, {})
+
+
+def test_existing_review_comments_empty_on_error(review_module, monkeypatch):
+    monkeypatch.setattr(review_module, "gh_api", lambda *a, **k: (1, {}))
+    assert review_module.existing_review_comments("owner/repo", 1) == set()
+
+
+def test_post_fallback_comment_uses_issue_endpoint(review_module, monkeypatch):
+    captured: list[tuple[str, Any]] = []
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
+    monkeypatch.setattr(
+        review_module, "gh_api", lambda endpoint, payload=None, **k: captured.append((endpoint, payload)) or (0, {})
+    )
+    review_module.post_fallback_comment(7, "raw model text")
+    assert captured[0][0] == "repos/owner/repo/issues/7/comments"
+    assert "raw model text" in captured[0][1]["body"]
 
 
 def test_single_line_suggestion_omits_start_line(review_module, monkeypatch):
