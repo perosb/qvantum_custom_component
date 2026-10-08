@@ -32,9 +32,11 @@ jobs:
         run: npm install -g @earendil-works/pi-coding-agent@latest
 
       # The guardrails extension is repo-owned so CI matches local review runs:
-      # OpenRouter allowlist, price-sorted ZDR routing and the output-token cap
-      # that keeps cheap providers (e.g. Relace) eligible over 1M-context ones.
-      - name: Install guardrails extension
+      # Repo-owned extension so CI matches local review runs: it references the
+      # OpenRouter account preset ("perosb") for ZDR/price-sorted routing and
+      # caps max_completion_tokens so cheap providers (e.g. Relace) stay
+      # eligible over 1M-context ones.
+      - name: Install OpenRouter extension
         run: |
           mkdir -p ~/.pi/agent/extensions
           cp .github/pi/openrouter-guardrails.ts ~/.pi/agent/extensions/

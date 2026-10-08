@@ -2,13 +2,11 @@ import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-age
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const MODEL_LIST_URL = `${OPENROUTER_BASE_URL}/models/user`;
-const OPENROUTER_PROVIDER_SETTINGS = {
-  zdr: true,
-  sort: { by: "price", partition: "model" },
-  allow_fallbacks: true,
-  data_collection: "deny",
-  preferred_min_throughput: { p90: 40 },
-};
+
+// Provider routing (zdr, price sort, provider order, data_collection) lives in
+// the OpenRouter account preset, so the extension only references it. Override
+// locally with OPENROUTER_PRESET, or set it empty to disable.
+const DEFAULT_OPENROUTER_PRESET = "perosb";
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 
 // OpenRouter's advertised max_completion_tokens assumes a provider with the
@@ -172,8 +170,8 @@ export default async function (pi: ExtensionAPI) {
 
   pi.registerProvider("openrouter", provider);
 
-  // Apply the OpenRouter routing/privacy policy to every request, regardless
-  // of the selected allowlisted model. This replaces the need for a preset.
+  // Apply the OpenRouter account preset (routing + privacy policy) to every
+  // request, regardless of the selected allowlisted model.
   pi.on("before_provider_request", (event, ctx) => {
     if (
       ctx.model?.provider !== "openrouter" ||
@@ -183,15 +181,17 @@ export default async function (pi: ExtensionAPI) {
     ) {
       return;
     }
+    const preset = (process.env.OPENROUTER_PRESET ?? DEFAULT_OPENROUTER_PRESET).trim();
+    if (!preset) return;
     const payload = event.payload as Record<string, unknown>;
     if (process.env.PI_DEBUG_OR_PAYLOAD) {
       console.error(
-        `[openrouter-guardrails] model=${ctx.model?.id} payload-model=${payload.model} provider-settings=${JSON.stringify(OPENROUTER_PROVIDER_SETTINGS)}`,
+        `[openrouter-guardrails] model=${ctx.model?.id} payload-model=${payload.model} preset=${preset}`,
       );
     }
     return {
       ...payload,
-      provider: OPENROUTER_PROVIDER_SETTINGS,
+      preset,
     };
   });
 
