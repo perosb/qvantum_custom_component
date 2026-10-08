@@ -123,7 +123,7 @@ def test_duplicates_do_not_consume_the_comment_cap(review_module, monkeypatch):
     already = set()
     for comment in duplicates:
         body = f"{review_module.SEVERITY_LABEL['low']}\n\n{review_module.suggestion_body(comment)}"
-        already.add((comment["path"], comment["line"], body[:120]))
+        already.add((comment["path"], comment["line"], body))
 
     posted, _ = _capture_post_review(review_module, monkeypatch, review["comments"], already)
 
@@ -141,6 +141,37 @@ def test_invalid_line_is_dropped_and_reported_not_counted(review_module, monkeyp
 
     assert [c["path"] for c in posted["comments"]] == ["b.py"]
     assert unanchored and unanchored[0][0] == "a.py"
+
+
+def test_batch_rejection_retries_per_comment(review_module, monkeypatch):
+    calls: list[tuple[str, Any]] = []
+
+    def fake_gh_api(endpoint: str, payload: Any = None, method=None, paginate: bool = False):
+        calls.append((endpoint, payload))
+        if endpoint.endswith("/reviews"):
+            # The batch attempt (with comments) is rejected; the body-only
+            # fallback review succeeds.
+            return (1, {}) if payload and payload.get("comments") else (0, {})
+        return (0, {})
+
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
+    monkeypatch.setattr(review_module, "existing_review_comments", lambda repo, number: set())
+    monkeypatch.setattr(review_module, "gh_api", fake_gh_api)
+    monkeypatch.setattr(review_module, "post_unanchorable", lambda repo, number, dropped: None)
+
+    comments = [{"path": "a.py", "line": 5, "severity": "high", "comment": "boom"}]
+    review_module.post_review(1, "sha", {"overview": "o", "comments": comments})
+
+    per_comment = [endpoint for endpoint, _ in calls if endpoint.endswith("/comments")]
+    assert per_comment == ["repos/owner/repo/pulls/1/comments"]
+
+    fallback_bodies = [
+        payload["body"]
+        for endpoint, payload in calls
+        if endpoint.endswith("/reviews") and payload and "comments" not in payload
+    ]
+    assert fallback_bodies, "expected a body-only fallback review"
+    assert "a.py:5" in fallback_bodies[-1]
 
 
 def test_single_line_suggestion_omits_start_line(review_module, monkeypatch):

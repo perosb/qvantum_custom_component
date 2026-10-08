@@ -144,7 +144,7 @@ def existing_review_comments(repo: str, number: int) -> set[tuple[str, int, str]
         except (TypeError, ValueError):
             continue
         body = str(item.get("body") or "").strip()
-        seen.add((path, line, body[:120]))
+        seen.add((path, line, body))
     return seen
 
 
@@ -189,7 +189,7 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
             continue
         severity = str(comment.get("severity") or "medium").lower()
         body_text = f"{SEVERITY_LABEL.get(severity, '💬 Low')}\n\n{suggestion_body(comment) or 'No comment text.'}"
-        if (path, line, body_text[:120]) in already_posted:
+        if (path, line, body_text) in already_posted:
             skipped += 1
             continue
         unique.append(comment)
