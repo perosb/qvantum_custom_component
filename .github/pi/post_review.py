@@ -60,25 +60,25 @@ def extract_assistant_text(events_path: str) -> str:
 
 
 def parse_review_json(raw: str) -> dict:
-    """Extract the review JSON object, tolerating stray code fences."""
-    candidate = raw.strip()
-    if "```" in candidate:
-        # Prefer a fenced json block if present.
-        for fence in ("```json", "```"):
-            if fence in candidate:
-                start = candidate.index(fence) + len(fence)
-                end = candidate.find("```", start)
-                if end != -1:
-                    candidate = candidate[start:end]
-                break
-    start = candidate.find("{")
-    end = candidate.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise RuntimeError("review output contains no JSON object")
-    review = json.loads(candidate[start : end + 1])
-    if not isinstance(review, dict):
-        raise RuntimeError("review output is not a JSON object")
-    return review
+    """Extract the review JSON object, tolerating prose or stray code fences.
+
+    Models sometimes wrap the object in fences, add trailing commentary or
+    emit multiple objects. Scan every "{" and accept the first position from
+    which a complete JSON object can be decoded.
+    """
+    decoder = json.JSONDecoder()
+    start = raw.find("{")
+    while start != -1:
+        try:
+            review, _ = decoder.raw_decode(raw[start:])
+            if isinstance(review, dict):
+                return review
+        except json.JSONDecodeError:
+            pass
+        start = raw.find("{", start + 1)
+    raise RuntimeError(
+        f"review output contains no decodable JSON object (head: {raw[:200]!r})"
+    )
 
 
 def suggestion_body(comment: dict) -> str | None:
@@ -192,6 +192,19 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
         sys.exit(1)
 
 
+def post_fallback_comment(number: int, raw: str) -> None:
+    """Keep the review visible even when the JSON could not be parsed."""
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    body = (
+        "## ⚠️ Pi review (unparsed)\n\n"
+        "The model's output could not be parsed as review JSON. Raw text:\n\n"
+        f"<details><summary>Raw model output</summary>\n\n{raw[:8000]}\n\n</details>"
+    )
+    code, _ = gh_api(f"repos/{repo}/issues/{number}/comments", {"body": body})
+    if code == 0:
+        print("Posted unparsed review as fallback comment.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("events", help="path to pi's --mode json output")
@@ -199,11 +212,14 @@ def main() -> None:
     parser.add_argument("--head-sha", default="", help="PR head commit SHA for comment anchoring")
     args = parser.parse_args()
 
+    raw = ""
     try:
         raw = extract_assistant_text(args.events)
         review = parse_review_json(raw)
     except (RuntimeError, json.JSONDecodeError) as error:
         print(f"Review parsing failed: {error}", file=sys.stderr)
+        if raw:
+            post_fallback_comment(args.number, raw)
         sys.exit(1)
 
     post_review(args.number, args.head_sha, review)
