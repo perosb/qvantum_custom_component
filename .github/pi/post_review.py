@@ -119,7 +119,7 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
     raw_comments.sort(key=lambda item: (SEVERITY_ORDER.get(str(item.get("severity", "low")).lower(), 9)))
 
     overview = str(review.get("overview") or "").strip() or "Clean diff."
-    body = f"## 🤖 Pi review\n\n{overview}\n"
+    body = f"{overview}\n"
 
     inline = []
     dropped = []
@@ -184,7 +184,7 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
     for entry in kept:
         body += f"- `{entry['path']}:{entry['line']}` — posted inline\n"
     if not dropped and not kept:
-        body = f"## 🤖 Pi review\n\n{overview}\n\n_(No inline comments could be posted.)_\n"
+        body = f"{overview}\n\n_(No inline comments could be posted.)_\n"
 
     code, _ = gh_api(f"repos/{repo}/pulls/{number}/reviews", {"event": "COMMENT", "body": body})
     if code != 0:
@@ -196,8 +196,7 @@ def post_fallback_comment(number: int, raw: str) -> None:
     """Keep the review visible even when the JSON could not be parsed."""
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     body = (
-        "## ⚠️ Pi review (unparsed)\n\n"
-        "The model's output could not be parsed as review JSON. Raw text:\n\n"
+        "⚠️ The model's output could not be parsed as review JSON. Raw text:\n\n"
         f"<details><summary>Raw model output</summary>\n\n{raw[:8000]}\n\n</details>"
     )
     code, _ = gh_api(f"repos/{repo}/issues/{number}/comments", {"body": body})
