@@ -159,11 +159,13 @@ export default async function (pi: ExtensionAPI) {
         allowedModels = await fetchAllowedModels(key, context.signal);
         return allowedModels;
       } catch (error) {
-        allowedModels = [];
+        // Keep the previously loaded catalog on transient failures — wiping it
+        // (combined with session_start emptying every other provider) would
+        // leave zero selectable models.
         console.warn(
           `[openrouter-guardrails] Could not refresh the OpenRouter allowlist: ${error instanceof Error ? error.message : String(error)}`,
         );
-        return [];
+        return allowedModels;
       }
     },
   };

@@ -59,9 +59,8 @@ jobs:
           # for larger diffs.
           PI_MODEL: ${{ github.event.pull_request.additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
         run: |
-          pi --provider openrouter --model "$PI_MODEL" \
-            -p --no-session --no-tools --mode json \
-            "$(cat /tmp/pi-review-prompt.txt)" > /tmp/pi-events.jsonl
+          cat /tmp/pi-review-prompt.txt | pi --provider openrouter --model "$PI_MODEL" \
+            -p --no-session --no-tools --mode json > /tmp/pi-events.jsonl
           [ -s /tmp/pi-events.jsonl ]
 
       - name: Post GitHub review
