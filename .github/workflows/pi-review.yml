@@ -1,0 +1,96 @@
+name: pi-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pi-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Fork PRs get no repository secrets, so the run would fail on the missing key.
+    if: github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Tooling-only PRs (just .github/**) skip the review: the reviewer would
+      # otherwise review its own workflow/extension changes and re-open nits.
+      - name: Check changed paths
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          tooling_only=true
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              .github/*) ;;
+              *) tooling_only=false ;;
+            esac
+          done < <(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")
+          echo "tooling_only=$tooling_only" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v6
+        if: steps.changed.outputs.tooling_only != 'true'
+        with:
+          node-version: "24"
+
+      - name: Install pi
+        if: steps.changed.outputs.tooling_only != 'true'
+        run: npm install -g @earendil-works/pi-coding-agent@1.1.0
+
+      # Repo-owned extension so CI matches local review runs: it references the
+      # OpenRouter account preset ("perosb") for ZDR/price-sorted routing and
+      # caps max_completion_tokens so cheap providers (e.g. Relace) stay
+      # eligible over 1M-context ones.
+      - name: Install OpenRouter extension
+        if: steps.changed.outputs.tooling_only != 'true'
+        run: |
+          mkdir -p ~/.pi/agent/extensions
+          cp .github/pi/openrouter-guardrails.ts ~/.pi/agent/extensions/
+
+      - name: Build PR diff
+        if: steps.changed.outputs.tooling_only != 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: git diff --unified=8 "${BASE_SHA}...${HEAD_SHA}" > /tmp/pr.diff
+
+      - name: Run pi review
+        if: steps.changed.outputs.tooling_only != 'true'
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # Same cost heuristic as the old opencode review: the full model only
+          # for larger diffs.
+          PI_MODEL: ${{ github.event.pull_request.additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
+        run: |
+          # Replace pi's coding-assistant system prompt: it advertises read/bash
+          # tools and pi's own docs, which makes a tool-less review run emit
+          # tool-call XML instead of the review JSON.
+          cat /tmp/pr.diff | pi --provider openrouter --model "$PI_MODEL" \
+            --system-prompt "$(cat .github/pi/review-prompt.md)" \
+            -p --no-session --no-tools --mode json > /tmp/pi-events.jsonl
+          [ -s /tmp/pi-events.jsonl ]
+
+      - name: Post GitHub review
+        if: steps.changed.outputs.tooling_only != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PI_REVIEW_MIN_SEVERITY: high
+        run: |
+          python3 .github/pi/post_review.py /tmp/pi-events.jsonl \
+            "${{ github.event.pull_request.number }}" --head-sha "$HEAD_SHA"
