@@ -29,7 +29,12 @@ SEVERITY_LABEL = {
 
 
 def extract_assistant_text(events_path: str) -> str:
-    """Return the text of the last completed assistant message."""
+    """Return the text of the last assistant message that contains text.
+
+    Requiring a specific stop reason would lose the review when the model hits
+    its output-token limit (stopReason "length"); the message may still hold
+    the complete JSON. Error/aborted messages carry no text and are skipped.
+    """
     text = ""
     with open(events_path, encoding="utf-8") as handle:
         for line in handle:
@@ -43,7 +48,7 @@ def extract_assistant_text(events_path: str) -> str:
             message = event.get("message") or {}
             if message.get("role") != "assistant":
                 continue
-            if event.get("type") == "message_end" and message.get("stopReason") == "stop":
+            if event.get("type") == "message_end":
                 content = message.get("content") or []
                 chunks = []
                 if isinstance(content, str):
@@ -92,8 +97,11 @@ def suggestion_body(comment: dict) -> str | None:
     return f"{text}\n\n{fence}suggestion\n{suggestion}\n{fence}"
 
 
-def gh_api(endpoint: str, payload: dict | None = None, method: str | None = None) -> tuple[int, dict]:
-    command = ["gh", "api", endpoint]
+def gh_api(endpoint: str, payload: dict | None = None, method: str | None = None, paginate: bool = False) -> tuple[int, dict]:
+    command = ["gh", "api"]
+    if paginate:
+        command.append("--paginate")
+    command.append(endpoint)
     args = []
     if method:
         args += ["--method", method]
@@ -123,7 +131,7 @@ def existing_review_comments(repo: str, number: int) -> set[tuple[str, int, str]
     The review agent sees the full cumulative diff on every push and tends to
     re-emit comments that were already fixed in earlier pushes; skip those.
     """
-    code, comments = gh_api(f"repos/{repo}/pulls/{number}/comments?per_page=100")
+    code, comments = gh_api(f"repos/{repo}/pulls/{number}/comments?per_page=100", paginate=True)
     if code != 0 or not isinstance(comments, list):
         return set()
     seen = set()
