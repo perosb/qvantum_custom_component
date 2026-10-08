@@ -93,8 +93,14 @@ def suggestion_body(comment: dict) -> str | None:
 
 
 def gh_api(endpoint: str, payload: dict | None = None, method: str | None = None) -> tuple[int, dict]:
-    command = ["gh", "api", endpoint, "--input", "-"]
-    args = ["--method", method] if method else []
+    command = ["gh", "api", endpoint]
+    args = []
+    if method:
+        args += ["--method", method]
+    if payload is not None:
+        # gh defaults to POST whenever a request body is present, so only pass
+        # --input for actual writes; GET lookups would otherwise be sent as POST.
+        args += ["--input", "-"]
     result = subprocess.run(
         command + args,
         input=json.dumps(payload) if payload is not None else None,
@@ -183,8 +189,12 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
         }
         if comment.get("start_line") is not None:
             try:
-                entry["start_line"] = int(comment["start_line"])
-                entry["start_side"] = "RIGHT"
+                start = int(comment["start_line"])
+                # GitHub rejects multi-line ranges where start == line; single-
+                # line comments must omit start_line entirely.
+                if 0 < start < line:
+                    entry["start_line"] = start
+                    entry["start_side"] = "RIGHT"
             except (TypeError, ValueError):
                 pass
         inline.append(entry)
