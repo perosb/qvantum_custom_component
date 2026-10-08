@@ -1,0 +1,73 @@
+name: pi-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pi-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Fork PRs get no repository secrets, so the run would fail on the missing key.
+    if: github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install pi
+        run: npm install -g @earendil-works/pi-coding-agent@latest
+
+      # The guardrails extension is repo-owned so CI matches local review runs:
+      # OpenRouter allowlist, price-sorted ZDR routing and the output-token cap
+      # that keeps cheap providers (e.g. Relace) eligible over 1M-context ones.
+      - name: Install guardrails extension
+        run: |
+          mkdir -p ~/.pi/agent/extensions
+          cp .github/pi/openrouter-guardrails.ts ~/.pi/agent/extensions/
+
+      - name: Build review prompt
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --unified=8 "${BASE_SHA}...${HEAD_SHA}" > /tmp/pr.diff
+          {
+            cat .github/pi/review-prompt.md
+            printf '\n\n## PR diff (%s → %s)\n\n```diff\n' "$BASE_SHA" "$HEAD_SHA"
+            cat /tmp/pr.diff
+            printf '\n```\n'
+          } > /tmp/pi-review-prompt.txt
+
+      - name: Run pi review
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # Same cost heuristic as the old opencode review: the full model only
+          # for larger diffs.
+          PI_MODEL: ${{ github.event.pull_request.additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
+        run: |
+          pi --provider openrouter --model "$PI_MODEL" \
+            -p --no-session --no-tools --mode json \
+            "$(cat /tmp/pi-review-prompt.txt)" > /tmp/pi-events.jsonl
+          [ -s /tmp/pi-events.jsonl ]
+
+      - name: Post GitHub review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 .github/pi/post_review.py /tmp/pi-events.jsonl \
+            "${{ github.event.pull_request.number }}" --head-sha "$HEAD_SHA"
