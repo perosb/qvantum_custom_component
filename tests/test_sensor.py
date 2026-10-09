@@ -953,6 +953,16 @@ class TestQvantumEfficiencySensors:
             and entity._attr_unique_id == "qvantum_efficiency_health_test_device_123"
             for entity in entities
         )
+        # Derived analytics are enabled by default; only transport gating may
+        # keep an entity out of a mode.
+        assert all(
+            entity._attr_entity_registry_enabled_default
+            for entity in entities
+            if isinstance(
+                entity,
+                (QvantumEfficiencySensorEntity, QvantumEfficiencyHealthSensor),
+            )
+        )
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_modbus_adds_cycling_sensors(
