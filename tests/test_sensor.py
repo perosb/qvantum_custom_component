@@ -611,6 +611,8 @@ class TestQvantumCurveSensors:
             "night_day_c": 0.2,
             "solar_c": -0.4,
             "load_c": 0.9,
+            "cop_c": 0.0,
+            "precharge_c": 0.0,
             "capped_by_indoor": False,
             "trims": {},
             "clamped": False,

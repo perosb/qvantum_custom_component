@@ -910,6 +910,16 @@
           "description": "shadow = solo cálculo, active = escribir la curva"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Establecer términos de curva",
+      "description": "Términos de control opcionales de la curva de calefacción adaptativa",
+      "fields": {
+        "cop_feedback": {
+          "name": "Retroalimentación de COP",
+          "description": "Reducir la impulsión cuando el COP medido esté por debajo de su referencia aprendida"
+        }
+      }
     }
   }
 }

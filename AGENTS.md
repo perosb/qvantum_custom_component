@@ -225,6 +225,10 @@ access, so no control is offered when a write would fail.
 - Interval-only option changes apply in place; host/port/unit/enablement reloads.
 - Do not invent endpoints or registers. Maps: `client/modbus/maps.py`.
   HTTP paths: `client/cloud/endpoints.py`.
+- Adaptive-curve optional terms (COP feedback) are off by default, persisted
+  in the curve Store, and enabled via `qvantum.set_curve_terms`. They only
+  apply while the curve is active and never override the indoor cap or the
+  total clamp.
 
 ---
 

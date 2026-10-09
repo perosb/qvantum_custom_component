@@ -910,6 +910,16 @@
           "description": "shadow = nur berechnen, active = Kurve schreiben"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Kurven-Begriffe festlegen",
+      "description": "Optionale Regelterme für die adaptive Heizkurve",
+      "fields": {
+        "cop_feedback": {
+          "name": "COP-Rückkopplung",
+          "description": "Vorlauftemperatur senken, wenn die gemessene COP unter ihrem gelernten Referenzwert liegt"
+        }
+      }
     }
   }
 }

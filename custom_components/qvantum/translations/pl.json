@@ -910,6 +910,16 @@
           "description": "shadow = tylko obliczenia, active = zapis krzywej"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Ustaw terminy krzywej",
+      "description": "Opcjonalne warunki sterowania adaptacyjnej krzywej grzewczej",
+      "fields": {
+        "cop_feedback": {
+          "name": "Sprzężenie zwrotne COP",
+          "description": "Obniż temperaturę zasilania, gdy zmierzony COP jest poniżej wyuczonego odniesienia"
+        }
+      }
     }
   }
 }

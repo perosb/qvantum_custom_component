@@ -910,6 +910,16 @@
           "description": "shadow = kun beregning, active = skriv kurven"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Angiv kurvtermer",
+      "description": "Valgfrie reguleringstermer for den adaptive varmekurve",
+      "fields": {
+        "cop_feedback": {
+          "name": "COP-feedback",
+          "description": "Sænk fremløbstemperaturen, når den målte COP er under sin indlærte reference"
+        }
+      }
     }
   }
 }

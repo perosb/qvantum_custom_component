@@ -910,6 +910,16 @@
           "description": "shadow = calcul uniquement, active = écrire la courbe"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Définir les termes de courbe",
+      "description": "Termes de régulation optionnels de la courbe de chauffe adaptative",
+      "fields": {
+        "cop_feedback": {
+          "name": "Rétroaction COP",
+          "description": "Réduire la température de départ lorsque le COP mesuré est inférieur à sa référence apprise"
+        }
+      }
     }
   }
 }

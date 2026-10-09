@@ -17,6 +17,10 @@ The adjustment is the sum of four forecast-driven terms:
   below the model demand for the target indoor temperature (the house is
   already warm against the forecast).
 
+Optional one-sided control terms (``cop_c``, ``precharge_c``) are computed by
+the coordinator, off by default, and folded into the same total before the
+indoor cap and the supply clamp.
+
 Indoor deviation is a **cap only** — a warm house vetoes upward adjustment
 and a cold house vetoes downward adjustment, it never drives a term.
 
@@ -91,6 +95,13 @@ TRIM_MAX_DISTANCE_C = 7.5
 #: Cap on the accumulated trim per point and on a single indicated residual.
 TRIM_MAX_C = 2.0
 
+#: COP-feedback clamp (the term only ever reduces the curve).
+COP_FEEDBACK_MAX_C = 1.0
+#: recent/reference ratio at which the COP feedback starts reducing supply.
+COP_FEEDBACK_TRIGGER_RATIO = 0.9
+#: Ratio span below the trigger over which the full reduction is reached.
+COP_FEEDBACK_SPAN_RATIO = 0.2
+
 #: Hard clamp on the total adjustment.
 TOTAL_MAX_C = 3.0
 
@@ -122,6 +133,8 @@ class CurveResult:
     capped_by_indoor: bool
     trims: Mapping[str, float] = field(default_factory=dict)
     clamped: bool = False
+    cop_c: float = 0.0
+    precharge_c: float = 0.0
 
     def as_dict(self) -> dict[str, float]:
         return {key: round(supply, 2) for key, supply in self.points}
@@ -514,6 +527,42 @@ def trim_residuals(
     return trims if any_evidence else None
 
 
+def cop_feedback_adjustment_c(
+    recent_cop: float | None,
+    reference_cop: float | None,
+    *,
+    max_reduction_c: float = COP_FEEDBACK_MAX_C,
+) -> float:
+    """One-sided supply reduction when measured COP falls below its reference.
+
+    ``recent_cop`` and ``reference_cop`` are in the same units. The term is
+    zero while the ratio is at or above ``COP_FEEDBACK_TRIGGER_RATIO`` and
+    reaches ``-max_reduction_c`` a span of ``COP_FEEDBACK_SPAN_RATIO`` below
+    it. Missing, non-finite, or non-positive inputs yield zero: without a
+    trusted reference there is nothing to feedback against.
+    """
+    if recent_cop is None or reference_cop is None:
+        return 0.0
+    try:
+        recent = float(recent_cop)
+        reference = float(reference_cop)
+    except (TypeError, ValueError):
+        return 0.0
+    if not (math.isfinite(recent) and math.isfinite(reference)):
+        return 0.0
+    if recent <= 0.0 or reference <= 0.0:
+        return 0.0
+    ratio = recent / reference
+    if ratio >= COP_FEEDBACK_TRIGGER_RATIO:
+        return 0.0
+    fraction = _clamp(
+        (COP_FEEDBACK_TRIGGER_RATIO - ratio) / COP_FEEDBACK_SPAN_RATIO,
+        0.0,
+        1.0,
+    )
+    return -max_reduction_c * fraction
+
+
 def compute_curve(
     *,
     baseline: Mapping[str, float],
@@ -529,6 +578,8 @@ def compute_curve(
     point_trims: Mapping[str, float] | None = None,
     min_supply_c: float | None = None,
     max_supply_c: float | None = None,
+    cop_c: float = 0.0,
+    precharge_c: float = 0.0,
 ) -> CurveResult:
     """Baseline + outdoor + night/day + solar + load → seven supply points.
 
@@ -566,7 +617,9 @@ def compute_curve(
     )
 
     total = _clamp(
-        outdoor_c + night_day_c + solar_c + load_c, -TOTAL_MAX_C, TOTAL_MAX_C
+        outdoor_c + night_day_c + solar_c + load_c + cop_c + precharge_c,
+        -TOTAL_MAX_C,
+        TOTAL_MAX_C,
     )
     capped_by_indoor = False
     if indoor_margin_c is not None:
@@ -608,4 +661,6 @@ def compute_curve(
         capped_by_indoor=capped_by_indoor,
         trims=effective_trims,
         clamped=clamped,
+        cop_c=cop_c,
+        precharge_c=precharge_c,
     )

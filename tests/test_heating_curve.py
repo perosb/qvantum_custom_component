@@ -7,6 +7,7 @@ import pytest
 from custom_components.qvantum.heating_curve import (
     BASELINE_MAX_CORRECTION_C,
     BASELINE_MIN_CORRECTION_C,
+    COP_FEEDBACK_MAX_C,
     INDOOR_CAP_C,
     LOAD_MAX_C,
     MAX_SUPPLY_C,
@@ -19,6 +20,7 @@ from custom_components.qvantum.heating_curve import (
     CurveResult,
     DayPhase,
     compute_curve,
+    cop_feedback_adjustment_c,
     corrected_baseline,
     curve_slope,
     diurnal_swing_c,
@@ -265,6 +267,58 @@ def test_load_adjustment_reduces_when_pump_coasts() -> None:
     # Too little predicted demand to define a ratio.
     tiny = make_model(a=10.0, c=0.0)
     assert load_adjustment_c(tiny, 0.0, 21.0, 20.0, {}, BASE_HOUR) == 0.0
+
+
+def test_cop_feedback_only_reduces_below_trigger() -> None:
+    reference = 4.0
+
+    # At or above 90 % of the reference there is nothing to correct.
+    assert cop_feedback_adjustment_c(4.0, reference) == 0.0
+    assert cop_feedback_adjustment_c(3.6, reference) == 0.0
+    # Full reduction at and below 70 % of the reference.
+    assert cop_feedback_adjustment_c(2.8, reference) == pytest.approx(
+        -COP_FEEDBACK_MAX_C
+    )
+    assert cop_feedback_adjustment_c(1.0, reference) == pytest.approx(
+        -COP_FEEDBACK_MAX_C
+    )
+    # Linear in between.
+    assert cop_feedback_adjustment_c(3.2, reference) == pytest.approx(
+        -COP_FEEDBACK_MAX_C / 2.0
+    )
+
+
+def test_cop_feedback_requires_a_trusted_reference() -> None:
+    assert cop_feedback_adjustment_c(None, 4.0) == 0.0
+    assert cop_feedback_adjustment_c(2.0, None) == 0.0
+    assert cop_feedback_adjustment_c(2.0, 0.0) == 0.0
+    assert cop_feedback_adjustment_c(0.0, 4.0) == 0.0
+    assert cop_feedback_adjustment_c(float("nan"), 4.0) == 0.0
+    assert cop_feedback_adjustment_c(2.0, float("inf")) == 0.0
+    assert cop_feedback_adjustment_c("x", 4.0) == 0.0
+
+
+def test_compute_curve_applies_cop_feedback_before_caps() -> None:
+    base = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature={},
+        ghi_by_hour={},
+    )
+    reduced = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature={},
+        ghi_by_hour={},
+        cop_c=-1.0,
+    )
+
+    assert reduced.cop_c == -1.0
+    assert reduced.adjustment_c == pytest.approx(-1.0)
+    assert all(
+        reduced_point[1] == pytest.approx(base_point[1] - 1.0)
+        for reduced_point, base_point in zip(reduced.points, base.points)
+    )
 
 
 def _observed_pairs(offset: float, *, span: int = 20) -> list[tuple[float, float]]:

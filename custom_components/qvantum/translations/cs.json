@@ -910,6 +910,16 @@
           "description": "shadow = pouze výpočet, active = zápis křivky"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Nastavit členy křivky",
+      "description": "Volitelné regulační členy adaptivní topné křivky",
+      "fields": {
+        "cop_feedback": {
+          "name": "Zpětná vazba COP",
+          "description": "Snížit přívodní teplotu, když je naměřené COP pod naučenou referencí"
+        }
+      }
     }
   }
 }

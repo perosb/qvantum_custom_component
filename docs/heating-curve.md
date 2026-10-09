@@ -238,12 +238,30 @@ connection writes holding 22 back to Auto and turns the switch off. If the
 pump is instead moved off User defined, the coordinator returns to shadow
 without touching holding 22. A revert that cannot be written is latched and
 retried, so a lost connection cannot leave the integration claiming control.
+Optional terms (`qvantum.set_curve_terms`) are persisted with the rest of the
+curve state and default to off.
 
 **One writer:** disable Home Assistant automations that write the curve offset
 (holding 15) while the switch is on, otherwise solar gain is applied twice.
 Reversion (active → shadow) writes holding 22 back to Auto but does **not**
 restore the parallel offset; leave the offset-writing automations off until
 they are deliberately re-enabled.
+
+### Optional terms
+
+Control-loop terms beyond the four forecast terms are **off by default** and
+only act while the curve is active. Enable them with
+`qvantum.set_curve_terms` (persisted in the curve Store):
+
+- **COP feedback** (`cop_feedback: true`) reduces the shared adjustment, by
+  at most 1 °C, when the instantaneous heating COP falls below a learned
+  reference for the current outdoor temperature bucket (5 °C buckets, EMA).
+  The reference needs at least 12 samples in the bucket before the term may
+  act; it is learned from `cop_heating` whenever the term is not correcting
+  and frozen during a correction so the loop has a stable target. The term is
+  one-sided downward, applies only while the pump is heating, and never
+  fights the indoor cap or the total clamp. Freezing the reference only
+  affects the COP loop; the baseline shape learning is untouched.
 
 ### Solar model
 

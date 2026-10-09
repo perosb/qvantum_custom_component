@@ -16,6 +16,7 @@ from homeassistant.exceptions import HomeAssistantError
 from custom_components.qvantum import curve_coordinator as cc
 from custom_components.qvantum.const import HP_STATUS_HEATING
 from custom_components.qvantum.heating_curve import (
+    COP_FEEDBACK_MAX_C,
     TOTAL_MAX_C,
     CurveResult,
     interpolate_supply,
@@ -121,6 +122,9 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._mode = "shadow"
     coordinator._revert_pending = False
     coordinator._control_lock = asyncio.Lock()
+    coordinator._terms = {"cop_feedback": False, "precharge": False}
+    coordinator._cop_reference = {}
+    coordinator._cop_samples = {}
     coordinator._listeners = {}
     coordinator.data = None
     coordinator.hass = MagicMock()
@@ -1683,4 +1687,125 @@ async def test_update_data_retries_pending_revert_on_cycle() -> None:
         "test_device_123",
         0,
     )
+
+
+class TestCopFeedback:
+    """COP-feedback term: opt-in, active-only, reference-learning."""
+
+    @staticmethod
+    def _values(coordinator, *, hp_status=HP_STATUS_HEATING, cop=2.0, outdoor=0.0):
+        coordinator._main.data = {
+            "values": {
+                "hp_status": hp_status,
+                "cop_heating": cop,
+                "bt1": outdoor,
+            }
+        }
+        return coordinator._main.data["values"]
+
+    @staticmethod
+    def _armed(coordinator):
+        coordinator._terms["cop_feedback"] = True
+        coordinator._mode = "active"
+        coordinator._cop_reference = {0: 4.0}
+        coordinator._cop_samples = {0: cc.COP_REFERENCE_MIN_SAMPLES}
+
+    def test_learns_reference_without_applying(self):
+        coordinator = make_coordinator()
+        values = self._values(coordinator, cop=4.0)
+
+        term = coordinator._cop_feedback_c(values, make_snapshot())
+
+        assert term == 0.0
+        assert coordinator._cop_reference == {0: 4.0}
+        assert coordinator._cop_samples == {0: 1}
+
+    def test_applies_once_enabled_active_and_learned(self):
+        coordinator = make_coordinator()
+        self._armed(coordinator)
+        values = self._values(coordinator, cop=2.8)
+
+        term = coordinator._cop_feedback_c(values, make_snapshot())
+
+        assert term == pytest.approx(-COP_FEEDBACK_MAX_C)
+        # A correcting cycle freezes the reference (stable loop target).
+        assert coordinator._cop_reference[0] == 4.0
+        assert coordinator._cop_samples[0] == cc.COP_REFERENCE_MIN_SAMPLES
+
+    def test_requires_flag_active_mode_and_enough_samples(self):
+        for mutate in (
+            lambda c: c._terms.__setitem__("cop_feedback", False),
+            lambda c: setattr(c, "_mode", "shadow"),
+            lambda c: c._cop_samples.__setitem__(0, 1),
+        ):
+            coordinator = make_coordinator()
+            self._armed(coordinator)
+            mutate(coordinator)
+            values = self._values(coordinator, cop=2.0)
+            assert coordinator._cop_feedback_c(values, make_snapshot()) == 0.0
+
+    def test_never_applies_when_not_heating(self):
+        coordinator = make_coordinator()
+        self._armed(coordinator)
+        values = self._values(coordinator, hp_status=0, cop=2.0)
+
+        assert coordinator._cop_feedback_c(values, make_snapshot()) == 0.0
+
+    def test_skips_when_indoor_cap_or_total_clamp_active(self):
+        coordinator = make_coordinator()
+        self._armed(coordinator)
+        values = self._values(coordinator, cop=2.0)
+
+        capped = make_snapshot(capped_by_indoor=True)
+        clamped = make_snapshot(adjustment_c=TOTAL_MAX_C)
+        ok = make_snapshot()
+
+        assert coordinator._cop_feedback_c(values, capped) == 0.0
+        assert coordinator._cop_feedback_c(values, clamped) == 0.0
+        assert coordinator._cop_feedback_c(values, ok) < 0.0
+
+    def test_ignores_invalid_inputs(self):
+        coordinator = make_coordinator()
+        self._armed(coordinator)
+
+        assert (
+            coordinator._cop_feedback_c(
+                {"hp_status": HP_STATUS_HEATING, "bt1": 0.0}, make_snapshot()
+            )
+            == 0.0
+        )
+        assert (
+            coordinator._cop_feedback_c(
+                {"hp_status": HP_STATUS_HEATING, "cop_heating": 2.0},
+                make_snapshot(),
+            )
+            == 0.0
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_terms_persists_flags(self):
+        store = FakeStore()
+        coordinator = make_coordinator(store=store)
+
+        await coordinator.async_set_terms(cop_feedback=True)
+
+        assert coordinator.terms == {"cop_feedback": True, "precharge": False}
+        assert store.saved["terms"]["cop_feedback"] is True
+
+    @pytest.mark.asyncio
+    async def test_restore_terms_and_reference(self):
+        store = FakeStore(
+            {
+                "terms": {"cop_feedback": True, "precharge": False},
+                "cop_reference": {"0": 3.5},
+                "cop_samples": {"0": 20},
+            }
+        )
+        coordinator = make_coordinator(store=store)
+
+        await coordinator.async_restore()
+
+        assert coordinator.terms == {"cop_feedback": True, "precharge": False}
+        assert coordinator._cop_reference == {0: 3.5}
+        assert coordinator._cop_samples == {0: 20}
 

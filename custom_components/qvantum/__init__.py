@@ -180,6 +180,7 @@ async def _async_sync_extra_hot_water_service(
     if registered:
         hass.services.async_remove(DOMAIN, "extra_hot_water")
         hass.services.async_remove(DOMAIN, "set_curve_control")
+        hass.services.async_remove(DOMAIN, "set_curve_terms")
 
 
 def _modbus_write_enabled(config_entry: ConfigEntry) -> bool:

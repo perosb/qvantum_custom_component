@@ -44,6 +44,7 @@ from .heating_curve import (
     TRIM_MAX_C,
     DayPhase,
     compute_curve,
+    cop_feedback_adjustment_c,
     corrected_baseline,
     effective_supply_bounds,
     interpolate_supply,
@@ -94,6 +95,13 @@ READY_MEDIAN_MAX_C = 1.0
 READY_MAX_ABS_C = 3.0
 STORAGE_VERSION = 1
 
+#: COP-reference learning: per-5 °C outdoor bucket EMA, and the minimum
+#: samples before the feedback term may act. Learning always runs while the
+#: pump heats, so enabling the term does not start from nothing.
+COP_REFERENCE_ALPHA = 0.05
+COP_REFERENCE_BUCKET_C = 5.0
+COP_REFERENCE_MIN_SAMPLES = 12
+
 #: Pause between single-point Modbus writes so one cycle is not a burst.
 WRITE_PAUSE_SECONDS = 1.0
 #: Minimum change in °C before a point is rewritten.
@@ -139,6 +147,8 @@ class CurveSnapshot:
     baseline_learned_hours: int | None = None
     baseline_outdoor_min_c: float | None = None
     baseline_outdoor_max_c: float | None = None
+    cop_c: float = 0.0
+    precharge_c: float = 0.0
 
 
 def freeze_baseline(settings: Mapping[str, Any]) -> dict[str, float] | None:
@@ -342,6 +352,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._mode = "shadow"
         self._revert_pending = False
         self._control_lock = asyncio.Lock()
+        # Optional control-loop terms (off unless explicitly enabled) and the
+        # learned COP reference used by the feedback term.
+        self._terms: dict[str, bool] = {"cop_feedback": False, "precharge": False}
+        self._cop_reference: dict[int, float] = {}
+        self._cop_samples: dict[int, int] = {}
 
         super().__init__(
             hass,
@@ -372,6 +387,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return bool(getattr(client, "writable", False))
 
     @property
+    def terms(self) -> dict[str, bool]:
+        """Optional control-loop term flags (off unless explicitly enabled)."""
+        return dict(self._terms)
+
+    @property
     def session(self) -> Any:
         if self._session is None:
             self._session = async_get_clientsession(self.hass)
@@ -391,6 +411,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "mode": self._mode,
             "revert_pending": self._revert_pending,
+            "cop_reference": {
+                str(bucket): value for bucket, value in self._cop_reference.items()
+            },
+            "cop_samples": {
+                str(bucket): count for bucket, count in self._cop_samples.items()
+            },
+            "terms": dict(self._terms),
         }
 
     def _mark_active_ended(self) -> None:
@@ -473,6 +500,50 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         elif data.get("mode") == "shadow":
             self._mode = "shadow"
         self._revert_pending = bool(data.get("revert_pending", False))
+        cop_reference = data.get("cop_reference")
+        if isinstance(cop_reference, dict):
+            for raw_bucket, value in cop_reference.items():
+                try:
+                    bucket = int(raw_bucket)
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    numeric = float(value)
+                    if math.isfinite(numeric) and numeric > 0.0:
+                        self._cop_reference[bucket] = numeric
+        cop_samples = data.get("cop_samples")
+        if isinstance(cop_samples, dict):
+            for raw_bucket, value in cop_samples.items():
+                try:
+                    bucket = int(raw_bucket)
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    self._cop_samples[bucket] = max(0, int(value))
+        terms = data.get("terms")
+        if isinstance(terms, dict):
+            for key in ("cop_feedback", "precharge"):
+                if key in terms:
+                    self._terms[key] = bool(terms[key])
+
+    async def async_set_terms(
+        self,
+        *,
+        cop_feedback: bool | None = None,
+        precharge: bool | None = None,
+    ) -> None:
+        """Enable or disable the optional control-loop terms.
+
+        Persisted and off by default. The terms only change the computed
+        curve while active, so enabling one in shadow mode has no write
+        effect until the curve is activated.
+        """
+        if cop_feedback is not None:
+            self._terms["cop_feedback"] = bool(cop_feedback)
+        if precharge is not None:
+            self._terms["precharge"] = bool(precharge)
+        await self._async_persist()
+        self.async_update_listeners()
 
     async def async_set_control_mode(self, mode: str) -> None:
         """Switch between shadow (no writes) and active curve control."""
@@ -1177,6 +1248,67 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return None
         return sum(self._powers) / len(self._powers)
 
+    def _cop_feedback_c(
+        self,
+        values: Mapping[str, Any],
+        previous: CurveSnapshot | None,
+    ) -> float:
+        """COP-feedback term for this cycle, or 0 when it must not act.
+
+        The reference is learned per 5 °C outdoor bucket whenever the term is
+        not actively correcting, so enabling it later starts from real
+        history instead of from nothing. The term only applies while the curve
+        is active, the pump is heating, the previous cycle was not capped by
+        the indoor margin, and the shared adjustment still has headroom — it
+        must never fight the indoor cap. A correcting cycle freezes the
+        reference so the loop has a stable target until COP recovers.
+        """
+        cop = values.get("cop_heating")
+        outdoor = values.get("bt1")
+        if isinstance(cop, bool) or not isinstance(cop, (int, float)):
+            return 0.0
+        if isinstance(outdoor, bool) or not isinstance(outdoor, (int, float)):
+            return 0.0
+        cop_value = float(cop)
+        if not math.isfinite(cop_value) or cop_value <= 0.0:
+            return 0.0
+        if values.get("hp_status") != HP_STATUS_HEATING:
+            return 0.0
+
+        bucket = int(
+            round(float(outdoor) / COP_REFERENCE_BUCKET_C) * COP_REFERENCE_BUCKET_C
+        )
+        reference = self._cop_reference.get(bucket)
+        samples = self._cop_samples.get(bucket, 0)
+        term = 0.0
+        if (
+            self._terms.get("cop_feedback")
+            and self.active
+            and previous is not None
+            and not previous.capped_by_indoor
+            and abs(previous.adjustment_c) < TOTAL_MAX_C
+            and samples >= COP_REFERENCE_MIN_SAMPLES
+        ):
+            term = cop_feedback_adjustment_c(cop_value, reference)
+
+        if term == 0.0 or reference is None:
+            if reference is None:
+                self._cop_reference[bucket] = cop_value
+            else:
+                self._cop_reference[bucket] = (
+                    COP_REFERENCE_ALPHA * cop_value
+                    + (1.0 - COP_REFERENCE_ALPHA) * reference
+                )
+            self._cop_samples[bucket] = samples + 1
+            if self._store is not None:
+                try:
+                    self._store.async_delay_save(self._state_payload, 600)
+                except Exception:
+                    _LOGGER.debug(
+                        "Failed to schedule curve COP-reference save", exc_info=True
+                    )
+        return term
+
     def _daylight(self, now: datetime) -> DayPhase | None:
         try:
             from homeassistant.helpers.sun import (
@@ -1249,6 +1381,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
 
         result = None
         low, high = self._supply_bounds(values)
+        # Use the previous cycle for the term's guard conditions: the indoor
+        # cap and total clamp it must not fight are those already published.
+        cop_c = self._cop_feedback_c(values, self.data)
         if self._baseline is not None:
             result = compute_curve(
                 baseline=self._baseline,
@@ -1263,6 +1398,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 point_trims=self._trims if self.active else None,
                 min_supply_c=low,
                 max_supply_c=high,
+                cop_c=cop_c,
+                precharge_c=0.0,
             )
         if result is not None:
             clamped = self.active and result.clamped
@@ -1349,4 +1486,6 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             baseline_learned_hours=learned_hours,
             baseline_outdoor_min_c=learned_min,
             baseline_outdoor_max_c=learned_max,
+            cop_c=0.0 if result is None else result.cop_c,
+            precharge_c=0.0 if result is None else result.precharge_c,
         )
