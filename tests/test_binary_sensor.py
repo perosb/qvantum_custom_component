@@ -195,15 +195,19 @@ class TestQvantumBaseBinaryEntity:
             "picpin_relay_gp3",
             "picpin_relay_ha12",
             "picpin_relay_pump",
+            # Internal call-for-heat / mode / state flags
+            "dhwdemand",
+            "heatingdemand",
+            "coolingdemand",
+            "additiondemand",
+            "additiondhwdemand",
+            "unit_state",
+            "cooling_enabled",
+            "time_to_defrost",
         ):
             entity = QvantumBaseBinaryEntity(mock_coordinator, key, mock_device, True)
             assert entity._attr_entity_category.name == "DIAGNOSTIC", key
             assert getattr(entity, "_attr_device_class", None) is None, key
-
-        demand = QvantumBaseBinaryEntity(
-            mock_coordinator, "heatingdemand", mock_device, True
-        )
-        assert getattr(demand, "_attr_entity_category", None) is None
 
 
 @pytest.mark.asyncio

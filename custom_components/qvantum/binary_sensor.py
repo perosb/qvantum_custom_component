@@ -46,6 +46,15 @@ _DIAGNOSTIC_BINARY_SENSORS = frozenset(
         "additionreleased",
         "freeze_protection_active",
         "compressor_blocked",
+        # Internal call-for-heat, mode and state flags
+        "dhwdemand",
+        "heatingdemand",
+        "coolingdemand",
+        "additiondemand",
+        "additiondhwdemand",
+        "unit_state",
+        "cooling_enabled",
+        "time_to_defrost",
         # All picpin relay status bits (HTTP + Modbus-only pump)
         "picpin_relay_heat_l1",
         "picpin_relay_heat_l2",
