@@ -613,6 +613,21 @@
       },
       "adaptive_curve_solar_model": {
         "name": "Adaptiv varmekurve: solmodel"
+      },
+      "cop_heating": {
+        "name": "COP opvarmning"
+      },
+      "cop_dhw": {
+        "name": "COP varmt vand"
+      },
+      "cop_system": {
+        "name": "COP system"
+      },
+      "scop_total": {
+        "name": "SCOP i alt (30 dage)"
+      },
+      "aux_heat_share": {
+        "name": "Andel supplerende varme"
       }
     },
     "number": {

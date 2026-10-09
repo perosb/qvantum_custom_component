@@ -28,8 +28,10 @@ from .const import (
     DHW_SHOWER_TEMP_C,
     DHW_TANK_VOLUME_L,
     HP_STATUS_HEATING,
+    HP_STATUS_HOT_WATER,
     SensorMode,
 )
+from .efficiency import cop_ratio, energy_delta
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -125,6 +127,66 @@ class QvantumCalculationsMixin:
             last_time_attr="_last_dhwenergy_time",
             mode_label="dhw",
         )
+
+    def _calculate_cop(self, values: dict) -> None:
+        """Derive instantaneous COP from the cumulative energy counters.
+
+        Uses the same counter-delta approach as ``_calculate_mode_power``: the
+        electrical counters (compressor + auxiliary) and the thermal counters
+        (heating + DHW) advance together, so a ratio over one poll interval is a
+        real measurement rather than an estimate. ``hp_status`` names the mode,
+        so the heating/DHW figure is published only while that mode is running;
+        a counter reset clears the published values instead of showing a bogus
+        ratio. Only the system figure exists when both modes ran in the same
+        interval, because the compressor counter is not split by mode.
+        """
+        keys = (
+            "heatingenergy",
+            "dhwenergy",
+            "compressorenergy",
+            "additionalenergy",
+        )
+        current: dict[str, float] = {}
+        for key in keys:
+            value = values.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                return
+            current[key] = float(value)
+        previous = self._last_cop_energies
+        self._last_cop_energies = current
+        if previous is None:
+            return
+
+        deltas: dict[str, float] = {}
+        for key in keys:
+            delta = energy_delta(previous.get(key), current[key])
+            if delta is None:
+                self._set_cop(values, None, None, None)
+                return
+            deltas[key] = delta
+
+        electrical = deltas["compressorenergy"] + deltas["additionalenergy"]
+        thermal_total = deltas["heatingenergy"] + deltas["dhwenergy"]
+        cop_heating = None
+        cop_dhw = None
+        hp_status = values.get("hp_status")
+        if hp_status == HP_STATUS_HEATING:
+            cop_heating = cop_ratio(deltas["heatingenergy"], electrical)
+        elif hp_status == HP_STATUS_HOT_WATER:
+            cop_dhw = cop_ratio(deltas["dhwenergy"], electrical)
+        self._set_cop(values, cop_heating, cop_dhw, cop_ratio(thermal_total, electrical))
+
+    @staticmethod
+    def _set_cop(
+        values: dict,
+        cop_heating: float | None,
+        cop_dhw: float | None,
+        cop_system: float | None,
+    ) -> None:
+        """Publish (or clear) the instantaneous COP values."""
+        values["cop_heating"] = cop_heating
+        values["cop_dhw"] = cop_dhw
+        values["cop_system"] = cop_system
 
     def _finalize_tap_water_session(self, *, tank_temp: float | None) -> None:
         """Finalize the current tap-water session and clear session state.

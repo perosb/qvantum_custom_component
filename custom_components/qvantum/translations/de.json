@@ -613,6 +613,21 @@
       },
       "adaptive_curve_solar_model": {
         "name": "Adaptive Heizkurve: Solarmodell"
+      },
+      "cop_heating": {
+        "name": "COP Heizung"
+      },
+      "cop_dhw": {
+        "name": "COP Warmwasser"
+      },
+      "cop_system": {
+        "name": "COP System"
+      },
+      "scop_total": {
+        "name": "SCOP gesamt (30 Tage)"
+      },
+      "aux_heat_share": {
+        "name": "Anteil Zusatzheizung"
       }
     },
     "number": {

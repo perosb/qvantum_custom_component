@@ -613,6 +613,21 @@
       },
       "adaptive_curve_solar_model": {
         "name": "Adaptacyjna krzywa grzewcza: model słoneczny"
+      },
+      "cop_heating": {
+        "name": "COP ogrzewanie"
+      },
+      "cop_dhw": {
+        "name": "COP ciepła woda"
+      },
+      "cop_system": {
+        "name": "COP system"
+      },
+      "scop_total": {
+        "name": "SCOP łącznie (30 dni)"
+      },
+      "aux_heat_share": {
+        "name": "Udział ogrzewania dodatkowego"
       }
     },
     "number": {

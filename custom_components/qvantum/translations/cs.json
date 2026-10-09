@@ -613,6 +613,21 @@
       },
       "adaptive_curve_solar_model": {
         "name": "Adaptivní topná křivka: solární model"
+      },
+      "cop_heating": {
+        "name": "COP topení"
+      },
+      "cop_dhw": {
+        "name": "COP teplá voda"
+      },
+      "cop_system": {
+        "name": "COP systém"
+      },
+      "scop_total": {
+        "name": "SCOP celkem (30 dní)"
+      },
+      "aux_heat_share": {
+        "name": "Podíl doplňkového vytápění"
       }
     },
     "number": {
