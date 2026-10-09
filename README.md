@@ -35,7 +35,9 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 
 ### Features
 
-- **Monitoring:** Temperatures, pressure, energy, power, system status, defrost, connectivity, filter time, and other heat-pump metrics.
+- **Monitoring:** Temperatures, pressure, energy, power, system status, defrost, connectivity, filter time, and other heat-pump metrics. Machine-internal values (refrigerant circuit, speeds, lifetime counters, settings read-backs) live under the **Diagnostics** entity category.
+- **Efficiency analytics:** COP and rolling SCOP, auxiliary-heat share, building heat-loss coefficient, heating degree hours and weather-normalized consumption, DHW standing loss, a DHW heat-meter plausibility check, compressor cycling/duty/speed and average power, plus an A–F efficiency health grade. All derived from data the integration already polls — no extra hardware.
+- **Solar:** Current solar irradiance and a self-calibrated solar-gain estimate from Open-Meteo, in both cloud and Modbus mode. No PV system is required.
 - **Control:** Operation modes, target temperatures, vacation mode, ventilation, and supported settings.
 - **Hot water (`water_heater`):** Tank temperature and DHW stop target with Eco, Normal, Extra, Smart, and Off modes.
 - **Energy Dashboard:** Compressor, heating, DHW, additional, and total energy sensors are ready for one-click setup.
@@ -86,6 +88,12 @@ turn on `switch.qvantum_adaptive_curve_control`. The integration then takes over
 the curve; turning the switch off — or a failed write, or a lost connection —
 hands control straight back to the pump's Auto curve.
 
+While active you can optionally enable extra control terms with
+`qvantum.set_curve_terms`: **COP feedback** (reduce supply while the measured
+COP is below its learned reference) and **cold-snap pre-charge** (raise supply
+ahead of a forecast temperature drop). Both are off by default and never
+override the indoor cap or the pump's supply limits.
+
 **What is expected of you:**
 
 - Enable Modbus writing.
@@ -123,6 +131,19 @@ data:
 ```
 
 Cloud extra ventilation is a timed boost; local Modbus fan extra is a sticky preset. The extra-DHW switch and timer are also available, and the service works in both modes.
+
+#### `qvantum.set_curve_control` and `qvantum.set_curve_terms`
+
+Adaptive-curve control (Modbus only). `set_curve_control` switches between
+`shadow` and `active`; `set_curve_terms` toggles the optional control terms.
+Both are off/opt-in by default.
+
+```yaml
+service: qvantum.set_curve_terms
+data:
+  cop_feedback: true
+  precharge: true
+```
 
 #### Elevate Access
 
