@@ -360,6 +360,13 @@ class TestDhwStandingLoss:
         self._values(coordinator, bt30=55.0, bf1_l_min=0.2, hp_status=0)
         assert coordinator._update_dhw_standing_loss(1000.0) is None
 
+    def test_missing_flow_is_not_idle(self):
+        """Without a measured flow a draw is indistinguishable from cooling."""
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, hp_status=0)
+        assert coordinator._update_dhw_standing_loss(1000.0) is None
+        assert coordinator._dhw_idle_start is None
+
     async def test_standing_loss_reaches_snapshot(self):
         coordinator = make_coordinator()
         self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)

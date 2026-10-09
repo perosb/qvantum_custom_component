@@ -353,7 +353,10 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         if tank is None:
             return None
         flow = _finite(values.get("bf1_l_min"))
-        if flow is not None and flow > DHW_IDLE_FLOW_LPM:
+        # A missing flow metric must not count as "no draw": without it a hot
+        # water draw during the window is indistinguishable from tank cooling
+        # and the standing loss would be silently inflated.
+        if flow is None or flow > DHW_IDLE_FLOW_LPM:
             return None
         if values.get("hp_status") == HP_STATUS_HOT_WATER:
             return None
