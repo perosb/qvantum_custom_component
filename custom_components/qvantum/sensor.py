@@ -98,17 +98,67 @@ _CURVE_SENSOR_KEYS = frozenset(
 
 # Instantaneous COP lives on the main coordinator values (counter deltas).
 _COP_SENSOR_KEYS = frozenset({"cop_heating", "cop_dhw", "cop_system"})
-# Rolling efficiency figures come from the efficiency coordinator (recorder stats).
-_EFFICIENCY_SENSOR_KEYS = frozenset({"scop_total", "aux_heat_share"})
 _COP_ICONS: dict[str, str] = {
     "cop_heating": "mdi:heat-pump",
     "cop_dhw": "mdi:water-boiler",
     "cop_system": "mdi:heat-pump-outline",
 }
-_EFFICIENCY_ICONS: dict[str, str] = {
-    "scop_total": "mdi:chart-line",
-    "aux_heat_share": "mdi:lightning-bolt-outline",
+# Rolling efficiency figures come from the efficiency coordinator (recorder
+# stats). key -> icon, unit, display scale, precision, enabled-by-default.
+_EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
+    "scop_total": {
+        "icon": "mdi:chart-line",
+        "unit": None,
+        "scale": 1.0,
+        "precision": 2,
+        "enabled": False,
+    },
+    "aux_heat_share": {
+        "icon": "mdi:lightning-bolt-outline",
+        "unit": PERCENTAGE,
+        "scale": 100.0,
+        "precision": 1,
+        "enabled": True,
+    },
+    "heat_loss_coefficient": {
+        "icon": "mdi:home-thermometer-outline",
+        "unit": "W/K",
+        "scale": 1.0,
+        "precision": 1,
+        "enabled": False,
+        "field": "heat_loss_w_per_k",
+    },
+    "heating_degree_hours": {
+        "icon": "mdi:thermometer-lines",
+        "unit": "°C·h",
+        "scale": 1.0,
+        "precision": 0,
+        "enabled": False,
+    },
+    "weather_normalized_heating": {
+        "icon": "mdi:chart-timeline-variant",
+        "unit": "kWh/HDD",
+        "scale": 1.0,
+        "precision": 3,
+        "enabled": False,
+    },
+    "dhw_standing_loss": {
+        "icon": "mdi:water-boiler-alert",
+        "unit": "kWh/d",
+        "scale": 1.0,
+        "precision": 2,
+        "enabled": False,
+    },
 }
+_EFFICIENCY_SENSOR_KEYS = frozenset(_EFFICIENCY_SENSOR_CONFIG)
+# Figures whose coverage comes from the building series, not the energy counters.
+_BUILDING_SENSOR_KEYS = frozenset(
+    {
+        "heat_loss_coefficient",
+        "heating_degree_hours",
+        "weather_normalized_heating",
+    }
+)
 
 # Numeric prefix so the seven points sort 1→7 (+30 … −30) like the pump's own
 # curve numbers in any entity list, independent of locale.
@@ -265,16 +315,15 @@ async def async_setup_entry(
     )
     if isinstance(efficiency_coordinator, QvantumEfficiencyCoordinator):
         special_sensor_keys.update(_EFFICIENCY_SENSOR_KEYS)
-        sensors.append(
-            QvantumEfficiencySensorEntity(
-                efficiency_coordinator, "scop_total", device, False
+        for efficiency_key, config in _EFFICIENCY_SENSOR_CONFIG.items():
+            sensors.append(
+                QvantumEfficiencySensorEntity(
+                    efficiency_coordinator,
+                    efficiency_key,
+                    device,
+                    bool(config["enabled"]),
+                )
             )
-        )
-        sensors.append(
-            QvantumEfficiencySensorEntity(
-                efficiency_coordinator, "aux_heat_share", device, True
-            )
-        )
     if coordinator.modbus_enabled:
         special_sensor_keys.update(
             {
@@ -751,7 +800,6 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
 
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_suggested_display_precision = 2
 
     def __init__(
         self,
@@ -766,9 +814,13 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"qvantum_{metric_key}_{resolve_device_id(device)}"
         self._attr_device_info = device
         self._attr_entity_registry_enabled_default = enabled_by_default
-        self._attr_icon = _EFFICIENCY_ICONS.get(metric_key)
-        if metric_key == "aux_heat_share":
-            self._attr_native_unit_of_measurement = PERCENTAGE
+        config = _EFFICIENCY_SENSOR_CONFIG[metric_key]
+        self._scale = float(config["scale"])
+        self._snapshot_field = str(config.get("field") or metric_key)
+        self._attr_icon = config["icon"]
+        self._attr_suggested_display_precision = config["precision"]
+        if config["unit"] is not None:
+            self._attr_native_unit_of_measurement = config["unit"]
 
     @property
     def suggested_object_id(self) -> str | None:
@@ -781,12 +833,10 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
         snapshot = self.coordinator.data
         if snapshot is None:
             return None
-        value = getattr(snapshot, self._metric_key, None)
+        value = getattr(snapshot, self._snapshot_field, None)
         if value is None:
             return None
-        if self._metric_key == "aux_heat_share":
-            return round(value * 100, 1)
-        return round(value, 2)
+        return round(value * self._scale, self._attr_suggested_display_precision)
 
     @property
     def available(self) -> bool:
@@ -799,11 +849,14 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
         snapshot = self.coordinator.data
         if snapshot is None:
             return None
-        attributes = {
-            "coverage_days": round(snapshot.coverage_days, 1),
+        attributes: dict[str, object] = {
             "updated_at": snapshot.updated_at,
             "attribution": "hourly long-term statistics",
         }
+        if self._metric_key in _BUILDING_SENSOR_KEYS:
+            attributes["coverage_days"] = round(snapshot.building_coverage_days, 1)
+        elif self._metric_key in ("scop_total", "aux_heat_share"):
+            attributes["coverage_days"] = round(snapshot.coverage_days, 1)
         if self._metric_key == "scop_total" and snapshot.scop_total_90d is not None:
             attributes["scop_90d"] = round(snapshot.scop_total_90d, 2)
         return attributes

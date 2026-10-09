@@ -15,7 +15,9 @@ custom_components/qvantum/
   calculations.py             # power / tap-water / instantaneous COP
   statistics.py               # shared recorder long-term-statistics helpers
   efficiency.py               # pure COP/SCOP/aux-share math (no HA imports)
-  efficiency_coordinator.py   # rolling SCOP / aux share (both transports)
+  building.py                 # pure degree-hours / heat-loss math (no HA imports)
+  dhw_loss.py                 # pure DHW standing-loss math (no HA imports)
+  efficiency_coordinator.py   # rolling SCOP / aux / building / DHW loss
   entity.py                   # QvantumEntity, icons, write-access mixin
   config_flow.py
   const.py                    # HA keys; re-exports client constants

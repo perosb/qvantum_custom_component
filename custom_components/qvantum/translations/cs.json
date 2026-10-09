@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Alarm"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "Počasím normalizovaná spotřeba vytápění roste"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Podíl doplňkového vytápění"
+      },
+      "heat_loss_coefficient": {
+        "name": "Koeficient tepelné ztráty budovy"
+      },
+      "heating_degree_hours": {
+        "name": "Topnostupně (30 dní)"
+      },
+      "weather_normalized_heating": {
+        "name": "Počasím normalizované vytápění"
+      },
+      "dhw_standing_loss": {
+        "name": "Ztráta teplé vody v klidu"
       }
     },
     "number": {

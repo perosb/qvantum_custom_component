@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Alarme"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "Consommation de chauffage normalisée en hausse"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Part de chauffage d'appoint"
+      },
+      "heat_loss_coefficient": {
+        "name": "Coefficient de déperdition thermique du bâtiment"
+      },
+      "heating_degree_hours": {
+        "name": "Degrés-heures de chauffage (30 jours)"
+      },
+      "weather_normalized_heating": {
+        "name": "Chauffage normalisé par la météo"
+      },
+      "dhw_standing_loss": {
+        "name": "Pertes permanentes de l'eau chaude"
       }
     },
     "number": {

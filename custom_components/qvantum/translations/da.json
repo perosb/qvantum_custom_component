@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Alarm"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "Vejrnormaliseret varmeforbrug stiger"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Andel supplerende varme"
+      },
+      "heat_loss_coefficient": {
+        "name": "Bygningens varmetabskoefficient"
+      },
+      "heating_degree_hours": {
+        "name": "Gradtimer for opvarmning (30 dage)"
+      },
+      "weather_normalized_heating": {
+        "name": "Vejrnormaliseret opvarmning"
+      },
+      "dhw_standing_loss": {
+        "name": "Varmtvandstankens standby-tab"
       }
     },
     "number": {

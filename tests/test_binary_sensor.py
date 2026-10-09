@@ -10,6 +10,10 @@ class MockCoordinatorEntity:
     def __init__(self, coordinator):
         self.coordinator = coordinator
 
+    @property
+    def available(self):
+        return self.coordinator is not None
+
 
 class MockBinarySensorEntity:
     pass
@@ -319,3 +323,59 @@ async def test_async_setup_entry_modbus_includes_pump_relay(
     finally:
         if hasattr(QvantumBaseBinaryEntity, "entity_id"):
             delattr(QvantumBaseBinaryEntity, "entity_id")
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_creates_efficiency_binary(
+    hass, mock_config_entry, mock_coordinator, mock_device
+):
+    """The weather-normalized trend flag is created when the coordinator exists."""
+    from custom_components.qvantum.binary_sensor import (
+        async_setup_entry,
+        QvantumEfficiencyBinaryEntity,
+    )
+    from custom_components.qvantum import RuntimeData
+    from custom_components.qvantum.efficiency_coordinator import (
+        EfficiencySnapshot,
+        QvantumEfficiencyCoordinator,
+    )
+
+    hass.data["entity_registry"] = MagicMock()
+    mock_device_registry = MagicMock()
+    mock_device_registry.async_get_device_by_identifier.return_value = None
+    hass.data["device_registry"] = mock_device_registry
+
+    efficiency = QvantumEfficiencyCoordinator.__new__(QvantumEfficiencyCoordinator)
+    efficiency.data = EfficiencySnapshot(normalized_rising=True)
+    mock_config_entry.runtime_data = RuntimeData(
+        coordinator=mock_coordinator,
+        device=mock_device,
+        client=MagicMock(),
+        efficiency_coordinator=efficiency,
+    )
+    mock_coordinator.modbus_enabled = False
+
+    async_add_entities = MagicMock()
+    with (
+        patch("custom_components.qvantum.entity.disable_entities_by_default"),
+        patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+    ):
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+
+    entities = [
+        entity
+        for entity in async_add_entities.call_args[0][0]
+        if isinstance(entity, QvantumEfficiencyBinaryEntity)
+    ]
+    assert len(entities) == 1
+    entity = entities[0]
+    assert entity._metric_key == "weather_normalized_consumption_rising"
+    assert entity._attr_unique_id == (
+        "qvantum_weather_normalized_consumption_rising_test_device_123"
+    )
+    assert entity.is_on is True
+    assert entity.available is True
+
+    efficiency.data = EfficiencySnapshot(normalized_rising=None)
+    assert entity.is_on is None
+    assert entity.available is False

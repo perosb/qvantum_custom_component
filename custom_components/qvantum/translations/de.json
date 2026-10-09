@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Alarm"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "Wetterbereinigter Heizverbrauch steigt"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Anteil Zusatzheizung"
+      },
+      "heat_loss_coefficient": {
+        "name": "Wärmeverlustkoeffizient des Gebäudes"
+      },
+      "heating_degree_hours": {
+        "name": "Heizgradstunden (30 Tage)"
+      },
+      "weather_normalized_heating": {
+        "name": "Wetterbereinigte Heizung"
+      },
+      "dhw_standing_loss": {
+        "name": "Standverlust Warmwasser"
       }
     },
     "number": {

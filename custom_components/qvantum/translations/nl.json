@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Alarm"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "Weer-genormaliseerd warmteverbruik stijgt"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Aandeel bijverwarming"
+      },
+      "heat_loss_coefficient": {
+        "name": "Warmteverliescoëfficiënt van het gebouw"
+      },
+      "heating_degree_hours": {
+        "name": "Graaduren verwarming (30 dagen)"
+      },
+      "weather_normalized_heating": {
+        "name": "Weer-genormaliseerde verwarming"
+      },
+      "dhw_standing_loss": {
+        "name": "Stand-by verlies warm water"
       }
     },
     "number": {

@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from .const import DOMAIN
+from .const import DOMAIN, SensorMode
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +44,24 @@ def resolve_statistic_entity_ids(
         if entity_id:
             resolved[key] = entity_id
     return resolved
+
+
+def resolve_indoor_metric_key(
+    resolved: Mapping[str, str], values: Mapping[str, Any]
+) -> str | None:
+    """Pick the indoor-temperature metric the pump is configured to use.
+
+    Mirrors the climate platform: ``sensor_mode`` selects BT2 or the external
+    room sensor, and a missing mode falls back to BT2. Returns ``None`` when
+    none of the candidate metrics resolved to an entity.
+    """
+    mode = values.get("sensor_mode")
+    if mode is None:
+        mode = values.get("use_operation_sensor")
+    for key in (*SensorMode.current_temperature_keys(mode), "bt2"):
+        if key in resolved:
+            return key
+    return None
 
 
 async def async_statistics_during_period(

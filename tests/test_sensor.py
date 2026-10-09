@@ -800,6 +800,34 @@ class TestQvantumEfficiencySensors:
         assert entity._attr_native_unit_of_measurement == "%"
         assert "scop_90d" not in entity.extra_state_attributes
 
+    def test_building_sensor_units_and_coverage(self, mock_device):
+        coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(
+                heat_loss_w_per_k=123.45,
+                building_coverage_days=28.0,
+                updated_at="2026-03-01T00:00:00+00:00",
+            )
+        )
+        entity = QvantumEfficiencySensorEntity(
+            coordinator, "heat_loss_coefficient", mock_device
+        )
+
+        assert entity.native_value == 123.5
+        assert entity._attr_native_unit_of_measurement == "W/K"
+        assert entity.extra_state_attributes["coverage_days"] == 28.0
+
+    def test_dhw_standing_loss_has_no_counter_coverage(self, mock_device):
+        coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(dhw_standing_loss=1.2, coverage_days=30.0)
+        )
+        entity = QvantumEfficiencySensorEntity(
+            coordinator, "dhw_standing_loss", mock_device
+        )
+
+        assert entity.native_value == 1.2
+        assert entity._attr_native_unit_of_measurement == "kWh/d"
+        assert "coverage_days" not in entity.extra_state_attributes
+
     def test_efficiency_sensor_unavailable_without_value(self, mock_device):
         coordinator = _efficiency_coordinator(EfficiencySnapshot())
         entity = QvantumEfficiencySensorEntity(coordinator, "scop_total", mock_device)
@@ -840,7 +868,14 @@ class TestQvantumEfficiencySensors:
             if isinstance(entity, QvantumEfficiencySensorEntity)
         }
         assert cop_keys == {"cop_heating", "cop_dhw", "cop_system"}
-        assert efficiency_keys == {"scop_total", "aux_heat_share"}
+        assert efficiency_keys == {
+            "scop_total",
+            "aux_heat_share",
+            "heat_loss_coefficient",
+            "heating_degree_hours",
+            "weather_normalized_heating",
+            "dhw_standing_loss",
+        }
 
 
 class TestQvantumDiagnosticEntity:
