@@ -291,12 +291,21 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         window_start = now_ts - BUILDING_WINDOW_DAYS * 86400.0
         outdoor = dict(outdoor_points)
         outdoor_window = {ts: value for ts, value in outdoor.items() if ts >= window_start}
-        hdh = degree_hours(outdoor_window) if outdoor_window else None
+        building_coverage = len(outdoor_window) / 24.0
+        # A fresh install must not read as a 30-day figure from a day or two
+        # of rows; the same minimum as the counters applies here.
+        hdh = (
+            degree_hours(outdoor_window)
+            if building_coverage >= MIN_COVERAGE_DAYS
+            else None
+        )
 
         heating_delta, heating_coverage = _window_delta(
             heating_points, now_ts, BUILDING_WINDOW_DAYS
         )
-        normalized = weather_normalized_heating(heating_delta, hdh)
+        normalized = None
+        if heating_coverage >= MIN_COVERAGE_DAYS:
+            normalized = weather_normalized_heating(heating_delta, hdh)
 
         indoor = dict(indoor_points)
         power = dict(power_points)
@@ -305,7 +314,11 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             for ts in set(indoor) & set(outdoor) & set(power)
             if ts >= window_start
         ]
-        heat_loss = fit_heat_loss(fit_hours, now_ts=int(now_ts))
+        heat_loss = (
+            fit_heat_loss(fit_hours, now_ts=int(now_ts))
+            if building_coverage >= MIN_COVERAGE_DAYS
+            else None
+        )
 
         previous_hdh = degree_hours(
             {
@@ -332,7 +345,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         ):
             rising = normalized >= previous * TREND_RISING_RATIO
 
-        return heat_loss, hdh, normalized, rising, len(outdoor_window) / 24.0
+        return heat_loss, hdh, normalized, rising, building_coverage
 
     @staticmethod
     def _window(

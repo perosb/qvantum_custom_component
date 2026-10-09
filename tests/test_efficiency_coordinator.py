@@ -289,6 +289,27 @@ class TestBuildingMetrics:
 
         assert snapshot.normalized_rising is None
 
+    async def test_short_building_history_publishes_nothing(self):
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        cutoff = now_ts - 2 * 86400
+        rows = {
+            key: [row for row in value if row["start"] >= cutoff]
+            for key, value in self._series(now_ts=now_ts).items()
+        }
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value=rows)
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.heat_loss_w_per_k is None
+        assert snapshot.heating_degree_hours is None
+        assert snapshot.weather_normalized_heating is None
+        assert snapshot.building_coverage_days == pytest.approx(2.0, abs=0.1)
+
     async def test_building_metrics_unavailable_without_series(self):
         coordinator = make_coordinator()
         with (
