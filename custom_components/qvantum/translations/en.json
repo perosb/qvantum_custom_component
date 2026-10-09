@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Alarm"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "Weather-normalized heating consumption rising"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Auxiliary heat share"
+      },
+      "heat_loss_coefficient": {
+        "name": "Building heat-loss coefficient"
+      },
+      "heating_degree_hours": {
+        "name": "Heating degree hours (30 days)"
+      },
+      "weather_normalized_heating": {
+        "name": "Weather-normalized heating"
+      },
+      "dhw_standing_loss": {
+        "name": "Hot water standing loss"
       }
     },
     "number": {

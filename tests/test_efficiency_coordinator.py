@@ -126,7 +126,7 @@ class TestComputeSnapshot:
         assert snapshot.scop_total_90d == pytest.approx(3.0)
         assert snapshot.aux_heat_share == pytest.approx(0.4)
         assert snapshot.coverage_days == pytest.approx(10.0)
-        assert stats.await_args.kwargs["types"] == {"sum"}
+        assert stats.await_args.kwargs["types"] == {"sum", "mean"}
 
     async def test_short_history_yields_no_values(self):
         coordinator = make_coordinator()
@@ -168,7 +168,10 @@ class TestComputeSnapshot:
         ):
             await coordinator._async_compute_snapshot()
 
-        assert resolve.call_args.args[2] == ec.COUNTER_KEYS
+        assert [call.args[2] for call in resolve.call_args_list] == [
+            ec.COUNTER_KEYS,
+            ec.BUILDING_KEYS,
+        ]
 
     def test_device_id_property(self):
         coordinator = make_coordinator()
@@ -206,3 +209,220 @@ class TestUpdateData:
         ):
             with pytest.raises(asyncio.CancelledError):
                 await coordinator._async_update_data()
+
+
+class TestBuildingMetrics:
+    @staticmethod
+    def _series(*, now_ts: int) -> dict[str, list[dict]]:
+        """60 hourly days: old consumption rate first, new rate second."""
+        hours = 60 * 24
+        bt1: list[dict] = []
+        bt2: list[dict] = []
+        power: list[dict] = []
+        heating: list[dict] = []
+        energy = 0.0
+        for index in range(hours):
+            ts = now_ts - (hours - 1 - index) * 3600
+            rate = 2.0 if index < hours // 2 else 4.0  # kWh/day
+            energy += rate / 24.0
+            bt1.append({"start": ts, "mean": 0.0})
+            bt2.append({"start": ts, "mean": 21.0})
+            power.append({"start": ts, "mean": 30.0 * 21.0})
+            heating.append({"start": ts, "sum": energy})
+        return {
+            "sensor.heatingenergy": heating,
+            "sensor.bt1": bt1,
+            "sensor.bt2": bt2,
+            "sensor.heatingpower": power,
+        }
+
+    @staticmethod
+    def _patch_resolve():
+        def fake_resolve(hass, device_id, keys):
+            if tuple(keys) == ec.COUNTER_KEYS:
+                return {"heatingenergy": "sensor.heatingenergy"}
+            return {
+                "bt1": "sensor.bt1",
+                "bt2": "sensor.bt2",
+                "heatingpower": "sensor.heatingpower",
+            }
+
+        return patch.object(ec, "resolve_statistic_entity_ids", fake_resolve)
+
+    async def test_computes_building_metrics_and_rising_trend(self):
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        rows = self._series(now_ts=now_ts)
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value=rows)
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.heat_loss_w_per_k == pytest.approx(30.0)
+        assert snapshot.heating_degree_hours == pytest.approx(
+            15.0 * 30 * 24, rel=0.01
+        )
+        assert snapshot.weather_normalized_heating == pytest.approx(
+            4.0 * 30 / (15.0 * 30), rel=0.02
+        )
+        assert snapshot.normalized_rising is True
+        assert snapshot.building_coverage_days == pytest.approx(30.0, rel=0.01)
+
+    async def test_trend_is_none_without_previous_window(self):
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        cutoff = now_ts - 30 * 86400
+        rows = {
+            key: [row for row in value if row["start"] >= cutoff]
+            for key, value in self._series(now_ts=now_ts).items()
+        }
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value=rows)
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.normalized_rising is None
+
+    async def test_normalized_uses_aligned_hours(self):
+        """Energy and degree hours must cover exactly the same hours."""
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        series = self._series(now_ts=now_ts)
+        cutoff = now_ts - 10 * 86400
+        rows = {
+            "sensor.heatingenergy": series["sensor.heatingenergy"],
+            "sensor.bt1": [
+                row for row in series["sensor.bt1"] if row["start"] >= cutoff
+            ],
+            "sensor.bt2": series["sensor.bt2"],
+            "sensor.heatingpower": series["sensor.heatingpower"],
+        }
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value=rows)
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        # 10 aligned days at 4 kWh/day and 15 K -> 4/15 kWh/HDD, not the
+        # cross-period 30-day energy over 10-day degree hours.
+        assert snapshot.building_coverage_days == pytest.approx(10.0, abs=0.2)
+        assert snapshot.weather_normalized_heating == pytest.approx(
+            4.0 / 15.0, rel=0.02
+        )
+        assert snapshot.normalized_rising is None
+
+    async def test_short_building_history_publishes_nothing(self):
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        cutoff = now_ts - 2 * 86400
+        rows = {
+            key: [row for row in value if row["start"] >= cutoff]
+            for key, value in self._series(now_ts=now_ts).items()
+        }
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value=rows)
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.heat_loss_w_per_k is None
+        assert snapshot.heating_degree_hours is None
+        assert snapshot.weather_normalized_heating is None
+        assert snapshot.building_coverage_days == pytest.approx(2.0, abs=0.1)
+
+    async def test_building_metrics_unavailable_without_series(self):
+        coordinator = make_coordinator()
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value={})
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.heat_loss_w_per_k is None
+        assert snapshot.heating_degree_hours is None
+        assert snapshot.weather_normalized_heating is None
+        assert snapshot.normalized_rising is None
+        assert snapshot.building_coverage_days == 0.0
+
+
+class TestDhwStandingLoss:
+    @staticmethod
+    def _values(coordinator, **values):
+        coordinator._main.data = {"values": values}
+
+    def test_accumulates_and_blends_on_activity(self):
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)
+        assert coordinator._update_dhw_standing_loss(1000.0) is None
+        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0)
+        assert coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600) is None
+        self._values(coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0)
+        value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
+
+        expected = 175.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
+        assert value == pytest.approx(expected)
+
+    def test_short_window_is_discarded(self):
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(coordinator, bt30=54.0, bf1_l_min=0.0, hp_status=0)
+        coordinator._update_dhw_standing_loss(1000.0 + 2 * 3600)
+        self._values(coordinator, bt30=54.0, bf1_l_min=6.0, hp_status=0)
+        assert coordinator._update_dhw_standing_loss(1000.0 + 2 * 3600) is None
+
+    def test_reheating_rise_closes_window_before_the_rise(self):
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0)
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        self._values(coordinator, bt30=54.0, bf1_l_min=0.0, hp_status=0)
+        value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
+
+        expected = 175.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
+        assert value == pytest.approx(expected)
+
+    def test_dhw_heating_is_not_idle(self):
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=2)
+        assert coordinator._update_dhw_standing_loss(1000.0) is None
+        assert coordinator._dhw_idle_start is None
+
+    def test_compressor_state_marks_dhw_active(self):
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, compressor_state=8)
+        assert coordinator._update_dhw_standing_loss(1000.0) is None
+
+    def test_flow_above_threshold_is_not_idle(self):
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.2, hp_status=0)
+        assert coordinator._update_dhw_standing_loss(1000.0) is None
+
+    def test_missing_flow_is_not_idle(self):
+        """Without a measured flow a draw is indistinguishable from cooling."""
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, hp_status=0)
+        assert coordinator._update_dhw_standing_loss(1000.0) is None
+        assert coordinator._dhw_idle_start is None
+
+    async def test_standing_loss_reaches_snapshot(self):
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)
+        coordinator._dhw_standing_loss = 1.23
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_standing_loss == 1.23

@@ -10,6 +10,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     BINARY_SENSOR_NAMES,
@@ -19,9 +20,13 @@ from .const import (
 )
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
-from .entity import QvantumEntity, finalize_platform_setup
+from .efficiency_coordinator import QvantumEfficiencyCoordinator
+from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 
 _LOGGER = logging.getLogger(__name__)
+
+# Derived from recorder statistics rather than a pump metric.
+_EFFICIENCY_BINARY_SENSORS = frozenset({"weather_normalized_consumption_rising"})
 
 _CONNECTIVITY_BINARY_SENSORS = frozenset({"wifi_connected", "cloud_connected"})
 _PROBLEM_BINARY_SENSORS = frozenset({"alarm_active"})
@@ -86,15 +91,69 @@ async def async_setup_entry(
             )
         )
 
+    possible_metrics = set(names)
+    efficiency_coordinator = getattr(
+        config_entry.runtime_data, "efficiency_coordinator", None
+    )
+    if isinstance(efficiency_coordinator, QvantumEfficiencyCoordinator):
+        possible_metrics.update(_EFFICIENCY_BINARY_SENSORS)
+        sensors.append(
+            QvantumEfficiencyBinaryEntity(
+                efficiency_coordinator,
+                "weather_normalized_consumption_rising",
+                device,
+                False,
+            )
+        )
+
     finalize_platform_setup(
         hass,
         coordinator,
         async_add_entities,
         sensors,
-        set(names),
+        possible_metrics,
         "binary_sensor",
         disable_by_default=True,
     )
+
+
+class QvantumEfficiencyBinaryEntity(CoordinatorEntity, BinarySensorEntity):
+    """Diagnostic flag derived from rolling efficiency analytics."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        efficiency_coordinator: QvantumEfficiencyCoordinator,
+        metric_key: str,
+        device: DeviceInfo | dict,
+        enabled_by_default: bool = False,
+    ) -> None:
+        super().__init__(efficiency_coordinator)
+        self._metric_key = metric_key
+        self._attr_translation_key = metric_key
+        self._attr_unique_id = f"qvantum_{metric_key}_{resolve_device_id(device)}"
+        self._attr_device_info = device
+        self._attr_entity_registry_enabled_default = enabled_by_default
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        """Stable English slug; translated names must not move entity IDs."""
+        return self._metric_key
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return the trend verdict, or None without enough history."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        return snapshot.normalized_rising
+
+    @property
+    def available(self) -> bool:
+        """Only meaningful once both trend windows have enough coverage."""
+        return super().available and self.is_on is not None
 
 
 class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):

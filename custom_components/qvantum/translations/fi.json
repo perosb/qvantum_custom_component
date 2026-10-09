@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Hälytys"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "Säänormalisoitu lämmityskulutus kasvaa"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Lisälämmityksen osuus"
+      },
+      "heat_loss_coefficient": {
+        "name": "Rakennuksen lämpöhäviökerroin"
+      },
+      "heating_degree_hours": {
+        "name": "Lämmitysaste-tunnit (30 päivää)"
+      },
+      "weather_normalized_heating": {
+        "name": "Säänormalisoitu lämmitys"
+      },
+      "dhw_standing_loss": {
+        "name": "Käyttöveden varastohäviö"
       }
     },
     "number": {

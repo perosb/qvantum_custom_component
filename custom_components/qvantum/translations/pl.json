@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Alarm"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "Znormalizowane zużycie ogrzewania rośnie"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Udział ogrzewania dodatkowego"
+      },
+      "heat_loss_coefficient": {
+        "name": "Współczynnik strat ciepła budynku"
+      },
+      "heating_degree_hours": {
+        "name": "Godzinostopnie grzania (30 dni)"
+      },
+      "weather_normalized_heating": {
+        "name": "Ogrzewanie znormalizowane pogodowo"
+      },
+      "dhw_standing_loss": {
+        "name": "Straty postojowe ciepłej wody"
       }
     },
     "number": {

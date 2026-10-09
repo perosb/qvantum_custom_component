@@ -57,7 +57,11 @@ from .open_meteo import (
     fetch_ghi_history,
 )
 from .solar_gain import SolarModel, SolarSample, fit_solar_model
-from .statistics import async_statistics_during_period, resolve_statistic_entity_ids
+from .statistics import (
+    async_statistics_during_period,
+    resolve_indoor_metric_key,
+    resolve_statistic_entity_ids,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -942,14 +946,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return await async_statistics_during_period(self.hass, statistic_ids, start)
 
     def _indoor_metric_key(self, resolved: Mapping[str, str]) -> str | None:
-        values = self._main_values()
-        mode = values.get("sensor_mode")
-        if mode is None:
-            mode = values.get("use_operation_sensor")
-        for key in (*SensorMode.current_temperature_keys(mode), "bt2"):
-            if key in resolved:
-                return key
-        return None
+        return resolve_indoor_metric_key(resolved, self._main_values())
 
     async def _async_hourly_maps(self) -> dict[str, dict[int, float]]:
         resolved = self._resolve_statistic_ids()

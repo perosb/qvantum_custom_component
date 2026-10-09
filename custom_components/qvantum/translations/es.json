@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Alarma"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "El consumo de calefacción normalizado está subiendo"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Proporción de calefacción auxiliar"
+      },
+      "heat_loss_coefficient": {
+        "name": "Coeficiente de pérdida térmica del edificio"
+      },
+      "heating_degree_hours": {
+        "name": "Grados-hora de calefacción (30 días)"
+      },
+      "weather_normalized_heating": {
+        "name": "Calefacción normalizada por clima"
+      },
+      "dhw_standing_loss": {
+        "name": "Pérdida en espera del agua caliente"
       }
     },
     "number": {

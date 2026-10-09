@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Riasztás"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "Az időjárás-normalizált fűtési fogyasztás növekszik"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Kiegészítő fűtés aránya"
+      },
+      "heat_loss_coefficient": {
+        "name": "Az épület hőveszteségi együtthatója"
+      },
+      "heating_degree_hours": {
+        "name": "Fűtési fokórák (30 nap)"
+      },
+      "weather_normalized_heating": {
+        "name": "Időjárás-normalizált fűtés"
+      },
+      "dhw_standing_loss": {
+        "name": "Használati melegvíz állási vesztesége"
       }
     },
     "number": {

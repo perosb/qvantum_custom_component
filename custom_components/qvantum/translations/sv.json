@@ -214,6 +214,9 @@
       },
       "alarm_active": {
         "name": "Larm"
+      },
+      "weather_normalized_consumption_rising": {
+        "name": "Vädernormaliserad uppvärmningsförbrukning stiger"
       }
     },
     "sensor": {
@@ -628,6 +631,18 @@
       },
       "aux_heat_share": {
         "name": "Andel tillsatsvärme"
+      },
+      "heat_loss_coefficient": {
+        "name": "Byggnadens värmeförlustkoefficient"
+      },
+      "heating_degree_hours": {
+        "name": "Gradtimmar värme (30 dagar)"
+      },
+      "weather_normalized_heating": {
+        "name": "Vädernormaliserad uppvärmning"
+      },
+      "dhw_standing_loss": {
+        "name": "Varmvattenberedarens ståförlust"
       }
     },
     "number": {
