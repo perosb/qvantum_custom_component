@@ -675,7 +675,7 @@
         "name": "Auringon säteily (nyt)"
       },
       "solar_gain_now_w": {
-        "name": "Aurinkovoitto (nyt)"
+        "name": "Aurinkohyöty (nyt)"
       }
     },
     "number": {
