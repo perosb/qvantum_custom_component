@@ -613,6 +613,21 @@
       },
       "adaptive_curve_solar_model": {
         "name": "Adaptív fűtési görbe: szoláris modell"
+      },
+      "cop_heating": {
+        "name": "COP fűtés"
+      },
+      "cop_dhw": {
+        "name": "COP használati melegvíz"
+      },
+      "cop_system": {
+        "name": "COP rendszer"
+      },
+      "scop_total": {
+        "name": "SCOP összesen (30 nap)"
+      },
+      "aux_heat_share": {
+        "name": "Kiegészítő fűtés aránya"
       }
     },
     "number": {

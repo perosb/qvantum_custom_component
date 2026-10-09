@@ -613,6 +613,21 @@
       },
       "adaptive_curve_solar_model": {
         "name": "Adaptiv värmekurva: solmodell"
+      },
+      "cop_heating": {
+        "name": "COP värme"
+      },
+      "cop_dhw": {
+        "name": "COP varmvatten"
+      },
+      "cop_system": {
+        "name": "COP system"
+      },
+      "scop_total": {
+        "name": "SCOP totalt (30 dagar)"
+      },
+      "aux_heat_share": {
+        "name": "Andel tillsatsvärme"
       }
     },
     "number": {

@@ -12,7 +12,10 @@ custom_components/qvantum/
   coordinator.py              # poll, derived metrics, extra-DHW helper
   maintenance_coordinator.py  # firmware / elevate-access (cloud)
   extra_dhw.py                # ExtraDhwTimer (HA Store + async_call_later)
-  calculations.py
+  calculations.py             # power / tap-water / instantaneous COP
+  statistics.py               # shared recorder long-term-statistics helpers
+  efficiency.py               # pure COP/SCOP/aux-share math (no HA imports)
+  efficiency_coordinator.py   # rolling SCOP / aux share (both transports)
   entity.py                   # QvantumEntity, icons, write-access mixin
   config_flow.py
   const.py                    # HA keys; re-exports client constants
@@ -29,7 +32,9 @@ tests/
 
 `config_entry.runtime_data` (`RuntimeData`): `coordinator`,
 `maintenance_coordinator`, `device`, `client`, `extra_dhw` (Modbus only),
-Modbus host/port/unit. Platforms read `runtime_data.coordinator` and `device`.
+`curve_coordinator` (Modbus only) and `efficiency_coordinator` (both
+transports), Modbus host/port/unit. Platforms read `runtime_data.coordinator`
+and `device`.
 Shared writes: `QvantumClient` on `coordinator.client`. Cloud-only / Modbus-only
 writes: coordinator helpers (`async_set_extra_tap_water`, `async_write_metric`,
 `async_set_smartcontrol`, `async_elevate_access`) — no `isinstance` on transport.
@@ -179,6 +184,12 @@ migration test when the entry schema changes.
 
 Icons on `QvantumEntity`. Cloud-only (SmartControl, firmware boards, access
 expiry, elevate-access) must not be created in Modbus mode.
+
+Derived metrics (`cop_*`, `scop_total`, `aux_heat_share`, …) are computed in HA
+after the poll. Never add them to `DEFAULT_ENABLED_*` / `DEFAULT_DISABLED_*`:
+those lists are also the fetch universe, so the client would request a metric
+the API does not return. Create derived entities explicitly in the platform and
+list their keys in `special_sensor_keys` so registry cleanup keeps them.
 
 Entity `available` must AND its data check with `_coordinator_available` (the
 coordinator's `last_update_success`); HA keeps stale data after a failed poll.

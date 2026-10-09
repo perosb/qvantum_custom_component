@@ -51,6 +51,7 @@ from .const import (
 )
 from .coordinator import QvantumDataUpdateCoordinator
 from .curve_coordinator import QvantumCurveCoordinator
+from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
@@ -249,6 +250,7 @@ class RuntimeData:
     device: DeviceInfo | None = None
     extra_dhw: ExtraDhwTimer | None = None
     curve_coordinator: QvantumCurveCoordinator | None = None
+    efficiency_coordinator: QvantumEfficiencyCoordinator | None = None
     modbus_host: str = DEFAULT_MODBUS_HOST
     modbus_port: int = DEFAULT_MODBUS_PORT
     modbus_unit_id: int = DEFAULT_MODBUS_UNIT_ID
@@ -375,6 +377,20 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
                 ) from err
             raise
 
+    # Rolling efficiency analytics (SCOP / auxiliary-heat share) are derived
+    # from recorder statistics and are transport-agnostic. Like the curve
+    # coordinator they never block setup: the first refresh degrades to an
+    # empty snapshot when the recorder or history is unavailable.
+    efficiency_coordinator = QvantumEfficiencyCoordinator(
+        hass, config_entry, coordinator
+    )
+    try:
+        await efficiency_coordinator.async_refresh()
+    except asyncio.CancelledError:
+        raise
+    except Exception as err:  # noqa: BLE001 — analytics must not block setup
+        _LOGGER.debug("Efficiency coordinator first refresh failed: %s", err)
+
     remove_listener = config_entry.add_update_listener(_async_update_listener)
     config_entry.async_on_unload(remove_listener)
 
@@ -385,6 +401,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         device,
         extra_dhw=extra_dhw,
         curve_coordinator=curve_coordinator,
+        efficiency_coordinator=efficiency_coordinator,
         modbus_host=modbus_host,
         modbus_port=modbus_port,
         modbus_unit_id=modbus_unit_id,
@@ -694,6 +711,7 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
         for coordinator in (
             getattr(runtime, "maintenance_coordinator", None),
             getattr(runtime, "curve_coordinator", None),
+            getattr(runtime, "efficiency_coordinator", None),
             getattr(runtime, "coordinator", None),
         ):
             if coordinator is None:

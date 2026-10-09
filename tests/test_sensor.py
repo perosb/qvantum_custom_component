@@ -51,11 +51,13 @@ with patch(
             from custom_components.qvantum.sensor import (
                 QvantumAccessExpireEntity,
                 QvantumBaseSensorEntity,
+                QvantumCopSensor,
                 QvantumCurveAdjustmentSensor,
                 QvantumCurveDeviationSensor,
                 QvantumCurvePointSensor,
                 QvantumCurveSolarModelSensor,
                 QvantumCurrentEntity,
+                QvantumEfficiencySensorEntity,
                 QvantumDiagnosticEntity,
                 QvantumDisplayFirmwareEntity,
                 QvantumEnergyEntity,
@@ -72,6 +74,10 @@ with patch(
             from custom_components.qvantum.curve_coordinator import (
                 CurveSnapshot,
                 QvantumCurveCoordinator,
+            )
+            from custom_components.qvantum.efficiency_coordinator import (
+                EfficiencySnapshot,
+                QvantumEfficiencyCoordinator,
             )
             from custom_components.qvantum.solar_gain import SolarModel
 
@@ -711,6 +717,130 @@ class TestQvantumCurveSensors:
         assert deviation.extra_state_attributes is None
         assert model.native_value is None
         assert model.extra_state_attributes is None
+
+
+def _efficiency_coordinator(snapshot) -> QvantumEfficiencyCoordinator:
+    coordinator = QvantumEfficiencyCoordinator.__new__(QvantumEfficiencyCoordinator)
+    coordinator.data = snapshot
+    return coordinator
+
+
+class TestQvantumEfficiencySensors:
+    """COP on the main coordinator; rolling SCOP/aux on the efficiency one."""
+
+    @pytest.fixture
+    def mock_config_entry(self, mock_coordinator, mock_device):
+        """Config entry whose runtime data can carry a real efficiency coordinator."""
+        from homeassistant.config_entries import ConfigEntry
+        from custom_components.qvantum import RuntimeData
+
+        config_entry = MagicMock(spec=ConfigEntry)
+        config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator, device=mock_device, client=MagicMock()
+        )
+        return config_entry
+
+    @pytest.fixture
+    def mock_hass(self):
+        """Minimal Home Assistant mock for platform setup."""
+        hass = MagicMock()
+        hass.data = {"entity_registry": MagicMock(), "device_registry": MagicMock()}
+        return hass
+
+    def test_cop_sensor_value_and_attributes(self, mock_coordinator, mock_device):
+        mock_coordinator.data["values"].update(
+            {"cop_heating": 4.2, "cop_dhw": None, "cop_system": 3.8, "hp_status": 3}
+        )
+        entity = QvantumCopSensor(mock_coordinator, "cop_heating", mock_device)
+
+        assert entity.native_value == 4.2
+        assert entity._attr_unique_id == "qvantum_cop_heating_test_device_123"
+        assert entity._attr_suggested_display_precision == 1
+        assert entity.extra_state_attributes["hp_status"] == 3
+        assert entity.extra_state_attributes["attribution"].startswith(
+            "energy-counter"
+        )
+
+    def test_cop_sensor_unavailable_without_value(self, mock_coordinator, mock_device):
+        entity = QvantumCopSensor(mock_coordinator, "cop_dhw", mock_device)
+
+        assert entity.native_value is None
+        assert entity.available is False
+
+    def test_scop_sensor_value_and_attributes(self, mock_device):
+        coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(
+                scop_total=3.456,
+                scop_total_90d=3.789,
+                aux_heat_share=0.123,
+                coverage_days=45.5,
+                updated_at="2026-03-01T00:00:00+00:00",
+            )
+        )
+        entity = QvantumEfficiencySensorEntity(
+            coordinator, "scop_total", mock_device, False
+        )
+
+        assert entity.native_value == 3.46
+        assert entity._attr_unique_id == "qvantum_scop_total_test_device_123"
+        assert entity._attr_entity_registry_enabled_default is False
+        attributes = entity.extra_state_attributes
+        assert attributes["scop_90d"] == 3.79
+        assert attributes["coverage_days"] == 45.5
+
+    def test_aux_heat_share_is_percent(self, mock_device):
+        coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(aux_heat_share=0.123, coverage_days=30.0)
+        )
+        entity = QvantumEfficiencySensorEntity(
+            coordinator, "aux_heat_share", mock_device
+        )
+
+        assert entity.native_value == 12.3
+        assert entity._attr_native_unit_of_measurement == "%"
+        assert "scop_90d" not in entity.extra_state_attributes
+
+    def test_efficiency_sensor_unavailable_without_value(self, mock_device):
+        coordinator = _efficiency_coordinator(EfficiencySnapshot())
+        entity = QvantumEfficiencySensorEntity(coordinator, "scop_total", mock_device)
+
+        assert entity.native_value is None
+        assert entity.available is False
+
+        coordinator.data = None
+        assert entity.native_value is None
+        assert entity.extra_state_attributes is None
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_creates_efficiency_sensors(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Both COP and the rolling sensors are created in cloud mode too."""
+        mock_coordinator.modbus_enabled = False
+        mock_config_entry.runtime_data.efficiency_coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(scop_total=3.0, aux_heat_share=0.1, coverage_days=30.0)
+        )
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        cop_keys = {
+            entity._metric_key
+            for entity in entities
+            if isinstance(entity, QvantumCopSensor)
+        }
+        efficiency_keys = {
+            entity._metric_key
+            for entity in entities
+            if isinstance(entity, QvantumEfficiencySensorEntity)
+        }
+        assert cop_keys == {"cop_heating", "cop_dhw", "cop_system"}
+        assert efficiency_keys == {"scop_total", "aux_heat_share"}
 
 
 class TestQvantumDiagnosticEntity:

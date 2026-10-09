@@ -613,6 +613,21 @@
       },
       "adaptive_curve_solar_model": {
         "name": "Adaptieve stooklijn: zonnemodel"
+      },
+      "cop_heating": {
+        "name": "COP verwarming"
+      },
+      "cop_dhw": {
+        "name": "COP warm water"
+      },
+      "cop_system": {
+        "name": "COP systeem"
+      },
+      "scop_total": {
+        "name": "SCOP totaal (30 dagen)"
+      },
+      "aux_heat_share": {
+        "name": "Aandeel bijverwarming"
       }
     },
     "number": {

@@ -613,6 +613,21 @@
       },
       "adaptive_curve_solar_model": {
         "name": "Adaptiivinen lämmityskäyrä: aurinkomalli"
+      },
+      "cop_heating": {
+        "name": "COP lämmitys"
+      },
+      "cop_dhw": {
+        "name": "COP käyttövesi"
+      },
+      "cop_system": {
+        "name": "COP järjestelmä"
+      },
+      "scop_total": {
+        "name": "SCOP yhteensä (30 päivää)"
+      },
+      "aux_heat_share": {
+        "name": "Lisälämmityksen osuus"
       }
     },
     "number": {

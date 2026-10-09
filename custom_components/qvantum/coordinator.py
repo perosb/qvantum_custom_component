@@ -225,6 +225,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._last_heatingenergy_time: datetime | None = None
         self._last_dhwenergy: float | None = None
         self._last_dhwenergy_time: datetime | None = None
+        # Cumulative energy counters from the previous poll, for instantaneous COP.
+        self._last_cop_energies: dict[str, float] | None = None
         self._last_shower_cold_temp: float | None = None
         self._last_shower_flow_lpm: float | None = None
         self._last_shower_temp_c: float | None = (
@@ -1210,6 +1212,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 await self._refresh_modbus_sw_version()
 
             self._derive_tap_water_capacity(values)
+            self._calculate_cop(values)
 
             if self.modbus_enabled:
                 self._calculate_heating_power(values)

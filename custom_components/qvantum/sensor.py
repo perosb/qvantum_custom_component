@@ -17,6 +17,7 @@ from homeassistant.const import (
     EntityCategory,
     UnitOfPressure,
     UnitOfElectricCurrent,
+    PERCENTAGE,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_utils
@@ -42,6 +43,7 @@ from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
 from .curve_coordinator import QvantumCurveCoordinator
+from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -93,6 +95,20 @@ _CURVE_SENSOR_KEYS = frozenset(
         "adaptive_curve_solar_model",
     }
 )
+
+# Instantaneous COP lives on the main coordinator values (counter deltas).
+_COP_SENSOR_KEYS = frozenset({"cop_heating", "cop_dhw", "cop_system"})
+# Rolling efficiency figures come from the efficiency coordinator (recorder stats).
+_EFFICIENCY_SENSOR_KEYS = frozenset({"scop_total", "aux_heat_share"})
+_COP_ICONS: dict[str, str] = {
+    "cop_heating": "mdi:heat-pump",
+    "cop_dhw": "mdi:water-boiler",
+    "cop_system": "mdi:heat-pump-outline",
+}
+_EFFICIENCY_ICONS: dict[str, str] = {
+    "scop_total": "mdi:chart-line",
+    "aux_heat_share": "mdi:lightning-bolt-outline",
+}
 
 # Numeric prefix so the seven points sort 1→7 (+30 … −30) like the pump's own
 # curve numbers in any entity list, independent of locale.
@@ -169,6 +185,10 @@ async def async_setup_entry(
     sensors.append(QvantumDiagnosticEntity(coordinator, "latency", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device, True))
     sensors.append(QvantumTimerEntity(coordinator, "tap_stop", device, True))
+    # Derived COP is a counter-delta ratio on the main coordinator and works in
+    # both transports (cloud and Modbus expose the four energy counters).
+    for cop_key in sorted(_COP_SENSOR_KEYS):
+        sensors.append(QvantumCopSensor(coordinator, cop_key, device, True))
     if coordinator.modbus_enabled:
         # Local Modbus: display firmware from input registers 191-193 and the
         # custom heating-curve shadow sensors (no cloud equivalent).
@@ -229,7 +249,32 @@ async def async_setup_entry(
 
     # Register entities, disable them by default where needed, and prune
     # registry entries for metrics no longer supported in the current mode.
-    special_sensor_keys = {"totalenergy", "latency", "hpid", "tap_stop"}
+    special_sensor_keys = {
+        "totalenergy",
+        "latency",
+        "hpid",
+        "tap_stop",
+        *_COP_SENSOR_KEYS,
+    }
+
+    # Rolling efficiency figures come from the efficiency coordinator. Created
+    # for both transports; the entities stay unavailable until the recorder
+    # has enough history to support a window.
+    efficiency_coordinator = getattr(
+        config_entry.runtime_data, "efficiency_coordinator", None
+    )
+    if isinstance(efficiency_coordinator, QvantumEfficiencyCoordinator):
+        special_sensor_keys.update(_EFFICIENCY_SENSOR_KEYS)
+        sensors.append(
+            QvantumEfficiencySensorEntity(
+                efficiency_coordinator, "scop_total", device, False
+            )
+        )
+        sensors.append(
+            QvantumEfficiencySensorEntity(
+                efficiency_coordinator, "aux_heat_share", device, True
+            )
+        )
     if coordinator.modbus_enabled:
         special_sensor_keys.update(
             {
@@ -334,6 +379,36 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             super().available
             and self._values.get(self._metric_key) is not None
         )
+
+class QvantumCopSensor(QvantumBaseSensorEntity):
+    """Instantaneous coefficient of performance (counter-delta ratio).
+
+    Dimensionless: state class MEASUREMENT, no unit. The value is derived on the
+    main coordinator each poll in both transports; ``hp_status`` decides which
+    mode figure is published, so the attribute records the attribution method.
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    def __init__(
+        self,
+        coordinator: QvantumDataUpdateCoordinator,
+        metric_key: str,
+        device: DeviceInfo | dict,
+        enabled_by_default: bool = True,
+    ) -> None:
+        super().__init__(coordinator, metric_key, device, enabled_by_default)
+        self._attr_icon = _COP_ICONS.get(metric_key)
+
+    @property
+    def extra_state_attributes(self):
+        """Return how the instantaneous ratio was attributed."""
+        return {
+            "hp_status": self._values.get("hp_status"),
+            "attribution": "energy-counter delta over one poll interval",
+        }
+
 
 class QvantumTemperatureEntity(QvantumBaseSensorEntity):
     """Sensor for temperature measurements."""
@@ -669,6 +744,69 @@ class QvantumCurveSolarModelSensor(QvantumCurveSensorEntity):
             "valid": model.valid,
             "calibrated_at": snapshot.calibrated_at,
         }
+
+
+class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
+    """Base for rolling efficiency sensors (recorder statistics coordinator)."""
+
+    _attr_has_entity_name = True
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+
+    def __init__(
+        self,
+        efficiency_coordinator: QvantumEfficiencyCoordinator,
+        metric_key: str,
+        device: DeviceInfo | dict,
+        enabled_by_default: bool = True,
+    ) -> None:
+        super().__init__(efficiency_coordinator)
+        self._metric_key = metric_key
+        self._attr_translation_key = metric_key
+        self._attr_unique_id = f"qvantum_{metric_key}_{resolve_device_id(device)}"
+        self._attr_device_info = device
+        self._attr_entity_registry_enabled_default = enabled_by_default
+        self._attr_icon = _EFFICIENCY_ICONS.get(metric_key)
+        if metric_key == "aux_heat_share":
+            self._attr_native_unit_of_measurement = PERCENTAGE
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        """Stable English slug; translated names must not move entity IDs."""
+        return self._metric_key
+
+    @property
+    def native_value(self):
+        """Return the rolling figure for this key, or None without history."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        value = getattr(snapshot, self._metric_key, None)
+        if value is None:
+            return None
+        if self._metric_key == "aux_heat_share":
+            return round(value * 100, 1)
+        return round(value, 2)
+
+    @property
+    def available(self) -> bool:
+        """Check the coordinator has a value for this window."""
+        return super().available and self.native_value is not None
+
+    @property
+    def extra_state_attributes(self):
+        """Return coverage and the longer window where one exists."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        attributes = {
+            "coverage_days": round(snapshot.coverage_days, 1),
+            "updated_at": snapshot.updated_at,
+            "attribution": "hourly long-term statistics",
+        }
+        if self._metric_key == "scop_total" and snapshot.scop_total_90d is not None:
+            attributes["scop_90d"] = round(snapshot.scop_total_90d, 2)
+        return attributes
 
 
 class QvantumDiagnosticEntity(QvantumBaseSensorEntity):
