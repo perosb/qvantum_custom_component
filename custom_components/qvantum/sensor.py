@@ -214,7 +214,7 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "unit": "W",
         "scale": 1.0,
         "precision": 0,
-        "enabled": False,
+        "enabled": True,
     },
 }
 #: Letter-grade heuristic; its own entity because the state is not numeric.
