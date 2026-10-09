@@ -80,6 +80,7 @@ jobs:
           # tools and pi's own docs, which makes a tool-less review run emit
           # tool-call XML instead of the review JSON.
           cat /tmp/pr.diff | pi --provider openrouter --model "$PI_MODEL" \
+            --thinking high \
             --system-prompt "$(cat .github/pi/review-prompt.md)" \
             -p --no-session --no-tools --mode json > /tmp/pi-events.jsonl
           [ -s /tmp/pi-events.jsonl ]
