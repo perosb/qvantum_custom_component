@@ -289,6 +289,36 @@ class TestBuildingMetrics:
 
         assert snapshot.normalized_rising is None
 
+    async def test_normalized_uses_aligned_hours(self):
+        """Energy and degree hours must cover exactly the same hours."""
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        series = self._series(now_ts=now_ts)
+        cutoff = now_ts - 10 * 86400
+        rows = {
+            "sensor.heatingenergy": series["sensor.heatingenergy"],
+            "sensor.bt1": [
+                row for row in series["sensor.bt1"] if row["start"] >= cutoff
+            ],
+            "sensor.bt2": series["sensor.bt2"],
+            "sensor.heatingpower": series["sensor.heatingpower"],
+        }
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value=rows)
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        # 10 aligned days at 4 kWh/day and 15 K -> 4/15 kWh/HDD, not the
+        # cross-period 30-day energy over 10-day degree hours.
+        assert snapshot.building_coverage_days == pytest.approx(10.0, abs=0.2)
+        assert snapshot.weather_normalized_heating == pytest.approx(
+            4.0 / 15.0, rel=0.02
+        )
+        assert snapshot.normalized_rising is None
+
     async def test_short_building_history_publishes_nothing(self):
         coordinator = make_coordinator()
         now_ts = int(datetime.now(timezone.utc).timestamp())

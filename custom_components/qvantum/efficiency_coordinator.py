@@ -135,18 +135,43 @@ def _window_delta(
     return delta, coverage_days
 
 
-def _range_delta(
-    points: list[tuple[int, float]], start_ts: float, end_ts: float
-) -> tuple[float | None, float]:
-    """Cumulative delta inside an explicit ``[start, end)`` window."""
-    window = [(ts, total) for ts, total in points if start_ts <= ts < end_ts]
-    coverage_days = len(window) / 24.0
-    if len(window) < 2:
-        return None, coverage_days
-    delta = window[-1][1] - window[0][1]
-    if delta < 0.0:
-        return None, coverage_days
-    return delta, coverage_days
+def _aligned_window(
+    heating_points: list[tuple[int, float]],
+    outdoor: Mapping[int, float],
+    start_ts: float,
+    end_ts: float,
+) -> tuple[float | None, dict[int, float], float]:
+    """Energy delta and outdoor hours over exactly the same observed hours.
+
+    Normalizing energy over a different period than the degree hours silently
+    inflates the result (and can trip the rising trend): if the outdoor series
+    is missing hours the energy series has, the numerator covers more days
+    than the denominator. Sum the hourly energy deltas only for hours where
+    both the current and the previous energy sample exist, and keep the
+    outdoor value for those same hours.
+    """
+    heating = dict(heating_points)
+    aligned_outdoor: dict[int, float] = {}
+    energy = 0.0
+    for ts in sorted(outdoor):
+        if not (start_ts <= ts < end_ts):
+            continue
+        previous = heating.get(ts - 3600)
+        current = heating.get(ts)
+        if previous is None or current is None:
+            continue
+        delta = current - previous
+        if delta < 0.0:
+            # A counter reset inside the hour: the delta is unknown, skip it
+            # rather than letting a negative value cancel real consumption.
+            continue
+        energy += delta
+        aligned_outdoor[ts] = outdoor[ts]
+
+    coverage_days = len(aligned_outdoor) / 24.0
+    if len(aligned_outdoor) < 2:
+        return None, aligned_outdoor, coverage_days
+    return energy, aligned_outdoor, coverage_days
 
 
 class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
@@ -289,23 +314,20 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         power_points = mean_series.get("heatingpower", [])
 
         window_start = now_ts - BUILDING_WINDOW_DAYS * 86400.0
+        previous_start = window_start - BUILDING_WINDOW_DAYS * 86400.0
         outdoor = dict(outdoor_points)
-        outdoor_window = {ts: value for ts, value in outdoor.items() if ts >= window_start}
-        building_coverage = len(outdoor_window) / 24.0
+
+        energy, aligned_outdoor, building_coverage = _aligned_window(
+            heating_points, outdoor, window_start, now_ts
+        )
         # A fresh install must not read as a 30-day figure from a day or two
         # of rows; the same minimum as the counters applies here.
         hdh = (
-            degree_hours(outdoor_window)
+            degree_hours(aligned_outdoor)
             if building_coverage >= MIN_COVERAGE_DAYS
             else None
         )
-
-        heating_delta, heating_coverage = _window_delta(
-            heating_points, now_ts, BUILDING_WINDOW_DAYS
-        )
-        normalized = None
-        if heating_coverage >= MIN_COVERAGE_DAYS:
-            normalized = weather_normalized_heating(heating_delta, hdh)
+        normalized = weather_normalized_heating(energy, hdh)
 
         indoor = dict(indoor_points)
         power = dict(power_points)
@@ -320,27 +342,21 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             else None
         )
 
-        previous_hdh = degree_hours(
-            {
-                ts: value
-                for ts, value in outdoor.items()
-                if now_ts - 2 * BUILDING_WINDOW_DAYS * 86400.0
-                <= ts
-                < window_start
-            }
+        previous_energy, previous_outdoor, previous_coverage = _aligned_window(
+            heating_points, outdoor, previous_start, window_start
         )
-        previous_delta, previous_coverage = _range_delta(
-            heating_points,
-            now_ts - 2 * BUILDING_WINDOW_DAYS * 86400.0,
-            window_start,
+        previous_hdh = (
+            degree_hours(previous_outdoor)
+            if previous_coverage >= TREND_MIN_COVERAGE_DAYS
+            else None
         )
-        previous = weather_normalized_heating(previous_delta, previous_hdh)
+        previous = weather_normalized_heating(previous_energy, previous_hdh)
 
         rising: bool | None = None
         if (
             normalized is not None
             and previous is not None
-            and heating_coverage >= TREND_MIN_COVERAGE_DAYS
+            and building_coverage >= TREND_MIN_COVERAGE_DAYS
             and previous_coverage >= TREND_MIN_COVERAGE_DAYS
         ):
             rising = normalized >= previous * TREND_RISING_RATIO
