@@ -901,14 +901,45 @@ class TestQvantumEfficiencySensors:
             "heating_degree_hours",
             "weather_normalized_heating",
             "dhw_standing_loss",
-            "compressor_starts_per_hour",
-            "compressor_run_hours_24h",
         }
         assert any(
             isinstance(entity, QvantumEfficiencyHealthSensor)
             and entity._attr_unique_id == "qvantum_efficiency_health_test_device_123"
             for entity in entities
         )
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_adds_cycling_sensors(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Modbus-only counters are not created as dead cloud entities."""
+        from custom_components.qvantum.const import CONF_MODBUS_TCP
+
+        mock_config_entry.options = {CONF_MODBUS_TCP: True}
+        mock_coordinator.modbus_enabled = True
+        mock_config_entry.runtime_data.efficiency_coordinator = _efficiency_coordinator(
+            EfficiencySnapshot()
+        )
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities") as cleanup,
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        efficiency_keys = {
+            entity._metric_key
+            for entity in async_add_entities.call_args[0][0]
+            if isinstance(entity, QvantumEfficiencySensorEntity)
+        }
+        assert {
+            "compressor_starts_per_hour",
+            "compressor_run_hours_24h",
+        } <= efficiency_keys
+        allowed = cleanup.call_args.args[2]
+        assert "compressor_starts_per_hour" in allowed
+        assert "compressor_run_hours_24h" in allowed
 
 
 class TestQvantumDiagnosticEntity:

@@ -155,6 +155,7 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "scale": 1.0,
         "precision": 2,
         "enabled": False,
+        "modbus_only": True,
     },
     "compressor_run_hours_24h": {
         "icon": "mdi:timer-outline",
@@ -162,9 +163,9 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "scale": 1.0,
         "precision": 1,
         "enabled": False,
+        "modbus_only": True,
     },
 }
-_EFFICIENCY_SENSOR_KEYS = frozenset(_EFFICIENCY_SENSOR_CONFIG)
 #: Letter-grade heuristic; its own entity because the state is not numeric.
 _EFFICIENCY_HEALTH_KEY = "efficiency_health"
 # Figures whose coverage comes from the building series, not the energy counters.
@@ -330,9 +331,14 @@ async def async_setup_entry(
         config_entry.runtime_data, "efficiency_coordinator", None
     )
     if isinstance(efficiency_coordinator, QvantumEfficiencyCoordinator):
-        special_sensor_keys.update(_EFFICIENCY_SENSOR_KEYS)
         special_sensor_keys.add(_EFFICIENCY_HEALTH_KEY)
         for efficiency_key, config in _EFFICIENCY_SENSOR_CONFIG.items():
+            if config.get("modbus_only") and not coordinator.modbus_enabled:
+                # Modbus-only series have no cloud statistics; leaving the key
+                # out of special_sensor_keys also lets registry cleanup remove
+                # a stale entity after a transport switch.
+                continue
+            special_sensor_keys.add(efficiency_key)
             sensors.append(
                 QvantumEfficiencySensorEntity(
                     efficiency_coordinator,
