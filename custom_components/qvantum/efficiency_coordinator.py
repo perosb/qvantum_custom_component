@@ -34,6 +34,7 @@ from .const import (
 from .dhw_loss import blend, standing_loss_kwh_per_day
 from .efficiency import aux_heat_share, scop_from_counters
 from .plant_analytics import (
+    dhw_heat_meter_power_w,
     duty_cycle,
     health_grade,
     mean_while_running,
@@ -68,6 +69,15 @@ CYCLING_WINDOW_DAYS = 1
 OPERATING_KEYS = ("compressormeasuredspeed", "compressor_power", "fanrpm")
 #: Minimum observed hours before the duty cycle is published.
 MIN_DUTY_CYCLE_HOURS = 12.0
+#: Secondary-side flow / temperatures behind the DHW heat-meter check.
+DHW_METER_KEYS = ("bf1_l_min", "bt33", "bt34")
+#: Window for the heat-meter plausibility comparison.
+DHW_METER_WINDOW_DAYS = 7
+#: Minimum matched draw hours and metered energy before a deviation is published.
+MIN_DHW_METER_HOURS = 6
+MIN_DHW_METER_KWH = 0.5
+#: |estimated - metered| above this share of metered is a warning.
+HEAT_METER_WARNING_PERCENT = 20.0
 #: Window for degree hours, normalized heating and the heat-loss fit.
 BUILDING_WINDOW_DAYS = 30
 #: Both the current and the previous window need this coverage for a trend.
@@ -98,6 +108,11 @@ class EfficiencySnapshot:
     compressor_power_avg: float | None = None
     compressor_duty_cycle: float | None = None
     exhaust_fan_speed_avg: float | None = None
+    dhw_heat_meter_deviation: float | None = None
+    dhw_heat_meter_warning: bool | None = None
+    dhw_heat_meter_estimated_kwh: float | None = None
+    dhw_heat_meter_metered_kwh: float | None = None
+    dhw_heat_meter_hours: int = 0
     efficiency_health_grade: str | None = None
     efficiency_health_score: float | None = None
     efficiency_health_coverage: float = 0.0
@@ -252,8 +267,11 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         operating = resolve_statistic_entity_ids(
             self.hass, self.device_id, OPERATING_KEYS
         )
+        dhw_meter = resolve_statistic_entity_ids(
+            self.hass, self.device_id, DHW_METER_KEYS
+        )
         dhw_standing_loss = self._update_dhw_standing_loss(now_ts)
-        keys = {**counters, **building, **cycling, **operating}
+        keys = {**counters, **building, **cycling, **operating, **dhw_meter}
         if not keys:
             return EfficiencySnapshot(
                 dhw_standing_loss=dhw_standing_loss, updated_at=now.isoformat()
@@ -271,7 +289,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         }
         mean_series = {
             key: _stat_series(rows.get(entity_id, []), "mean")
-            for key, entity_id in {**building, **operating}.items()
+            for key, entity_id in {**building, **operating, **dhw_meter}.items()
         }
         cycling_series = {
             key: _cumulative_series(rows.get(entity_id, []))
@@ -347,6 +365,13 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         duty = None
         if run_coverage_days * 24.0 >= MIN_DUTY_CYCLE_HOURS:
             duty = duty_cycle(run_hours_delta, run_coverage_days * 24.0)
+        (
+            dhw_meter_deviation,
+            dhw_meter_warning,
+            dhw_meter_estimated_kwh,
+            dhw_meter_metered_kwh,
+            dhw_meter_hours,
+        ) = self._dhw_heat_meter_metrics(mean_series, sum_series, now_ts)
         health = health_grade(
             {
                 "scop": scop_total,
@@ -370,6 +395,11 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             compressor_power_avg=power_avg,
             compressor_duty_cycle=duty,
             exhaust_fan_speed_avg=fan_avg,
+            dhw_heat_meter_deviation=dhw_meter_deviation,
+            dhw_heat_meter_warning=dhw_meter_warning,
+            dhw_heat_meter_estimated_kwh=dhw_meter_estimated_kwh,
+            dhw_heat_meter_metered_kwh=dhw_meter_metered_kwh,
+            dhw_heat_meter_hours=dhw_meter_hours,
             efficiency_health_grade=health.letter,
             efficiency_health_score=health.score,
             efficiency_health_coverage=health.coverage,
@@ -455,6 +485,52 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             deltas[key] = delta
             coverages.append(coverage_days)
         return deltas, min(coverages) if coverages else 0.0
+
+    def _dhw_heat_meter_metrics(
+        self,
+        mean_series: Mapping[str, list[tuple[int, float]]],
+        sum_series: Mapping[str, list[tuple[int, float]]],
+        now_ts: float,
+    ) -> tuple[float | None, bool | None, float | None, float | None, int]:
+        """Compare flow×ΔT DHW heat against the metered dhwenergy counter.
+
+        Both sides are integrated over exactly the same hours: an hour needs
+        the flow/temperature samples and the metered counter delta, and only
+        hours with a real draw qualify. Below a minimum of matched hours and
+        metered energy no deviation is published, so one short draw cannot
+        produce a wild percentage.
+        """
+        window_start = now_ts - DHW_METER_WINDOW_DAYS * 86400.0
+        counter = dict(sum_series.get("dhwenergy", []))
+        flow = dict(mean_series.get("bf1_l_min", []))
+        hot = dict(mean_series.get("bt34", []))
+        cold = dict(mean_series.get("bt33", []))
+
+        estimated_kwh = 0.0
+        metered_kwh = 0.0
+        hours = 0
+        for ts in sorted(set(flow) & set(hot) & set(cold)):
+            if ts < window_start or flow[ts] <= DHW_IDLE_FLOW_LPM:
+                continue
+            power_w = dhw_heat_meter_power_w(flow[ts], hot[ts], cold[ts])
+            if power_w is None:
+                continue
+            previous = counter.get(ts - 3600)
+            current = counter.get(ts)
+            if previous is None or current is None:
+                continue
+            delta = current - previous
+            if delta < 0.0:
+                continue
+            estimated_kwh += power_w / 1000.0
+            metered_kwh += delta
+            hours += 1
+
+        if hours < MIN_DHW_METER_HOURS or metered_kwh < MIN_DHW_METER_KWH:
+            return None, None, estimated_kwh, metered_kwh, hours
+        deviation = (estimated_kwh - metered_kwh) / metered_kwh * 100.0
+        warning = abs(deviation) >= HEAT_METER_WARNING_PERCENT
+        return deviation, warning, estimated_kwh, metered_kwh, hours
 
     def _dhw_is_idle(self, values: Mapping[str, Any]) -> float | None:
         """Tank temperature when the DHW circuit is idle, else ``None``."""

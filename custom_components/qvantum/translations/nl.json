@@ -217,6 +217,9 @@
       },
       "weather_normalized_consumption_rising": {
         "name": "Weer-genormaliseerd warmteverbruik stijgt"
+      },
+      "heat_meter_deviation_warning": {
+        "name": "Waarschuwing: afwijking warmwater-warmtemeter"
       }
     },
     "sensor": {
@@ -664,6 +667,9 @@
       },
       "exhaust_fan_speed_avg": {
         "name": "Afvoerventilatorsnelheid (24 uur)"
+      },
+      "dhw_heat_meter_deviation": {
+        "name": "Afwijking warmwater-warmtemeter"
       }
     },
     "number": {

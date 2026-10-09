@@ -26,7 +26,13 @@ from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 _LOGGER = logging.getLogger(__name__)
 
 # Derived from recorder statistics rather than a pump metric.
-_EFFICIENCY_BINARY_SENSORS = frozenset({"weather_normalized_consumption_rising"})
+_EFFICIENCY_BINARY_SENSORS = frozenset(
+    {"weather_normalized_consumption_rising", "heat_meter_deviation_warning"}
+)
+_EFFICIENCY_BINARY_FIELDS = {
+    "weather_normalized_consumption_rising": "normalized_rising",
+    "heat_meter_deviation_warning": "dhw_heat_meter_warning",
+}
 
 _CONNECTIVITY_BINARY_SENSORS = frozenset({"wifi_connected", "cloud_connected"})
 _PROBLEM_BINARY_SENSORS = frozenset({"alarm_active"})
@@ -97,14 +103,12 @@ async def async_setup_entry(
     )
     if isinstance(efficiency_coordinator, QvantumEfficiencyCoordinator):
         possible_metrics.update(_EFFICIENCY_BINARY_SENSORS)
-        sensors.append(
-            QvantumEfficiencyBinaryEntity(
-                efficiency_coordinator,
-                "weather_normalized_consumption_rising",
-                device,
-                False,
+        for binary_key in sorted(_EFFICIENCY_BINARY_SENSORS):
+            sensors.append(
+                QvantumEfficiencyBinaryEntity(
+                    efficiency_coordinator, binary_key, device, False
+                )
             )
-        )
 
     finalize_platform_setup(
         hass,
@@ -144,11 +148,11 @@ class QvantumEfficiencyBinaryEntity(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return the trend verdict, or None without enough history."""
+        """Return the verdict for this key, or None without enough history."""
         snapshot = self.coordinator.data
         if snapshot is None:
             return None
-        return snapshot.normalized_rising
+        return getattr(snapshot, _EFFICIENCY_BINARY_FIELDS[self._metric_key], None)
 
     @property
     def available(self) -> bool:

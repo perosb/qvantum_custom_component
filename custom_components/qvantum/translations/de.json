@@ -217,6 +217,9 @@
       },
       "weather_normalized_consumption_rising": {
         "name": "Wetterbereinigter Heizverbrauch steigt"
+      },
+      "heat_meter_deviation_warning": {
+        "name": "Warnung: Abweichung des Warmwasser-Wärmemessers"
       }
     },
     "sensor": {
@@ -664,6 +667,9 @@
       },
       "exhaust_fan_speed_avg": {
         "name": "Abluftventilator-Drehzahl (24 Stunden)"
+      },
+      "dhw_heat_meter_deviation": {
+        "name": "Abweichung des Warmwasser-Wärmemessers"
       }
     },
     "number": {
