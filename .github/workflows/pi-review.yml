@@ -26,6 +26,9 @@ jobs:
 
       # Tooling-only PRs (just .github/**) skip the review: the reviewer would
       # otherwise review its own workflow/extension changes and re-open nits.
+      # Also computes the reviewable addition count for model selection:
+      # translations and tests inflate line counts without adding review
+      # complexity, so they are kept out of that heuristic.
       - name: Check changed paths
         id: changed
         env:
@@ -33,14 +36,21 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           tooling_only=true
-          while IFS= read -r file; do
+          review_additions=0
+          while IFS=$'\t' read -r additions deletions file; do
             [ -z "$file" ] && continue
             case "$file" in
               .github/*) ;;
               *) tooling_only=false ;;
             esac
-          done < <(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")
+            case "$file" in
+              custom_components/qvantum/translations/*|tests/*) continue ;;
+            esac
+            [ "$additions" = "-" ] && continue
+            review_additions=$((review_additions + additions))
+          done < <(git diff --numstat "${BASE_SHA}...${HEAD_SHA}")
           echo "tooling_only=$tooling_only" >> "$GITHUB_OUTPUT"
+          echo "review_additions=$review_additions" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v6
         if: steps.changed.outputs.tooling_only != 'true'
@@ -72,9 +82,10 @@ jobs:
         if: steps.changed.outputs.tooling_only != 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          # Same cost heuristic as the old opencode review: the full model only
-          # for larger diffs.
-          PI_MODEL: ${{ github.event.pull_request.additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
+          # Cost heuristic: pick the full model only when the reviewable source
+          # diff is large. Translations and tests are excluded from the count
+          # (see the changed-paths step) since they add volume, not complexity.
+          PI_MODEL: ${{ steps.changed.outputs.review_additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
         run: |
           # Replace pi's coding-assistant system prompt: it advertises read/bash
           # tools and pi's own docs, which makes a tool-less review run emit
