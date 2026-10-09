@@ -172,6 +172,7 @@ class TestComputeSnapshot:
             ec.COUNTER_KEYS,
             ec.BUILDING_KEYS,
             ec.CYCLING_KEYS,
+            ec.OPERATING_KEYS,
         ]
 
     def test_device_id_property(self):
@@ -395,6 +396,7 @@ class TestCyclingAndHealth:
 
         assert snapshot.compressor_starts_per_hour == pytest.approx(1.0)
         assert snapshot.compressor_run_hours_24h == pytest.approx(11.5)
+        assert snapshot.compressor_duty_cycle == pytest.approx(11.5 / 24.0)
         # Only the cycling component is available: score 1.0, coverage 0.25.
         assert snapshot.efficiency_health_grade == "A"
         assert snapshot.efficiency_health_score == pytest.approx(1.0)
@@ -415,6 +417,68 @@ class TestCyclingAndHealth:
         assert snapshot.compressor_run_hours_24h is None
         assert snapshot.efficiency_health_grade is None
         assert snapshot.efficiency_health_coverage == 0.0
+
+
+class TestOperatingPoint:
+    @staticmethod
+    def _patch_resolve():
+        def fake_resolve(hass, device_id, keys):
+            if tuple(keys) != ec.OPERATING_KEYS:
+                return {}
+            return {
+                "compressormeasuredspeed": "sensor.speed",
+                "compressor_power": "sensor.power",
+                "fanrpm": "sensor.fan",
+            }
+
+        return patch.object(ec, "resolve_statistic_entity_ids", fake_resolve)
+
+    async def test_computes_operating_point(self):
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        hours = 24
+
+        def rows(value):
+            return [
+                {"start": now_ts - (hours - 1 - index) * 3600, "mean": value}
+                for index in range(hours)
+            ]
+
+        rows_by_entity = {
+            "sensor.speed": rows(3000.0),
+            "sensor.power": rows(1200.0),
+            "sensor.fan": rows(700.0),
+        }
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec,
+                "async_statistics_during_period",
+                AsyncMock(return_value=rows_by_entity),
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.compressor_speed_avg == pytest.approx(3000.0)
+        assert snapshot.compressor_power_avg == pytest.approx(1200.0)
+        assert snapshot.exhaust_fan_speed_avg == pytest.approx(700.0)
+        # No cycling counters were resolved, so there is no duty cycle.
+        assert snapshot.compressor_duty_cycle is None
+
+    async def test_operating_point_unavailable_without_series(self):
+        coordinator = make_coordinator()
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value={})
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.compressor_speed_avg is None
+        assert snapshot.compressor_power_avg is None
+        assert snapshot.exhaust_fan_speed_avg is None
+        assert snapshot.compressor_duty_cycle is None
 
 
 class TestDhwStandingLoss:

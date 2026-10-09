@@ -652,6 +652,18 @@
       },
       "compressor_run_hours_24h": {
         "name": "Doba chodu kompresoru (24 hodin)"
+      },
+      "compressor_speed_avg": {
+        "name": "Otáčky kompresoru (24 hodin)"
+      },
+      "compressor_power_avg": {
+        "name": "Výkon kompresoru (24 hodin)"
+      },
+      "compressor_duty_cycle": {
+        "name": "Pracovní cyklus kompresoru (24 hodin)"
+      },
+      "exhaust_fan_speed_avg": {
+        "name": "Otáčky ventilátoru odtahu (24 hodin)"
       }
     },
     "number": {

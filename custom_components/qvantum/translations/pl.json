@@ -652,6 +652,18 @@
       },
       "compressor_run_hours_24h": {
         "name": "Czas pracy sprężarki (24 godziny)"
+      },
+      "compressor_speed_avg": {
+        "name": "Prędkość sprężarki (24 godziny)"
+      },
+      "compressor_power_avg": {
+        "name": "Moc sprężarki (24 godziny)"
+      },
+      "compressor_duty_cycle": {
+        "name": "Cykl pracy sprężarki (24 godziny)"
+      },
+      "exhaust_fan_speed_avg": {
+        "name": "Prędkość wentylatora wywiewnego (24 godziny)"
       }
     },
     "number": {

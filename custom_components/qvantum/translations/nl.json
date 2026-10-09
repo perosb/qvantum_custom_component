@@ -652,6 +652,18 @@
       },
       "compressor_run_hours_24h": {
         "name": "Compressorlooptijd (24 uur)"
+      },
+      "compressor_speed_avg": {
+        "name": "Compressortoerental (24 uur)"
+      },
+      "compressor_power_avg": {
+        "name": "Compressorvermogen (24 uur)"
+      },
+      "compressor_duty_cycle": {
+        "name": "Compressorbelastingsgraad (24 uur)"
+      },
+      "exhaust_fan_speed_avg": {
+        "name": "Afvoerventilatorsnelheid (24 uur)"
       }
     },
     "number": {

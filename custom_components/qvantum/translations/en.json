@@ -652,6 +652,18 @@
       },
       "compressor_run_hours_24h": {
         "name": "Compressor run time (24 hours)"
+      },
+      "compressor_speed_avg": {
+        "name": "Compressor speed (24 hours)"
+      },
+      "compressor_power_avg": {
+        "name": "Compressor power (24 hours)"
+      },
+      "compressor_duty_cycle": {
+        "name": "Compressor duty cycle (24 hours)"
+      },
+      "exhaust_fan_speed_avg": {
+        "name": "Exhaust air fan speed (24 hours)"
       }
     },
     "number": {

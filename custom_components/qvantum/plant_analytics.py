@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Callable, Mapping
+from typing import Callable, Mapping, Sequence
 
 #: A cycling figure needs at least this much compressor run time (hours).
 MIN_RUN_HOURS = 1.0
@@ -68,6 +68,41 @@ def starts_per_hour(
         return None
     value = starts / run_hours
     return value if math.isfinite(value) and value >= 0.0 else None
+
+
+def mean_while_running(
+    points: Sequence[tuple[int, float]],
+    *,
+    start_ts: float,
+    end_ts: float,
+    min_value: float = 0.0,
+) -> float | None:
+    """Mean of hourly means at or above ``min_value`` inside the window.
+
+    Hours where the metric is zero or absent (compressor stopped, pump idle)
+    are excluded so the average describes the operating point instead of being
+    diluted by idle time. ``None`` when no hour qualifies.
+    """
+    values: list[float] = []
+    for ts, value in points:
+        if not (start_ts <= ts < end_ts):
+            continue
+        numeric = _finite(value)
+        if numeric is None or numeric <= min_value:
+            continue
+        values.append(numeric)
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def duty_cycle(run_hours: object, window_hours: object) -> float | None:
+    """Share of the observed window spent running, clamped to [0, 1]."""
+    run = _finite(run_hours)
+    window = _finite(window_hours)
+    if run is None or window is None or window <= 0.0:
+        return None
+    return _clamp01(run / window)
 
 
 def score_scop(scop: float) -> float:

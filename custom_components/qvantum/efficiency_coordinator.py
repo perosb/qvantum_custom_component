@@ -33,7 +33,12 @@ from .const import (
 )
 from .dhw_loss import blend, standing_loss_kwh_per_day
 from .efficiency import aux_heat_share, scop_from_counters
-from .plant_analytics import health_grade, starts_per_hour
+from .plant_analytics import (
+    duty_cycle,
+    health_grade,
+    mean_while_running,
+    starts_per_hour,
+)
 from .statistics import (
     async_statistics_during_period,
     resolve_indoor_metric_key,
@@ -57,8 +62,12 @@ COUNTER_KEYS = ("heatingenergy", "dhwenergy", "compressorenergy", "additionalene
 BUILDING_KEYS = ("bt1", "bt2", "room_temp_external", "room_temp_ext", "heatingpower")
 #: Compressor cycling counters (Modbus-only metrics; absent in cloud).
 CYCLING_KEYS = ("compressor_starts", "compressor_run_time")
-#: Rolling window for the cycling rate.
+#: Rolling window for the cycling rate and operating point.
 CYCLING_WINDOW_DAYS = 1
+#: Operating-point series (hourly means while the unit is running).
+OPERATING_KEYS = ("compressormeasuredspeed", "compressor_power", "fanrpm")
+#: Minimum observed hours before the duty cycle is published.
+MIN_DUTY_CYCLE_HOURS = 12.0
 #: Window for degree hours, normalized heating and the heat-loss fit.
 BUILDING_WINDOW_DAYS = 30
 #: Both the current and the previous window need this coverage for a trend.
@@ -85,6 +94,10 @@ class EfficiencySnapshot:
     dhw_standing_loss: float | None = None
     compressor_starts_per_hour: float | None = None
     compressor_run_hours_24h: float | None = None
+    compressor_speed_avg: float | None = None
+    compressor_power_avg: float | None = None
+    compressor_duty_cycle: float | None = None
+    exhaust_fan_speed_avg: float | None = None
     efficiency_health_grade: str | None = None
     efficiency_health_score: float | None = None
     efficiency_health_coverage: float = 0.0
@@ -236,8 +249,11 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         counters = resolve_statistic_entity_ids(self.hass, self.device_id, COUNTER_KEYS)
         building = resolve_statistic_entity_ids(self.hass, self.device_id, BUILDING_KEYS)
         cycling = resolve_statistic_entity_ids(self.hass, self.device_id, CYCLING_KEYS)
+        operating = resolve_statistic_entity_ids(
+            self.hass, self.device_id, OPERATING_KEYS
+        )
         dhw_standing_loss = self._update_dhw_standing_loss(now_ts)
-        keys = {**counters, **building, **cycling}
+        keys = {**counters, **building, **cycling, **operating}
         if not keys:
             return EfficiencySnapshot(
                 dhw_standing_loss=dhw_standing_loss, updated_at=now.isoformat()
@@ -255,7 +271,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         }
         mean_series = {
             key: _stat_series(rows.get(entity_id, []), "mean")
-            for key, entity_id in building.items()
+            for key, entity_id in {**building, **operating}.items()
         }
         cycling_series = {
             key: _cumulative_series(rows.get(entity_id, []))
@@ -306,12 +322,31 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             now_ts,
             CYCLING_WINDOW_DAYS,
         )
-        run_hours_delta, _ = _window_delta(
+        run_hours_delta, run_coverage_days = _window_delta(
             cycling_series.get("compressor_run_time", []),
             now_ts,
             CYCLING_WINDOW_DAYS,
         )
         cycling_rate = starts_per_hour(starts_delta, run_hours_delta)
+        operating_start = now_ts - CYCLING_WINDOW_DAYS * 86400.0
+        speed_avg = mean_while_running(
+            mean_series.get("compressormeasuredspeed", []),
+            start_ts=operating_start,
+            end_ts=now_ts,
+        )
+        power_avg = mean_while_running(
+            mean_series.get("compressor_power", []),
+            start_ts=operating_start,
+            end_ts=now_ts,
+        )
+        fan_avg = mean_while_running(
+            mean_series.get("fanrpm", []),
+            start_ts=operating_start,
+            end_ts=now_ts,
+        )
+        duty = None
+        if run_coverage_days * 24.0 >= MIN_DUTY_CYCLE_HOURS:
+            duty = duty_cycle(run_hours_delta, run_coverage_days * 24.0)
         health = health_grade(
             {
                 "scop": scop_total,
@@ -331,6 +366,10 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             dhw_standing_loss=dhw_standing_loss,
             compressor_starts_per_hour=cycling_rate,
             compressor_run_hours_24h=run_hours_delta,
+            compressor_speed_avg=speed_avg,
+            compressor_power_avg=power_avg,
+            compressor_duty_cycle=duty,
+            exhaust_fan_speed_avg=fan_avg,
             efficiency_health_grade=health.letter,
             efficiency_health_score=health.score,
             efficiency_health_coverage=health.coverage,
