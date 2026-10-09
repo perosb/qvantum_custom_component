@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Ztráta teplé vody v klidu"
+      },
+      "efficiency_health": {
+        "name": "Stav účinnosti"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Starty kompresoru za hodinu provozu"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Doba chodu kompresoru (24 hodin)"
       }
     },
     "number": {

@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Varmtvandstankens standby-tab"
+      },
+      "efficiency_health": {
+        "name": "Effektivitetstilstand"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Kompressorstarter pr. driftstime"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Kompressorens driftstid (24 timer)"
       }
     },
     "number": {

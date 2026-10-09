@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, Mapping
 
@@ -33,6 +33,7 @@ from .const import (
 )
 from .dhw_loss import blend, standing_loss_kwh_per_day
 from .efficiency import aux_heat_share, scop_from_counters
+from .plant_analytics import health_grade, starts_per_hour
 from .statistics import (
     async_statistics_during_period,
     resolve_indoor_metric_key,
@@ -54,6 +55,10 @@ MIN_COVERAGE_DAYS = 7.0
 COUNTER_KEYS = ("heatingenergy", "dhwenergy", "compressorenergy", "additionalenergy")
 #: Outdoor / indoor / power series behind the building figures.
 BUILDING_KEYS = ("bt1", "bt2", "room_temp_external", "room_temp_ext", "heatingpower")
+#: Compressor cycling counters (Modbus-only metrics; absent in cloud).
+CYCLING_KEYS = ("compressor_starts", "compressor_run_time")
+#: Rolling window for the cycling rate.
+CYCLING_WINDOW_DAYS = 1
 #: Window for degree hours, normalized heating and the heat-loss fit.
 BUILDING_WINDOW_DAYS = 30
 #: Both the current and the previous window need this coverage for a trend.
@@ -78,6 +83,12 @@ class EfficiencySnapshot:
     weather_normalized_heating: float | None = None
     normalized_rising: bool | None = None
     dhw_standing_loss: float | None = None
+    compressor_starts_per_hour: float | None = None
+    compressor_run_hours_24h: float | None = None
+    efficiency_health_grade: str | None = None
+    efficiency_health_score: float | None = None
+    efficiency_health_coverage: float = 0.0
+    efficiency_health_components: dict[str, float] = field(default_factory=dict)
     coverage_days: float = 0.0
     building_coverage_days: float = 0.0
     updated_at: str | None = None
@@ -224,8 +235,9 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         now_ts = now.timestamp()
         counters = resolve_statistic_entity_ids(self.hass, self.device_id, COUNTER_KEYS)
         building = resolve_statistic_entity_ids(self.hass, self.device_id, BUILDING_KEYS)
+        cycling = resolve_statistic_entity_ids(self.hass, self.device_id, CYCLING_KEYS)
         dhw_standing_loss = self._update_dhw_standing_loss(now_ts)
-        keys = {**counters, **building}
+        keys = {**counters, **building, **cycling}
         if not keys:
             return EfficiencySnapshot(
                 dhw_standing_loss=dhw_standing_loss, updated_at=now.isoformat()
@@ -244,6 +256,10 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         mean_series = {
             key: _stat_series(rows.get(entity_id, []), "mean")
             for key, entity_id in building.items()
+        }
+        cycling_series = {
+            key: _cumulative_series(rows.get(entity_id, []))
+            for key, entity_id in cycling.items()
         }
 
         short_deltas, short_coverage = self._window(
@@ -285,6 +301,25 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             sum_series.get("heatingenergy", []), mean_series, now_ts
         )
 
+        starts_delta, _ = _window_delta(
+            cycling_series.get("compressor_starts", []),
+            now_ts,
+            CYCLING_WINDOW_DAYS,
+        )
+        run_hours_delta, _ = _window_delta(
+            cycling_series.get("compressor_run_time", []),
+            now_ts,
+            CYCLING_WINDOW_DAYS,
+        )
+        cycling_rate = starts_per_hour(starts_delta, run_hours_delta)
+        health = health_grade(
+            {
+                "scop": scop_total,
+                "aux_share": aux_share,
+                "cycling": cycling_rate,
+            }
+        )
+
         return EfficiencySnapshot(
             scop_total=scop_total,
             scop_total_90d=scop_total_90d,
@@ -294,6 +329,12 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             weather_normalized_heating=normalized_heating,
             normalized_rising=normalized_rising,
             dhw_standing_loss=dhw_standing_loss,
+            compressor_starts_per_hour=cycling_rate,
+            compressor_run_hours_24h=run_hours_delta,
+            efficiency_health_grade=health.letter,
+            efficiency_health_score=health.score,
+            efficiency_health_coverage=health.coverage,
+            efficiency_health_components=health.components,
             coverage_days=short_coverage,
             building_coverage_days=building_coverage,
             updated_at=now.isoformat(),

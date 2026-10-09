@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Pérdida en espera del agua caliente"
+      },
+      "efficiency_health": {
+        "name": "Salud de eficiencia"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Arranques del compresor por hora de funcionamiento"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Tiempo de funcionamiento del compresor (24 horas)"
       }
     },
     "number": {

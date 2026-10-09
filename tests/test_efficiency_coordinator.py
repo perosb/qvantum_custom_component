@@ -171,6 +171,7 @@ class TestComputeSnapshot:
         assert [call.args[2] for call in resolve.call_args_list] == [
             ec.COUNTER_KEYS,
             ec.BUILDING_KEYS,
+            ec.CYCLING_KEYS,
         ]
 
     def test_device_id_property(self):
@@ -355,6 +356,65 @@ class TestBuildingMetrics:
         assert snapshot.weather_normalized_heating is None
         assert snapshot.normalized_rising is None
         assert snapshot.building_coverage_days == 0.0
+
+
+class TestCyclingAndHealth:
+    @staticmethod
+    def _patch_resolve():
+        def fake_resolve(hass, device_id, keys):
+            if tuple(keys) in (ec.COUNTER_KEYS, ec.BUILDING_KEYS):
+                return {}
+            return {
+                "compressor_starts": "sensor.starts",
+                "compressor_run_time": "sensor.run",
+            }
+
+        return patch.object(ec, "resolve_statistic_entity_ids", fake_resolve)
+
+    async def test_computes_cycling_and_health(self):
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        hours = 24
+        rows = {
+            "sensor.starts": [
+                {"start": now_ts - (hours - 1 - index) * 3600, "sum": index * 0.5}
+                for index in range(hours)
+            ],
+            "sensor.run": [
+                {"start": now_ts - (hours - 1 - index) * 3600, "sum": index * 0.5}
+                for index in range(hours)
+            ],
+        }
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value=rows)
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.compressor_starts_per_hour == pytest.approx(1.0)
+        assert snapshot.compressor_run_hours_24h == pytest.approx(11.5)
+        # Only the cycling component is available: score 1.0, coverage 0.25.
+        assert snapshot.efficiency_health_grade == "A"
+        assert snapshot.efficiency_health_score == pytest.approx(1.0)
+        assert snapshot.efficiency_health_coverage == pytest.approx(0.25)
+        assert snapshot.efficiency_health_components == {"cycling": 1.0}
+
+    async def test_cycling_unavailable_without_counters(self):
+        coordinator = make_coordinator()
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value={})
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.compressor_starts_per_hour is None
+        assert snapshot.compressor_run_hours_24h is None
+        assert snapshot.efficiency_health_grade is None
+        assert snapshot.efficiency_health_coverage == 0.0
 
 
 class TestDhwStandingLoss:
