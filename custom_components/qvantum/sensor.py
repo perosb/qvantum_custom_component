@@ -165,6 +165,36 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "enabled": False,
         "modbus_only": True,
     },
+    "compressor_speed_avg": {
+        "icon": "mdi:speedometer",
+        "unit": "rpm",
+        "scale": 1.0,
+        "precision": 0,
+        "enabled": False,
+    },
+    "compressor_power_avg": {
+        "icon": "mdi:lightning-bolt",
+        "unit": "W",
+        "scale": 1.0,
+        "precision": 0,
+        "enabled": False,
+        "modbus_only": True,
+    },
+    "compressor_duty_cycle": {
+        "icon": "mdi:timer-sand",
+        "unit": PERCENTAGE,
+        "scale": 100.0,
+        "precision": 0,
+        "enabled": False,
+        "modbus_only": True,
+    },
+    "exhaust_fan_speed_avg": {
+        "icon": "mdi:fan",
+        "unit": "rpm",
+        "scale": 1.0,
+        "precision": 0,
+        "enabled": False,
+    },
 }
 #: Letter-grade heuristic; its own entity because the state is not numeric.
 _EFFICIENCY_HEALTH_KEY = "efficiency_health"

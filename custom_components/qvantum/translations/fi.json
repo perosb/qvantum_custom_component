@@ -652,6 +652,18 @@
       },
       "compressor_run_hours_24h": {
         "name": "Kompressorin käyttöaika (24 tuntia)"
+      },
+      "compressor_speed_avg": {
+        "name": "Kompressorin nopeus (24 tuntia)"
+      },
+      "compressor_power_avg": {
+        "name": "Kompressorin teho (24 tuntia)"
+      },
+      "compressor_duty_cycle": {
+        "name": "Kompressorin käyttösuhde (24 tuntia)"
+      },
+      "exhaust_fan_speed_avg": {
+        "name": "Poistoilmapuhaltimen nopeus (24 tuntia)"
       }
     },
     "number": {

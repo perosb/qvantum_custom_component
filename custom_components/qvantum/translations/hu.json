@@ -652,6 +652,18 @@
       },
       "compressor_run_hours_24h": {
         "name": "Kompresszor üzemideje (24 óra)"
+      },
+      "compressor_speed_avg": {
+        "name": "Kompresszor fordulatszáma (24 óra)"
+      },
+      "compressor_power_avg": {
+        "name": "Kompresszor teljesítménye (24 óra)"
+      },
+      "compressor_duty_cycle": {
+        "name": "Kompresszor üzemciklus (24 óra)"
+      },
+      "exhaust_fan_speed_avg": {
+        "name": "Elszívó ventilátor fordulatszáma (24 óra)"
       }
     },
     "number": {

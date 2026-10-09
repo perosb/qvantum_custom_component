@@ -652,6 +652,18 @@
       },
       "compressor_run_hours_24h": {
         "name": "Kompressorns drifttid (24 timmar)"
+      },
+      "compressor_speed_avg": {
+        "name": "Kompressorvarvtal (24 timmar)"
+      },
+      "compressor_power_avg": {
+        "name": "Kompressoreffekt (24 timmar)"
+      },
+      "compressor_duty_cycle": {
+        "name": "Kompressorns driftcykel (24 timmar)"
+      },
+      "exhaust_fan_speed_avg": {
+        "name": "Frånluftsfläktens varvtal (24 timmar)"
       }
     },
     "number": {

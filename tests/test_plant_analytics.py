@@ -9,7 +9,9 @@ import pytest
 from custom_components.qvantum.plant_analytics import (
     DEFAULT_HEALTH_WEIGHTS,
     HealthGrade,
+    duty_cycle,
     health_grade,
+    mean_while_running,
     score_aux_share,
     score_cycling,
     score_scop,
@@ -31,6 +33,42 @@ class TestStartsPerHour:
         assert starts_per_hour(3.0, -1.0) is None
         assert starts_per_hour("x", 3.0) is None
         assert starts_per_hour(3.0, math.nan) is None
+
+
+class TestMeanWhileRunning:
+    def test_excludes_zero_idle_and_invalid_hours(self):
+        points = [(100, 0.0), (200, 3000.0), (300, 4000.0), (400, None)]
+        assert mean_while_running(points, start_ts=0, end_ts=1000) == pytest.approx(
+            3500.0
+        )
+
+    def test_window_filter(self):
+        points = [(100, 1000.0), (900, 3000.0)]
+        assert mean_while_running(points, start_ts=200, end_ts=1000) == 3000.0
+
+    def test_no_running_hours_is_none(self):
+        assert mean_while_running([(100, 0.0)], start_ts=0, end_ts=1000) is None
+        assert mean_while_running([], start_ts=0, end_ts=1000) is None
+
+    def test_custom_min_value(self):
+        assert (
+            mean_while_running([(1, 5.0)], start_ts=0, end_ts=10, min_value=5.0)
+            is None
+        )
+
+
+class TestDutyCycle:
+    def test_share(self):
+        assert duty_cycle(12.0, 24.0) == 0.5
+
+    def test_clamped(self):
+        assert duty_cycle(30.0, 24.0) == 1.0
+        assert duty_cycle(-1.0, 24.0) == 0.0
+
+    def test_invalid(self):
+        assert duty_cycle(None, 24.0) is None
+        assert duty_cycle(12.0, 0.0) is None
+        assert duty_cycle("x", 24.0) is None
 
 
 class TestComponentScores:

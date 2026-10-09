@@ -901,6 +901,8 @@ class TestQvantumEfficiencySensors:
             "heating_degree_hours",
             "weather_normalized_heating",
             "dhw_standing_loss",
+            "compressor_speed_avg",
+            "exhaust_fan_speed_avg",
         }
         assert any(
             isinstance(entity, QvantumEfficiencyHealthSensor)
@@ -936,10 +938,14 @@ class TestQvantumEfficiencySensors:
         assert {
             "compressor_starts_per_hour",
             "compressor_run_hours_24h",
+            "compressor_power_avg",
+            "compressor_duty_cycle",
         } <= efficiency_keys
         allowed = cleanup.call_args.args[2]
         assert "compressor_starts_per_hour" in allowed
         assert "compressor_run_hours_24h" in allowed
+        assert "compressor_power_avg" in allowed
+        assert "compressor_duty_cycle" in allowed
 
 
 class TestQvantumDiagnosticEntity:

@@ -652,6 +652,18 @@
       },
       "compressor_run_hours_24h": {
         "name": "Temps de fonctionnement du compresseur (24 heures)"
+      },
+      "compressor_speed_avg": {
+        "name": "Vitesse du compresseur (24 heures)"
+      },
+      "compressor_power_avg": {
+        "name": "Puissance du compresseur (24 heures)"
+      },
+      "compressor_duty_cycle": {
+        "name": "Rapport cyclique du compresseur (24 heures)"
+      },
+      "exhaust_fan_speed_avg": {
+        "name": "Vitesse du ventilateur d'extraction (24 heures)"
       }
     },
     "number": {
