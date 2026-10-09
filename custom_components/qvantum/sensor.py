@@ -978,8 +978,8 @@ class QvantumSolarGhiSensor(QvantumEfficiencySensorEntity):
     """Current smoothed solar irradiance plus the forecast peak.
 
     GHI needs no hardware, so this is available in both transports; the
-    modelled solar gain is a separate (disabled by default) sensor because it
-    needs an identified model.
+    modelled solar gain is a separate sensor that stays unavailable until the
+    coordinator has fitted a model.
     """
 
     @property
