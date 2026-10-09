@@ -670,6 +670,12 @@
       },
       "dhw_heat_meter_deviation": {
         "name": "Afwijking warmwater-warmtemeter"
+      },
+      "solar_ghi_now": {
+        "name": "Zoninstraling (nu)"
+      },
+      "solar_gain_now_w": {
+        "name": "Zonnewinst (nu)"
       }
     },
     "number": {

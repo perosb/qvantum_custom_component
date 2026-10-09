@@ -56,7 +56,12 @@ from .open_meteo import (
     fetch_forecast,
     fetch_ghi_history,
 )
-from .solar_gain import SolarModel, SolarSample, fit_solar_model
+from .solar_gain import (
+    MIN_SAMPLE_Q_W,
+    SolarModel,
+    build_samples,
+    fit_solar_model,
+)
 from .statistics import (
     async_statistics_during_period,
     resolve_indoor_metric_key,
@@ -71,8 +76,6 @@ UPDATE_INTERVAL = timedelta(minutes=15)
 CALIBRATION_DAYS = 60
 CALIBRATION_REFRESH_HOURS = 24.0
 MIN_CALIBRATION_SAMPLES = 72
-MIN_SAMPLE_DELTA_T_K = 5.0
-MIN_SAMPLE_Q_W = 50.0
 #: Days of observed ``(BT1, cal_heat_temp)`` used to correct the baseline.
 BASELINE_LEARN_DAYS = 7
 #: Minimum time between baseline-correction statistics fetches.
@@ -147,39 +150,6 @@ def freeze_baseline(settings: Mapping[str, Any]) -> dict[str, float] | None:
             return None
         baseline[key] = float(value)
     return baseline
-
-
-def build_samples(
-    q_by_hour: Mapping[int, float],
-    indoor_by_hour: Mapping[int, float],
-    outdoor_by_hour: Mapping[int, float],
-    ghi_by_hour: Mapping[int, float],
-    *,
-    min_delta_t_k: float = MIN_SAMPLE_DELTA_T_K,
-    min_q_w: float = MIN_SAMPLE_Q_W,
-) -> list[SolarSample]:
-    """Join hourly maps into heating samples for the solar fit.
-
-    Hours without heating demand are dropped: the model needs hours where
-    the heating circuit actually delivered heat.
-    """
-    samples: list[SolarSample] = []
-    for ts in sorted(set(q_by_hour) & set(indoor_by_hour) & set(outdoor_by_hour) & set(ghi_by_hour)):
-        delta_t = indoor_by_hour[ts] - outdoor_by_hour[ts]
-        if delta_t < min_delta_t_k:
-            continue
-        q_heat = q_by_hour[ts]
-        if q_heat < min_q_w:
-            continue
-        samples.append(
-            SolarSample(
-                hour_ts=int(ts),
-                delta_t_k=delta_t,
-                ghi_wm2=max(0.0, ghi_by_hour[ts]),
-                q_heat_w=q_heat,
-            )
-        )
-    return samples
 
 
 def signal_blocker(

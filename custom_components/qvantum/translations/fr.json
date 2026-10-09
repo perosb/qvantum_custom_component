@@ -670,6 +670,12 @@
       },
       "dhw_heat_meter_deviation": {
         "name": "Écart du compteur de chaleur ECS"
+      },
+      "solar_ghi_now": {
+        "name": "Irradiance solaire (maintenant)"
+      },
+      "solar_gain_now_w": {
+        "name": "Gains solaires (maintenant)"
       }
     },
     "number": {

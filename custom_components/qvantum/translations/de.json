@@ -670,6 +670,12 @@
       },
       "dhw_heat_meter_deviation": {
         "name": "Abweichung des Warmwasser-Wärmemessers"
+      },
+      "solar_ghi_now": {
+        "name": "Sonnenstrahlung (jetzt)"
+      },
+      "solar_gain_now_w": {
+        "name": "Solare Wärmegewinne (jetzt)"
       }
     },
     "number": {

@@ -15,6 +15,8 @@ from custom_components.qvantum.efficiency_coordinator import (
     _cumulative_series,
     _window_delta,
 )
+from custom_components.qvantum.open_meteo import HourlyWeather, WeatherForecast
+from custom_components.qvantum.solar_gain import SolarModel
 
 
 def make_coordinator() -> QvantumEfficiencyCoordinator:
@@ -28,6 +30,11 @@ def make_coordinator() -> QvantumEfficiencyCoordinator:
     coordinator.hass = MagicMock()
     coordinator.data = None
     coordinator._listeners = {}
+    # Mirrors QvantumEfficiencyCoordinator.__init__ state that the tests
+    # bypass by constructing via __new__.
+    coordinator._session = MagicMock()
+    coordinator._solar_model = None
+    coordinator._last_solar_fit_ts = None
     return coordinator
 
 
@@ -590,6 +597,137 @@ class TestDhwHeatMeter:
         assert snapshot.dhw_heat_meter_deviation is None
         assert snapshot.dhw_heat_meter_warning is None
         assert snapshot.dhw_heat_meter_hours == 0
+
+
+class TestSolar:
+    @staticmethod
+    def _fixed_now():
+        return datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+    async def test_ghi_now_and_forecast_peak(self):
+        """GHI needs only Open-Meteo, so it works with no model and no stats."""
+        coordinator = make_coordinator()
+        coordinator.hass.config.latitude = 59.3
+        coordinator.hass.config.longitude = 18.1
+        fixed = self._fixed_now()
+        now_hour = int(fixed.timestamp())
+        forecast = WeatherForecast(
+            points=(
+                HourlyWeather(now_hour, 5.0, 100.0),
+                HourlyWeather(now_hour + 3600, 5.0, 400.0),
+            )
+        )
+        with (
+            patch.object(ec.dt_util, "utcnow", return_value=fixed),
+            patch.object(ec, "resolve_statistic_entity_ids", return_value={}),
+            patch.object(ec, "fetch_forecast", AsyncMock(return_value=forecast)),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.solar_ghi_now is not None
+        assert 0.0 < snapshot.solar_ghi_now < 400.0
+        assert snapshot.solar_ghi_peak == 400.0
+        assert snapshot.solar_ghi_peak_in_hours == pytest.approx(1.0)
+        assert snapshot.solar_gain_now_w is None
+
+    async def test_forecast_failure_degrades_to_none(self):
+        coordinator = make_coordinator()
+        coordinator.hass.config.latitude = 59.3
+        coordinator.hass.config.longitude = 18.1
+        with (
+            patch.object(ec, "resolve_statistic_entity_ids", return_value={}),
+            patch.object(
+                ec,
+                "fetch_forecast",
+                AsyncMock(side_effect=ec.OpenMeteoError("down")),
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.solar_ghi_now is None
+        assert snapshot.solar_gain_now_w is None
+
+    async def test_solar_gain_uses_fitted_model(self):
+        coordinator = make_coordinator()
+        coordinator.hass.config.latitude = 59.3
+        coordinator.hass.config.longitude = 18.1
+        fixed = self._fixed_now()
+        now_ts = int(fixed.timestamp())
+        series = TestBuildingMetrics._series(now_ts=now_ts)
+        rows = {
+            "sensor.heatingenergy": series["sensor.heatingenergy"],
+            "sensor.bt1": series["sensor.bt1"],
+            "sensor.bt2": series["sensor.bt2"],
+            "sensor.heatingpower": series["sensor.heatingpower"],
+        }
+        ghi_history = {row["start"]: 100.0 for row in series["sensor.bt1"]}
+        model = SolarModel(
+            a_w_per_k=100.0,
+            b_m2=0.5,
+            c_w=0.0,
+            trust=1.0,
+            r2_opaque=0.9,
+            r2_solar=0.9,
+            b_std_err=None,
+            n_opaque=100,
+            n_solar=100,
+            valid=True,
+        )
+
+        def fake_resolve(hass, device_id, keys):
+            if tuple(keys) == ec.BUILDING_KEYS:
+                return {
+                    "heatingpower": "sensor.heatingpower",
+                    "bt1": "sensor.bt1",
+                    "bt2": "sensor.bt2",
+                }
+            return {}
+
+        with (
+            patch.object(ec.dt_util, "utcnow", return_value=fixed),
+            patch.object(ec, "resolve_statistic_entity_ids", fake_resolve),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value=rows)
+            ),
+            patch.object(
+                ec,
+                "fetch_forecast",
+                AsyncMock(
+                    return_value=WeatherForecast(
+                        points=(HourlyWeather(now_ts, 5.0, 300.0),)
+                    )
+                ),
+            ),
+            patch.object(ec, "fetch_ghi_history", AsyncMock(return_value=ghi_history)),
+            patch.object(ec, "fit_solar_model", MagicMock(return_value=model)) as fit,
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert fit.called
+        assert snapshot.solar_gain_now_w is not None
+        assert snapshot.solar_gain_now_w > 0.0
+
+    async def test_model_fit_is_throttled(self):
+        coordinator = make_coordinator()
+        coordinator._solar_model = SolarModel(
+            a_w_per_k=1.0,
+            b_m2=1.0,
+            c_w=0.0,
+            trust=1.0,
+            r2_opaque=0.0,
+            r2_solar=0.0,
+            b_std_err=None,
+            n_opaque=0,
+            n_solar=0,
+            valid=True,
+        )
+        coordinator._last_solar_fit_ts = 1_000_000.0
+        with patch.object(ec, "fetch_ghi_history", AsyncMock()) as history:
+            await coordinator._async_refresh_solar_model(
+                {}, 1_000_000.0 + 60.0, 59.3, 18.1
+            )
+
+        history.assert_not_awaited()
 
 
 class TestDhwStandingLoss:
