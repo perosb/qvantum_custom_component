@@ -95,6 +95,13 @@ TRIM_MAX_DISTANCE_C = 7.5
 #: Cap on the accumulated trim per point and on a single indicated residual.
 TRIM_MAX_C = 2.0
 
+#: Pre-charge clamp (the term only ever raises the curve).
+PRECHARGE_MAX_C = 1.5
+#: Forecast temperature drop over the horizon that starts the pre-charge,
+#: and the span above it that reaches the full raise.
+PRECHARGE_TRIGGER_K = 4.0
+PRECHARGE_HORIZON_H = 8
+
 #: COP-feedback clamp (the term only ever reduces the curve).
 COP_FEEDBACK_MAX_C = 1.0
 #: recent/reference ratio at which the COP feedback starts reducing supply.
@@ -561,6 +568,41 @@ def cop_feedback_adjustment_c(
         1.0,
     )
     return -max_reduction_c * fraction
+
+
+def precharge_adjustment_c(
+    forecast_temperature: Mapping[int, float],
+    now_ts: int,
+    *,
+    trigger_k: float = PRECHARGE_TRIGGER_K,
+    horizon_hours: int = PRECHARGE_HORIZON_H,
+    max_raise_c: float = PRECHARGE_MAX_C,
+) -> float:
+    """One-sided raise ahead of a forecast cold snap.
+
+    Compares the forecast now with its minimum over the next
+    ``horizon_hours``. A drop at or below ``trigger_k`` (or a missing
+    forecast) yields zero; the raise grows linearly and caps at
+    ``max_raise_c`` a further ``trigger_k`` below the trigger. The caller
+    still applies it through the total clamp, the indoor cap and the pump's
+    max supply, so this never exceeds what the firmware will use.
+    """
+    now_hour = now_ts - (now_ts % 3600)
+    temperature_now = forecast_temperature.get(now_hour)
+    if temperature_now is None:
+        return 0.0
+    ahead = [
+        forecast_temperature[now_hour + hour * 3600]
+        for hour in range(1, max(1, horizon_hours) + 1)
+        if now_hour + hour * 3600 in forecast_temperature
+    ]
+    if not ahead:
+        return 0.0
+    drop = float(temperature_now) - min(ahead)
+    if drop <= trigger_k:
+        return 0.0
+    fraction = _clamp((drop - trigger_k) / trigger_k, 0.0, 1.0)
+    return max_raise_c * fraction
 
 
 def compute_curve(

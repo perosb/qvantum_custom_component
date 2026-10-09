@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "COP-takaisinkytkentä",
           "description": "Laske menolämpötilaa, kun mitattu COP on opitun viitearvon alapuolella"
+        },
+        "precharge": {
+          "name": "Esilämmitys",
+          "description": "Nosta menolämpötilaa ennen ennustettua kylmäjaksoa"
         }
       }
     }

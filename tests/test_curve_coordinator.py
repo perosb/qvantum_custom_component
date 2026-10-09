@@ -17,6 +17,7 @@ from custom_components.qvantum import curve_coordinator as cc
 from custom_components.qvantum.const import HP_STATUS_HEATING
 from custom_components.qvantum.heating_curve import (
     COP_FEEDBACK_MAX_C,
+    PRECHARGE_MAX_C,
     TOTAL_MAX_C,
     CurveResult,
     interpolate_supply,
@@ -1808,4 +1809,48 @@ class TestCopFeedback:
         assert coordinator.terms == {"cop_feedback": True, "precharge": False}
         assert coordinator._cop_reference == {0: 3.5}
         assert coordinator._cop_samples == {0: 20}
+
+
+class TestPrecharge:
+    """Pre-charge term: opt-in, active-only, one-sided upward."""
+
+    @staticmethod
+    def _forecast() -> tuple[dict[int, float], int]:
+        now = int(time.time())
+        now_hour = now - (now % 3600)
+        return {now_hour: 8.0, now_hour + 3600: -4.0}, now
+
+    def test_requires_flag_and_active_mode(self):
+        coordinator = make_coordinator()
+        forecast, now = self._forecast()
+
+        assert coordinator._precharge_c(forecast, now, make_snapshot()) == 0.0
+
+        coordinator._terms["precharge"] = True
+        assert coordinator._precharge_c(forecast, now, make_snapshot()) == 0.0
+
+        coordinator._mode = "active"
+        assert coordinator._precharge_c(forecast, now, make_snapshot()) == pytest.approx(
+            PRECHARGE_MAX_C
+        )
+
+    def test_skips_when_previous_capped_or_at_total_clamp(self):
+        coordinator = make_coordinator()
+        coordinator._terms["precharge"] = True
+        coordinator._mode = "active"
+        forecast, now = self._forecast()
+
+        assert (
+            coordinator._precharge_c(
+                forecast, now, make_snapshot(capped_by_indoor=True)
+            )
+            == 0.0
+        )
+        assert (
+            coordinator._precharge_c(
+                forecast, now, make_snapshot(adjustment_c=TOTAL_MAX_C)
+            )
+            == 0.0
+        )
+        assert coordinator._precharge_c(forecast, now, make_snapshot()) > 0.0
 

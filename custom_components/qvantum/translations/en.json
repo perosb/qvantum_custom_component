@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "COP feedback",
           "description": "Reduce supply while measured COP is below its learned reference"
+        },
+        "precharge": {
+          "name": "Pre-charge",
+          "description": "Raise supply ahead of a forecast cold snap"
         }
       }
     }

@@ -262,6 +262,12 @@ only act while the curve is active. Enable them with
   one-sided downward, applies only while the pump is heating, and never
   fights the indoor cap or the total clamp. Freezing the reference only
   affects the COP loop; the baseline shape learning is untouched.
+- **Cold-snap pre-charge** (`precharge: true`) raises the shared adjustment,
+  by at most 1.5 °C, when the forecast drops at least 4 K within the next 8
+  hours (the minimum over that horizon, not the last hour). It is one-sided
+  upward and skipped when the previous cycle was already capped or at the
+  positive total clamp; the indoor cap remains the final veto for a warm
+  house and the pump's max supply bounds every point.
 
 ### Solar model
 

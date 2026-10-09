@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "COP visszacsatolás",
           "description": "Csökkentse az előremenő hőmérsékletet, ha a mért COP a tanult referencia alatt van"
+        },
+        "precharge": {
+          "name": "Előmelegítés",
+          "description": "Növelje az előremenő hőmérsékletet a várható hidegbetörés előtt"
         }
       }
     }

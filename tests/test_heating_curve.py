@@ -14,6 +14,7 @@ from custom_components.qvantum.heating_curve import (
     MIN_SUPPLY_C,
     NIGHT_DAY_MAX_C,
     OUTDOOR_MAX_C,
+    PRECHARGE_MAX_C,
     SOLAR_MAX_C,
     TOTAL_MAX_C,
     TRIM_MAX_C,
@@ -30,6 +31,7 @@ from custom_components.qvantum.heating_curve import (
     night_day_adjustment_c,
     normalize_baseline,
     outdoor_adjustment_c,
+    precharge_adjustment_c,
     solar_adjustment_c,
     trim_residuals,
 )
@@ -318,6 +320,52 @@ def test_compute_curve_applies_cop_feedback_before_caps() -> None:
     assert all(
         reduced_point[1] == pytest.approx(base_point[1] - 1.0)
         for reduced_point, base_point in zip(reduced.points, base.points)
+    )
+
+
+def test_precharge_raises_only_on_a_forecast_drop() -> None:
+    now = 1_760_000_000 // 3600 * 3600
+
+    # No forecast, no future hours or a flat/small drop: no term.
+    assert precharge_adjustment_c({}, now) == 0.0
+    assert precharge_adjustment_c({now: 2.0}, now) == 0.0
+    assert precharge_adjustment_c({now: 2.0, now + 3600: 1.0}, now) == 0.0
+    # At the trigger the raise just starts.
+    assert precharge_adjustment_c({now: 8.0, now + 3600: 4.0}, now) == 0.0
+    # Half a trigger further down gives half the raise.
+    assert precharge_adjustment_c(
+        {now: 8.0, now + 3600: 2.0}, now
+    ) == pytest.approx(PRECHARGE_MAX_C / 2.0)
+    # A deeper drop caps at the maximum raise.
+    assert precharge_adjustment_c(
+        {now: 8.0, now + 3600: -4.0}, now
+    ) == pytest.approx(PRECHARGE_MAX_C)
+    # The minimum over the horizon drives the term, not the last hour.
+    assert precharge_adjustment_c(
+        {now: 8.0, now + 3600: 7.0, now + 2 * 3600: -1.0}, now
+    ) == pytest.approx(PRECHARGE_MAX_C)
+
+
+def test_compute_curve_applies_precharge_before_caps() -> None:
+    base = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature={},
+        ghi_by_hour={},
+    )
+    raised = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature={},
+        ghi_by_hour={},
+        precharge_c=1.0,
+    )
+
+    assert raised.precharge_c == 1.0
+    assert raised.adjustment_c == pytest.approx(1.0)
+    assert all(
+        raised_point[1] == pytest.approx(base_point[1] + 1.0)
+        for raised_point, base_point in zip(raised.points, base.points)
     )
 
 
