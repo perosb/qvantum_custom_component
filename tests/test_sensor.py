@@ -271,6 +271,42 @@ class TestQvantumBaseSensorEntity:
         other = QvantumBaseSensorEntity(mock_coordinator, "bt1", mock_device, True)
         assert getattr(other, "_attr_entity_category", None) is None
 
+    @pytest.mark.parametrize(
+        "metric_key",
+        (
+            "bt20",
+            "bt22",
+            "bp1_pressure",
+            "fanrpm",
+            "gp1_speed",
+            "compressormeasuredspeed",
+            "qn8position",
+            "degree_minute",
+            "price_region",
+            "start_cooling_temp",
+        ),
+    )
+    def test_machine_internal_sensors_are_diagnostic(
+        self, mock_coordinator, mock_device, metric_key
+    ):
+        """Refrigerant/speed/settings read-backs belong under Diagnostics."""
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, metric_key, mock_device, True
+        )
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
+
+    @pytest.mark.parametrize(
+        "metric_key", ("bt1", "bt2", "bt11", "bt30", "cal_heat_temp", "hp_status")
+    )
+    def test_primary_sensors_stay_in_main_ui(
+        self, mock_coordinator, mock_device, metric_key
+    ):
+        """Primary temperatures/status must not be hidden under Diagnostics."""
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, metric_key, mock_device, True
+        )
+        assert getattr(entity, "_attr_entity_category", None) is None
+
     def test_alarm_count_sensor(self, mock_coordinator, mock_device):
         """Active-alarm count is a diagnostic measurement with integer display."""
         entity = QvantumBaseSensorEntity(
@@ -857,6 +893,38 @@ class TestQvantumEfficiencySensors:
         assert attributes["metered_kwh"] == 16.8
         assert attributes["hours"] == 24
         assert "flow × ΔT" in attributes["attribution"]
+
+    def test_efficiency_sensor_categories(self, mock_device):
+        """Derived internals are diagnostics; headline figures stay in main."""
+        coordinator = _efficiency_coordinator(EfficiencySnapshot())
+        diagnostics = (
+            "heat_loss_coefficient",
+            "heating_degree_hours",
+            "weather_normalized_heating",
+            "dhw_standing_loss",
+            "compressor_starts_per_hour",
+            "compressor_run_hours_24h",
+            "compressor_speed_avg",
+            "compressor_power_avg",
+            "compressor_duty_cycle",
+            "exhaust_fan_speed_avg",
+            "dhw_heat_meter_deviation",
+        )
+        for key in diagnostics:
+            entity = QvantumEfficiencySensorEntity(coordinator, key, mock_device)
+            assert entity._attr_entity_category.name == "DIAGNOSTIC", key
+        for key in ("scop_total", "aux_heat_share"):
+            entity = QvantumEfficiencySensorEntity(coordinator, key, mock_device)
+            assert getattr(entity, "_attr_entity_category", None) is None, key
+        health = QvantumEfficiencyHealthSensor(coordinator, mock_device)
+        assert getattr(health, "_attr_entity_category", None) is None
+
+    def test_curve_deviation_sensor_is_diagnostic(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        entity = QvantumCurveDeviationSensor(
+            coordinator, "adaptive_curve_deviation", mock_device
+        )
+        assert entity._attr_entity_category.name == "DIAGNOSTIC"
 
     def test_health_sensor_state_and_attributes(self, mock_device):
         coordinator = _efficiency_coordinator(

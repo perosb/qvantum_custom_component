@@ -52,8 +52,13 @@ _LOGGER = logging.getLogger(__name__)
 _ALARM_CODE_SENSORS = frozenset(
     {f"alarm_{index}_code" for index in range(1, 6)}
 )
+#: Machine-internal telemetry and settings read-backs belong under
+#: Diagnostics. Primary temperatures (outdoor/indoor/tank/flow), the energy
+#: counters, the tap-water comfort figures and the derived COP/efficiency
+#: headlines stay in the main UI.
 _DIAGNOSTIC_SENSORS = frozenset(
     {
+        # Lifetime counters and countdowns
         "ventilation_filter_time_left",
         "compressor_blocked_sec",
         "compressor_run_time",
@@ -61,6 +66,57 @@ _DIAGNOSTIC_SENSORS = frozenset(
         "ventilation_fan_run_time",
         "active_alarms",
         *_ALARM_CODE_SENSORS,
+        # Refrigerant circuit, air side and pressures
+        "bt4",
+        "bt10",
+        "bt13",
+        "bt14",
+        "bt15",
+        "bt20",
+        "bt21",
+        "bt22",
+        "bt23",
+        "bt31",
+        "btx",
+        "bp1_pressure",
+        "bp1_temp",
+        "bp2_pressure",
+        "bp2_temp",
+        # Machine speeds, flows and valve position
+        "bf1_l_min",
+        "bf1_rpm",
+        "fanrpm",
+        "fan0_10v",
+        "gp1_speed",
+        "gp2_speed",
+        "compressormeasuredspeed",
+        "qn8position",
+        # Settings read-backs and raw informational fields
+        "start_cooling_temp",
+        "price_region",
+        "op_mode_sensor",
+        "smart_dhw_control_status",
+        "dhw_prioritytime",
+        "dhw_prioritytimeleft",
+        "heating_prioritytimeleft",
+        "cooling_prioritytimeleft",
+        "degree_minute",
+        "calc_suppy_cpr",
+        "guide_des_temp",
+        "guide_he",
+        "filtered60sec_outdoortemp",
+        "bp1_temp_20min_filter",
+        "max_freq_env",
+        "max_bp2_env",
+        "dhw_set",
+        "dhw_outl_temp_15",
+        "dhw_outl_temp_5",
+        "dhw_outl_temp_max",
+        "switch_state",
+        "picpin_mask",
+        "inputcurrent1",
+        "inputcurrent2",
+        "inputcurrent3",
     }
 )
 _DURATION_HOURS_SENSORS = frozenset(
@@ -126,24 +182,28 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "scale": 1.0,
         "precision": 1,
         "field": "heat_loss_w_per_k",
+        "diagnostic": True,
     },
     "heating_degree_hours": {
         "icon": "mdi:thermometer-lines",
         "unit": "°C·h",
         "scale": 1.0,
         "precision": 0,
+        "diagnostic": True,
     },
     "weather_normalized_heating": {
         "icon": "mdi:chart-timeline-variant",
         "unit": "kWh/HDD",
         "scale": 1.0,
         "precision": 3,
+        "diagnostic": True,
     },
     "dhw_standing_loss": {
         "icon": "mdi:water-boiler-alert",
         "unit": "kWh/d",
         "scale": 1.0,
         "precision": 2,
+        "diagnostic": True,
     },
     "compressor_starts_per_hour": {
         "icon": "mdi:restart",
@@ -151,6 +211,7 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "scale": 1.0,
         "precision": 2,
         "modbus_only": True,
+        "diagnostic": True,
     },
     "compressor_run_hours_24h": {
         "icon": "mdi:timer-outline",
@@ -158,12 +219,14 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "scale": 1.0,
         "precision": 1,
         "modbus_only": True,
+        "diagnostic": True,
     },
     "compressor_speed_avg": {
         "icon": "mdi:speedometer",
         "unit": "rpm",
         "scale": 1.0,
         "precision": 0,
+        "diagnostic": True,
     },
     "compressor_power_avg": {
         "icon": "mdi:lightning-bolt",
@@ -171,6 +234,7 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "scale": 1.0,
         "precision": 0,
         "modbus_only": True,
+        "diagnostic": True,
     },
     "compressor_duty_cycle": {
         "icon": "mdi:timer-sand",
@@ -178,18 +242,21 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "scale": 100.0,
         "precision": 0,
         "modbus_only": True,
+        "diagnostic": True,
     },
     "exhaust_fan_speed_avg": {
         "icon": "mdi:fan",
         "unit": "rpm",
         "scale": 1.0,
         "precision": 0,
+        "diagnostic": True,
     },
     "dhw_heat_meter_deviation": {
         "icon": "mdi:scale-unbalanced",
         "unit": PERCENTAGE,
         "scale": 1.0,
         "precision": 1,
+        "diagnostic": True,
     },
     "solar_ghi_now": {
         "icon": "mdi:weather-sunny",
@@ -784,6 +851,7 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
 class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
     """Computed supply minus the pump's ``cal_heat_temp`` (shadow comparison)."""
 
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -887,6 +955,8 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
         self._scale = float(config["scale"])
         self._snapshot_field = str(config.get("field") or metric_key)
         self._attr_icon = config["icon"]
+        if config.get("diagnostic"):
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_suggested_display_precision = config["precision"]
         if config["unit"] is not None:
             self._attr_native_unit_of_measurement = config["unit"]

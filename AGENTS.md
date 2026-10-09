@@ -193,6 +193,15 @@ migration test when the entry schema changes.
 Icons on `QvantumEntity`. Cloud-only (SmartControl, firmware boards, access
 expiry, elevate-access) must not be created in Modbus mode.
 
+Entity category: machine-internal telemetry and settings read-backs
+(refrigerant/air-side BT sensors, refrigerant pressures, compressor/pump/fan
+speeds, lifetime counters, valve position, derived diagnostics such as the
+heat-loss or heat-meter figures) belongs under `EntityCategory.DIAGNOSTIC`.
+Primary temperatures (outdoor/indoor/tank/heating flow), energy and power
+counters, tap-water comfort, solar exposure and the headline efficiency
+figures (COP/SCOP/aux share/health) stay in the main UI. Controls are never
+diagnostics; `alarm_active` is a PROBLEM, not a diagnostic.
+
 Derived metrics (`cop_*`, `scop_total`, `aux_heat_share`, …) are computed in HA
 after the poll. Never add them to `DEFAULT_ENABLED_*` / `DEFAULT_DISABLED_*`:
 those lists are also the fetch universe, so the client would request a metric
