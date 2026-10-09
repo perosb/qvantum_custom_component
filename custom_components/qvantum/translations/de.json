@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Standverlust Warmwasser"
+      },
+      "efficiency_health": {
+        "name": "Effizienz-Zustand"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Kompressorstarts pro Betriebsstunde"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Kompressorlaufzeit (24 Stunden)"
       }
     },
     "number": {

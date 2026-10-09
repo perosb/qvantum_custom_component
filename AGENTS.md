@@ -17,7 +17,8 @@ custom_components/qvantum/
   efficiency.py               # pure COP/SCOP/aux-share math (no HA imports)
   building.py                 # pure degree-hours / heat-loss math (no HA imports)
   dhw_loss.py                 # pure DHW standing-loss math (no HA imports)
-  efficiency_coordinator.py   # rolling SCOP / aux / building / DHW loss
+  plant_analytics.py          # pure cycling / health-grade math (no HA imports)
+  efficiency_coordinator.py   # rolling SCOP / aux / building / DHW / cycling
   entity.py                   # QvantumEntity, icons, write-access mixin
   config_flow.py
   const.py                    # HA keys; re-exports client constants

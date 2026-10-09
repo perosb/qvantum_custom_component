@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Straty postojowe ciepłej wody"
+      },
+      "efficiency_health": {
+        "name": "Kondycja efektywności"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Rozruchy sprężarki na godzinę pracy"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Czas pracy sprężarki (24 godziny)"
       }
     },
     "number": {

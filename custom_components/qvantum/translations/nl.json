@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Stand-by verlies warm water"
+      },
+      "efficiency_health": {
+        "name": "Efficiëntie-status"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Compressorstarts per bedrijfsuur"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Compressorlooptijd (24 uur)"
       }
     },
     "number": {

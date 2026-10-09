@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Pertes permanentes de l'eau chaude"
+      },
+      "efficiency_health": {
+        "name": "Santé de l'efficacité"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Démarrages du compresseur par heure de fonctionnement"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Temps de fonctionnement du compresseur (24 heures)"
       }
     },
     "number": {

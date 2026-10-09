@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Käyttöveden varastohäviö"
+      },
+      "efficiency_health": {
+        "name": "Hyötysuhteen tila"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Kompressorin käynnistykset käyttötuntia kohden"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Kompressorin käyttöaika (24 tuntia)"
       }
     },
     "number": {

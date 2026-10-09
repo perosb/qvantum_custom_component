@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Használati melegvíz állási vesztesége"
+      },
+      "efficiency_health": {
+        "name": "Hatékonysági állapot"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Kompresszorindítások üzemóránként"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Kompresszor üzemideje (24 óra)"
       }
     },
     "number": {

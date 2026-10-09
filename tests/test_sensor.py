@@ -57,6 +57,7 @@ with patch(
                 QvantumCurvePointSensor,
                 QvantumCurveSolarModelSensor,
                 QvantumCurrentEntity,
+                QvantumEfficiencyHealthSensor,
                 QvantumEfficiencySensorEntity,
                 QvantumDiagnosticEntity,
                 QvantumDisplayFirmwareEntity,
@@ -816,6 +817,31 @@ class TestQvantumEfficiencySensors:
         assert entity._attr_native_unit_of_measurement == "W/K"
         assert entity.extra_state_attributes["coverage_days"] == 28.0
 
+    def test_health_sensor_state_and_attributes(self, mock_device):
+        coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(
+                efficiency_health_grade="B",
+                efficiency_health_score=0.75,
+                efficiency_health_coverage=0.75,
+                efficiency_health_components={"scop": 1.0, "aux_share": 0.0},
+            )
+        )
+        entity = QvantumEfficiencyHealthSensor(coordinator, mock_device)
+
+        assert entity.native_value == "B"
+        assert entity._attr_unique_id == "qvantum_efficiency_health_test_device_123"
+        attributes = entity.extra_state_attributes
+        assert attributes["score"] == 0.75
+        assert attributes["coverage"] == 0.75
+        assert attributes["components"] == {"scop": 1.0, "aux_share": 0.0}
+
+    def test_health_sensor_unavailable_without_grade(self, mock_device):
+        coordinator = _efficiency_coordinator(EfficiencySnapshot())
+        entity = QvantumEfficiencyHealthSensor(coordinator, mock_device)
+
+        assert entity.native_value is None
+        assert entity.available is False
+
     def test_dhw_standing_loss_has_no_counter_coverage(self, mock_device):
         coordinator = _efficiency_coordinator(
             EfficiencySnapshot(dhw_standing_loss=1.2, coverage_days=30.0)
@@ -876,6 +902,44 @@ class TestQvantumEfficiencySensors:
             "weather_normalized_heating",
             "dhw_standing_loss",
         }
+        assert any(
+            isinstance(entity, QvantumEfficiencyHealthSensor)
+            and entity._attr_unique_id == "qvantum_efficiency_health_test_device_123"
+            for entity in entities
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_adds_cycling_sensors(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Modbus-only counters are not created as dead cloud entities."""
+        from custom_components.qvantum.const import CONF_MODBUS_TCP
+
+        mock_config_entry.options = {CONF_MODBUS_TCP: True}
+        mock_coordinator.modbus_enabled = True
+        mock_config_entry.runtime_data.efficiency_coordinator = _efficiency_coordinator(
+            EfficiencySnapshot()
+        )
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities") as cleanup,
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        efficiency_keys = {
+            entity._metric_key
+            for entity in async_add_entities.call_args[0][0]
+            if isinstance(entity, QvantumEfficiencySensorEntity)
+        }
+        assert {
+            "compressor_starts_per_hour",
+            "compressor_run_hours_24h",
+        } <= efficiency_keys
+        allowed = cleanup.call_args.args[2]
+        assert "compressor_starts_per_hour" in allowed
+        assert "compressor_run_hours_24h" in allowed
 
 
 class TestQvantumDiagnosticEntity:

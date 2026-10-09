@@ -149,8 +149,25 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "precision": 2,
         "enabled": False,
     },
+    "compressor_starts_per_hour": {
+        "icon": "mdi:restart",
+        "unit": "1/h",
+        "scale": 1.0,
+        "precision": 2,
+        "enabled": False,
+        "modbus_only": True,
+    },
+    "compressor_run_hours_24h": {
+        "icon": "mdi:timer-outline",
+        "unit": "h",
+        "scale": 1.0,
+        "precision": 1,
+        "enabled": False,
+        "modbus_only": True,
+    },
 }
-_EFFICIENCY_SENSOR_KEYS = frozenset(_EFFICIENCY_SENSOR_CONFIG)
+#: Letter-grade heuristic; its own entity because the state is not numeric.
+_EFFICIENCY_HEALTH_KEY = "efficiency_health"
 # Figures whose coverage comes from the building series, not the energy counters.
 _BUILDING_SENSOR_KEYS = frozenset(
     {
@@ -314,8 +331,14 @@ async def async_setup_entry(
         config_entry.runtime_data, "efficiency_coordinator", None
     )
     if isinstance(efficiency_coordinator, QvantumEfficiencyCoordinator):
-        special_sensor_keys.update(_EFFICIENCY_SENSOR_KEYS)
+        special_sensor_keys.add(_EFFICIENCY_HEALTH_KEY)
         for efficiency_key, config in _EFFICIENCY_SENSOR_CONFIG.items():
+            if config.get("modbus_only") and not coordinator.modbus_enabled:
+                # Modbus-only series have no cloud statistics; leaving the key
+                # out of special_sensor_keys also lets registry cleanup remove
+                # a stale entity after a transport switch.
+                continue
+            special_sensor_keys.add(efficiency_key)
             sensors.append(
                 QvantumEfficiencySensorEntity(
                     efficiency_coordinator,
@@ -324,6 +347,9 @@ async def async_setup_entry(
                     bool(config["enabled"]),
                 )
             )
+        sensors.append(
+            QvantumEfficiencyHealthSensor(efficiency_coordinator, device, True)
+        )
     if coordinator.modbus_enabled:
         special_sensor_keys.update(
             {
@@ -860,6 +886,70 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
         if self._metric_key == "scop_total" and snapshot.scop_total_90d is not None:
             attributes["scop_90d"] = round(snapshot.scop_total_90d, 2)
         return attributes
+
+
+class QvantumEfficiencyHealthSensor(CoordinatorEntity, SensorEntity):
+    """A–F heuristic over the available efficiency components.
+
+    The state is a letter, so there is no unit or state class. The attribute
+    breakdown exposes the score, the per-component scores and the coverage so
+    a grade built from one signal is never mistaken for a full picture.
+    """
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:heart-pulse"
+
+    def __init__(
+        self,
+        efficiency_coordinator: QvantumEfficiencyCoordinator,
+        device: DeviceInfo | dict,
+        enabled_by_default: bool = True,
+    ) -> None:
+        super().__init__(efficiency_coordinator)
+        self._metric_key = _EFFICIENCY_HEALTH_KEY
+        self._attr_translation_key = _EFFICIENCY_HEALTH_KEY
+        self._attr_unique_id = (
+            f"qvantum_{_EFFICIENCY_HEALTH_KEY}_{resolve_device_id(device)}"
+        )
+        self._attr_device_info = device
+        self._attr_entity_registry_enabled_default = enabled_by_default
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        """Stable English slug; translated names must not move entity IDs."""
+        return _EFFICIENCY_HEALTH_KEY
+
+    @property
+    def native_value(self):
+        """Return the letter grade, or None without enough components."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        return snapshot.efficiency_health_grade
+
+    @property
+    def available(self) -> bool:
+        """Only meaningful once at least one component is available."""
+        return super().available and self.native_value is not None
+
+    @property
+    def extra_state_attributes(self):
+        """Return the score, component breakdown and coverage."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        return {
+            "score": (
+                None
+                if snapshot.efficiency_health_score is None
+                else round(snapshot.efficiency_health_score, 3)
+            ),
+            "coverage": round(snapshot.efficiency_health_coverage, 2),
+            "components": dict(snapshot.efficiency_health_components),
+            "attribution": (
+                "heuristic; missing components are excluded from the score"
+            ),
+        }
 
 
 class QvantumDiagnosticEntity(QvantumBaseSensorEntity):

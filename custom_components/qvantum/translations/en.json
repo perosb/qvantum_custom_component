@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Hot water standing loss"
+      },
+      "efficiency_health": {
+        "name": "Efficiency health"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Compressor starts per running hour"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Compressor run time (24 hours)"
       }
     },
     "number": {

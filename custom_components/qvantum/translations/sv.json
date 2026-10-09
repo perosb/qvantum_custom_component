@@ -643,6 +643,15 @@
       },
       "dhw_standing_loss": {
         "name": "Varmvattenberedarens ståförlust"
+      },
+      "efficiency_health": {
+        "name": "Effektivitetshälsa"
+      },
+      "compressor_starts_per_hour": {
+        "name": "Kompressorstarter per drifttimme"
+      },
+      "compressor_run_hours_24h": {
+        "name": "Kompressorns drifttid (24 timmar)"
       }
     },
     "number": {
