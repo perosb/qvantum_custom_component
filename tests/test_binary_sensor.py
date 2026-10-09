@@ -387,6 +387,8 @@ async def test_async_setup_entry_creates_efficiency_binary(
     assert warning.is_on is False
     assert trend.available is True
     assert warning.available is True
+    # Recorder-derived flags are enabled by default.
+    assert all(entity._attr_entity_registry_enabled_default for entity in entities)
 
     efficiency.data = EfficiencySnapshot(
         normalized_rising=None, dhw_heat_meter_warning=None

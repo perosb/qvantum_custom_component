@@ -106,7 +106,7 @@ async def async_setup_entry(
         for binary_key in sorted(_EFFICIENCY_BINARY_SENSORS):
             sensors.append(
                 QvantumEfficiencyBinaryEntity(
-                    efficiency_coordinator, binary_key, device, False
+                    efficiency_coordinator, binary_key, device, True
                 )
             )
 
@@ -132,7 +132,7 @@ class QvantumEfficiencyBinaryEntity(CoordinatorEntity, BinarySensorEntity):
         efficiency_coordinator: QvantumEfficiencyCoordinator,
         metric_key: str,
         device: DeviceInfo | dict,
-        enabled_by_default: bool = False,
+        enabled_by_default: bool = True,
     ) -> None:
         super().__init__(efficiency_coordinator)
         self._metric_key = metric_key

@@ -104,28 +104,27 @@ _COP_ICONS: dict[str, str] = {
     "cop_system": "mdi:heat-pump-outline",
 }
 # Rolling efficiency figures come from the efficiency coordinator (recorder
-# stats). key -> icon, unit, display scale, precision, enabled-by-default.
+# stats). key -> icon, unit, display scale, precision. All are enabled by
+# default; a config may set "enabled": False for an opt-in diagnostic, and
+# "modbus_only": True keeps an entity out of cloud mode entirely.
 _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
     "scop_total": {
         "icon": "mdi:chart-line",
         "unit": None,
         "scale": 1.0,
         "precision": 2,
-        "enabled": False,
     },
     "aux_heat_share": {
         "icon": "mdi:lightning-bolt-outline",
         "unit": PERCENTAGE,
         "scale": 100.0,
         "precision": 1,
-        "enabled": True,
     },
     "heat_loss_coefficient": {
         "icon": "mdi:home-thermometer-outline",
         "unit": "W/K",
         "scale": 1.0,
         "precision": 1,
-        "enabled": False,
         "field": "heat_loss_w_per_k",
     },
     "heating_degree_hours": {
@@ -133,28 +132,24 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "unit": "°C·h",
         "scale": 1.0,
         "precision": 0,
-        "enabled": False,
     },
     "weather_normalized_heating": {
         "icon": "mdi:chart-timeline-variant",
         "unit": "kWh/HDD",
         "scale": 1.0,
         "precision": 3,
-        "enabled": False,
     },
     "dhw_standing_loss": {
         "icon": "mdi:water-boiler-alert",
         "unit": "kWh/d",
         "scale": 1.0,
         "precision": 2,
-        "enabled": False,
     },
     "compressor_starts_per_hour": {
         "icon": "mdi:restart",
         "unit": "1/h",
         "scale": 1.0,
         "precision": 2,
-        "enabled": False,
         "modbus_only": True,
     },
     "compressor_run_hours_24h": {
@@ -162,7 +157,6 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "unit": "h",
         "scale": 1.0,
         "precision": 1,
-        "enabled": False,
         "modbus_only": True,
     },
     "compressor_speed_avg": {
@@ -170,14 +164,12 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "unit": "rpm",
         "scale": 1.0,
         "precision": 0,
-        "enabled": False,
     },
     "compressor_power_avg": {
         "icon": "mdi:lightning-bolt",
         "unit": "W",
         "scale": 1.0,
         "precision": 0,
-        "enabled": False,
         "modbus_only": True,
     },
     "compressor_duty_cycle": {
@@ -185,7 +177,6 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "unit": PERCENTAGE,
         "scale": 100.0,
         "precision": 0,
-        "enabled": False,
         "modbus_only": True,
     },
     "exhaust_fan_speed_avg": {
@@ -193,14 +184,12 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "unit": "rpm",
         "scale": 1.0,
         "precision": 0,
-        "enabled": False,
     },
     "dhw_heat_meter_deviation": {
         "icon": "mdi:scale-unbalanced",
         "unit": PERCENTAGE,
         "scale": 1.0,
         "precision": 1,
-        "enabled": False,
     },
     "solar_ghi_now": {
         "icon": "mdi:weather-sunny",
@@ -398,7 +387,7 @@ async def async_setup_entry(
                     efficiency_coordinator,
                     efficiency_key,
                     device,
-                    bool(config["enabled"]),
+                    bool(config.get("enabled", True)),
                 )
             )
         sensors.append(
