@@ -9,6 +9,7 @@ import pytest
 from custom_components.qvantum.plant_analytics import (
     DEFAULT_HEALTH_WEIGHTS,
     HealthGrade,
+    dhw_heat_meter_power_w,
     duty_cycle,
     health_grade,
     mean_while_running,
@@ -69,6 +70,23 @@ class TestDutyCycle:
         assert duty_cycle(None, 24.0) is None
         assert duty_cycle(12.0, 0.0) is None
         assert duty_cycle("x", 24.0) is None
+
+
+class TestDhwHeatMeterPower:
+    def test_flow_times_delta_t(self):
+        # 1 L/min over 10 K: 1/60 · 4186 · 10 = 697.67 W
+        assert dhw_heat_meter_power_w(1.0, 20.0, 10.0) == pytest.approx(697.6667)
+
+    def test_idle_or_cooling_is_none(self):
+        assert dhw_heat_meter_power_w(0.0, 45.0, 10.0) is None
+        assert dhw_heat_meter_power_w(6.0, 10.0, 45.0) is None
+        assert dhw_heat_meter_power_w(6.0, 10.0, 10.0) is None
+
+    def test_invalid_input(self):
+        assert dhw_heat_meter_power_w(None, 45.0, 10.0) is None
+        assert dhw_heat_meter_power_w(6.0, None, 10.0) is None
+        assert dhw_heat_meter_power_w(6.0, 45.0, "x") is None
+        assert dhw_heat_meter_power_w(6.0, math.inf, 10.0) is None
 
 
 class TestComponentScores:

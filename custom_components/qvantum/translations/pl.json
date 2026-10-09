@@ -217,6 +217,9 @@
       },
       "weather_normalized_consumption_rising": {
         "name": "Znormalizowane zużycie ogrzewania rośnie"
+      },
+      "heat_meter_deviation_warning": {
+        "name": "Ostrzeżenie: odchylenie ciepłomierza CWU"
       }
     },
     "sensor": {
@@ -664,6 +667,9 @@
       },
       "exhaust_fan_speed_avg": {
         "name": "Prędkość wentylatora wywiewnego (24 godziny)"
+      },
+      "dhw_heat_meter_deviation": {
+        "name": "Odchylenie ciepłomierza CWU"
       }
     },
     "number": {

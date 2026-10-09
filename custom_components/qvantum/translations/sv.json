@@ -217,6 +217,9 @@
       },
       "weather_normalized_consumption_rising": {
         "name": "Vädernormaliserad uppvärmningsförbrukning stiger"
+      },
+      "heat_meter_deviation_warning": {
+        "name": "Varning: avvikelse för varmvattenmätare"
       }
     },
     "sensor": {
@@ -664,6 +667,9 @@
       },
       "exhaust_fan_speed_avg": {
         "name": "Frånluftsfläktens varvtal (24 timmar)"
+      },
+      "dhw_heat_meter_deviation": {
+        "name": "Avvikelse för varmvattenmätare"
       }
     },
     "number": {

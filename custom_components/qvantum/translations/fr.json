@@ -217,6 +217,9 @@
       },
       "weather_normalized_consumption_rising": {
         "name": "Consommation de chauffage normalisée en hausse"
+      },
+      "heat_meter_deviation_warning": {
+        "name": "Avertissement : écart du compteur de chaleur ECS"
       }
     },
     "sensor": {
@@ -664,6 +667,9 @@
       },
       "exhaust_fan_speed_avg": {
         "name": "Vitesse du ventilateur d'extraction (24 heures)"
+      },
+      "dhw_heat_meter_deviation": {
+        "name": "Écart du compteur de chaleur ECS"
       }
     },
     "number": {

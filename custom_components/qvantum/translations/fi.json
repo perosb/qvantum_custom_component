@@ -217,6 +217,9 @@
       },
       "weather_normalized_consumption_rising": {
         "name": "Säänormalisoitu lämmityskulutus kasvaa"
+      },
+      "heat_meter_deviation_warning": {
+        "name": "Varoitus: käyttöveden lämpömittarin poikkeama"
       }
     },
     "sensor": {
@@ -664,6 +667,9 @@
       },
       "exhaust_fan_speed_avg": {
         "name": "Poistoilmapuhaltimen nopeus (24 tuntia)"
+      },
+      "dhw_heat_meter_deviation": {
+        "name": "Käyttöveden lämpömittarin poikkeama"
       }
     },
     "number": {

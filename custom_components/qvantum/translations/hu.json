@@ -217,6 +217,9 @@
       },
       "weather_normalized_consumption_rising": {
         "name": "Az időjárás-normalizált fűtési fogyasztás növekszik"
+      },
+      "heat_meter_deviation_warning": {
+        "name": "Figyelmeztetés: HMV hőmennyiségmérő eltérése"
       }
     },
     "sensor": {
@@ -664,6 +667,9 @@
       },
       "exhaust_fan_speed_avg": {
         "name": "Elszívó ventilátor fordulatszáma (24 óra)"
+      },
+      "dhw_heat_meter_deviation": {
+        "name": "HMV hőmennyiségmérő eltérése"
       }
     },
     "number": {

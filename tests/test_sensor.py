@@ -57,6 +57,7 @@ with patch(
                 QvantumCurvePointSensor,
                 QvantumCurveSolarModelSensor,
                 QvantumCurrentEntity,
+                QvantumDhwHeatMeterSensor,
                 QvantumEfficiencyHealthSensor,
                 QvantumEfficiencySensorEntity,
                 QvantumDiagnosticEntity,
@@ -817,6 +818,26 @@ class TestQvantumEfficiencySensors:
         assert entity._attr_native_unit_of_measurement == "W/K"
         assert entity.extra_state_attributes["coverage_days"] == 28.0
 
+    def test_dhw_heat_meter_sensor_attributes(self, mock_device):
+        coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(
+                dhw_heat_meter_deviation=-0.3,
+                dhw_heat_meter_estimated_kwh=16.744,
+                dhw_heat_meter_metered_kwh=16.8,
+                dhw_heat_meter_hours=24,
+            )
+        )
+        entity = QvantumDhwHeatMeterSensor(
+            coordinator, "dhw_heat_meter_deviation", mock_device
+        )
+
+        assert entity.native_value == -0.3
+        attributes = entity.extra_state_attributes
+        assert attributes["estimated_kwh"] == 16.744
+        assert attributes["metered_kwh"] == 16.8
+        assert attributes["hours"] == 24
+        assert "flow × ΔT" in attributes["attribution"]
+
     def test_health_sensor_state_and_attributes(self, mock_device):
         coordinator = _efficiency_coordinator(
             EfficiencySnapshot(
@@ -903,6 +924,7 @@ class TestQvantumEfficiencySensors:
             "dhw_standing_loss",
             "compressor_speed_avg",
             "exhaust_fan_speed_avg",
+            "dhw_heat_meter_deviation",
         }
         assert any(
             isinstance(entity, QvantumEfficiencyHealthSensor)

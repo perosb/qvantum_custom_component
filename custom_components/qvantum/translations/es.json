@@ -217,6 +217,9 @@
       },
       "weather_normalized_consumption_rising": {
         "name": "El consumo de calefacción normalizado está subiendo"
+      },
+      "heat_meter_deviation_warning": {
+        "name": "Aviso: desviación del contador de calor de ACS"
       }
     },
     "sensor": {
@@ -664,6 +667,9 @@
       },
       "exhaust_fan_speed_avg": {
         "name": "Velocidad del ventilador de extracción (24 horas)"
+      },
+      "dhw_heat_meter_deviation": {
+        "name": "Desviación del contador de calor de ACS"
       }
     },
     "number": {

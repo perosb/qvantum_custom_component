@@ -31,6 +31,8 @@ AUX_SHARE_WORST = 0.2
 #: Starts per compressor running hour score: 1.0 -> 1.0, 4.0 -> 0.0.
 CYCLING_BEST = 1.0
 CYCLING_WORST = 4.0
+#: Water specific heat in J/(kg·K); one litre of water is ~1 kg.
+WATER_HEAT_CAPACITY_J_PER_KG_K = 4186.0
 
 
 def _finite(value: object) -> float | None:
@@ -94,6 +96,30 @@ def mean_while_running(
     if not values:
         return None
     return sum(values) / len(values)
+
+
+def dhw_heat_meter_power_w(
+    flow_l_min: object,
+    hot_out_c: object,
+    cold_in_c: object,
+) -> float | None:
+    """Instantaneous DHW heat from the secondary-side flow and ΔT.
+
+    ``flow [L/min] / 60 · c [J/(kg·K)] · (hot − cold) [K]``, with one litre of
+    water taken as ~1 kg. ``None`` when any input is unusable or the water is
+    not being heated (ΔT ≤ 0), so idle hours never contribute a fake
+    zero-draw estimate.
+    """
+    flow = _finite(flow_l_min)
+    hot = _finite(hot_out_c)
+    cold = _finite(cold_in_c)
+    if flow is None or hot is None or cold is None or flow <= 0.0:
+        return None
+    delta_t = hot - cold
+    if delta_t <= 0.0:
+        return None
+    power = flow / 60.0 * WATER_HEAT_CAPACITY_J_PER_KG_K * delta_t
+    return power if math.isfinite(power) and power > 0.0 else None
 
 
 def duty_cycle(run_hours: object, window_hours: object) -> float | None:

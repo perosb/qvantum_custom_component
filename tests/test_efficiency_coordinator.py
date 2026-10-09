@@ -173,6 +173,7 @@ class TestComputeSnapshot:
             ec.BUILDING_KEYS,
             ec.CYCLING_KEYS,
             ec.OPERATING_KEYS,
+            ec.DHW_METER_KEYS,
         ]
 
     def test_device_id_property(self):
@@ -479,6 +480,116 @@ class TestOperatingPoint:
         assert snapshot.compressor_power_avg is None
         assert snapshot.exhaust_fan_speed_avg is None
         assert snapshot.compressor_duty_cycle is None
+
+
+class TestDhwHeatMeter:
+    @staticmethod
+    def _patch_resolve():
+        def fake_resolve(hass, device_id, keys):
+            keys = tuple(keys)
+            if keys == ec.COUNTER_KEYS:
+                return {"dhwenergy": "sensor.dhwenergy"}
+            if keys == ec.DHW_METER_KEYS:
+                return {
+                    "bf1_l_min": "sensor.flow",
+                    "bt33": "sensor.cold",
+                    "bt34": "sensor.hot",
+                }
+            return {}
+
+        return patch.object(ec, "resolve_statistic_entity_ids", fake_resolve)
+
+    @staticmethod
+    def _rows(
+        *,
+        now_ts: int,
+        hours: int = 24,
+        kwh_per_hour: float = 0.7,
+    ) -> dict[str, list[dict]]:
+        # 1 L/min over 10 K is 0.6977 kWh/h, so 0.7 kWh/h is ~-0.3% off.
+        def means(value):
+            return [
+                {"start": now_ts - (hours - 1 - index) * 3600, "mean": value}
+                for index in range(hours)
+            ]
+
+        return {
+            "sensor.dhwenergy": [
+                {"start": now_ts - (hours - index) * 3600, "sum": index * kwh_per_hour}
+                for index in range(hours + 1)
+            ],
+            "sensor.flow": means(1.0),
+            "sensor.cold": means(10.0),
+            "sensor.hot": means(20.0),
+        }
+
+    async def test_matching_meter_and_estimate(self):
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec,
+                "async_statistics_during_period",
+                AsyncMock(return_value=self._rows(now_ts=now_ts)),
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_heat_meter_hours == 24
+        assert snapshot.dhw_heat_meter_estimated_kwh == pytest.approx(16.744, rel=0.01)
+        assert snapshot.dhw_heat_meter_metered_kwh == pytest.approx(16.8, rel=0.01)
+        assert snapshot.dhw_heat_meter_deviation == pytest.approx(-0.33, abs=0.05)
+        assert snapshot.dhw_heat_meter_warning is False
+
+    async def test_low_meter_reading_warns(self):
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec,
+                "async_statistics_during_period",
+                AsyncMock(
+                    return_value=self._rows(now_ts=now_ts, kwh_per_hour=0.2)
+                ),
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_heat_meter_deviation > 20.0
+        assert snapshot.dhw_heat_meter_warning is True
+
+    async def test_below_minimum_is_not_published(self):
+        coordinator = make_coordinator()
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec,
+                "async_statistics_during_period",
+                AsyncMock(return_value=self._rows(now_ts=now_ts, hours=4)),
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_heat_meter_hours == 4
+        assert snapshot.dhw_heat_meter_deviation is None
+        assert snapshot.dhw_heat_meter_warning is None
+
+    async def test_unavailable_without_series(self):
+        coordinator = make_coordinator()
+        with (
+            self._patch_resolve(),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value={})
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_heat_meter_deviation is None
+        assert snapshot.dhw_heat_meter_warning is None
+        assert snapshot.dhw_heat_meter_hours == 0
 
 
 class TestDhwStandingLoss:

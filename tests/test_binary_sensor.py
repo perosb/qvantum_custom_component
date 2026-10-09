@@ -329,7 +329,7 @@ async def test_async_setup_entry_modbus_includes_pump_relay(
 async def test_async_setup_entry_creates_efficiency_binary(
     hass, mock_config_entry, mock_coordinator, mock_device
 ):
-    """The weather-normalized trend flag is created when the coordinator exists."""
+    """Both recorder-derived flags are created when the coordinator exists."""
     from custom_components.qvantum.binary_sensor import (
         async_setup_entry,
         QvantumEfficiencyBinaryEntity,
@@ -346,7 +346,9 @@ async def test_async_setup_entry_creates_efficiency_binary(
     hass.data["device_registry"] = mock_device_registry
 
     efficiency = QvantumEfficiencyCoordinator.__new__(QvantumEfficiencyCoordinator)
-    efficiency.data = EfficiencySnapshot(normalized_rising=True)
+    efficiency.data = EfficiencySnapshot(
+        normalized_rising=True, dhw_heat_meter_warning=False
+    )
     mock_config_entry.runtime_data = RuntimeData(
         coordinator=mock_coordinator,
         device=mock_device,
@@ -367,15 +369,29 @@ async def test_async_setup_entry_creates_efficiency_binary(
         for entity in async_add_entities.call_args[0][0]
         if isinstance(entity, QvantumEfficiencyBinaryEntity)
     ]
-    assert len(entities) == 1
-    entity = entities[0]
-    assert entity._metric_key == "weather_normalized_consumption_rising"
-    assert entity._attr_unique_id == (
+    assert len(entities) == 2
+    by_key = {entity._metric_key: entity for entity in entities}
+    assert set(by_key) == {
+        "weather_normalized_consumption_rising",
+        "heat_meter_deviation_warning",
+    }
+    trend = by_key["weather_normalized_consumption_rising"]
+    warning = by_key["heat_meter_deviation_warning"]
+    assert trend._attr_unique_id == (
         "qvantum_weather_normalized_consumption_rising_test_device_123"
     )
-    assert entity.is_on is True
-    assert entity.available is True
+    assert warning._attr_unique_id == (
+        "qvantum_heat_meter_deviation_warning_test_device_123"
+    )
+    assert trend.is_on is True
+    assert warning.is_on is False
+    assert trend.available is True
+    assert warning.available is True
 
-    efficiency.data = EfficiencySnapshot(normalized_rising=None)
-    assert entity.is_on is None
-    assert entity.available is False
+    efficiency.data = EfficiencySnapshot(
+        normalized_rising=None, dhw_heat_meter_warning=None
+    )
+    assert trend.is_on is None
+    assert warning.is_on is None
+    assert trend.available is False
+    assert warning.available is False

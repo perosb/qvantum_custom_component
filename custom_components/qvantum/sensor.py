@@ -195,6 +195,13 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "precision": 0,
         "enabled": False,
     },
+    "dhw_heat_meter_deviation": {
+        "icon": "mdi:scale-unbalanced",
+        "unit": PERCENTAGE,
+        "scale": 1.0,
+        "precision": 1,
+        "enabled": False,
+    },
 }
 #: Letter-grade heuristic; its own entity because the state is not numeric.
 _EFFICIENCY_HEALTH_KEY = "efficiency_health"
@@ -369,8 +376,13 @@ async def async_setup_entry(
                 # a stale entity after a transport switch.
                 continue
             special_sensor_keys.add(efficiency_key)
+            sensor_class = (
+                QvantumDhwHeatMeterSensor
+                if efficiency_key == "dhw_heat_meter_deviation"
+                else QvantumEfficiencySensorEntity
+            )
             sensors.append(
-                QvantumEfficiencySensorEntity(
+                sensor_class(
                     efficiency_coordinator,
                     efficiency_key,
                     device,
@@ -916,6 +928,38 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
         if self._metric_key == "scop_total" and snapshot.scop_total_90d is not None:
             attributes["scop_90d"] = round(snapshot.scop_total_90d, 2)
         return attributes
+
+
+class QvantumDhwHeatMeterSensor(QvantumEfficiencySensorEntity):
+    """Flow×ΔT DHW heat estimate compared with the metered energy counter.
+
+    The numeric state is the signed deviation in percent; the integrated
+    estimates and the number of matched draw hours are attributes so the
+    figure can be judged instead of trusted blindly.
+    """
+
+    @property
+    def extra_state_attributes(self):
+        """Return the integrated estimate, the meter and the matched hours."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        attributes = dict(super().extra_state_attributes or {})
+        attributes.update(
+            {
+                "estimated_kwh": self._round(snapshot.dhw_heat_meter_estimated_kwh),
+                "metered_kwh": self._round(snapshot.dhw_heat_meter_metered_kwh),
+                "hours": snapshot.dhw_heat_meter_hours,
+                "attribution": (
+                    "flow × ΔT estimate vs dhwenergy over the last 7 days"
+                ),
+            }
+        )
+        return attributes
+
+    @staticmethod
+    def _round(value: float | None) -> float | None:
+        return None if value is None else round(value, 3)
 
 
 class QvantumEfficiencyHealthSensor(CoordinatorEntity, SensorEntity):

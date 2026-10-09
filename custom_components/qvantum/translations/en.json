@@ -217,6 +217,9 @@
       },
       "weather_normalized_consumption_rising": {
         "name": "Weather-normalized heating consumption rising"
+      },
+      "heat_meter_deviation_warning": {
+        "name": "DHW heat-meter deviation warning"
       }
     },
     "sensor": {
@@ -664,6 +667,9 @@
       },
       "exhaust_fan_speed_avg": {
         "name": "Exhaust air fan speed (24 hours)"
+      },
+      "dhw_heat_meter_deviation": {
+        "name": "DHW heat-meter deviation"
       }
     },
     "number": {

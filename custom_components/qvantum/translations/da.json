@@ -217,6 +217,9 @@
       },
       "weather_normalized_consumption_rising": {
         "name": "Vejrnormaliseret varmeforbrug stiger"
+      },
+      "heat_meter_deviation_warning": {
+        "name": "Advarsel: afvigelse for varmtvandsvarmemåler"
       }
     },
     "sensor": {
@@ -664,6 +667,9 @@
       },
       "exhaust_fan_speed_avg": {
         "name": "Udsugningsventilatorens hastighed (24 timer)"
+      },
+      "dhw_heat_meter_deviation": {
+        "name": "Afvigelse for varmtvandsvarmemåler"
       }
     },
     "number": {
