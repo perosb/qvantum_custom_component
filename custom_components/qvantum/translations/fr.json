@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "Rétroaction COP",
           "description": "Réduire la température de départ lorsque le COP mesuré est inférieur à sa référence apprise"
+        },
+        "precharge": {
+          "name": "Préchargement",
+          "description": "Augmenter la température de départ avant une vague de froid prévue"
         }
       }
     }

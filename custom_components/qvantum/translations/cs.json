@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "Zpětná vazba COP",
           "description": "Snížit přívodní teplotu, když je naměřené COP pod naučenou referencí"
+        },
+        "precharge": {
+          "name": "Předehřev",
+          "description": "Zvýšit přívodní teplotu před předpovídaným ochlazením"
         }
       }
     }

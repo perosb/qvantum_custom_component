@@ -49,6 +49,7 @@ from .heating_curve import (
     effective_supply_bounds,
     interpolate_supply,
     normalize_baseline,
+    precharge_adjustment_c,
     trim_residuals,
 )
 from .open_meteo import (
@@ -1309,6 +1310,27 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     )
         return term
 
+    def _precharge_c(
+        self,
+        forecast_temperature: Mapping[int, float],
+        now_ts: float,
+        previous: CurveSnapshot | None,
+    ) -> float:
+        """Pre-charge term for this cycle, or 0 when it must not act.
+
+        Only raises the curve while active and only when the previous cycle
+        was not already capped or at the positive total clamp. The indoor cap
+        inside ``compute_curve`` stays the final veto for a warm house, and
+        the pump's max supply clamp bounds the points regardless.
+        """
+        if not self._terms.get("precharge") or not self.active:
+            return 0.0
+        if previous is not None and (
+            previous.capped_by_indoor or previous.adjustment_c >= TOTAL_MAX_C
+        ):
+            return 0.0
+        return precharge_adjustment_c(forecast_temperature, int(now_ts))
+
     def _daylight(self, now: datetime) -> DayPhase | None:
         try:
             from homeassistant.helpers.sun import (
@@ -1384,6 +1406,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         # Use the previous cycle for the term's guard conditions: the indoor
         # cap and total clamp it must not fight are those already published.
         cop_c = self._cop_feedback_c(values, self.data)
+        precharge_c = self._precharge_c(
+            forecast_temperature, now_ts, self.data
+        )
         if self._baseline is not None:
             result = compute_curve(
                 baseline=self._baseline,
@@ -1399,7 +1424,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 min_supply_c=low,
                 max_supply_c=high,
                 cop_c=cop_c,
-                precharge_c=0.0,
+                precharge_c=precharge_c,
             )
         if result is not None:
             clamped = self.active and result.clamped

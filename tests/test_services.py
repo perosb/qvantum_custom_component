@@ -460,7 +460,9 @@ class TestSetCurveTermsService:
 
         result = await service_func(service_call)
 
-        curve.async_set_terms.assert_awaited_once_with(cop_feedback=True)
+        curve.async_set_terms.assert_awaited_once_with(
+            cop_feedback=True, precharge=None
+        )
         assert result == {
             "qvantum": {"terms": {"cop_feedback": True, "precharge": False}}
         }
@@ -479,7 +481,27 @@ class TestSetCurveTermsService:
 
         await service_func(service_call)
 
-        curve.async_set_terms.assert_awaited_once_with(cop_feedback=None)
+        curve.async_set_terms.assert_awaited_once_with(
+            cop_feedback=None, precharge=None
+        )
+
+    @pytest.mark.asyncio
+    async def test_enables_precharge(self, mock_hass):
+        curve = MagicMock()
+        curve.async_set_terms = AsyncMock()
+        curve.terms = {"cop_feedback": False, "precharge": True}
+        self._register(mock_hass, curve)
+        service_func = await self._service_func(mock_hass)
+
+        service_call = MagicMock()
+        service_call.data = {"precharge": True}
+        service_call.hass = mock_hass
+
+        await service_func(service_call)
+
+        curve.async_set_terms.assert_awaited_once_with(
+            cop_feedback=None, precharge=True
+        )
 
     @pytest.mark.asyncio
     async def test_reports_unknown_error_on_failure(self, mock_hass):
@@ -518,12 +540,17 @@ class TestSetCurveTermsSchema:
     def test_accepts_boolean(self):
         assert SET_CURVE_TERMS_SCHEMA({"cop_feedback": True}) == {"cop_feedback": True}
 
+    def test_accepts_precharge(self):
+        assert SET_CURVE_TERMS_SCHEMA({"precharge": False}) == {"precharge": False}
+
     def test_accepts_empty(self):
         assert SET_CURVE_TERMS_SCHEMA({}) == {}
 
     def test_rejects_non_boolean(self):
         with pytest.raises(vol.Invalid):
             SET_CURVE_TERMS_SCHEMA({"cop_feedback": "maybe"})
+        with pytest.raises(vol.Invalid):
+            SET_CURVE_TERMS_SCHEMA({"precharge": "maybe"})
 
 
 class TestSetCurveControlSchema:

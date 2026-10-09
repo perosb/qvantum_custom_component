@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "COP-Rückkopplung",
           "description": "Vorlauftemperatur senken, wenn die gemessene COP unter ihrem gelernten Referenzwert liegt"
+        },
+        "precharge": {
+          "name": "Vorladen",
+          "description": "Vorlauftemperatur vor einem prognostizierten Kälteeinbruch anheben"
         }
       }
     }

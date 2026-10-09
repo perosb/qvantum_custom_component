@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "Retroalimentación de COP",
           "description": "Reducir la impulsión cuando el COP medido esté por debajo de su referencia aprendida"
+        },
+        "precharge": {
+          "name": "Precarga",
+          "description": "Aumentar la impulsión antes de una ola de frío prevista"
         }
       }
     }

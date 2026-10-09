@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "Sprzężenie zwrotne COP",
           "description": "Obniż temperaturę zasilania, gdy zmierzony COP jest poniżej wyuczonego odniesienia"
+        },
+        "precharge": {
+          "name": "Wstępne ładowanie",
+          "description": "Podnieś temperaturę zasilania przed prognozowanym ochłodzeniem"
         }
       }
     }

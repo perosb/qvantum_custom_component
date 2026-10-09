@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "COP-feedback",
           "description": "Sænk fremløbstemperaturen, når den målte COP er under sin indlærte reference"
+        },
+        "precharge": {
+          "name": "Forvarmning",
+          "description": "Hæv fremløbstemperaturen før et varslet kuldetab"
         }
       }
     }

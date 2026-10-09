@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "COP-terugkoppeling",
           "description": "Verlaag de aanvoertemperatuur wanneer de gemeten COP onder de geleerde referentie ligt"
+        },
+        "precharge": {
+          "name": "Voorverwarming",
+          "description": "Verhoog de aanvoertemperatuur vóór een voorspelde koude-inval"
         }
       }
     }

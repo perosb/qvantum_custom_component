@@ -918,6 +918,10 @@
         "cop_feedback": {
           "name": "COP-återkoppling",
           "description": "Sänk framledningen när uppmätt COP ligger under sin inlärda referens"
+        },
+        "precharge": {
+          "name": "Förladdning",
+          "description": "Höj framledningen före ett prognostiserat köldknäpp"
         }
       }
     }
