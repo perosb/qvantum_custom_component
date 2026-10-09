@@ -910,6 +910,16 @@
           "description": "shadow = compute only, active = write the curve"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Set curve terms",
+      "description": "Optional adaptive heating curve control terms",
+      "fields": {
+        "cop_feedback": {
+          "name": "COP feedback",
+          "description": "Reduce supply while measured COP is below its learned reference"
+        }
+      }
     }
   }
 }

@@ -910,6 +910,16 @@
           "description": "shadow = endast beräkning, active = skriv kurvan"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Ange kurvtermer",
+      "description": "Valfria styrtermer för den adaptiva värmekurvan",
+      "fields": {
+        "cop_feedback": {
+          "name": "COP-återkoppling",
+          "description": "Sänk framledningen när uppmätt COP ligger under sin inlärda referens"
+        }
+      }
     }
   }
 }

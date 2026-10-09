@@ -37,6 +37,7 @@ with patch("homeassistant.core.SupportsResponse", MockSupportsResponse):
     from custom_components.qvantum.services import (
         EXTRA_TAP_WATER_SCHEMA,
         SET_CURVE_CONTROL_SCHEMA,
+        SET_CURVE_TERMS_SCHEMA,
         async_setup_services,
     )
     from custom_components.qvantum.const import DOMAIN
@@ -72,8 +73,8 @@ class TestQvantumServices:
 
         await async_setup_services(mock_hass)
 
-        # Verify both services were registered
-        assert mock_hass.services.async_register.call_count == 2
+        # Verify all services were registered
+        assert mock_hass.services.async_register.call_count == 3
 
         # Check first call (extra_hot_water)
         first_call = mock_hass.services.async_register.call_args_list[0]
@@ -88,6 +89,13 @@ class TestQvantumServices:
         assert second_call[1]["service"] == "set_curve_control"
         assert "service_func" in second_call[1]
         assert "schema" in second_call[1]
+
+        # Check third call (set_curve_terms)
+        third_call = mock_hass.services.async_register.call_args_list[2]
+        assert third_call[1]["domain"] == DOMAIN
+        assert third_call[1]["service"] == "set_curve_terms"
+        assert "service_func" in third_call[1]
+        assert "schema" in third_call[1]
 
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_success(self, mock_hass, mock_api):
@@ -421,6 +429,101 @@ class TestSetCurveControlService:
         result = await service_func(service_call)
 
         assert result["qvantum"]["exception"] == "unknown_error"
+
+
+class TestSetCurveTermsService:
+    """COP-feedback term service (opt-in, Modbus only)."""
+
+    def _register(self, mock_hass, curve):
+        entry = MagicMock()
+        entry.runtime_data.coordinator = MagicMock()
+        entry.runtime_data.curve_coordinator = curve
+        mock_hass.config_entries.async_entries.return_value = [entry]
+
+    async def _service_func(self, mock_hass):
+        await async_setup_services(mock_hass)
+        third_call = mock_hass.services.async_register.call_args_list[2]
+        assert third_call[1]["service"] == "set_curve_terms"
+        return third_call[1]["service_func"]
+
+    @pytest.mark.asyncio
+    async def test_enables_cop_feedback(self, mock_hass):
+        curve = MagicMock()
+        curve.async_set_terms = AsyncMock()
+        curve.terms = {"cop_feedback": True, "precharge": False}
+        self._register(mock_hass, curve)
+        service_func = await self._service_func(mock_hass)
+
+        service_call = MagicMock()
+        service_call.data = {"cop_feedback": True}
+        service_call.hass = mock_hass
+
+        result = await service_func(service_call)
+
+        curve.async_set_terms.assert_awaited_once_with(cop_feedback=True)
+        assert result == {
+            "qvantum": {"terms": {"cop_feedback": True, "precharge": False}}
+        }
+
+    @pytest.mark.asyncio
+    async def test_omits_absent_flags(self, mock_hass):
+        curve = MagicMock()
+        curve.async_set_terms = AsyncMock()
+        curve.terms = {"cop_feedback": False, "precharge": False}
+        self._register(mock_hass, curve)
+        service_func = await self._service_func(mock_hass)
+
+        service_call = MagicMock()
+        service_call.data = {}
+        service_call.hass = mock_hass
+
+        await service_func(service_call)
+
+        curve.async_set_terms.assert_awaited_once_with(cop_feedback=None)
+
+    @pytest.mark.asyncio
+    async def test_reports_unknown_error_on_failure(self, mock_hass):
+        curve = MagicMock()
+        curve.async_set_terms = AsyncMock(side_effect=Exception("boom"))
+        self._register(mock_hass, curve)
+        service_func = await self._service_func(mock_hass)
+
+        service_call = MagicMock()
+        service_call.data = {"cop_feedback": True}
+        service_call.hass = mock_hass
+
+        result = await service_func(service_call)
+
+        assert result["qvantum"]["exception"] == "unknown_error"
+        assert result["qvantum"]["details"] == "boom"
+
+    @pytest.mark.asyncio
+    async def test_requires_modbus_curve_coordinator(self, mock_hass):
+        self._register(mock_hass, None)
+        service_func = await self._service_func(mock_hass)
+
+        service_call = MagicMock()
+        service_call.data = {"cop_feedback": True}
+        service_call.hass = mock_hass
+
+        result = await service_func(service_call)
+
+        assert result["qvantum"]["exception"] == "unknown_error"
+        assert "Modbus" in result["qvantum"]["details"]
+
+
+class TestSetCurveTermsSchema:
+    """Validate the terms schema without invoking the service handler."""
+
+    def test_accepts_boolean(self):
+        assert SET_CURVE_TERMS_SCHEMA({"cop_feedback": True}) == {"cop_feedback": True}
+
+    def test_accepts_empty(self):
+        assert SET_CURVE_TERMS_SCHEMA({}) == {}
+
+    def test_rejects_non_boolean(self):
+        with pytest.raises(vol.Invalid):
+            SET_CURVE_TERMS_SCHEMA({"cop_feedback": "maybe"})
 
 
 class TestSetCurveControlSchema:

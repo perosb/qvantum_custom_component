@@ -910,6 +910,16 @@
           "description": "shadow = vain laskenta, active = kirjoita käyrä"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Aseta käyrätermit",
+      "description": "Adaptiivisen lämmityskäyrän valinnaiset ohjaustermit",
+      "fields": {
+        "cop_feedback": {
+          "name": "COP-takaisinkytkentä",
+          "description": "Laske menolämpötilaa, kun mitattu COP on opitun viitearvon alapuolella"
+        }
+      }
     }
   }
 }

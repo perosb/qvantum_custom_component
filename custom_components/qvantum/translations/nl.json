@@ -910,6 +910,16 @@
           "description": "shadow = alleen berekenen, active = curve schrijven"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Curvetermen instellen",
+      "description": "Optionele regelingen van de adaptieve stooklijn",
+      "fields": {
+        "cop_feedback": {
+          "name": "COP-terugkoppeling",
+          "description": "Verlaag de aanvoertemperatuur wanneer de gemeten COP onder de geleerde referentie ligt"
+        }
+      }
     }
   }
 }

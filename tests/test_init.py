@@ -163,6 +163,7 @@ class TestSetupDeviceRequirements:
         assert hass.services.async_remove.call_args_list == [
             call("qvantum", "extra_hot_water"),
             call("qvantum", "set_curve_control"),
+            call("qvantum", "set_curve_terms"),
         ]
 
     @pytest.mark.asyncio

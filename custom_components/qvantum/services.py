@@ -47,6 +47,22 @@ SET_CURVE_CONTROL_SCHEMA = vol.Schema(
     }
 )
 
+SET_CURVE_TERMS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("cop_feedback"): cv.boolean,
+    }
+)
+
+
+def _find_curve_coordinator(hass: HomeAssistant):
+    """Return the loaded adaptive-curve coordinator, if any (Modbus only)."""
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        runtime = getattr(entry, "runtime_data", None)
+        candidate = getattr(runtime, "curve_coordinator", None)
+        if candidate is not None:
+            return candidate
+    return None
+
 
 async def async_setup_services(hass: HomeAssistant):
     _LOGGER.debug("Setting up services")
@@ -109,13 +125,7 @@ async def async_setup_services(hass: HomeAssistant):
         """Shadow or active custom heating-curve control (Modbus only)."""
         data = service_call.data
         mode = data["mode"]
-        curve_coordinator = None
-        for entry in service_call.hass.config_entries.async_entries(DOMAIN):
-            runtime = getattr(entry, "runtime_data", None)
-            candidate = getattr(runtime, "curve_coordinator", None)
-            if candidate is not None:
-                curve_coordinator = candidate
-                break
+        curve_coordinator = _find_curve_coordinator(service_call.hass)
         if curve_coordinator is None:
             return {
                 "qvantum": {
@@ -135,5 +145,33 @@ async def async_setup_services(hass: HomeAssistant):
         service="set_curve_control",
         service_func=set_curve_control,
         schema=SET_CURVE_CONTROL_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    async def set_curve_terms(service_call: ServiceCall) -> Any:
+        """Enable or disable the optional adaptive-curve control terms."""
+        data = service_call.data
+        curve_coordinator = _find_curve_coordinator(service_call.hass)
+        if curve_coordinator is None:
+            return {
+                "qvantum": {
+                    "exception": "unknown_error",
+                    "details": "Adaptive curve control is only available in Modbus mode",
+                }
+            }
+        try:
+            await curve_coordinator.async_set_terms(
+                cop_feedback=data.get("cop_feedback"),
+            )
+        except Exception as err:
+            _LOGGER.error("Failed to set curve terms %s: %s", data, err)
+            return {"qvantum": {"exception": "unknown_error", "details": str(err)}}
+        return {"qvantum": {"terms": curve_coordinator.terms}}
+
+    hass.services.async_register(
+        domain=DOMAIN,
+        service="set_curve_terms",
+        service_func=set_curve_terms,
+        schema=SET_CURVE_TERMS_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )

@@ -842,6 +842,8 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
             "night_day_c": snapshot.night_day_c,
             "solar_c": snapshot.solar_c,
             "load_c": snapshot.load_c,
+            "cop_c": snapshot.cop_c,
+            "precharge_c": snapshot.precharge_c,
             "capped_by_indoor": snapshot.capped_by_indoor,
             "trims": dict(snapshot.trims),
             "clamped": snapshot.clamped,

@@ -910,6 +910,16 @@
           "description": "shadow = csak számítás, active = a görbe írása"
         }
       }
+    },
+    "set_curve_terms": {
+      "name": "Görbe tagok beállítása",
+      "description": "Az adaptív fűtési görbe opcionális szabályozási tagjai",
+      "fields": {
+        "cop_feedback": {
+          "name": "COP visszacsatolás",
+          "description": "Csökkentse az előremenő hőmérsékletet, ha a mért COP a tanult referencia alatt van"
+        }
+      }
     }
   }
 }

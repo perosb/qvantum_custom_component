@@ -26,3 +26,17 @@ set_curve_control:
           options:
             - shadow
             - active
+
+set_curve_terms:
+  name: set_curve_terms
+  description: >-
+    Optional adaptive heating-curve control terms, off by default. COP
+    feedback reduces the computed supply when the measured COP falls below
+    its learned reference. Modbus only, and the term only acts while the
+    curve is active.
+  fields:
+    cop_feedback:
+      description: Enable or disable the COP-feedback term
+      example: true
+      selector:
+        boolean:
