@@ -670,6 +670,12 @@
       },
       "dhw_heat_meter_deviation": {
         "name": "DHW heat-meter deviation"
+      },
+      "solar_ghi_now": {
+        "name": "Solar irradiance (now)"
+      },
+      "solar_gain_now_w": {
+        "name": "Solar gain (now)"
       }
     },
     "number": {

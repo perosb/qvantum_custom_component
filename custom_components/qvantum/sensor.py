@@ -202,6 +202,20 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "precision": 1,
         "enabled": False,
     },
+    "solar_ghi_now": {
+        "icon": "mdi:weather-sunny",
+        "unit": "W/m²",
+        "scale": 1.0,
+        "precision": 0,
+        "enabled": True,
+    },
+    "solar_gain_now_w": {
+        "icon": "mdi:solar-power",
+        "unit": "W",
+        "scale": 1.0,
+        "precision": 0,
+        "enabled": True,
+    },
 }
 #: Letter-grade heuristic; its own entity because the state is not numeric.
 _EFFICIENCY_HEALTH_KEY = "efficiency_health"
@@ -376,10 +390,8 @@ async def async_setup_entry(
                 # a stale entity after a transport switch.
                 continue
             special_sensor_keys.add(efficiency_key)
-            sensor_class = (
-                QvantumDhwHeatMeterSensor
-                if efficiency_key == "dhw_heat_meter_deviation"
-                else QvantumEfficiencySensorEntity
+            sensor_class = _EFFICIENCY_SENSOR_CLASSES.get(
+                efficiency_key, QvantumEfficiencySensorEntity
             )
             sensors.append(
                 sensor_class(
@@ -960,6 +972,44 @@ class QvantumDhwHeatMeterSensor(QvantumEfficiencySensorEntity):
     @staticmethod
     def _round(value: float | None) -> float | None:
         return None if value is None else round(value, 3)
+
+
+class QvantumSolarGhiSensor(QvantumEfficiencySensorEntity):
+    """Current smoothed solar irradiance plus the forecast peak.
+
+    GHI needs no hardware, so this is available in both transports; the
+    modelled solar gain is a separate sensor that stays unavailable until the
+    coordinator has fitted a model.
+    """
+
+    @property
+    def extra_state_attributes(self):
+        """Return the forecast peak and how far away it is."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        attributes = dict(super().extra_state_attributes or {})
+        peak = snapshot.solar_ghi_peak
+        peak_hours = snapshot.solar_ghi_peak_in_hours
+        attributes.update(
+            {
+                "peak_wm2": None if peak is None else round(peak, 0),
+                "peak_in_hours": (
+                    None if peak_hours is None else round(peak_hours, 1)
+                ),
+                "attribution": (
+                    "Open-Meteo shortwave radiation, exponentially smoothed"
+                ),
+            }
+        )
+        return attributes
+
+
+# Keys whose entities need custom attributes rather than the plain numeric base.
+_EFFICIENCY_SENSOR_CLASSES: dict[str, type] = {
+    "dhw_heat_meter_deviation": QvantumDhwHeatMeterSensor,
+    "solar_ghi_now": QvantumSolarGhiSensor,
+}
 
 
 class QvantumEfficiencyHealthSensor(CoordinatorEntity, SensorEntity):

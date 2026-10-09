@@ -60,6 +60,7 @@ with patch(
                 QvantumDhwHeatMeterSensor,
                 QvantumEfficiencyHealthSensor,
                 QvantumEfficiencySensorEntity,
+                QvantumSolarGhiSensor,
                 QvantumDiagnosticEntity,
                 QvantumDisplayFirmwareEntity,
                 QvantumEnergyEntity,
@@ -818,6 +819,25 @@ class TestQvantumEfficiencySensors:
         assert entity._attr_native_unit_of_measurement == "W/K"
         assert entity.extra_state_attributes["coverage_days"] == 28.0
 
+    def test_solar_ghi_sensor_attributes(self, mock_device):
+        coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(
+                solar_ghi_now=225.0,
+                solar_ghi_peak=400.0,
+                solar_ghi_peak_in_hours=1.5,
+            )
+        )
+        entity = QvantumSolarGhiSensor(
+            coordinator, "solar_ghi_now", mock_device
+        )
+
+        assert entity.native_value == 225.0
+        assert entity._attr_native_unit_of_measurement == "W/m²"
+        attributes = entity.extra_state_attributes
+        assert attributes["peak_wm2"] == 400.0
+        assert attributes["peak_in_hours"] == 1.5
+        assert "Open-Meteo" in attributes["attribution"]
+
     def test_dhw_heat_meter_sensor_attributes(self, mock_device):
         coordinator = _efficiency_coordinator(
             EfficiencySnapshot(
@@ -925,6 +945,8 @@ class TestQvantumEfficiencySensors:
             "compressor_speed_avg",
             "exhaust_fan_speed_avg",
             "dhw_heat_meter_deviation",
+            "solar_ghi_now",
+            "solar_gain_now_w",
         }
         assert any(
             isinstance(entity, QvantumEfficiencyHealthSensor)

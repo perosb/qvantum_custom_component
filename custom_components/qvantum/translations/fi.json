@@ -670,6 +670,12 @@
       },
       "dhw_heat_meter_deviation": {
         "name": "Käyttöveden lämpömittarin poikkeama"
+      },
+      "solar_ghi_now": {
+        "name": "Auringon säteily (nyt)"
+      },
+      "solar_gain_now_w": {
+        "name": "Aurinkohyöty (nyt)"
       }
     },
     "number": {

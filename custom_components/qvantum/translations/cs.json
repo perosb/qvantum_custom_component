@@ -670,6 +670,12 @@
       },
       "dhw_heat_meter_deviation": {
         "name": "Odchylka měřiče tepla TUV"
+      },
+      "solar_ghi_now": {
+        "name": "Sluneční ozáření (nyní)"
+      },
+      "solar_gain_now_w": {
+        "name": "Solární zisk (nyní)"
       }
     },
     "number": {

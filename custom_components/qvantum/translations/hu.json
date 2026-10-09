@@ -670,6 +670,12 @@
       },
       "dhw_heat_meter_deviation": {
         "name": "HMV hőmennyiségmérő eltérése"
+      },
+      "solar_ghi_now": {
+        "name": "Napsugárzás (most)"
+      },
+      "solar_gain_now_w": {
+        "name": "Naperő nyereség (most)"
       }
     },
     "number": {

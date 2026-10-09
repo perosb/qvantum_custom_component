@@ -21,6 +21,7 @@ from typing import Any, Mapping
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -33,6 +34,7 @@ from .const import (
 )
 from .dhw_loss import blend, standing_loss_kwh_per_day
 from .efficiency import aux_heat_share, scop_from_counters
+from .open_meteo import OpenMeteoError, fetch_forecast, fetch_ghi_history
 from .plant_analytics import (
     dhw_heat_meter_power_w,
     duty_cycle,
@@ -40,6 +42,7 @@ from .plant_analytics import (
     mean_while_running,
     starts_per_hour,
 )
+from .solar_gain import SolarModel, build_samples, fit_solar_model, smooth_ghi
 from .statistics import (
     async_statistics_during_period,
     resolve_indoor_metric_key,
@@ -88,6 +91,25 @@ TREND_RISING_RATIO = 1.15
 DHW_IDLE_FLOW_LPM = 0.1
 #: Tank rise between samples that means reheating started, not sensor noise.
 DHW_TEMP_NOISE_K = 0.2
+#: Forecast hours fetched from Open-Meteo for the solar exposure.
+SOLAR_FORECAST_FUTURE_HOURS = 12
+#: Days of hourly history behind the solar-gain fit; mirrors the curve
+#: coordinator's calibration window and minimum sample count so both models
+#: are identified the same way.
+SOLAR_FIT_WINDOW_DAYS = 60
+MIN_SOLAR_FIT_SAMPLES = 72
+#: A solar fit is refreshed at most this often (the archive changes daily).
+SOLAR_FIT_REFRESH_HOURS = 24.0
+
+
+@dataclass(frozen=True)
+class SolarSnapshot:
+    """Current irradiance, its forecast peak, and the modelled solar gain."""
+
+    ghi_now: float | None = None
+    ghi_peak: float | None = None
+    peak_in_hours: float | None = None
+    gain_w: float | None = None
 
 
 @dataclass(frozen=True)
@@ -113,6 +135,10 @@ class EfficiencySnapshot:
     dhw_heat_meter_estimated_kwh: float | None = None
     dhw_heat_meter_metered_kwh: float | None = None
     dhw_heat_meter_hours: int = 0
+    solar_ghi_now: float | None = None
+    solar_ghi_peak: float | None = None
+    solar_ghi_peak_in_hours: float | None = None
+    solar_gain_now_w: float | None = None
     efficiency_health_grade: str | None = None
     efficiency_health_score: float | None = None
     efficiency_health_coverage: float = 0.0
@@ -228,6 +254,11 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         self._dhw_idle_start: tuple[float, float] | None = None
         self._dhw_idle_last: tuple[float, float] | None = None
         self._dhw_standing_loss: float | None = None
+        # Solar state: the session is created lazily, the model is fitted by
+        # this coordinator so the gain works without the Modbus-only curve one.
+        self._session: Any = None
+        self._solar_model: SolarModel | None = None
+        self._last_solar_fit_ts: float | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -242,11 +273,129 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         """Device id of the main coordinator, when known."""
         return getattr(self._main, "device_id", None)
 
+    @property
+    def session(self) -> Any:
+        """Borrow Home Assistant's aiohttp session; never owned here."""
+        if self._session is None:
+            self._session = async_get_clientsession(self.hass)
+        return self._session
+
     def _main_values(self) -> dict:
         """Current merged values from the main coordinator."""
         data = self._main.data if isinstance(self._main.data, dict) else {}
         values = data.get("values")
         return values if isinstance(values, dict) else {}
+
+    async def _async_solar(
+        self,
+        mean_series: Mapping[str, list[tuple[int, float]]],
+        now_ts: float,
+    ) -> SolarSnapshot:
+        """Current smoothed irradiance, its forecast peak, and modelled gain.
+
+        GHI comes from Open-Meteo and needs no hardware, so it is available to
+        every user with a location. The gain needs a fitted ``SolarModel``;
+        this coordinator fits and owns its own so the figure works in cloud
+        mode, where the adaptive-curve coordinator does not exist. Missing
+        location or forecast simply yields ``None`` values.
+        """
+        config = getattr(self.hass, "config", None)
+        latitude = _finite(getattr(config, "latitude", None))
+        longitude = _finite(getattr(config, "longitude", None))
+        if latitude is None or longitude is None:
+            return SolarSnapshot()
+
+        ghi_now = None
+        ghi_peak = None
+        peak_in_hours = None
+        try:
+            forecast = await fetch_forecast(
+                self.session,
+                latitude,
+                longitude,
+                future_hours=SOLAR_FORECAST_FUTURE_HOURS,
+            )
+        except OpenMeteoError as err:
+            _LOGGER.debug("Solar forecast unavailable: %s", err)
+        else:
+            ghi_by_hour = forecast.ghi_by_hour()
+            ghi_now = smooth_ghi(ghi_by_hour, int(now_ts))
+            future = [(ts, ghi) for ts, ghi in ghi_by_hour.items() if ts > now_ts]
+            if future:
+                peak_ts, ghi_peak = max(future, key=lambda item: item[1])
+                peak_in_hours = (peak_ts - now_ts) / 3600.0
+
+        await self._async_refresh_solar_model(mean_series, now_ts, latitude, longitude)
+        gain = None
+        if self._solar_model is not None and ghi_now is not None:
+            gain = self._solar_model.solar_gain_w(ghi_now)
+        return SolarSnapshot(
+            ghi_now=ghi_now,
+            ghi_peak=ghi_peak,
+            peak_in_hours=peak_in_hours,
+            gain_w=gain,
+        )
+
+    async def _async_refresh_solar_model(
+        self,
+        mean_series: Mapping[str, list[tuple[int, float]]],
+        now_ts: float,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        """Fit or refresh the solar-gain model from recorder series + GHI.
+
+        Throttled: a failed or skipped attempt still records its timestamp so
+        a fresh install does not re-fetch 60 days of archive every 30 minutes.
+        """
+        if (
+            self._last_solar_fit_ts is not None
+            and now_ts - self._last_solar_fit_ts < SOLAR_FIT_REFRESH_HOURS * 3600.0
+        ):
+            return
+        self._last_solar_fit_ts = now_ts
+
+        power = dict(mean_series.get("heatingpower", []))
+        outdoor = dict(mean_series.get("bt1", []))
+        indoor_key = resolve_indoor_metric_key(
+            {key: key for key in mean_series}, self._main_values()
+        )
+        indoor = dict(mean_series.get(indoor_key, [])) if indoor_key else {}
+        if not power or not outdoor or not indoor:
+            return
+
+        try:
+            today = dt_util.utcnow().date()
+            ghi_history = await fetch_ghi_history(
+                self.session,
+                latitude,
+                longitude,
+                today - timedelta(days=SOLAR_FIT_WINDOW_DAYS),
+                today,
+            )
+        except OpenMeteoError as err:
+            _LOGGER.debug("Solar history unavailable: %s", err)
+            return
+
+        samples = build_samples(power, indoor, outdoor, ghi_history)
+        if len(samples) < MIN_SOLAR_FIT_SAMPLES:
+            _LOGGER.debug(
+                "Solar fit skipped: %s samples < %s",
+                len(samples),
+                MIN_SOLAR_FIT_SAMPLES,
+            )
+            return
+        model = fit_solar_model(samples, now_ts=int(now_ts))
+        if not model.valid:
+            _LOGGER.debug("Solar fit rejected: %s", model.notes)
+            return
+        self._solar_model = model
+        _LOGGER.info(
+            "Efficiency solar model fitted: a=%.1f W/K b=%.3f m² trust=%.2f",
+            model.a_w_per_k,
+            model.b_m2,
+            model.trust,
+        )
 
     async def _async_update_data(self) -> EfficiencySnapshot:
         """Never fail: degrade to the last good snapshot on any error."""
@@ -273,8 +422,14 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         dhw_standing_loss = self._update_dhw_standing_loss(now_ts)
         keys = {**counters, **building, **cycling, **operating, **dhw_meter}
         if not keys:
+            solar = await self._async_solar({}, now_ts)
             return EfficiencySnapshot(
-                dhw_standing_loss=dhw_standing_loss, updated_at=now.isoformat()
+                dhw_standing_loss=dhw_standing_loss,
+                solar_ghi_now=solar.ghi_now,
+                solar_ghi_peak=solar.ghi_peak,
+                solar_ghi_peak_in_hours=solar.peak_in_hours,
+                solar_gain_now_w=solar.gain_w,
+                updated_at=now.isoformat(),
             )
 
         rows = await async_statistics_during_period(
@@ -372,6 +527,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             dhw_meter_metered_kwh,
             dhw_meter_hours,
         ) = self._dhw_heat_meter_metrics(mean_series, sum_series, now_ts)
+        solar = await self._async_solar(mean_series, now_ts)
         health = health_grade(
             {
                 "scop": scop_total,
@@ -400,6 +556,10 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             dhw_heat_meter_estimated_kwh=dhw_meter_estimated_kwh,
             dhw_heat_meter_metered_kwh=dhw_meter_metered_kwh,
             dhw_heat_meter_hours=dhw_meter_hours,
+            solar_ghi_now=solar.ghi_now,
+            solar_ghi_peak=solar.ghi_peak,
+            solar_ghi_peak_in_hours=solar.peak_in_hours,
+            solar_gain_now_w=solar.gain_w,
             efficiency_health_grade=health.letter,
             efficiency_health_score=health.score,
             efficiency_health_coverage=health.coverage,

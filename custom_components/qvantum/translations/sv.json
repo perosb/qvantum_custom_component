@@ -670,6 +670,12 @@
       },
       "dhw_heat_meter_deviation": {
         "name": "Avvikelse för varmvattenmätare"
+      },
+      "solar_ghi_now": {
+        "name": "Solstrålning (nu)"
+      },
+      "solar_gain_now_w": {
+        "name": "Soltillskott (nu)"
       }
     },
     "number": {

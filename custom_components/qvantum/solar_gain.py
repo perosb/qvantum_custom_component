@@ -48,6 +48,10 @@ MAD_SCALE: float = 1.4826
 DEFAULT_TAU_HOURS: float = 3.0
 #: Default one-sided span of the effective-GHI kernel.
 DEFAULT_SPAN_HOURS: int = 6
+#: Minimum indoor-outdoor spread for a heating hour to carry signal.
+MIN_SAMPLE_DELTA_T_K: float = 5.0
+#: Minimum measured heating power for a heating hour to carry signal.
+MIN_SAMPLE_Q_W: float = 50.0
 
 
 @dataclass(frozen=True)
@@ -86,6 +90,41 @@ class SolarModel:
         if not self.valid or ghi_wm2 <= 0.0:
             return 0.0
         return max(0.0, self.effective_b_m2 * float(ghi_wm2))
+
+
+def build_samples(
+    q_by_hour: Mapping[int, float],
+    indoor_by_hour: Mapping[int, float],
+    outdoor_by_hour: Mapping[int, float],
+    ghi_by_hour: Mapping[int, float],
+    *,
+    min_delta_t_k: float = MIN_SAMPLE_DELTA_T_K,
+    min_q_w: float = MIN_SAMPLE_Q_W,
+) -> list[SolarSample]:
+    """Join hourly maps into heating samples for the solar fit.
+
+    Hours without heating demand are dropped: the model needs hours where the
+    heating circuit actually delivered heat.
+    """
+    samples: list[SolarSample] = []
+    for ts in sorted(
+        set(q_by_hour) & set(indoor_by_hour) & set(outdoor_by_hour) & set(ghi_by_hour)
+    ):
+        delta_t = indoor_by_hour[ts] - outdoor_by_hour[ts]
+        if delta_t < min_delta_t_k:
+            continue
+        q_heat = q_by_hour[ts]
+        if q_heat < min_q_w:
+            continue
+        samples.append(
+            SolarSample(
+                hour_ts=int(ts),
+                delta_t_k=delta_t,
+                ghi_wm2=max(0.0, ghi_by_hour[ts]),
+                q_heat_w=q_heat,
+            )
+        )
+    return samples
 
 
 def smooth_ghi(

@@ -670,6 +670,12 @@
       },
       "dhw_heat_meter_deviation": {
         "name": "Odchylenie ciepłomierza CWU"
+      },
+      "solar_ghi_now": {
+        "name": "Nasłonecznienie (teraz)"
+      },
+      "solar_gain_now_w": {
+        "name": "Zysk słoneczny (teraz)"
       }
     },
     "number": {

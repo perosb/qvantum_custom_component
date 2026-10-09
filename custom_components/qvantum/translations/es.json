@@ -670,6 +670,12 @@
       },
       "dhw_heat_meter_deviation": {
         "name": "Desviación del contador de calor de ACS"
+      },
+      "solar_ghi_now": {
+        "name": "Irradiancia solar (ahora)"
+      },
+      "solar_gain_now_w": {
+        "name": "Ganancia solar (ahora)"
       }
     },
     "number": {
