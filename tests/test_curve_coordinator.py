@@ -1095,7 +1095,9 @@ def test_resolve_statistic_ids_uses_registry() -> None:
         )
     )
 
-    with patch.object(cc.er, "async_get", return_value=registry):
+    with patch(
+        "custom_components.qvantum.statistics.er.async_get", return_value=registry
+    ):
         resolved = coordinator._resolve_statistic_ids()
         entity_id = coordinator._resolve_curve_entity_id("adaptive_curve_deviation")
 

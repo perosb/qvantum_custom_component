@@ -28,7 +28,6 @@ from zoneinfo import ZoneInfo
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -58,6 +57,7 @@ from .open_meteo import (
     fetch_ghi_history,
 )
 from .solar_gain import SolarModel, SolarSample, fit_solar_model
+from .statistics import async_statistics_during_period, resolve_statistic_entity_ids
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -918,61 +918,28 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         await self._async_persist()
 
     def _resolve_statistic_ids(self) -> dict[str, str]:
-        device_id = getattr(self._main, "device_id", None)
-        if not device_id:
-            return {}
-        registry = er.async_get(self.hass)
-        resolved: dict[str, str] = {}
-        for key in (
-            "heatingpower",
-            "bt1",
-            "bt2",
-            "cal_heat_temp",
-            "room_temp_external",
-            "room_temp_ext",
-        ):
-            entity_id = registry.async_get_entity_id(
-                "sensor", DOMAIN, f"qvantum_{key}_{device_id}"
-            )
-            if entity_id:
-                resolved[key] = entity_id
-        return resolved
+        return resolve_statistic_entity_ids(
+            self.hass,
+            getattr(self._main, "device_id", None),
+            (
+                "heatingpower",
+                "bt1",
+                "bt2",
+                "cal_heat_temp",
+                "room_temp_external",
+                "room_temp_ext",
+            ),
+        )
 
     def _resolve_curve_entity_id(self, metric_key: str) -> str | None:
-        device_id = getattr(self._main, "device_id", None)
-        if not device_id:
-            return None
-        registry = er.async_get(self.hass)
-        return registry.async_get_entity_id(
-            "sensor", DOMAIN, f"qvantum_{metric_key}_{device_id}"
-        )
+        return resolve_statistic_entity_ids(
+            self.hass, getattr(self._main, "device_id", None), (metric_key,)
+        ).get(metric_key)
 
     async def _async_statistics(
         self, statistic_ids: set[str], start: datetime
     ) -> dict[str, list[Any]]:
-        if not statistic_ids:
-            return {}
-        from homeassistant.components.recorder import get_instance
-        from homeassistant.components.recorder.statistics import statistics_during_period
-
-        try:
-            get_instance(self.hass)
-        except (KeyError, RuntimeError):
-            return {}
-        try:
-            return await self.hass.async_add_executor_job(
-                statistics_during_period,
-                self.hass,
-                start,
-                None,
-                statistic_ids,
-                "hour",
-                None,
-                {"mean"},
-            )
-        except Exception as err:  # noqa: BLE001 — recorder may be unavailable
-            _LOGGER.debug("Recorder statistics unavailable: %s", err)
-            return {}
+        return await async_statistics_during_period(self.hass, statistic_ids, start)
 
     def _indoor_metric_key(self, resolved: Mapping[str, str]) -> str | None:
         values = self._main_values()
