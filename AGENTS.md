@@ -77,6 +77,11 @@ writes: coordinator helpers (`async_set_extra_tap_water`, `async_write_metric`,
 
 Do not ask permission for these steps. Do not merge unless asked.
 
+**One concern per PR.** A follow-up change — even in a file an open PR already
+touches — gets its own branch from the latest `main`; never append it to that
+PR's branch. Before pushing to a PR branch, check `gh pr view <n> --json state`:
+a merged PR's branch is gone, so branch from `main` again.
+
 **Worktrees live in `${TMPDIR:-/tmp}`.** Never create `<repo>-pr-<n>` next to the
 checkout. Never switch the primary checkout to inspect a PR (another session may
 own it). Exception: a fresh single-session clone (CI) — use that checkout, no
