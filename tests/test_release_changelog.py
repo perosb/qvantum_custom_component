@@ -353,18 +353,145 @@ def test_previous_stable_release_skips_drafts_and_prereleases(changelog, monkeyp
     assert previous["tagName"] == "2026.9.14"
 
 
-def test_update_release_link_is_idempotent(changelog, monkeypatch):
+def test_update_release_notes_is_idempotent(changelog, monkeypatch):
     fake = FakeGh(releases=RELEASES, info=INFO, body="# What's Changed\n\n## New features\n", prs=PRS)
     monkeypatch.setattr(changelog, "_gh", fake)
-    assert changelog.update_release_link("o/r", "2026.9.16") is True
+    assert changelog.update_release_notes("o/r", "2026.9.16", "A friendly overview.") is True
     assert fake.edited is not None
     assert fake.edited.count("Full release notes") == 1
+    assert fake.edited.count(changelog.OVERVIEW_MARKER_START) == 1
+    assert "A friendly overview." in fake.edited
     assert "docs/releases/2026.9.16.md" in fake.edited
 
-    # The edit re-reads the body; simulate the inserted link surviving.
+    # A second run with the same overview is a no-op (no duplicate block).
     fake.body = fake.edited
-    assert changelog.update_release_link("o/r", "2026.9.16") is True
-    assert fake.edited.count("Full release notes") == 1
+    assert changelog.update_release_notes("o/r", "2026.9.16", "A friendly overview.") is True
+    assert fake.edited.count(changelog.OVERVIEW_MARKER_START) == 1
+
+    # A changed overview replaces the block instead of appending.
+    assert changelog.update_release_notes("o/r", "2026.9.16", "New overview.") is True
+    assert fake.edited.count(changelog.OVERVIEW_MARKER_START) == 1
+    assert "New overview." in fake.edited
+    assert "A friendly overview." not in fake.edited
+
+
+def test_remove_release_notes_strips_block_and_link(changelog, monkeypatch):
+    body = (
+        "# What's Changed\n\n"
+        "<!-- changelog-overview:start -->\n"
+        "Friendly.\n"
+        "<!-- changelog-overview:end -->\n\n"
+        "📄 **Full release notes:** [x](y)\n\n"
+        "## New features\n"
+    )
+    fake = FakeGh(releases=RELEASES, info=INFO, body=body, prs=PRS)
+    monkeypatch.setattr(changelog, "_gh", fake)
+    assert changelog.remove_release_notes("o/r", "2026.9.15") is True
+    assert "changelog-overview" not in fake.edited
+    assert "Full release notes" not in fake.edited
+    assert "## New features" in fake.edited
+
+    # Without inserted notes there is nothing to do.
+    fake.body = "# What's Changed\n\n## New features\n"
+    fake.edited = None
+    assert changelog.remove_release_notes("o/r", "2026.9.15") is False
+    assert fake.edited is None
+
+
+class _FakeResponse:
+    """Minimal context-manager response for ``urllib.request.urlopen``."""
+
+    def __init__(self, body: bytes):
+        self._body = body
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_polish_overview_skips_without_key(changelog, monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    called = False
+
+    def fake_urlopen(*args, **kwargs):  # pragma: no cover - must not be called
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(changelog.urllib.request, "urlopen", fake_urlopen)
+    assert changelog.polish_overview("Highlights: a.") is None
+    assert called is False
+
+
+def test_polish_overview_calls_openrouter(changelog, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "key")
+    captured = {}
+
+    def fake_urlopen(request, timeout=None):
+        captured["url"] = request.full_url
+        captured["payload"] = json.loads(request.data.decode())
+        body = json.dumps({"choices": [{"message": {"content": " Friendly.\n"}}]})
+        return _FakeResponse(body.encode())
+
+    monkeypatch.setattr(changelog.urllib.request, "urlopen", fake_urlopen)
+    assert changelog.polish_overview("Highlights: a.", context="full doc") == "Friendly."
+    assert captured["url"] == changelog.OPENROUTER_URL
+    assert captured["payload"]["model"] == changelog.POLISH_MODEL
+    assert "full doc" in captured["payload"]["messages"][0]["content"]
+
+
+def test_polish_overview_returns_none_on_error(changelog, monkeypatch, capsys):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "key")
+
+    def boom(request, timeout=None):
+        raise changelog.urllib.error.URLError("down")
+
+    monkeypatch.setattr(changelog.urllib.request, "urlopen", boom)
+    assert changelog.polish_overview("Highlights: a.") is None
+    assert "skipped" in capsys.readouterr().err
+
+
+def test_polish_overview_falls_back_on_truncation(changelog, monkeypatch, capsys):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "key")
+
+    def fake_urlopen(request, timeout=None):
+        body = json.dumps(
+            {"choices": [{"finish_reason": "length", "message": {"content": "Cut off"}}]}
+        )
+        return _FakeResponse(body.encode())
+
+    monkeypatch.setattr(changelog.urllib.request, "urlopen", fake_urlopen)
+    assert changelog.polish_overview("Highlights: a.") is None
+    assert "truncated" in capsys.readouterr().err
+
+
+def test_main_polish_writes_and_preserves(changelog, monkeypatch, tmp_path):
+    fake = FakeGh(releases=RELEASES, info=INFO, body=BODY, prs=PRS)
+    monkeypatch.setattr(changelog, "_gh", fake)
+    calls = {"n": 0}
+
+    def fake_polish(text, **kwargs):
+        calls["n"] += 1
+        return "A friendly overview."
+
+    monkeypatch.setattr(changelog, "polish_overview", fake_polish)
+    out = tmp_path / "2026.9.16.md"
+    index = tmp_path / "README.md"
+    args = ["--tag", "2026.9.16", "--out", str(out), "--index", str(index), "--polish"]
+
+    assert changelog.main(args) == 0
+    assert "A friendly overview." in out.read_text()
+    assert calls["n"] == 1
+
+    # The polished overview is preserved on regeneration; the model is not called again.
+    monkeypatch.setattr(changelog, "polish_overview", lambda *a, **k: "Should not be used.")
+    assert changelog.main(args) == 0
+    assert "A friendly overview." in out.read_text()
+    assert "Should not be used." not in out.read_text()
 
 
 def test_main_writes_file_and_index(changelog, monkeypatch, tmp_path):

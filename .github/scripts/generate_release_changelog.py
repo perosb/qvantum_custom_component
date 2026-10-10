@@ -20,6 +20,8 @@ import re
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,6 +32,11 @@ DEFAULT_INDEX = REPO_ROOT / "docs" / "releases" / "README.md"
 ALL_RELEASES_URL = "https://github.com/{repo}/tree/main/docs/releases"
 COMPARE_URL = "https://github.com/{repo}/compare/{base}...{head}"
 BLOB_URL = "https://github.com/{repo}/blob/main/docs/releases/{tag}.md"
+
+# Markers around the overview inserted into the GitHub release body, so re-runs
+# can replace it instead of appending.
+OVERVIEW_MARKER_START = "<!-- changelog-overview:start -->"
+OVERVIEW_MARKER_END = "<!-- changelog-overview:end -->"
 
 NEW_FEATURES = "New features"
 BUG_FIXES = "Bug fixes"
@@ -64,6 +71,22 @@ _SUMMARY_RE = re.compile(r"^##+\s*Summary\s*$", re.IGNORECASE | re.MULTILINE)
 _NEXT_HEADING_RE = re.compile(r"^##+\s", re.MULTILINE)
 _META_RE = re.compile(r"^_Released\b")
 _BULLET_RE = re.compile(r"^[-*+]\s+(.*)$")
+
+# End-user polish of the overview paragraph (one-shot OpenRouter call, gpt-luna).
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+POLISH_MODEL = "~openai/gpt-luna-latest"
+POLISH_MAX_TOKENS = 4096
+POLISH_TIMEOUT = 120
+POLISH_PROMPT = (
+    "Below is a generated release-notes document for a Home Assistant integration for "
+    "Qvantum heat pumps. Rewrite ONLY the overview paragraph (the first paragraph after "
+    'the metadata line, starting with "Highlights:") into a short, friendly, '
+    "non-technical introduction for end users: 2-4 sentences, plain language. Summarize "
+    "the main themes of the new features AND of the bug fixes in the document; keep "
+    "every fact, do not invent anything and do not drop a major theme. State plainly "
+    "what changed; avoid marketing words. Do not mention pull requests, registers, "
+    "code, Modbus or cloud. Output only the new paragraph, as a single paragraph."
+)
 
 
 @dataclass(frozen=True)
@@ -210,50 +233,93 @@ def collect_release_prs(repo: str, tag: str) -> list[PullRequest]:
     return pull_requests
 
 
-def update_release_link(repo: str, tag: str) -> bool:
-    """Insert the changelog-file link into a published release body (idempotent)."""
-    try:
-        body = _gh(["release", "view", tag, "--repo", repo, "--json", "body", "-q", ".body"])
-    except subprocess.CalledProcessError:
-        return False
-    link = f"📄 **Full release notes:** [docs/releases/{tag}.md]({BLOB_URL.format(repo=repo, tag=tag)})"
-    lines = [line for line in body.splitlines() if "Full release notes:" not in line]
-    result: list[str] = []
-    inserted = False
-    for line in lines:
-        result.append(line)
-        if not inserted and line.startswith("# "):
-            result.extend(["", link])
-            inserted = True
-    if not inserted:
-        result = [link, ""] + result
-    new_body = "\n".join(result).strip() + "\n"
+def _release_notes_link(repo: str, tag: str) -> str:
+    return (
+        f"📄 **Full release notes:** "
+        f"[docs/releases/{tag}.md]({BLOB_URL.format(repo=repo, tag=tag)})"
+    )
+
+
+def _overview_in_body(body: str) -> str:
+    """Return the overview currently wrapped in markers, or an empty string."""
+    match = re.search(
+        re.escape(OVERVIEW_MARKER_START) + r"\n(.*?)\n" + re.escape(OVERVIEW_MARKER_END),
+        body,
+        re.DOTALL,
+    )
+    return match.group(1) if match else ""
+
+
+def _strip_inserted_notes(body: str) -> str:
+    """Remove the marker block and the changelog link line, collapsing blank runs."""
+    lines: list[str] = []
+    inside = False
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped == OVERVIEW_MARKER_START:
+            inside = True
+            continue
+        if stripped == OVERVIEW_MARKER_END:
+            inside = False
+            continue
+        if inside or "Full release notes:" in line:
+            continue
+        lines.append(line)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def _write_release_body(repo: str, tag: str, body: str) -> None:
+    body = body if body.endswith("\n") else body + "\n"
     with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as handle:
-        handle.write(new_body)
+        handle.write(body)
         path = handle.name
     try:
         _gh(["release", "edit", tag, "--repo", repo, "--notes-file", path])
     finally:
         os.unlink(path)
-    return True
 
 
-def remove_release_link(repo: str, tag: str) -> bool:
-    """Remove the changelog-file link from a release body (used when pruning)."""
+def update_release_notes(repo: str, tag: str, overview: str | None = None) -> bool:
+    """Insert the overview and changelog link into a published release body.
+
+    Idempotent: a marker block replaces any previously inserted overview, and the
+    link line is rewritten. Called at publish time (after the file is pushed) and by
+    the manual backfill.
+    """
     body = release_body(repo, tag)
     if body is None:
         return False
-    lines = body.splitlines()
-    if not any("Full release notes:" in line for line in lines):
+    link = _release_notes_link(repo, tag)
+    if link in body and _overview_in_body(body) == (overview or ""):
+        return True
+
+    insert: list[str] = []
+    if overview:
+        insert.extend([OVERVIEW_MARKER_START, overview, OVERVIEW_MARKER_END, ""])
+    insert.append(link)
+
+    result: list[str] = []
+    inserted = False
+    for line in _strip_inserted_notes(body).splitlines():
+        result.append(line)
+        if not inserted and line.startswith("# "):
+            result.extend(["", *insert])
+            inserted = True
+    if not inserted:
+        result = [*insert, "", *result]
+    _write_release_body(repo, tag, "\n".join(result).strip())
+    return True
+
+
+def remove_release_notes(repo: str, tag: str) -> bool:
+    """Remove the inserted overview and link from a release body (when pruning)."""
+    body = release_body(repo, tag)
+    if body is None:
         return False
-    new_body = "\n".join(line for line in lines if "Full release notes:" not in line).strip() + "\n"
-    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as handle:
-        handle.write(new_body)
-        path = handle.name
-    try:
-        _gh(["release", "edit", tag, "--repo", repo, "--notes-file", path])
-    finally:
-        os.unlink(path)
+    cleaned = _strip_inserted_notes(body)
+    if cleaned == body.strip():
+        return False
+    _write_release_body(repo, tag, cleaned)
     return True
 
 
@@ -284,7 +350,7 @@ def prune_superseded_prereleases(repo: str, releases_dir: Path, index_path: Path
             continue
         path.unlink()
         prune_index_row(index_path, path.stem)
-        remove_release_link(repo, path.stem)
+        remove_release_notes(repo, path.stem)
         removed.append(path.stem)
     return removed
 
@@ -421,6 +487,51 @@ def generated_overview(features: list[PullRequest]) -> str:
     return text
 
 
+def polish_overview(
+    text: str,
+    *,
+    context: str | None = None,
+    model: str = POLISH_MODEL,
+    timeout: int = POLISH_TIMEOUT,
+) -> str | None:
+    """Rewrite the overview paragraph for end users via the OpenRouter API.
+
+    ``context`` (the rendered release with the deterministic overview) is sent so the
+    model can keep the facts; only ``text`` is expected back. Returns the rewritten
+    paragraph, or ``None`` when ``OPENROUTER_API_KEY`` is unset or the request fails,
+    so the caller keeps the deterministic overview. The caller persists the result in
+    the file, where :func:`existing_overview` preserves it on later regenerations.
+    """
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        return None
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "user", "content": f"{POLISH_PROMPT}\n\n---\n\n{context or text}"}
+        ],
+        "max_tokens": POLISH_MAX_TOKENS,
+        "temperature": 0.4,
+    }
+    request = urllib.request.Request(
+        OPENROUTER_URL,
+        data=json.dumps(payload).encode(),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            data = json.load(response)
+        choice = data["choices"][0]
+        content = choice["message"]["content"]
+        if choice.get("finish_reason") == "length":
+            raise ValueError("response truncated (finish_reason=length)")
+    except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError, TypeError) as error:
+        print(f"Overview polish skipped: {error}", file=sys.stderr)
+        return None
+    return (content or "").strip() or None
+
+
 def format_date(iso: str | None) -> str | None:
     """Return ``YYYY-MM-DD`` for a GitHub timestamp, or ``None`` if unavailable."""
     if not iso or iso.startswith("0001-"):
@@ -551,6 +662,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Only insert the changelog link; do not regenerate the file.",
     )
+    parser.add_argument(
+        "--polish",
+        action="store_true",
+        help="Rewrite the overview for end users via OpenRouter (falls back if unavailable).",
+    )
+    parser.add_argument(
+        "--repolish",
+        action="store_true",
+        help="Like --polish but ignore and replace an existing overview.",
+    )
+    parser.add_argument("--polish-model", default=POLISH_MODEL)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
@@ -567,7 +689,7 @@ def main(argv: list[str] | None = None) -> int:
         if info is None:
             print(f"Release {tag} not found.", file=sys.stderr)
             return 1
-        update_release_link(repo, tag)
+        update_release_notes(repo, tag, existing_overview(out))
         return 0
 
     if args.previous_tag:
@@ -584,14 +706,33 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     features = [pr for pr in pull_requests if category_for(pr) == NEW_FEATURES]
-    overview = existing_overview(out) or generated_overview(features)
+    callouts = extract_callouts()
+    overview = None if args.repolish else existing_overview(out)
+    if overview is None:
+        overview = generated_overview(features)
+        if args.polish or args.repolish:
+            preview = render_release(
+                repo=repo,
+                tag=tag,
+                previous_tag=previous["tagName"],
+                published_at=published_at,
+                pull_requests=pull_requests,
+                callouts=callouts,
+                overview=overview,
+            )
+            overview = (
+                polish_overview(
+                    overview, context=preview, model=args.polish_model
+                )
+                or overview
+            )
     content = render_release(
         repo=repo,
         tag=tag,
         previous_tag=previous["tagName"],
         published_at=published_at,
         pull_requests=pull_requests,
-        callouts=extract_callouts(),
+        callouts=callouts,
         overview=overview,
     )
 
@@ -605,7 +746,7 @@ def main(argv: list[str] | None = None) -> int:
     prune_superseded_prereleases(repo, out.parent, Path(args.index))
 
     if args.update_link and info is not None:
-        update_release_link(repo, tag)
+        update_release_notes(repo, tag, overview)
     return 0
 
 

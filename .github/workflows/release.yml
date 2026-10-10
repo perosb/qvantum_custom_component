@@ -30,10 +30,12 @@ jobs:
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           python3 .github/scripts/generate_release_changelog.py \
             --tag "${{ github.event.release.tag_name }}" \
-            --out "docs/releases/${{ github.event.release.tag_name }}.md"
+            --out "docs/releases/${{ github.event.release.tag_name }}.md" \
+            --polish
 
       - name: Update manifest.json version to ${{ github.event.release.tag_name }}
         run: |
