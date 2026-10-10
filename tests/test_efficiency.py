@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import math
+from collections import deque
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+
+import pytest
 
 from custom_components.qvantum.calculations import QvantumCalculationsMixin
 from custom_components.qvantum.const import HP_STATUS_HEATING, HP_STATUS_HOT_WATER
 from custom_components.qvantum.efficiency import (
+    COP_WINDOW_SECONDS,
     aux_heat_share,
     cop_ratio,
     energy_delta,
@@ -19,6 +25,8 @@ class _Calculator(QvantumCalculationsMixin):
 
     def __init__(self) -> None:
         self._last_cop_energies: dict[str, float] | None = None
+        self._cop_history: deque[tuple[datetime, dict[str, float]]] = deque()
+        self._cop_last: dict[str, float | None] = {}
 
 
 def _values(**overrides):
@@ -111,8 +119,36 @@ class TestCalculateCop:
             "compressorenergy": 40.0,
             "additionalenergy": 10.0,
         }
+        assert len(calculator._cop_history) == 1
 
-    def test_heating_interval_publishes_system_and_heating(self):
+    def test_quantised_single_step_does_not_publish(self):
+        """One 0.1 kWh step is quantisation, not a measurement."""
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        values = _values(heatingenergy=100.1, compressorenergy=40.1)
+
+        calculator._calculate_cop(values)
+
+        assert values["cop_heating"] is None
+        assert values["cop_dhw"] is None
+        assert values["cop_system"] is None
+
+    def test_window_accumulates_until_electrical_is_measurable(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        first = _values(heatingenergy=100.1, compressorenergy=40.1)
+        calculator._calculate_cop(first)
+        assert first["cop_system"] is None
+
+        values = _values(heatingenergy=100.6, compressorenergy=40.2)
+        calculator._calculate_cop(values)
+
+        # Two compressor steps (0.2 kWh) against 0.6 kWh of heating energy.
+        assert values["cop_heating"] == pytest.approx(3.0)
+        assert values["cop_dhw"] is None
+        assert values["cop_system"] == pytest.approx(3.0)
+
+    def test_heating_window_publishes_system_and_heating(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         values = _values(heatingenergy=105.0, compressorenergy=41.0)
@@ -123,7 +159,7 @@ class TestCalculateCop:
         assert values["cop_dhw"] is None
         assert values["cop_system"] == 5.0
 
-    def test_dhw_interval_publishes_system_and_dhw(self):
+    def test_dhw_window_publishes_system_and_dhw(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         values = _values(
@@ -136,7 +172,7 @@ class TestCalculateCop:
         assert values["cop_dhw"] == 3.0
         assert values["cop_system"] == 3.0
 
-    def test_idle_interval_publishes_system_only(self):
+    def test_idle_window_publishes_system_only(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         values = _values(heatingenergy=102.0, compressorenergy=41.0)
@@ -148,20 +184,105 @@ class TestCalculateCop:
         assert values["cop_dhw"] is None
         assert values["cop_system"] == 2.0
 
-    def test_no_electrical_delta_clears_per_mode_values(self):
+    def test_mixed_window_cannot_attribute_a_heating_only_ratio(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
-        values = _values(heatingenergy=102.0, compressorenergy=40.0)
+        values = _values(heatingenergy=106.0, dhwenergy=51.0, compressorenergy=42.0)
 
         calculator._calculate_cop(values)
 
+        # Both thermal counters advanced: the shared electrical side cannot be
+        # split, so only the system figure is a measurement.
         assert values["cop_heating"] is None
         assert values["cop_dhw"] is None
-        assert values["cop_system"] is None
+        assert values["cop_system"] == 3.5
+
+    def test_holds_last_value_after_the_window_goes_idle(self):
+        calculator = _Calculator()
+        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=timezone.utc)
+        t1 = t0 + timedelta(seconds=10)
+        t_idle = t0 + timedelta(seconds=COP_WINDOW_SECONDS + 20)
+
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=t0,
+        ):
+            calculator._calculate_cop(_values())
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=t1,
+        ):
+            calculator._calculate_cop(
+                _values(heatingenergy=105.0, compressorenergy=41.0)
+            )
+
+        # The only activity has aged out of the window; the last value is held
+        # instead of the sensor dropping to unavailable.
+        values = _values(heatingenergy=105.0, compressorenergy=41.0)
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=t_idle,
+        ):
+            calculator._calculate_cop(values)
+
+        assert values["cop_heating"] == 5.0
+        assert values["cop_system"] == 5.0
+
+    def test_window_drops_samples_older_than_the_window(self):
+        calculator = _Calculator()
+        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=timezone.utc)
+        t1 = t0 + timedelta(seconds=100)
+        t2 = t0 + timedelta(seconds=COP_WINDOW_SECONDS + 100)
+
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=t0,
+        ):
+            calculator._calculate_cop(_values())
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=t1,
+        ):
+            calculator._calculate_cop(
+                _values(heatingenergy=100.1, compressorenergy=40.0)
+            )
+
+        values = _values(heatingenergy=101.1, compressorenergy=40.3)
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=t2,
+        ):
+            calculator._calculate_cop(values)
+
+        # Baseline is the t1 sample (+1.0 kWh heating, +0.3 kWh compressor),
+        # not the t0 seed (+1.1 / +0.3).
+        assert values["cop_system"] == pytest.approx(10 / 3)
+
+    def test_keeps_the_previous_sample_when_polls_exceed_the_window(self):
+        """A poll interval longer than the window still yields a ratio."""
+        calculator = _Calculator()
+        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=timezone.utc)
+        t1 = t0 + timedelta(seconds=COP_WINDOW_SECONDS * 2)
+
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=t0,
+        ):
+            calculator._calculate_cop(_values())
+        values = _values(heatingenergy=105.0, compressorenergy=41.0)
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=t1,
+        ):
+            calculator._calculate_cop(values)
+
+        assert values["cop_heating"] == 5.0
+        assert values["cop_system"] == 5.0
 
     def test_counter_reset_clears_published_values(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
+        calculator._calculate_cop(_values(heatingenergy=105.0, compressorenergy=41.0))
         values = _values(heatingenergy=1.0, compressorenergy=1.0)
 
         calculator._calculate_cop(values)
@@ -169,6 +290,7 @@ class TestCalculateCop:
         assert values["cop_heating"] is None
         assert values["cop_dhw"] is None
         assert values["cop_system"] is None
+        assert calculator._cop_last == {}
 
     def test_missing_counter_skips_without_advancing_state(self):
         calculator = _Calculator()
