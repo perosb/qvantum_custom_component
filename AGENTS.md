@@ -142,7 +142,13 @@ bump, and inserted into the release body (overview paragraph + file link) by the
 `Release` workflow. The script
 reads the release-drafter body for the PR list, so `enhancement`/`bug` labels
 drive what is described; other labels are collapsed into one internal-changes
-line. The overview paragraph is rewritten for end users once via the OpenRouter API
+line. The release is then grouped into a handful of end-user themes: the model
+returns `theme → PR numbers + prose`, the generator renders the `##` sections and
+their `_Related:_` links, and the grouping is stored in a hidden comment and reused
+on regeneration (`--retheme` forces a new grouping). If grouping is unavailable the
+deterministic `New features`/`Bug fixes` structure is used. Themes never include the
+internal-changes line, which stays as a separate footer. The overview paragraph is
+rewritten for end users once via the OpenRouter API
 (`~openai/gpt-luna-latest`) and then preserved on regeneration; it is also copied
 into the release body. Without `OPENROUTER_API_KEY` (or on any API error) the
 deterministic title-based overview is used. Only the newest pre-release keeps a file — older ones are pruned (and their
@@ -150,7 +156,7 @@ release-body link removed) once a newer release exists, because a pre-release an
 the stable that follows it share the same PRs. Regenerate a single release with:
 
 ```bash
-python3 .github/scripts/generate_release_changelog.py --tag <tag> --update-link
+python3 .github/scripts/generate_release_changelog.py --tag <tag> --polish --themed --update-link
 ```
 
 PR body:
