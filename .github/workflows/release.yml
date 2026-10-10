@@ -8,6 +8,11 @@ on:
 env:
   COMPONENT_DIR: qvantum
 
+# Serialize with any other automation that writes to main.
+concurrency:
+  group: main-release-automation
+  cancel-in-progress: false
+
 jobs:
   release_zip_file:
     name: Prepare release asset
@@ -18,20 +23,45 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 .github/scripts/generate_release_changelog.py \
+            --tag "${{ github.event.release.tag_name }}" \
+            --out "docs/releases/${{ github.event.release.tag_name }}.md"
+
       - name: Update manifest.json version to ${{ github.event.release.tag_name }}
         run: |
           python3 ${{ github.workspace }}/.github/scripts/update_hacs_manifest.py --version ${{ github.event.release.tag_name }} --path /custom_components/qvantum/
-      - name: Commit manifest update
+
+      - name: Commit manifest and release notes
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add ./custom_components/qvantum/manifest.json ./custom_components/qvantum/const.py
+          if [ -d docs/releases ]; then git add docs/releases; fi
           git commit -m "Update for new version ${{ github.event.release.tag_name }}"
           git push origin HEAD:main --force
+
+      - name: Link the release notes
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 .github/scripts/generate_release_changelog.py \
+            --tag "${{ github.event.release.tag_name }}" \
+            --link-only
+
       - name: Create zip
         run: |
           cd custom_components/qvantum
           zip qvantum.zip -r ./
+
       - name: Upload zip to release
         uses: svenstaro/upload-release-action@2.11.5
         with:
