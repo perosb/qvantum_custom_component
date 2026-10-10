@@ -84,6 +84,8 @@ writes: coordinator helpers (`async_set_extra_tap_water`, `async_write_metric`,
 2. Conventional commit (table below).
 3. `git push -u origin HEAD` — that branch only.
 4. `gh pr create` against default branch. Stay on the feature branch.
+5. Keep the PR `## Summary` current as the diff evolves — it feeds the
+   per-release changelog (below).
 
 Do not ask permission for these steps. Do not merge unless asked.
 
@@ -158,6 +160,11 @@ PR body:
 - [ ] In HA, … (only if a unit test cannot prove it)
 ```
 
+The `## Summary` feeds the per-release changelog: its bullets are expanded
+bullet-by-bullet into `docs/releases/<tag>.md`. Write it in user-facing language
+and keep it current as the PR changes, so the generated notes describe what
+actually shipped. `## Test plan` is ignored by the changelog.
+
 Labels `bug` / `enhancement` / `chore` feed release-drafter. Version lives in
 `manifest.json` and `const.py`; release workflow rewrites from the tag.
 
@@ -178,6 +185,8 @@ enough. Verify in a `/tmp` worktree — never by switching the primary checkout
   your own PR.
 - After pushing a fix, resolve the GitHub thread (`resolveReviewThread`).
 - Clean diff: still publish a short overview with empty `comments`.
+- Confirm the PR `## Summary` still matches the final diff — it becomes the
+  per-release changelog, so a stale description ships wrong notes.
 
 **Flag**
 
