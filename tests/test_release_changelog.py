@@ -570,6 +570,136 @@ def test_prune_superseded_prereleases_keeps_latest(changelog, monkeypatch, tmp_p
     assert fake.edited is not None and "Full release notes" not in fake.edited
 
 
+def test_parse_themes_valid_and_invalid(changelog):
+    assert changelog.parse_themes(None) is None
+    assert changelog.parse_themes("no json") is None
+    assert changelog.parse_themes('{"themes": "nope"}') is None
+    assert changelog.parse_themes('{"themes": [{"title": "t"}]}') is None
+    parsed = changelog.parse_themes(
+        '```json\n{"themes":[{"title":"T","body":"B","prs":["5",7]}]}\n```'
+    )
+    assert parsed == [{"title": "T", "body": "B", "prs": [5, 7]}]
+
+
+def test_complete_themes_fills_missing_prs(changelog):
+    prs = [
+        _pr(changelog, number=1),
+        _pr(changelog, number=2, title="fix: Two", labels=("bug",)),
+    ]
+    themes = changelog.complete_themes(
+        [{"title": "One", "body": "B", "prs": [1, 99, 1]}], prs
+    )
+    assert themes[0]["prs"] == [1]
+    assert themes[-1] == {
+        "title": "More changes",
+        "body": "Other fixes and improvements in this release.",
+        "prs": [2],
+    }
+
+
+def test_generate_themes_calls_model_and_completes(changelog, monkeypatch):
+    def fake_chat(model, prompt, content, *, max_tokens, timeout):
+        raw = json.dumps({"themes": [{"title": "Group", "body": "Body.", "prs": [1]}]})
+        return {"choices": [{"finish_reason": "stop", "message": {"content": raw}}]}
+
+    monkeypatch.setattr(changelog, "_openrouter_chat", fake_chat)
+    prs = [_pr(changelog, number=1), _pr(changelog, number=2, title="fix: Two", labels=("bug",))]
+    themes = changelog.generate_themes(prs)
+    assert themes[0]["title"] == "Group"
+    assert themes[-1]["title"] == "More changes"
+    assert themes[-1]["prs"] == [2]
+
+
+def test_render_release_themed_uses_themes(changelog):
+    themes = [{"title": "Adaptive curve", "body": "It learns.", "prs": [1, 2]}]
+    content = changelog.render_release(
+        repo="o/r",
+        tag="2026.10.1",
+        previous_tag="2026.9.16",
+        published_at="2026-10-05T19:03:08Z",
+        pull_requests=[
+            _pr(changelog, number=1),
+            _pr(changelog, number=2, title="fix: Two", labels=("bug",)),
+        ],
+        callouts="",
+        overview=None,
+        themes=themes,
+    )
+    assert "## Adaptive curve" in content
+    assert "## New features" not in content
+    assert "## Bug fixes" not in content
+    assert "[#1](" in content and "[#2](" in content
+    assert "_Related: " in content
+
+
+def test_existing_themes_roundtrip_and_coverage(changelog, tmp_path):
+    path = tmp_path / "2026.10.1.md"
+    themes = [{"title": "T", "body": "B", "prs": [1]}]
+    path.write_text(
+        "# 2026.10.1\n\n<!-- changelog-themes: " + json.dumps({"themes": themes}) + " -->\n"
+    )
+    assert changelog.existing_themes(path) == themes
+    assert changelog.themes_cover(themes, [_pr(changelog, number=1)]) is True
+    assert (
+        changelog.themes_cover(
+            themes, [_pr(changelog, number=1), _pr(changelog, number=2)]
+        )
+        is False
+    )
+    assert changelog.existing_themes(tmp_path / "missing.md") is None
+
+
+def test_main_themed_writes_and_preserves(changelog, monkeypatch, tmp_path):
+    fake = FakeGh(releases=RELEASES, info=INFO, body=BODY, prs=PRS)
+    monkeypatch.setattr(changelog, "_gh", fake)
+    calls = {"n": 0}
+
+    def fake_themes(pull_requests, **kwargs):
+        calls["n"] += 1
+        return [{"title": "Theme A", "body": "Body A.", "prs": [1, 2, 3]}]
+
+    monkeypatch.setattr(changelog, "generate_themes", fake_themes)
+    out = tmp_path / "x.md"
+    index = tmp_path / "README.md"
+    args = ["--tag", "2026.9.16", "--out", str(out), "--index", str(index), "--themed"]
+
+    assert changelog.main(args) == 0
+    text = out.read_text()
+    assert "## Theme A" in text
+    assert "## New features" not in text
+    assert "changelog-themes" in text
+    assert calls["n"] == 1
+
+    # A second run reuses the stored themes and does not call the model again.
+    again = {"n": 0}
+
+    def boom(*args, **kwargs):
+        again["n"] += 1
+        return None
+
+    monkeypatch.setattr(changelog, "generate_themes", boom)
+    assert changelog.main(args) == 0
+    assert again["n"] == 0
+    assert "## Theme A" in out.read_text()
+
+
+def test_main_themed_falls_back_without_model(changelog, monkeypatch, tmp_path):
+    fake = FakeGh(releases=RELEASES, info=INFO, body=BODY, prs=PRS)
+    monkeypatch.setattr(changelog, "_gh", fake)
+    monkeypatch.setattr(changelog, "generate_themes", lambda *a, **k: None)
+    out = tmp_path / "x.md"
+    index = tmp_path / "README.md"
+    assert (
+        changelog.main(
+            ["--tag", "2026.9.16", "--out", str(out), "--index", str(index), "--themed"]
+        )
+        == 0
+    )
+    text = out.read_text()
+    assert "## New features" in text
+    assert "changelog-themes" not in text
+
+
 def test_repo_docs_index_lists_every_release(changelog):
     releases_dir = SCRIPT.parents[2] / "docs" / "releases"
     index = (releases_dir / "README.md").read_text(encoding="utf-8")

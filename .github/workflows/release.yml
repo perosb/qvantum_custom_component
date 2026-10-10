@@ -35,7 +35,8 @@ jobs:
           python3 .github/scripts/generate_release_changelog.py \
             --tag "${{ github.event.release.tag_name }}" \
             --out "docs/releases/${{ github.event.release.tag_name }}.md" \
-            --polish
+            --polish \
+            --themed
 
       - name: Update manifest.json version to ${{ github.event.release.tag_name }}
         run: |

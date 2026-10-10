@@ -88,6 +88,21 @@ POLISH_PROMPT = (
     "code, Modbus or cloud. Output only the new paragraph, as a single paragraph."
 )
 
+# Themed grouping: the model returns JSON themes, the generator renders them.
+THEME_MODEL = POLISH_MODEL
+THEMED_MAX_TOKENS = 8000
+THEMED_PROMPT = (
+    "Below are the merged pull requests of a release for a Home Assistant integration "
+    "for Qvantum heat pumps, each with a short factual summary. Group them into 5-9 "
+    "themes for end users; merge related features and fixes into the same theme when "
+    "they belong together. For each theme return a short user-facing title, 1-3 "
+    "plain-language sentences for end users (no registers, code, file names or internal "
+    'terms), and the list of PR numbers that belong to it. Use every PR number exactly '
+    'once. Do not invent anything and do not drop any PR. Respond with JSON only: '
+    '{"themes": [{"title": "...", "body": "...", "prs": [123, 124]}]}'
+)
+_THEMES_COMMENT_RE = re.compile(r"<!-- changelog-themes: (.*?) -->")
+
 
 @dataclass(frozen=True)
 class PullRequest:
@@ -476,6 +491,34 @@ def existing_overview(path: Path) -> str | None:
     return "\n".join(collected).strip() or None
 
 
+def existing_themes(path: Path) -> list[dict] | None:
+    """Read themes persisted in the file's hidden comment, if any."""
+    path = Path(path)
+    if not path.exists():
+        return None
+    match = _THEMES_COMMENT_RE.search(path.read_text(encoding="utf-8"))
+    if not match:
+        return None
+    try:
+        data = json.loads(match.group(1))
+    except ValueError:
+        return None
+    themes = data.get("themes")
+    return themes if isinstance(themes, list) else None
+
+
+def themes_cover(themes: list[dict], pull_requests: list[PullRequest]) -> bool:
+    """True when every PR is referenced by at least one theme."""
+    known = {pull_request.number for pull_request in pull_requests}
+    covered = {
+        int(number)
+        for theme in themes
+        for number in theme.get("prs", [])
+        if str(number).lstrip("-").isdigit()
+    }
+    return known <= covered
+
+
 def generated_overview(features: list[PullRequest]) -> str:
     """Compose a fallback overview from the top feature titles."""
     if not features:
@@ -485,6 +528,54 @@ def generated_overview(features: list[PullRequest]) -> str:
     if len(features) > 3:
         text += f" Plus {len(features) - 3} more."
     return text
+
+
+def _openrouter_chat(
+    model: str,
+    prompt: str,
+    content: str,
+    *,
+    max_tokens: int,
+    timeout: int,
+) -> dict | None:
+    """Send one user message to OpenRouter and return the parsed response, or None."""
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        return None
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": f"{prompt}\n\n---\n\n{content}"}],
+        "max_tokens": max_tokens,
+        "temperature": 0.4,
+    }
+    request = urllib.request.Request(
+        OPENROUTER_URL,
+        data=json.dumps(payload).encode(),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.load(response)
+    except (urllib.error.URLError, OSError, ValueError) as error:
+        print(f"OpenRouter call skipped: {error}", file=sys.stderr)
+        return None
+
+
+def _first_choice(data: dict | None, label: str) -> str | None:
+    """Return the first choice's text, or None when missing or truncated."""
+    if data is None:
+        return None
+    try:
+        choice = data["choices"][0]
+        content = choice["message"]["content"]
+    except (KeyError, IndexError, TypeError) as error:
+        print(f"{label} skipped: {error}", file=sys.stderr)
+        return None
+    if choice.get("finish_reason") == "length":
+        print(f"{label} skipped: response truncated", file=sys.stderr)
+        return None
+    return (content or "").strip() or None
 
 
 def polish_overview(
@@ -502,34 +593,103 @@ def polish_overview(
     so the caller keeps the deterministic overview. The caller persists the result in
     the file, where :func:`existing_overview` preserves it on later regenerations.
     """
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        return None
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "user", "content": f"{POLISH_PROMPT}\n\n---\n\n{context or text}"}
-        ],
-        "max_tokens": POLISH_MAX_TOKENS,
-        "temperature": 0.4,
-    }
-    request = urllib.request.Request(
-        OPENROUTER_URL,
-        data=json.dumps(payload).encode(),
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        method="POST",
+    data = _openrouter_chat(
+        model, POLISH_PROMPT, context or text, max_tokens=POLISH_MAX_TOKENS, timeout=timeout
     )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            data = json.load(response)
-        choice = data["choices"][0]
-        content = choice["message"]["content"]
-        if choice.get("finish_reason") == "length":
-            raise ValueError("response truncated (finish_reason=length)")
-    except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError, TypeError) as error:
-        print(f"Overview polish skipped: {error}", file=sys.stderr)
+    return _first_choice(data, "Overview polish")
+
+
+def _pull_requests_digest(pull_requests: list[PullRequest]) -> str:
+    """Compact per-PR input for the theme model."""
+    blocks = []
+    for pull_request in pull_requests:
+        category = category_for(pull_request) or "internal"
+        prose = summary_to_prose(parse_summary(pull_request.body) or pull_request.title)
+        blocks.append(
+            f"#{pull_request.number} [{category}] {display_title(pull_request.title)}\n{prose}"
+        )
+    return "\n\n".join(blocks)
+
+
+def parse_themes(raw: str | None) -> list[dict] | None:
+    """Extract and validate the themes JSON from a model response."""
+    if not raw:
         return None
-    return (content or "").strip() or None
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start == -1 or end <= start:
+        return None
+    try:
+        data = json.loads(raw[start : end + 1])
+    except ValueError:
+        return None
+    raw_themes = data.get("themes")
+    if not isinstance(raw_themes, list):
+        return None
+    themes = []
+    for theme in raw_themes:
+        if not isinstance(theme, dict):
+            continue
+        title = str(theme.get("title") or "").strip()
+        body = str(theme.get("body") or "").strip()
+        numbers = theme.get("prs")
+        if not title or not body or not isinstance(numbers, list):
+            continue
+        parsed = []
+        for number in numbers:
+            try:
+                parsed.append(int(number))
+            except (TypeError, ValueError):
+                continue
+        if parsed:
+            themes.append({"title": title, "body": body, "prs": parsed})
+    return themes or None
+
+
+def complete_themes(themes: list[dict], pull_requests: list[PullRequest]) -> list[dict]:
+    """Keep every PR exactly once, appending a catch-all theme for any gap."""
+    known = {pull_request.number for pull_request in pull_requests}
+    seen: set[int] = set()
+    result = []
+    for theme in themes:
+        numbers = []
+        for number in theme["prs"]:
+            if number in known and number not in seen and number not in numbers:
+                numbers.append(number)
+        seen.update(numbers)
+        if numbers:
+            result.append({"title": theme["title"], "body": theme["body"], "prs": numbers})
+    missing = sorted(known - seen)
+    if missing:
+        result.append(
+            {
+                "title": "More changes",
+                "body": "Other fixes and improvements in this release.",
+                "prs": missing,
+            }
+        )
+    return result
+
+
+def generate_themes(
+    pull_requests: list[PullRequest],
+    *,
+    model: str = THEME_MODEL,
+    timeout: int = POLISH_TIMEOUT,
+) -> list[dict] | None:
+    """Group the release into end-user themes via OpenRouter; None on any failure."""
+    data = _openrouter_chat(
+        model,
+        THEMED_PROMPT,
+        _pull_requests_digest(pull_requests),
+        max_tokens=THEMED_MAX_TOKENS,
+        timeout=timeout,
+    )
+    themes = parse_themes(_first_choice(data, "Theme grouping"))
+    if not themes:
+        print("Theme grouping skipped: no valid themes", file=sys.stderr)
+        return None
+    return complete_themes(themes, pull_requests)
 
 
 def format_date(iso: str | None) -> str | None:
@@ -537,6 +697,22 @@ def format_date(iso: str | None) -> str | None:
     if not iso or iso.startswith("0001-"):
         return None
     return iso[:10]
+
+
+def render_themes(themes: list[dict], pull_requests: list[PullRequest]) -> str:
+    """Render the themed sections, each with its related PR links."""
+    by_number = {pull_request.number: pull_request for pull_request in pull_requests}
+    parts = []
+    for theme in themes:
+        parts.extend([f"## {theme['title']}", "", theme["body"], ""])
+        links = [
+            f"[#{number}]({by_number[number].url})"
+            for number in theme["prs"]
+            if number in by_number
+        ]
+        if links:
+            parts.extend([f"_Related: {', '.join(links)}_", ""])
+    return "\n".join(parts).rstrip()
 
 
 def render_release(
@@ -548,6 +724,7 @@ def render_release(
     pull_requests: list[PullRequest],
     callouts: str,
     overview: str | None,
+    themes: list[dict] | None = None,
 ) -> str:
     """Render the full markdown document for one release."""
     features = [pr for pr in pull_requests if category_for(pr) == NEW_FEATURES]
@@ -567,20 +744,23 @@ def render_release(
     if callouts:
         parts.extend([callouts, ""])
 
-    for heading, items in ((NEW_FEATURES, features), (BUG_FIXES, fixes)):
-        if not items:
-            continue
-        parts.extend([f"## {heading}", ""])
-        for pull_request in items:
-            parts.extend(
-                [
-                    f"### {display_title(pull_request.title)}"
-                    f" ([#{pull_request.number}]({pull_request.url}))",
-                    "",
-                    summary_to_prose(parse_summary(pull_request.body) or pull_request.title),
-                    "",
-                ]
-            )
+    if themes:
+        parts.extend([render_themes(themes, pull_requests), ""])
+    else:
+        for heading, items in ((NEW_FEATURES, features), (BUG_FIXES, fixes)):
+            if not items:
+                continue
+            parts.extend([f"## {heading}", ""])
+            for pull_request in items:
+                parts.extend(
+                    [
+                        f"### {display_title(pull_request.title)}"
+                        f" ([#{pull_request.number}]({pull_request.url}))",
+                        "",
+                        summary_to_prose(parse_summary(pull_request.body) or pull_request.title),
+                        "",
+                    ]
+                )
 
     if internal:
         numbers = ", ".join(f"#{pr.number}" for pr in internal)
@@ -673,6 +853,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Like --polish but ignore and replace an existing overview.",
     )
     parser.add_argument("--polish-model", default=POLISH_MODEL)
+    parser.add_argument(
+        "--themed",
+        action="store_true",
+        help="Group the release into themes via OpenRouter (falls back to New features/Bug fixes).",
+    )
+    parser.add_argument(
+        "--retheme",
+        action="store_true",
+        help="Like --themed but ignore and replace existing themes.",
+    )
+    parser.add_argument("--theme-model", default=THEME_MODEL)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
@@ -726,6 +917,16 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 or overview
             )
+    external = [pr for pr in pull_requests if category_for(pr) is not None]
+    themes = None
+    if args.themed or args.retheme:
+        if not args.retheme:
+            stored = existing_themes(out)
+            if stored and themes_cover(stored, external):
+                themes = stored
+        if themes is None:
+            themes = generate_themes(external, model=args.theme_model)
+
     content = render_release(
         repo=repo,
         tag=tag,
@@ -734,7 +935,15 @@ def main(argv: list[str] | None = None) -> int:
         pull_requests=pull_requests,
         callouts=callouts,
         overview=overview,
+        themes=themes,
     )
+    if themes is not None:
+        content = (
+            content.rstrip()
+            + "\n\n<!-- changelog-themes: "
+            + json.dumps({"themes": themes}, ensure_ascii=False, separators=(",", ":"))
+            + " -->\n"
+        )
 
     if args.dry_run:
         print(content)
