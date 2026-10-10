@@ -142,8 +142,9 @@ class QvantumCalculationsMixin:
         The counters advance in 0.1 kWh steps, so the delta over one poll is
         zero most of the time and a single-step ratio is a quantisation
         artefact. The calculation keeps a rolling window of counter samples and
-        publishes a ratio once the window holds measurable electrical input,
-        holding the last value until then.
+        publishes a ratio once the window holds measurable electrical input. The
+        last value is held across mode changes (a DHW charge must not blank the
+        heating figure) and only a counter reset or restart clears it.
 
         Space heating: only the electrical energy consumed while ``hp_status``
         is heating is divided into ``heatingenergy`` — the compressor/auxiliary
@@ -252,9 +253,7 @@ class QvantumCalculationsMixin:
 
         self._set_cop(
             values,
-            self._cop_last.get("cop_heating")
-            if hp_status == HP_STATUS_HEATING
-            else None,
+            self._cop_last.get("cop_heating"),
             self._cop_last.get("cop_dhw"),
         )
 

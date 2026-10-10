@@ -576,10 +576,11 @@ class QvantumCopSensor(QvantumBaseSensorEntity):
 
     Dimensionless: state class MEASUREMENT, no unit. The values are derived on
     the main coordinator each poll in both transports from a rolling window of
-    counter samples, and the last value is held while the window is too small to
-    be a measurement. The space-heating figure divides only heating-mode
-    electrical into the heating output; the DHW figure estimates production from
-    the tank balance (drawn energy plus stored-energy change) divided by
+    counter samples. The last value is held across mode changes and small
+    windows until a counter reset or restart; a DHW charge must not blank the
+    heating figure. The space-heating figure divides only heating-mode
+    electrical into the heating output; the DHW figure estimates production
+    from the tank balance (drawn energy plus stored-energy change) divided by
     DHW-mode electrical.
     """
 
