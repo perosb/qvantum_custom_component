@@ -623,6 +623,9 @@
       "cop_heating": {
         "name": "COP topení"
       },
+      "cop_dhw": {
+        "name": "COP teplá voda"
+      },
       "scop_total": {
         "name": "SCOP celkem (30 dní)"
       },

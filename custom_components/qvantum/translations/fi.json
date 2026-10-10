@@ -623,6 +623,9 @@
       "cop_heating": {
         "name": "COP lämmitys"
       },
+      "cop_dhw": {
+        "name": "COP käyttövesi"
+      },
       "scop_total": {
         "name": "SCOP yhteensä (30 päivää)"
       },

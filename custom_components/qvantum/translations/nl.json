@@ -623,6 +623,9 @@
       "cop_heating": {
         "name": "COP verwarming"
       },
+      "cop_dhw": {
+        "name": "COP warm water"
+      },
       "scop_total": {
         "name": "SCOP totaal (30 dagen)"
       },
