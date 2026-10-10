@@ -234,15 +234,20 @@ class TestCalculateCop:
 
         assert values["cop_heating"] is None
 
-    def test_publishes_only_while_heating(self):
+    def test_holds_heating_cop_across_mode_changes(self):
+        """A DHW charge must not blank the space-heating figure."""
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         calculator._calculate_cop(_values(heatingenergy=105.0, compressorenergy=41.0))
-        values = _values(heatingenergy=105.0, compressorenergy=41.0, hp_status=0)
+        values = _values(
+            heatingenergy=105.0,
+            compressorenergy=41.3,
+            hp_status=HP_STATUS_HOT_WATER,
+        )
 
         calculator._calculate_cop(values)
 
-        assert values["cop_heating"] is None
+        assert values["cop_heating"] == 5.0
 
     def test_holds_last_value_after_the_window_goes_idle(self):
         calculator = _Calculator()
