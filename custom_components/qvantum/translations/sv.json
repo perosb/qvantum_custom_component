@@ -623,12 +623,6 @@
       "cop_heating": {
         "name": "COP värme"
       },
-      "cop_dhw": {
-        "name": "COP varmvatten"
-      },
-      "cop_system": {
-        "name": "COP system"
-      },
       "scop_total": {
         "name": "SCOP totalt (30 dagar)"
       },

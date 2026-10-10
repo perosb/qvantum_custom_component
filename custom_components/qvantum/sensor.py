@@ -153,12 +153,13 @@ _CURVE_SENSOR_KEYS = frozenset(
     }
 )
 
-# Instantaneous COP lives on the main coordinator values (counter deltas).
-_COP_SENSOR_KEYS = frozenset({"cop_heating", "cop_dhw", "cop_system"})
+# Space-heating COP lives on the main coordinator values (counter deltas).
+# There is no instantaneous DHW/system COP: dhwenergy meters the DHW draw
+# (secondary side), not the compressor's DHW output, so it cannot be divided
+# into the compressor's electrical input over a short window.
+_COP_SENSOR_KEYS = frozenset({"cop_heating"})
 _COP_ICONS: dict[str, str] = {
     "cop_heating": "mdi:heat-pump",
-    "cop_dhw": "mdi:water-boiler",
-    "cop_system": "mdi:heat-pump-outline",
 }
 # Rolling efficiency figures come from the efficiency coordinator (recorder
 # stats). key -> icon, unit, display scale, precision. All are enabled by
@@ -360,8 +361,9 @@ async def async_setup_entry(
     sensors.append(QvantumDiagnosticEntity(coordinator, "latency", device, True))
     sensors.append(QvantumDiagnosticEntity(coordinator, "hpid", device, True))
     sensors.append(QvantumTimerEntity(coordinator, "tap_stop", device, True))
-    # Derived COP is a counter-delta ratio on the main coordinator and works in
-    # both transports (cloud and Modbus expose the four energy counters).
+    # Derived space-heating COP is a counter-delta ratio on the main
+    # coordinator and works in both transports (cloud and Modbus expose the
+    # four energy counters).
     for cop_key in sorted(_COP_SENSOR_KEYS):
         sensors.append(QvantumCopSensor(coordinator, cop_key, device, True))
     if coordinator.modbus_enabled:
@@ -567,13 +569,14 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
         )
 
 class QvantumCopSensor(QvantumBaseSensorEntity):
-    """Coefficient of performance from a rolling window of energy counters.
+    """Space-heating coefficient of performance from the energy counters.
 
     Dimensionless: state class MEASUREMENT, no unit. The value is derived on the
     main coordinator each poll in both transports from the cumulative energy
     counter deltas over a rolling window, and the last value is held while the
-    window is too small to be a measurement. ``hp_status`` decides which mode
-    figure is shown, so the attribute records the attribution method.
+    window is too small to be a measurement. Only electrical energy consumed
+    while the heat pump is heating is divided into the heating output, so DHW
+    charging cannot lower the figure.
     """
 
     _attr_state_class = SensorStateClass.MEASUREMENT

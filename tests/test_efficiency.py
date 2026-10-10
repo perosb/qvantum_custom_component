@@ -1,4 +1,4 @@
-"""Tests for pure efficiency math and the instantaneous COP calculation."""
+"""Tests for pure efficiency math and the space-heating COP calculation."""
 
 from __future__ import annotations
 
@@ -25,7 +25,9 @@ class _Calculator(QvantumCalculationsMixin):
 
     def __init__(self) -> None:
         self._last_cop_energies: dict[str, float] | None = None
-        self._cop_history: deque[tuple[datetime, dict[str, float]]] = deque()
+        self._cop_history: deque[tuple[datetime, dict[str, float], int | None]] = (
+            deque()
+        )
         self._cop_last: dict[str, float | None] = {}
 
 
@@ -130,25 +132,21 @@ class TestCalculateCop:
         calculator._calculate_cop(values)
 
         assert values["cop_heating"] is None
-        assert values["cop_dhw"] is None
-        assert values["cop_system"] is None
 
     def test_window_accumulates_until_electrical_is_measurable(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         first = _values(heatingenergy=100.1, compressorenergy=40.1)
         calculator._calculate_cop(first)
-        assert first["cop_system"] is None
+        assert first["cop_heating"] is None
 
         values = _values(heatingenergy=100.6, compressorenergy=40.2)
         calculator._calculate_cop(values)
 
         # Two compressor steps (0.2 kWh) against 0.6 kWh of heating energy.
         assert values["cop_heating"] == pytest.approx(3.0)
-        assert values["cop_dhw"] is None
-        assert values["cop_system"] == pytest.approx(3.0)
 
-    def test_heating_window_publishes_system_and_heating(self):
+    def test_heating_window_publishes_heating_cop(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         values = _values(heatingenergy=105.0, compressorenergy=41.0)
@@ -156,23 +154,38 @@ class TestCalculateCop:
         calculator._calculate_cop(values)
 
         assert values["cop_heating"] == 5.0
-        assert values["cop_dhw"] is None
-        assert values["cop_system"] == 5.0
 
-    def test_dhw_window_publishes_system_and_dhw(self):
+    def test_only_the_heating_cop_key_is_published(self):
+        """There is no metered DHW production, so no DHW/system figure."""
         calculator = _Calculator()
         calculator._calculate_cop(_values())
-        values = _values(
-            dhwenergy=53.0, compressorenergy=41.0, hp_status=HP_STATUS_HOT_WATER
-        )
+        values = _values(heatingenergy=105.0, compressorenergy=41.0)
 
         calculator._calculate_cop(values)
 
-        assert values["cop_heating"] is None
-        assert values["cop_dhw"] == 3.0
-        assert values["cop_system"] == 3.0
+        assert "cop_dhw" not in values
+        assert "cop_system" not in values
 
-    def test_idle_window_publishes_system_only(self):
+    def test_dhw_charging_does_not_lower_heating_cop(self):
+        """Electrical spent charging the DHW tank is not heating input."""
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        # A DHW charge: electrical advances, but no space-heating output.
+        charging = _values(
+            heatingenergy=100.0,
+            compressorenergy=40.3,
+            hp_status=HP_STATUS_HOT_WATER,
+        )
+        calculator._calculate_cop(charging)
+        assert charging["cop_heating"] is None
+
+        values = _values(heatingenergy=100.6, compressorenergy=40.5)
+        calculator._calculate_cop(values)
+
+        # Only the heating interval counts: 0.6 / 0.2, not 0.6 / 0.5.
+        assert values["cop_heating"] == pytest.approx(3.0)
+
+    def test_idle_window_does_not_publish(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         values = _values(heatingenergy=102.0, compressorenergy=41.0)
@@ -181,21 +194,16 @@ class TestCalculateCop:
         calculator._calculate_cop(values)
 
         assert values["cop_heating"] is None
-        assert values["cop_dhw"] is None
-        assert values["cop_system"] == 2.0
 
-    def test_mixed_window_cannot_attribute_a_heating_only_ratio(self):
+    def test_publishes_only_while_heating(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
-        values = _values(heatingenergy=106.0, dhwenergy=51.0, compressorenergy=42.0)
+        calculator._calculate_cop(_values(heatingenergy=105.0, compressorenergy=41.0))
+        values = _values(heatingenergy=105.0, compressorenergy=41.0, hp_status=0)
 
         calculator._calculate_cop(values)
 
-        # Both thermal counters advanced: the shared electrical side cannot be
-        # split, so only the system figure is a measurement.
         assert values["cop_heating"] is None
-        assert values["cop_dhw"] is None
-        assert values["cop_system"] == 3.5
 
     def test_holds_last_value_after_the_window_goes_idle(self):
         calculator = _Calculator()
@@ -226,7 +234,6 @@ class TestCalculateCop:
             calculator._calculate_cop(values)
 
         assert values["cop_heating"] == 5.0
-        assert values["cop_system"] == 5.0
 
     def test_window_drops_samples_older_than_the_window(self):
         calculator = _Calculator()
@@ -256,7 +263,7 @@ class TestCalculateCop:
 
         # Baseline is the t1 sample (+1.0 kWh heating, +0.3 kWh compressor),
         # not the t0 seed (+1.1 / +0.3).
-        assert values["cop_system"] == pytest.approx(10 / 3)
+        assert values["cop_heating"] == pytest.approx(10 / 3)
 
     def test_keeps_the_previous_sample_when_polls_exceed_the_window(self):
         """A poll interval longer than the window still yields a ratio."""
@@ -277,7 +284,6 @@ class TestCalculateCop:
             calculator._calculate_cop(values)
 
         assert values["cop_heating"] == 5.0
-        assert values["cop_system"] == 5.0
 
     def test_counter_reset_clears_published_values(self):
         calculator = _Calculator()
@@ -288,8 +294,6 @@ class TestCalculateCop:
         calculator._calculate_cop(values)
 
         assert values["cop_heating"] is None
-        assert values["cop_dhw"] is None
-        assert values["cop_system"] is None
         assert calculator._cop_last == {}
 
     def test_missing_counter_skips_without_advancing_state(self):
