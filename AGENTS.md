@@ -162,6 +162,10 @@ the stable that follows it share the same PRs. Regenerate a single release with:
 python3 .github/scripts/generate_release_changelog.py --tag <tag> --polish --themed --update-link
 ```
 
+A release mistakenly published as a pre-release (so its manifest and `qvantum.zip`
+were never bumped) is recovered with **Actions → Release → Run workflow** and the
+tag: it bumps `manifest.json`/`const.py` on `main` and rebuilds the zip asset.
+
 PR body:
 
 ```markdown
