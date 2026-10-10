@@ -245,7 +245,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # after a restart so the sensors do not blank while the window refills.
         self._cop_last_time: datetime | None = None
         self._last_persisted_cop_state: tuple | None = None
-        self._last_cop_persist_at: float = 0.0
+        # Below the interval so the first snapshot always writes, even when the
+        # host (and thus the monotonic clock) has just booted.
+        self._last_cop_persist_at: float = -COP_PERSIST_INTERVAL_SECONDS
         self._cop_store: Store = Store(
             hass, 1, f"{DOMAIN}.cop.{config_entry.entry_id}"
         )

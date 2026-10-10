@@ -2094,6 +2094,25 @@ class TestCopPersistence:
         mock_save.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_persist_cop_state_writes_right_after_boot(self):
+        """The first snapshot writes even when the host just booted."""
+        coordinator = self._make_coordinator()
+        coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
+        coordinator._cop_last_time = dt_util.utcnow()
+
+        # A monotonic clock below the throttle interval must not swallow the
+        # first write.
+        with (
+            patch("time.monotonic", return_value=10.0),
+            patch.object(
+                coordinator._cop_store, "async_save", new=AsyncMock()
+            ) as mock_save,
+        ):
+            await coordinator._persist_cop_state()
+
+        mock_save.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_persist_cop_state_throttles_until_the_interval(self):
         """A changed figure is not written again inside the throttle window."""
         coordinator = self._make_coordinator()
