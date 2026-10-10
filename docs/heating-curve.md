@@ -160,6 +160,7 @@ pump's current seven-point table (holding 24–30) as the baseline and computes
 | night/day | local sunrise/sunset (Home Assistant location); amplitude is a fraction of the forecast's diurnal supply swing (curve slope × outdoor range), bounded |
 | solar | self-calibrating `a`/`b`/`trust` model from recorder statistics (`heatingpower`, indoor, outdoor) plus Open-Meteo GHI history; gain in W → °C through the local baseline slope |
 | load | one-sided reduction when measured heating power is below the model demand at the target indoor temperature |
+| optional | COP feedback and/or cold-snap pre-charge, **off by default** — see [Optional terms](#optional-terms) |
 
 Indoor deviation from the target is a **cap** only (a warm house blocks upward
 adjustment, a cold house blocks downward), it never drives a term. Points are
@@ -201,15 +202,17 @@ Entities:
   curve numbers so they sort together, with `baseline`, `adjustment` and
   `trim` attributes.
 - `sensor.qvantum_adaptive_curve_adjustment` — the shared adjustment, with
-  `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `trims` and `clamped`
-  attributes.
+  `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `cop_c`, `precharge_c`,
+  `trims` and `clamped` attributes.
 - `sensor.qvantum_adaptive_curve_deviation` — computed supply at the measured
   outdoor minus `cal_heat_temp` (input 35), with `shadow`, `ready`, `blocker`
   and `baseline_auto` (baseline frozen while the pump was on Auto) attributes,
   plus `baseline_learned_hours`, `baseline_outdoor_min_c` and
-  `baseline_outdoor_max_c` from the last baseline fit.
+  `baseline_outdoor_max_c` from the last baseline fit. Diagnostic entity,
+  enabled by default.
 - `sensor.qvantum_adaptive_curve_solar_model` — model trust in %, with
   `a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque` and `r2_solar` diagnostics.
+  Diagnostic entity.
 - `switch.qvantum_adaptive_curve_control` — off = shadow, on = active writing.
   `qvantum.set_curve_control` with `mode: shadow|active` does the same from an
   automation.
@@ -222,7 +225,9 @@ absolute deviation ≤ 1.0 °C and no hourly deviation beyond 3.0 °C. The
 `blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
 `window`, `median`, `max`). `ready` is a signal, not an activation. `ready`
 also needs the deviation sensor enabled and the recorder running: without
-hourly statistics the window stays incomplete and `blocker` is `window`.
+hourly statistics the window stays incomplete and `blocker` is `window`. The
+deviation sensor is a Diagnostic entity and is enabled by default; disabling
+it turns the readiness signal off.
 
 Turning the switch on:
 
