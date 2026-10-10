@@ -207,6 +207,20 @@ def test_render_release_released(changelog, tmp_path):
     assert "## Chores" not in content
 
 
+def test_render_release_puts_callouts_last(changelog):
+    content = changelog.render_release(
+        repo="o/r",
+        tag="2026.10.1",
+        previous_tag="2026.9.16",
+        published_at="2026-10-05T19:03:08Z",
+        pull_requests=[_pr(changelog, number=1)],
+        callouts="> [!IMPORTANT]\n> Setup note.",
+        overview="A short overview.",
+    )
+    assert content.index("A short overview.") < content.index("## New features")
+    assert content.rstrip().endswith("> Setup note.")
+
+
 def test_render_release_internal_only_has_no_sections(changelog):
     content = changelog.render_release(
         repo="perosb/qvantum_custom_component",
@@ -668,6 +682,7 @@ def test_main_themed_writes_and_preserves(changelog, monkeypatch, tmp_path):
     assert "## Theme A" in text
     assert "## New features" not in text
     assert "changelog-themes" in text
+    assert "Theme A" in index.read_text()
     assert calls["n"] == 1
 
     # A second run reuses the stored themes and does not call the model again.

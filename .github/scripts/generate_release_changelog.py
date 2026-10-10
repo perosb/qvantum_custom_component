@@ -741,8 +741,6 @@ def render_release(
     parts = [f"# {tag}", "", metadata, ""]
     if overview:
         parts.extend([overview, ""])
-    if callouts:
-        parts.extend([callouts, ""])
 
     if themes:
         parts.extend([render_themes(themes, pull_requests), ""])
@@ -765,6 +763,9 @@ def render_release(
     if internal:
         numbers = ", ".join(f"#{pr.number}" for pr in internal)
         parts.extend(["---", "", INTERNAL_NOTE.format(numbers=numbers), ""])
+
+    if callouts:
+        parts.extend([callouts, ""])
 
     return "\n".join(parts).rstrip() + "\n"
 
@@ -951,7 +952,8 @@ def main(argv: list[str] | None = None) -> int:
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(content, encoding="utf-8")
-    update_index(Path(args.index), tag, published_at, highlights_for(pull_requests))
+    highlights = themes[0]["title"] if themes else highlights_for(pull_requests)
+    update_index(Path(args.index), tag, published_at, highlights)
     prune_superseded_prereleases(repo, out.parent, Path(args.index))
 
     if args.update_link and info is not None:
