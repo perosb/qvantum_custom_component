@@ -49,23 +49,28 @@ async def test_statistics_returns_empty_when_recorder_unavailable():
         )
 
 
-async def test_statistics_uses_executor_and_maps_errors():
+async def test_statistics_uses_recorder_executor_and_maps_errors():
     hass = MagicMock()
     start = datetime.now(timezone.utc)
     rows = {"sensor.x": [{"start": 100, "sum": 1.0}]}
-    hass.async_add_executor_job = AsyncMock(return_value=rows)
+    recorder = MagicMock()
+    recorder.async_add_executor_job = AsyncMock(return_value=rows)
 
-    with patch("homeassistant.components.recorder.get_instance", return_value=None):
+    with patch(
+        "homeassistant.components.recorder.get_instance", return_value=recorder
+    ):
         assert (
             await stats.async_statistics_during_period(
                 hass, {"sensor.x"}, start, types={"sum"}
             )
             == rows
         )
-    assert hass.async_add_executor_job.await_args.args[-1] == {"sum"}
+    assert recorder.async_add_executor_job.await_args.args[-1] == {"sum"}
 
-    hass.async_add_executor_job = AsyncMock(side_effect=OSError("db"))
-    with patch("homeassistant.components.recorder.get_instance", return_value=None):
+    recorder.async_add_executor_job = AsyncMock(side_effect=OSError("db"))
+    with patch(
+        "homeassistant.components.recorder.get_instance", return_value=recorder
+    ):
         assert (
             await stats.async_statistics_during_period(hass, {"sensor.x"}, start)
             == {}

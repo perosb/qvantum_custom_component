@@ -85,11 +85,11 @@ async def async_statistics_during_period(
     from homeassistant.components.recorder.statistics import statistics_during_period
 
     try:
-        get_instance(hass)
+        recorder = get_instance(hass)
     except (KeyError, RuntimeError):
         return {}
     try:
-        return await hass.async_add_executor_job(
+        return await recorder.async_add_executor_job(
             statistics_during_period,
             hass,
             start,
