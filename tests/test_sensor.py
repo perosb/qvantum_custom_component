@@ -789,9 +789,7 @@ class TestQvantumEfficiencySensors:
         return hass
 
     def test_cop_sensor_value_and_attributes(self, mock_coordinator, mock_device):
-        mock_coordinator.data["values"].update(
-            {"cop_heating": 4.2, "cop_dhw": None, "cop_system": 3.8, "hp_status": 3}
-        )
+        mock_coordinator.data["values"].update({"cop_heating": 4.2, "hp_status": 3})
         entity = QvantumCopSensor(mock_coordinator, "cop_heating", mock_device)
 
         assert entity.native_value == 4.2
@@ -803,7 +801,7 @@ class TestQvantumEfficiencySensors:
         )
 
     def test_cop_sensor_unavailable_without_value(self, mock_coordinator, mock_device):
-        entity = QvantumCopSensor(mock_coordinator, "cop_dhw", mock_device)
+        entity = QvantumCopSensor(mock_coordinator, "cop_heating", mock_device)
 
         assert entity.native_value is None
         assert entity.available is False
@@ -1004,7 +1002,7 @@ class TestQvantumEfficiencySensors:
             for entity in entities
             if isinstance(entity, QvantumEfficiencySensorEntity)
         }
-        assert cop_keys == {"cop_heating", "cop_dhw", "cop_system"}
+        assert cop_keys == {"cop_heating"}
         assert efficiency_keys == {
             "scop_total",
             "aux_heat_share",

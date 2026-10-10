@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import math
 from datetime import timedelta
+from itertools import pairwise
 from typing import Any, Callable
 
 from homeassistant.util import dt as dt_util
@@ -35,7 +36,6 @@ from .const import (
 from .efficiency import (
     COP_MIN_ELECTRICAL_KWH,
     COP_WINDOW_SECONDS,
-    MIN_THERMAL_KWH,
     cop_ratio,
     energy_delta,
 )
@@ -136,20 +136,19 @@ class QvantumCalculationsMixin:
         )
 
     def _calculate_cop(self, values: dict) -> None:
-        """Derive COP from the cumulative energy counters over a rolling window.
+        """Derive the space-heating COP from the cumulative energy counters.
 
-        The electrical counters (compressor + auxiliary) and the thermal
-        counters (heating + DHW) only advance in 0.1 kWh steps, so the delta
-        over one poll interval is zero most of the time and a ratio from a
-        single step would be a quantisation artefact. The calculation therefore
-        keeps a rolling window of counter samples and publishes a ratio once
-        the electrical input in the window is measurable; until then it holds
-        the last published value. ``hp_status`` names the running mode, so the
-        heating/DHW figure is only shown while that mode runs. The per-mode
-        figure is only valid for a window in which the other thermal counter
-        did not advance, because the compressor counter is not split by mode;
-        the system figure always uses the whole window. A counter reset drops
-        the window instead of showing a bogus ratio.
+        The counters advance in 0.1 kWh steps, so the delta over one poll is
+        zero most of the time and a single-step ratio is a quantisation
+        artefact. The calculation keeps a rolling window of counter samples and
+        publishes a ratio once the window holds measurable electrical input,
+        holding the last value until then. Only the electrical energy consumed
+        while ``hp_status`` is heating is divided into ``heatingenergy``: the
+        compressor/auxiliary counter is shared with DHW charging, so a window
+        that charged the tank must not lower the heating COP. ``dhwenergy`` is
+        the DHW draw meter (secondary side), not the compressor's DHW output,
+        so no instantaneous DHW or system COP is published from it. A counter
+        reset drops the window instead of showing a bogus ratio.
         """
         keys = (
             "heatingenergy",
@@ -167,23 +166,24 @@ class QvantumCalculationsMixin:
         now = dt_util.utcnow()
         previous = self._last_cop_energies
         self._last_cop_energies = current
+        hp_status = values.get("hp_status")
         history = self._cop_history
 
         if previous is None:
             # First observation only seeds the window.
             history.clear()
-            history.append((now, current))
+            history.append((now, current, hp_status))
             return
 
         if any(energy_delta(previous[key], current[key]) is None for key in keys):
             # A counter reset makes every accumulated delta unknown.
             history.clear()
             self._cop_last.clear()
-            history.append((now, current))
-            self._set_cop(values, None, None, None)
+            history.append((now, current, hp_status))
+            self._set_cop(values, None)
             return
 
-        history.append((now, current))
+        history.append((now, current, hp_status))
         cutoff = now - timedelta(seconds=COP_WINDOW_SECONDS)
         # Always keep the previous sample as the baseline: if the poll interval
         # exceeds the window, the window would otherwise trim down to the
@@ -191,56 +191,40 @@ class QvantumCalculationsMixin:
         while len(history) > 2 and history[0][0] < cutoff:
             history.popleft()
 
-        baseline = history[0][1]
-        # The counters are read as floats, so a window delta can land a hair
-        # below its nominal value (0.2 -> 0.19999999999999574). Rounding below
-        # the 0.1 kWh counter resolution keeps the threshold comparisons exact.
-        deltas = {key: round(current[key] - baseline[key], 6) for key in keys}
-        electrical = deltas["compressorenergy"] + deltas["additionalenergy"]
-        thermal_total = deltas["heatingenergy"] + deltas["dhwenergy"]
-
-        if electrical >= COP_MIN_ELECTRICAL_KWH:
-            # A window that saw DHW cannot attribute a heating-only ratio, and
-            # vice versa: the electrical side is shared.
-            cop_heating = (
-                cop_ratio(deltas["heatingenergy"], electrical)
-                if deltas["dhwenergy"] < MIN_THERMAL_KWH
-                else None
+        heating_thermal = 0.0
+        heating_electrical = 0.0
+        for (_, before, _), (_, after, mode) in pairwise(history):
+            if mode != HP_STATUS_HEATING:
+                continue
+            heating_thermal += after["heatingenergy"] - before["heatingenergy"]
+            heating_electrical += (
+                after["compressorenergy"]
+                + after["additionalenergy"]
+                - before["compressorenergy"]
+                - before["additionalenergy"]
             )
-            cop_dhw = (
-                cop_ratio(deltas["dhwenergy"], electrical)
-                if deltas["heatingenergy"] < MIN_THERMAL_KWH
-                else None
-            )
-            self._cop_last = {
-                "cop_heating": cop_heating,
-                "cop_dhw": cop_dhw,
-                "cop_system": cop_ratio(thermal_total, electrical),
-            }
 
-        hp_status = values.get("hp_status")
+        # The counters are read as floats, so a sum can land a hair below its
+        # nominal value (0.2 -> 0.19999999999999574). Rounding below the
+        # 0.1 kWh counter resolution keeps the threshold comparison exact.
+        heating_thermal = round(heating_thermal, 6)
+        heating_electrical = round(heating_electrical, 6)
+        if heating_electrical >= COP_MIN_ELECTRICAL_KWH:
+            self._cop_last["cop_heating"] = cop_ratio(
+                heating_thermal, heating_electrical
+            )
+
         self._set_cop(
             values,
             self._cop_last.get("cop_heating")
             if hp_status == HP_STATUS_HEATING
             else None,
-            self._cop_last.get("cop_dhw")
-            if hp_status == HP_STATUS_HOT_WATER
-            else None,
-            self._cop_last.get("cop_system"),
         )
 
     @staticmethod
-    def _set_cop(
-        values: dict,
-        cop_heating: float | None,
-        cop_dhw: float | None,
-        cop_system: float | None,
-    ) -> None:
-        """Publish (or clear) the instantaneous COP values."""
+    def _set_cop(values: dict, cop_heating: float | None) -> None:
+        """Publish (or clear) the space-heating COP."""
         values["cop_heating"] = cop_heating
-        values["cop_dhw"] = cop_dhw
-        values["cop_system"] = cop_system
 
     def _finalize_tap_water_session(self, *, tank_temp: float | None) -> None:
         """Finalize the current tap-water session and clear session state.

@@ -254,6 +254,11 @@ access, so no control is offered when a write would fail.
 - Interval-only option changes apply in place; host/port/unit/enablement reloads.
 - Do not invent endpoints or registers. Maps: `client/modbus/maps.py`.
   HTTP paths: `client/cloud/endpoints.py`.
+- Energy counters: `heatingenergy` is space-heating output, but `dhwenergy`
+  meters the DHW **draw** (secondary side), not the compressor's DHW output —
+  so there is no instantaneous DHW/system COP. The electrical counters
+  (`compressorenergy` + `additionalenergy`) are shared between modes; attribute
+  them by `hp_status` when a per-mode ratio is needed.
 - Adaptive-curve optional terms (COP feedback, cold-snap pre-charge) are off
   by default, persisted in the curve Store, and enabled via
   `qvantum.set_curve_terms`. They only apply while the curve is active and

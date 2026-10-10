@@ -195,8 +195,6 @@ _ENTITY_ICONS: dict[str, str] = {
     # Sensors
     "tap_water_cap": "mdi:account-group",
     "cop_heating": "mdi:heat-pump",
-    "cop_dhw": "mdi:water-boiler",
-    "cop_system": "mdi:heat-pump-outline",
     "scop_total": "mdi:chart-line",
     "aux_heat_share": "mdi:lightning-bolt-outline",
     "fanrpm": "mdi:fan",
