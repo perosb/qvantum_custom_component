@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - drafter
+    paths-ignore:
+      # A docs-only release-notes commit (pre-releases bump no manifest) must
+      # not re-trigger the drafter and create another draft with the same PRs.
+      - "docs/releases/**"
   pull_request:
     types: [opened, reopened, edited, synchronize]
 
