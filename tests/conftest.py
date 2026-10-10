@@ -158,6 +158,7 @@ def mock_coordinator():
     }
     coordinator.async_config_entry_first_refresh = AsyncMock()
     coordinator.async_restore_dhw_state = AsyncMock()
+    coordinator.async_restore_cop_state = AsyncMock()
 
     # Mock the maintenance coordinator for access level checking
     config_entry = Mock()

@@ -29,6 +29,7 @@ class _Calculator(QvantumCalculationsMixin):
             tuple[datetime, dict[str, float], int | None, float | None]
         ] = deque()
         self._cop_last: dict[str, float | None] = {}
+        self._cop_last_time: datetime | None = None
 
 
 def _values(**overrides):
@@ -115,7 +116,8 @@ class TestCalculateCop:
 
         calculator._calculate_cop(values)
 
-        assert "cop_heating" not in values
+        assert values["cop_heating"] is None
+        assert values["cop_dhw"] is None
         assert calculator._last_cop_energies == {
             "heatingenergy": 100.0,
             "dhwenergy": 50.0,
@@ -123,6 +125,17 @@ class TestCalculateCop:
             "additionalenergy": 10.0,
         }
         assert len(calculator._cop_history) == 1
+
+    def test_first_poll_publishes_a_restored_snapshot(self):
+        """A snapshot restored after a restart is shown immediately."""
+        calculator = _Calculator()
+        calculator._cop_last = {"cop_heating": 3.2, "cop_dhw": 1.4}
+        values = _values()
+
+        calculator._calculate_cop(values)
+
+        assert values["cop_heating"] == 3.2
+        assert values["cop_dhw"] == 1.4
 
     def test_quantised_single_step_does_not_publish(self):
         """One 0.1 kWh step is quantisation, not a measurement."""
@@ -155,6 +168,7 @@ class TestCalculateCop:
         calculator._calculate_cop(values)
 
         assert values["cop_heating"] == 5.0
+        assert calculator._cop_last_time is not None
 
     def test_no_short_window_system_cop(self):
         """A short window cannot publish a system COP from the draw meter."""
@@ -339,6 +353,7 @@ class TestCalculateCop:
 
         assert values["cop_heating"] is None
         assert calculator._cop_last == {}
+        assert calculator._cop_last_time is None
 
     def test_missing_counter_skips_without_advancing_state(self):
         calculator = _Calculator()

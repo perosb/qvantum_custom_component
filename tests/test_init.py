@@ -864,6 +864,7 @@ class TestIntegrationSetup:
         }
         mock_coordinator.async_config_entry_first_refresh = AsyncMock()
         mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_coordinator.async_restore_cop_state = AsyncMock()
         mock_config_entry.add_update_listener = MagicMock()
 
         mock_firmware_coordinator = MagicMock()
@@ -906,6 +907,7 @@ class TestIntegrationSetup:
         }
         mock_coordinator.async_config_entry_first_refresh = AsyncMock()
         mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_coordinator.async_restore_cop_state = AsyncMock()
         mock_config_entry.add_update_listener = MagicMock()
 
         with (
@@ -945,6 +947,7 @@ class TestIntegrationSetup:
         }
         mock_coordinator.async_config_entry_first_refresh = AsyncMock()
         mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_coordinator.async_restore_cop_state = AsyncMock()
         mock_config_entry.add_update_listener = MagicMock()
         unit = MagicMock()
         mock_firmware_coordinator = MagicMock()
@@ -1007,6 +1010,7 @@ class TestIntegrationSetup:
         }
         mock_coordinator.async_config_entry_first_refresh = AsyncMock()
         mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_coordinator.async_restore_cop_state = AsyncMock()
 
         mock_firmware_coordinator = MagicMock()
         mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock(
@@ -1047,6 +1051,7 @@ class TestIntegrationSetup:
         }
         mock_coordinator.async_config_entry_first_refresh = AsyncMock()
         mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_coordinator.async_restore_cop_state = AsyncMock()
 
         mock_firmware_coordinator = MagicMock()
         mock_firmware_coordinator.async_config_entry_first_refresh = AsyncMock(
@@ -1077,6 +1082,7 @@ class TestIntegrationSetup:
         mock_coordinator.data = {"device": {}}
         mock_coordinator.async_config_entry_first_refresh = AsyncMock(side_effect=[None, None])
         mock_coordinator.async_restore_dhw_state = AsyncMock()
+        mock_coordinator.async_restore_cop_state = AsyncMock()
 
         with patch("custom_components.qvantum.QvantumCloudClient", return_value=mock_api), patch("custom_components.qvantum.QvantumModbusClient", return_value=mock_api), \
             patch("custom_components.qvantum.QvantumDataUpdateCoordinator", return_value=mock_coordinator), \
