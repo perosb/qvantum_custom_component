@@ -57,6 +57,13 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Cache npm (pi)
+        if: steps.changed.outputs.tooling_only != 'true'
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: npm-pi-${{ runner.os }}-1.1.0
+
       - name: Install pi
         if: steps.changed.outputs.tooling_only != 'true'
         run: npm install -g @earendil-works/pi-coding-agent@1.1.0
