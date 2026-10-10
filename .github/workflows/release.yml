@@ -2,11 +2,17 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to rebuild and bump the manifest for (recovery)"
+        required: true
+        type: string
   release:
     types: [published]
 
 env:
   COMPONENT_DIR: qvantum
+  RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
 
 # Serialize with any other automation that writes to main.
 concurrency:
@@ -24,6 +30,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG || github.ref }}
           fetch-depth: 0
 
       - name: Generate release notes
@@ -33,19 +40,20 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           python3 .github/scripts/generate_release_changelog.py \
-            --tag "${{ github.event.release.tag_name }}" \
-            --out "docs/releases/${{ github.event.release.tag_name }}.md" \
+            --tag "${{ env.RELEASE_TAG }}" \
+            --out "docs/releases/${{ env.RELEASE_TAG }}.md" \
             --polish \
             --themed
 
-      # A pre-release must not move the manifest / VERSION on main.
-      - name: Update manifest.json version to ${{ github.event.release.tag_name }}
-        if: github.event_name == 'release' && !github.event.release.prerelease
+      # A pre-release must not move the manifest / VERSION on main. A manual
+      # (workflow_dispatch) run is an explicit recovery for a stable release.
+      - name: Update manifest.json version to ${{ env.RELEASE_TAG }}
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && !github.event.release.prerelease)
         run: |
-          python3 ${{ github.workspace }}/.github/scripts/update_hacs_manifest.py --version ${{ github.event.release.tag_name }} --path /custom_components/qvantum/
+          python3 ${{ github.workspace }}/.github/scripts/update_hacs_manifest.py --version ${{ env.RELEASE_TAG }} --path /custom_components/qvantum/
 
       - name: Set up SSH deploy key
-        if: github.event_name == 'release'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
         uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
@@ -53,7 +61,7 @@ jobs:
       # Build the commit on top of origin/main (fast-forward) and push over SSH,
       # so the repository rule requiring pull requests does not reject it.
       - name: Commit manifest and release notes
-        if: github.event_name == 'release'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan github.com >> ~/.ssh/known_hosts
@@ -61,7 +69,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if [ "${{ github.event.release.prerelease }}" != "true" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.release.prerelease }}" != "true" ]; then
             git add ./custom_components/qvantum/manifest.json ./custom_components/qvantum/const.py
           fi
           if [ -d docs/releases ]; then
@@ -73,10 +81,10 @@ jobs:
             exit 0
           fi
 
-          if [ "${{ github.event.release.prerelease }}" = "true" ]; then
-            git commit -m "docs: release notes for ${{ github.event.release.tag_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.release.prerelease }}" != "true" ]; then
+            git commit -m "Update for new version ${{ env.RELEASE_TAG }}"
           else
-            git commit -m "Update for new version ${{ github.event.release.tag_name }}"
+            git commit -m "docs: release notes for ${{ env.RELEASE_TAG }}"
           fi
 
           git fetch origin main
@@ -89,7 +97,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 .github/scripts/generate_release_changelog.py \
-            --tag "${{ github.event.release.tag_name }}" \
+            --tag "${{ env.RELEASE_TAG }}" \
             --link-only
 
       - name: Create zip
@@ -103,5 +111,5 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./custom_components/qvantum/qvantum.zip
           asset_name: qvantum.zip
-          tag: ${{ github.ref }}
+          tag: ${{ env.RELEASE_TAG }}
           overwrite: true
