@@ -48,8 +48,8 @@ INTERNAL_NOTE = (
 INDEX_HEADER = """\
 # Release notes
 
-One file per release, named after the tag. Each file expands every merged PR
-into a short paragraph grouped by type, and is the source of truth for the
+One file per release, named after the tag. Each file summarizes every merged PR,
+grouped into end-user themes, and is the source of truth for the overview and
 link added to the GitHub release body.
 
 | Version | Released | Highlights |
