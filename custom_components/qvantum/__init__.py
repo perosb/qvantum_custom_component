@@ -310,6 +310,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         hass, config_entry, client=client, extra_dhw=extra_dhw
     )
     await coordinator.async_restore_dhw_state()
+    await coordinator.async_restore_cop_state()
     await coordinator.async_config_entry_first_refresh()
 
     # HTTP mode needs live cloud metadata. Modbus mode only needs a device id

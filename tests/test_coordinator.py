@@ -19,6 +19,7 @@ from custom_components.qvantum.client.exceptions import (
     RateLimitError,
     TransportError,
 )
+from custom_components.qvantum.efficiency import COP_WINDOW_SECONDS
 from custom_components.qvantum.const import (
     DHW_MODE_EXTRA,
     DHW_MODE_NORMAL,
@@ -1995,6 +1996,138 @@ class TestCalculateDhwPower:
             coordinator._calculate_dhw_power(values)
 
         assert values["dhwpower"] == 240.0
+
+
+class TestCopPersistence:
+    """Tests for the COP restart snapshot."""
+
+    def _make_coordinator(self):
+        with patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__",
+            return_value=None,
+        ):
+            mock_hass = MagicMock()
+            mock_hass.data = {DOMAIN: MagicMock()}
+            mock_config_entry = MagicMock()
+            mock_config_entry.options.get.side_effect = lambda key, default=None: default
+            mock_config_entry.data = {}
+            mock_config_entry.unique_id = "test_device_123"
+            coordinator = QvantumDataUpdateCoordinator(
+                mock_hass, mock_config_entry, client=make_client_mock()
+            )
+            coordinator.data = None
+        return coordinator
+
+    @pytest.mark.asyncio
+    async def test_restore_recent_snapshot(self):
+        """A recent snapshot is loaded into the held COP figures."""
+        coordinator = self._make_coordinator()
+        stored = {
+            "updated_at": dt_util.utcnow().isoformat(),
+            "cop_heating": 3.5,
+            "cop_dhw": 1.7,
+        }
+        with patch.object(coordinator._cop_store, "async_load", return_value=stored):
+            await coordinator.async_restore_cop_state()
+        assert coordinator._cop_last == {"cop_heating": 3.5, "cop_dhw": 1.7}
+        assert coordinator._cop_last_time is not None
+
+    @pytest.mark.asyncio
+    async def test_restore_stale_snapshot_is_ignored(self):
+        """A snapshot older than the rolling window is not reused."""
+        coordinator = self._make_coordinator()
+        old = dt_util.utcnow() - timedelta(seconds=COP_WINDOW_SECONDS + 60)
+        stored = {
+            "updated_at": old.isoformat(),
+            "cop_heating": 3.5,
+            "cop_dhw": 1.7,
+        }
+        with patch.object(coordinator._cop_store, "async_load", return_value=stored):
+            await coordinator.async_restore_cop_state()
+        assert coordinator._cop_last == {}
+
+    @pytest.mark.asyncio
+    async def test_restore_empty_or_error_leaves_empty(self):
+        """Missing or corrupt storage leaves the figures empty."""
+        coordinator = self._make_coordinator()
+        with patch.object(coordinator._cop_store, "async_load", return_value=None):
+            await coordinator.async_restore_cop_state()
+        with patch.object(
+            coordinator._cop_store, "async_load", side_effect=Exception("disk")
+        ):
+            await coordinator.async_restore_cop_state()
+        assert coordinator._cop_last == {}
+
+    @pytest.mark.asyncio
+    async def test_restore_malformed_snapshot_is_ignored(self):
+        """Non-dict, bad timestamp and naive timestamp payloads are rejected."""
+        coordinator = self._make_coordinator()
+        for stored in (
+            [],
+            {"updated_at": 123, "cop_heating": 3.5},
+            {"updated_at": "not-a-date", "cop_heating": 3.5},
+            {"updated_at": "2026-10-10T00:00:00", "cop_heating": 3.5},
+            {"cop_heating": 3.5},
+        ):
+            with patch.object(
+                coordinator._cop_store, "async_load", return_value=stored
+            ):
+                await coordinator.async_restore_cop_state()
+        assert coordinator._cop_last == {}
+
+    def test_persist_cop_state_schedules_once_and_guards(self):
+        """The snapshot is scheduled once and skipped while unchanged."""
+        coordinator = self._make_coordinator()
+        coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
+        coordinator._cop_last_time = dt_util.utcnow()
+
+        with patch.object(
+            coordinator._cop_store, "async_delay_save"
+        ) as mock_delay_save:
+            coordinator._persist_cop_state()
+            coordinator._persist_cop_state()
+
+        mock_delay_save.assert_called_once()
+
+    def test_persist_cop_state_payload(self):
+        """The scheduled payload carries the timestamp and both figures."""
+        coordinator = self._make_coordinator()
+        coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": 1.7}
+        coordinator._cop_last_time = datetime(
+            2026, 10, 10, 7, 0, tzinfo=timezone.utc
+        )
+        captured = {}
+        with patch.object(
+            coordinator._cop_store,
+            "async_delay_save",
+            side_effect=lambda data_func, delay: captured.update(data_func()),
+        ):
+            coordinator._persist_cop_state()
+        assert captured == {
+            "updated_at": "2026-10-10T07:00:00+00:00",
+            "cop_heating": 3.5,
+            "cop_dhw": 1.7,
+        }
+
+    def test_persist_cop_state_without_time_is_a_noop(self):
+        coordinator = self._make_coordinator()
+        with patch.object(
+            coordinator._cop_store, "async_delay_save"
+        ) as mock_delay_save:
+            coordinator._persist_cop_state()
+        mock_delay_save.assert_not_called()
+
+    def test_persist_cop_state_error_is_swallowed(self):
+        coordinator = self._make_coordinator()
+        coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
+        coordinator._cop_last_time = dt_util.utcnow()
+        with patch.object(
+            coordinator._cop_store,
+            "async_delay_save",
+            side_effect=Exception("schedule"),
+        ):
+            coordinator._persist_cop_state()
+        assert coordinator._last_persisted_cop_state is None
 
 
 class TestCalculateTapWaterCap:

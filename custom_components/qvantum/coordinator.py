@@ -40,6 +40,7 @@ from .client.protocol import (
 from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
 from .calculations import QvantumCalculationsMixin
 from .client.constants import alias_heating_curve_settings
+from .efficiency import COP_WINDOW_SECONDS
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
@@ -236,6 +237,13 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         ] = deque()
         # Last published COP figures, held while the current window is too small.
         self._cop_last: dict[str, float | None] = {}
+        # When the figures were last computed; a recent snapshot is restored
+        # after a restart so the sensors do not blank while the window refills.
+        self._cop_last_time: datetime | None = None
+        self._last_persisted_cop_state: tuple | None = None
+        self._cop_store: Store = Store(
+            hass, 1, f"{DOMAIN}.cop.{config_entry.entry_id}"
+        )
         self._last_shower_cold_temp: float | None = None
         self._last_shower_flow_lpm: float | None = None
         self._last_shower_temp_c: float | None = (
@@ -425,6 +433,43 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._last_shower_duration_min or 0.0,
                 self._last_tap_water_cap or 0.0,
             )
+
+    async def async_restore_cop_state(self) -> None:
+        """Restore the last COP snapshot after a restart.
+
+        Only a recent snapshot is reused: a value older than the rolling window
+        says nothing about current operation, so the sensors start unavailable
+        and refill instead. Errors are swallowed so a bad store file never
+        blocks setup.
+        """
+        try:
+            data = await self._cop_store.async_load()
+        except Exception:
+            _LOGGER.warning(
+                "Failed to load COP state from storage; starting fresh",
+                exc_info=True,
+            )
+            return
+        if not isinstance(data, dict):
+            return
+        stored_at = data.get("updated_at")
+        if not isinstance(stored_at, str):
+            return
+        try:
+            updated_at = datetime.fromisoformat(stored_at)
+        except ValueError:
+            return
+        if updated_at.tzinfo is None:
+            return
+        age = (dt_util.utcnow() - updated_at).total_seconds()
+        if age < 0 or age > COP_WINDOW_SECONDS:
+            return
+        self._cop_last = {
+            "cop_heating": self._coerce_store_number(data.get("cop_heating")),
+            "cop_dhw": self._coerce_store_number(data.get("cop_dhw")),
+        }
+        self._cop_last_time = updated_at
+        _LOGGER.debug("Restored COP snapshot (age %.0f s)", age)
 
     @staticmethod
     def _coerce_store_number(
@@ -657,6 +702,43 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             self._last_persisted_dhw_state = current_state
         except Exception:
             _LOGGER.warning("Failed to schedule DHW state persistence", exc_info=True)
+
+    def _persist_cop_state(self) -> None:
+        """Save the last COP snapshot via a debounced write.
+
+        The figures change every poll while the pump runs, so the write delay is
+        longer than the DHW store's: a restart may restore a few minutes-old
+        value, which is still well inside the rolling window. Failures are
+        swallowed so they cannot break the poll.
+        """
+        if self._cop_last_time is None:
+            return
+        current_state = (
+            self._rounded_cop("cop_heating"),
+            self._rounded_cop("cop_dhw"),
+            self._cop_last_time,
+        )
+        if current_state == self._last_persisted_cop_state:
+            return
+        try:
+            self._cop_store.async_delay_save(
+                lambda: {
+                    "updated_at": self._cop_last_time.isoformat()
+                    if self._cop_last_time
+                    else None,
+                    "cop_heating": self._cop_last.get("cop_heating"),
+                    "cop_dhw": self._cop_last.get("cop_dhw"),
+                },
+                delay=300,
+            )
+            self._last_persisted_cop_state = current_state
+        except Exception:
+            _LOGGER.warning("Failed to schedule COP state persistence", exc_info=True)
+
+    def _rounded_cop(self, key: str) -> float | None:
+        """Round a held COP figure for change detection, rejecting non-numbers."""
+        value = self._cop_last.get(key)
+        return round(value, 4) if isinstance(value, (int, float)) else None
 
     @property
     def device_id(self) -> str | None:
@@ -1222,6 +1304,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
             self._derive_tap_water_capacity(values)
             self._calculate_cop(values)
+            self._persist_cop_state()
 
             if self.modbus_enabled:
                 self._calculate_heating_power(values)
