@@ -1128,17 +1128,22 @@ async def test_statistics_returns_empty_without_ids_or_recorder() -> None:
         assert await coordinator._async_statistics({"sensor.x"}, start) == {}
 
 
-async def test_statistics_uses_executor_and_maps_errors() -> None:
+async def test_statistics_uses_recorder_executor_and_maps_errors() -> None:
     coordinator = make_coordinator()
     start = datetime.now(timezone.utc)
     rows = {"sensor.x": [{"start": 100, "mean": 1.0}]}
-    coordinator.hass.async_add_executor_job = AsyncMock(return_value=rows)
+    recorder = MagicMock()
+    recorder.async_add_executor_job = AsyncMock(return_value=rows)
 
-    with patch("homeassistant.components.recorder.get_instance", return_value=None):
+    with patch(
+        "homeassistant.components.recorder.get_instance", return_value=recorder
+    ):
         assert await coordinator._async_statistics({"sensor.x"}, start) == rows
 
-    coordinator.hass.async_add_executor_job = AsyncMock(side_effect=OSError("db"))
-    with patch("homeassistant.components.recorder.get_instance", return_value=None):
+    recorder.async_add_executor_job = AsyncMock(side_effect=OSError("db"))
+    with patch(
+        "homeassistant.components.recorder.get_instance", return_value=recorder
+    ):
         assert await coordinator._async_statistics({"sensor.x"}, start) == {}
 
 
