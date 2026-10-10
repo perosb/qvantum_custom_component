@@ -39,6 +39,7 @@ from .const import (
     CURRENT_METRICS,
     PRESSURE_METRICS,
 )
+from .efficiency import COP_WINDOW_SECONDS
 from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
@@ -566,11 +567,13 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
         )
 
 class QvantumCopSensor(QvantumBaseSensorEntity):
-    """Instantaneous coefficient of performance (counter-delta ratio).
+    """Coefficient of performance from a rolling window of energy counters.
 
     Dimensionless: state class MEASUREMENT, no unit. The value is derived on the
-    main coordinator each poll in both transports; ``hp_status`` decides which
-    mode figure is published, so the attribute records the attribution method.
+    main coordinator each poll in both transports from the cumulative energy
+    counter deltas over a rolling window, and the last value is held while the
+    window is too small to be a measurement. ``hp_status`` decides which mode
+    figure is shown, so the attribute records the attribution method.
     """
 
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -588,10 +591,11 @@ class QvantumCopSensor(QvantumBaseSensorEntity):
 
     @property
     def extra_state_attributes(self):
-        """Return how the instantaneous ratio was attributed."""
+        """Return how the ratio was attributed."""
         return {
             "hp_status": self._values.get("hp_status"),
-            "attribution": "energy-counter delta over one poll interval",
+            "attribution": "energy-counter delta over a rolling window",
+            "window_seconds": COP_WINDOW_SECONDS,
         }
 
 

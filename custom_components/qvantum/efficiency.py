@@ -7,7 +7,7 @@ an efficiency figure that is silently wrong is worse than no figure at all.
 
 The energy counters are cumulative kWh meters available in both transports
 (``heatingenergy``, ``dhwenergy``, ``compressorenergy``, ``additionalenergy``).
-Instantaneous COP is a ratio of counter deltas over one poll interval; rolling
+Instantaneous COP is a ratio of counter deltas over a rolling window; rolling
 SCOP is a ratio of long-term-statistics sums over weeks.
 """
 
@@ -24,6 +24,17 @@ MIN_ELECTRICAL_KWH = 1e-6
 
 #: Thermal deltas below this are ignored for the same reason.
 MIN_THERMAL_KWH = 1e-6
+
+#: Instantaneous COP is averaged over a rolling window of counter samples.
+#: A window (not one poll interval) is required because the kWh counters
+#: advance in 0.1 kWh steps, so a single-poll delta is zero most of the time
+#: and a one-step ratio would be a quantisation artefact.
+COP_WINDOW_SECONDS = 3600.0
+
+#: Minimum electrical input in the window before the ratio is a measurement.
+#: Two counter steps are enough to get past the 0.1 kWh quantisation; the
+#: window keeps growing until the full COP_WINDOW_SECONDS is reached.
+COP_MIN_ELECTRICAL_KWH = 0.2
 
 
 def _finite(value: object) -> float | None:
