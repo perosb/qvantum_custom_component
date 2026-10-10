@@ -367,7 +367,8 @@ def category_for(pull_request: PullRequest) -> str | None:
         return BUG_FIXES
     if "enhancement" in labels:
         return NEW_FEATURES
-    prefix = pull_request.title.split(":", 1)[0].strip().lower()
+    match = _TITLE_PREFIX_RE.match(pull_request.title)
+    prefix = match.group(1).lower() if match else ""
     return _TITLE_PREFIX_CATEGORY.get(prefix)
 
 

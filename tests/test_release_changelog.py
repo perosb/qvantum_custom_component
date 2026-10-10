@@ -136,6 +136,15 @@ def test_category_for_falls_back_to_title_prefix(changelog):
         changelog.category_for(_pr(changelog, title="perf: x", labels=()))
         == changelog.NEW_FEATURES
     )
+    # Scoped conventional titles must not fall through to the internal line.
+    assert (
+        changelog.category_for(_pr(changelog, title="feat(modbus): x", labels=(("chore"),)))
+        == changelog.NEW_FEATURES
+    )
+    assert (
+        changelog.category_for(_pr(changelog, title="fix(curve): x", labels=("docs",)))
+        == changelog.BUG_FIXES
+    )
     assert changelog.category_for(_pr(changelog, title="chore: x", labels=())) is None
 
 
