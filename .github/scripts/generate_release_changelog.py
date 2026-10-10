@@ -4,8 +4,7 @@
 The output lives in ``docs/releases/<tag>.md`` (one file per release) and is the
 source of truth for the link added to the GitHub release body. It is generated:
 
-* on every merge to ``main``, for the in-progress draft/next version;
-* on publish (including pre-releases), for the released tag;
+* on publish — stable and pre-release, never drafts — for the released tag;
 * manually, to backfill a historical release.
 
 GitHub access is isolated in :func:`_gh` so every rendering helper stays pure and
@@ -308,9 +307,22 @@ def parse_summary(body: str) -> str | None:
 
 
 def summary_to_prose(summary: str) -> str:
-    """Turn a bulleted PR summary into a prose paragraph (nested bullets kept)."""
+    """Turn a bulleted PR summary into a prose paragraph (nested bullets kept).
+
+    PR bodies are usually hard-wrapped, so a line without a bullet marker is a
+    continuation of the previous item (the previous paragraph line or the last
+    nested bullet) and must be joined with a space, not treated as new text.
+    """
     paragraph: list[str] = []
     nested: list[str] = []
+    last_target: list[str] | None = None
+
+    def _continue(target: list[str], text: str) -> None:
+        if target:
+            target[-1] = f"{target[-1]} {text}"
+        else:
+            target.append(text)
+
     for raw in summary.splitlines():
         line = raw.rstrip()
         if not line.strip():
@@ -322,11 +334,13 @@ def summary_to_prose(summary: str) -> str:
             text = bullet.group(1).strip()
             if indent > 0:
                 nested.append(text)
-                continue
-        elif indent > 0:
-            nested.append(text)
+                last_target = nested
+            else:
+                paragraph.append(text)
+                last_target = paragraph
             continue
-        paragraph.append(text)
+        _continue(last_target if last_target is not None else paragraph, text)
+
     if not paragraph and nested:
         paragraph, nested = nested, []
     sentences = []

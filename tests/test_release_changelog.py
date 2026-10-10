@@ -83,6 +83,35 @@ def test_summary_to_prose_promotes_nested_when_no_lead(changelog):
     assert changelog.summary_to_prose("  - only nested") == "only nested."
 
 
+def test_summary_to_prose_joins_hard_wrapped_continuations(changelog):
+    summary = (
+        "Reduces the hardcoding by deriving the\n"
+        "remaining knobs from weather data.\n\n"
+        "- **Baseline** While\n"
+        "  the pump is on Auto, it corrects the table.\n"
+        "- **Night term** scales with the\n"
+        "  forecast's diurnal swing."
+    )
+    assert changelog.summary_to_prose(summary) == (
+        "Reduces the hardcoding by deriving the remaining knobs from weather data. "
+        "**Baseline** While the pump is on Auto, it corrects the table. "
+        "**Night term** scales with the forecast's diurnal swing."
+    )
+
+
+def test_summary_to_prose_joins_nested_continuations(changelog):
+    summary = "- lead\n  - nested line\n    continues here\n  - second nested"
+    assert changelog.summary_to_prose(summary) == (
+        "lead.\n\n- nested line continues here\n- second nested"
+    )
+
+
+def test_summary_to_prose_top_level_continuation_after_nested(changelog):
+    summary = "- a\n  - n1\n- b\n  continued b"
+    # The continuation belongs to the top-level bullet, not the last nested one.
+    assert changelog.summary_to_prose(summary) == "a. b continued b.\n\n- n1"
+
+
 def test_display_title_strips_conventional_prefix(changelog):
     assert changelog.display_title("feat(scope): Add thing") == "Add thing"
     assert changelog.display_title("fix: Fix thing") == "Fix thing"
