@@ -2075,58 +2075,111 @@ class TestCopPersistence:
                 await coordinator.async_restore_cop_state()
         assert coordinator._cop_last == {}
 
-    def test_persist_cop_state_schedules_once_and_guards(self):
-        """The snapshot is scheduled once and skipped while unchanged."""
+    @pytest.mark.asyncio
+    async def test_persist_cop_state_writes_and_guards(self):
+        """The snapshot is written once and skipped while unchanged."""
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
         coordinator._cop_last_time = dt_util.utcnow()
 
-        with patch.object(
-            coordinator._cop_store, "async_delay_save"
-        ) as mock_delay_save:
-            coordinator._persist_cop_state()
-            coordinator._persist_cop_state()
+        with (
+            patch("time.monotonic", return_value=1000.0),
+            patch.object(
+                coordinator._cop_store, "async_save", new=AsyncMock()
+            ) as mock_save,
+        ):
+            await coordinator._persist_cop_state()
+            await coordinator._persist_cop_state()
 
-        mock_delay_save.assert_called_once()
+        mock_save.assert_awaited_once()
 
-    def test_persist_cop_state_payload(self):
-        """The scheduled payload carries the timestamp and both figures."""
+    @pytest.mark.asyncio
+    async def test_persist_cop_state_writes_right_after_boot(self):
+        """The first snapshot writes even when the host just booted."""
+        coordinator = self._make_coordinator()
+        coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
+        coordinator._cop_last_time = dt_util.utcnow()
+
+        # A monotonic clock below the throttle interval must not swallow the
+        # first write.
+        with (
+            patch("time.monotonic", return_value=10.0),
+            patch.object(
+                coordinator._cop_store, "async_save", new=AsyncMock()
+            ) as mock_save,
+        ):
+            await coordinator._persist_cop_state()
+
+        mock_save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_persist_cop_state_throttles_until_the_interval(self):
+        """A changed figure is not written again inside the throttle window."""
+        coordinator = self._make_coordinator()
+        coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
+        coordinator._cop_last_time = dt_util.utcnow()
+
+        with (
+            patch("time.monotonic", side_effect=[1000.0, 1100.0, 1301.0]),
+            patch.object(
+                coordinator._cop_store, "async_save", new=AsyncMock()
+            ) as mock_save,
+        ):
+            await coordinator._persist_cop_state()
+            coordinator._cop_last["cop_heating"] = 3.6
+            await coordinator._persist_cop_state()  # throttled
+            coordinator._cop_last["cop_heating"] = 3.7
+            await coordinator._persist_cop_state()  # past the window
+
+        assert mock_save.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_persist_cop_state_payload(self):
+        """The payload carries the timestamp and both figures."""
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": 1.7}
         coordinator._cop_last_time = datetime(
             2026, 10, 10, 7, 0, tzinfo=timezone.utc
         )
-        captured = {}
-        with patch.object(
-            coordinator._cop_store,
-            "async_delay_save",
-            side_effect=lambda data_func, delay: captured.update(data_func()),
+        with (
+            patch("time.monotonic", return_value=1000.0),
+            patch.object(
+                coordinator._cop_store, "async_save", new=AsyncMock()
+            ) as mock_save,
         ):
-            coordinator._persist_cop_state()
-        assert captured == {
-            "updated_at": "2026-10-10T07:00:00+00:00",
-            "cop_heating": 3.5,
-            "cop_dhw": 1.7,
-        }
+            await coordinator._persist_cop_state()
 
-    def test_persist_cop_state_without_time_is_a_noop(self):
+        mock_save.assert_awaited_once_with(
+            {
+                "updated_at": "2026-10-10T07:00:00+00:00",
+                "cop_heating": 3.5,
+                "cop_dhw": 1.7,
+            }
+        )
+
+    @pytest.mark.asyncio
+    async def test_persist_cop_state_without_time_is_a_noop(self):
         coordinator = self._make_coordinator()
         with patch.object(
-            coordinator._cop_store, "async_delay_save"
-        ) as mock_delay_save:
-            coordinator._persist_cop_state()
-        mock_delay_save.assert_not_called()
+            coordinator._cop_store, "async_save", new=AsyncMock()
+        ) as mock_save:
+            await coordinator._persist_cop_state()
+        mock_save.assert_not_awaited()
 
-    def test_persist_cop_state_error_is_swallowed(self):
+    @pytest.mark.asyncio
+    async def test_persist_cop_state_error_is_swallowed(self):
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
         coordinator._cop_last_time = dt_util.utcnow()
-        with patch.object(
-            coordinator._cop_store,
-            "async_delay_save",
-            side_effect=Exception("schedule"),
+        with (
+            patch("time.monotonic", return_value=1000.0),
+            patch.object(
+                coordinator._cop_store,
+                "async_save",
+                new=AsyncMock(side_effect=Exception("disk")),
+            ),
         ):
-            coordinator._persist_cop_state()
+            await coordinator._persist_cop_state()
         assert coordinator._last_persisted_cop_state is None
 
 

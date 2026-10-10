@@ -72,6 +72,10 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+#: Minimum seconds between COP snapshot writes. The figures change every poll,
+#: so the store is throttled directly instead of waiting for a quiet period.
+COP_PERSIST_INTERVAL_SECONDS = 300.0
+
 # Cap a Retry-After backoff so a hostile/huge value cannot park the poller
 # for hours; a successful poll restores the configured interval.
 _MAX_RATE_LIMIT_BACKOFF_SECONDS = 3600
@@ -241,6 +245,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # after a restart so the sensors do not blank while the window refills.
         self._cop_last_time: datetime | None = None
         self._last_persisted_cop_state: tuple | None = None
+        # Below the interval so the first snapshot always writes, even when the
+        # host (and thus the monotonic clock) has just booted.
+        self._last_cop_persist_at: float = -COP_PERSIST_INTERVAL_SECONDS
         self._cop_store: Store = Store(
             hass, 1, f"{DOMAIN}.cop.{config_entry.entry_id}"
         )
@@ -703,13 +710,14 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         except Exception:
             _LOGGER.warning("Failed to schedule DHW state persistence", exc_info=True)
 
-    def _persist_cop_state(self) -> None:
-        """Save the last COP snapshot via a debounced write.
+    async def _persist_cop_state(self) -> None:
+        """Persist the last COP snapshot at most every few minutes.
 
-        The figures change every poll while the pump runs, so the write delay is
-        longer than the DHW store's: a restart may restore a few minutes-old
-        value, which is still well inside the rolling window. Failures are
-        swallowed so they cannot break the poll.
+        ``async_delay_save`` waits for a quiet period, and the figures change
+        every poll while the pump runs, so it would never write. A monotonic
+        throttle with a direct save keeps the snapshot at most a few minutes
+        stale — still well inside the rolling window. Failures are swallowed so
+        they cannot break the poll.
         """
         if self._cop_last_time is None:
             return
@@ -720,20 +728,20 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         )
         if current_state == self._last_persisted_cop_state:
             return
+        now = time.monotonic()
+        if now - self._last_cop_persist_at < COP_PERSIST_INTERVAL_SECONDS:
+            return
+        payload = {
+            "updated_at": self._cop_last_time.isoformat(),
+            "cop_heating": self._cop_last.get("cop_heating"),
+            "cop_dhw": self._cop_last.get("cop_dhw"),
+        }
         try:
-            self._cop_store.async_delay_save(
-                lambda: {
-                    "updated_at": self._cop_last_time.isoformat()
-                    if self._cop_last_time
-                    else None,
-                    "cop_heating": self._cop_last.get("cop_heating"),
-                    "cop_dhw": self._cop_last.get("cop_dhw"),
-                },
-                delay=300,
-            )
+            await self._cop_store.async_save(payload)
             self._last_persisted_cop_state = current_state
+            self._last_cop_persist_at = now
         except Exception:
-            _LOGGER.warning("Failed to schedule COP state persistence", exc_info=True)
+            _LOGGER.warning("Failed to persist COP state", exc_info=True)
 
     def _rounded_cop(self, key: str) -> float | None:
         """Round a held COP figure for change detection, rejecting non-numbers."""
@@ -1304,7 +1312,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
             self._derive_tap_water_capacity(values)
             self._calculate_cop(values)
-            self._persist_cop_state()
+            await self._persist_cop_state()
 
             if self.modbus_enabled:
                 self._calculate_heating_power(values)
