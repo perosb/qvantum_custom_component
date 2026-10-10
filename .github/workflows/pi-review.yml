@@ -27,8 +27,8 @@ jobs:
       # Tooling-only PRs (just .github/**) skip the review: the reviewer would
       # otherwise review its own workflow/extension changes and re-open nits.
       # Also computes the reviewable addition count for model selection:
-      # translations and tests inflate line counts without adding review
-      # complexity, so they are kept out of that heuristic.
+      # translations, tests, docs and .github inflate line counts without
+      # adding review complexity, so they are kept out of that heuristic.
       - name: Check changed paths
         id: changed
         env:
@@ -44,7 +44,7 @@ jobs:
               *) tooling_only=false ;;
             esac
             case "$file" in
-              custom_components/qvantum/translations/*|tests/*) continue ;;
+              custom_components/qvantum/translations/*|tests/*|docs/*|.github/*) continue ;;
             esac
             [ "$additions" = "-" ] && continue
             review_additions=$((review_additions + additions))
@@ -83,8 +83,9 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           # Cost heuristic: pick the full model only when the reviewable source
-          # diff is large. Translations and tests are excluded from the count
-          # (see the changed-paths step) since they add volume, not complexity.
+          # diff is large. Translations, tests, docs and .github are excluded
+          # from the count (see the changed-paths step) since they add volume,
+          # not complexity.
           PI_MODEL: ${{ steps.changed.outputs.review_additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
         run: |
           # Replace pi's coding-assistant system prompt: it advertises read/bash
