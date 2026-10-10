@@ -623,6 +623,9 @@
       "cop_heating": {
         "name": "COP fűtés"
       },
+      "cop_dhw": {
+        "name": "COP használati melegvíz"
+      },
       "scop_total": {
         "name": "SCOP összesen (30 nap)"
       },

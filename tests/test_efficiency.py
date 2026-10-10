@@ -25,9 +25,9 @@ class _Calculator(QvantumCalculationsMixin):
 
     def __init__(self) -> None:
         self._last_cop_energies: dict[str, float] | None = None
-        self._cop_history: deque[tuple[datetime, dict[str, float], int | None]] = (
-            deque()
-        )
+        self._cop_history: deque[
+            tuple[datetime, dict[str, float], int | None, float | None]
+        ] = deque()
         self._cop_last: dict[str, float | None] = {}
 
 
@@ -38,6 +38,7 @@ def _values(**overrides):
         "compressorenergy": 40.0,
         "additionalenergy": 10.0,
         "hp_status": HP_STATUS_HEATING,
+        "bt30": 50.0,
     }
     base.update(overrides)
     return base
@@ -155,16 +156,54 @@ class TestCalculateCop:
 
         assert values["cop_heating"] == 5.0
 
-    def test_only_the_heating_cop_key_is_published(self):
-        """There is no metered DHW production, so no DHW/system figure."""
+    def test_no_short_window_system_cop(self):
+        """A short window cannot publish a system COP from the draw meter."""
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         values = _values(heatingenergy=105.0, compressorenergy=41.0)
 
         calculator._calculate_cop(values)
 
-        assert "cop_dhw" not in values
+        assert values["cop_dhw"] is None
         assert "cop_system" not in values
+
+    def test_dhw_cop_recovers_production_from_tank_balance(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        # A draw discharges the tank; the drawn energy leaves with no DHW
+        # electrical input in that interval.
+        draw = _values(dhwenergy=52.0, bt30=40.0)
+        calculator._calculate_cop(draw)
+        assert draw["cop_dhw"] is None
+        # The recharge returns the tank to its starting temperature using
+        # 0.5 kWh of DHW-mode electrical.
+        charge = _values(
+            dhwenergy=52.0,
+            bt30=50.0,
+            compressorenergy=40.5,
+            hp_status=HP_STATUS_HOT_WATER,
+        )
+        calculator._calculate_cop(charge)
+        # production = 2 kWh drawn + 0 kWh tank change -> 2 / 0.5.
+        assert charge["cop_dhw"] == pytest.approx(4.0)
+
+        # A quiet poll keeps the last value instead of dropping to unavailable.
+        hold = _values(dhwenergy=52.0, bt30=50.0, compressorenergy=40.5)
+        calculator._calculate_cop(hold)
+        assert hold["cop_dhw"] == pytest.approx(4.0)
+
+    def test_dhw_cop_requires_the_tank_temperature(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        charge = _values(
+            bt30=None,
+            compressorenergy=40.5,
+            hp_status=HP_STATUS_HOT_WATER,
+        )
+
+        calculator._calculate_cop(charge)
+
+        assert charge["cop_dhw"] is None
 
     def test_dhw_charging_does_not_lower_heating_cop(self):
         """Electrical spent charging the DHW tank is not heating input."""

@@ -153,13 +153,16 @@ _CURVE_SENSOR_KEYS = frozenset(
     }
 )
 
-# Space-heating COP lives on the main coordinator values (counter deltas).
-# There is no instantaneous DHW/system COP: dhwenergy meters the DHW draw
-# (secondary side), not the compressor's DHW output, so it cannot be divided
-# into the compressor's electrical input over a short window.
-_COP_SENSOR_KEYS = frozenset({"cop_heating"})
+# COP lives on the main coordinator values (counter deltas). The space-heating
+# figure attributes the shared electrical counters by mode; the DHW figure
+# combines the draw meter with the tank energy balance, because dhwenergy alone
+# meters the draw (secondary side), not the compressor's output. There is no
+# short-window system figure — drawn DHW energy only balances production over
+# the 30-day scop_total window.
+_COP_SENSOR_KEYS = frozenset({"cop_heating", "cop_dhw"})
 _COP_ICONS: dict[str, str] = {
     "cop_heating": "mdi:heat-pump",
+    "cop_dhw": "mdi:water-boiler",
 }
 # Rolling efficiency figures come from the efficiency coordinator (recorder
 # stats). key -> icon, unit, display scale, precision. All are enabled by
@@ -569,14 +572,15 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
         )
 
 class QvantumCopSensor(QvantumBaseSensorEntity):
-    """Space-heating coefficient of performance from the energy counters.
+    """Coefficient of performance from the energy counters.
 
-    Dimensionless: state class MEASUREMENT, no unit. The value is derived on the
-    main coordinator each poll in both transports from the cumulative energy
-    counter deltas over a rolling window, and the last value is held while the
-    window is too small to be a measurement. Only electrical energy consumed
-    while the heat pump is heating is divided into the heating output, so DHW
-    charging cannot lower the figure.
+    Dimensionless: state class MEASUREMENT, no unit. The values are derived on
+    the main coordinator each poll in both transports from a rolling window of
+    counter samples, and the last value is held while the window is too small to
+    be a measurement. The space-heating figure divides only heating-mode
+    electrical into the heating output; the DHW figure estimates production from
+    the tank balance (drawn energy plus stored-energy change) divided by
+    DHW-mode electrical.
     """
 
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -595,9 +599,14 @@ class QvantumCopSensor(QvantumBaseSensorEntity):
     @property
     def extra_state_attributes(self):
         """Return how the ratio was attributed."""
+        attribution = (
+            "tank-balance estimate over a rolling window"
+            if self._metric_key == "cop_dhw"
+            else "heating-mode energy-counter delta over a rolling window"
+        )
         return {
             "hp_status": self._values.get("hp_status"),
-            "attribution": "energy-counter delta over a rolling window",
+            "attribution": attribution,
             "window_seconds": COP_WINDOW_SECONDS,
         }
 
