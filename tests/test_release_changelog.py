@@ -715,6 +715,87 @@ def test_main_themed_falls_back_without_model(changelog, monkeypatch, tmp_path):
     assert "changelog-themes" not in text
 
 
+def test_main_highlights_only_inserts_overview_without_link(changelog, monkeypatch):
+    fake = FakeGh(releases=RELEASES, info=INFO, body=BODY, prs=PRS)
+    monkeypatch.setattr(changelog, "_gh", fake)
+    monkeypatch.setattr(changelog, "polish_overview", lambda *a, **k: "Friendly highlights.")
+    assert changelog.main(["--tag", "2026.9.16", "--highlights-only"]) == 0
+    assert fake.edited is not None
+    assert changelog.OVERVIEW_MARKER_START in fake.edited
+    assert "Friendly highlights." in fake.edited
+    # A draft gets the highlights only; the link is added at publish time.
+    assert "Full release notes" not in fake.edited
+
+
+def test_main_highlights_only_reuses_existing_overview(changelog, monkeypatch):
+    body = (
+        "# What's Changed\n\n"
+        "<!-- changelog-overview:start -->\n"
+        "Already there.\n"
+        "<!-- changelog-overview:end -->\n\n"
+        "## New features\n\n- #1 feat: Add thing @a\n"
+    )
+    fake = FakeGh(releases=RELEASES, info=INFO, body=body, prs=PRS)
+    monkeypatch.setattr(changelog, "_gh", fake)
+
+    def boom(*args, **kwargs):
+        raise AssertionError("polish must not run when the body already has highlights")
+
+    monkeypatch.setattr(changelog, "polish_overview", boom)
+    assert changelog.main(["--tag", "2026.9.16", "--highlights-only"]) == 0
+    assert fake.edited is None  # body unchanged
+
+
+def test_main_reuses_overview_from_release_body(changelog, monkeypatch, tmp_path):
+    body = (
+        "# What's Changed\n\n"
+        "<!-- changelog-overview:start -->\n"
+        "Highlights from the draft.\n"
+        "<!-- changelog-overview:end -->\n\n"
+        "## New features\n\n- #1 feat: Add thing @a\n"
+    )
+    fake = FakeGh(releases=RELEASES, info=INFO, body=body, prs=PRS)
+    monkeypatch.setattr(changelog, "_gh", fake)
+
+    def boom(*args, **kwargs):
+        raise AssertionError("polish must not run when the body already has highlights")
+
+    monkeypatch.setattr(changelog, "polish_overview", boom)
+    out = tmp_path / "2026.9.16.md"
+    index = tmp_path / "README.md"
+    assert (
+        changelog.main(
+            ["--tag", "2026.9.16", "--out", str(out), "--index", str(index), "--polish"]
+        )
+        == 0
+    )
+    assert "Highlights from the draft." in out.read_text()
+
+
+def test_main_repolish_ignores_body_overview(changelog, monkeypatch, tmp_path):
+    body = (
+        "# What's Changed\n\n"
+        "<!-- changelog-overview:start -->\n"
+        "Old highlights.\n"
+        "<!-- changelog-overview:end -->\n\n"
+        "## New features\n\n- #1 feat: Add thing @a\n"
+    )
+    fake = FakeGh(releases=RELEASES, info=INFO, body=body, prs=PRS)
+    monkeypatch.setattr(changelog, "_gh", fake)
+    monkeypatch.setattr(changelog, "polish_overview", lambda *a, **k: "Fresh highlights.")
+    out = tmp_path / "2026.9.16.md"
+    index = tmp_path / "README.md"
+    assert (
+        changelog.main(
+            ["--tag", "2026.9.16", "--out", str(out), "--index", str(index), "--repolish"]
+        )
+        == 0
+    )
+    text = out.read_text()
+    assert "Fresh highlights." in text
+    assert "Old highlights." not in text
+
+
 def test_repo_docs_index_lists_every_release(changelog):
     releases_dir = SCRIPT.parents[2] / "docs" / "releases"
     index = (releases_dir / "README.md").read_text(encoding="utf-8")

@@ -1,0 +1,33 @@
+name: Release highlights
+
+# Run this on a draft release before publishing it: it writes the polished,
+# end-user highlights into the release body, so the release email GitHub sends on
+# publish already contains them. The notes file, link and zip are still created
+# by the Release workflow after publish.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Draft (or published) release tag to write the highlights into"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  highlights:
+    name: Write highlights into the release body
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Insert highlights
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python3 .github/scripts/generate_release_changelog.py \
+            --tag "${{ inputs.tag }}" \
+            --highlights-only
