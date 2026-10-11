@@ -936,9 +936,10 @@ def main(argv: list[str] | None = None) -> int:
     features = [pr for pr in pull_requests if category_for(pr) == NEW_FEATURES]
     callouts = extract_callouts()
     overview = None if args.repolish else existing_overview(out)
-    if overview is None:
+    if overview is None and not args.repolish:
         # Reuse highlights pre-filled into the body (e.g. on a draft) so the file,
-        # the body and the release email all carry the same text.
+        # the body and the release email all carry the same text. --repolish skips
+        # this so it can actually force a fresh overview.
         overview = _overview_in_body(release_body(repo, tag) or "") or None
     if overview is None:
         overview = generated_overview(features)
