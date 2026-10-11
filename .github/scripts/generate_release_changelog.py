@@ -294,24 +294,26 @@ def _write_release_body(repo: str, tag: str, body: str) -> None:
         os.unlink(path)
 
 
-def update_release_notes(repo: str, tag: str, overview: str | None = None) -> bool:
-    """Insert the overview and changelog link into a published release body.
+def update_release_notes(
+    repo: str, tag: str, overview: str | None = None, *, link: bool = True
+) -> bool:
+    """Insert the overview (and the changelog link) into a release body.
 
     Idempotent: a marker block replaces any previously inserted overview, and the
-    link line is rewritten. Called at publish time (after the file is pushed) and by
-    the manual backfill.
+    link line is rewritten. Called at publish time (after the file is pushed), to
+    pre-fill a draft's highlights (``link=False``), and by the manual backfill.
     """
     body = release_body(repo, tag)
     if body is None:
         return False
-    link = _release_notes_link(repo, tag)
-    if link in body and _overview_in_body(body) == (overview or ""):
-        return True
+    link_line = _release_notes_link(repo, tag)
+    had_link = link_line in body
 
     insert: list[str] = []
     if overview:
         insert.extend([OVERVIEW_MARKER_START, overview, OVERVIEW_MARKER_END, ""])
-    insert.append(link)
+    if link or had_link:
+        insert.append(link_line)
 
     result: list[str] = []
     inserted = False
@@ -322,7 +324,10 @@ def update_release_notes(repo: str, tag: str, overview: str | None = None) -> bo
             inserted = True
     if not inserted:
         result = [*insert, "", *result]
-    _write_release_body(repo, tag, "\n".join(result).strip())
+    new_body = "\n".join(result).strip()
+    if new_body == body.strip():
+        return True
+    _write_release_body(repo, tag, new_body)
     return True
 
 
@@ -844,6 +849,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Only insert the changelog link; do not regenerate the file.",
     )
     parser.add_argument(
+        "--highlights-only",
+        action="store_true",
+        help="Only write the end-user highlights into the release body (for a draft, before publish).",
+    )
+    parser.add_argument(
         "--polish",
         action="store_true",
         help="Rewrite the overview for end users via OpenRouter (falls back if unavailable).",
@@ -884,6 +894,32 @@ def main(argv: list[str] | None = None) -> int:
         update_release_notes(repo, tag, existing_overview(out))
         return 0
 
+    # Pre-fill a draft's body with the end-user highlights, so the release email
+    # sent on publish already contains them. The notes file and link are added at
+    # publish time as usual.
+    if args.highlights_only:
+        if info is None:
+            print(f"Release {tag} not found.", file=sys.stderr)
+            return 1
+        pull_requests = collect_release_prs(repo, tag)
+        if not pull_requests:
+            print(f"No PRs listed for {tag}; skipping.")
+            return 0
+        overview = _overview_in_body(release_body(repo, tag) or "") or None
+        if overview is None:
+            features = [pr for pr in pull_requests if category_for(pr) == NEW_FEATURES]
+            raw = generated_overview(features)
+            overview = (
+                polish_overview(
+                    raw,
+                    context=_pull_requests_digest(pull_requests),
+                    model=args.polish_model,
+                )
+                or raw
+            )
+        update_release_notes(repo, tag, overview, link=False)
+        return 0
+
     if args.previous_tag:
         previous = {"tagName": args.previous_tag, "publishedAt": None}
     else:
@@ -900,6 +936,10 @@ def main(argv: list[str] | None = None) -> int:
     features = [pr for pr in pull_requests if category_for(pr) == NEW_FEATURES]
     callouts = extract_callouts()
     overview = None if args.repolish else existing_overview(out)
+    if overview is None:
+        # Reuse highlights pre-filled into the body (e.g. on a draft) so the file,
+        # the body and the release email all carry the same text.
+        overview = _overview_in_body(release_body(repo, tag) or "") or None
     if overview is None:
         overview = generated_overview(features)
         if args.polish or args.repolish:

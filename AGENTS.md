@@ -166,6 +166,11 @@ A release mistakenly published as a pre-release (so its manifest and `qvantum.zi
 were never bumped) is recovered with **Actions → Release → Run workflow** and the
 tag: it bumps `manifest.json`/`const.py` on `main` and rebuilds the zip asset.
 
+To include the overview in the release email GitHub sends on publish, run
+**Actions → Release highlights → Run workflow** on the draft first: it writes the
+overview (and nothing else) into the draft body, and the publish run then reuses
+that text for the file and the body.
+
 PR body:
 
 ```markdown
