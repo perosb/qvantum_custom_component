@@ -716,9 +716,7 @@ def test_main_themed_falls_back_without_model(changelog, monkeypatch, tmp_path):
 
 
 def test_main_highlights_only_inserts_overview_without_link(changelog, monkeypatch):
-    fake = FakeGh(
-        releases=RELEASES, info=INFO, body="# What's Changed\n\n## New features\n", prs=PRS
-    )
+    fake = FakeGh(releases=RELEASES, info=INFO, body=BODY, prs=PRS)
     monkeypatch.setattr(changelog, "_gh", fake)
     monkeypatch.setattr(changelog, "polish_overview", lambda *a, **k: "Friendly highlights.")
     assert changelog.main(["--tag", "2026.9.16", "--highlights-only"]) == 0
@@ -735,7 +733,7 @@ def test_main_highlights_only_reuses_existing_overview(changelog, monkeypatch):
         "<!-- changelog-overview:start -->\n"
         "Already there.\n"
         "<!-- changelog-overview:end -->\n\n"
-        "## New features\n"
+        "## New features\n\n- #1 feat: Add thing @a\n"
     )
     fake = FakeGh(releases=RELEASES, info=INFO, body=body, prs=PRS)
     monkeypatch.setattr(changelog, "_gh", fake)
