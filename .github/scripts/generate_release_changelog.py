@@ -324,7 +324,7 @@ def update_release_notes(
             inserted = True
     if not inserted:
         result = [*insert, "", *result]
-    new_body = "\n".join(result).strip()
+    new_body = re.sub(r"\n{3,}", "\n\n", "\n".join(result)).strip()
     if new_body == body.strip():
         return True
     _write_release_body(repo, tag, new_body)
