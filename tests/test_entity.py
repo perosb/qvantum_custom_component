@@ -10,6 +10,7 @@ from custom_components.qvantum.entity import (
     async_get_qvantum_device_entry,
     cleanup_disabled_entities,
     finalize_platform_setup,
+    resolve_device_id,
 )
 from custom_components.qvantum.const import DOMAIN
 
@@ -292,6 +293,43 @@ def test_resolve_device_id_from_identifier():
     device = {"identifiers": {(DOMAIN, "qvantum-test_device_123")}}
 
     assert dummy._resolve_device_id(device) == "test_device_123"
+
+
+def test_resolve_device_id_from_device_info():
+    """A real DeviceInfo resolves, whether it is a dict or a dataclass."""
+    from homeassistant.helpers.device_registry import DeviceInfo
+
+    device = DeviceInfo(identifiers={(DOMAIN, "qvantum-abc123")})
+
+    assert resolve_device_id(device) == "abc123"
+
+
+def test_resolve_device_id_from_device_info_object():
+    """Read identifiers as attributes when DeviceInfo is not a dict."""
+
+    class AttributeDevice:
+        identifiers = {(DOMAIN, "qvantum-attribute-1")}
+
+    assert resolve_device_id(AttributeDevice()) == "attribute-1"
+
+
+def test_resolve_device_id_from_direct_id_key():
+    """A coordinator device dict can carry a direct id."""
+    assert resolve_device_id({"id": 1011074250800138}) == "1011074250800138"
+
+
+def test_resolve_device_id_returns_none_without_match():
+    """Foreign domains, prefixes and empty suffixes yield no device id."""
+
+    class AttributeDevice:
+        identifiers = {
+            (DOMAIN, "qvantum-"),
+            ("other", "qvantum-pump"),
+            (DOMAIN, "not-qvantum-prefixed"),
+        }
+
+    assert resolve_device_id(AttributeDevice()) is None
+    assert resolve_device_id({}) is None
 
 
 def test_resolve_device_id_from_coordinator_values():

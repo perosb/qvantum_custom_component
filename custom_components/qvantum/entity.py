@@ -22,24 +22,37 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+def _device_value(device: DeviceInfo | dict[str, object], key: str) -> object:
+    """Read one device info field, whether it is a mapping or an object.
+
+    ``DeviceInfo`` is a plain dict today, but Home Assistant is migrating it to a
+    dataclass (home-assistant/core#180251), where its fields are attributes.
+    """
+    if isinstance(device, dict):
+        return device.get(key)
+    return getattr(device, key, None)
+
+
 def resolve_device_id(device: DeviceInfo | dict[str, object]) -> str | None:
     """Resolve device ID from device info.
 
-    Handles both dict format (from coordinator) and DeviceInfo format.
+    Handles both the mapping format (from coordinator data) and a ``DeviceInfo``
+    object, reading it as attributes once it is no longer a dict.
     """
-    # Check if it's a dict with direct "id" key
-    if isinstance(device, dict) and "id" in device:
-        return str(device["id"])
+    # A direct "id" key, when the caller passes the coordinator's device dict
+    if (device_id := _device_value(device, "id")) is not None:
+        return str(device_id)
 
-    # Check if it's DeviceInfo with identifiers
-    if isinstance(device, dict) and "identifiers" in device:
-        identifiers = device["identifiers"]
-        # identifiers should be a set of (domain, identifier) tuples
-        for domain, identifier in identifiers:
-            if domain == DOMAIN and identifier.startswith(f"{DOMAIN}-"):
-                device_id = identifier.removeprefix(f"{DOMAIN}-")
-                if device_id:
-                    return str(device_id)
+    # Otherwise the identifier is (DOMAIN, f"{DOMAIN}-{device_id}")
+    identifiers = _device_value(device, "identifiers")
+    if not isinstance(identifiers, set):
+        return None
+
+    for domain, identifier in identifiers:
+        if domain == DOMAIN and identifier.startswith(f"{DOMAIN}-"):
+            resolved = identifier.removeprefix(f"{DOMAIN}-")
+            if resolved:
+                return str(resolved)
 
     return None
 
