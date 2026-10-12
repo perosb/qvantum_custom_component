@@ -187,6 +187,9 @@ bullet-by-bullet into `docs/releases/<tag>.md`. Write it in user-facing language
 and keep it current as the PR changes, so the generated notes describe what
 actually shipped. `## Test plan` is ignored by the changelog.
 
+When the PR resolves an issue, end the body with `Closes #<n>` so GitHub links
+the issue and closes it on merge.
+
 Labels `bug` / `enhancement` / `chore` feed release-drafter. Version lives in
 `manifest.json` and `const.py`; release workflow rewrites from the tag.
 
