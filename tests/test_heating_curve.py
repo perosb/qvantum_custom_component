@@ -15,6 +15,9 @@ from custom_components.qvantum.heating_curve import (
     NIGHT_DAY_MAX_C,
     OUTDOOR_MAX_C,
     PRECHARGE_MAX_C,
+    ROOM_GAIN_MAX_C,
+    ROOM_GAIN_MIN_SAMPLES,
+    ROOM_GAIN_MIN_SPAN_C,
     SOLAR_MAX_C,
     TOTAL_MAX_C,
     TRIM_MAX_C,
@@ -32,6 +35,8 @@ from custom_components.qvantum.heating_curve import (
     normalize_baseline,
     outdoor_adjustment_c,
     precharge_adjustment_c,
+    room_compensation_gain,
+    room_corrected_deviation,
     solar_adjustment_c,
     trim_residuals,
 )
@@ -427,6 +432,73 @@ def test_corrected_baseline_fits_a_tilt() -> None:
     assert learned is not None
     assert learned["curve_30"] < learned["curve_minus_30"]
     assert learned["curve_minus_30"] == pytest.approx(60.0 + 0.2 * 30.0, abs=0.5)
+
+
+def _room_observations(
+    gain: float,
+    *,
+    offset: float = 0.0,
+    tilt: float = 0.0,
+    span: int = 20,
+) -> list[tuple[float, float, float]]:
+    base = normalize_baseline(BASELINE)
+    return [
+        (
+            float(outdoor),
+            interpolate_supply(base, float(outdoor))
+            + offset
+            + tilt * outdoor
+            - gain * error,
+            error,
+        )
+        for outdoor in range(span + 1)
+        for error in (-0.5, 0.0, 0.5)
+    ]
+
+
+def test_room_compensation_gain_recovers_the_room_slope() -> None:
+    assert room_compensation_gain(
+        _room_observations(9.0), BASELINE
+    ) == pytest.approx(9.0)
+    # The baseline offset and tilt are controlled for, not attributed to the room.
+    assert room_compensation_gain(
+        _room_observations(4.0, offset=3.0, tilt=0.2), BASELINE
+    ) == pytest.approx(4.0)
+
+
+def test_room_compensation_gain_rejects_thin_or_flat_data() -> None:
+    thin = _room_observations(9.0)[: ROOM_GAIN_MIN_SAMPLES - 1]
+    assert room_compensation_gain(thin, BASELINE) is None
+    # No room-error spread: the slope is not identifiable.
+    flat = [(float(outdoor), 40.0, 0.1) for outdoor in range(30)]
+    assert room_compensation_gain(flat, BASELINE) is None
+    assert room_compensation_gain(_room_observations(9.0), {"curve_0": 42.0}) is None
+    # Perfectly collinear outdoor/room error: the room slope is not separable.
+    collinear = [(float(outdoor), 40.0, 2.0 * outdoor) for outdoor in range(30)]
+    assert room_compensation_gain(collinear, BASELINE) is None
+    # A negative fit is noise: clamp to no correction.
+    assert room_compensation_gain(_room_observations(-5.0), BASELINE) == 0.0
+    # And an absurd slope is capped.
+    assert room_compensation_gain(
+        _room_observations(200.0), BASELINE
+    ) == pytest.approx(ROOM_GAIN_MAX_C)
+
+
+def test_room_compensation_gain_needs_span_above_threshold() -> None:
+    errors = [ROOM_GAIN_MIN_SPAN_C / 4, 0.0, -ROOM_GAIN_MIN_SPAN_C / 4]
+    rows = [
+        (float(outdoor), 40.0 - 9.0 * error, error)
+        for outdoor in range(20)
+        for error in errors
+    ]
+    assert room_compensation_gain(rows, BASELINE) is None
+
+
+def test_room_corrected_deviation_subtracts_the_room_term() -> None:
+    assert room_corrected_deviation(2.0, 9.0, 0.5) == pytest.approx(-2.5)
+    assert room_corrected_deviation(2.0, None, 0.5) == 2.0
+    assert room_corrected_deviation(2.0, 9.0, None) == 2.0
+    assert room_corrected_deviation(None, 9.0, 0.5) is None
 
 
 def test_effective_supply_bounds_sanitizes_and_falls_back() -> None:

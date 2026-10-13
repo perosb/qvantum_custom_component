@@ -50,6 +50,8 @@ from .heating_curve import (
     interpolate_supply,
     normalize_baseline,
     precharge_adjustment_c,
+    room_compensation_gain,
+    room_corrected_deviation,
     trim_residuals,
 )
 from .open_meteo import (
@@ -148,6 +150,8 @@ class CurveSnapshot:
     baseline_learned_hours: int | None = None
     baseline_outdoor_min_c: float | None = None
     baseline_outdoor_max_c: float | None = None
+    #: Identified pump room-compensation gain (supply °C per °C room error).
+    room_gain_c: float | None = None
     cop_c: float = 0.0
     precharge_c: float = 0.0
 
@@ -343,6 +347,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._trims: dict[str, float] = {}
         self._last_trim_ts: float | None = None
         self._baseline_stats: dict[str, Any] | None = None
+        self._room_gain: float | None = None
         self._clamped_state = False
         self._forecast: WeatherForecast | None = None
         self._forecast_ok = False
@@ -409,6 +414,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "last_active_ts": self._last_active_ts,
             "trims": dict(self._trims),
             "baseline_stats": self._baseline_stats,
+            "room_gain": self._room_gain,
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "mode": self._mode,
             "revert_pending": self._revert_pending,
@@ -486,6 +492,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             self._baseline_stats = {
                 key: stats.get(key) for key in ("hours", "min_c", "max_c", "corrected")
             }
+        room_gain = data.get("room_gain")
+        if isinstance(room_gain, (int, float)) and not isinstance(room_gain, bool):
+            self._room_gain = float(room_gain)
         margins = data.get("indoor_margins")
         if isinstance(margins, list):
             for item in margins:
@@ -1075,6 +1084,63 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             observations.append((outdoor[ts], supply[ts]))
         return observations
 
+    async def _async_room_gain(self) -> float | None:
+        """Identify the pump's room-compensation gain from observed Auto hours.
+
+        While the pump runs room compensation its ``cal_heat_temp`` is the
+        weather curve plus a room term, so the readiness comparison against it
+        can never settle. The residual against the learned baseline is fitted
+        against ``(BT1, indoor − target)``; the room slope is the gain the
+        deviation correction removes. The target is not a long-term statistic,
+        so the current one is applied to the whole window (it changes rarely).
+        """
+        if self._baseline is None:
+            return None
+        resolved = self._resolve_statistic_ids()
+        outdoor_id = resolved.get("bt1")
+        supply_id = resolved.get("cal_heat_temp")
+        indoor_key = self._indoor_metric_key(resolved)
+        indoor_id = resolved.get(indoor_key) if indoor_key else None
+        if not outdoor_id or not supply_id or not indoor_id:
+            return None
+        target = self._main_values().get("indoor_temperature_target")
+        if not isinstance(target, (int, float)) or isinstance(target, bool):
+            return None
+        power_id = resolved.get("heatingpower")
+        statistic_ids = {outdoor_id, supply_id, indoor_id}
+        if power_id:
+            statistic_ids.add(power_id)
+        start = dt_util.utcnow() - timedelta(days=BASELINE_LEARN_DAYS)
+        if self._last_active_ts is not None:
+            start = max(
+                start, datetime.fromtimestamp(self._last_active_ts, tz=timezone.utc)
+            )
+        rows = await self._async_statistics(statistic_ids, start)
+
+        def _series(entity_id: str) -> dict[int, float]:
+            series: dict[int, float] = {}
+            for row in rows.get(entity_id, []):
+                mean = row.get("mean")
+                start_ts = row.get("start")
+                if mean is None or start_ts is None:
+                    continue
+                series[int(start_ts)] = float(mean)
+            return series
+
+        outdoor = _series(outdoor_id)
+        supply = _series(supply_id)
+        indoor = _series(indoor_id)
+        power = _series(power_id) if power_id else {}
+        target_c = float(target)
+        observations: list[tuple[float, float, float]] = []
+        for ts in sorted(set(outdoor) & set(supply) & set(indoor)):
+            if power_id and power.get(ts, 0.0) < MIN_SAMPLE_Q_W:
+                continue
+            observations.append(
+                (outdoor[ts], supply[ts], indoor[ts] - target_c)
+            )
+        return room_compensation_gain(observations, self._baseline)
+
     async def _async_learn_baseline(self, values: Mapping[str, Any], now_ts: float) -> None:
         """Correct the frozen baseline from observed Auto behaviour.
 
@@ -1096,6 +1162,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         ):
             return
         self._last_baseline_learn_ts = now_ts
+        await self._async_refresh_room_gain()
         try:
             observations = await self._async_baseline_observations(
                 since_ts=self._last_active_ts
@@ -1126,6 +1193,21 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "Heating-curve baseline corrected from %s observed Auto hours",
             len(observations),
         )
+        await self._async_persist()
+
+    async def _async_refresh_room_gain(self) -> None:
+        """Refresh the identified room-compensation gain (best effort)."""
+        try:
+            gain = await self._async_room_gain()
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa: BLE001 — identification is best effort
+            _LOGGER.debug("Room-compensation gain unavailable: %s", err)
+            return
+        if gain is None or gain == self._room_gain:
+            return
+        self._room_gain = gain
+        _LOGGER.info("Room-compensation gain identified: %.2f °C/°C", gain)
         await self._async_persist()
 
     async def _async_trim_observations(self) -> list[tuple[int, float, float]]:
@@ -1224,11 +1306,20 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 return float(value)
         return None
 
-    def _push_indoor_margin(self, values: Mapping[str, Any], now_ts: float) -> float | None:
+    def _room_error(self, values: Mapping[str, Any]) -> float | None:
+        """Indoor temperature minus the target, or ``None`` when unknown."""
         indoor = self._indoor_value(values)
         target = values.get("indoor_temperature_target")
-        if indoor is not None and isinstance(target, (int, float)) and not isinstance(target, bool):
-            self._indoor_margins.append((now_ts, indoor - float(target)))
+        if indoor is None or not isinstance(target, (int, float)) or isinstance(
+            target, bool
+        ):
+            return None
+        return indoor - float(target)
+
+    def _push_indoor_margin(self, values: Mapping[str, Any], now_ts: float) -> float | None:
+        error = self._room_error(values)
+        if error is not None:
+            self._indoor_margins.append((now_ts, error))
         recent = [
             margin
             for ts, margin in self._indoor_margins
@@ -1468,6 +1559,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 None if measured_outdoor is None else float(measured_outdoor),
                 None if cal_heat_temp is None else float(cal_heat_temp),
             )
+            # The pump adds its room term to cal_heat_temp, so the raw
+            # deviation carries a room-dependent part the shadow curve does not
+            # emit; remove it before it feeds the readiness window.
+            deviation = room_corrected_deviation(
+                deviation, self._room_gain, self._room_error(values)
+            )
 
         signal = signal_blocker(
             has_baseline=self._baseline is not None,
@@ -1511,6 +1608,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             baseline_learned_hours=learned_hours,
             baseline_outdoor_min_c=learned_min,
             baseline_outdoor_max_c=learned_max,
+            room_gain_c=self._room_gain,
             cop_c=0.0 if result is None else result.cop_c,
             precharge_c=0.0 if result is None else result.precharge_c,
         )

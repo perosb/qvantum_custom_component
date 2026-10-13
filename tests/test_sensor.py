@@ -695,6 +695,7 @@ class TestQvantumCurveSensors:
                 baseline_learned_hours=120,
                 baseline_outdoor_min_c=-7.5,
                 baseline_outdoor_max_c=12.0,
+                room_gain_c=8.6,
             )
         )
         entity = QvantumCurveDeviationSensor(
@@ -705,6 +706,7 @@ class TestQvantumCurveSensors:
         assert attributes["baseline_learned_hours"] == 120
         assert attributes["baseline_outdoor_min_c"] == -7.5
         assert attributes["baseline_outdoor_max_c"] == 12.0
+        assert attributes["room_gain_c_per_c"] == 8.6
 
     def test_deviation_sensor_unavailable_without_value(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot(deviation_c=None))
