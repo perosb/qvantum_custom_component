@@ -286,10 +286,11 @@ access, so no control is offered when a write would fail.
   by default, persisted in the curve Store, and enabled via
   `qvantum.set_curve_terms`. They only apply while the curve is active and
   never override the indoor cap or the total clamp.
-- Adaptive-curve `ready` compares the shadow curve to `cal_heat_temp`, which
-  carries the pump's room-compensation term. The coordinator identifies that
-  gain from the Auto hours and removes it from the deviation; without it a
-  compensating pump (BT2 / external room sensor) could never become `ready`.
+- Adaptive-curve `ready` compares the *learned baseline* (not the adjusted
+  shadow) to `cal_heat_temp` on heating hours, with the pump's room term
+  (identified from the Auto hours) removed. Gates: median ≤ 1.5 °C and p95
+  ≤ 3.0 °C over ≥ 3 days and ≥ 24 heating hours — calibrated to what a 10°
+  seven-point table can represent; a tighter median gate is unreachable.
 
 ---
 
