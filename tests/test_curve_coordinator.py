@@ -115,6 +115,7 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._trims = {}
     coordinator._last_trim_ts = None
     coordinator._baseline_stats = None
+    coordinator._room_gain = None
     coordinator._clamped_state = False
     coordinator._forecast = None
     coordinator._forecast_ok = False
@@ -318,6 +319,133 @@ async def test_learn_baseline_throttles_and_swallows_failures() -> None:
     coordinator._last_baseline_learn_ts = None
     await coordinator._async_learn_baseline({**VALUES, **SETTINGS}, 9000.0)
     assert coordinator.baseline == BASELINE
+
+
+def _room_statistics(gain: float, *, power: float = 900.0) -> dict:
+    base = normalize_baseline(BASELINE)
+    rows: dict[str, list] = {
+        "sensor.t": [],
+        "sensor.s": [],
+        "sensor.r": [],
+        "sensor.q": [],
+    }
+    for outdoor in range(21):
+        for index, error in enumerate((-0.5, 0.0, 0.5)):
+            ts = 1000 + outdoor * 3600 + index
+            rows["sensor.t"].append({"start": ts, "mean": float(outdoor)})
+            rows["sensor.s"].append(
+                {
+                    "start": ts,
+                    "mean": interpolate_supply(base, float(outdoor)) - gain * error,
+                }
+            )
+            rows["sensor.r"].append({"start": ts, "mean": 20.0 + error})
+            rows["sensor.q"].append({"start": ts, "mean": power})
+    for series in rows.values():
+        series.append({"start": None, "mean": 1.0})
+        series.append({"start": 42, "mean": None})
+    return rows
+
+
+async def test_room_gain_identifies_from_statistics() -> None:
+    coordinator = make_coordinator(
+        values={**VALUES, "sensor_mode": 4, "indoor_temperature_target": 20.0},
+        settings=SETTINGS,
+    )
+    coordinator._baseline = dict(BASELINE)
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "room_temp_external": "sensor.r",
+            "heatingpower": "sensor.q",
+        }
+    )
+    coordinator._async_statistics = AsyncMock(return_value=_room_statistics(7.0))
+
+    assert await coordinator._async_room_gain() == pytest.approx(7.0)
+    statistic_ids = coordinator._async_statistics.call_args.args[0]
+    assert statistic_ids == {"sensor.t", "sensor.s", "sensor.r", "sensor.q"}
+
+
+async def test_room_gain_skips_idle_hours() -> None:
+    coordinator = make_coordinator(
+        values={**VALUES, "sensor_mode": 4, "indoor_temperature_target": 20.0},
+        settings=SETTINGS,
+    )
+    coordinator._baseline = dict(BASELINE)
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "room_temp_external": "sensor.r",
+            "heatingpower": "sensor.q",
+        }
+    )
+    coordinator._async_statistics = AsyncMock(
+        return_value=_room_statistics(7.0, power=1.0)
+    )
+
+    assert await coordinator._async_room_gain() is None
+
+
+async def test_room_gain_requires_baseline_ids_and_target() -> None:
+    coordinator = make_coordinator(
+        values={**VALUES, "sensor_mode": 4, "indoor_temperature_target": 20.0},
+        settings=SETTINGS,
+    )
+    coordinator._async_statistics = AsyncMock(return_value=_room_statistics(7.0))
+
+    # No baseline yet.
+    assert await coordinator._async_room_gain() is None
+
+    coordinator._baseline = dict(BASELINE)
+    coordinator._resolve_statistic_ids = MagicMock(return_value={})
+    assert await coordinator._async_room_gain() is None
+    coordinator._async_statistics.assert_not_awaited()
+
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "cal_heat_temp": "sensor.s"}
+    )
+    assert await coordinator._async_room_gain() is None
+    coordinator._async_statistics.assert_not_awaited()
+
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "room_temp_external": "sensor.r",
+        }
+    )
+    coordinator._main.data["values"].pop("indoor_temperature_target")
+    assert await coordinator._async_room_gain() is None
+    coordinator._async_statistics.assert_not_awaited()
+
+
+async def test_refresh_room_gain_persists_and_swallows_errors() -> None:
+    store = FakeStore()
+    coordinator = make_coordinator(store=store)
+    coordinator._async_room_gain = AsyncMock(return_value=9.0)
+
+    await coordinator._async_refresh_room_gain()
+
+    assert coordinator._room_gain == pytest.approx(9.0)
+    assert store.saved["room_gain"] == pytest.approx(9.0)
+
+    # An unchanged gain does not write the store again.
+    store.saved = None
+    await coordinator._async_refresh_room_gain()
+    assert store.saved is None
+
+    # A recorder failure is swallowed and keeps the last gain.
+    coordinator._async_room_gain = AsyncMock(side_effect=RuntimeError("recorder down"))
+    await coordinator._async_refresh_room_gain()
+    assert coordinator._room_gain == pytest.approx(9.0)
+
+    # A missing fit keeps the last gain too.
+    coordinator._async_room_gain = AsyncMock(return_value=None)
+    await coordinator._async_refresh_room_gain()
+    assert coordinator._room_gain == pytest.approx(9.0)
 
 
 def _trim_hours(
@@ -791,6 +919,7 @@ async def test_async_restore_loads_state() -> None:
                 "corrected": True,
             },
             "indoor_margins": [[1_770_000_000.0, 0.4], ["bad"], [1_770_000_100.0, -0.2]],
+            "room_gain": 8.6,
         }
     )
     coordinator = make_coordinator(store=store)
@@ -813,6 +942,7 @@ async def test_async_restore_loads_state() -> None:
         (1_770_000_000.0, 0.4),
         (1_770_000_100.0, -0.2),
     ]
+    assert coordinator._room_gain == pytest.approx(8.6)
 
 
 async def test_async_restore_ignores_bad_payloads() -> None:
@@ -821,6 +951,11 @@ async def test_async_restore_ignores_bad_payloads() -> None:
         await coordinator.async_restore()
         assert coordinator.baseline is None
         assert coordinator.model is None
+        assert coordinator._room_gain is None
+
+    coordinator = make_coordinator(store=FakeStore({"room_gain": "nope"}))
+    await coordinator.async_restore()
+    assert coordinator._room_gain is None
 
 
 async def test_async_persist_swallows_store_errors() -> None:
@@ -1244,6 +1379,48 @@ async def test_snapshot_forecast_failure_blocks_and_falls_back() -> None:
 
     assert snapshot.blocker == "forecast"
     assert snapshot.points == BASELINE
+
+
+async def test_snapshot_deviation_removes_room_term() -> None:
+    values = {
+        **VALUES,
+        "sensor_mode": 4,
+        "room_temp_external": 20.6,
+        "indoor_temperature_target": 20.1,
+    }
+    coordinator = make_coordinator(values=values, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._room_gain = 9.0
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    # Raw deviation is 36.0 − 37.0; the 0.5 °C room error at 9 °C/°C is removed.
+    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.5)
+    assert snapshot.room_gain_c == pytest.approx(9.0)
+
+
+async def test_snapshot_deviation_uncorrected_without_gain() -> None:
+    values = {
+        **VALUES,
+        "sensor_mode": 4,
+        "room_temp_external": 20.6,
+        "indoor_temperature_target": 20.1,
+    }
+    coordinator = make_coordinator(values=values, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0)
+    assert snapshot.room_gain_c is None
 
 
 async def test_snapshot_deviation_falls_back_to_forecast_outdoor() -> None:

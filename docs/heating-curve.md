@@ -177,6 +177,17 @@ correction self-stabilises: once it matches, the residual falls under the noise
 threshold and nothing more is written. This is why `ready` can become true even
 when the cached table initially disagrees with Auto.
 
+Room compensation is a second, separate loop the shadow curve does not model:
+with BT2 or an external room sensor the firmware adds a room term to
+`cal_heat_temp`, so at a constant outdoor temperature the supply moves with the
+indoor error. The coordinator identifies that gain (supply °C per °C indoor
+error) from the same Auto hours, fitting the residual against both outdoor and
+the room error, and subtracts `gain × (indoor − target)` from the deviation
+before it feeds the readiness window. Without that, the shadow curve could
+never match a compensating pump closely enough to become `ready`. The gain is
+persisted and exposed as `room_gain_c_per_c` on the deviation sensor; it stays
+unidentified (no correction) while the pump has no room error to learn from.
+
 ### Active trims
 
 While the curve is active the module also learns slow **per-point trims** from
@@ -207,9 +218,10 @@ Entities:
 - `sensor.qvantum_adaptive_curve_deviation` — computed supply at the measured
   outdoor minus `cal_heat_temp` (input 35), with `shadow`, `ready`, `blocker`
   and `baseline_auto` (baseline frozen while the pump was on Auto) attributes,
-  plus `baseline_learned_hours`, `baseline_outdoor_min_c` and
-  `baseline_outdoor_max_c` from the last baseline fit. Diagnostic entity,
-  enabled by default.
+  plus `baseline_learned_hours`, `baseline_outdoor_min_c`,
+  `baseline_outdoor_max_c` from the last baseline fit and `room_gain_c_per_c`
+  (the identified pump room-compensation gain removed from the deviation).
+  Diagnostic entity, enabled by default.
 - `sensor.qvantum_adaptive_curve_solar_model` — model trust in %, with
   `a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque` and `r2_solar` diagnostics.
   Diagnostic entity.
@@ -221,7 +233,8 @@ Entities:
 
 The switch never turns itself on. `ready` becomes true after at least three
 full local days of deviation statistics with ≥ 90 % coverage, a median
-absolute deviation ≤ 1.0 °C and no hourly deviation beyond 3.0 °C. The
+absolute deviation ≤ 1.0 °C (after the pump's room-compensation term is
+removed) and no hourly deviation beyond 3.0 °C. The
 `blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
 `window`, `median`, `max`). `ready` is a signal, not an activation. `ready`
 also needs the deviation sensor enabled and the recorder running: without

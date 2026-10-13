@@ -286,6 +286,10 @@ access, so no control is offered when a write would fail.
   by default, persisted in the curve Store, and enabled via
   `qvantum.set_curve_terms`. They only apply while the curve is active and
   never override the indoor cap or the total clamp.
+- Adaptive-curve `ready` compares the shadow curve to `cal_heat_temp`, which
+  carries the pump's room-compensation term. The coordinator identifies that
+  gain from the Auto hours and removes it from the deviation; without it a
+  compensating pump (BT2 / external room sensor) could never become `ready`.
 
 ---
 

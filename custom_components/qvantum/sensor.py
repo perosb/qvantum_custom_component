@@ -904,6 +904,7 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             "baseline_learned_hours": snapshot.baseline_learned_hours,
             "baseline_outdoor_min_c": snapshot.baseline_outdoor_min_c,
             "baseline_outdoor_max_c": snapshot.baseline_outdoor_max_c,
+            "room_gain_c_per_c": snapshot.room_gain_c,
         }
 
 

@@ -86,6 +86,13 @@ BASELINE_MIN_CORRECTION_C = 1.0
 #: Never move a baseline point by more than this.
 BASELINE_MAX_CORRECTION_C = 8.0
 
+#: Observed Auto hours needed before the room-compensation gain is identified.
+ROOM_GAIN_MIN_SAMPLES = 24
+#: Minimum observed room-error span for a meaningful gain fit.
+ROOM_GAIN_MIN_SPAN_C = 0.3
+#: Upper bound on the identified gain (supply °C per °C room error).
+ROOM_GAIN_MAX_C = 25.0
+
 #: Recency half-life for the indoor-error trim observations.
 TRIM_HALF_LIFE_DAYS = 2.0
 #: Hourly observations in an outdoor bucket before it carries evidence.
@@ -452,6 +459,89 @@ def corrected_baseline(
     }
     repaired = normalize_baseline(raw)
     return {key: supply for key, (_, supply) in zip(CURVE_KEYS, repaired)}
+
+
+def room_compensation_gain(
+    observations: Sequence[tuple[float, float, float]],
+    baseline: Mapping[str, float],
+    *,
+    min_samples: int = ROOM_GAIN_MIN_SAMPLES,
+    min_span_c: float = ROOM_GAIN_MIN_SPAN_C,
+    max_gain_c: float = ROOM_GAIN_MAX_C,
+) -> float | None:
+    """Identify the pump's room-compensation gain from observed Auto hours.
+
+    ``observations`` are ``(outdoor BT1, cal_heat_temp, indoor − target)``
+    triples measured while the pump followed its own curve. When the firmware
+    adds a room term, the supply residual against the baseline is
+    ``intercept + b1 · outdoor + b2 · (indoor − target)`` with ``b2 = −g``;
+    the residual is fitted against outdoor as well so baseline shape error
+    does not leak into the room slope. Returns ``None`` when there is too
+    little data or the room error barely moved, and clamps the gain to
+    ``[0, max_gain_c]`` (a negative fit is noise, not a cooling loop).
+    """
+    try:
+        base = normalize_baseline(baseline)
+    except (TypeError, ValueError):
+        return None
+
+    clean: list[tuple[float, float, float]] = []
+    for outdoor, supply, error in observations:
+        values = (float(outdoor), float(supply), float(error))
+        if all(math.isfinite(value) for value in values):
+            clean.append(values)
+    if len(clean) < min_samples:
+        return None
+    errors = [error for _, _, error in clean]
+    if max(errors) - min(errors) < min_span_c:
+        return None
+
+    outdoors = [outdoor for outdoor, _, _ in clean]
+    residuals = [
+        supply - interpolate_supply(base, outdoor)
+        for outdoor, supply, _ in clean
+    ]
+    mean_outdoor = sum(outdoors) / len(outdoors)
+    mean_error = sum(errors) / len(errors)
+    mean_residual = sum(residuals) / len(residuals)
+    s_oo = sum((value - mean_outdoor) ** 2 for value in outdoors)
+    s_ee = sum((value - mean_error) ** 2 for value in errors)
+    s_oe = sum(
+        (outdoor - mean_outdoor) * (error - mean_error)
+        for outdoor, error in zip(outdoors, errors)
+    )
+    s_or = sum(
+        (outdoor - mean_outdoor) * (residual - mean_residual)
+        for outdoor, residual in zip(outdoors, residuals)
+    )
+    s_er = sum(
+        (error - mean_error) * (residual - mean_residual)
+        for error, residual in zip(errors, residuals)
+    )
+    determinant = s_oo * s_ee - s_oe * s_oe
+    if abs(determinant) <= 1e-12:
+        return None
+    # b2 is the room slope; g = −b2.
+    slope_error = (s_oo * s_er - s_oe * s_or) / determinant
+    return _clamp(-slope_error, 0.0, max_gain_c)
+
+
+def room_corrected_deviation(
+    deviation_c: float | None,
+    gain_c: float | None,
+    room_error_c: float | None,
+) -> float | None:
+    """Remove the pump's room-compensation term from a shadow deviation.
+
+    ``deviation = shadow − cal_heat_temp`` carries the room term the firmware
+    adds on top of its curve, so the readiness window can never settle while
+    the pump runs room compensation. Subtracting ``gain · (indoor − target)``
+    leaves the curve comparison. Returns ``deviation_c`` unchanged when any
+    input is missing.
+    """
+    if deviation_c is None or gain_c is None or room_error_c is None:
+        return deviation_c
+    return deviation_c - gain_c * room_error_c
 
 
 def _weighted_median(values: Sequence[tuple[float, float]]) -> float:
