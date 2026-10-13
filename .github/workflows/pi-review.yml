@@ -68,15 +68,17 @@ jobs:
         if: steps.changed.outputs.tooling_only != 'true'
         run: npm install -g @earendil-works/pi-coding-agent@1.1.0
 
-      # Repo-owned extension so CI matches local review runs: it references the
-      # OpenRouter account preset ("perosb") for ZDR/price-sorted routing and
-      # caps max_completion_tokens so cheap providers (e.g. Relace) stay
-      # eligible over 1M-context ones.
-      - name: Install OpenRouter extension
+      # Repo-owned extensions so CI matches local review runs. The guardrails
+      # reference the OpenRouter account preset ("perosb") for ZDR/price-sorted
+      # routing and cap max_completion_tokens so cheap providers (e.g. Relace)
+      # stay eligible over 1M-context ones. The lookup tools give the reviewer
+      # read-only, checkout-scoped verification without pi's built-in read/bash,
+      # which a prompt-injected diff could use to reach credentials.
+      - name: Install review extensions
         if: steps.changed.outputs.tooling_only != 'true'
         run: |
           mkdir -p ~/.pi/agent/extensions
-          cp .github/pi/openrouter-guardrails.ts ~/.pi/agent/extensions/
+          cp .github/pi/openrouter-guardrails.ts .github/pi/repo-lookup.ts ~/.pi/agent/extensions/
 
       - name: Build PR diff
         if: steps.changed.outputs.tooling_only != 'true'
@@ -89,19 +91,23 @@ jobs:
         if: steps.changed.outputs.tooling_only != 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # Root the repo-scoped lookup tools at the checkout explicitly.
+          PI_REVIEW_ROOT: ${{ github.workspace }}
           # Cost heuristic: pick the full model only when the reviewable source
           # diff is large. Translations, tests, docs and .github are excluded
           # from the count (see the changed-paths step) since they add volume,
           # not complexity.
           PI_MODEL: ${{ steps.changed.outputs.review_additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
         run: |
-          # Replace pi's coding-assistant system prompt: it advertises read/bash
-          # tools and pi's own docs, which makes a tool-less review run emit
-          # tool-call XML instead of the review JSON.
+          # Replace pi's coding-assistant system prompt: it advertises pi's own
+          # docs and a broad tool set, which makes a review run wander instead
+          # of returning the review JSON. Only the two repo-scoped lookup tools
+          # stay enabled, so the reviewer can verify a claim but cannot read
+          # credentials or run commands.
           cat /tmp/pr.diff | pi --provider openrouter --model "$PI_MODEL" \
             --thinking high \
             --system-prompt "$(cat .github/pi/review-prompt.md)" \
-            -p --no-session --no-tools --mode json > /tmp/pi-events.jsonl
+            -p --no-session --tools repo_grep,repo_read --mode json > /tmp/pi-events.jsonl
           [ -s /tmp/pi-events.jsonl ]
 
       - name: Post GitHub review
