@@ -393,6 +393,9 @@
       "room_temp_ext": {
         "name": "Zewnętrzna temperatura pokojowa"
       },
+      "room_temp_external": {
+        "name": "Zewnętrzna temperatura pokojowa"
+      },
       "compressorenergy": {
         "name": "Energia sprężarki"
       },

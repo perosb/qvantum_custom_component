@@ -393,6 +393,9 @@
       "room_temp_ext": {
         "name": "Kamertemperatuur extern"
       },
+      "room_temp_external": {
+        "name": "Kamertemperatuur extern"
+      },
       "compressorenergy": {
         "name": "Compressor energie"
       },

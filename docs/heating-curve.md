@@ -193,11 +193,16 @@ unidentified (no correction) while the pump has no room error to learn from.
 While the curve is active the module also learns slow **per-point trims** from
 the indoor error: hourly `(BT1, indoor − target)` from recorder statistics is
 bucketed by outdoor temperature and converted to supply degrees through the
-local curve slope, with recency weighting. A reference point with no observed
-hours within 7.5 °C stays at 0 — no evidence, no correction — each trim is
-capped at ±2 °C and updated at most once a day with a damped step, so it
-converges and stops when the error is gone. Trims are only applied while
-active (in shadow the baseline learning owns the curve shape) and are cleared
+local curve slope, with recency weighting. `indoor` is the sensor the pump is
+configured to use — BT2, or the fed external room temperature. In Modbus mode
+the fed value (holding 14) is also exposed as a diagnostic sensor, because
+long-term statistics exist only for sensors; that is what the trims and the
+room-gain fit read when the pump runs an external room sensor, not BT2. A
+reference point with no observed hours within 7.5 °C stays at 0 — no evidence,
+no correction — each trim is capped at ±2 °C and updated at most once a day
+with a damped step, so it converges and stops when the error is gone. Trims
+are only applied while active (in shadow the baseline learning owns the curve
+shape) and are cleared
 on reversion or when the baseline is re-learned. This is what keeps a
 mid-autumn activation working through winter: the part of the curve October
 could not observe is corrected by the weather the house actually sees.

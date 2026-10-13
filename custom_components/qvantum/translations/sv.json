@@ -391,7 +391,10 @@
         "name": "Elprisområde"
       },
       "room_temp_ext": {
-        "name": "Room temperature external"
+        "name": "Extern rumstemperatur"
+      },
+      "room_temp_external": {
+        "name": "Extern rumstemperatur"
       },
       "smart_sh_mode": {
         "name": "Smart SH läge",

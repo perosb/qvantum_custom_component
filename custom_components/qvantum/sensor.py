@@ -94,6 +94,7 @@ _DIAGNOSTIC_SENSORS = frozenset(
         "qn8position",
         # Settings read-backs and raw informational fields
         "start_cooling_temp",
+        "room_temp_external",
         "price_region",
         "op_mode_sensor",
         "smart_dhw_control_status",
@@ -377,6 +378,17 @@ async def async_setup_entry(
                 coordinator, "display_fw_version", device, True
             )
         )
+        if "room_temp_external" in values:
+            # The fed external room temperature (holding 14) as a recorded
+            # sensor: long-term statistics exist only for sensors, and the
+            # curve trims and room-gain fit must read the same sensor the pump
+            # is controlled by rather than BT2. The number entity stays the
+            # control.
+            sensors.append(
+                QvantumTemperatureEntity(
+                    coordinator, "room_temp_external", device, True
+                )
+            )
         curve_coordinator = getattr(
             config_entry.runtime_data, "curve_coordinator", None
         )
@@ -470,6 +482,7 @@ async def async_setup_entry(
         special_sensor_keys.update(
             {
                 "display_fw_version",
+                "room_temp_external",
                 *_CURVE_SENSOR_KEYS,
             }
         )

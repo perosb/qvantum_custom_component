@@ -1365,6 +1365,7 @@ class TestSensorSetup:
         assert "hpid" in allowed
         assert "tap_stop" in allowed
         assert "display_fw_version" in allowed
+        assert "room_temp_external" in allowed
         assert "adaptive_curve_30" in allowed
         assert "adaptive_curve_minus_30" in allowed
         assert "adaptive_curve_adjustment" in allowed
@@ -1402,6 +1403,64 @@ class TestSensorSetup:
         assert entity._attr_unique_id == "qvantum_display_fw_version_test_device_123"
         assert entity._attr_translation_key == "firmware_display_fw_version"
         assert entity.native_value == "1.3.6"
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_modbus_creates_external_room_sensor(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """The fed external room temperature is recorded as a sensor.
+
+        Long-term statistics exist only for sensors, and the curve trims and
+        room-gain fit must resolve the same value the pump is fed.
+        """
+        from custom_components.qvantum.const import CONF_MODBUS_TCP
+
+        mock_config_entry.options = {CONF_MODBUS_TCP: True}
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.data["values"]["room_temp_external"] = 20.5
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        room = [
+            entity
+            for entity in entities
+            if getattr(entity, "_metric_key", None) == "room_temp_external"
+            and isinstance(entity, QvantumTemperatureEntity)
+        ]
+
+        assert len(room) == 1
+        entity = room[0]
+        assert entity._attr_unique_id == "qvantum_room_temp_external_test_device_123"
+        assert entity._attr_state_class == SensorStateClass.MEASUREMENT
+        assert entity.native_value == 20.5
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_http_does_not_create_external_room_sensor(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """Cloud mode has no holding 14; the Modbus sensor is not created."""
+        mock_coordinator.modbus_enabled = False
+        mock_coordinator.data["values"]["room_temp_external"] = 20.5
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        assert not any(
+            getattr(entity, "_metric_key", None) == "room_temp_external"
+            and isinstance(entity, QvantumTemperatureEntity)
+            for entity in entities
+        )
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_http_does_not_create_display_firmware_sensor(

@@ -30,6 +30,27 @@ def test_resolve_entity_ids_without_device_id_returns_empty():
     assert stats.resolve_statistic_entity_ids(MagicMock(), None, ("bt1",)) == {}
 
 
+def test_resolve_indoor_metric_key_follows_the_configured_sensor():
+    from custom_components.qvantum.const import SensorMode
+
+    resolved = {
+        "bt2": "sensor.qvantum_indoor",
+        "room_temp_external": "sensor.qvantum_room_temp_external",
+    }
+
+    assert (
+        stats.resolve_indoor_metric_key(resolved, {"sensor_mode": SensorMode.EXTERNAL})
+        == "room_temp_external"
+    )
+    assert (
+        stats.resolve_indoor_metric_key(resolved, {"sensor_mode": SensorMode.BT2})
+        == "bt2"
+    )
+    # Missing mode falls back to BT2; no candidate at all is None.
+    assert stats.resolve_indoor_metric_key({"bt2": "sensor.x"}, {}) == "bt2"
+    assert stats.resolve_indoor_metric_key({}, {"sensor_mode": 4}) is None
+
+
 async def test_statistics_returns_empty_without_ids():
     assert (
         await stats.async_statistics_during_period(

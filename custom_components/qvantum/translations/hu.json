@@ -393,6 +393,9 @@
       "room_temp_ext": {
         "name": "Külső szobahőmérséklet"
       },
+      "room_temp_external": {
+        "name": "Külső szobahőmérséklet"
+      },
       "compressorenergy": {
         "name": "Kompresszor energia"
       },

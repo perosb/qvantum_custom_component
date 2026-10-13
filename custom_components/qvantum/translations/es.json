@@ -393,6 +393,9 @@
       "room_temp_ext": {
         "name": "Temperatura de habitación externa"
       },
+      "room_temp_external": {
+        "name": "Temperatura de habitación externa"
+      },
       "compressorenergy": {
         "name": "Energía compresor"
       },
