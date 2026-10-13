@@ -22,7 +22,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
@@ -94,8 +94,15 @@ INDOOR_MARGIN_CYCLES = 96  # 24 h at 15 min
 POWER_CYCLES = 4  # 1 h at 15 min
 READY_WINDOW_DAYS = 3
 READY_MIN_COVERAGE = 0.9
-READY_MEDIAN_MAX_C = 1.0
-READY_MAX_ABS_C = 3.0
+#: Heating-hour samples needed before the readiness statistics mean anything.
+READY_MIN_HOURS = 24
+#: Median gate, calibrated to what a ten-degree seven-point table can
+#: represent: even a converged baseline leaves ~1 °C of scatter in the
+#: observed outdoor range, so a tighter gate is unreachable by construction.
+READY_MEDIAN_MAX_C = 1.5
+#: Upper-bound gate on the 95th percentile: single mode-switch hours are not a
+#: curve error, and an absolute maximum would fail on them forever.
+READY_P95_MAX_C = 3.0
 STORAGE_VERSION = 1
 
 #: COP-reference learning: per-5 °C outdoor bucket EMA, and the minimum
@@ -121,6 +128,7 @@ class CurveReadiness:
     median_abs_c: float | None
     max_abs_c: float | None
     window_hours: float
+    p95_abs_c: float | None = None
 
 
 @dataclass(frozen=True)
@@ -152,6 +160,8 @@ class CurveSnapshot:
     baseline_outdoor_max_c: float | None = None
     #: Identified pump room-compensation gain (supply °C per °C room error).
     room_gain_c: float | None = None
+    #: 95th percentile of the readiness window (the gated upper bound).
+    p95_abs_c: float | None = None
     cop_c: float = 0.0
     precharge_c: float = 0.0
 
@@ -239,11 +249,16 @@ def assess_readiness(
     tz: ZoneInfo,
     *,
     signal: str | None = None,
+    covered_hours: Iterable[int] | None = None,
 ) -> CurveReadiness:
-    """Assess the shadow window over at least three full local days.
+    """Assess the readiness window over at least three full local days.
 
     ``signal`` carries the missing-signal blocker (baseline/forecast/history)
     computed by the caller; window/value blockers are added here.
+    ``covered_hours`` are the timestamps the recorder covered inside the
+    window, so a sample that is deliberately filtered (heating hours only) is
+    not judged against every hour of the window; it defaults to the sample
+    count for callers that pass an unfiltered series.
     """
     if signal is not None:
         return CurveReadiness(False, signal, None, None, 0.0)
@@ -260,17 +275,43 @@ def assess_readiness(
         and isinstance(value, (int, float))
         and math.isfinite(float(value))
     ]
-    if len(values) / expected < READY_MIN_COVERAGE:
+    if covered_hours is None:
+        observed = len(values)
+    else:
+        observed = sum(1 for ts in covered_hours if start <= ts < now_ts)
+    if observed / expected < READY_MIN_COVERAGE or len(values) < READY_MIN_HOURS:
         return CurveReadiness(False, "window", None, None, round(window_hours, 1))
 
     absolute = sorted(abs(value) for value in values)
     median_abs = _median_sorted(absolute)
+    p95_abs = absolute[min(len(absolute) - 1, round(0.95 * (len(absolute) - 1)))]
     max_abs = absolute[-1]
     if median_abs > READY_MEDIAN_MAX_C:
-        return CurveReadiness(False, "median", round(median_abs, 2), round(max_abs, 2), round(window_hours, 1))
-    if max_abs > READY_MAX_ABS_C:
-        return CurveReadiness(False, "max", round(median_abs, 2), round(max_abs, 2), round(window_hours, 1))
-    return CurveReadiness(True, None, round(median_abs, 2), round(max_abs, 2), round(window_hours, 1))
+        return CurveReadiness(
+            False,
+            "median",
+            round(median_abs, 2),
+            round(max_abs, 2),
+            round(window_hours, 1),
+            round(p95_abs, 2),
+        )
+    if p95_abs > READY_P95_MAX_C:
+        return CurveReadiness(
+            False,
+            "max",
+            round(median_abs, 2),
+            round(max_abs, 2),
+            round(window_hours, 1),
+            round(p95_abs, 2),
+        )
+    return CurveReadiness(
+        True,
+        None,
+        round(median_abs, 2),
+        round(max_abs, 2),
+        round(window_hours, 1),
+        round(p95_abs, 2),
+    )
 
 
 def _model_to_state(model: SolarModel | None) -> dict[str, Any] | None:
@@ -837,6 +878,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             blocker="baseline" if self._baseline is None else "forecast",
             median_abs_c=None,
             max_abs_c=None,
+            p95_abs_c=None,
             window_hours=0.0,
             model=self._model,
             calibrated_at=self._calibrated_at,
@@ -1022,22 +1064,73 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             maps["outdoor"] = maps["bt1"]
         return maps
 
-    async def _async_deviation_hours(self) -> dict[int, float]:
-        entity_id = self._resolve_curve_entity_id("adaptive_curve_deviation")
-        if not entity_id:
-            return {}
+    async def _async_readiness_hours(self) -> tuple[dict[int, float], set[int]]:
+        """Hourly baseline-vs-pump deviations for the readiness window.
+
+        Readiness asks whether the *learned baseline* reproduces the pump, not
+        whether the shadow (baseline plus the module's deliberate outdoor /
+        night-day / solar / load terms) does — those terms are the point of
+        activation, and judging them against Auto can never settle. Only
+        heating hours enter, like the baseline fit itself: when the circuit is
+        idle ``cal_heat_temp`` sits at the min-supply clamp and no longer
+        describes the curve. Returns the deviations plus the hours the recorder
+        covered, which is the coverage guard's denominator.
+        """
+        if self._baseline is None:
+            return {}, set()
+        resolved = self._resolve_statistic_ids()
+        outdoor_id = resolved.get("bt1")
+        supply_id = resolved.get("cal_heat_temp")
+        if not outdoor_id or not supply_id:
+            return {}, set()
+        power_id = resolved.get("heatingpower")
+        indoor_key = self._indoor_metric_key(resolved)
+        indoor_id = resolved.get(indoor_key) if indoor_key else None
+        statistic_ids = {outdoor_id, supply_id}
+        if power_id:
+            statistic_ids.add(power_id)
+        if indoor_id:
+            statistic_ids.add(indoor_id)
         rows = await self._async_statistics(
-            {entity_id},
+            statistic_ids,
             dt_util.utcnow() - timedelta(days=READY_WINDOW_DAYS + 1),
         )
+
+        def _series(entity_id: str) -> dict[int, float]:
+            series: dict[int, float] = {}
+            for row in rows.get(entity_id, []):
+                mean = row.get("mean")
+                start_ts = row.get("start")
+                if mean is None or start_ts is None:
+                    continue
+                series[int(start_ts)] = float(mean)
+            return series
+
+        outdoor = _series(outdoor_id)
+        supply = _series(supply_id)
+        power = _series(power_id) if power_id else {}
+        indoor = _series(indoor_id) if indoor_id else {}
+        target = self._main_values().get("indoor_temperature_target")
+        target_c = (
+            float(target)
+            if isinstance(target, (int, float)) and not isinstance(target, bool)
+            else None
+        )
+        try:
+            points = normalize_baseline(self._baseline)
+        except (TypeError, ValueError):
+            return {}, set()
         series: dict[int, float] = {}
-        for row in rows.get(entity_id, []):
-            mean = row.get("mean")
-            start = row.get("start")
-            if mean is None or start is None:
+        for ts in sorted(set(outdoor) & set(supply)):
+            if power_id and power.get(ts, 0.0) < MIN_SAMPLE_Q_W:
                 continue
-            series[int(start)] = float(mean)
-        return series
+            value = interpolate_supply(points, outdoor[ts]) - supply[ts]
+            if target_c is not None and ts in indoor:
+                value = room_corrected_deviation(
+                    value, self._room_gain, indoor[ts] - target_c
+                )
+            series[ts] = value
+        return series, set(outdoor)
 
     async def _async_baseline_observations(
         self, *, since_ts: float | None = None
@@ -1571,11 +1664,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             forecast_ok=self._forecast_ok,
             history_ok=self._model is not None and self._model.valid,
         )
+        readiness_hours, covered_hours = await self._async_readiness_hours()
         readiness = assess_readiness(
-            await self._async_deviation_hours(),
+            readiness_hours,
             int(now_ts),
             dt_util.get_default_time_zone(),
             signal=signal,
+            covered_hours=covered_hours,
         )
 
         points = result.as_dict() if result is not None else {}
@@ -1599,6 +1694,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             blocker=readiness.blocker,
             median_abs_c=readiness.median_abs_c,
             max_abs_c=readiness.max_abs_c,
+            p95_abs_c=readiness.p95_abs_c,
             window_hours=readiness.window_hours,
             model=self._model,
             calibrated_at=self._calibrated_at,

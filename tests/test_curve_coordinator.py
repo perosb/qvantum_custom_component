@@ -671,17 +671,57 @@ def test_assess_readiness_ready_and_value_blockers() -> None:
     assert result.blocker is None
     assert result.median_abs_c == pytest.approx(0.5)
     assert result.max_abs_c == pytest.approx(0.5)
+    assert result.p95_abs_c == pytest.approx(0.5)
 
-    median_fail = {ts: 1.5 for ts in window}
+    median_fail = {ts: 1.6 for ts in window}
     result = assess_readiness(median_fail, int(now), ZoneInfo("UTC"))
     assert not result.ready
     assert result.blocker == "median"
 
-    max_fail = {ts: 0.5 for ts in window}
-    max_fail[int(midnight) + 10 * 3600] = 5.0
-    result = assess_readiness(max_fail, int(now), ZoneInfo("UTC"))
+    # A single mode-switch hour must not fail the upper-bound gate.
+    transient = {ts: 0.5 for ts in window}
+    transient[int(midnight) + 10 * 3600] = 5.0
+    assert assess_readiness(transient, int(now), ZoneInfo("UTC")).ready
+
+    # A systematic tail does.
+    tail = {ts: 0.5 for ts in window}
+    for ts in list(tail)[:10]:
+        tail[ts] = 5.0
+    result = assess_readiness(tail, int(now), ZoneInfo("UTC"))
     assert not result.ready
     assert result.blocker == "max"
+    assert result.p95_abs_c == pytest.approx(5.0)
+
+
+def test_assess_readiness_coverage_uses_covered_hours() -> None:
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc).timestamp()
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc).timestamp()
+    window = {ts: 0.5 for ts in range(int(midnight), int(now), 3600)}
+    # Heating-only sample: a third of the window, but the recorder covered it.
+    heating = dict(list(window.items())[:28])
+
+    result = assess_readiness(
+        heating, int(now), ZoneInfo("UTC"), covered_hours=set(window)
+    )
+    assert result.ready
+
+    # Too few heating samples is still a window blocker.
+    result = assess_readiness(
+        dict(list(window.items())[:10]),
+        int(now),
+        ZoneInfo("UTC"),
+        covered_hours=set(window),
+    )
+    assert not result.ready
+    assert result.blocker == "window"
+
+    # Coverage counts only hours inside the window.
+    before = set(range(int(midnight) - 48 * 3600, int(midnight), 3600))
+    result = assess_readiness(
+        heating, int(now), ZoneInfo("UTC"), covered_hours=before
+    )
+    assert not result.ready
+    assert result.blocker == "window"
 
 
 def test_curve_deviation_uses_interpolated_supply() -> None:
@@ -711,7 +751,7 @@ async def test_snapshot_shadow_freezes_baseline_and_reports_blocker() -> None:
     coordinator = make_coordinator(values=VALUES, settings=SETTINGS, store=store)
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     snapshot = await coordinator._async_compute_snapshot()
@@ -741,15 +781,15 @@ async def test_snapshot_ready_with_model_and_window() -> None:
         hour=0, minute=0, second=0, microsecond=0
     )
     start = int((midnight - timedelta(days=3)).timestamp())
-    coordinator._async_deviation_hours = AsyncMock(
-        return_value={ts: 0.25 for ts in range(start, int(now), 3600)}
-    )
+    window = {ts: 0.25 for ts in range(start, int(now), 3600)}
+    coordinator._async_readiness_hours = AsyncMock(return_value=(window, set(window)))
 
     snapshot = await coordinator._async_compute_snapshot()
 
     assert snapshot.ready
     assert snapshot.blocker is None
     assert snapshot.median_abs_c == pytest.approx(0.25)
+    assert snapshot.p95_abs_c == pytest.approx(0.25)
     assert snapshot.model is not None
 
 
@@ -759,7 +799,7 @@ async def test_snapshot_deviates_when_user_defined() -> None:
     )
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     snapshot = await coordinator._async_compute_snapshot()
@@ -771,7 +811,7 @@ async def test_snapshot_without_baseline_does_not_fetch_forecast() -> None:
     coordinator = make_coordinator(values=VALUES, settings={})
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     snapshot = await coordinator._async_compute_snapshot()
@@ -785,7 +825,7 @@ async def test_snapshot_learns_baseline_while_auto() -> None:
     coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._async_baseline_observations = AsyncMock(
         return_value=_curve_observations(-3.0)
     )
@@ -804,7 +844,7 @@ async def test_snapshot_clamps_to_pump_supply_limits() -> None:
     coordinator = make_coordinator(values=values, settings=SETTINGS)
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     snapshot = await coordinator._async_compute_snapshot()
@@ -822,7 +862,7 @@ async def test_snapshot_active_records_clamp() -> None:
     coordinator._mode = "active"
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._async_trim_observations = AsyncMock(return_value=[])
     coordinator._daylight = MagicMock(return_value=None)
 
@@ -850,7 +890,7 @@ async def test_snapshot_trim_update_serializes_with_deactivation() -> None:
     coordinator._async_trim_observations = slow_observations
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     with patch.object(cc.asyncio, "sleep", AsyncMock()):
@@ -1307,23 +1347,69 @@ async def test_hourly_maps_builds_series_and_indoor() -> None:
     assert maps["indoor"] == {100: 19.0}
 
 
-async def test_deviation_hours_reads_sensor_statistics() -> None:
-    coordinator = make_coordinator()
-    coordinator._resolve_curve_entity_id = MagicMock(return_value="sensor.dev")
+async def test_readiness_hours_uses_baseline_on_heating_hours() -> None:
+    coordinator = make_coordinator(values={**VALUES, "sensor_mode": 4})
+    coordinator._baseline = dict(BASELINE)
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "heatingpower": "sensor.q",
+            "room_temp_external": "sensor.r",
+        }
+    )
     coordinator._async_statistics = AsyncMock(
         return_value={
-            "sensor.dev": [
-                {"start": 100, "mean": 0.5},
-                {"start": None, "mean": 1.0},
-                {"start": 200, "mean": None},
-            ]
+            "sensor.t": [{"start": 100, "mean": 10.0}],
+            "sensor.s": [{"start": 100, "mean": 37.5}],
+            "sensor.q": [{"start": 100, "mean": 900.0}],
+            "sensor.r": [{"start": 100, "mean": 21.1}],
         }
     )
 
-    assert await coordinator._async_deviation_hours() == {100: 0.5}
+    series, covered = await coordinator._async_readiness_hours()
 
-    coordinator._resolve_curve_entity_id = MagicMock(return_value=None)
-    assert await coordinator._async_deviation_hours() == {}
+    # Baseline (not the adjusted shadow) minus the pump: 36.0 − 37.5.
+    assert series == {100: pytest.approx(-1.5)}
+    assert covered == {100}
+
+
+async def test_readiness_hours_skips_idle_and_missing_inputs() -> None:
+    coordinator = make_coordinator(values={**VALUES, "sensor_mode": 4})
+    coordinator._baseline = dict(BASELINE)
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "heatingpower": "sensor.q",
+        }
+    )
+    coordinator._async_statistics = AsyncMock(
+        return_value={
+            "sensor.t": [{"start": 100, "mean": 10.0}, {"start": 200, "mean": 10.0}],
+            "sensor.s": [{"start": 100, "mean": 37.5}, {"start": 200, "mean": 37.5}],
+            "sensor.q": [{"start": 100, "mean": 900.0}, {"start": 200, "mean": 1.0}],
+        }
+    )
+
+    series, covered = await coordinator._async_readiness_hours()
+
+    assert series == {100: pytest.approx(-1.5)}
+    assert covered == {100, 200}
+
+    coordinator._baseline = None
+    assert await coordinator._async_readiness_hours() == ({}, set())
+
+    coordinator._baseline = dict(BASELINE)
+    coordinator._resolve_statistic_ids = MagicMock(return_value={"bt1": "sensor.t"})
+    assert await coordinator._async_readiness_hours() == ({}, set())
+
+    # An incomplete baseline is rejected rather than raising into the poll.
+    coordinator._baseline = {"curve_0": 42.0}
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "cal_heat_temp": "sensor.s"}
+    )
+    assert await coordinator._async_readiness_hours() == ({}, set())
 
 
 def test_daylight_builds_phase_and_degrades() -> None:
@@ -1372,7 +1458,7 @@ async def test_snapshot_forecast_failure_blocks_and_falls_back() -> None:
     coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(side_effect=OpenMeteoError("down"))
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     snapshot = await coordinator._async_compute_snapshot()
@@ -1393,7 +1479,7 @@ async def test_snapshot_deviation_removes_room_term() -> None:
     coordinator._room_gain = 9.0
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     snapshot = await coordinator._async_compute_snapshot()
@@ -1414,7 +1500,7 @@ async def test_snapshot_deviation_uncorrected_without_gain() -> None:
     coordinator._baseline = dict(BASELINE)
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     snapshot = await coordinator._async_compute_snapshot()
@@ -1430,7 +1516,7 @@ async def test_snapshot_deviation_falls_back_to_forecast_outdoor() -> None:
     coordinator._async_fetch_forecast = AsyncMock(
         return_value=make_forecast(temperature=10.0)
     )
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     snapshot = await coordinator._async_compute_snapshot()
@@ -1444,7 +1530,7 @@ async def test_snapshot_deviation_falls_back_to_forecast_outdoor() -> None:
     coordinator._async_fetch_forecast = AsyncMock(
         return_value=make_forecast(temperature=10.0)
     )
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     snapshot = await coordinator._async_compute_snapshot()
@@ -1860,7 +1946,7 @@ async def test_update_data_retries_pending_revert_on_cycle() -> None:
     coordinator._revert_pending = True
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
-    coordinator._async_deviation_hours = AsyncMock(return_value={})
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     coordinator._daylight = MagicMock(return_value=None)
 
     await coordinator._async_compute_snapshot()

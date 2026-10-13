@@ -548,6 +548,7 @@ def _curve_snapshot(**overrides) -> CurveSnapshot:
         blocker=None,
         median_abs_c=0.4,
         max_abs_c=0.9,
+        p95_abs_c=0.7,
         window_hours=84.0,
         model=SolarModel(
             a_w_per_k=161.0,
@@ -687,6 +688,7 @@ class TestQvantumCurveSensors:
         assert entity.extra_state_attributes["ready"] is True
         assert entity.extra_state_attributes["blocker"] is None
         assert entity.extra_state_attributes["window_hours"] == 84.0
+        assert entity.extra_state_attributes["p95_abs_c"] == 0.7
         assert entity.extra_state_attributes["baseline_auto"] is True
 
     def test_deviation_sensor_exposes_baseline_learning(self, mock_device):

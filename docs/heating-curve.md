@@ -218,10 +218,12 @@ Entities:
 - `sensor.qvantum_adaptive_curve_deviation` — computed supply at the measured
   outdoor minus `cal_heat_temp` (input 35), with `shadow`, `ready`, `blocker`
   and `baseline_auto` (baseline frozen while the pump was on Auto) attributes,
-  plus `baseline_learned_hours`, `baseline_outdoor_min_c`,
+  plus `median_abs_c`, `p95_abs_c`, `max_abs_c` and `window_hours` from the
+  readiness window, `baseline_learned_hours`, `baseline_outdoor_min_c`,
   `baseline_outdoor_max_c` from the last baseline fit and `room_gain_c_per_c`
   (the identified pump room-compensation gain removed from the deviation).
-  Diagnostic entity, enabled by default.
+  The `ready`/`blocker` attributes describe the baseline-vs-pump window, not
+  this sensor's own value. Diagnostic entity, enabled by default.
 - `sensor.qvantum_adaptive_curve_solar_model` — model trust in %, with
   `a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque` and `r2_solar` diagnostics.
   Diagnostic entity.
@@ -231,16 +233,27 @@ Entities:
 
 ### Activation and reversion
 
-The switch never turns itself on. `ready` becomes true after at least three
-full local days of deviation statistics with ≥ 90 % coverage, a median
-absolute deviation ≤ 1.0 °C (after the pump's room-compensation term is
-removed) and no hourly deviation beyond 3.0 °C. The
+The switch never turns itself on. `ready` becomes true when the **learned
+baseline** — not the adjusted shadow — reproduces the pump over at least three
+full local days: a median absolute deviation ≤ 1.5 °C and a 95th percentile
+≤ 3.0 °C, over heating hours only (`heatingpower` above the same floor the
+baseline fit uses). Idle hours sit at the min-supply clamp and no longer
+describe the curve, and the module's own outdoor / night-day / solar / load
+terms are deliberate — judging them against Auto would block activation
+forever. The room-compensation term the firmware adds is removed first, and
+the pump's room gain is identified from the same Auto hours.
+
+The gates are calibrated to what a ten-degree seven-point table can
+represent: even a converged baseline leaves roughly 1 °C of scatter across the
+observed outdoor range, so a tighter median gate is unreachable by
+construction. The 95th percentile replaces an absolute maximum because single
+mode-switch hours are transients, not a curve error. The
 `blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
 `window`, `median`, `max`). `ready` is a signal, not an activation. `ready`
-also needs the deviation sensor enabled and the recorder running: without
-hourly statistics the window stays incomplete and `blocker` is `window`. The
-deviation sensor is a Diagnostic entity and is enabled by default; disabling
-it turns the readiness signal off.
+needs the recorder running with ≥ 90 % window coverage and at least 24 heating
+hours: without hourly statistics the window stays incomplete and `blocker` is
+`window`. The deviation sensor is a Diagnostic entity and is enabled by
+default; it is informational and no longer feeds the readiness window.
 
 Turning the switch on:
 
