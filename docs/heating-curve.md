@@ -209,8 +209,10 @@ indoor resolver falls back to the next candidate (BT2 last) until it has
 ≈ a day of hourly rows — otherwise the trims, room-gain fit, solar calibration
 and the building metrics would all go dormant on a sensor change. A reference
 point with no observed hours within 7.5 °C stays at 0 — no evidence, no
-correction — each trim is capped at ±2 °C and updated at most once a day with
-a damped step, so it converges and stops when the error is gone. Trims
+correction — each trim is capped at ±2 °C and updated with a damped step, so it
+converges and stops when the error is gone. Updates are at most once a day once
+any trim exists; until then a shorter cadence applies, because the hours that
+justify the first correction are already in the window. Trims
 are only applied while active (in shadow the baseline learning owns the curve
 shape) and are cleared
 on reversion or when the baseline is re-learned. This is what keeps a
