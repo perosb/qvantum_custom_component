@@ -86,7 +86,15 @@ curve is only compared with the pump's own curve. When the comparison has
 looked good for a few days, the deviation sensor reports `ready` and you can
 turn on `switch.qvantum_adaptive_curve_control`. The integration then takes over
 the curve; turning the switch off — or a failed write, or a lost connection —
-hands control straight back to the pump's Auto curve.
+hands control straight back to the pump's Auto curve, and removing the
+integration does the same. Restarting Home Assistant does **not**: the pump
+keeps running the last table written, so it still heats while nothing is
+supervising it.
+
+`ready` only describes that pre-activation comparison. While the curve is
+active the pump follows the integration's own table, so watch
+`sensor.qvantum_adaptive_curve_room_error` instead — it reports how far the
+rooms actually sit from the target over the last three days.
 
 While active you can optionally enable extra control terms with
 `qvantum.set_curve_terms`: **COP feedback** (reduce supply while the measured

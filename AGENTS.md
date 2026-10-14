@@ -300,6 +300,13 @@ access, so no control is offered when a write would fail.
   enough hourly rows, otherwise the next candidate (BT2 last) keeps them
   alive. Never hard-code BT2 or the external sensor; always degrade to
   "no series" rather than a wrong one.
+- Removing the config entry reverts holding 22 to Auto (`async_remove_entry`),
+  because nothing would be left to supervise the User-defined table we wrote.
+  Reload and HA shutdown deliberately keep it: a reload re-activates from the
+  curve Store, and while HA is down the pump should still heat on the last
+  curve. A removal-time write must borrow a *temporary* Modbus unit
+  (`_async_temporary_modbus_unit`): `_async_modbus_unit` ties its release to
+  `entry.async_on_unload`, which cannot run once the entry is unloaded.
 
 ---
 
