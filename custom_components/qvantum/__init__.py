@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 import inspect
 import logging
@@ -39,6 +40,7 @@ from .const import (
     VERSION,
     CONFIG_VERSION,
     FIRMWARE_KEYS,
+    HeatingCurveType,
     CONF_MODBUS_TCP,
     CONF_MODBUS_WRITE,
     CONF_MODBUS_HOST,
@@ -50,7 +52,7 @@ from .const import (
     HTTP_CLOUD_LOOKUP_TIMEOUT,
 )
 from .coordinator import QvantumDataUpdateCoordinator
-from .curve_coordinator import QvantumCurveCoordinator
+from .curve_coordinator import QvantumCurveCoordinator, async_stored_curve_mode
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
@@ -207,6 +209,29 @@ def _async_modbus_unit(hass: HomeAssistant, config_entry: ConfigEntry):
         ModbusTcpParams(host=host, port=port),
         unit_id,
     )
+
+
+@asynccontextmanager
+async def _async_temporary_modbus_unit(hass: HomeAssistant, config_entry: ConfigEntry):
+    """Borrow a Modbus unit for one write outside the entry's lifetime.
+
+    ``_async_modbus_unit`` ties its hold to the config entry, which fits setup
+    and unload. Removal runs *after* the entry is unloaded, where a hold added
+    then would never be released - the connection would stay open with no
+    owner. The temporary unit is opened and closed here instead, and yields
+    ``None`` when the entry is not on Modbus.
+    """
+    enabled, host, port, unit_id = _modbus_link_settings(config_entry)
+    if not enabled:
+        yield None
+        return
+    from homeassistant.components.modbus import async_get_temporary_unit
+    from modbus_connection import ModbusTcpParams
+
+    async with async_get_temporary_unit(
+        hass, ModbusTcpParams(host=host, port=port), unit_id
+    ) as unit:
+        yield unit
 
 
 def _coordinator_device(coordinator: QvantumDataUpdateCoordinator) -> dict:
@@ -777,3 +802,49 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
                 )
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+    """Revert an active adaptive curve before the entry is removed.
+
+    Only a real removal lands here: unload and reload both go through
+    ``async_unload_entry`` and, for a reload, back into setup. On removal
+    nothing is left to supervise the User-defined table this module last
+    wrote, so the pump would keep running it with frozen trims, offset and
+    adjustments. Reverting to the pump's own Auto curve is the safe end state —
+    the same thing the integration already does when Modbus writes are turned
+    off while the curve is active.
+
+    HA shutdown is deliberately not covered: there the pump should keep
+    running our last table while Home Assistant is down.
+
+    Best effort: cloud mode, disabled writes, an unreadable curve Store and an
+    unreachable pump all skip it without failing the removal.
+    """
+    if not _modbus_write_enabled(config_entry):
+        return
+    if await async_stored_curve_mode(hass, config_entry) != "active":
+        return
+    try:
+        async with _async_temporary_modbus_unit(hass, config_entry) as unit:
+            if unit is None:
+                return
+            client = QvantumModbusClient(unit, writable=True)
+            try:
+                await client.set_curve_type_heating(
+                    config_entry.entry_id, int(HeatingCurveType.AUTO)
+                )
+            finally:
+                await client.close()
+        _LOGGER.info(
+            "Adaptive curve reverted to the pump's Auto curve before removing %s",
+            config_entry.entry_id,
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as err:  # noqa: BLE001 — best effort
+        _LOGGER.warning(
+            "Could not revert the adaptive curve while removing %s: %s",
+            config_entry.entry_id,
+            err,
+        )

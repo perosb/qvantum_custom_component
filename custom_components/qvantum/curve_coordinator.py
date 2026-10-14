@@ -105,6 +105,11 @@ READY_MEDIAN_MAX_C = 1.5
 READY_P95_MAX_C = 3.0
 STORAGE_VERSION = 1
 
+
+def curve_store_key(entry_id: str) -> str:
+    """Storage key for one config entry's curve state."""
+    return f"{DOMAIN}.curve.{entry_id}"
+
 #: COP-reference learning: per-5 °C outdoor bucket EMA, and the minimum
 #: samples before the feedback term may act. Learning always runs while the
 #: pump heats, so enabling the term does not start from nothing.
@@ -117,6 +122,29 @@ WRITE_PAUSE_SECONDS = 1.0
 #: Minimum change in °C before a point is rewritten.
 MIN_WRITE_DELTA_C = 1.0
 CONTROL_MODES = ("shadow", "active")
+
+
+async def async_stored_curve_mode(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> str | None:
+    """Curve control mode from the Store, without a live coordinator.
+
+    Called on config-entry removal, after the coordinator has been shut down
+    and the client closed. Returns ``None`` when the state is missing or
+    unreadable, which callers treat as "not active" — removal must never fail
+    because the curve state could not be read.
+    """
+    store = Store(hass, STORAGE_VERSION, curve_store_key(config_entry.entry_id))
+    try:
+        data = await store.async_load()
+    except asyncio.CancelledError:
+        raise
+    except Exception:  # noqa: BLE001 — best effort
+        return None
+    if not isinstance(data, dict):
+        return None
+    mode = data.get("mode")
+    return str(mode) if mode in CONTROL_MODES else None
 
 
 @dataclass(frozen=True)
@@ -375,7 +403,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if store is None and isinstance(
             getattr(getattr(hass, "config", None), "config_dir", None), str
         ):
-            store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.curve.{config_entry.entry_id}")
+            store = Store(
+                hass, STORAGE_VERSION, curve_store_key(config_entry.entry_id)
+            )
         self._store = store
         self._baseline: dict[str, float] | None = None
         self._baseline_auto: bool | None = None
