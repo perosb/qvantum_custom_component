@@ -302,24 +302,38 @@ class QvantumEntity(QvantumAccessMixin, CoordinatorEntity):
 def disable_entities_by_default(
     hass: HomeAssistant, entities: list[QvantumEntity]
 ) -> None:
-    """Disable entities that should be disabled by default."""
+    """Apply each entity's enabled-by-default flag to the entity registry.
+
+    Beyond disabling the entities that ask for it, this clears a stale
+    ``disabled_by=INTEGRATION`` from entities that are enabled by default now:
+    a metric can move out of a ``DEFAULT_DISABLED_*`` list, and nothing else
+    would ever re-enable the registry entry this integration disabled under an
+    earlier version. ``disabled_by=USER`` is never touched — that is the user's
+    choice, not ours.
+    """
     from homeassistant.helpers import entity_registry as er
     from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
     entity_registry = er.async_get(hass)
     for entity in entities:
-        if not entity._attr_entity_registry_enabled_default:
-            entity_entry = entity_registry.async_get(entity.entity_id)
-            if entity_entry and entity_entry.disabled_by is None:
-                # Entity is currently enabled, respect user's choice
-                continue
+        entity_entry = entity_registry.async_get(entity.entity_id)
+        if entity._attr_entity_registry_enabled_default:
             if (
-                entity_entry is None
-                or entity_entry.disabled_by != RegistryEntryDisabler.USER
+                entity_entry is not None
+                and entity_entry.disabled_by is RegistryEntryDisabler.INTEGRATION
             ):
-                entity_registry.async_update_entity(
-                    entity.entity_id, disabled_by=RegistryEntryDisabler.INTEGRATION
-                )
+                entity_registry.async_update_entity(entity.entity_id, disabled_by=None)
+            continue
+        if entity_entry and entity_entry.disabled_by is None:
+            # Entity is currently enabled, respect user's choice
+            continue
+        if (
+            entity_entry is None
+            or entity_entry.disabled_by != RegistryEntryDisabler.USER
+        ):
+            entity_registry.async_update_entity(
+                entity.entity_id, disabled_by=RegistryEntryDisabler.INTEGRATION
+            )
 
 
 def extract_metric_key(unique_id: str, device_id: str) -> str:

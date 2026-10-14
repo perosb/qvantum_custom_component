@@ -218,6 +218,12 @@ DEFAULT_ENABLED_HTTP_ONLY_METRICS = [
     "fan0_10v",
     # Epoch timestamp for when extra hot water ends; powers QvantumTimerEntity
     "tap_stop",
+    # The cloud external room temperature. Enabled by default because the
+    # building heat loss and the solar fit resolve the indoor sensor from it
+    # once the pump runs an external room sensor, and a disabled entity
+    # records no statistics. The API only returns the metric when such a
+    # sensor exists, so BT2 installs get no entity from it.
+    "room_temp_ext",
 ]
 
 DEFAULT_ENABLED_MODBUS_METRICS = (
@@ -244,7 +250,11 @@ DEFAULT_DISABLED_HTTP_METRICS = [
     "op_man_cooling",
     "op_mode_sensor",
     "price_region",
-    "room_temp_ext",
+    # ``room_temp_ext`` is deliberately absent: the statistics-based figures
+    # (building heat loss, solar fit) resolve the indoor sensor from it once
+    # the pump runs an external room sensor, and a disabled entity records no
+    # statistics. The API only returns it when such a sensor exists, so
+    # enabling it by default adds no entity for BT2 installs.
     "dhwdemand",
     "heatingdemand",
     "coolingdemand",
@@ -299,7 +309,10 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
 # logs "Metric X not found in response data".
 REQUIRED_METRICS = [
     "bt2",  # Required by climate when sensor_mode is BT2
-    "room_temp_ext",  # Required by climate when sensor_mode is external (HTTP)
+    # Required by climate when sensor_mode is external (HTTP), and enabled by
+    # default so the recorder has the series the building metrics read (see
+    # DEFAULT_DISABLED_HTTP_METRICS).
+    "room_temp_ext",
     "man_mode",  # Required by switch component
     "op_man_addition",  # Required by switch component
     "op_man_dhw",  # Required by switch component

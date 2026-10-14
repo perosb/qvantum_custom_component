@@ -73,6 +73,12 @@ the pump's watchdog stays satisfied. Manual writes to the feed's number entity
 are overwritten by the next refresh while the feed is active. Clear the picker
 to turn the feed off.
 
+Either way the pump's external room temperature is also exposed as a sensor —
+`room_temp_ext` in cloud mode, and a diagnostic sensor next to the feed number
+in Modbus mode — so the recorded series can be used by the building figures and
+the adaptive curve. When the pump has no such sensor the metric is absent and
+no entity is created.
+
 
 #### Adaptive heating curve
 

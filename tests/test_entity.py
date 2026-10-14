@@ -1,6 +1,6 @@
 """Tests for qvantum entity helpers."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -531,6 +531,98 @@ def test_finalize_platform_setup_registers_disables_and_cleans():
     async_add_entities.assert_called_once_with(entities)
     disable.assert_called_once_with(hass, entities)
     cleanup.assert_called_once_with(hass, coordinator, {"bt1"}, "sensor")
+
+
+class _StubEntity:
+    """The registry pass reads exactly these two fields."""
+
+    def __init__(self, entity_id: str, enabled_by_default: bool) -> None:
+        self.entity_id = entity_id
+        self._attr_entity_registry_enabled_default = enabled_by_default
+
+
+def _registry_mock(entries: dict):
+    registry = MagicMock()
+    registry.async_get.side_effect = lambda entity_id: entries.get(entity_id)
+    return registry
+
+
+def test_disable_entities_by_default_re_enables_a_stale_integration_disable():
+    """A metric that became enabled by default must come back on.
+
+    Existing installs carry ``disabled_by=INTEGRATION`` from the version that
+    created the entity, and nothing else would ever clear it - the entity would
+    keep recording no statistics. A user's own disable is left alone.
+    """
+    from homeassistant.helpers.entity_registry import RegistryEntryDisabler
+
+    from custom_components.qvantum.entity import disable_entities_by_default
+
+    registry = _registry_mock(
+        {
+            "sensor.qvantum_room_temp_ext": MagicMock(
+                disabled_by=RegistryEntryDisabler.INTEGRATION
+            ),
+            "sensor.qvantum_user_choice": MagicMock(
+                disabled_by=RegistryEntryDisabler.USER
+            ),
+            "sensor.qvantum_already_on": MagicMock(disabled_by=None),
+        }
+    )
+    entities = [
+        _StubEntity("sensor.qvantum_room_temp_ext", True),
+        _StubEntity("sensor.qvantum_user_choice", True),
+        _StubEntity("sensor.qvantum_already_on", True),
+        _StubEntity("sensor.qvantum_not_in_registry", True),
+    ]
+
+    with patch(
+        "homeassistant.helpers.entity_registry.async_get", return_value=registry
+    ):
+        disable_entities_by_default(MagicMock(), entities)
+
+    assert registry.async_update_entity.call_args_list == [
+        call("sensor.qvantum_room_temp_ext", disabled_by=None)
+    ]
+
+
+def test_disable_entities_by_default_still_disables_and_spares_the_user():
+    """The original direction keeps working: only our own disables are applied."""
+    from homeassistant.helpers.entity_registry import RegistryEntryDisabler
+
+    from custom_components.qvantum.entity import disable_entities_by_default
+
+    registry = _registry_mock(
+        {
+            # The user enabled a metric we ship disabled: leave it on.
+            "sensor.qvantum_bt12": MagicMock(disabled_by=None),
+            # The user disabled it themselves: leave it off.
+            "sensor.qvantum_bt4": MagicMock(
+                disabled_by=RegistryEntryDisabler.USER
+            ),
+            # Already disabled by us; re-applying is idempotent.
+            "sensor.qvantum_guide_des_temp": MagicMock(
+                disabled_by=RegistryEntryDisabler.INTEGRATION
+            ),
+        }
+    )
+    entities = [
+        _StubEntity("sensor.qvantum_bt12", False),
+        _StubEntity("sensor.qvantum_bt4", False),
+        _StubEntity("sensor.qvantum_guide_des_temp", False),
+    ]
+
+    with patch(
+        "homeassistant.helpers.entity_registry.async_get", return_value=registry
+    ):
+        disable_entities_by_default(MagicMock(), entities)
+
+    assert registry.async_update_entity.call_args_list == [
+        call(
+            "sensor.qvantum_guide_des_temp",
+            disabled_by=RegistryEntryDisabler.INTEGRATION,
+        )
+    ]
 
 
 def test_finalize_platform_setup_skips_disable_by_default():
