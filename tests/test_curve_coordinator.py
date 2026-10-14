@@ -118,6 +118,7 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._last_trim_ts = None
     coordinator._baseline_stats = None
     coordinator._room_gain = None
+    coordinator._room_gain_source = None
     coordinator._clamped_state = False
     coordinator._forecast = None
     coordinator._forecast_ok = False
@@ -365,7 +366,10 @@ async def test_room_gain_identifies_from_statistics() -> None:
     )
     coordinator._async_statistics = AsyncMock(return_value=_room_statistics(7.0))
 
-    assert await coordinator._async_room_gain() == pytest.approx(7.0)
+    identified = await coordinator._async_room_gain()
+
+    # The gain travels with the indoor sensor it was fitted against.
+    assert identified == (pytest.approx(7.0), "room_temp_external")
     statistic_ids = coordinator._async_statistics.call_args.args[0]
     assert statistic_ids == {"sensor.t", "sensor.s", "sensor.r", "sensor.q"}
 
@@ -427,27 +431,106 @@ async def test_room_gain_requires_baseline_ids_and_target() -> None:
 async def test_refresh_room_gain_persists_and_swallows_errors() -> None:
     store = FakeStore()
     coordinator = make_coordinator(store=store)
-    coordinator._async_room_gain = AsyncMock(return_value=9.0)
+    coordinator._async_room_gain = AsyncMock(return_value=(9.0, "bt2"))
 
     await coordinator._async_refresh_room_gain()
 
     assert coordinator._room_gain == pytest.approx(9.0)
+    assert coordinator._room_gain_source == "bt2"
     assert store.saved["room_gain"] == pytest.approx(9.0)
+    assert store.saved["room_gain_source"] == "bt2"
 
     # An unchanged gain does not write the store again.
     store.saved = None
     await coordinator._async_refresh_room_gain()
     assert store.saved is None
 
+    # A new source for the same gain is worth persisting: it changes which
+    # sensor the correction may be applied to.
+    coordinator._async_room_gain = AsyncMock(return_value=(9.0, "room_temp_external"))
+    await coordinator._async_refresh_room_gain()
+    assert coordinator._room_gain_source == "room_temp_external"
+    assert store.saved["room_gain_source"] == "room_temp_external"
+
     # A recorder failure is swallowed and keeps the last gain.
     coordinator._async_room_gain = AsyncMock(side_effect=RuntimeError("recorder down"))
     await coordinator._async_refresh_room_gain()
     assert coordinator._room_gain == pytest.approx(9.0)
+    assert coordinator._room_gain_source == "room_temp_external"
 
     # A missing fit keeps the last gain too.
     coordinator._async_room_gain = AsyncMock(return_value=None)
     await coordinator._async_refresh_room_gain()
     assert coordinator._room_gain == pytest.approx(9.0)
+
+
+def test_gain_for_requires_the_sensor_it_was_learned_from() -> None:
+    coordinator = make_coordinator()
+    coordinator._room_gain = 9.0
+    coordinator._room_gain_source = "bt2"
+
+    assert coordinator._gain_for("bt2") == pytest.approx(9.0)
+    assert coordinator._gain_for("room_temp_external") is None
+    assert coordinator._gain_for(None) is None
+
+    coordinator._room_gain_source = None
+    assert coordinator._gain_for("bt2") is None
+
+
+async def test_readiness_room_correction_requires_the_matching_sensor() -> None:
+    """A gain from another sensor must not touch this window's deviation."""
+    values = {**VALUES, "sensor_mode": 4, "indoor_temperature_target": 20.0}
+    hours = [100 + index * 3600 for index in range(cc.INDOOR_METRIC_MIN_HOURS)]
+
+    def build(*, source: str):
+        coordinator = make_coordinator(values=values, settings=SETTINGS)
+        coordinator._baseline = dict(BASELINE)
+        coordinator._room_gain = 9.0
+        coordinator._room_gain_source = source
+        coordinator._resolve_statistic_ids = MagicMock(
+            return_value={
+                "bt1": "sensor.t",
+                "cal_heat_temp": "sensor.s",
+                "heatingpower": "sensor.q",
+                "bt2": "sensor.i",
+                "room_temp_external": "sensor.r",
+            }
+        )
+        coordinator._async_statistics = AsyncMock(
+            return_value={
+                "sensor.t": [{"start": ts, "mean": 10.0} for ts in hours],
+                "sensor.s": [{"start": ts, "mean": 40.0} for ts in hours],
+                "sensor.q": [{"start": ts, "mean": 900.0} for ts in hours],
+                # Only BT2 has history, so the picker falls back to it.
+                "sensor.i": [{"start": ts, "mean": 21.0} for ts in hours],
+            }
+        )
+        return coordinator
+
+    # The picker falls back to BT2 and the gain came from BT2: corrected.
+    series, _ = await build(source="bt2")._async_readiness_hours()
+    assert series[100] == pytest.approx(36.0 - 40.0 - 9.0 * 1.0)
+
+    # Learned from the external sensor, which has no history here: the BT2
+    # error is left alone rather than scaled by another sensor's gain.
+    series, _ = await build(source="room_temp_external")._async_readiness_hours()
+    assert series[100] == pytest.approx(36.0 - 40.0)
+
+
+async def test_restore_keeps_a_known_room_gain_source() -> None:
+    store = FakeStore({"room_gain": 9.0, "room_gain_source": "bt2"})
+    coordinator = make_coordinator(store=store)
+    await coordinator.async_restore()
+    assert coordinator._room_gain == pytest.approx(9.0)
+    assert coordinator._room_gain_source == "bt2"
+
+    # An unknown key is ignored rather than carried into the correction.
+    for payload in ("nope", 4, None, True):
+        coordinator = make_coordinator(
+            store=FakeStore({"room_gain": 9.0, "room_gain_source": payload})
+        )
+        await coordinator.async_restore()
+        assert coordinator._room_gain_source is None
 
 
 def _trim_hours(
@@ -1723,6 +1806,7 @@ async def test_snapshot_deviation_removes_room_term() -> None:
     coordinator = make_coordinator(values=values, settings=SETTINGS)
     coordinator._baseline = dict(BASELINE)
     coordinator._room_gain = 9.0
+    coordinator._room_gain_source = "room_temp_external"
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
     coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
@@ -1732,6 +1816,31 @@ async def test_snapshot_deviation_removes_room_term() -> None:
 
     # Raw deviation is 36.0 − 37.0; the 0.5 °C room error at 9 °C/°C is removed.
     assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.5)
+    assert snapshot.room_gain_c == pytest.approx(9.0)
+
+
+async def test_snapshot_deviation_skips_a_gain_from_another_sensor() -> None:
+    """A gain learned from BT2 must not be applied to the external sensor."""
+    values = {
+        **VALUES,
+        "sensor_mode": 4,
+        "room_temp_external": 20.6,
+        "indoor_temperature_target": 20.1,
+    }
+    coordinator = make_coordinator(values=values, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._room_gain = 9.0
+    coordinator._room_gain_source = "bt2"
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    # Uncorrected, rather than subtracting BT2's room term from the external
+    # sensor's error. The gain is still reported for diagnostics.
+    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0)
     assert snapshot.room_gain_c == pytest.approx(9.0)
 
 

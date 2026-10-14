@@ -184,9 +184,13 @@ indoor error. The coordinator identifies that gain (supply °C per °C indoor
 error) from the same Auto hours, fitting the residual against both outdoor and
 the room error, and subtracts `gain × (indoor − target)` from the deviation
 before it feeds the readiness window. Without that, the shadow curve could
-never match a compensating pump closely enough to become `ready`. The gain is
-persisted and exposed as `room_gain_c_per_c` on the deviation sensor; it stays
-unidentified (no correction) while the pump has no room error to learn from.
+never match a compensating pump closely enough to become `ready`. The gain
+**travels with the indoor sensor it was fitted against**: if the resolver falls
+back to another sensor, or the live payload reports a different one, the
+correction is skipped rather than subtracting one sensor's room term from
+another's error. It is persisted and exposed as `room_gain_c_per_c` on the
+deviation sensor, and stays unidentified (no correction) while the pump has no
+room error to learn from.
 
 ### Active trims
 
