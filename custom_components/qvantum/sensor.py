@@ -205,6 +205,22 @@ _EFFICIENCY_SENSOR_CONFIG: dict[str, dict[str, object]] = {
         "precision": 3,
         "diagnostic": True,
     },
+    # Identified from the room decay while the pump is not heating.
+    "thermal_time_constant": {
+        "icon": "mdi:timer-sand",
+        "unit": "h",
+        "scale": 1.0,
+        "precision": 1,
+        "diagnostic": True,
+    },
+    "thermal_mass": {
+        "icon": "mdi:wall",
+        "unit": "kWh/K",
+        "scale": 1.0,
+        "precision": 1,
+        "field": "thermal_mass_kwh_per_k",
+        "diagnostic": True,
+    },
     "dhw_standing_loss": {
         "icon": "mdi:water-boiler-alert",
         "unit": "kWh/d",
@@ -288,6 +304,8 @@ _BUILDING_SENSOR_KEYS = frozenset(
         "heat_loss_coefficient",
         "heating_degree_hours",
         "weather_normalized_heating",
+        "thermal_time_constant",
+        "thermal_mass",
     }
 )
 
@@ -1083,6 +1101,13 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
             attributes["coverage_days"] = round(snapshot.building_coverage_days, 1)
         elif self._metric_key in ("scop_total", "aux_heat_share"):
             attributes["coverage_days"] = round(snapshot.coverage_days, 1)
+        if self._metric_key == "thermal_time_constant":
+            attributes["episodes"] = snapshot.thermal_episodes
+            attributes["gain_k_per_h"] = (
+                None
+                if snapshot.thermal_gain_k_per_h is None
+                else round(snapshot.thermal_gain_k_per_h, 3)
+            )
         if self._metric_key == "scop_total" and snapshot.scop_total_90d is not None:
             attributes["scop_90d"] = round(snapshot.scop_total_90d, 2)
         return attributes

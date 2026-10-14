@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Ogrzewanie znormalizowane pogodowo"
       },
+      "thermal_time_constant": {
+        "name": "Stała czasowa przegród"
+      },
+      "thermal_mass": {
+        "name": "Masa termiczna"
+      },
       "dhw_standing_loss": {
         "name": "Straty postojowe ciepłej wody"
       },

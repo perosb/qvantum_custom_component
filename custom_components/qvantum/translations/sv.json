@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Vädernormaliserad uppvärmning"
       },
+      "thermal_time_constant": {
+        "name": "Byggnadens tidskonstant"
+      },
+      "thermal_mass": {
+        "name": "Termisk massa"
+      },
       "dhw_standing_loss": {
         "name": "Varmvattenberedarens ståförlust"
       },

@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Weer-genormaliseerde verwarming"
       },
+      "thermal_time_constant": {
+        "name": "Tijdconstante van de gebouwschil"
+      },
+      "thermal_mass": {
+        "name": "Thermische massa"
+      },
       "dhw_standing_loss": {
         "name": "Stand-by verlies warm water"
       },

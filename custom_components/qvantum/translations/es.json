@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Calefacción normalizada por clima"
       },
+      "thermal_time_constant": {
+        "name": "Constante de tiempo de la envolvente"
+      },
+      "thermal_mass": {
+        "name": "Masa térmica"
+      },
       "dhw_standing_loss": {
         "name": "Pérdida en espera del agua caliente"
       },

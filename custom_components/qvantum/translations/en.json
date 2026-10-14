@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Weather-normalized heating"
       },
+      "thermal_time_constant": {
+        "name": "Envelope time constant"
+      },
+      "thermal_mass": {
+        "name": "Thermal mass"
+      },
       "dhw_standing_loss": {
         "name": "Hot water standing loss"
       },

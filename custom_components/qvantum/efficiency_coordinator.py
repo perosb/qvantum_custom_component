@@ -29,6 +29,7 @@ from .building import (
     MIN_FIT_ROWS,
     degree_hours,
     fit_heat_loss,
+    fit_time_constant,
     weather_normalized_heating,
 )
 from .const import (
@@ -127,6 +128,10 @@ class EfficiencySnapshot:
     heat_loss_w_per_k: float | None = None
     heating_degree_hours: float | None = None
     weather_normalized_heating: float | None = None
+    thermal_time_constant: float | None = None
+    thermal_gain_k_per_h: float | None = None
+    thermal_mass_kwh_per_k: float | None = None
+    thermal_episodes: int = 0
     normalized_rising: bool | None = None
     dhw_standing_loss: float | None = None
     compressor_starts_per_hour: float | None = None
@@ -497,6 +502,12 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         ) = self._building_metrics(
             sum_series.get("heatingenergy", []), mean_series, now_ts
         )
+        (
+            thermal_time_constant,
+            thermal_gain_k_per_h,
+            thermal_mass_kwh_per_k,
+            thermal_episodes,
+        ) = self._thermal_metrics(mean_series, heat_loss_w_per_k)
 
         starts_delta, _ = _window_delta(
             cycling_series.get("compressor_starts", []),
@@ -549,6 +560,10 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             scop_total_90d=scop_total_90d,
             aux_heat_share=aux_share,
             heat_loss_w_per_k=heat_loss_w_per_k,
+            thermal_time_constant=thermal_time_constant,
+            thermal_gain_k_per_h=thermal_gain_k_per_h,
+            thermal_mass_kwh_per_k=thermal_mass_kwh_per_k,
+            thermal_episodes=thermal_episodes,
             heating_degree_hours=heating_degree_hours,
             weather_normalized_heating=normalized_heating,
             normalized_rising=normalized_rising,
@@ -643,6 +658,39 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             rising = normalized >= previous * TREND_RISING_RATIO
 
         return heat_loss, hdh, normalized, rising, building_coverage
+
+    def _thermal_metrics(
+        self,
+        mean_series: Mapping[str, list[tuple[int, float]]],
+        heat_loss_w_per_k: float | None,
+    ) -> tuple[float | None, float | None, float | None, int]:
+        """Envelope time constant, standing gain and the implied heat capacity.
+
+        Identified from the hours the pump was not heating (see
+        :func:`building.fit_time_constant`). The capacity only exists once the
+        steady-state loss coefficient does: ``C = UA · τ``.
+        """
+        indoor_key = pick_indoor_metric_key(
+            {key: key for key in mean_series},
+            self._main_values(),
+            mean_series,
+            min_rows=MIN_FIT_ROWS,
+        )
+        if not indoor_key:
+            return None, None, None, 0
+        fit = fit_time_constant(
+            dict(mean_series.get(indoor_key, [])),
+            dict(mean_series.get("bt1", [])),
+            dict(mean_series.get("heatingpower", [])),
+        )
+        if fit is None:
+            return None, None, None, 0
+        mass = (
+            None
+            if heat_loss_w_per_k is None
+            else heat_loss_w_per_k * fit.time_constant_h / 1000.0
+        )
+        return fit.time_constant_h, fit.gain_k_per_h, mass, fit.episodes
 
     @staticmethod
     def _window(
