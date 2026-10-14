@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -898,16 +899,34 @@ class TestSolarDaily:
         assert loss == pytest.approx(152.0)
 
     async def test_refresh_fits_the_day_block_model(self):
+        """The day-block fit must actually see the series it is given."""
         coordinator = make_coordinator()
         fixed = datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
         now_ts = int(fixed.timestamp())
-        series = TestBuildingMetrics._series(now_ts=now_ts)
-        mean_series = {
-            "heatingpower": series["sensor.heatingpower"],
-            "bt1": series["sensor.bt1"],
-            "bt2": series["sensor.bt2"],
+        days = 30
+        mean_series: dict[str, list[tuple[int, float]]] = {
+            "heatingpower": [],
+            "bt1": [],
+            "bt2": [],
         }
-        ghi_history = {row["start"]: 0.0 for row in series["sensor.bt1"]}
+        ghi_history: dict[int, float] = {}
+        for index in range(days * 24):
+            ts = now_ts - (days * 24 - 1 - index) * 3600
+            ts -= ts % 3600
+            day = index // 24
+            outdoor = 12.0 + 0.4 * (day % 5)
+            hour = (ts // 3600) % 24
+            ghi = (
+                (300.0 + 90.0 * (day % 11)) * math.sin(math.pi * hour / 24.0)
+                if 6 <= hour < 18
+                else 0.0
+            )
+            ghi_history[ts] = ghi
+            mean_series["bt1"].append((ts, outdoor))
+            mean_series["bt2"].append((ts, 21.0))
+            mean_series["heatingpower"].append(
+                (ts, max(0.0, 152.0 * (21.0 - outdoor) - 600.0 - 1.9 * ghi))
+            )
 
         with patch.object(
             ec, "fetch_ghi_history", AsyncMock(return_value=ghi_history)
@@ -916,6 +935,9 @@ class TestSolarDaily:
                 mean_series, now_ts, 59.3, 18.1
             )
 
-        assert coordinator.solar_daily is not None
-        # Not enough heating days in a 10-hour series: gated off, not guessed.
-        assert coordinator.solar_daily.valid is False
+        daily = coordinator.solar_daily
+        assert daily is not None
+        assert daily.valid
+        assert daily.n_days >= 20
+        assert daily.b_m2 > 0.0
+        assert daily.notes.startswith("days=")
