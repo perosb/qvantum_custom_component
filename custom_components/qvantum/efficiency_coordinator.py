@@ -48,7 +48,16 @@ from .plant_analytics import (
     mean_while_running,
     starts_per_hour,
 )
-from .solar_gain import SolarModel, build_samples, fit_solar_model, smooth_ghi
+from .solar_gain import (
+    SolarDailyModel,
+    SolarModel,
+    aggregate_days,
+    build_samples,
+    effective_solar_model,
+    fit_daily_solar_model,
+    fit_solar_model,
+    smooth_ghi,
+)
 from .statistics import (
     async_statistics_during_period,
     pick_indoor_metric_key,
@@ -268,6 +277,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         # this coordinator so the gain works without the Modbus-only curve one.
         self._session: Any = None
         self._solar_model: SolarModel | None = None
+        self._solar_daily: SolarDailyModel | None = None
         self._last_solar_fit_ts: float | None = None
         super().__init__(
             hass,
@@ -282,6 +292,16 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
     def device_id(self) -> str | None:
         """Device id of the main coordinator, when known."""
         return getattr(self._main, "device_id", None)
+
+    @property
+    def solar_daily(self) -> SolarDailyModel | None:
+        """Day-block solar identification (what the gain uses when valid)."""
+        return self._solar_daily
+
+    @property
+    def solar_model(self) -> SolarModel | None:
+        """Heating-hour solar identification (the gain's fallback)."""
+        return self._solar_model
 
     @property
     def session(self) -> Any:
@@ -337,8 +357,13 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
 
         await self._async_refresh_solar_model(mean_series, now_ts, latitude, longitude)
         gain = None
-        if self._solar_model is not None and ghi_now is not None:
-            gain = self._solar_model.solar_gain_w(ghi_now)
+        if ghi_now is not None:
+            # Same policy as the curve's solar term: the day-block aperture
+            # wins when it passed its gates, the hourly one is the fallback.
+            # No identified aperture means "unknown", not "zero watts".
+            aperture, _ = effective_solar_model(self._solar_model, self._solar_daily)
+            if aperture > 0.0:
+                gain = max(0.0, aperture * ghi_now)
         return SolarSnapshot(
             ghi_now=ghi_now,
             ghi_peak=ghi_peak,
@@ -390,6 +415,13 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             _LOGGER.debug("Solar history unavailable: %s", err)
             return
 
+        # Day-block identification first: unlike the heating-hour fit below it
+        # keeps the sunny idle hours (q = 0) the pump's room term created, so
+        # it is the one that can see a positive aperture at all.
+        self._solar_daily = fit_daily_solar_model(
+            aggregate_days(power, indoor, outdoor, ghi_history)
+        )
+
         samples = build_samples(power, indoor, outdoor, ghi_history)
         if len(samples) < MIN_SOLAR_FIT_SAMPLES:
             _LOGGER.debug(
@@ -409,6 +441,17 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             model.b_m2,
             model.trust,
         )
+        daily = self._solar_daily
+        if daily is not None:
+            _LOGGER.info(
+                "Efficiency daily solar model: b=%.3f m² trust=%.2f valid=%s "
+                "(%s days, %s)",
+                daily.b_m2,
+                daily.trust,
+                daily.valid,
+                daily.n_days,
+                daily.notes,
+            )
 
     async def _async_update_data(self) -> EfficiencySnapshot:
         """Never fail: degrade to the last good snapshot on any error."""

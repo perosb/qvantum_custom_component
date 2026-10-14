@@ -158,7 +158,7 @@ pump's current seven-point table (holding 24–30) as the baseline and computes
 |---|---|
 | outdoor | Open-Meteo hourly temperature trend over the next hours (never instantaneous BT1), damped |
 | night/day | local sunrise/sunset (Home Assistant location); amplitude is a fraction of the forecast's diurnal supply swing (curve slope × outdoor range), bounded |
-| solar | self-calibrating `a`/`b`/`trust` model from recorder statistics (`heatingpower`, indoor, outdoor) plus Open-Meteo GHI history; gain in W → °C through the local baseline slope |
+| solar | self-calibrating `a`/`b`/`trust` model from recorder statistics (`heatingpower`, indoor, outdoor) plus Open-Meteo GHI history, identified on **day blocks** (see [Solar model](#solar-model)); gain in W → °C through the local baseline slope |
 | load | one-sided reduction when measured heating power is below the model demand at the target indoor temperature |
 | optional | COP feedback and/or cold-snap pre-charge, **off by default** — see [Optional terms](#optional-terms) |
 
@@ -253,9 +253,12 @@ Entities:
   compares our baseline with the pump, which says nothing about the house once
   the curve is active; this measures whether the rooms actually follow the
   target, on whichever indoor sensor the trims are reading. Diagnostic entity.
-- `sensor.qvantum_adaptive_curve_solar_model` — model trust in %, with
-  `a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque` and `r2_solar` diagnostics.
-  Diagnostic entity.
+- `sensor.qvantum_adaptive_curve_solar_model` — the **applied** trust in %
+  (the day-block model's when it is valid, otherwise the hourly one), with the
+  hourly coefficients (`a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque`,
+  `r2_solar`) and a `model_daily` block carrying the day-block `a`, `b`, `t`,
+  `r2`, `n_days`, the two window halves, the jackknife range and the gate
+  `notes` that explain why a term is missing. Diagnostic entity.
 - `switch.qvantum_adaptive_curve_control` — off = shadow, on = active writing.
   `qvantum.set_curve_control` with `mode: shadow|active` does the same from an
   automation.
@@ -350,6 +353,33 @@ temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily.
 are computed from your house's data — nothing is hand-tuned. Weak evidence
 keeps the solar term tiny automatically, and GHI is smoothed with an
 exponential kernel so one cloud cannot swing the curve.
+
+The aperture is identified from the **daily energy balance**:
+
+```
+Q_day ≈ a · ΣΔT + 24c − b · ΣGHI        (Σ over every hour of the UTC day)
+```
+
+Idle hours contribute `q = 0` instead of being dropped. That matters because
+the heating hours are a *selected* sample: on a sunny day the pump's own room
+term has already stopped the circuit, so exactly the hours that carry the
+solar signal are the ones a heating-hour fit never sees. Identified per hour
+the same data even flips the sign (the pump's recovery runs cluster in the
+low-sun hours), which is why the day block is the smallest window used.
+
+The day-block model is **gated**: at least 20 usable days (≥ 20 h of data and
+≥ 5 heating hours each), a positive loss coefficient and aperture, `b`'s
+t-statistic ≥ 2.5, R² ≥ 0.85, and a leave-one-day-out check that no single day
+moves `b` by more than ±50 %. When a gate fails the model is *invalid* and the
+solar term is simply 0 — the curve never guesses, and an unidentifiable window
+switches the term off rather than preserving an older aperture. Because the
+evidence is measured in heating days, a fresh install needs a few weeks of
+heating season before the term appears.
+
+When the day-block model is valid it is the one the term uses (its `b` and its
+`a` are converted with each other); the hourly fit remains as the fallback and
+still feeds the load term's demand estimate. Both are visible in diagnostics
+(`curve.model` and `curve.model_daily`) and on the solar-model sensor.
 
 ## Seasonality
 

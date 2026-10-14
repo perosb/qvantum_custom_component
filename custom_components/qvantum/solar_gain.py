@@ -24,13 +24,27 @@ is upward-biased for small samples and would make a handful of rows look
 more trustworthy than the evidence supports. Callers convert the returned
 watts to supply-temperature degrees; this module never writes to a heat
 pump.
+
+Heating hours are a *selected* sample: they are the hours the pump itself
+decided to heat, and on a sunny day its room term has already stopped the
+circuit. The sunniest hours are therefore censored away, and at hour
+resolution the control response (recovery runs in the low-sun hours)
+dominates the fit — measured on a live pump the slope comes out *negative*
+(−0.9 m², t = −8.7 at 1 h). :func:`fit_daily_solar_model` is the same
+balance identified on UTC day blocks instead, where the idle hours the sun
+bought contribute ``q = 0`` rather than being dropped::
+
+    Q_day ≈ a · ΣΔT + 24c − b · ΣGHI     (Σ over all hours of the day)
+
+It is gated on evidence (day count, t-stat, R², half-window agreement) and
+returns an invalid model — no solar term at all — whenever a gate fails.
 """
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 #: Recency half-life for the exponential weights (effective memory ≈ 60 days).
 HALF_LIFE_DAYS: float = 30.0
@@ -52,6 +66,36 @@ DEFAULT_SPAN_HOURS: int = 6
 MIN_SAMPLE_DELTA_T_K: float = 5.0
 #: Minimum measured heating power for a heating hour to carry signal.
 MIN_SAMPLE_Q_W: float = 50.0
+
+# --- Day-block identification -------------------------------------------------
+
+#: Day blocks are the smallest window where the fit describes the house rather
+#: than the pump's control response: with idle hours counted at hour resolution
+#: the fitted slope flips sign (measured −0.90 ± 0.10 m² at 1 h on a live pump).
+DAILY_BLOCK_HOURS: int = 24
+#: Joined hours a day needs before its balance means anything.
+DAILY_MIN_HOURS: int = 20
+#: Real heating hours a day needs, else it is a summer day whose zero demand
+#: says nothing about the envelope. Measured: including those days collapses
+#: the aperture to 0.27 m² (t = 0.6) over 59 days.
+DAILY_MIN_HEATING_HOURS: int = 5
+#: Evidence gates. ``trust`` already scales the applied offset by ``t²/(t²+4)``,
+#: so the t gate only refuses *no* evidence rather than tuning precision
+#: (the live pump sits at t ≈ 3.0 with 25 heating days — the ceiling this
+#: sample size can reach).
+DAILY_MIN_DAYS: int = 20
+#: Days a window half needs before its aperture is reported as a diagnostic.
+DAILY_MIN_HALF_DAYS: int = 8
+DAILY_MIN_T_STAT: float = 2.5
+DAILY_MIN_R2: float = 0.85
+DAILY_MAX_B_M2: float = 10.0
+#: Every leave-one-day-out refit must stay positive and within ±this factor of
+#: the full-window aperture: the estimate must not rest on a single day.
+#: Measured on a live pump (26 heating days): jackknife 1.49–2.22 around 1.88,
+#: i.e. ±21 %. A plain two-half split is *not* the right test — the older half
+#: of a shoulder-season window is simply low-information (R² 0.33 with 6 kWh
+#: days), which is a fact about the window, not about the aperture.
+DAILY_JACKKNIFE_BAND: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -410,3 +454,337 @@ def fit_solar_model(
         valid=True,
         notes=f"opaque n={n_opaque} r2={r2_opaque:.3f}; {solar_note}",
     )
+
+
+@dataclass(frozen=True)
+class SolarDay:
+    """One UTC day of the site energy balance.
+
+    The input maps are hourly *means*, so the sums are energy-like: ``ΣΔT``
+    in K·h, ``ΣGHI`` in Wh/m² and ``Q`` in Wh. Idle hours are included with
+    ``q = 0`` — that is the point, the sun's work shows up as an hour the
+    circuit did not have to run.
+    """
+
+    day_ts: int
+    sum_delta_t_k: float
+    sum_ghi_wm2: float
+    q_heat_wh: float
+    hours: int
+    heating_hours: int
+
+
+@dataclass(frozen=True)
+class SolarDailyModel:
+    """Day-block energy balance ``Q = a·ΣΔT + 24c − b·ΣGHI``.
+
+    ``valid`` is ``False`` whenever an evidence gate fails; callers then
+    apply no solar term at all rather than a guess.
+    """
+
+    a_w_per_k: float
+    b_m2: float
+    c_w: float
+    trust: float
+    r2: float
+    n_days: int
+    b_std_err: float | None = None
+    t_stat: float | None = None
+    b_first_half_m2: float | None = None
+    b_second_half_m2: float | None = None
+    b_jackknife_min_m2: float | None = None
+    b_jackknife_max_m2: float | None = None
+    valid: bool = False
+    notes: str = ""
+
+    @property
+    def effective_b_m2(self) -> float:
+        """``b`` shrunk by ``trust``; what actually drives the solar offset."""
+        return self.b_m2 * max(0.0, min(1.0, self.trust))
+
+
+def aggregate_days(
+    q_by_hour: Mapping[int, float],
+    indoor_by_hour: Mapping[int, float],
+    outdoor_by_hour: Mapping[int, float],
+    ghi_by_hour: Mapping[int, float],
+) -> list[SolarDay]:
+    """Sum hourly maps into UTC day blocks.
+
+    Every hour present in all four series contributes; non-finite rows are
+    skipped rather than poisoning a day's sums.
+    """
+    buckets: dict[int, dict[str, float]] = {}
+    for ts in sorted(
+        set(q_by_hour) & set(indoor_by_hour) & set(outdoor_by_hour) & set(ghi_by_hour)
+    ):
+        try:
+            hour = int(ts)
+            delta_t = float(indoor_by_hour[ts]) - float(outdoor_by_hour[ts])
+            irradiance = float(ghi_by_hour[ts])
+            q_heat = float(q_by_hour[ts])
+        except (TypeError, ValueError):
+            continue
+        if not (
+            math.isfinite(delta_t) and math.isfinite(irradiance) and math.isfinite(q_heat)
+        ):
+            continue
+        day_ts = hour - (hour % (DAILY_BLOCK_HOURS * 3600))
+        bucket = buckets.setdefault(
+            day_ts,
+            {"sum_delta_t": 0.0, "sum_ghi": 0.0, "q_heat": 0.0, "hours": 0, "heat": 0},
+        )
+        bucket["sum_delta_t"] += delta_t
+        bucket["sum_ghi"] += max(0.0, irradiance)
+        bucket["q_heat"] += max(0.0, q_heat)
+        bucket["hours"] += 1
+        if q_heat >= MIN_SAMPLE_Q_W and delta_t >= MIN_SAMPLE_DELTA_T_K:
+            bucket["heat"] += 1
+    return [
+        SolarDay(
+            day_ts=day_ts,
+            sum_delta_t_k=bucket["sum_delta_t"],
+            sum_ghi_wm2=bucket["sum_ghi"],
+            q_heat_wh=bucket["q_heat"],
+            hours=int(bucket["hours"]),
+            heating_hours=int(bucket["heat"]),
+        )
+        for day_ts, bucket in sorted(buckets.items())
+    ]
+
+
+def _invert_3x3(matrix: Sequence[Sequence[float]]) -> list[list[float]]:
+    """Gauss-Jordan inverse with partial pivoting; raises on a singular design."""
+    scale = max((abs(value) for row in matrix for value in row), default=0.0)
+    if scale <= 0.0:
+        raise ValueError("singular design")
+    aug = [
+        [float(matrix[row][col]) for col in range(3)]
+        + [1.0 if row == column else 0.0 for column in range(3)]
+        for row in range(3)
+    ]
+    for col in range(3):
+        pivot_row = max(range(col, 3), key=lambda row: abs(aug[row][col]))
+        if abs(aug[pivot_row][col]) <= 1e-12 * scale:
+            raise ValueError("singular design")
+        aug[col], aug[pivot_row] = aug[pivot_row], aug[col]
+        divisor = aug[col][col]
+        aug[col] = [value / divisor for value in aug[col]]
+        for row in range(3):
+            if row == col:
+                continue
+            factor = aug[row][col]
+            if factor:
+                aug[row] = [
+                    value - factor * base for value, base in zip(aug[row], aug[col])
+                ]
+    return [row[3:] for row in aug]
+
+
+def _ols_three(
+    x1: Sequence[float],
+    x2: Sequence[float],
+    x3: Sequence[float],
+    y: Sequence[float],
+) -> tuple[tuple[float, float, float], tuple[float, float, float], float]:
+    """Plain least squares for three regressors → ``(beta, stderr, r2)``.
+
+    Raises ``ValueError`` when there are fewer rows than coefficients or the
+    design matrix is singular.
+    """
+    rows = list(zip(x1, x2, x3, y))
+    n = len(rows)
+    if n < 4:
+        raise ValueError("too few rows")
+    columns = (
+        [row[0] for row in rows],
+        [row[1] for row in rows],
+        [row[2] for row in rows],
+    )
+    targets = [row[3] for row in rows]
+    xtx = [
+        [sum(a * b for a, b in zip(columns[i], columns[j])) for j in range(3)]
+        for i in range(3)
+    ]
+    xty = [sum(a * b for a, b in zip(columns[i], targets)) for i in range(3)]
+    inverse = _invert_3x3(xtx)
+    beta = tuple(
+        sum(inverse[i][j] * xty[j] for j in range(3)) for i in range(3)
+    )
+    residuals = [
+        target - sum(beta[j] * columns[j][index] for j in range(3))
+        for index, target in enumerate(targets)
+    ]
+    ss_res = sum(value * value for value in residuals)
+    mean_y = sum(targets) / n
+    ss_tot = sum((target - mean_y) ** 2 for target in targets)
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > 1e-9 else 0.0
+    sigma2 = ss_res / (n - 3)
+    stderr = tuple(
+        math.sqrt(max(0.0, sigma2 * inverse[i][i])) for i in range(3)
+    )
+    if not all(math.isfinite(value) for value in beta + stderr):
+        raise ValueError("non-finite fit")
+    return beta, stderr, r2
+
+
+def _fit_daily_rows(
+    days: Sequence[SolarDay],
+) -> tuple[float, float, float, float, float | None, float]:
+    """Day-block OLS → ``(a, b, c, b_std_err, t_stat, r2)``.
+
+    ``c`` is per hour (the intercept is a day's ``24c``), so it keeps the same
+    meaning as the hourly model's intercept.
+    """
+    n = len(days)
+    beta, stderr, r2 = _ols_three(
+        [day.sum_delta_t_k for day in days],
+        [day.sum_ghi_wm2 for day in days],
+        [1.0] * n,
+        [day.q_heat_wh for day in days],
+    )
+    a, minus_b, intercept = beta
+    se_b = stderr[1]
+    b = -minus_b
+    t_stat = None if se_b <= 1e-12 else b / se_b
+    return a, b, intercept / float(DAILY_BLOCK_HOURS), se_b, t_stat, r2
+
+
+def fit_daily_solar_model(days: Sequence[SolarDay]) -> SolarDailyModel:
+    """Identify ``a``/``c``/``b`` from UTC day blocks, gated on evidence.
+
+    Returns an invalid zero model whenever a gate fails — too few usable
+    days, a non-positive loss or aperture, an absurd aperture, a weak t-stat,
+    a poor R², or two window halves that disagree. The caller then applies no
+    solar term at all: an unidentifiable aperture must degrade to "off", not
+    to a guess.
+    """
+    usable = [
+        day
+        for day in days
+        if day.hours >= DAILY_MIN_HOURS
+        and day.heating_hours >= DAILY_MIN_HEATING_HOURS
+    ]
+    n_days = len(usable)
+    empty: dict[str, Any] = {
+        "a_w_per_k": 0.0,
+        "b_m2": 0.0,
+        "c_w": 0.0,
+        "trust": 0.0,
+        "r2": 0.0,
+        "n_days": n_days,
+        "valid": False,
+    }
+    if n_days < DAILY_MIN_DAYS:
+        return SolarDailyModel(**empty, notes=f"days {n_days} < {DAILY_MIN_DAYS}")
+
+    ordered = sorted(usable, key=lambda day: day.day_ts)
+    try:
+        a, b, c, se_b, t_stat, r2 = _fit_daily_rows(ordered)
+    except ValueError as err:
+        return SolarDailyModel(**empty, notes=f"daily fit failed: {err}")
+    measured: dict[str, Any] = {
+        **empty,
+        "a_w_per_k": a,
+        "b_m2": b,
+        "c_w": c,
+        "r2": max(0.0, min(1.0, r2)),
+        "b_std_err": se_b,
+        "t_stat": t_stat,
+    }
+    if a <= 0.0:
+        return SolarDailyModel(**measured, notes="a ≤ 0")
+    if b <= 0.0:
+        return SolarDailyModel(**measured, notes=f"no positive aperture (b={b:.3f} m²)")
+    if b > DAILY_MAX_B_M2:
+        return SolarDailyModel(
+            **measured, notes=f"b {b:.2f} m² > {DAILY_MAX_B_M2:.0f} m²"
+        )
+    if t_stat is None or t_stat < DAILY_MIN_T_STAT:
+        return SolarDailyModel(
+            **measured,
+            notes=(
+                "t-stat unavailable"
+                if t_stat is None
+                else f"t {t_stat:.2f} < {DAILY_MIN_T_STAT:.1f}"
+            ),
+        )
+    if r2 < DAILY_MIN_R2:
+        return SolarDailyModel(**measured, notes=f"r2 {r2:.2f} < {DAILY_MIN_R2:.2f}")
+
+    # Diagnostics: the two halves of the window, reported (never gated) so a
+    # support dump shows when the older half carried no information at all.
+    half = n_days // 2
+    b_halves: list[float | None] = []
+    for part in (ordered[:half], ordered[half:]):
+        value: float | None = None
+        if len(part) >= DAILY_MIN_HALF_DAYS:
+            try:
+                candidate = _fit_daily_rows(part)[1]
+            except ValueError:
+                candidate = float("nan")
+            if math.isfinite(candidate):
+                value = candidate
+        b_halves.append(value)
+
+    # Stability: no single day may carry the estimate.
+    jackknife: list[float] = []
+    for index in range(n_days):
+        try:
+            candidate = _fit_daily_rows(ordered[:index] + ordered[index + 1 :])[1]
+        except ValueError:
+            candidate = float("nan")
+        jackknife.append(candidate)
+    if not all(math.isfinite(value) for value in jackknife):
+        return SolarDailyModel(**measured, notes="jackknife fit failed")
+    band = DAILY_JACKKNIFE_BAND
+    if not all(band * b <= value <= (1.0 + band) * b for value in jackknife):
+        return SolarDailyModel(
+            **measured,
+            notes=(
+                f"jackknife {min(jackknife):.2f}-{max(jackknife):.2f} m² "
+                f"vs {b:.2f} m²"
+            ),
+        )
+
+    trust = max(0.0, min(1.0, _trust_from_t_stat(t_stat)))
+    return SolarDailyModel(
+        a_w_per_k=a,
+        b_m2=b,
+        c_w=c,
+        trust=trust,
+        r2=max(0.0, min(1.0, r2)),
+        n_days=n_days,
+        b_std_err=se_b,
+        t_stat=t_stat,
+        b_first_half_m2=b_halves[0],
+        b_second_half_m2=b_halves[1],
+        b_jackknife_min_m2=min(jackknife),
+        b_jackknife_max_m2=max(jackknife),
+        valid=True,
+        notes=(
+            f"days={n_days} t={t_stat:.2f} r2={r2:.3f} "
+            f"jackknife={min(jackknife):.2f}-{max(jackknife):.2f}"
+        ),
+    )
+
+
+def effective_solar_model(
+    model: SolarModel | None,
+    daily: SolarDailyModel | None,
+) -> tuple[float, float]:
+    """``(aperture m², loss coefficient W/K)`` the solar term should use.
+
+    The day-block pair wins whenever it passed its gates with a positive
+    aperture: it is the same balance identified without the heating-hour
+    censoring, so its ``b`` and ``a`` belong together and are converted with
+    each other. The hourly model is the fallback (its own ``b`` is 0 on a
+    censored window, i.e. no term), never a second opinion to average in.
+    """
+    if daily is not None and daily.valid and daily.a_w_per_k > 0.0:
+        aperture = daily.effective_b_m2
+        if aperture > 0.0:
+            return aperture, daily.a_w_per_k
+    if model is not None and model.valid and model.a_w_per_k > 0.0:
+        return model.effective_b_m2, model.a_w_per_k
+    return 0.0, 0.0

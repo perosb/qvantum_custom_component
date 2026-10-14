@@ -1003,9 +1003,18 @@ class QvantumCurveSolarModelSensor(QvantumCurveSensorEntity):
 
     @property
     def native_value(self):
-        """Return the model trust in percent."""
+        """Return the *applied* trust in percent.
+
+        The day-block model is the solar term's source whenever it passed its
+        gates, so its trust is the number that describes what the curve does.
+        """
         snapshot = self.coordinator.data
-        if snapshot is None or snapshot.model is None:
+        if snapshot is None:
+            return None
+        daily = snapshot.daily_model
+        if daily is not None and daily.valid:
+            return round(daily.trust * 100)
+        if snapshot.model is None:
             return None
         return round(snapshot.model.trust * 100)
 
@@ -1016,25 +1025,72 @@ class QvantumCurveSolarModelSensor(QvantumCurveSensorEntity):
 
     @property
     def extra_state_attributes(self):
-        """Return the identified coefficients and diagnostics."""
+        """Return the identified coefficients and diagnostics.
+
+        Either model may be missing on its own (they are fitted from the same
+        window but gated separately), so both blocks are always emitted and a
+        missing one reads as ``None`` rather than hiding the other.
+        """
         snapshot = self.coordinator.data
-        if snapshot is None or snapshot.model is None:
+        if snapshot is None:
             return None
         model = snapshot.model
-        return {
-            "a_w_per_k": round(model.a_w_per_k, 2),
-            "b_m2": round(model.b_m2, 4),
-            "c_w": round(model.c_w, 1),
+        daily = snapshot.daily_model
+        if model is None and daily is None:
+            return None
+        attributes: dict[str, object] = {
+            "a_w_per_k": None if model is None else round(model.a_w_per_k, 2),
+            "b_m2": None if model is None else round(model.b_m2, 4),
+            "c_w": None if model is None else round(model.c_w, 1),
             "b_std_err": (
-                None if model.b_std_err is None else round(model.b_std_err, 5)
+                None
+                if model is None or model.b_std_err is None
+                else round(model.b_std_err, 5)
             ),
-            "r2_opaque": round(model.r2_opaque, 3),
-            "r2_solar": round(model.r2_solar, 3),
-            "n_opaque": model.n_opaque,
-            "n_solar": model.n_solar,
-            "valid": model.valid,
+            "r2_opaque": None if model is None else round(model.r2_opaque, 3),
+            "r2_solar": None if model is None else round(model.r2_solar, 3),
+            "n_opaque": None if model is None else model.n_opaque,
+            "n_solar": None if model is None else model.n_solar,
+            "valid": None if model is None else model.valid,
             "calibrated_at": snapshot.calibrated_at,
+            # Same block name as the support dump, so a report and the sensor
+            # can be read side by side when the solar term stays off.
+            "model_daily": (
+                None
+                if daily is None
+                else {
+                    "a_w_per_k": round(daily.a_w_per_k, 2),
+                    "b_m2": round(daily.b_m2, 4),
+                    "c_w": round(daily.c_w, 1),
+                    "trust": round(daily.trust, 3),
+                    "r2": round(daily.r2, 3),
+                    "b_std_err": (
+                        None
+                        if daily.b_std_err is None
+                        else round(daily.b_std_err, 5)
+                    ),
+                    "t_stat": (
+                        None if daily.t_stat is None else round(daily.t_stat, 3)
+                    ),
+                    "n_days": daily.n_days,
+                    "b_first_half_m2": round(daily.b_first_half_m2, 3)
+                    if daily.b_first_half_m2 is not None
+                    else None,
+                    "b_second_half_m2": round(daily.b_second_half_m2, 3)
+                    if daily.b_second_half_m2 is not None
+                    else None,
+                    "b_jackknife_min_m2": round(daily.b_jackknife_min_m2, 3)
+                    if daily.b_jackknife_min_m2 is not None
+                    else None,
+                    "b_jackknife_max_m2": round(daily.b_jackknife_max_m2, 3)
+                    if daily.b_jackknife_max_m2 is not None
+                    else None,
+                    "valid": daily.valid,
+                    "notes": daily.notes,
+                }
+            ),
         }
+        return attributes
 
 
 class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
@@ -1145,6 +1201,52 @@ class QvantumDhwHeatMeterSensor(QvantumEfficiencySensorEntity):
         return None if value is None else round(value, 3)
 
 
+class QvantumSolarGainSensor(QvantumEfficiencySensorEntity):
+    """Modelled solar gain, plus which identification produced it.
+
+    The day-block aperture is what the curve's solar term uses when it passed
+    its gates, so the figure and the applied offset cannot drift apart.
+    """
+
+    @property
+    def extra_state_attributes(self):
+        """Return the model behind the number, not just the number."""
+        attributes = dict(super().extra_state_attributes or {})
+        coordinator = self.coordinator
+        daily = getattr(coordinator, "solar_daily", None)
+        if daily is not None and daily.valid:
+            attributes.update(
+                {
+                    "source": "day-block energy balance",
+                    "a_w_per_k": round(daily.a_w_per_k, 2),
+                    "b_m2": round(daily.b_m2, 4),
+                    "trust": round(daily.trust, 3),
+                    "n_days": daily.n_days,
+                    "attribution": (
+                        "Q = a·ΣΔT + 24c − b·ΣGHI over UTC day blocks"
+                    ),
+                }
+            )
+            return attributes
+        model = getattr(coordinator, "solar_model", None)
+        attributes.update(
+            {
+                "source": "hourly fit" if model is not None else None,
+                "a_w_per_k": (
+                    None if model is None else round(model.a_w_per_k, 2)
+                ),
+                "b_m2": None if model is None else round(model.b_m2, 4),
+                "trust": None if model is None else round(model.trust, 3),
+                "attribution": (
+                    "a·ΔT − b·GHI over heating hours"
+                    if model is not None
+                    else "no identified model"
+                ),
+            }
+        )
+        return attributes
+
+
 class QvantumSolarGhiSensor(QvantumEfficiencySensorEntity):
     """Current smoothed solar irradiance plus the forecast peak.
 
@@ -1180,6 +1282,7 @@ class QvantumSolarGhiSensor(QvantumEfficiencySensorEntity):
 _EFFICIENCY_SENSOR_CLASSES: dict[str, type] = {
     "dhw_heat_meter_deviation": QvantumDhwHeatMeterSensor,
     "solar_ghi_now": QvantumSolarGhiSensor,
+    "solar_gain_now_w": QvantumSolarGainSensor,
 }
 
 

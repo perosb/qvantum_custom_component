@@ -63,8 +63,11 @@ from .open_meteo import (
 )
 from .solar_gain import (
     MIN_SAMPLE_Q_W,
+    SolarDailyModel,
     SolarModel,
+    aggregate_days,
     build_samples,
+    fit_daily_solar_model,
     fit_solar_model,
 )
 from .statistics import (
@@ -198,6 +201,9 @@ class CurveSnapshot:
     window_hours: float
     model: SolarModel | None
     calibrated_at: str | None
+    #: Day-block identification (no heating-hour censoring). When ``valid``
+    #: its aperture is the one the solar term applies.
+    daily_model: SolarDailyModel | None = None
     baseline_auto: bool = False
     trims: Mapping[str, float] = field(default_factory=dict)
     clamped: bool = False
@@ -445,6 +451,61 @@ def _model_to_state(model: SolarModel | None) -> dict[str, Any] | None:
     }
 
 
+def _daily_to_state(model: SolarDailyModel | None) -> dict[str, Any] | None:
+    if model is None:
+        return None
+    return {
+        "a": model.a_w_per_k,
+        "b": model.b_m2,
+        "c": model.c_w,
+        "trust": model.trust,
+        "r2": model.r2,
+        "n_days": model.n_days,
+        "b_std_err": model.b_std_err,
+        "t_stat": model.t_stat,
+        "b_first_half": model.b_first_half_m2,
+        "b_second_half": model.b_second_half_m2,
+        "b_jackknife_min": model.b_jackknife_min_m2,
+        "b_jackknife_max": model.b_jackknife_max_m2,
+        "valid": model.valid,
+        "notes": model.notes,
+    }
+
+
+def _daily_from_state(state: Any) -> SolarDailyModel | None:
+    if not isinstance(state, dict):
+        return None
+
+    def optional(raw: Any) -> float | None:
+        if raw is None or isinstance(raw, bool):
+            return None
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return None
+        return value if math.isfinite(value) else None
+
+    try:
+        return SolarDailyModel(
+            a_w_per_k=float(state["a"]),
+            b_m2=float(state["b"]),
+            c_w=float(state["c"]),
+            trust=float(state.get("trust", 0.0)),
+            r2=float(state.get("r2", 0.0)),
+            n_days=int(state.get("n_days", 0)),
+            b_std_err=optional(state.get("b_std_err")),
+            t_stat=optional(state.get("t_stat")),
+            b_first_half_m2=optional(state.get("b_first_half")),
+            b_second_half_m2=optional(state.get("b_second_half")),
+            b_jackknife_min_m2=optional(state.get("b_jackknife_min")),
+            b_jackknife_max_m2=optional(state.get("b_jackknife_max")),
+            valid=bool(state.get("valid", False)),
+            notes=str(state.get("notes", "")),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def _model_from_state(state: Any) -> SolarModel | None:
     if not isinstance(state, dict):
         return None
@@ -496,6 +557,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._baseline_auto: bool | None = None
         self._curve_23: int | None = None
         self._model: SolarModel | None = None
+        self._daily_model: SolarDailyModel | None = None
         self._calibrated_at: str | None = None
         self._last_calibration_ts: float | None = None
         self._last_baseline_learn_ts: float | None = None
@@ -540,6 +602,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return self._model
 
     @property
+    def daily_model(self) -> SolarDailyModel | None:
+        """Day-block identification; the solar term's source when it is valid."""
+        return self._daily_model
+
+    @property
     def active(self) -> bool:
         """True when the curve writes the pump (holding 22 is ours)."""
         return self._mode == "active"
@@ -567,6 +634,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "baseline_auto": self._baseline_auto,
             "temp_compensation_curve": self._curve_23,
             "model": _model_to_state(self._model),
+            "daily_model": _daily_to_state(self._daily_model),
             "calibrated_at": self._calibrated_at,
             "calibrated_ts": self._last_calibration_ts,
             "last_active_ts": self._last_active_ts,
@@ -628,6 +696,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 if isinstance(value, (int, float)) and not isinstance(value, bool):
                     self._curve_23 = int(value)
         self._model = _model_from_state(data.get("model"))
+        self._daily_model = _daily_from_state(data.get("daily_model"))
         calibrated_at = data.get("calibrated_at")
         self._calibrated_at = calibrated_at if isinstance(calibrated_at, str) else None
         calibrated_ts = data.get("calibrated_ts")
@@ -1008,6 +1077,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             p95_abs_c=None,
             window_hours=0.0,
             model=self._model,
+            daily_model=self._daily_model,
             calibrated_at=self._calibrated_at,
             baseline_auto=bool(self._baseline_auto),
             trims={},
@@ -1113,6 +1183,20 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             _LOGGER.debug("Solar calibration unavailable: %s", err)
             return
 
+        # Day-block identification: the same balance over whole days, where
+        # the sunniest idle hours contribute q = 0 instead of being censored
+        # out of the heating-hour sample. Stored on every attempt — an invalid
+        # model means "this window has no identifiable aperture", which must
+        # switch the term off rather than preserve an older, unvalidated one.
+        self._daily_model = fit_daily_solar_model(
+            aggregate_days(
+                maps.get("heatingpower", {}),
+                maps.get("indoor", {}),
+                maps.get("outdoor", {}),
+                ghi,
+            )
+        )
+
         samples = build_samples(
             maps.get("heatingpower", {}),
             maps.get("indoor", {}),
@@ -1121,24 +1205,37 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         )
         if len(samples) < MIN_CALIBRATION_SAMPLES:
             _LOGGER.debug(
-                "Solar calibration skipped: %s samples < %s",
+                "Hourly solar calibration skipped: %s samples < %s",
                 len(samples),
                 MIN_CALIBRATION_SAMPLES,
             )
-            return
-        model = fit_solar_model(samples, now_ts=int(now_ts))
-        if not model.valid:
-            _LOGGER.debug("Solar calibration rejected: %s", model.notes)
-            return
-        self._model = model
-        self._calibrated_at = dt_util.utcnow().isoformat()
-        _LOGGER.info(
-            "Solar model calibrated: a=%.1f W/K b=%.3f m² trust=%.2f (%s samples)",
-            model.a_w_per_k,
-            model.b_m2,
-            model.trust,
-            len(samples),
-        )
+        else:
+            model = fit_solar_model(samples, now_ts=int(now_ts))
+            if not model.valid:
+                _LOGGER.debug("Solar calibration rejected: %s", model.notes)
+            else:
+                self._model = model
+                self._calibrated_at = dt_util.utcnow().isoformat()
+                _LOGGER.info(
+                    "Solar model calibrated: a=%.1f W/K b=%.3f m² trust=%.2f "
+                    "(%s samples)",
+                    model.a_w_per_k,
+                    model.b_m2,
+                    model.trust,
+                    len(samples),
+                )
+        daily = self._daily_model
+        if daily is not None:
+            _LOGGER.info(
+                "Daily solar model: a=%.1f W/K b=%.3f m² trust=%.2f valid=%s "
+                "(%s days, %s)",
+                daily.a_w_per_k,
+                daily.b_m2,
+                daily.trust,
+                daily.valid,
+                daily.n_days,
+                daily.notes,
+            )
         await self._async_persist()
 
     def _resolve_statistic_ids(self) -> dict[str, str]:
@@ -1798,6 +1895,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 forecast_temperature=forecast_temperature,
                 ghi_by_hour=ghi_by_hour,
                 model=self._model,
+                daily_model=self._daily_model,
                 daylight=self._daylight(now),
                 indoor_margin_c=indoor_margin,
                 indoor_target_c=indoor_target,
@@ -1912,6 +2010,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             room_error_samples=0 if room is None else room.samples,
             room_error_source=room_source,
             model=self._model,
+            daily_model=self._daily_model,
             calibrated_at=self._calibrated_at,
             baseline_auto=bool(self._baseline_auto),
             trims=active_trims,
