@@ -557,6 +557,7 @@ def _curve_snapshot(**overrides) -> CurveSnapshot:
         room_error_samples=72,
         room_error_source="room_temp_external",
         trim_evidence={"curve_30": 12, "curve_0": 0},
+        extrapolated_points=("curve_30", "curve_minus_30"),
         model=SolarModel(
             a_w_per_k=161.0,
             b_m2=0.1,
@@ -706,6 +707,7 @@ class TestQvantumCurveSensors:
                 baseline_outdoor_min_c=-7.5,
                 baseline_outdoor_max_c=12.0,
                 room_gain_c=8.6,
+                extrapolated_points=("curve_30", "curve_minus_30"),
             )
         )
         entity = QvantumCurveDeviationSensor(
@@ -717,6 +719,7 @@ class TestQvantumCurveSensors:
         assert attributes["baseline_outdoor_min_c"] == -7.5
         assert attributes["baseline_outdoor_max_c"] == 12.0
         assert attributes["room_gain_c_per_c"] == 8.6
+        assert attributes["extrapolated_points"] == ["curve_30", "curve_minus_30"]
 
     def test_deviation_sensor_unavailable_without_value(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot(deviation_c=None))

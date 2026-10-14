@@ -240,6 +240,9 @@ Entities:
   readiness window, `baseline_learned_hours`, `baseline_outdoor_min_c`,
   `baseline_outdoor_max_c` from the last baseline fit and `room_gain_c_per_c`
   (the identified pump room-compensation gain removed from the deviation).
+  `extrapolated_points` lists the curve points outside that observed range:
+  their supply comes from the cached table rather than from anything the pump
+  was watched doing, so readiness says nothing about them yet.
   The `ready`/`blocker` attributes describe the baseline-vs-pump window, not
   this sensor's own value. Diagnostic entity, enabled by default.
 - `sensor.qvantum_adaptive_curve_room_error` — the **outcome**: the median
@@ -272,7 +275,11 @@ represent: even a converged baseline leaves roughly 1 °C of scatter across the
 observed outdoor range, so a tighter median gate is unreachable by
 construction. Readiness says nothing about the house once the curve is active,
 where the pump follows our own table; `sensor.qvantum_adaptive_curve_room_error`
-is the outcome signal to watch instead. The 95th percentile replaces an absolute maximum because single
+is the outcome signal to watch instead. It also only covers the outdoor range
+the baseline was observed at — on a mild autumn that can be a handful of points
+around 0–15 °C, while the cold end is extrapolated from the cached table. The
+trims correct those points once the weather gets there, which is why a winter
+curve should be watched rather than assumed. The 95th percentile replaces an absolute maximum because single
 mode-switch hours are transients, not a curve error. The
 `blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
 `window`, `median`, `max`). `ready` is a signal, not an activation. `ready`
