@@ -67,6 +67,7 @@ from .solar_gain import (
     fit_solar_model,
 )
 from .statistics import (
+    INDOOR_METRIC_KEYS,
     INDOOR_METRIC_MIN_HOURS,
     async_statistics_during_period,
     indoor_metric_entity_ids,
@@ -490,6 +491,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._last_trim_ts: float | None = None
         self._baseline_stats: dict[str, Any] | None = None
         self._room_gain: float | None = None
+        self._room_gain_source: str | None = None
         self._clamped_state = False
         self._forecast: WeatherForecast | None = None
         self._forecast_ok = False
@@ -557,6 +559,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "trims": dict(self._trims),
             "baseline_stats": self._baseline_stats,
             "room_gain": self._room_gain,
+            "room_gain_source": self._room_gain_source,
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "mode": self._mode,
             "revert_pending": self._revert_pending,
@@ -637,6 +640,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         room_gain = data.get("room_gain")
         if isinstance(room_gain, (int, float)) and not isinstance(room_gain, bool):
             self._room_gain = float(room_gain)
+        room_gain_source = data.get("room_gain_source")
+        if room_gain_source in INDOOR_METRIC_KEYS:
+            self._room_gain_source = str(room_gain_source)
         margins = data.get("indoor_margins")
         if isinstance(margins, list):
             for item in margins:
@@ -1213,7 +1219,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         outdoor = _hourly_series(rows, outdoor_id)
         supply = _hourly_series(rows, supply_id)
         power = _hourly_series(rows, power_id) if power_id else {}
-        _, indoor = self._indoor_series(resolved, rows)
+        indoor_key, indoor = self._indoor_series(resolved, rows)
         target = self._main_values().get("indoor_temperature_target")
         target_c = (
             float(target)
@@ -1231,7 +1237,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             value = interpolate_supply(points, outdoor[ts]) - supply[ts]
             if target_c is not None and ts in indoor:
                 value = room_corrected_deviation(
-                    value, self._room_gain, indoor[ts] - target_c
+                    value, self._gain_for(indoor_key), indoor[ts] - target_c
                 )
             series[ts] = value
         return series, set(outdoor)
@@ -1307,7 +1313,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             observations.append((outdoor[ts], supply[ts]))
         return observations
 
-    async def _async_room_gain(self) -> float | None:
+    async def _async_room_gain(self) -> tuple[float, str] | None:
         """Identify the pump's room-compensation gain from observed Auto hours.
 
         While the pump runs room compensation its ``cal_heat_temp`` is the
@@ -1316,6 +1322,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         against ``(BT1, indoor − target)``; the room slope is the gain the
         deviation correction removes. The target is not a long-term statistic,
         so the current one is applied to the whole window (it changes rarely).
+
+        Returns the gain **and the indoor metric it was fitted against**, so a
+        correction can be skipped rather than applied to another sensor's room
+        error.
         """
         if self._baseline is None:
             return None
@@ -1343,9 +1353,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
 
         outdoor = _hourly_series(rows, outdoor_id)
         supply = _hourly_series(rows, supply_id)
-        _, indoor = self._indoor_series(resolved, rows)
+        indoor_key, indoor = self._indoor_series(resolved, rows)
         power = _hourly_series(rows, power_id) if power_id else {}
-        if not indoor:
+        if not indoor or indoor_key is None:
             return None
         target_c = float(target)
         observations: list[tuple[float, float, float]] = []
@@ -1355,7 +1365,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             observations.append(
                 (outdoor[ts], supply[ts], indoor[ts] - target_c)
             )
-        return room_compensation_gain(observations, self._baseline)
+        gain = room_compensation_gain(observations, self._baseline)
+        return None if gain is None else (gain, indoor_key)
 
     async def _async_learn_baseline(self, values: Mapping[str, Any], now_ts: float) -> None:
         """Correct the frozen baseline from observed Auto behaviour.
@@ -1414,16 +1425,22 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
     async def _async_refresh_room_gain(self) -> None:
         """Refresh the identified room-compensation gain (best effort)."""
         try:
-            gain = await self._async_room_gain()
+            identified = await self._async_room_gain()
         except asyncio.CancelledError:
             raise
         except Exception as err:  # noqa: BLE001 — identification is best effort
             _LOGGER.debug("Room-compensation gain unavailable: %s", err)
             return
-        if gain is None or gain == self._room_gain:
+        if identified is None:
+            return
+        gain, source = identified
+        if gain == self._room_gain and source == self._room_gain_source:
             return
         self._room_gain = gain
-        _LOGGER.info("Room-compensation gain identified: %.2f °C/°C", gain)
+        self._room_gain_source = source
+        _LOGGER.info(
+            "Room-compensation gain identified: %.2f °C/°C from %s", gain, source
+        )
         await self._async_persist()
 
     async def _async_trim_observations(self) -> list[tuple[int, float, float]]:
@@ -1516,15 +1533,37 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         )
         await self._async_persist()
 
-    def _indoor_value(self, values: Mapping[str, Any]) -> float | None:
-        """Indoor temperature from the configured sensor, else BT2."""
+    def _indoor_live_key(self, values: Mapping[str, Any]) -> str | None:
+        """Metric key the live payload supplies the indoor temperature from.
+
+        Same preference order as the statistics resolver, but read from the
+        poll payload rather than the recorder.
+        """
         mode = values.get("sensor_mode")
         if mode is None:
             mode = values.get("use_operation_sensor")
         for key in (*SensorMode.current_temperature_keys(mode), "bt2"):
             value = values.get(key)
             if isinstance(value, (int, float)) and not isinstance(value, bool):
-                return float(value)
+                return key
+        return None
+
+    def _indoor_value(self, values: Mapping[str, Any]) -> float | None:
+        """Indoor temperature from the configured sensor, else BT2."""
+        key = self._indoor_live_key(values)
+        return None if key is None else float(values[key])
+
+    def _gain_for(self, indoor_key: str | None) -> float | None:
+        """The room gain, but only for the sensor it was learned from.
+
+        The statistics picker can fall back to BT2 while a newly configured
+        sensor has no history, and the live payload can report yet another
+        sensor. Subtracting one sensor's room term from another's error would
+        be worse than not correcting at all, so an unknown source means no
+        correction.
+        """
+        if indoor_key is not None and indoor_key == self._room_gain_source:
+            return self._room_gain
         return None
 
     def _room_error(self, values: Mapping[str, Any]) -> float | None:
@@ -1784,7 +1823,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             # deviation carries a room-dependent part the shadow curve does not
             # emit; remove it before it feeds the readiness window.
             deviation = room_corrected_deviation(
-                deviation, self._room_gain, self._room_error(values)
+                deviation,
+                self._gain_for(self._indoor_live_key(values)),
+                self._room_error(values),
             )
 
         signal = signal_blocker(
