@@ -348,7 +348,11 @@ only act while the curve is active. Enable them with
 ### Solar model
 
 The fit uses recorder long-term statistics (`heatingpower`, outdoor and indoor
-temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily.
+temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily. An
+attempt that cannot fetch its inputs retries within the hour instead of waiting
+the full day, so one network hiccup does not freeze the model; a completed
+attempt — fit accepted or rejected — waits the full interval, because the
+inputs cannot change in an hour.
 `a` (W/K), `b` (m²) and a continuous trust in [0, 1] from `b`'s t-statistic
 are computed from your house's data — nothing is hand-tuned. Weak evidence
 keeps the solar term tiny automatically, and GHI is smoothed with an

@@ -314,7 +314,10 @@ access, so no control is offered when a write would fail.
   window means **no** term (never a preserved older aperture). When it is
   valid, `effective_solar_model` makes the term use its `b` *and* its `a`
   together; the hourly fit stays the fallback and still owns the load term's
-  demand estimate, which must subtract the same applied gain.
+  demand estimate, which must subtract the same applied gain. Solar
+  calibration retries within the hour when it cannot fetch its inputs
+  (`CALIBRATION_RETRY_HOURS`) and waits `CALIBRATION_REFRESH_HOURS` after a
+  completed attempt; the flag is persisted and exposed as `calibration_ok`.
 - Statistics-based curve features (trims, room gain, solar calibration) and
   the efficiency building metrics resolve the indoor sensor through
   `statistics.pick_indoor_metric_key`: the configured sensor wins once it has

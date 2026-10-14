@@ -380,6 +380,9 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
             getattr(coordinator, "_daily_model", None)
         ),
         "calibrated_at": getattr(coordinator, "_calibrated_at", None),
+        # None = no attempt since this version loaded, False = the last attempt
+        # could not fetch its inputs (it retries within the hour).
+        "calibration_ok": getattr(coordinator, "_last_calibration_ok", None),
         "timestamps": {
             field.removeprefix("_"): getattr(coordinator, field, None)
             for field in _CURVE_TIMESTAMP_FIELDS
