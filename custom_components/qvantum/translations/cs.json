@@ -620,6 +620,9 @@
       "adaptive_curve_deviation": {
         "name": "Adaptivní topná křivka: odchylka"
       },
+      "adaptive_curve_room_error": {
+        "name": "Adaptivní topná křivka: odchylka místnosti"
+      },
       "adaptive_curve_solar_model": {
         "name": "Adaptivní topná křivka: solární model"
       },

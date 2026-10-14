@@ -620,6 +620,9 @@
       "adaptive_curve_deviation": {
         "name": "Adaptiv varmekurve: afvigelse"
       },
+      "adaptive_curve_room_error": {
+        "name": "Adaptiv varmekurve: rumafvigelse"
+      },
       "adaptive_curve_solar_model": {
         "name": "Adaptiv varmekurve: solmodel"
       },

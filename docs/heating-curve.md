@@ -233,6 +233,12 @@ Entities:
   (the identified pump room-compensation gain removed from the deviation).
   The `ready`/`blocker` attributes describe the baseline-vs-pump window, not
   this sensor's own value. Diagnostic entity, enabled by default.
+- `sensor.qvantum_adaptive_curve_room_error` — the **outcome**: the median
+  `|indoor − target|` over the readiness window, with the signed `median_c`,
+  `p90_abs_c`, `samples` and the `source` indoor metric as attributes. Readiness
+  compares our baseline with the pump, which says nothing about the house once
+  the curve is active; this measures whether the rooms actually follow the
+  target, on whichever indoor sensor the trims are reading. Diagnostic entity.
 - `sensor.qvantum_adaptive_curve_solar_model` — model trust in %, with
   `a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque` and `r2_solar` diagnostics.
   Diagnostic entity.
@@ -255,7 +261,9 @@ the pump's room gain is identified from the same Auto hours.
 The gates are calibrated to what a ten-degree seven-point table can
 represent: even a converged baseline leaves roughly 1 °C of scatter across the
 observed outdoor range, so a tighter median gate is unreachable by
-construction. The 95th percentile replaces an absolute maximum because single
+construction. Readiness says nothing about the house once the curve is active,
+where the pump follows our own table; `sensor.qvantum_adaptive_curve_room_error`
+is the outcome signal to watch instead. The 95th percentile replaces an absolute maximum because single
 mode-switch hours are transients, not a curve error. The
 `blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
 `window`, `median`, `max`). `ready` is a signal, not an activation. `ready`

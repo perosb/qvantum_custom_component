@@ -620,6 +620,9 @@
       "adaptive_curve_deviation": {
         "name": "Adaptive Heizkurve: Abweichung"
       },
+      "adaptive_curve_room_error": {
+        "name": "Adaptive Heizkurve: Raumabweichung"
+      },
       "adaptive_curve_solar_model": {
         "name": "Adaptive Heizkurve: Solarmodell"
       },

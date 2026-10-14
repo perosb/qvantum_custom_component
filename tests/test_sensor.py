@@ -55,6 +55,7 @@ with patch(
                 QvantumCurveAdjustmentSensor,
                 QvantumCurveDeviationSensor,
                 QvantumCurvePointSensor,
+                QvantumCurveRoomErrorSensor,
                 QvantumCurveSolarModelSensor,
                 QvantumCurrentEntity,
                 QvantumDhwHeatMeterSensor,
@@ -550,6 +551,11 @@ def _curve_snapshot(**overrides) -> CurveSnapshot:
         max_abs_c=0.9,
         p95_abs_c=0.7,
         window_hours=84.0,
+        room_error_median_abs_c=0.3,
+        room_error_median_c=-0.1,
+        room_error_p90_abs_c=0.6,
+        room_error_samples=72,
+        room_error_source="room_temp_external",
         model=SolarModel(
             a_w_per_k=161.0,
             b_m2=0.1,
@@ -716,6 +722,31 @@ class TestQvantumCurveSensors:
             coordinator, "adaptive_curve_deviation", mock_device
         )
 
+        assert entity.available is False
+
+    def test_room_error_sensor_reports_tracking(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        entity = QvantumCurveRoomErrorSensor(
+            coordinator, "adaptive_curve_room_error", mock_device
+        )
+
+        assert entity.native_value == 0.3
+        assert entity.available is True
+        assert entity.extra_state_attributes == {
+            "median_c": -0.1,
+            "p90_abs_c": 0.6,
+            "samples": 72,
+            "source": "room_temp_external",
+            "window_days": 3,
+        }
+
+    def test_room_error_sensor_unavailable_without_a_window(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot(room_error_median_abs_c=None))
+        entity = QvantumCurveRoomErrorSensor(
+            coordinator, "adaptive_curve_room_error", mock_device
+        )
+
+        assert entity.native_value is None
         assert entity.available is False
 
     def test_solar_model_sensor_reports_trust_and_coefficients(self, mock_device):
@@ -1370,6 +1401,7 @@ class TestSensorSetup:
         assert "adaptive_curve_minus_30" in allowed
         assert "adaptive_curve_adjustment" in allowed
         assert "adaptive_curve_deviation" in allowed
+        assert "adaptive_curve_room_error" in allowed
         assert "adaptive_curve_solar_model" in allowed
         assert "expiresAt" not in allowed
         assert "firmware_last_check" not in allowed
@@ -1517,6 +1549,11 @@ class TestSensorSetup:
             for entity in entities
             if isinstance(entity, QvantumCurveDeviationSensor)
         ]
+        room_errors = [
+            entity
+            for entity in entities
+            if isinstance(entity, QvantumCurveRoomErrorSensor)
+        ]
         models = [
             entity
             for entity in entities
@@ -1531,11 +1568,12 @@ class TestSensorSetup:
             )
             for key in ("30", "20", "10", "0", "minus_10", "minus_20", "minus_30")
         }
-        assert len(adjustments) == len(deviations) == len(models) == 1
+        assert len(adjustments) == len(deviations) == len(room_errors) == len(models) == 1
         assert adjustments[0]._attr_unique_id == (
             "qvantum_adaptive_curve_adjustment_test_device_123"
         )
         assert deviations[0]._attr_translation_key == "adaptive_curve_deviation"
+        assert room_errors[0]._attr_translation_key == "adaptive_curve_room_error"
         assert models[0]._attr_translation_key == "adaptive_curve_solar_model"
 
     @pytest.mark.asyncio

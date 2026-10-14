@@ -620,6 +620,9 @@
       "adaptive_curve_deviation": {
         "name": "Adaptacyjna krzywa grzewcza: odchylenie"
       },
+      "adaptive_curve_room_error": {
+        "name": "Adaptacyjna krzywa grzewcza: odchylenie w pomieszczeniu"
+      },
       "adaptive_curve_solar_model": {
         "name": "Adaptacyjna krzywa grzewcza: model słoneczny"
       },
