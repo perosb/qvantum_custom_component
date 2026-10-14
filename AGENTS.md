@@ -294,6 +294,10 @@ access, so no control is offered when a write would fail.
   While the curve is active the pump follows our table, so readiness turns
   self-referential — `sensor.qvantum_adaptive_curve_room_error` (median
   `|indoor − target|` over the same window) is the outcome signal instead.
+  Readiness also only covers the outdoor range the baseline was observed at
+  (`baseline_outdoor_min_c`/`max_c`); points outside it are extrapolated from
+  the cached table and listed in `extrapolated_points`, and only the trims
+  correct them once the weather gets there.
 - Statistics-based curve features (trims, room gain, solar calibration) and
   the efficiency building metrics resolve the indoor sensor through
   `statistics.pick_indoor_metric_key`: the configured sensor wins once it has

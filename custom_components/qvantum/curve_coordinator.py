@@ -207,6 +207,10 @@ class CurveSnapshot:
     #: Hours behind each point's trim; 0 means the trim is deliberately 0
     #: because the window holds no evidence near that outdoor temperature.
     trim_evidence: Mapping[str, int] = field(default_factory=dict)
+    #: Points whose outdoor temperature lies outside the range the baseline
+    #: was observed at. Their supply is extrapolated from the cached table, so
+    #: readiness says nothing about them until the weather gets there.
+    extrapolated_points: tuple[str, ...] = ()
 
     #: Room tracking over the same window: |indoor − target|, signed median,
     #: p90 and sample count, plus the indoor metric they came from.
@@ -1868,6 +1872,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         points = result.as_dict() if result is not None else {}
         baseline = dict(self._baseline) if self._baseline else {}
         learned_hours, learned_min, learned_max = self._baseline_stats_values()
+        extrapolated: tuple[str, ...] = ()
+        if learned_min is not None and learned_max is not None:
+            extrapolated = tuple(
+                key
+                for key, outdoor in HEATING_CURVE_OUTDOOR_TEMPS.items()
+                if not learned_min <= outdoor <= learned_max
+            )
         active_trims = (
             dict(result.trims) if self.active and result is not None else {}
         )
@@ -1903,6 +1914,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             baseline_outdoor_max_c=learned_max,
             room_gain_c=self._room_gain,
             trim_evidence=dict(self._trim_evidence),
+            extrapolated_points=extrapolated,
             cop_c=0.0 if result is None else result.cop_c,
             precharge_c=0.0 if result is None else result.precharge_c,
         )

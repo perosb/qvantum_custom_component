@@ -1014,6 +1014,52 @@ async def test_snapshot_reports_room_tracking() -> None:
     assert snapshot.room_error_samples == len(list(window))
 
 
+async def test_snapshot_lists_extrapolated_points() -> None:
+    """Only the observed outdoor range is validated; the rest is extrapolated."""
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._baseline_stats = {
+        "hours": 148,
+        "min_c": 3.4,
+        "max_c": 14.1,
+        "corrected": False,
+    }
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_room_error_hours = AsyncMock(return_value=({}, None))
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.baseline_outdoor_min_c == pytest.approx(3.4)
+    assert snapshot.baseline_outdoor_max_c == pytest.approx(14.1)
+    # Only curve_10 (10 °C) falls inside the observed 3.4–14.1 °C.
+    assert snapshot.extrapolated_points == (
+        "curve_30",
+        "curve_20",
+        "curve_0",
+        "curve_minus_10",
+        "curve_minus_20",
+        "curve_minus_30",
+    )
+
+
+async def test_snapshot_without_a_baseline_fit_claims_no_extrapolation() -> None:
+    """Nothing has been observed yet, so no point is singled out."""
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_room_error_hours = AsyncMock(return_value=({}, None))
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.extrapolated_points == ()
+
+
 def test_curve_deviation_uses_interpolated_supply() -> None:
     points = {**BASELINE, "curve_10": 39.0}
 
