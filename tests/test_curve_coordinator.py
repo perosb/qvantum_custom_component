@@ -494,6 +494,71 @@ async def test_trim_observations_join_and_subtract_target() -> None:
     coordinator._async_statistics.assert_awaited_once()
 
 
+async def test_trim_observations_skip_hours_without_heating() -> None:
+    """Hot-water and idle hours cool the rooms without the curve being wrong."""
+    coordinator = make_coordinator(
+        values={"bt2": 21.0, "indoor_temperature_target": 20.0}
+    )
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "bt2": "sensor.i",
+            "heatingpower": "sensor.q",
+        }
+    )
+    hours = [
+        100 + index * 3600 for index in range(cc.INDOOR_METRIC_MIN_HOURS + 1)
+    ]
+    idle, heating = hours[0], hours[1:]
+    coordinator._async_statistics = AsyncMock(
+        return_value={
+            "sensor.t": [{"start": ts, "mean": 5.0} for ts in hours],
+            "sensor.i": [{"start": ts, "mean": 21.0} for ts in hours],
+            "sensor.q": [
+                {"start": ts, "mean": 0.0 if ts == idle else 900.0}
+                for ts in hours
+            ],
+        }
+    )
+
+    observations = await coordinator._async_trim_observations()
+
+    assert [ts for ts, _, _ in observations] == heating
+    assert all(error == pytest.approx(1.0) for _, _, error in observations)
+    assert coordinator._async_statistics.call_args.args[0] == {
+        "sensor.t",
+        "sensor.i",
+        "sensor.q",
+    }
+
+
+async def test_trim_observations_keep_every_hour_without_power_statistics() -> None:
+    """Without heating-power statistics the filter is skipped, not the feature."""
+    coordinator = make_coordinator(
+        values={"bt2": 21.0, "indoor_temperature_target": 20.0}
+    )
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "bt2": "sensor.i"}
+    )
+    hours = [
+        100 + index * 3600 for index in range(cc.INDOOR_METRIC_MIN_HOURS)
+    ]
+    coordinator._async_statistics = AsyncMock(
+        return_value={
+            "sensor.t": [{"start": ts, "mean": 5.0} for ts in hours],
+            "sensor.i": [{"start": ts, "mean": 21.0} for ts in hours],
+        }
+    )
+
+    observations = await coordinator._async_trim_observations()
+
+    assert [ts for ts, _, _ in observations] == hours
+    assert coordinator._async_statistics.call_args.args[0] == {
+        "sensor.t",
+        "sensor.i",
+    }
+
+
 async def test_trim_observations_require_target_and_indoor() -> None:
     coordinator = make_coordinator(values={"bt2": 21.0})
     coordinator._resolve_statistic_ids = MagicMock(

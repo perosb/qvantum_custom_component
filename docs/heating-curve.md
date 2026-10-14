@@ -193,7 +193,9 @@ unidentified (no correction) while the pump has no room error to learn from.
 While the curve is active the module also learns slow **per-point trims** from
 the indoor error: hourly `(BT1, indoor − target)` from recorder statistics is
 bucketed by outdoor temperature and converted to supply degrees through the
-local curve slope, with recency weighting. `indoor` is the sensor the pump is
+local curve slope, with recency weighting. Only heating hours enter, like the
+baseline fit — while the pump makes hot water or idles the rooms cool without
+the curve being wrong, and those hours would push every trim up. `indoor` is the sensor the pump is
 configured to use — BT2, or the fed external room temperature. In Modbus mode
 the fed value (holding 14) is also exposed as a diagnostic sensor, because
 long-term statistics exist only for sensors; that is what the trims and the

@@ -1429,6 +1429,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
     async def _async_trim_observations(self) -> list[tuple[int, float, float]]:
         """Hourly ``(ts, BT1, indoor − target)`` pairs from recorder statistics.
 
+        Only hours with measured heating power are kept, like the baseline fit:
+        while the pump makes hot water or idles the rooms cool because nothing
+        is being heated, not because the curve is wrong, and feeding those
+        hours in would push every trim up. Without heating-power statistics the
+        filter is skipped rather than the feature disabled.
+
         The target is not a long-term statistic, so the current target is
         applied to the whole window; it changes rarely and a target change only
         slows convergence for a day.
@@ -1443,7 +1449,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         indoor_ids = indoor_metric_entity_ids(resolved)
         if not indoor_ids:
             return []
+        power_id = resolved.get("heatingpower")
         statistic_ids = {outdoor_id, *indoor_ids.values()}
+        if power_id:
+            statistic_ids.add(power_id)
         rows = await self._async_statistics(
             statistic_ids,
             dt_util.utcnow() - timedelta(days=TRIM_WINDOW_DAYS),
@@ -1451,12 +1460,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
 
         outdoor = _hourly_series(rows, outdoor_id)
         _, indoor = self._indoor_series(resolved, rows)
+        power = _hourly_series(rows, power_id) if power_id else {}
         if not indoor:
             return []
         target_c = float(target)
         return [
             (ts, outdoor[ts], indoor[ts] - target_c)
             for ts in sorted(set(outdoor) & set(indoor))
+            if not power_id or power.get(ts, 0.0) >= MIN_SAMPLE_Q_W
         ]
 
     async def _async_update_trims(self, result: Any, now_ts: float) -> None:
