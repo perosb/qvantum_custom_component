@@ -51,6 +51,96 @@ def test_resolve_indoor_metric_key_follows_the_configured_sensor():
     assert stats.resolve_indoor_metric_key({}, {"sensor_mode": 4}) is None
 
 
+def test_indoor_metric_candidates_are_ordered_and_resolved() -> None:
+    from custom_components.qvantum.const import SensorMode
+
+    resolved = {
+        "bt2": "sensor.indoor",
+        "room_temp_external": "sensor.external",
+        "room_temp_ext": "sensor.http_ext",
+    }
+
+    assert stats.indoor_metric_candidates(
+        resolved, {"sensor_mode": SensorMode.EXTERNAL}
+    ) == ("room_temp_external", "room_temp_ext", "bt2")
+    assert stats.indoor_metric_candidates(
+        resolved, {"sensor_mode": SensorMode.BT2}
+    ) == ("bt2",)
+    # Unresolved candidates never appear.
+    assert stats.indoor_metric_candidates(
+        {"bt2": "sensor.indoor"}, {"sensor_mode": SensorMode.EXTERNAL}
+    ) == ("bt2",)
+
+
+def test_indoor_metric_entity_ids_keeps_every_resolvable_candidate() -> None:
+    assert stats.indoor_metric_entity_ids(
+        {
+            "bt1": "sensor.outdoor",
+            "bt2": "sensor.indoor",
+            "room_temp_external": "sensor.external",
+        }
+    ) == {"room_temp_external": "sensor.external", "bt2": "sensor.indoor"}
+
+
+def test_pick_indoor_metric_key_falls_back_until_the_new_sensor_has_history() -> None:
+    from custom_components.qvantum.const import SensorMode
+
+    resolved = {
+        "room_temp_external": "sensor.external",
+        "bt2": "sensor.indoor",
+    }
+    values = {"sensor_mode": SensorMode.EXTERNAL}
+    fresh = [{"start": index, "mean": 1.0} for index in range(2)]
+    historic = [{"start": index, "mean": 1.0} for index in range(24)]
+
+    # The configured sensor wins as soon as it has enough rows of its own.
+    assert (
+        stats.pick_indoor_metric_key(
+            resolved,
+            values,
+            {
+                "room_temp_external": historic,
+                "bt2": historic,
+            },
+        )
+        == "room_temp_external"
+    )
+    # A freshly added sensor has no history: keep the previous one.
+    assert (
+        stats.pick_indoor_metric_key(
+            resolved,
+            values,
+            {"room_temp_external": fresh, "bt2": historic},
+        )
+        == "bt2"
+    )
+    # Nothing has enough rows: no series, rather than a wrong one.
+    assert (
+        stats.pick_indoor_metric_key(
+            resolved,
+            values,
+            {"room_temp_external": fresh, "bt2": fresh},
+        )
+        is None
+    )
+    # Consumers with other minimums can ask for less or more.
+    assert (
+        stats.pick_indoor_metric_key(
+            resolved, values, {"room_temp_external": fresh}, min_rows=2
+        )
+        == "room_temp_external"
+    )
+    assert (
+        stats.pick_indoor_metric_key(
+            resolved,
+            values,
+            {"room_temp_external": historic, "bt2": historic},
+            min_rows=25,
+        )
+        is None
+    )
+
+
 async def test_statistics_returns_empty_without_ids():
     assert (
         await stats.async_statistics_during_period(

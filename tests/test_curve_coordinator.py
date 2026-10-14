@@ -475,16 +475,20 @@ async def test_trim_observations_join_and_subtract_target() -> None:
     coordinator._resolve_statistic_ids = MagicMock(
         return_value={"bt1": "sensor.t", "bt2": "sensor.i"}
     )
+    hours = [100 + index * 3600 for index in range(cc.INDOOR_METRIC_MIN_HOURS)]
     coordinator._async_statistics = AsyncMock(
         return_value={
-            "sensor.t": [{"start": 100, "mean": 5.0}, {"start": 200, "mean": 6.0}],
-            "sensor.i": [{"start": 100, "mean": 21.0}, {"start": 300, "mean": 22.0}],
+            "sensor.t": [{"start": ts, "mean": 5.0} for ts in hours],
+            # One extra indoor hour that has no outdoor partner: dropped.
+            "sensor.i": [
+                {"start": ts, "mean": 21.0} for ts in [*hours, hours[-1] + 3600]
+            ],
         }
     )
 
     observations = await coordinator._async_trim_observations()
 
-    assert observations == [(100, 5.0, 1.0)]
+    assert observations == [(ts, 5.0, 1.0) for ts in hours]
     coordinator._async_statistics.assert_awaited_once()
 
 
@@ -1039,18 +1043,44 @@ async def test_push_indoor_margin_averages_window() -> None:
     ) == pytest.approx(-1.0)
 
 
-async def test_indoor_metric_key_prefers_sensor_mode() -> None:
+async def test_indoor_series_prefers_the_configured_sensor() -> None:
     coordinator = make_coordinator(values={"sensor_mode": 4})
+    resolved = {"room_temp_external": "sensor.x", "bt2": "sensor.y"}
+    rows = lambda mean, count: [{"start": index, "mean": mean} for index in range(count)]
+    enough = cc.INDOOR_METRIC_MIN_HOURS
 
-    assert (
-        coordinator._indoor_metric_key({"room_temp_external": "sensor.x", "bt2": "sensor.y"})
-        == "room_temp_external"
+    key, series = coordinator._indoor_series(
+        resolved,
+        {"sensor.x": rows(19.0, enough), "sensor.y": rows(21.0, enough)},
     )
-    assert coordinator._indoor_metric_key({"bt2": "sensor.y"}) == "bt2"
-    assert coordinator._indoor_metric_key({}) is None
+    assert key == "room_temp_external"
+    assert series[0] == pytest.approx(19.0)
 
+    # A freshly added sensor has no history yet: keep the previous reading.
+    key, series = coordinator._indoor_series(
+        resolved, {"sensor.x": rows(19.0, 3), "sensor.y": rows(21.0, enough)}
+    )
+    assert key == "bt2"
+    assert series[0] == pytest.approx(21.0)
+
+    # Nothing has enough rows: no indoor series at all.
+    key, series = coordinator._indoor_series(
+        resolved, {"sensor.x": rows(19.0, 3), "sensor.y": rows(21.0, 3)}
+    )
+    assert key is None
+    assert series == {}
+
+    # A missing sensor_mode falls back to BT2.
     fallback = make_coordinator(values={"use_operation_sensor": 1})
-    assert fallback._indoor_metric_key({"bt2": "sensor.y"}) == "bt2"
+    key, _ = fallback._indoor_series(
+        {"bt2": "sensor.y"}, {"sensor.y": rows(21.0, enough)}
+    )
+    assert key == "bt2"
+
+    # No resolvable indoor metric at all.
+    key, series = coordinator._indoor_series({}, {})
+    assert key is None
+    assert series == {}
 
 
 def test_constructor_wires_dependencies() -> None:
@@ -1322,11 +1352,20 @@ async def test_statistics_uses_recorder_executor_and_maps_errors() -> None:
         assert await coordinator._async_statistics({"sensor.x"}, start) == {}
 
 
-async def test_hourly_maps_builds_series_and_indoor() -> None:
-    coordinator = make_coordinator(values={"sensor_mode": 1})
+async def test_hourly_maps_builds_series_and_indoor_fallback() -> None:
+    coordinator = make_coordinator(values={"sensor_mode": 4})
     coordinator._resolve_statistic_ids = MagicMock(
-        return_value={"heatingpower": "sensor.q", "bt1": "sensor.t", "bt2": "sensor.i"}
+        return_value={
+            "heatingpower": "sensor.q",
+            "bt1": "sensor.t",
+            "room_temp_external": "sensor.x",
+            "bt2": "sensor.i",
+        }
     )
+    old = [
+        {"start": 100 + index * 3600, "mean": 19.0}
+        for index in range(cc.MIN_CALIBRATION_SAMPLES)
+    ]
     coordinator._async_statistics = AsyncMock(
         return_value={
             "sensor.q": [
@@ -1335,7 +1374,9 @@ async def test_hourly_maps_builds_series_and_indoor() -> None:
                 {"start": None, "mean": 1.0},
             ],
             "sensor.t": [{"start": 100, "mean": 5.0}],
-            "sensor.i": [{"start": 100, "mean": 19.0}],
+            # The configured external sensor is brand new; BT2 carries the fit.
+            "sensor.x": [{"start": 100, "mean": 20.5}],
+            "sensor.i": list(old),
         }
     )
 
@@ -1344,7 +1385,8 @@ async def test_hourly_maps_builds_series_and_indoor() -> None:
     assert maps["heatingpower"] == {100: 1200.0}
     assert maps["bt1"] == {100: 5.0}
     assert maps["outdoor"] == {100: 5.0}
-    assert maps["indoor"] == {100: 19.0}
+    assert maps["room_temp_external"] == {100: 20.5}
+    assert maps["indoor"] == {row["start"]: 19.0 for row in old}
 
 
 async def test_readiness_hours_uses_baseline_on_heating_hours() -> None:

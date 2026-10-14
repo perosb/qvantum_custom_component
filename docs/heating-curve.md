@@ -198,9 +198,13 @@ configured to use — BT2, or the fed external room temperature. In Modbus mode
 the fed value (holding 14) is also exposed as a diagnostic sensor, because
 long-term statistics exist only for sensors; that is what the trims and the
 room-gain fit read when the pump runs an external room sensor, not BT2. A
-reference point with no observed hours within 7.5 °C stays at 0 — no evidence,
-no correction — each trim is capped at ±2 °C and updated at most once a day
-with a damped step, so it converges and stops when the error is gone. Trims
+freshly configured sensor has no recorder history for its first hours, so the
+indoor resolver falls back to the next candidate (BT2 last) until it has
+≈ a day of hourly rows — otherwise the trims, room-gain fit, solar calibration
+and the building metrics would all go dormant on a sensor change. A reference
+point with no observed hours within 7.5 °C stays at 0 — no evidence, no
+correction — each trim is capped at ±2 °C and updated at most once a day with
+a damped step, so it converges and stops when the error is gone. Trims
 are only applied while active (in shadow the baseline learning owns the curve
 shape) and are cleared
 on reversion or when the baseline is re-learned. This is what keeps a
