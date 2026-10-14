@@ -624,6 +624,43 @@ def trim_residuals(
     return trims if any_evidence else None
 
 
+def trim_evidence_hours(
+    observations: Sequence[tuple[int, float, float]],
+    *,
+    min_bucket_hours: int = TRIM_MIN_BUCKET_HOURS,
+    max_distance_c: float = TRIM_MAX_DISTANCE_C,
+) -> dict[str, int]:
+    """Hours behind each curve point's trim, keyed like the seven points.
+
+    A point with 0 hours has no evidence: either no observations within
+    ``max_distance_c`` of it, or none in an outdoor bucket that reached
+    ``min_bucket_hours``. Its trim deliberately stays 0 rather than being
+    invented, so this answers "why are the trims empty?" straight from the
+    observations ``trim_residuals`` already consumes.
+    """
+    buckets: dict[int, int] = {}
+    for _hour_ts, outdoor, _error in observations:
+        outdoor_c = float(outdoor)
+        if not math.isfinite(outdoor_c):
+            continue
+        rounded = round(outdoor_c)
+        buckets[rounded] = buckets.get(rounded, 0) + 1
+
+    qualifying = {
+        outdoor: hours
+        for outdoor, hours in buckets.items()
+        if hours >= min_bucket_hours
+    }
+    return {
+        key: sum(
+            hours
+            for outdoor, hours in qualifying.items()
+            if abs(outdoor - outdoor_c) <= max_distance_c
+        )
+        for key, outdoor_c in HEATING_CURVE_OUTDOOR_TEMPS.items()
+    }
+
+
 def cop_feedback_adjustment_c(
     recent_cop: float | None,
     reference_cop: float | None,

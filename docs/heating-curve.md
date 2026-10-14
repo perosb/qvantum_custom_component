@@ -225,8 +225,11 @@ Entities:
 
 - `sensor.qvantum_adaptive_curve_01_30` … `sensor.qvantum_adaptive_curve_07_minus_30` —
   the computed shadow points, numbered 1–7 (+30 … −30) like the pump's own
-  curve numbers so they sort together, with `baseline`, `adjustment` and
-  `trim` attributes.
+  curve numbers so they sort together, with `baseline`, `adjustment`, `trim`
+  and `evidence_hours` attributes. `evidence_hours` is how many hours the trim
+  window holds near that outdoor temperature: **0 means the trim is 0 on
+  purpose** — no evidence, no correction — rather than because the curve is
+  already right.
 - `sensor.qvantum_adaptive_curve_adjustment` — the shared adjustment, with
   `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `cop_c`, `precharge_c`,
   `trims` and `clamped` attributes.
