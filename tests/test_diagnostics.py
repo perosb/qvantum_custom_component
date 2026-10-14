@@ -99,6 +99,7 @@ def _curve_coordinator() -> SimpleNamespace:
         blocker=None,
         median_abs_c=0.4,
         max_abs_c=1.1,
+        p95_abs_c=0.9,
         window_hours=72.0,
         model=_solar_model(),
         calibrated_at="2026-09-25T10:00:00+00:00",
@@ -108,6 +109,12 @@ def _curve_coordinator() -> SimpleNamespace:
         baseline_learned_hours=48,
         baseline_outdoor_min_c=-2.0,
         baseline_outdoor_max_c=11.0,
+        extrapolated_points=("curve_minus_20", "curve_minus_30"),
+        room_error_median_abs_c=0.6,
+        room_error_median_c=-0.2,
+        room_error_p90_abs_c=1.4,
+        room_error_samples=96,
+        room_error_source="room_temp_external",
     )
     return SimpleNamespace(
         data=snapshot,
@@ -126,6 +133,9 @@ def _curve_coordinator() -> SimpleNamespace:
             "corrected": True,
         },
         _trims={"curve_30": 0.1},
+        _trim_evidence={"curve_30": 12, "curve_minus_30": 0},
+        _room_gain=1.8,
+        _room_gain_source="room_temp_external",
         _model=_solar_model(),
         _calibrated_at="2026-09-25T10:00:00+00:00",
         _last_calibration_ts=1758794400.0,
@@ -452,10 +462,22 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["blocker"] is None
     assert curve["median_abs_c"] == 0.4
     assert curve["max_abs_c"] == 1.1
+    assert curve["p95_abs_c"] == 0.9
     assert curve["window_hours"] == 72.0
     assert curve["baseline_learned_hours"] == 48
     assert curve["baseline_outdoor_min_c"] == -2.0
     assert curve["baseline_outdoor_max_c"] == 11.0
+    assert curve["extrapolated_points"] == ["curve_minus_20", "curve_minus_30"]
+    assert curve["room_gain"] == 1.8
+    assert curve["room_gain_source"] == "room_temp_external"
+    assert curve["trim_evidence"] == {"curve_30": 12, "curve_minus_30": 0}
+    assert curve["room_error"] == {
+        "median_abs_c": 0.6,
+        "median_c": -0.2,
+        "p90_abs_c": 1.4,
+        "samples": 96,
+        "source": "room_temp_external",
+    }
     assert curve["model"]["trust"] == 0.8
     assert curve["model"]["b_m2"] == 2.5
     assert curve["calibrated_at"] == "2026-09-25T10:00:00+00:00"
@@ -487,6 +509,9 @@ async def test_curve_diagnostics_tolerates_malformed_state(hass):
     assert curve_result["baseline"] == {}
     assert curve_result["trims"] == {}
     assert curve_result["model"] is None
+    assert curve_result["extrapolated_points"] == []
+    assert curve_result["trim_evidence"] == {}
+    assert curve_result["room_error"] is None
     assert curve_result["adjustment_c"] is None
     assert curve_result["indoor_margins"] == []
     assert curve_result["power_samples"] == []

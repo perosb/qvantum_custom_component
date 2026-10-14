@@ -265,12 +265,32 @@ def _curve_model_diagnostics(model: Any) -> dict[str, Any] | None:
     }
 
 
+def _curve_room_error_diagnostics(snapshot: Any) -> dict[str, Any] | None:
+    """Return the indoor-error outcome over the readiness window.
+
+    Readiness compares our baseline with the pump, which says nothing about the
+    house once the curve is active. This is the outcome signal for that case.
+    """
+    if snapshot is None:
+        return None
+    return {
+        "median_abs_c": getattr(snapshot, "room_error_median_abs_c", None),
+        "median_c": getattr(snapshot, "room_error_median_c", None),
+        "p90_abs_c": getattr(snapshot, "room_error_p90_abs_c", None),
+        "samples": getattr(snapshot, "room_error_samples", None),
+        "source": getattr(snapshot, "room_error_source", None),
+    }
+
+
 def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
     """Return adaptive heating-curve state (Modbus only).
 
     Mirrors the persisted curve state plus the live computed snapshot, so a
     support dump shows the frozen baseline, the shared adjustment and its
-    terms, the solar model, the active trims and the activation blocker.
+    terms, the solar model, the active trims, the activation blocker, the
+    learned room gain with its source, the indoor-error outcome and the
+    per-point trim evidence. Keep it in step with the snapshot: a new curve
+    field that is missing here cannot be read from a user's support dump.
     """
     if coordinator is None:
         return None
@@ -310,10 +330,23 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "blocker": getattr(snapshot, "blocker", None),
         "median_abs_c": getattr(snapshot, "median_abs_c", None),
         "max_abs_c": getattr(snapshot, "max_abs_c", None),
+        "p95_abs_c": getattr(snapshot, "p95_abs_c", None),
         "window_hours": getattr(snapshot, "window_hours", None),
         "baseline_learned_hours": getattr(snapshot, "baseline_learned_hours", None),
         "baseline_outdoor_min_c": getattr(snapshot, "baseline_outdoor_min_c", None),
         "baseline_outdoor_max_c": getattr(snapshot, "baseline_outdoor_max_c", None),
+        # Readiness only speaks for the outdoor range the baseline was observed
+        # at; the rest is extrapolated from the cached table.
+        "extrapolated_points": [
+            str(point) for point in (getattr(snapshot, "extrapolated_points", None) or ())
+        ],
+        # The gain is bound to the sensor it was identified from: an unknown
+        # source means no correction is applied at all.
+        "room_gain": getattr(coordinator, "_room_gain", None),
+        "room_gain_source": getattr(coordinator, "_room_gain_source", None),
+        # Hours behind each point's trim; 0 means the trim is deliberately 0.
+        "trim_evidence": dict(getattr(coordinator, "_trim_evidence", None) or {}),
+        "room_error": _curve_room_error_diagnostics(snapshot),
         "model": _curve_model_diagnostics(getattr(coordinator, "_model", None)),
         "calibrated_at": getattr(coordinator, "_calibrated_at", None),
         "timestamps": {
