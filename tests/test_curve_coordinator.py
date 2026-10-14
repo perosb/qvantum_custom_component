@@ -115,6 +115,7 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._last_baseline_learn_ts = float("inf")
     coordinator._last_active_ts = None
     coordinator._trims = {}
+    coordinator._trim_evidence = {}
     coordinator._last_trim_ts = None
     coordinator._baseline_stats = None
     coordinator._room_gain = None
@@ -640,6 +641,37 @@ async def test_trim_observations_keep_every_hour_without_power_statistics() -> N
         "sensor.t",
         "sensor.i",
     }
+
+
+async def test_trims_record_evidence_when_the_fit_is_empty() -> None:
+    """One qualifying bucket fits no trims, and the evidence explains why."""
+    store = FakeStore()
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS, store=store)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._mode = "active"
+    coordinator._last_trim_ts = None
+    coordinator._async_trim_observations = AsyncMock(
+        return_value=[(100 + index, 5.0, 0.5) for index in range(6)]
+    )
+
+    await coordinator._async_update_trims(make_result(), 1000.0)
+
+    assert coordinator._trims == {}
+    assert coordinator._trim_evidence["curve_0"] == 6
+    assert coordinator._trim_evidence["curve_10"] == 6
+    assert coordinator._trim_evidence["curve_30"] == 0
+    # The evidence is persisted so the empty trims stay explainable across a
+    # restart.
+    assert store.saved["trim_evidence"]["curve_0"] == 6
+
+
+async def test_trim_evidence_round_trips_through_the_store() -> None:
+    store = FakeStore({"trim_evidence": {"curve_0": 9, "nope": 3, "curve_10": True}})
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator._trim_evidence == {"curve_0": 9}
 
 
 async def test_trim_observations_require_target_and_indoor() -> None:

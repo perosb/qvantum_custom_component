@@ -38,6 +38,7 @@ from custom_components.qvantum.heating_curve import (
     room_compensation_gain,
     room_corrected_deviation,
     solar_adjustment_c,
+    trim_evidence_hours,
     trim_residuals,
 )
 from custom_components.qvantum.solar_gain import SolarModel
@@ -499,6 +500,24 @@ def test_room_corrected_deviation_subtracts_the_room_term() -> None:
     assert room_corrected_deviation(2.0, None, 0.5) == 2.0
     assert room_corrected_deviation(2.0, 9.0, None) == 2.0
     assert room_corrected_deviation(None, 9.0, 0.5) is None
+
+
+def test_trim_evidence_hours_counts_only_qualifying_buckets() -> None:
+    # Six hours at 5 °C qualify; two at 9 °C do not.
+    observations = [
+        (index, outdoor, 0.5)
+        for index, outdoor in enumerate([5.0] * 6 + [9.0] * 2)
+    ]
+
+    evidence = trim_evidence_hours(observations)
+
+    assert evidence["curve_10"] == 6  # within 7.5 °C of the 5 °C bucket
+    assert evidence["curve_0"] == 6
+    assert evidence["curve_20"] == 0  # 11 °C away from the nearest
+    assert evidence["curve_minus_10"] == 0
+
+    # Non-finite outdoor readings cannot support anything.
+    assert set(trim_evidence_hours([(0, float("nan"), 0.1)]).values()) == {0}
 
 
 def test_effective_supply_bounds_sanitizes_and_falls_back() -> None:

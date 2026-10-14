@@ -52,6 +52,7 @@ from .heating_curve import (
     precharge_adjustment_c,
     room_compensation_gain,
     room_corrected_deviation,
+    trim_evidence_hours,
     trim_residuals,
 )
 from .open_meteo import (
@@ -203,6 +204,10 @@ class CurveSnapshot:
     room_gain_c: float | None = None
     #: 95th percentile of the readiness window (the gated upper bound).
     p95_abs_c: float | None = None
+    #: Hours behind each point's trim; 0 means the trim is deliberately 0
+    #: because the window holds no evidence near that outdoor temperature.
+    trim_evidence: Mapping[str, int] = field(default_factory=dict)
+
     #: Room tracking over the same window: |indoor − target|, signed median,
     #: p90 and sample count, plus the indoor metric they came from.
     room_error_median_abs_c: float | None = None
@@ -488,6 +493,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._last_baseline_learn_ts: float | None = None
         self._last_active_ts: float | None = None
         self._trims: dict[str, float] = {}
+        self._trim_evidence: dict[str, int] = {}
         self._last_trim_ts: float | None = None
         self._baseline_stats: dict[str, Any] | None = None
         self._room_gain: float | None = None
@@ -557,6 +563,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "calibrated_ts": self._last_calibration_ts,
             "last_active_ts": self._last_active_ts,
             "trims": dict(self._trims),
+            "trim_evidence": dict(self._trim_evidence),
             "baseline_stats": self._baseline_stats,
             "room_gain": self._room_gain,
             "room_gain_source": self._room_gain_source,
@@ -632,6 +639,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     and not isinstance(value, bool)
                 ):
                     self._trims[key] = float(value)
+        evidence = data.get("trim_evidence")
+        if isinstance(evidence, dict):
+            for key, hours in evidence.items():
+                if key in CURVE_KEYS and isinstance(hours, int) and not isinstance(hours, bool):
+                    self._trim_evidence[key] = hours
         stats = data.get("baseline_stats")
         if isinstance(stats, dict):
             self._baseline_stats = {
@@ -1515,8 +1527,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return
         if not observations:
             return
+        # Recorded before the fit: when there is no residual the evidence is
+        # exactly what explains the empty trims.
+        evidence = trim_evidence_hours(observations)
+        evidence_changed = evidence != self._trim_evidence
+        self._trim_evidence = evidence
         residual = trim_residuals(self._baseline, observations, int(now_ts))
         if residual is None:
+            if evidence_changed:
+                await self._async_persist()
             return
         changed = False
         for key, value in residual.items():
@@ -1525,12 +1544,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             if abs(new - old) > 1e-9:
                 self._trims[key] = new
                 changed = True
-        if not changed:
+        if not changed and not evidence_changed:
             return
-        _LOGGER.info(
-            "Adaptive-curve trims updated from %s indoor-error hours",
-            len(observations),
-        )
+        if changed:
+            _LOGGER.info(
+                "Adaptive-curve trims updated from %s indoor-error hours",
+                len(observations),
+            )
         await self._async_persist()
 
     def _indoor_live_key(self, values: Mapping[str, Any]) -> str | None:
@@ -1882,6 +1902,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             baseline_outdoor_min_c=learned_min,
             baseline_outdoor_max_c=learned_max,
             room_gain_c=self._room_gain,
+            trim_evidence=dict(self._trim_evidence),
             cop_c=0.0 if result is None else result.cop_c,
             precharge_c=0.0 if result is None else result.precharge_c,
         )

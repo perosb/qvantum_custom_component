@@ -556,6 +556,7 @@ def _curve_snapshot(**overrides) -> CurveSnapshot:
         room_error_p90_abs_c=0.6,
         room_error_samples=72,
         room_error_source="room_temp_external",
+        trim_evidence={"curve_30": 12, "curve_0": 0},
         model=SolarModel(
             a_w_per_k=161.0,
             b_m2=0.1,
@@ -594,6 +595,7 @@ class TestQvantumCurveSensors:
             "baseline": 25.0,
             "adjustment": 1.0,
             "trim": 0.0,
+            "evidence_hours": 12,
         }
         assert entity.suggested_object_id == "adaptive_curve_01_30"
         assert entity._attr_unique_id == "qvantum_adaptive_curve_30_test_device_123"

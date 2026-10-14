@@ -844,6 +844,9 @@ class QvantumCurvePointSensor(QvantumCurveSensorEntity):
             "baseline": snapshot.baseline.get(self._curve_key),
             "adjustment": snapshot.adjustment_c,
             "trim": snapshot.trims.get(self._curve_key, 0.0),
+            # 0 means the trim is deliberately 0: the window holds no evidence
+            # near this outdoor temperature.
+            "evidence_hours": snapshot.trim_evidence.get(self._curve_key, 0),
         }
 
 
