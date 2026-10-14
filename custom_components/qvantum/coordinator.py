@@ -40,7 +40,6 @@ from .client.protocol import (
 from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
 from .calculations import QvantumCalculationsMixin
 from .client.constants import alias_heating_curve_settings
-from .efficiency import COP_WINDOW_SECONDS
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
@@ -75,6 +74,9 @@ _LOGGER = logging.getLogger(__name__)
 #: Minimum seconds between COP snapshot writes. The figures change every poll,
 #: so the store is throttled directly instead of waiting for a quiet period.
 COP_PERSIST_INTERVAL_SECONDS = 300.0
+
+#: Held COP figures, keyed by the canonical metric name.
+_COP_KEYS = ("cop_heating", "cop_dhw")
 
 # Cap a Retry-After backoff so a hostile/huge value cannot park the poller
 # for hours; a successful poll restores the configured interval.
@@ -241,9 +243,10 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         ] = deque()
         # Last published COP figures, held while the current window is too small.
         self._cop_last: dict[str, float | None] = {}
-        # When the figures were last computed; a recent snapshot is restored
-        # after a restart so the sensors do not blank while the window refills.
-        self._cop_last_time: datetime | None = None
+        # Per-figure computation time. Persisted and restored with the values so
+        # a restart does not blank a figure that is merely waiting for a new
+        # measurable window; the sensor exposes the age as an attribute.
+        self._cop_last_times: dict[str, datetime] = {}
         self._last_persisted_cop_state: tuple | None = None
         # Below the interval so the first snapshot always writes, even when the
         # host (and thus the monotonic clock) has just booted.
@@ -444,10 +447,12 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
     async def async_restore_cop_state(self) -> None:
         """Restore the last COP snapshot after a restart.
 
-        Only a recent snapshot is reused: a value older than the rolling window
-        says nothing about current operation, so the sensors start unavailable
-        and refill instead. Errors are swallowed so a bad store file never
-        blocks setup.
+        The figures are held across idle periods and counter resets, so they are
+        restored regardless of age — a restart must not blank a value that was
+        still shown a moment earlier. Each figure carries its own timestamp; the
+        legacy shared ``updated_at`` is used as a fallback. The sensor exposes
+        the age so a held value can be told apart from a fresh one. Errors are
+        swallowed so a bad store file never blocks setup.
         """
         try:
             data = await self._cop_store.async_load()
@@ -459,24 +464,32 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             return
         if not isinstance(data, dict):
             return
-        stored_at = data.get("updated_at")
-        if not isinstance(stored_at, str):
-            return
+
+        legacy_updated_at = self._parse_store_timestamp(data.get("updated_at"))
+        for key in _COP_KEYS:
+            value = self._coerce_store_number(data.get(key), positive=True)
+            if value is None:
+                continue
+            self._cop_last[key] = value
+            updated_at = (
+                self._parse_store_timestamp(data.get(f"{key}_updated_at"))
+                or legacy_updated_at
+            )
+            if updated_at is not None:
+                self._cop_last_times[key] = updated_at
+        if self._cop_last:
+            _LOGGER.debug("Restored COP snapshot: %s", self._cop_last)
+
+    @staticmethod
+    def _parse_store_timestamp(value: object) -> datetime | None:
+        """Return an aware datetime from stored state, or None when unusable."""
+        if not isinstance(value, str):
+            return None
         try:
-            updated_at = datetime.fromisoformat(stored_at)
+            parsed = datetime.fromisoformat(value)
         except ValueError:
-            return
-        if updated_at.tzinfo is None:
-            return
-        age = (dt_util.utcnow() - updated_at).total_seconds()
-        if age < 0 or age > COP_WINDOW_SECONDS:
-            return
-        self._cop_last = {
-            "cop_heating": self._coerce_store_number(data.get("cop_heating")),
-            "cop_dhw": self._coerce_store_number(data.get("cop_dhw")),
-        }
-        self._cop_last_time = updated_at
-        _LOGGER.debug("Restored COP snapshot (age %.0f s)", age)
+            return None
+        return parsed if parsed.tzinfo is not None else None
 
     @staticmethod
     def _coerce_store_number(
@@ -711,30 +724,31 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             _LOGGER.warning("Failed to schedule DHW state persistence", exc_info=True)
 
     async def _persist_cop_state(self) -> None:
-        """Persist the last COP snapshot at most every few minutes.
+        """Persist the held COP figures and their computation times.
 
         ``async_delay_save`` waits for a quiet period, and the figures change
         every poll while the pump runs, so it would never write. A monotonic
         throttle with a direct save keeps the snapshot at most a few minutes
-        stale — still well inside the rolling window. Failures are swallowed so
-        they cannot break the poll.
+        stale. Failures are swallowed so they cannot break the poll.
         """
-        if self._cop_last_time is None:
-            return
-        current_state = (
-            self._rounded_cop("cop_heating"),
-            self._rounded_cop("cop_dhw"),
-            self._cop_last_time,
-        )
+        current_state = self._cop_state()
         if current_state == self._last_persisted_cop_state:
+            return
+        if self._last_persisted_cop_state is None and not any(
+            self._cop_last.get(key) is not None for key in _COP_KEYS
+        ):
+            # Nothing has been computed yet; do not write an empty snapshot on
+            # every boot.
             return
         now = time.monotonic()
         if now - self._last_cop_persist_at < COP_PERSIST_INTERVAL_SECONDS:
             return
         payload = {
-            "updated_at": self._cop_last_time.isoformat(),
+            "updated_at": self._cop_newest_time_iso(),
             "cop_heating": self._cop_last.get("cop_heating"),
             "cop_dhw": self._cop_last.get("cop_dhw"),
+            "cop_heating_updated_at": self._cop_time_iso("cop_heating"),
+            "cop_dhw_updated_at": self._cop_time_iso("cop_dhw"),
         }
         try:
             await self._cop_store.async_save(payload)
@@ -742,6 +756,29 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             self._last_cop_persist_at = now
         except Exception:
             _LOGGER.warning("Failed to persist COP state", exc_info=True)
+
+    def _cop_state(self) -> tuple:
+        """Change-detection tuple: the rounded figures and their times."""
+        return (
+            self._rounded_cop("cop_heating"),
+            self._rounded_cop("cop_dhw"),
+            self._cop_time_iso("cop_heating"),
+            self._cop_time_iso("cop_dhw"),
+        )
+
+    def _cop_time_iso(self, key: str) -> str | None:
+        """ISO timestamp for one held figure, or None when unknown."""
+        updated_at = self._cop_last_times.get(key)
+        return updated_at.isoformat() if updated_at is not None else None
+
+    def _cop_newest_time_iso(self) -> str | None:
+        """Newest per-figure time, kept as the legacy shared ``updated_at``."""
+        times = [ts for ts in self._cop_last_times.values() if ts is not None]
+        return max(times).isoformat() if times else None
+
+    def cop_last_updated(self, key: str) -> datetime | None:
+        """Return when a held COP figure was last computed, if known."""
+        return self._cop_last_times.get(key)
 
     def _rounded_cop(self, key: str) -> float | None:
         """Round a held COP figure for change detection, rejecting non-numbers."""
