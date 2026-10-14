@@ -1494,6 +1494,70 @@ class TestSensorSetup:
             for entity in entities
         )
 
+    def test_external_room_metric_must_stay_enabled_by_default(self):
+        """Guard: a disabled entity records no statistics.
+
+        The building heat loss and the solar fit resolve the indoor sensor
+        from ``room_temp_ext`` in cloud mode, so disabling it by default would
+        silently push them back onto BT2. The API only returns the metric when
+        the pump has an external room sensor, so enabling it adds nothing for
+        other installs.
+        """
+        from custom_components.qvantum.const import (
+            DEFAULT_DISABLED_HTTP_METRICS,
+            REQUIRED_METRICS,
+        )
+
+        assert "room_temp_ext" not in DEFAULT_DISABLED_HTTP_METRICS
+        assert "room_temp_ext" in REQUIRED_METRICS
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_records_external_room_metric(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """The cloud external room temperature is created enabled, and recorded."""
+        mock_coordinator.modbus_enabled = False
+        mock_coordinator.data["values"]["room_temp_ext"] = 20.5
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        room = [
+            entity
+            for entity in entities
+            if getattr(entity, "_metric_key", None) == "room_temp_ext"
+        ]
+
+        assert len(room) == 1
+        assert room[0]._attr_entity_registry_enabled_default is True
+        assert room[0].native_value == 20.5
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_skips_absent_external_room_metric(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """The API omits the metric when the pump has no external room sensor."""
+        mock_coordinator.modbus_enabled = False
+        mock_coordinator.data["values"].pop("room_temp_ext", None)
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        assert not any(
+            getattr(entity, "_metric_key", None) == "room_temp_ext"
+            for entity in entities
+        )
+
     @pytest.mark.asyncio
     async def test_async_setup_entry_http_does_not_create_display_firmware_sensor(
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device

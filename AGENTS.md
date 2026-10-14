@@ -299,7 +299,11 @@ access, so no control is offered when a write would fail.
   `statistics.pick_indoor_metric_key`: the configured sensor wins once it has
   enough hourly rows, otherwise the next candidate (BT2 last) keeps them
   alive. Never hard-code BT2 or the external sensor; always degrade to
-  "no series" rather than a wrong one.
+  "no series" rather than a wrong one. Both external-room metrics must stay in
+  `DEFAULT_ENABLED_*` for the same reason — `room_temp_ext` (HTTP) and the
+  `room_temp_external` holding sensor — because a disabled entity records no
+  statistics, and moving either into a `DEFAULT_DISABLED_*` list silently
+  sends those features back to BT2.
 - Removing the config entry reverts holding 22 to Auto (`async_remove_entry`),
   because nothing would be left to supervise the User-defined table we wrote.
   Reload and HA shutdown deliberately keep it: a reload re-activates from the
