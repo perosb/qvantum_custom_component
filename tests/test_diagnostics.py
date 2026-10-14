@@ -13,7 +13,7 @@ from custom_components.qvantum.diagnostics import (
     TO_REDACT,
     async_get_config_entry_diagnostics,
 )
-from custom_components.qvantum.solar_gain import SolarModel
+from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
 
 REDACTED = "**REDACTED**"
 # Same length/format as a real Qvantum serial number.
@@ -102,6 +102,7 @@ def _curve_coordinator() -> SimpleNamespace:
         p95_abs_c=0.9,
         window_hours=72.0,
         model=_solar_model(),
+        daily_model=_solar_daily_model(),
         calibrated_at="2026-09-25T10:00:00+00:00",
         baseline_auto=True,
         trims={"curve_30": 0.1},
@@ -124,6 +125,7 @@ def _curve_coordinator() -> SimpleNamespace:
         _revert_pending=False,
         _forecast_ok=True,
         _baseline={"curve_30": 28.0, "curve_minus_30": 52.0},
+        _daily_model=_solar_daily_model(),
         _baseline_auto=True,
         _curve_23=20,
         _baseline_stats={
@@ -159,6 +161,25 @@ def _solar_model() -> SolarModel:
         n_opaque=40,
         n_solar=30,
         valid=True,
+    )
+
+
+def _solar_daily_model() -> SolarDailyModel:
+    return SolarDailyModel(
+        a_w_per_k=152.0,
+        b_m2=1.9,
+        c_w=-600.0,
+        trust=0.7,
+        r2=0.92,
+        n_days=25,
+        b_std_err=0.6,
+        t_stat=3.0,
+        b_first_half_m2=1.7,
+        b_second_half_m2=2.1,
+        b_jackknife_min_m2=1.5,
+        b_jackknife_max_m2=2.2,
+        valid=True,
+        notes="days=25 t=3.00 r2=0.920 jackknife=1.50-2.20",
     )
 
 
@@ -480,6 +501,11 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     }
     assert curve["model"]["trust"] == 0.8
     assert curve["model"]["b_m2"] == 2.5
+    assert curve["model_daily"]["b_m2"] == 1.9
+    assert curve["model_daily"]["t_stat"] == 3.0
+    assert curve["model_daily"]["n_days"] == 25
+    assert curve["model_daily"]["valid"] is True
+    assert curve["model_daily"]["b_jackknife_min_m2"] == 1.5
     assert curve["calibrated_at"] == "2026-09-25T10:00:00+00:00"
     assert curve["timestamps"]["last_trim_ts"] == 1758794400.0
     assert curve["timestamps"]["last_active_ts"] is None
@@ -509,6 +535,7 @@ async def test_curve_diagnostics_tolerates_malformed_state(hass):
     assert curve_result["baseline"] == {}
     assert curve_result["trims"] == {}
     assert curve_result["model"] is None
+    assert curve_result["model_daily"] is None
     assert curve_result["extrapolated_points"] == []
     assert curve_result["trim_evidence"] == {}
     assert curve_result["room_error"] is None

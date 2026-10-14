@@ -265,6 +265,33 @@ def _curve_model_diagnostics(model: Any) -> dict[str, Any] | None:
     }
 
 
+def _curve_daily_model_diagnostics(model: Any) -> dict[str, Any] | None:
+    """Return the day-block identification (the solar term's actual source).
+
+    Its ``b`` is the aperture the curve applies whenever ``valid``; the hourly
+    model's own ``b`` is 0 on a censored window, so this block is where a
+    missing solar term is explained.
+    """
+    if model is None:
+        return None
+    return {
+        "a_w_per_k": getattr(model, "a_w_per_k", None),
+        "b_m2": getattr(model, "b_m2", None),
+        "c_w": getattr(model, "c_w", None),
+        "trust": getattr(model, "trust", None),
+        "r2": getattr(model, "r2", None),
+        "b_std_err": getattr(model, "b_std_err", None),
+        "t_stat": getattr(model, "t_stat", None),
+        "n_days": getattr(model, "n_days", None),
+        "b_first_half_m2": getattr(model, "b_first_half_m2", None),
+        "b_second_half_m2": getattr(model, "b_second_half_m2", None),
+        "b_jackknife_min_m2": getattr(model, "b_jackknife_min_m2", None),
+        "b_jackknife_max_m2": getattr(model, "b_jackknife_max_m2", None),
+        "valid": getattr(model, "valid", None),
+        "notes": getattr(model, "notes", None),
+    }
+
+
 def _curve_room_error_diagnostics(snapshot: Any) -> dict[str, Any] | None:
     """Return the indoor-error outcome over the readiness window.
 
@@ -348,6 +375,10 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "trim_evidence": dict(getattr(coordinator, "_trim_evidence", None) or {}),
         "room_error": _curve_room_error_diagnostics(snapshot),
         "model": _curve_model_diagnostics(getattr(coordinator, "_model", None)),
+        # Day-block identification: the aperture the solar term uses when valid.
+        "model_daily": _curve_daily_model_diagnostics(
+            getattr(coordinator, "_daily_model", None)
+        ),
         "calibrated_at": getattr(coordinator, "_calibrated_at", None),
         "timestamps": {
             field.removeprefix("_"): getattr(coordinator, field, None)

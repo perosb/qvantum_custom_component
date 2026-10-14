@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -16,7 +17,7 @@ from custom_components.qvantum.efficiency_coordinator import (
     _window_delta,
 )
 from custom_components.qvantum.open_meteo import HourlyWeather, WeatherForecast
-from custom_components.qvantum.solar_gain import SolarModel
+from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
 
 
 def make_coordinator() -> QvantumEfficiencyCoordinator:
@@ -34,6 +35,7 @@ def make_coordinator() -> QvantumEfficiencyCoordinator:
     # bypass by constructing via __new__.
     coordinator._session = MagicMock()
     coordinator._solar_model = None
+    coordinator._solar_daily = None
     coordinator._last_solar_fit_ts = None
     return coordinator
 
@@ -864,3 +866,78 @@ def test_thermal_metrics_without_a_loss_coefficient() -> None:
     assert tau == pytest.approx(40.0)
     assert mass is None
     assert episodes == 3
+
+
+class TestSolarDaily:
+    """The gain must follow the same identification policy as the curve."""
+
+    @staticmethod
+    def _daily_model() -> SolarDailyModel:
+        return SolarDailyModel(
+            a_w_per_k=152.0,
+            b_m2=1.9,
+            c_w=-600.0,
+            trust=0.7,
+            r2=0.92,
+            n_days=25,
+            b_std_err=0.6,
+            t_stat=3.0,
+            valid=True,
+            notes="days=25",
+        )
+
+    def test_daily_model_drives_the_gain(self):
+        coordinator = make_coordinator()
+        coordinator._solar_daily = self._daily_model()
+        coordinator._solar_model = None
+
+        aperture, loss = ec.effective_solar_model(
+            coordinator.solar_model, coordinator.solar_daily
+        )
+
+        assert aperture == pytest.approx(1.9 * 0.7)
+        assert loss == pytest.approx(152.0)
+
+    async def test_refresh_fits_the_day_block_model(self):
+        """The day-block fit must actually see the series it is given."""
+        coordinator = make_coordinator()
+        fixed = datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
+        now_ts = int(fixed.timestamp())
+        days = 30
+        mean_series: dict[str, list[tuple[int, float]]] = {
+            "heatingpower": [],
+            "bt1": [],
+            "bt2": [],
+        }
+        ghi_history: dict[int, float] = {}
+        for index in range(days * 24):
+            ts = now_ts - (days * 24 - 1 - index) * 3600
+            ts -= ts % 3600
+            day = index // 24
+            outdoor = 12.0 + 0.4 * (day % 5)
+            hour = (ts // 3600) % 24
+            ghi = (
+                (300.0 + 90.0 * (day % 11)) * math.sin(math.pi * hour / 24.0)
+                if 6 <= hour < 18
+                else 0.0
+            )
+            ghi_history[ts] = ghi
+            mean_series["bt1"].append((ts, outdoor))
+            mean_series["bt2"].append((ts, 21.0))
+            mean_series["heatingpower"].append(
+                (ts, max(0.0, 152.0 * (21.0 - outdoor) - 600.0 - 1.9 * ghi))
+            )
+
+        with patch.object(
+            ec, "fetch_ghi_history", AsyncMock(return_value=ghi_history)
+        ):
+            await coordinator._async_refresh_solar_model(
+                mean_series, now_ts, 59.3, 18.1
+            )
+
+        daily = coordinator.solar_daily
+        assert daily is not None
+        assert daily.valid
+        assert daily.n_days >= 20
+        assert daily.b_m2 > 0.0
+        assert daily.notes.startswith("days=")

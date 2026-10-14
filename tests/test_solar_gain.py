@@ -5,20 +5,31 @@ from __future__ import annotations
 import ast
 import math
 import random
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from custom_components.qvantum.solar_gain import (
+    DAILY_MIN_DAYS,
+    DAILY_MIN_R2,
+    DAILY_MIN_T_STAT,
     MIN_FIT_ROWS,
+    MIN_SAMPLE_Q_W,
     OPAQUE_GHI_MAX_WM2,
+    SolarDay,
     SolarModel,
     SolarSample,
     _median,
+    _ols_three,
     _recency_weights,
     _robust_weights_line,
     _trust_from_t_stat,
     _weighted_r2,
+    aggregate_days,
+    build_samples,
+    effective_solar_model,
+    fit_daily_solar_model,
     fit_solar_model,
     smooth_ghi,
 )
@@ -394,3 +405,410 @@ def test_all_opaque_rows_non_finite_is_invalid() -> None:
 
     assert not model.valid
     assert "opaque rows" in model.notes
+
+
+# ---------------------------------------------------------------------------
+# Day-block identification
+# ---------------------------------------------------------------------------
+
+
+def make_daily_rows(
+    *,
+    a: float = 150.0,
+    b: float = 1.8,
+    c: float = -300.0,
+    days: int = 26,
+    noise: float = 40.0,
+    seed: int = 21,
+    start_ts: int = NOW - 26 * 86400,
+    mutate=None,
+) -> list[SolarDay]:
+    """Synthetic day blocks from ``Q = a·ΣΔT + 24c − b·ΣGHI``."""
+    rng = random.Random(seed)
+    rows: list[SolarDay] = []
+    for index in range(days):
+        sum_delta_t = 160.0 + 120.0 * rng.random()
+        sum_ghi = 300.0 + 3000.0 * rng.random()
+        q_heat = a * sum_delta_t + 24.0 * c - b * sum_ghi + rng.gauss(0.0, noise)
+        row = SolarDay(
+            day_ts=start_ts + index * 86400,
+            sum_delta_t_k=sum_delta_t,
+            sum_ghi_wm2=sum_ghi,
+            q_heat_wh=q_heat,
+            hours=24,
+            heating_hours=12,
+        )
+        if mutate is not None:
+            row = mutate(row, index)
+        rows.append(row)
+    return rows
+
+
+def make_censored_history(
+    *,
+    a: float = 150.0,
+    b: float = 1.8,
+    c: float = -700.0,
+    days: int = 40,
+    noise: float = 40.0,
+    seed: int = 23,
+    outdoor_low_c: float = 14.0,
+    outdoor_high_c: float = 16.0,
+    peak_ghi_wm2: float = 600.0,
+    now_ts: int = NOW,
+) -> tuple[dict[int, float], dict[int, float], dict[int, float], dict[int, float]]:
+    """Hourly maps for a house whose circuit stops when demand is covered.
+
+    Every hour's demand is ``a·ΔT + c − b·GHI``; the pump delivers it only when
+    it is positive (that is what a room-compensated pump does in the sun),
+    which is exactly the censoring the day-block estimator exists to undo.
+    """
+    rng = random.Random(seed)
+    q_heat: dict[int, float] = {}
+    indoor: dict[int, float] = {}
+    outdoor: dict[int, float] = {}
+    ghi_by_hour: dict[int, float] = {}
+    # Align to a UTC midnight so the window is exactly ``days`` day blocks.
+    start = now_ts - days * 24 * 3600
+    start -= start % 86400
+    for day in range(days):
+        outdoor_day = outdoor_low_c + (outdoor_high_c - outdoor_low_c) * rng.random()
+        clearness = rng.uniform(0.15, 1.0)
+        for hour in range(24):
+            ts = start + (day * 24 + hour) * 3600
+            outdoor[ts] = outdoor_day
+            indoor[ts] = 21.0
+            if 5 <= hour < 18:
+                ghi = peak_ghi_wm2 * math.sin(math.pi * (hour - 5) / 13.0) * clearness
+            else:
+                ghi = 0.0
+            ghi_by_hour[ts] = ghi
+            demand = a * (21.0 - outdoor_day) + c - b * ghi
+            q_heat[ts] = max(0.0, demand + rng.gauss(0.0, noise))
+    return q_heat, indoor, outdoor, ghi_by_hour
+
+
+def test_aggregate_days_sums_hours_and_keeps_idle_hours() -> None:
+    q_heat, indoor, outdoor, ghi = make_censored_history(days=3, noise=0.0)
+    days = aggregate_days(q_heat, indoor, outdoor, ghi)
+
+    assert len(days) == 3
+    day = days[0]
+    keys = [ts for ts in q_heat if ts // 86400 == day.day_ts // 86400]
+    assert day.hours == len(keys)
+    assert day.q_heat_wh == pytest.approx(sum(q_heat[ts] for ts in keys))
+    assert day.sum_ghi_wm2 == pytest.approx(sum(ghi[ts] for ts in keys))
+    assert day.sum_delta_t_k == pytest.approx(
+        sum(indoor[ts] - outdoor[ts] for ts in keys)
+    )
+    # Idle hours are the evidence: they stay in the sums with q = 0.
+    assert day.heating_hours < 24
+    idle = [ts for ts in keys if q_heat[ts] < MIN_SAMPLE_Q_W]
+    assert idle
+    assert day.q_heat_wh <= sum(q_heat[ts] for ts in keys if ts not in idle) + 1e-9
+
+
+def test_aggregate_days_skips_non_finite_and_short_days() -> None:
+    start = NOW - 2 * 86400
+    start -= start % 86400
+    keys = [start + index * 3600 for index in range(36)]
+    q_heat = {ts: 400.0 for ts in keys}
+    indoor = {ts: 21.0 for ts in keys}
+    outdoor = {ts: 5.0 for ts in keys}
+    ghi = {ts: 100.0 for ts in keys}
+    q_heat[keys[0]] = float("nan")
+    indoor[keys[1]] = float("inf")
+
+    days = aggregate_days(q_heat, indoor, outdoor, ghi)
+
+    assert len(days) == 2
+    assert days[0].hours == 22  # 24 hours minus one NaN and one inf row
+    assert all(day.hours < 24 for day in days)
+
+
+def test_daily_fit_recovers_the_aperture() -> None:
+    model = fit_daily_solar_model(make_daily_rows())
+
+    assert model.valid
+    assert model.a_w_per_k == pytest.approx(150.0, abs=12.0)
+    assert model.b_m2 == pytest.approx(1.8, abs=0.4)
+    assert model.trust > 0.5
+    assert model.effective_b_m2 == pytest.approx(model.b_m2 * model.trust)
+    assert model.n_days == 26
+
+
+def test_day_blocks_keep_the_hours_the_heating_sample_drops() -> None:
+    """Why the day-block estimator exists, as a regression test.
+
+    The hourly sample is a heating-hour sample: on a sunny day the room term
+    stops the circuit, so the strongest-sun hours never reach it. The day
+    blocks keep those same hours with ``q = 0``, which is the only way the
+    aperture can be seen at all.
+
+    Note the day-block fit is *attenuated* in this synthetic world: a demand
+    truncated at zero is not exactly linear, so the recovered ``b`` is a lower
+    bound on the true one. Being biased down is the safe direction.
+    """
+    a, b = 150.0, 1.8
+    q_heat, indoor, outdoor, ghi = make_censored_history(a=a, b=b, days=40)
+    samples = build_samples(q_heat, indoor, outdoor, ghi)
+    days = aggregate_days(q_heat, indoor, outdoor, ghi)
+
+    peak_ghi = max(ghi.values())
+    sunny_idle = [
+        ts
+        for ts in ghi
+        if ghi[ts] >= 100.0 and q_heat[ts] < MIN_SAMPLE_Q_W
+    ]
+    assert sunny_idle  # the sun really does switch the circuit off
+    assert max(sample.ghi_wm2 for sample in samples) < 0.5 * peak_ghi
+    assert all(day.hours == 24 for day in days)
+    assert max(day.sum_ghi_wm2 for day in days) > 0.0
+
+    daily = fit_daily_solar_model(days)
+
+    assert daily.valid
+    assert daily.a_w_per_k > 0.0
+    assert 0.0 < daily.b_m2 <= b
+
+
+def test_daily_fit_rejects_too_few_days() -> None:
+    model = fit_daily_solar_model(make_daily_rows(days=DAILY_MIN_DAYS - 1))
+
+    assert not model.valid
+    assert "days" in model.notes
+    assert model.effective_b_m2 == 0.0
+
+
+def test_daily_fit_rejects_days_without_heating() -> None:
+    model = fit_daily_solar_model(
+        make_daily_rows(mutate=lambda row, index: replace(row, heating_hours=1))
+    )
+
+    assert not model.valid
+    assert "days 0" in model.notes
+
+
+def test_daily_fit_rejects_non_positive_aperture() -> None:
+    model = fit_daily_solar_model(make_daily_rows(b=-1.2))
+
+    assert not model.valid
+    assert "aperture" in model.notes
+
+
+def test_daily_fit_rejects_a_noisy_window() -> None:
+    noisy = fit_daily_solar_model(make_daily_rows(noise=6000.0, seed=31))
+
+    assert not noisy.valid
+    assert "r2" in noisy.notes or "t" in noisy.notes
+
+
+def test_daily_fit_rejects_a_single_day_that_carries_the_estimate() -> None:
+    # Every day but one shares the same irradiance, so no day but that one
+    # carries any information about b at all. One day must never be enough to
+    # switch a solar term on.
+    rows = make_daily_rows(
+        days=26, mutate=lambda row, index: replace(row, sum_ghi_wm2=1000.0)
+    )
+    rows = [
+        replace(row, sum_ghi_wm2=20000.0, q_heat_wh=row.q_heat_wh - 30000.0)
+        if index == 5
+        else row
+        for index, row in enumerate(rows)
+    ]
+
+    model = fit_daily_solar_model(rows)
+
+    assert not model.valid
+    assert "jackknife" in model.notes
+
+
+def test_daily_fit_records_halves_and_jackknife() -> None:
+    model = fit_daily_solar_model(make_daily_rows())
+
+    assert model.valid
+    assert model.b_first_half_m2 is not None
+    assert model.b_second_half_m2 is not None
+    assert model.b_jackknife_min_m2 is not None
+    assert model.b_jackknife_max_m2 is not None
+    assert model.b_jackknife_min_m2 <= model.b_m2 <= model.b_jackknife_max_m2
+    assert model.b_jackknife_min_m2 > 0.0
+    assert "jackknife" in model.notes
+    assert model.t_stat is not None and model.t_stat >= DAILY_MIN_T_STAT
+    assert model.r2 >= DAILY_MIN_R2
+
+
+def test_daily_fit_rejects_singular_and_short_designs() -> None:
+    flat = make_daily_rows(
+        mutate=lambda row, index: replace(
+            row, sum_delta_t_k=0.0, sum_ghi_wm2=0.0, q_heat_wh=500.0
+        )
+    )
+    model = fit_daily_solar_model(flat)
+
+    assert not model.valid
+    assert "daily fit failed" in model.notes
+
+
+def test_ols_three_recovers_coefficients_and_guards() -> None:
+    rows = [(1.0, 2.0, 1.0), (2.0, 1.0, 1.0), (3.0, 4.0, 1.0), (4.0, 3.0, 1.0)]
+    beta, stderr, r2 = _ols_three(
+        [row[0] for row in rows],
+        [row[1] for row in rows],
+        [row[2] for row in rows],
+        [3.0 * row[0] - 2.0 * row[1] + 7.0 for row in rows],
+    )
+
+    assert beta[0] == pytest.approx(3.0)
+    assert beta[1] == pytest.approx(-2.0)
+    assert beta[2] == pytest.approx(7.0)
+    assert r2 == pytest.approx(1.0)
+    assert all(value >= 0.0 for value in stderr)
+
+    with pytest.raises(ValueError):
+        _ols_three([1.0, 2.0], [1.0, 2.0], [1.0, 1.0], [1.0, 2.0])
+
+
+def test_effective_solar_model_prefers_the_gated_day_block() -> None:
+    hourly = SolarModel(
+        a_w_per_k=100.0,
+        b_m2=0.5,
+        c_w=0.0,
+        trust=1.0,
+        r2_opaque=0.0,
+        r2_solar=0.0,
+        b_std_err=0.1,
+        n_opaque=10,
+        n_solar=10,
+        valid=True,
+    )
+    daily = fit_daily_solar_model(make_daily_rows())
+
+    aperture, loss = effective_solar_model(hourly, daily)
+    assert aperture == pytest.approx(daily.effective_b_m2)
+    assert loss == pytest.approx(daily.a_w_per_k)
+
+    # An ungated day-block model must never be used, however good it looks.
+    rejected = replace(daily, valid=False, trust=1.0)
+    assert effective_solar_model(hourly, rejected) == (
+        pytest.approx(hourly.effective_b_m2),
+        pytest.approx(hourly.a_w_per_k),
+    )
+    assert effective_solar_model(None, rejected) == (0.0, 0.0)
+    assert effective_solar_model(None, None) == (0.0, 0.0)
+
+
+def make_gated_rows(
+    *,
+    a: float = 152.0,
+    b: float = 1.8,
+    sdt_range: tuple[float, float] = (130.0, 230.0),
+    ghi_range: tuple[float, float] = (300.0, 3300.0),
+    noise: float = 40.0,
+    days: int = 26,
+    seed: int = 41,
+) -> list[SolarDay]:
+    """Day blocks built around the production equation, for gate tests."""
+    rng = random.Random(seed)
+    rows: list[SolarDay] = []
+    for index in range(days):
+        sum_delta_t = sdt_range[0] + (sdt_range[1] - sdt_range[0]) * rng.random()
+        sum_ghi = ghi_range[0] + (ghi_range[1] - ghi_range[0]) * rng.random()
+        q_heat = (
+            a * sum_delta_t
+            + 24.0 * -600.0
+            - b * sum_ghi
+            + rng.gauss(0.0, noise)
+        )
+        rows.append(
+            SolarDay(
+                day_ts=index * 86400,
+                sum_delta_t_k=sum_delta_t,
+                sum_ghi_wm2=sum_ghi,
+                q_heat_wh=q_heat,
+                hours=24,
+                heating_hours=12,
+            )
+        )
+    return rows
+
+
+def test_daily_fit_rejects_a_non_positive_loss_coefficient() -> None:
+    rows = [
+        replace(row, q_heat_wh=20000.0 - 40.0 * (row.sum_delta_t_k - 200.0))
+        for row in make_gated_rows()
+    ]
+
+    model = fit_daily_solar_model(rows)
+
+    assert not model.valid
+    assert model.notes == "a ≤ 0"
+    assert model.a_w_per_k < 0.0
+
+
+def test_daily_fit_rejects_an_absurd_aperture() -> None:
+    rows = [
+        replace(
+            row,
+            sum_ghi_wm2=1.0 + 0.5 * index,
+            q_heat_wh=row.q_heat_wh - 15.0 * (1.0 + 0.5 * index),
+        )
+        for index, row in enumerate(make_gated_rows())
+    ]
+
+    model = fit_daily_solar_model(rows)
+
+    assert not model.valid
+    assert "m² >" in model.notes
+
+
+def test_daily_fit_rejects_a_window_that_explains_too_little() -> None:
+    rows = make_gated_rows(
+        sdt_range=(100.0, 300.0), ghi_range=(0.0, 20000.0), noise=6000.0, seed=5
+    )
+
+    model = fit_daily_solar_model(rows)
+
+    assert not model.valid
+    assert model.t_stat is not None and model.t_stat >= DAILY_MIN_T_STAT
+    assert model.r2 < DAILY_MIN_R2
+    assert "r2" in model.notes
+
+
+def test_daily_fit_rejects_a_day_that_swings_the_estimate() -> None:
+    """One wild day must not decide the aperture, even when t looks superb."""
+    rows = make_gated_rows(
+        ghi_range=(1000.0, 1005.0), noise=300.0, seed=11
+    )
+    rows = [
+        replace(
+            row,
+            sum_ghi_wm2=30000.0,
+            q_heat_wh=152.0 * row.sum_delta_t_k - 14400.0 - 6.0 * 30000.0,
+        )
+        if index == 7
+        else row
+        for index, row in enumerate(rows)
+    ]
+
+    model = fit_daily_solar_model(rows)
+
+    assert not model.valid
+    assert model.t_stat is not None and model.t_stat > DAILY_MIN_T_STAT
+    assert "jackknife" in model.notes
+
+
+def test_aggregate_days_ignores_unparsable_values() -> None:
+    start = NOW - 86400
+    start -= start % 86400
+    keys = [start + index * 3600 for index in range(4)]
+    q_heat = {ts: 400.0 for ts in keys}
+    indoor = {ts: 21.0 for ts in keys}
+    outdoor = {ts: 5.0 for ts in keys}
+    ghi = {ts: 100.0 for ts in keys}
+    q_heat[keys[0]] = "n/a"  # type: ignore[assignment]
+
+    days = aggregate_days(q_heat, indoor, outdoor, ghi)
+
+    assert len(days) == 1
+    assert days[0].hours == 3

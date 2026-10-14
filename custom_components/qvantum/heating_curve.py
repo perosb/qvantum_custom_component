@@ -41,7 +41,12 @@ from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
-from .solar_gain import SolarModel, smooth_ghi
+from .solar_gain import (
+    SolarDailyModel,
+    SolarModel,
+    effective_solar_model,
+    smooth_ghi,
+)
 
 CURVE_KEYS: tuple[str, ...] = tuple(HEATING_CURVE_OUTDOOR_TEMPS)
 OUTDOOR_TEMPS: tuple[int, ...] = tuple(HEATING_CURVE_OUTDOOR_TEMPS.values())
@@ -321,23 +326,47 @@ def night_day_adjustment_c(
     return -amplitude_c * math.sin(math.pi * _clamp(phase, 0.0, 1.0))
 
 
+def solar_gain_w_now(
+    model: SolarModel | None,
+    daily: SolarDailyModel | None,
+    ghi_by_hour: Mapping[int, float],
+    now_ts: int,
+) -> float:
+    """Effective solar gain in W at the smoothed irradiance.
+
+    The day-block model wins whenever it passed its evidence gates; the
+    hourly model is the fallback, and on a censored window its ``b`` is 0 —
+    i.e. no term at all, never a second opinion averaged in.
+    """
+    aperture, _ = effective_solar_model(model, daily)
+    if aperture <= 0.0:
+        return 0.0
+    return max(0.0, aperture * smooth_ghi(ghi_by_hour, now_ts))
+
+
 def solar_adjustment_c(
     model: SolarModel | None,
     ghi_by_hour: Mapping[int, float],
     now_ts: int,
     points: Sequence[tuple[float, float]],
     forecast_temperature_c: float | None,
+    daily: SolarDailyModel | None = None,
 ) -> float:
-    """Solar gain in W → equivalent ΔT → supply degrees, damped by trust."""
-    if model is None or not model.valid or model.a_w_per_k <= 0:
+    """Solar gain in W → equivalent ΔT → supply degrees, damped by trust.
+
+    The aperture and the loss coefficient are taken from the *same* model, so
+    the W → K conversion is self-consistent: a day-block ``b`` is divided by
+    the day-block ``a`` it was identified with.
+    """
+    aperture, loss_w_per_k = effective_solar_model(model, daily)
+    if aperture <= 0.0 or loss_w_per_k <= 0.0:
         return 0.0
-    ghi = smooth_ghi(ghi_by_hour, now_ts)
-    gain_w = model.solar_gain_w(ghi)
+    gain_w = solar_gain_w_now(model, daily, ghi_by_hour, now_ts)
     if gain_w <= 0.0:
         return 0.0
     reference = 0.0 if forecast_temperature_c is None else forecast_temperature_c
     slope = curve_slope(points, reference)
-    raw = slope * (gain_w / model.a_w_per_k)
+    raw = slope * (gain_w / loss_w_per_k)
     return _clamp(raw, -SOLAR_MAX_C, 0.0)
 
 
@@ -348,11 +377,15 @@ def load_adjustment_c(
     outdoor_c: float | None,
     ghi_by_hour: Mapping[int, float],
     now_ts: int,
+    daily: SolarDailyModel | None = None,
 ) -> float:
     """One-sided reduction when the pump coasts below the model demand.
 
-    The expected demand includes the solar term, so a sun-driven drop does
-    not trigger the load term twice.
+    The expected demand subtracts the *same* solar gain the curve applies —
+    including a day-block term — so a sun-driven drop does not trigger the
+    load term twice. Its loss coefficient and intercept stay the hourly
+    fit's: with a day-block aperture identified separately, ``a``/``c`` were
+    never re-identified for this term.
     """
     if model is None or not model.valid or q_actual_w is None:
         return 0.0
@@ -361,7 +394,7 @@ def load_adjustment_c(
     expected_w = (
         model.a_w_per_k * (indoor_target_c - outdoor_c)
         + model.c_w
-        - model.solar_gain_w(smooth_ghi(ghi_by_hour, now_ts))
+        - solar_gain_w_now(model, daily, ghi_by_hour, now_ts)
     )
     if expected_w <= model.a_w_per_k * LOAD_Q_FLOOR_K:
         return 0.0
@@ -739,6 +772,7 @@ def compute_curve(
     forecast_temperature: Mapping[int, float],
     ghi_by_hour: Mapping[int, float],
     model: SolarModel | None = None,
+    daily_model: SolarDailyModel | None = None,
     daylight: DayPhase | None = None,
     indoor_margin_c: float | None = None,
     indoor_target_c: float | None = None,
@@ -779,10 +813,16 @@ def compute_curve(
         now_ts, daylight, amplitude_c=night_amplitude_c
     )
     solar_c = solar_adjustment_c(
-        model, ghi_by_hour, now_ts, points, forecast_now
+        model, ghi_by_hour, now_ts, points, forecast_now, daily_model
     )
     load_c = load_adjustment_c(
-        model, q_actual_w, indoor_target_c, forecast_now, ghi_by_hour, now_ts
+        model,
+        q_actual_w,
+        indoor_target_c,
+        forecast_now,
+        ghi_by_hour,
+        now_ts,
+        daily_model,
     )
 
     total = _clamp(

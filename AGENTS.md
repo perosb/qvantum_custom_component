@@ -305,6 +305,16 @@ access, so no control is offered when a write would fail.
   (`baseline_outdoor_min_c`/`max_c`); points outside it are extrapolated from
   the cached table and listed in `extrapolated_points`, and only the trims
   correct them once the weather gets there.
+- The solar aperture is identified from the **day-block energy balance**
+  (`Q_day ≈ a·ΣΔT + 24c − b·ΣGHI`, idle hours contributing `q = 0`), not from
+  heating hours: the sunny hours are exactly the ones the pump's room term has
+  already switched off, so a heating-hour fit is censored — and at hour
+  resolution the control response flips its sign. `fit_daily_solar_model`
+  gates on day count, `t`, R² and a leave-one-day-out band, and an ungated
+  window means **no** term (never a preserved older aperture). When it is
+  valid, `effective_solar_model` makes the term use its `b` *and* its `a`
+  together; the hourly fit stays the fallback and still owns the load term's
+  demand estimate, which must subtract the same applied gain.
 - Statistics-based curve features (trims, room gain, solar calibration) and
   the efficiency building metrics resolve the indoor sensor through
   `statistics.pick_indoor_metric_key`: the configured sensor wins once it has

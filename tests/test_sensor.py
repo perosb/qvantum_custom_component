@@ -1,6 +1,7 @@
 """Tests for Qvantum sensors."""
 
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -61,6 +62,7 @@ with patch(
                 QvantumDhwHeatMeterSensor,
                 QvantumEfficiencyHealthSensor,
                 QvantumEfficiencySensorEntity,
+                QvantumSolarGainSensor,
                 QvantumSolarGhiSensor,
                 QvantumDiagnosticEntity,
                 QvantumDisplayFirmwareEntity,
@@ -83,7 +85,7 @@ with patch(
                 EfficiencySnapshot,
                 QvantumEfficiencyCoordinator,
             )
-            from custom_components.qvantum.solar_gain import SolarModel
+            from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
 
 
 @pytest.fixture
@@ -2162,3 +2164,133 @@ def test_measurement_state_class_for_derived_sensors(
     """H17: instantaneous/derived readings get long-term statistics."""
     entity = QvantumBaseSensorEntity(mock_coordinator, metric_key, mock_device, True)
     assert entity._attr_state_class == SensorStateClass.MEASUREMENT
+
+
+class TestQvantumSolarDailyModelSensor:
+    """The curve's solar-model sensor must show what is actually applied."""
+
+    def test_daily_model_drives_the_reported_trust(self, mock_device):
+        daily = SolarDailyModel(
+            a_w_per_k=152.0,
+            b_m2=1.9,
+            c_w=-600.0,
+            trust=0.7,
+            r2=0.92,
+            n_days=25,
+            b_std_err=0.6,
+            t_stat=3.0,
+            b_first_half_m2=1.7,
+            b_second_half_m2=2.1,
+            b_jackknife_min_m2=1.5,
+            b_jackknife_max_m2=2.2,
+            valid=True,
+            notes="days=25 t=3.00 r2=0.920 jackknife=1.50-2.20",
+        )
+        coordinator = _curve_coordinator(_curve_snapshot(daily_model=daily))
+        entity = QvantumCurveSolarModelSensor(
+            coordinator, "adaptive_curve_solar_model", mock_device
+        )
+
+        # 70 %, not the hourly model's 25 %: the daily model is the applied one.
+        assert entity.native_value == 70
+        attributes = entity.extra_state_attributes
+        assert attributes["b_m2"] == 0.1
+        daily_attributes = attributes["model_daily"]
+        assert daily_attributes["b_m2"] == 1.9
+        assert daily_attributes["t_stat"] == 3.0
+        assert daily_attributes["n_days"] == 25
+        assert daily_attributes["b_jackknife_min_m2"] == 1.5
+        assert daily_attributes["valid"] is True
+
+    def test_ungated_daily_model_falls_back_to_the_hourly_trust(self, mock_device):
+        daily = SolarDailyModel(
+            a_w_per_k=152.0,
+            b_m2=1.9,
+            c_w=-600.0,
+            trust=0.7,
+            r2=0.92,
+            n_days=25,
+            valid=False,
+            notes="jackknife 0.40-6.00 m² vs 1.90 m²",
+        )
+        coordinator = _curve_coordinator(_curve_snapshot(daily_model=daily))
+        entity = QvantumCurveSolarModelSensor(
+            coordinator, "adaptive_curve_solar_model", mock_device
+        )
+
+        assert entity.native_value == 25
+        assert entity.extra_state_attributes["model_daily"]["valid"] is False
+        assert "jackknife" in entity.extra_state_attributes["model_daily"]["notes"]
+
+    def test_gain_sensor_reports_the_day_block_source(self, mock_device):
+        coordinator = _efficiency_coordinator(EfficiencySnapshot(solar_gain_now_w=300.0))
+        coordinator._solar_daily = SimpleNamespace(
+            a_w_per_k=152.0, b_m2=1.9, trust=0.7, n_days=25, valid=True
+        )
+        coordinator._solar_model = None
+        entity = QvantumSolarGainSensor(coordinator, "solar_gain_now_w", mock_device)
+
+        assert entity.native_value == 300.0
+        attributes = entity.extra_state_attributes
+        assert attributes["source"] == "day-block energy balance"
+        assert attributes["b_m2"] == 1.9
+        assert attributes["trust"] == 0.7
+        assert "ΣΔT" in attributes["attribution"]
+
+    def test_gain_sensor_falls_back_to_the_hourly_fit(self, mock_device):
+        coordinator = _efficiency_coordinator(EfficiencySnapshot(solar_gain_now_w=12.0))
+        coordinator._solar_daily = SimpleNamespace(valid=False)
+        coordinator._solar_model = SimpleNamespace(
+            a_w_per_k=161.0, b_m2=0.1, trust=0.25
+        )
+        entity = QvantumSolarGainSensor(coordinator, "solar_gain_now_w", mock_device)
+
+        attributes = entity.extra_state_attributes
+        assert attributes["source"] == "hourly fit"
+        assert attributes["b_m2"] == 0.1
+
+    def test_gain_sensor_without_any_model(self, mock_device):
+        coordinator = _efficiency_coordinator(EfficiencySnapshot())
+        coordinator._solar_daily = None
+        coordinator._solar_model = None
+        entity = QvantumSolarGainSensor(coordinator, "solar_gain_now_w", mock_device)
+
+        attributes = entity.extra_state_attributes
+        assert attributes["source"] is None
+        assert attributes["attribution"] == "no identified model"
+
+    def test_daily_model_alone_still_reports_attributes(self, mock_device):
+        daily = SolarDailyModel(
+            a_w_per_k=152.0,
+            b_m2=1.9,
+            c_w=-600.0,
+            trust=0.7,
+            r2=0.92,
+            n_days=25,
+            valid=True,
+            notes="days=25",
+        )
+        coordinator = _curve_coordinator(
+            _curve_snapshot(model=None, daily_model=daily)
+        )
+        entity = QvantumCurveSolarModelSensor(
+            coordinator, "adaptive_curve_solar_model", mock_device
+        )
+
+        assert entity.native_value == 70
+        assert entity.available is True
+        attributes = entity.extra_state_attributes
+        assert attributes["a_w_per_k"] is None
+        assert attributes["model_daily"]["b_m2"] == 1.9
+
+    def test_no_models_reports_nothing(self, mock_device):
+        coordinator = _curve_coordinator(
+            _curve_snapshot(model=None, daily_model=None)
+        )
+        entity = QvantumCurveSolarModelSensor(
+            coordinator, "adaptive_curve_solar_model", mock_device
+        )
+
+        assert entity.native_value is None
+        assert entity.available is False
+        assert entity.extra_state_attributes is None

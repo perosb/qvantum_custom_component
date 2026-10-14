@@ -41,7 +41,7 @@ from custom_components.qvantum.heating_curve import (
     trim_evidence_hours,
     trim_residuals,
 )
-from custom_components.qvantum.solar_gain import SolarModel
+from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
 
 BASE_HOUR = (1_760_000_000 // 3600) * 3600
 DAY0 = (BASE_HOUR // 86400) * 86400
@@ -797,3 +797,89 @@ def test_integer_points_round_half_up() -> None:
     )
 
     assert result.integer_points() == (("curve_30", 43), ("curve_20", 42))
+
+
+def make_daily_model(
+    *,
+    a: float = 152.0,
+    b: float = 1.9,
+    trust: float = 0.7,
+    valid: bool = True,
+) -> SolarDailyModel:
+    return SolarDailyModel(
+        a_w_per_k=a,
+        b_m2=b,
+        c_w=-600.0,
+        trust=trust,
+        r2=0.92,
+        n_days=25,
+        b_std_err=0.6,
+        t_stat=3.0,
+        b_first_half_m2=1.7,
+        b_second_half_m2=2.1,
+        b_jackknife_min_m2=1.5,
+        b_jackknife_max_m2=2.2,
+        valid=valid,
+        notes="days=25",
+    )
+
+
+def test_solar_adjustment_prefers_the_gated_day_block_pair() -> None:
+    points = normalize_baseline(BASELINE)
+    daily = make_daily_model()
+    hourly = make_model(b=0.0, trust=0.0)
+
+    # The censored hourly model alone emits nothing at all.
+    assert solar_adjustment_c(hourly, ghi_flat(), BASE_HOUR, points, 0.0) == 0.0
+
+    term = solar_adjustment_c(hourly, ghi_flat(), BASE_HOUR, points, 0.0, daily)
+
+    gain_w = daily.effective_b_m2 * 500.0
+    expected = curve_slope(points, 0.0) * (gain_w / daily.a_w_per_k)
+    assert term == pytest.approx(max(-SOLAR_MAX_C, expected), abs=1e-6)
+    assert term < 0.0
+
+    # An ungated day-block model must not be used, however good it looks.
+    assert (
+        solar_adjustment_c(
+            hourly, ghi_flat(), BASE_HOUR, points, 0.0, make_daily_model(valid=False)
+        )
+        == 0.0
+    )
+    # ... and a zero-aperture day block leaves the hourly fallback in charge.
+    assert solar_adjustment_c(
+        make_model(), ghi_flat(), BASE_HOUR, points, 0.0, make_daily_model(b=0.0)
+    ) == pytest.approx(-SOLAR_MAX_C)
+
+
+def test_load_adjustment_subtracts_the_same_day_block_gain() -> None:
+    model = make_model(b=0.0, trust=0.0)
+    daily = make_daily_model()
+    gain_w = daily.effective_b_m2 * 500.0
+    expected = 161.0 * 21.0 + 300.0
+
+    # Demand already covered by the applied solar term: no load reduction.
+    assert (
+        load_adjustment_c(
+            model, expected - gain_w, 21.0, 0.0, ghi_flat(), BASE_HOUR, daily
+        )
+        == 0.0
+    )
+    # Without the daily model the same actual power looks like a shortfall.
+    assert load_adjustment_c(
+        model, expected - gain_w, 21.0, 0.0, ghi_flat(), BASE_HOUR
+    ) < 0.0
+
+
+def test_compute_curve_accepts_a_daily_model() -> None:
+    result = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature=forecast_map(0.0),
+        ghi_by_hour=ghi_flat(),
+        model=make_model(b=0.0, trust=0.0),
+        daily_model=make_daily_model(),
+    )
+
+    assert result.solar_c < 0.0
+    assert result.adjustment_c <= 0.0

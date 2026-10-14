@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 from collections import deque
 from dataclasses import replace
@@ -45,7 +46,11 @@ from custom_components.qvantum.open_meteo import (
     OpenMeteoError,
     WeatherForecast,
 )
-from custom_components.qvantum.solar_gain import SolarModel, SolarSample
+from custom_components.qvantum.solar_gain import (
+    SolarDailyModel,
+    SolarModel,
+    SolarSample,
+)
 
 CURVE_KEYS = (
     "curve_30",
@@ -109,6 +114,7 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._baseline_auto = None
     coordinator._curve_23 = None
     coordinator._model = None
+    coordinator._daily_model = None
     coordinator._calibrated_at = None
     coordinator._last_calibration_ts = None
     # Throttle baseline learning off by default; dedicated tests re-enable it.
@@ -154,6 +160,27 @@ def make_model(**overrides) -> SolarModel:
     )
     values.update(overrides)
     return SolarModel(**values)
+
+
+def make_daily_model(**overrides) -> SolarDailyModel:
+    values = dict(
+        a_w_per_k=152.0,
+        b_m2=1.9,
+        c_w=-600.0,
+        trust=0.7,
+        r2=0.92,
+        n_days=25,
+        b_std_err=0.6,
+        t_stat=3.0,
+        b_first_half_m2=1.7,
+        b_second_half_m2=2.1,
+        b_jackknife_min_m2=1.5,
+        b_jackknife_max_m2=2.2,
+        valid=True,
+        notes="days=25",
+    )
+    values.update(overrides)
+    return SolarDailyModel(**values)
 
 
 def test_freeze_baseline_complete_and_rejects_bad_values() -> None:
@@ -2589,3 +2616,117 @@ class TestPrecharge:
         )
         assert coordinator._precharge_c(forecast, now, make_snapshot()) > 0.0
 
+
+
+def _daily_maps(days: int = 26, *, now_ts: float | None = None):
+    """Hourly maps for a house whose demand the sun visibly covers."""
+    now_ts = int(now_ts or time.time())
+    start = now_ts - days * 86400
+    start -= start % 86400
+    q: dict[int, float] = {}
+    indoor: dict[int, float] = {}
+    outdoor: dict[int, float] = {}
+    ghi: dict[int, float] = {}
+    for day in range(days):
+        outdoor_day = 8.0 + 0.2 * (day % 5)
+        for hour in range(24):
+            ts = start + (day * 24 + hour) * 3600
+            outdoor[ts] = outdoor_day
+            indoor[ts] = 21.0
+            ghi[ts] = (
+                (300.0 + 90.0 * ((day * 7) % 11)) * math.sin(math.pi * hour / 24.0)
+                if 6 <= hour < 18
+                else 0.0
+            )
+            q[ts] = max(0.0, 152.0 * (21.0 - outdoor_day) - 500.0 - 1.9 * ghi[ts])
+    return q, indoor, outdoor, ghi
+
+
+async def test_calibrate_fits_and_persists_the_daily_model() -> None:
+    now_ts = time.time()
+    coordinator = make_coordinator(store=FakeStore())
+    q, indoor, outdoor, ghi = _daily_maps(now_ts=now_ts)
+    coordinator._async_hourly_maps = AsyncMock(
+        return_value={"heatingpower": q, "indoor": indoor, "outdoor": outdoor}
+    )
+    with patch.object(cc, "fetch_ghi_history", AsyncMock(return_value=ghi)):
+        await coordinator._async_calibrate(now_ts)
+
+    daily = coordinator.daily_model
+    assert daily is not None
+    assert daily.valid
+    assert daily.b_m2 > 0.0
+    assert daily.n_days >= 20
+    assert coordinator._store.saved["daily_model"]["b"] == pytest.approx(daily.b_m2)
+    assert coordinator._store.saved["daily_model"]["n_days"] == daily.n_days
+
+
+async def test_daily_model_round_trips_through_the_store() -> None:
+    now_ts = time.time()
+    coordinator = make_coordinator(store=FakeStore())
+    q, indoor, outdoor, ghi = _daily_maps(now_ts=now_ts)
+    coordinator._async_hourly_maps = AsyncMock(
+        return_value={"heatingpower": q, "indoor": indoor, "outdoor": outdoor}
+    )
+    with patch.object(cc, "fetch_ghi_history", AsyncMock(return_value=ghi)):
+        await coordinator._async_calibrate(now_ts)
+    payload = coordinator._store.saved
+
+    restored = make_coordinator(store=FakeStore(data=payload))
+    await restored.async_restore()
+
+    assert restored.daily_model is not None
+    assert restored.daily_model.valid
+    assert restored.daily_model.b_m2 == pytest.approx(coordinator.daily_model.b_m2)
+    assert restored.daily_model.trust == pytest.approx(coordinator.daily_model.trust)
+    assert restored.daily_model.b_jackknife_min_m2 == pytest.approx(
+        coordinator.daily_model.b_jackknife_min_m2
+    )
+    assert restored.data is None
+
+
+async def test_daily_model_replaces_an_unidentifiable_window() -> None:
+    """An ungated window must switch the term off, not keep an older model."""
+    now_ts = time.time()
+    coordinator = make_coordinator(store=FakeStore())
+    coordinator._daily_model = make_daily_model()
+    q = {int(now_ts) - index * 3600: 1000.0 for index in range(100)}
+    coordinator._async_hourly_maps = AsyncMock(
+        return_value={
+            "heatingpower": q,
+            "indoor": {ts: 20.0 for ts in q},
+            "outdoor": {ts: 5.0 for ts in q},
+        }
+    )
+    with patch.object(
+        cc, "fetch_ghi_history", AsyncMock(return_value={ts: 0.0 for ts in q})
+    ):
+        await coordinator._async_calibrate(now_ts)
+
+    assert coordinator.daily_model is not None
+    assert not coordinator.daily_model.valid
+    assert coordinator._store.saved["daily_model"]["valid"] is False
+
+
+async def test_snapshot_applies_the_day_block_solar_term() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(
+        return_value=make_forecast(ghi=500.0)
+    )
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_room_error_hours = AsyncMock(return_value=({}, None))
+    coordinator._daylight = MagicMock(return_value=None)
+    coordinator._model = make_model(b_m2=0.0, trust=0.0)
+    coordinator._daily_model = make_daily_model()
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.daily_model is coordinator._daily_model
+    assert snapshot.solar_c < 0.0
+
+    coordinator._daily_model = make_daily_model(valid=False)
+    censored = await coordinator._async_compute_snapshot()
+
+    assert censored.solar_c == 0.0
