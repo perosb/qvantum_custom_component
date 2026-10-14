@@ -620,6 +620,9 @@
       "adaptive_curve_deviation": {
         "name": "Courbe de chauffage adaptative: écart"
       },
+      "adaptive_curve_room_error": {
+        "name": "Courbe de chauffage adaptative: écart de pièce"
+      },
       "adaptive_curve_solar_model": {
         "name": "Courbe de chauffage adaptative: modèle solaire"
       },

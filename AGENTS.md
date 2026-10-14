@@ -291,6 +291,9 @@ access, so no control is offered when a write would fail.
   (identified from the Auto hours) removed. Gates: median ≤ 1.5 °C and p95
   ≤ 3.0 °C over ≥ 3 days and ≥ 24 heating hours — calibrated to what a 10°
   seven-point table can represent; a tighter median gate is unreachable.
+  While the curve is active the pump follows our table, so readiness turns
+  self-referential — `sensor.qvantum_adaptive_curve_room_error` (median
+  `|indoor − target|` over the same window) is the outcome signal instead.
 - Statistics-based curve features (trims, room gain, solar calibration) and
   the efficiency building metrics resolve the indoor sensor through
   `statistics.pick_indoor_metric_key`: the configured sensor wins once it has

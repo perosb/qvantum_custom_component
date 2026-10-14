@@ -43,7 +43,7 @@ from .efficiency import COP_WINDOW_SECONDS
 from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
-from .curve_coordinator import QvantumCurveCoordinator
+from .curve_coordinator import READY_WINDOW_DAYS, QvantumCurveCoordinator
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
@@ -150,6 +150,7 @@ _CURVE_SENSOR_KEYS = frozenset(
         *_CURVE_POINT_METRICS,
         "adaptive_curve_adjustment",
         "adaptive_curve_deviation",
+        "adaptive_curve_room_error",
         "adaptive_curve_solar_model",
     }
 )
@@ -405,6 +406,11 @@ async def async_setup_entry(
             sensors.append(
                 QvantumCurveDeviationSensor(
                     curve_coordinator, "adaptive_curve_deviation", device
+                )
+            )
+            sensors.append(
+                QvantumCurveRoomErrorSensor(
+                    curve_coordinator, "adaptive_curve_room_error", device
                 )
             )
             sensors.append(
@@ -919,6 +925,46 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             "baseline_outdoor_min_c": snapshot.baseline_outdoor_min_c,
             "baseline_outdoor_max_c": snapshot.baseline_outdoor_max_c,
             "room_gain_c_per_c": snapshot.room_gain_c,
+        }
+
+
+class QvantumCurveRoomErrorSensor(QvantumCurveSensorEntity):
+    """How far the rooms sit from the target over the readiness window.
+
+    Readiness compares our baseline with the pump, which says nothing about
+    the house once the curve is active. This is the outcome: the median
+    absolute indoor error, with the signed median and p90 as attributes.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:home-thermometer"
+
+    @property
+    def native_value(self):
+        """Return the median absolute indoor error in °C."""
+        snapshot = self.coordinator.data
+        return None if snapshot is None else snapshot.room_error_median_abs_c
+
+    @property
+    def available(self) -> bool:
+        """Check the window holds enough hours to say anything."""
+        return super().available and self.native_value is not None
+
+    @property
+    def extra_state_attributes(self):
+        """Return the signed median, p90, sample count and source sensor."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        return {
+            "median_c": snapshot.room_error_median_c,
+            "p90_abs_c": snapshot.room_error_p90_abs_c,
+            "samples": snapshot.room_error_samples,
+            "source": snapshot.room_error_source,
+            "window_days": READY_WINDOW_DAYS,
         }
 
 

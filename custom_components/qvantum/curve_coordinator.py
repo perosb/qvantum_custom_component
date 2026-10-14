@@ -134,6 +134,16 @@ class CurveReadiness:
 
 
 @dataclass(frozen=True)
+class RoomTracking:
+    """How far the rooms sit from the target over the readiness window."""
+
+    median_abs_c: float
+    median_c: float
+    p90_abs_c: float
+    samples: int
+
+
+@dataclass(frozen=True)
 class CurveSnapshot:
     """Curve coordinator data consumed by the curve sensors."""
 
@@ -164,6 +174,13 @@ class CurveSnapshot:
     room_gain_c: float | None = None
     #: 95th percentile of the readiness window (the gated upper bound).
     p95_abs_c: float | None = None
+    #: Room tracking over the same window: |indoor − target|, signed median,
+    #: p90 and sample count, plus the indoor metric they came from.
+    room_error_median_abs_c: float | None = None
+    room_error_median_c: float | None = None
+    room_error_p90_abs_c: float | None = None
+    room_error_samples: int = 0
+    room_error_source: str | None = None
     cop_c: float = 0.0
     precharge_c: float = 0.0
 
@@ -257,6 +274,49 @@ def points_within_limits(
     return True
 
 
+def readiness_window(now_ts: int, tz: ZoneInfo) -> tuple[float, float]:
+    """``(window start, hours covered)`` for the current local day.
+
+    The window is the last ``READY_WINDOW_DAYS`` full local days, so it rolls
+    over at local midnight rather than drifting with the poll cadence.
+    """
+    local_now = datetime.fromtimestamp(now_ts, tz)
+    day_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start = (day_start - timedelta(days=READY_WINDOW_DAYS)).timestamp()
+    return start, (now_ts - start) / 3600.0
+
+
+def room_error_summary(
+    hourly_errors: Mapping[int, float], now_ts: int, tz: ZoneInfo
+) -> "RoomTracking | None":
+    """Median and p90 of the hourly ``indoor − target`` over the window.
+
+    Readiness asks whether our baseline still matches the pump, which becomes
+    self-referential once the curve is active. This is the outcome instead:
+    how far the rooms actually sit from the target. ``None`` when the window
+    holds fewer than ``READY_MIN_HOURS`` usable hours.
+    """
+    start, _ = readiness_window(now_ts, tz)
+    values = [
+        float(value)
+        for ts, value in hourly_errors.items()
+        if start <= ts < now_ts
+        and isinstance(value, (int, float))
+        and math.isfinite(float(value))
+    ]
+    if len(values) < READY_MIN_HOURS:
+        return None
+    signed = sorted(values)
+    absolute = sorted(abs(value) for value in signed)
+    index = min(len(absolute) - 1, round(0.9 * (len(absolute) - 1)))
+    return RoomTracking(
+        median_abs_c=round(_median_sorted(absolute), 2),
+        median_c=round(_median_sorted(signed), 2),
+        p90_abs_c=round(absolute[index], 2),
+        samples=len(values),
+    )
+
+
 def assess_readiness(
     hourly_deviations: Mapping[int, float],
     now_ts: int,
@@ -277,10 +337,7 @@ def assess_readiness(
     if signal is not None:
         return CurveReadiness(False, signal, None, None, 0.0)
 
-    local_now = datetime.fromtimestamp(now_ts, tz)
-    day_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    start = (day_start - timedelta(days=READY_WINDOW_DAYS)).timestamp()
-    window_hours = (now_ts - start) / 3600.0
+    start, window_hours = readiness_window(now_ts, tz)
     expected = max(1, int((now_ts - start) // 3600))
     values = [
         float(value)
@@ -1149,6 +1206,32 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             series[ts] = value
         return series, set(outdoor)
 
+    async def _async_room_error_hours(self) -> tuple[dict[int, float], str | None]:
+        """Hourly ``indoor − target`` over the readiness window, and its source.
+
+        The outcome figure for the curve: readiness compares our baseline with
+        the pump and turns self-referential once the curve is active, while
+        this measures whether the rooms actually follow the target. Uses the
+        same indoor resolver and fallback as the trims, so it follows whichever
+        sensor the pump is being controlled by.
+        """
+        resolved = self._resolve_statistic_ids()
+        indoor_ids = indoor_metric_entity_ids(resolved)
+        if not indoor_ids:
+            return {}, None
+        target = self._main_values().get("indoor_temperature_target")
+        if not isinstance(target, (int, float)) or isinstance(target, bool):
+            return {}, None
+        rows = await self._async_statistics(
+            set(indoor_ids.values()),
+            dt_util.utcnow() - timedelta(days=READY_WINDOW_DAYS + 1),
+        )
+        key, indoor = self._indoor_series(resolved, rows)
+        if key is None or not indoor:
+            return {}, None
+        target_c = float(target)
+        return {ts: value - target_c for ts, value in indoor.items()}, key
+
     async def _async_baseline_observations(
         self, *, since_ts: float | None = None
     ) -> list[tuple[float, float]]:
@@ -1668,14 +1751,17 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             forecast_ok=self._forecast_ok,
             history_ok=self._model is not None and self._model.valid,
         )
+        time_zone = dt_util.get_default_time_zone()
         readiness_hours, covered_hours = await self._async_readiness_hours()
         readiness = assess_readiness(
             readiness_hours,
             int(now_ts),
-            dt_util.get_default_time_zone(),
+            time_zone,
             signal=signal,
             covered_hours=covered_hours,
         )
+        room_errors, room_source = await self._async_room_error_hours()
+        room = room_error_summary(room_errors, int(now_ts), time_zone)
 
         points = result.as_dict() if result is not None else {}
         baseline = dict(self._baseline) if self._baseline else {}
@@ -1700,6 +1786,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             max_abs_c=readiness.max_abs_c,
             p95_abs_c=readiness.p95_abs_c,
             window_hours=readiness.window_hours,
+            room_error_median_abs_c=None if room is None else room.median_abs_c,
+            room_error_median_c=None if room is None else room.median_c,
+            room_error_p90_abs_c=None if room is None else room.p90_abs_c,
+            room_error_samples=0 if room is None else room.samples,
+            room_error_source=room_source,
             model=self._model,
             calibrated_at=self._calibrated_at,
             baseline_auto=bool(self._baseline_auto),
