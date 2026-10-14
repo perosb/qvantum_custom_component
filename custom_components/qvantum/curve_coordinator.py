@@ -86,6 +86,11 @@ CURVE_KEYS: tuple[str, ...] = tuple(HEATING_CURVE_OUTDOOR_TEMPS)
 UPDATE_INTERVAL = timedelta(minutes=15)
 CALIBRATION_DAYS = 60
 CALIBRATION_REFRESH_HOURS = 24.0
+#: Retry delay after an attempt that could not fetch its inputs. A
+#: transient failure must not cost a full refresh interval of staleness:
+#: the fetch covers 60 days of archive plus statistics, and the inputs are
+#: unchanged for the rest of the day.
+CALIBRATION_RETRY_HOURS = 1.0
 MIN_CALIBRATION_SAMPLES = 72
 #: Days of observed ``(BT1, cal_heat_temp)`` used to correct the baseline.
 BASELINE_LEARN_DAYS = 7
@@ -560,6 +565,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._daily_model: SolarDailyModel | None = None
         self._calibrated_at: str | None = None
         self._last_calibration_ts: float | None = None
+        self._last_calibration_ok: bool | None = None
         self._last_baseline_learn_ts: float | None = None
         self._last_active_ts: float | None = None
         self._trims: dict[str, float] = {}
@@ -637,6 +643,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "daily_model": _daily_to_state(self._daily_model),
             "calibrated_at": self._calibrated_at,
             "calibrated_ts": self._last_calibration_ts,
+            "calibration_ok": self._last_calibration_ok,
             "last_active_ts": self._last_active_ts,
             "trims": dict(self._trims),
             "trim_evidence": dict(self._trim_evidence),
@@ -702,6 +709,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         calibrated_ts = data.get("calibrated_ts")
         if isinstance(calibrated_ts, (int, float)) and not isinstance(calibrated_ts, bool):
             self._last_calibration_ts = float(calibrated_ts)
+        calibration_ok = data.get("calibration_ok")
+        if isinstance(calibration_ok, bool):
+            self._last_calibration_ok = calibration_ok
         last_active_ts = data.get("last_active_ts")
         if isinstance(last_active_ts, (int, float)) and not isinstance(
             last_active_ts, bool
@@ -1154,16 +1164,28 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return await fetch_forecast(self.session, latitude, longitude)
 
     def _calibration_due(self, now_ts: float) -> bool:
-        """Throttle calibration attempts, not only successful ones."""
+        """Throttle calibration attempts, not only successful ones.
+
+        A completed attempt (fit accepted or rejected) waits the full refresh
+        interval: the inputs cannot change within the hour. An attempt that
+        could not fetch them retries after :data:`CALIBRATION_RETRY_HOURS`,
+        so one transient network failure does not cost a day of staleness.
+        """
         if self._last_calibration_ts is None:
             return True
-        return now_ts - self._last_calibration_ts >= CALIBRATION_REFRESH_HOURS * 3600
+        interval = (
+            CALIBRATION_REFRESH_HOURS
+            if self._last_calibration_ok is not False
+            else CALIBRATION_RETRY_HOURS
+        )
+        return now_ts - self._last_calibration_ts >= interval * 3600
 
     async def _async_calibrate(self, now_ts: float) -> None:
-        # Record the attempt before any IO: a failed or skipped calibration
-        # (fresh install, no history, invalid fit) must not re-fetch 60 days
+        # Record the attempt before any IO: an attempt that cannot fetch its
+        # inputs (fresh install, no history, network) must not re-fetch 60 days
         # of archive plus statistics on every 15-minute cycle.
         self._last_calibration_ts = now_ts
+        self._last_calibration_ok = None
         await self._async_persist()
         latitude = self.hass.config.latitude
         longitude = self.hass.config.longitude
@@ -1181,7 +1203,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             maps = await self._async_hourly_maps()
         except Exception as err:  # noqa: BLE001 — calibration is best effort
             _LOGGER.debug("Solar calibration unavailable: %s", err)
+            self._last_calibration_ok = False
+            await self._async_persist()
             return
+        # The inputs arrived, so this attempt is done whatever the fit says: a
+        # rejected fit is a statement about the window, not a retryable error.
+        self._last_calibration_ok = True
 
         # Day-block identification: the same balance over whole days, where
         # the sunniest idle hours contribute q = 0 instead of being censored

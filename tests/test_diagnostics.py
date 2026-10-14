@@ -141,6 +141,7 @@ def _curve_coordinator() -> SimpleNamespace:
         _model=_solar_model(),
         _calibrated_at="2026-09-25T10:00:00+00:00",
         _last_calibration_ts=1758794400.0,
+        _last_calibration_ok=False,
         _last_baseline_learn_ts=1758794400.0,
         _last_active_ts=None,
         _last_trim_ts=1758794400.0,
@@ -507,6 +508,7 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["model_daily"]["valid"] is True
     assert curve["model_daily"]["b_jackknife_min_m2"] == 1.5
     assert curve["calibrated_at"] == "2026-09-25T10:00:00+00:00"
+    assert curve["calibration_ok"] is False
     assert curve["timestamps"]["last_trim_ts"] == 1758794400.0
     assert curve["timestamps"]["last_active_ts"] is None
     assert curve["indoor_margins"] == [[1758794400.0, 0.5]]
@@ -536,6 +538,7 @@ async def test_curve_diagnostics_tolerates_malformed_state(hass):
     assert curve_result["trims"] == {}
     assert curve_result["model"] is None
     assert curve_result["model_daily"] is None
+    assert curve_result["calibration_ok"] is None
     assert curve_result["extrapolated_points"] == []
     assert curve_result["trim_evidence"] == {}
     assert curve_result["room_error"] is None
