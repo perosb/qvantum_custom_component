@@ -636,17 +636,26 @@ class QvantumCopSensor(QvantumBaseSensorEntity):
 
     @property
     def extra_state_attributes(self):
-        """Return how the ratio was attributed."""
+        """Return how the ratio was attributed and how old the held value is."""
         attribution = (
             "tank-balance estimate over a rolling window"
             if self._metric_key == "cop_dhw"
             else "heating-mode energy-counter delta over a rolling window"
         )
-        return {
+        attributes = {
             "hp_status": self._values.get("hp_status"),
             "attribution": attribution,
             "window_seconds": COP_WINDOW_SECONDS,
         }
+        # The value is held across idle periods and restarts, so expose when it
+        # was last computed; a held value is not a current measurement.
+        updated_at = self.coordinator.cop_last_updated(self._metric_key)
+        if isinstance(updated_at, datetime):
+            attributes["last_updated"] = updated_at.isoformat()
+            attributes["age_seconds"] = round(
+                (dt_utils.utcnow() - updated_at).total_seconds()
+            )
+        return attributes
 
 
 class QvantumTemperatureEntity(QvantumBaseSensorEntity):

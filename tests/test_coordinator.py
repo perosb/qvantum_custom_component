@@ -2019,32 +2019,43 @@ class TestCopPersistence:
         return coordinator
 
     @pytest.mark.asyncio
-    async def test_restore_recent_snapshot(self):
-        """A recent snapshot is loaded into the held COP figures."""
+    async def test_restore_snapshot_regardless_of_age(self):
+        """Old figures are restored: the sensor is defined to hold its value."""
         coordinator = self._make_coordinator()
+        old = dt_util.utcnow() - timedelta(seconds=COP_WINDOW_SECONDS * 48)
+        fresh = dt_util.utcnow()
         stored = {
-            "updated_at": dt_util.utcnow().isoformat(),
+            "cop_heating": 3.5,
+            "cop_heating_updated_at": old.isoformat(),
+            "cop_dhw": 1.7,
+            "cop_dhw_updated_at": fresh.isoformat(),
+        }
+        with patch.object(coordinator._cop_store, "async_load", return_value=stored):
+            await coordinator.async_restore_cop_state()
+        assert coordinator._cop_last == {"cop_heating": 3.5, "cop_dhw": 1.7}
+        assert coordinator._cop_last_times == {
+            "cop_heating": old,
+            "cop_dhw": fresh,
+        }
+        assert coordinator.cop_last_updated("cop_heating") == old
+
+    @pytest.mark.asyncio
+    async def test_restore_legacy_shared_timestamp(self):
+        """A pre-per-figure snapshot uses its shared timestamp for both."""
+        coordinator = self._make_coordinator()
+        stored_at = dt_util.utcnow() - timedelta(seconds=COP_WINDOW_SECONDS * 48)
+        stored = {
+            "updated_at": stored_at.isoformat(),
             "cop_heating": 3.5,
             "cop_dhw": 1.7,
         }
         with patch.object(coordinator._cop_store, "async_load", return_value=stored):
             await coordinator.async_restore_cop_state()
         assert coordinator._cop_last == {"cop_heating": 3.5, "cop_dhw": 1.7}
-        assert coordinator._cop_last_time is not None
-
-    @pytest.mark.asyncio
-    async def test_restore_stale_snapshot_is_ignored(self):
-        """A snapshot older than the rolling window is not reused."""
-        coordinator = self._make_coordinator()
-        old = dt_util.utcnow() - timedelta(seconds=COP_WINDOW_SECONDS + 60)
-        stored = {
-            "updated_at": old.isoformat(),
-            "cop_heating": 3.5,
-            "cop_dhw": 1.7,
+        assert coordinator._cop_last_times == {
+            "cop_heating": stored_at,
+            "cop_dhw": stored_at,
         }
-        with patch.object(coordinator._cop_store, "async_load", return_value=stored):
-            await coordinator.async_restore_cop_state()
-        assert coordinator._cop_last == {}
 
     @pytest.mark.asyncio
     async def test_restore_empty_or_error_leaves_empty(self):
@@ -2059,28 +2070,53 @@ class TestCopPersistence:
         assert coordinator._cop_last == {}
 
     @pytest.mark.asyncio
-    async def test_restore_malformed_snapshot_is_ignored(self):
-        """Non-dict, bad timestamp and naive timestamp payloads are rejected."""
+    async def test_restore_non_dict_payload_is_ignored(self):
+        coordinator = self._make_coordinator()
+        with patch.object(coordinator._cop_store, "async_load", return_value=[]):
+            await coordinator.async_restore_cop_state()
+        assert coordinator._cop_last == {}
+        assert coordinator._cop_last_times == {}
+
+    @pytest.mark.asyncio
+    async def test_restore_bad_timestamp_keeps_the_value(self):
+        """An unusable timestamp must not discard the held figure."""
         coordinator = self._make_coordinator()
         for stored in (
-            [],
             {"updated_at": 123, "cop_heating": 3.5},
             {"updated_at": "not-a-date", "cop_heating": 3.5},
             {"updated_at": "2026-10-10T00:00:00", "cop_heating": 3.5},
             {"cop_heating": 3.5},
         ):
+            coordinator._cop_last = {}
+            coordinator._cop_last_times = {}
             with patch.object(
                 coordinator._cop_store, "async_load", return_value=stored
             ):
                 await coordinator.async_restore_cop_state()
+            assert coordinator._cop_last == {"cop_heating": 3.5}
+            assert coordinator._cop_last_times == {}
+
+    @pytest.mark.asyncio
+    async def test_restore_rejects_non_positive_values(self):
+        """A zero or negative stored ratio is not a measurement."""
+        coordinator = self._make_coordinator()
+        stored = {
+            "cop_heating": 0.0,
+            "cop_heating_updated_at": dt_util.utcnow().isoformat(),
+            "cop_dhw": -1.0,
+            "cop_dhw_updated_at": dt_util.utcnow().isoformat(),
+        }
+        with patch.object(coordinator._cop_store, "async_load", return_value=stored):
+            await coordinator.async_restore_cop_state()
         assert coordinator._cop_last == {}
+        assert coordinator._cop_last_times == {}
 
     @pytest.mark.asyncio
     async def test_persist_cop_state_writes_and_guards(self):
         """The snapshot is written once and skipped while unchanged."""
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
-        coordinator._cop_last_time = dt_util.utcnow()
+        coordinator._cop_last_times = {"cop_heating": dt_util.utcnow()}
 
         with (
             patch("time.monotonic", return_value=1000.0),
@@ -2098,7 +2134,7 @@ class TestCopPersistence:
         """The first snapshot writes even when the host just booted."""
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
-        coordinator._cop_last_time = dt_util.utcnow()
+        coordinator._cop_last_times = {"cop_heating": dt_util.utcnow()}
 
         # A monotonic clock below the throttle interval must not swallow the
         # first write.
@@ -2117,7 +2153,7 @@ class TestCopPersistence:
         """A changed figure is not written again inside the throttle window."""
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
-        coordinator._cop_last_time = dt_util.utcnow()
+        coordinator._cop_last_times = {"cop_heating": dt_util.utcnow()}
 
         with (
             patch("time.monotonic", side_effect=[1000.0, 1100.0, 1301.0]),
@@ -2135,12 +2171,13 @@ class TestCopPersistence:
 
     @pytest.mark.asyncio
     async def test_persist_cop_state_payload(self):
-        """The payload carries the timestamp and both figures."""
+        """The payload carries per-figure timestamps and the legacy shared one."""
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": 1.7}
-        coordinator._cop_last_time = datetime(
-            2026, 10, 10, 7, 0, tzinfo=timezone.utc
-        )
+        coordinator._cop_last_times = {
+            "cop_heating": datetime(2026, 10, 10, 7, 0, tzinfo=timezone.utc),
+            "cop_dhw": datetime(2026, 10, 10, 6, 0, tzinfo=timezone.utc),
+        }
         with (
             patch("time.monotonic", return_value=1000.0),
             patch.object(
@@ -2154,11 +2191,13 @@ class TestCopPersistence:
                 "updated_at": "2026-10-10T07:00:00+00:00",
                 "cop_heating": 3.5,
                 "cop_dhw": 1.7,
+                "cop_heating_updated_at": "2026-10-10T07:00:00+00:00",
+                "cop_dhw_updated_at": "2026-10-10T06:00:00+00:00",
             }
         )
 
     @pytest.mark.asyncio
-    async def test_persist_cop_state_without_time_is_a_noop(self):
+    async def test_persist_cop_state_without_values_is_a_noop(self):
         coordinator = self._make_coordinator()
         with patch.object(
             coordinator._cop_store, "async_save", new=AsyncMock()
@@ -2170,7 +2209,7 @@ class TestCopPersistence:
     async def test_persist_cop_state_error_is_swallowed(self):
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": None}
-        coordinator._cop_last_time = dt_util.utcnow()
+        coordinator._cop_last_times = {"cop_heating": dt_util.utcnow()}
         with (
             patch("time.monotonic", return_value=1000.0),
             patch.object(

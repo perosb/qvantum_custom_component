@@ -890,6 +890,19 @@ class TestQvantumEfficiencySensors:
         assert entity.native_value is None
         assert entity.available is False
 
+    def test_cop_sensor_exposes_the_held_value_age(
+        self, mock_coordinator, mock_device
+    ):
+        """A held figure reports when it was last computed."""
+        computed_at = datetime(2026, 10, 10, 7, 0, tzinfo=timezone.utc)
+        mock_coordinator.cop_last_updated.return_value = computed_at
+        mock_coordinator.data["values"].update({"cop_heating": 4.2})
+        entity = QvantumCopSensor(mock_coordinator, "cop_heating", mock_device)
+
+        attributes = entity.extra_state_attributes
+        assert attributes["last_updated"] == computed_at.isoformat()
+        assert attributes["age_seconds"] > 0
+
     def test_scop_sensor_value_and_attributes(self, mock_device):
         coordinator = _efficiency_coordinator(
             EfficiencySnapshot(

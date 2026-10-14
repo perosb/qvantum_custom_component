@@ -29,7 +29,7 @@ class _Calculator(QvantumCalculationsMixin):
             tuple[datetime, dict[str, float], int | None, float | None]
         ] = deque()
         self._cop_last: dict[str, float | None] = {}
-        self._cop_last_time: datetime | None = None
+        self._cop_last_times: dict[str, datetime] = {}
 
 
 def _values(**overrides):
@@ -168,7 +168,7 @@ class TestCalculateCop:
         calculator._calculate_cop(values)
 
         assert values["cop_heating"] == 5.0
-        assert calculator._cop_last_time is not None
+        assert calculator._cop_last_times["cop_heating"] is not None
 
     def test_no_short_window_system_cop(self):
         """A short window cannot publish a system COP from the draw meter."""
@@ -343,17 +343,22 @@ class TestCalculateCop:
 
         assert values["cop_heating"] == 5.0
 
-    def test_counter_reset_clears_published_values(self):
+    def test_counter_reset_keeps_the_held_value(self):
+        """A reset drops the window but not the last measured figure."""
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         calculator._calculate_cop(_values(heatingenergy=105.0, compressorenergy=41.0))
+        held = calculator._cop_last["cop_heating"]
         values = _values(heatingenergy=1.0, compressorenergy=1.0)
 
         calculator._calculate_cop(values)
 
-        assert values["cop_heating"] is None
-        assert calculator._cop_last == {}
-        assert calculator._cop_last_time is None
+        # No bogus ratio from the negative delta, and the window restarts from
+        # the post-reset sample.
+        assert values["cop_heating"] == held
+        assert calculator._cop_last == {"cop_heating": held}
+        assert calculator._cop_last_times["cop_heating"] is not None
+        assert len(calculator._cop_history) == 1
 
     def test_missing_counter_skips_without_advancing_state(self):
         calculator = _Calculator()

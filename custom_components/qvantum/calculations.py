@@ -196,12 +196,18 @@ class QvantumCalculationsMixin:
             return
 
         if any(energy_delta(previous[key], current[key]) is None for key in keys):
-            # A counter reset makes every accumulated delta unknown.
+            # A counter reset makes every accumulated delta unknown. Drop the
+            # window and restart it from this sample, but keep the last
+            # published figures: a reset only invalidates the window, not the
+            # ratios measured before it, and the sensor is defined to hold its
+            # last value until a new window is measurable.
             history.clear()
-            self._cop_last.clear()
-            self._cop_last_time = None
             history.append((now, current, hp_status, tank_temp))
-            self._set_cop(values, None, None)
+            self._set_cop(
+                values,
+                self._cop_last.get("cop_heating"),
+                self._cop_last.get("cop_dhw"),
+            )
             return
 
         history.append((now, current, hp_status, tank_temp))
@@ -242,7 +248,7 @@ class QvantumCalculationsMixin:
             heating_ratio = cop_ratio(heating_thermal, heating_electrical)
             if heating_ratio is not None:
                 self._cop_last["cop_heating"] = heating_ratio
-                self._cop_last_time = now
+                self._cop_last_times["cop_heating"] = now
 
         baseline_tank = history[0][3]
         if (
@@ -258,7 +264,7 @@ class QvantumCalculationsMixin:
             dhw_ratio = cop_ratio(production, dhw_electrical)
             if dhw_ratio is not None:
                 self._cop_last["cop_dhw"] = dhw_ratio
-                self._cop_last_time = now
+                self._cop_last_times["cop_dhw"] = now
 
         self._set_cop(
             values,
