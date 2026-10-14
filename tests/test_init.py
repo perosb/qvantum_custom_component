@@ -10,6 +10,7 @@ from custom_components.qvantum import (
     async_setup_entry,
     async_setup,
     async_unload_entry,
+    async_remove_entry,
     async_remove_config_entry_device,
     async_migrate_entry,
     PLATFORMS,
@@ -1423,3 +1424,119 @@ class TestMigrateToV5Callbacks:
         ]
         # The active entity must not be touched
         ent_reg.async_update_entity.assert_not_called()
+
+
+class TestCurveRevertOnRemove:
+    """Removing the entry must not leave the pump on our User-defined table.
+
+    Unload and reload go through ``async_unload_entry``; only real removal
+    reaches ``async_remove_entry``, where nothing is left to supervise the
+    table this module wrote.
+    """
+
+    @pytest.fixture
+    def modbus_entry(self, mock_config_entry):
+        mock_config_entry.options = {"modbus_tcp": True, "modbus_write": True}
+        return mock_config_entry
+
+    @staticmethod
+    def _patch(
+        *,
+        stored_mode="active",
+        unit=object(),
+        write=None,
+    ):
+        client = MagicMock()
+        client.close = AsyncMock()
+        client.set_curve_type_heating = AsyncMock(
+            side_effect=write if write is not None else None
+        )
+        return client, (
+            patch(
+                "custom_components.qvantum.async_stored_curve_mode",
+                new_callable=AsyncMock,
+                return_value=stored_mode,
+            ),
+            patch(
+                "custom_components.qvantum._async_modbus_unit",
+                new_callable=AsyncMock,
+                return_value=unit,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumModbusClient",
+                return_value=client,
+            ),
+        )
+
+    @pytest.mark.asyncio
+    async def test_reverts_active_curve_to_auto(self, hass, modbus_entry):
+        client, patches = self._patch()
+        with patches[0], patches[1], patches[2]:
+            await async_remove_entry(hass, modbus_entry)
+
+        client.set_curve_type_heating.assert_awaited_once_with(
+            modbus_entry.entry_id, 0
+        )
+        client.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_skips_when_curve_was_shadow(self, hass, modbus_entry):
+        client, patches = self._patch(stored_mode="shadow")
+        with patches[0], patches[1], patches[2]:
+            await async_remove_entry(hass, modbus_entry)
+
+        client.set_curve_type_heating.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_skips_when_writes_are_disabled(self, hass, mock_config_entry):
+        mock_config_entry.options = {"modbus_tcp": True, "modbus_write": False}
+        client, patches = self._patch()
+        with patches[0] as stored, patches[1], patches[2]:
+            await async_remove_entry(hass, mock_config_entry)
+
+        stored.assert_not_awaited()
+        client.set_curve_type_heating.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_skips_without_a_modbus_unit(self, hass, modbus_entry):
+        client, patches = self._patch(unit=None)
+        with patches[0], patches[1], patches[2]:
+            await async_remove_entry(hass, modbus_entry)
+
+        client.set_curve_type_heating.assert_not_awaited()
+        client.close.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_unit_lookup_failure_never_blocks_removal(
+        self, hass, modbus_entry
+    ):
+        client = MagicMock()
+        client.set_curve_type_heating = AsyncMock()
+        with (
+            patch(
+                "custom_components.qvantum.async_stored_curve_mode",
+                new_callable=AsyncMock,
+                return_value="active",
+            ),
+            patch(
+                "custom_components.qvantum._async_modbus_unit",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("no modbus"),
+            ),
+            patch(
+                "custom_components.qvantum.QvantumModbusClient",
+                return_value=client,
+            ),
+        ):
+            await async_remove_entry(hass, modbus_entry)
+
+        client.set_curve_type_heating.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_write_failure_never_blocks_removal(self, hass, modbus_entry):
+        client, patches = self._patch(write=RuntimeError("pump unreachable"))
+        with patches[0], patches[1], patches[2]:
+            await async_remove_entry(hass, modbus_entry)
+
+        client.set_curve_type_heating.assert_awaited_once()
+        client.close.assert_awaited_once()

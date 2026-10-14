@@ -283,6 +283,13 @@ Reversion (active → shadow) writes holding 22 back to Auto but does **not**
 restore the parallel offset; leave the offset-writing automations off until
 they are deliberately re-enabled.
 
+**Removing the integration** reverts holding 22 to Auto, so the pump is not
+left on a User-defined table with nothing to supervise it (the same guard that
+runs when Modbus writes are turned off). This happens only on removal — a
+reload, and Home Assistant shutting down, deliberately leave the written table
+in place so the pump keeps heating with the last curve while nothing is
+running.
+
 ### Optional terms
 
 Control-loop terms beyond the four forecast terms are **off by default** and

@@ -39,6 +39,7 @@ from .const import (
     VERSION,
     CONFIG_VERSION,
     FIRMWARE_KEYS,
+    HeatingCurveType,
     CONF_MODBUS_TCP,
     CONF_MODBUS_WRITE,
     CONF_MODBUS_HOST,
@@ -50,7 +51,7 @@ from .const import (
     HTTP_CLOUD_LOOKUP_TIMEOUT,
 )
 from .coordinator import QvantumDataUpdateCoordinator
-from .curve_coordinator import QvantumCurveCoordinator
+from .curve_coordinator import QvantumCurveCoordinator, async_stored_curve_mode
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
@@ -777,3 +778,54 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
                 )
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+    """Revert an active adaptive curve before the entry is removed.
+
+    Only a real removal lands here: unload and reload both go through
+    ``async_unload_entry`` and, for a reload, back into setup. On removal
+    nothing is left to supervise the User-defined table this module last
+    wrote, so the pump would keep running it with frozen trims, offset and
+    adjustments. Reverting to the pump's own Auto curve is the safe end state —
+    the same thing the integration already does when Modbus writes are turned
+    off while the curve is active.
+
+    HA shutdown is deliberately not covered: there the pump should keep
+    running our last table while Home Assistant is down.
+
+    Best effort: cloud mode, disabled writes, an unreadable curve Store and an
+    unreachable pump all skip it without failing the removal.
+    """
+    if not _modbus_write_enabled(config_entry):
+        return
+    if await async_stored_curve_mode(hass, config_entry) != "active":
+        return
+    try:
+        unit = await _async_modbus_unit(hass, config_entry)
+    except asyncio.CancelledError:
+        raise
+    except Exception as err:  # noqa: BLE001 — removal must not fail
+        _LOGGER.debug("Could not borrow a Modbus unit to revert the curve: %s", err)
+        return
+    if unit is None:
+        return
+    client = QvantumModbusClient(unit, writable=True)
+    try:
+        await client.set_curve_type_heating(
+            config_entry.entry_id, int(HeatingCurveType.AUTO)
+        )
+        _LOGGER.info(
+            "Adaptive curve reverted to the pump's Auto curve before removing %s",
+            config_entry.entry_id,
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as err:  # noqa: BLE001 — best effort
+        _LOGGER.warning(
+            "Could not revert the adaptive curve while removing %s: %s",
+            config_entry.entry_id,
+            err,
+        )
+    finally:
+        await client.close()

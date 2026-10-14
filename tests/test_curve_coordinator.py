@@ -998,6 +998,39 @@ async def test_async_restore_ignores_bad_payloads() -> None:
     assert coordinator._room_gain is None
 
 
+async def test_curve_store_key_is_namespaced_per_entry() -> None:
+    assert cc.curve_store_key("abc") == "qvantum.curve.abc"
+
+
+async def test_stored_curve_mode_reads_the_curve_store() -> None:
+    entry = MagicMock()
+    entry.entry_id = "abc"
+
+    for payload, expected in (
+        ({"mode": "active"}, "active"),
+        ({"mode": "shadow"}, "shadow"),
+        ({"mode": "bogus"}, None),
+        ({}, None),
+        (None, None),
+        ("nope", None),
+    ):
+        store = MagicMock()
+        store.async_load = AsyncMock(return_value=payload)
+        with patch.object(cc, "Store", return_value=store):
+            assert await cc.async_stored_curve_mode(MagicMock(), entry) == expected
+
+    # An unreadable store must not fail removal.
+    store = MagicMock()
+    store.async_load = AsyncMock(side_effect=RuntimeError("disk"))
+    with patch.object(cc, "Store", return_value=store):
+        assert await cc.async_stored_curve_mode(MagicMock(), entry) is None
+
+    store.async_load = AsyncMock(side_effect=asyncio.CancelledError())
+    with patch.object(cc, "Store", return_value=store):
+        with pytest.raises(asyncio.CancelledError):
+            await cc.async_stored_curve_mode(MagicMock(), entry)
+
+
 async def test_async_persist_swallows_store_errors() -> None:
     coordinator = make_coordinator(store=FakeStore())
 
