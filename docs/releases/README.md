@@ -6,6 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
+| [2026.10.6](2026.10.6.md) | 2026-10-14 | Clearer release highlights |
 | [2026.10.4](2026.10.4.md) | 2026-10-13 | write release highlights into the release before publishing |
 | [2026.10.5](2026.10.5.md) | 2026-10-13 | Release highlights are included before publication |
 | [2026.10.3](2026.10.3.md) | 2026-10-10 | Safer, clearer controls |
