@@ -2,6 +2,8 @@
 
 import sys
 import types
+from contextlib import asynccontextmanager
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
@@ -16,6 +18,7 @@ from custom_components.qvantum import (
     PLATFORMS,
     _async_update_listener,
     _async_modbus_unit,
+    _async_temporary_modbus_unit,
     _coordinator_device,
     _has_required_device,
     _device_sw_version,
@@ -1440,10 +1443,24 @@ class TestCurveRevertOnRemove:
         return mock_config_entry
 
     @staticmethod
+    def _unit_context(*, unit=object(), error=None):
+        """Stand-in for _async_temporary_modbus_unit's async context manager."""
+
+        @asynccontextmanager
+        async def context(_hass, _entry):
+            if error is not None:
+                raise error
+            yield unit
+
+        return context
+
+    @classmethod
     def _patch(
+        cls,
         *,
         stored_mode="active",
         unit=object(),
+        error=None,
         write=None,
     ):
         client = MagicMock()
@@ -1458,9 +1475,8 @@ class TestCurveRevertOnRemove:
                 return_value=stored_mode,
             ),
             patch(
-                "custom_components.qvantum._async_modbus_unit",
-                new_callable=AsyncMock,
-                return_value=unit,
+                "custom_components.qvantum._async_temporary_modbus_unit",
+                new=cls._unit_context(unit=unit, error=error),
             ),
             patch(
                 "custom_components.qvantum.QvantumModbusClient",
@@ -1510,24 +1526,8 @@ class TestCurveRevertOnRemove:
     async def test_unit_lookup_failure_never_blocks_removal(
         self, hass, modbus_entry
     ):
-        client = MagicMock()
-        client.set_curve_type_heating = AsyncMock()
-        with (
-            patch(
-                "custom_components.qvantum.async_stored_curve_mode",
-                new_callable=AsyncMock,
-                return_value="active",
-            ),
-            patch(
-                "custom_components.qvantum._async_modbus_unit",
-                new_callable=AsyncMock,
-                side_effect=RuntimeError("no modbus"),
-            ),
-            patch(
-                "custom_components.qvantum.QvantumModbusClient",
-                return_value=client,
-            ),
-        ):
+        client, patches = self._patch(error=RuntimeError("no modbus"))
+        with patches[0], patches[1], patches[2]:
             await async_remove_entry(hass, modbus_entry)
 
         client.set_curve_type_heating.assert_not_awaited()
@@ -1540,3 +1540,42 @@ class TestCurveRevertOnRemove:
 
         client.set_curve_type_heating.assert_awaited_once()
         client.close.assert_awaited_once()
+
+
+class TestTemporaryModbusUnit:
+    """A removal-time write must not leave a connection hold behind."""
+
+    @pytest.mark.asyncio
+    async def test_yields_none_without_modbus(self):
+        entry = MagicMock()
+        with patch(
+            "custom_components.qvantum._modbus_link_settings",
+            return_value=(False, "host", 502, 1),
+        ):
+            async with _async_temporary_modbus_unit(MagicMock(), entry) as unit:
+                assert unit is None
+
+    @pytest.mark.asyncio
+    async def test_borrows_and_releases_a_unit(self, monkeypatch):
+        entry = MagicMock()
+        expected = object()
+        borrowed = MagicMock()
+        borrowed.__aenter__ = AsyncMock(return_value=expected)
+        borrowed.__aexit__ = AsyncMock(return_value=False)
+        borrow = MagicMock(return_value=borrowed)
+        # The helper imports this lazily; the test environment does not load
+        # the real Modbus component, so provide it as a module.
+        modbus = types.ModuleType("homeassistant.components.modbus")
+        modbus.async_get_temporary_unit = borrow
+        monkeypatch.setitem(sys.modules, "homeassistant.components.modbus", modbus)
+
+        with patch(
+            "custom_components.qvantum._modbus_link_settings",
+            return_value=(True, "host", 502, 1),
+        ):
+            async with _async_temporary_modbus_unit(MagicMock(), entry) as unit:
+                assert unit is expected
+
+        borrow.assert_called_once()
+        borrowed.__aenter__.assert_awaited_once()
+        borrowed.__aexit__.assert_awaited_once()

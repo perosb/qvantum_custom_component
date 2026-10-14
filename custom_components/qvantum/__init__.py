@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 import inspect
 import logging
@@ -208,6 +209,29 @@ def _async_modbus_unit(hass: HomeAssistant, config_entry: ConfigEntry):
         ModbusTcpParams(host=host, port=port),
         unit_id,
     )
+
+
+@asynccontextmanager
+async def _async_temporary_modbus_unit(hass: HomeAssistant, config_entry: ConfigEntry):
+    """Borrow a Modbus unit for one write outside the entry's lifetime.
+
+    ``_async_modbus_unit`` ties its hold to the config entry, which fits setup
+    and unload. Removal runs *after* the entry is unloaded, where a hold added
+    then would never be released - the connection would stay open with no
+    owner. The temporary unit is opened and closed here instead, and yields
+    ``None`` when the entry is not on Modbus.
+    """
+    enabled, host, port, unit_id = _modbus_link_settings(config_entry)
+    if not enabled:
+        yield None
+        return
+    from homeassistant.components.modbus import async_get_temporary_unit
+    from modbus_connection import ModbusTcpParams
+
+    async with async_get_temporary_unit(
+        hass, ModbusTcpParams(host=host, port=port), unit_id
+    ) as unit:
+        yield unit
 
 
 def _coordinator_device(coordinator: QvantumDataUpdateCoordinator) -> dict:
@@ -802,19 +826,16 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     if await async_stored_curve_mode(hass, config_entry) != "active":
         return
     try:
-        unit = await _async_modbus_unit(hass, config_entry)
-    except asyncio.CancelledError:
-        raise
-    except Exception as err:  # noqa: BLE001 — removal must not fail
-        _LOGGER.debug("Could not borrow a Modbus unit to revert the curve: %s", err)
-        return
-    if unit is None:
-        return
-    client = QvantumModbusClient(unit, writable=True)
-    try:
-        await client.set_curve_type_heating(
-            config_entry.entry_id, int(HeatingCurveType.AUTO)
-        )
+        async with _async_temporary_modbus_unit(hass, config_entry) as unit:
+            if unit is None:
+                return
+            client = QvantumModbusClient(unit, writable=True)
+            try:
+                await client.set_curve_type_heating(
+                    config_entry.entry_id, int(HeatingCurveType.AUTO)
+                )
+            finally:
+                await client.close()
         _LOGGER.info(
             "Adaptive curve reverted to the pump's Auto curve before removing %s",
             config_entry.entry_id,
@@ -827,5 +848,3 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
             config_entry.entry_id,
             err,
         )
-    finally:
-        await client.close()
