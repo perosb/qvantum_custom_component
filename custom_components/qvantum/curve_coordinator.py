@@ -92,6 +92,10 @@ BASELINE_LEARN_REFRESH_HOURS = 6.0
 TRIM_WINDOW_DAYS = 7
 #: Minimum time between trim updates.
 TRIM_REFRESH_HOURS = 24.0
+#: Faster cadence until the first trims exist: the evidence needed for them is
+#: already in the 7-day window, so waiting a full day only delays the first
+#: correction. Once any trim is in place the proven daily step takes over.
+TRIM_FIRST_REFRESH_HOURS = 3.0
 #: Fraction of the indicated residual applied per update (damped loop).
 TRIM_UPDATE_GAIN = 0.3
 INDOOR_MARGIN_CYCLES = 96  # 24 h at 15 min
@@ -1516,9 +1520,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return
         if result.capped_by_indoor or abs(result.adjustment_c) >= TOTAL_MAX_C - 1e-9:
             return
+        interval_hours = (
+            TRIM_REFRESH_HOURS if self._trims else TRIM_FIRST_REFRESH_HOURS
+        )
         if (
             self._last_trim_ts is not None
-            and now_ts - self._last_trim_ts < TRIM_REFRESH_HOURS * 3600.0
+            and now_ts - self._last_trim_ts < interval_hours * 3600.0
         ):
             return
         self._last_trim_ts = now_ts

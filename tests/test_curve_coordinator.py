@@ -734,6 +734,40 @@ async def test_update_trims_skips_inactive_capped_and_throttled() -> None:
     assert coordinator._async_trim_observations.await_count == 2
 
 
+async def test_update_trims_retries_sooner_until_the_first_trims_exist() -> None:
+    """The evidence for the first trims is already in the window."""
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._mode = "active"
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._last_trim_ts = None
+
+    await coordinator._async_update_trims(make_result(), 1000.0)
+    assert coordinator._async_trim_observations.await_count == 1
+
+    # Still inside the short cadence.
+    await coordinator._async_update_trims(make_result(), 1000.0 + 3600.0)
+    assert coordinator._async_trim_observations.await_count == 1
+
+    # No trims yet, so the next attempt does not wait a full day.
+    await coordinator._async_update_trims(
+        make_result(), 1000.0 + cc.TRIM_FIRST_REFRESH_HOURS * 3600.0
+    )
+    assert coordinator._async_trim_observations.await_count == 2
+
+    # Once a trim exists the proven daily step takes over.
+    coordinator._trims = {"curve_0": 0.5}
+    last = 1000.0 + cc.TRIM_FIRST_REFRESH_HOURS * 3600.0
+    await coordinator._async_update_trims(
+        make_result(), last + cc.TRIM_FIRST_REFRESH_HOURS * 3600.0
+    )
+    assert coordinator._async_trim_observations.await_count == 2
+    await coordinator._async_update_trims(
+        make_result(), last + cc.TRIM_REFRESH_HOURS * 3600.0
+    )
+    assert coordinator._async_trim_observations.await_count == 3
+
+
 async def test_update_trims_swallows_failures_and_empty_residual() -> None:
     coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
     coordinator._baseline = dict(BASELINE)
