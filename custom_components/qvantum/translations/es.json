@@ -620,6 +620,9 @@
       "adaptive_curve_deviation": {
         "name": "Curva de calefacción adaptativa: desviación"
       },
+      "adaptive_curve_room_error": {
+        "name": "Curva de calefacción adaptativa: desviación de la habitación"
+      },
       "adaptive_curve_solar_model": {
         "name": "Curva de calefacción adaptativa: modelo solar"
       },

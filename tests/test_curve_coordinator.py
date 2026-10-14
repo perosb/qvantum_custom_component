@@ -26,6 +26,7 @@ from custom_components.qvantum.heating_curve import (
 from custom_components.qvantum.curve_coordinator import (
     INDOOR_MARGIN_CYCLES,
     POWER_CYCLES,
+    READY_MIN_HOURS,
     CurveSnapshot,
     QvantumCurveCoordinator,
     _median_sorted,
@@ -36,6 +37,7 @@ from custom_components.qvantum.curve_coordinator import (
     curve_deviation_c,
     freeze_baseline,
     points_within_limits,
+    room_error_summary,
     signal_blocker,
 )
 from custom_components.qvantum.open_meteo import (
@@ -726,6 +728,110 @@ def test_assess_readiness_coverage_uses_covered_hours() -> None:
     )
     assert not result.ready
     assert result.blocker == "window"
+
+
+def test_room_error_summary_reports_median_and_p90() -> None:
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc)
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc)
+    window = list(range(int(midnight.timestamp()), int(now.timestamp()), 3600))
+    tz = ZoneInfo("UTC")
+
+    flat = {ts: 0.5 for ts in window}
+    summary = room_error_summary(flat, int(now.timestamp()), tz)
+    assert summary is not None
+    assert summary.median_abs_c == pytest.approx(0.5)
+    assert summary.median_c == pytest.approx(0.5)
+    assert summary.p90_abs_c == pytest.approx(0.5)
+    assert summary.samples == len(window)
+
+    # The signed median keeps the direction; p90 works on magnitude.
+    split = len(window) * 2 // 3
+    mixed = {
+        ts: (-0.5 if index < split else 1.5) for index, ts in enumerate(window)
+    }
+    summary = room_error_summary(mixed, int(now.timestamp()), tz)
+    assert summary.median_c == pytest.approx(-0.5)
+    assert summary.median_abs_c == pytest.approx(0.5)
+    assert summary.p90_abs_c == pytest.approx(1.5)
+
+
+def test_room_error_summary_needs_enough_usable_hours() -> None:
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc)
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc)
+    window = list(range(int(midnight.timestamp()), int(now.timestamp()), 3600))
+    tz = ZoneInfo("UTC")
+
+    assert room_error_summary({}, int(now.timestamp()), tz) is None
+    thin = {ts: 0.1 for ts in window[: READY_MIN_HOURS - 1]}
+    assert room_error_summary(thin, int(now.timestamp()), tz) is None
+
+    # Hours outside the window and non-finite values are dropped, not treated
+    # as zero error.
+    stale = {int(midnight.timestamp()) - index * 3600: 5.0 for index in range(200)}
+    stale.update({ts: float("nan") for ts in window})
+    assert room_error_summary(stale, int(now.timestamp()), tz) is None
+
+
+async def test_room_error_hours_subtracts_the_target() -> None:
+    coordinator = make_coordinator(
+        values={"sensor_mode": 4, "indoor_temperature_target": 20.0}
+    )
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"room_temp_external": "sensor.r", "bt2": "sensor.i"}
+    )
+    rows = [
+        {"start": 100 + index * 3600, "mean": 20.5}
+        for index in range(cc.INDOOR_METRIC_MIN_HOURS)
+    ]
+    coordinator._async_statistics = AsyncMock(return_value={"sensor.r": rows})
+
+    errors, source = await coordinator._async_room_error_hours()
+
+    assert source == "room_temp_external"
+    assert len(errors) == cc.INDOOR_METRIC_MIN_HOURS
+    assert errors[100] == pytest.approx(0.5)
+    coordinator._async_statistics.assert_awaited_once()
+
+
+async def test_room_error_hours_requires_target_and_sensor() -> None:
+    coordinator = make_coordinator(values={"indoor_temperature_target": 20.0})
+    coordinator._async_statistics = AsyncMock()
+
+    coordinator._resolve_statistic_ids = MagicMock(return_value={})
+    assert await coordinator._async_room_error_hours() == ({}, None)
+
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"room_temp_external": "sensor.r"}
+    )
+    coordinator._main.data["values"].pop("indoor_temperature_target")
+    assert await coordinator._async_room_error_hours() == ({}, None)
+
+    coordinator._async_statistics.assert_not_awaited()
+
+
+async def test_snapshot_reports_room_tracking() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    now = time.time()
+    midnight = datetime.fromtimestamp(now, timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    window = range(int((midnight - timedelta(days=3)).timestamp()), int(now), 3600)
+    coordinator._async_room_error_hours = AsyncMock(
+        return_value=({ts: -0.25 for ts in window}, "bt2")
+    )
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.room_error_median_abs_c == pytest.approx(0.25)
+    assert snapshot.room_error_median_c == pytest.approx(-0.25)
+    assert snapshot.room_error_p90_abs_c == pytest.approx(0.25)
+    assert snapshot.room_error_source == "bt2"
+    assert snapshot.room_error_samples == len(list(window))
 
 
 def test_curve_deviation_uses_interpolated_supply() -> None:

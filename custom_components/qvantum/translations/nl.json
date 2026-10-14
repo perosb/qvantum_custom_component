@@ -620,6 +620,9 @@
       "adaptive_curve_deviation": {
         "name": "Adaptieve stooklijn: afwijking"
       },
+      "adaptive_curve_room_error": {
+        "name": "Adaptieve stooklijn: kamerafwijking"
+      },
       "adaptive_curve_solar_model": {
         "name": "Adaptieve stooklijn: zonnemodel"
       },
