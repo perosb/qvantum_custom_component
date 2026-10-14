@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -46,20 +46,71 @@ def resolve_statistic_entity_ids(
     return resolved
 
 
+#: Every indoor-temperature metric a resolver may choose from.
+INDOOR_METRIC_KEYS: tuple[str, ...] = (
+    "room_temp_external",
+    "room_temp_ext",
+    "bt2",
+)
+#: Hourly rows a newly configured sensor needs before it replaces the fallback.
+INDOOR_METRIC_MIN_HOURS = 24
+
+
+def indoor_metric_candidates(
+    resolved: Mapping[str, str], values: Mapping[str, Any]
+) -> tuple[str, ...]:
+    """Indoor-temperature metrics in preference order, configured one first.
+
+    Mirrors the climate platform: ``sensor_mode`` selects BT2 or the external
+    room sensor, and a missing mode falls back to BT2. BT2 stays last, so a
+    configured external sensor wins whenever it has data.
+    """
+    mode = values.get("sensor_mode")
+    if mode is None:
+        mode = values.get("use_operation_sensor")
+    # dict.fromkeys dedupes: BT2 is both a mode and the final fallback.
+    ordered = (*SensorMode.current_temperature_keys(mode), "bt2")
+    return tuple(dict.fromkeys(key for key in ordered if key in resolved))
+
+
+def indoor_metric_entity_ids(resolved: Mapping[str, str]) -> dict[str, str]:
+    """Every resolvable indoor metric by key, for one statistics fetch.
+
+    Callers fetch all of them and let :func:`pick_indoor_metric_key` choose:
+    the configured sensor may be an entity the recorder has no history for yet.
+    """
+    return {key: resolved[key] for key in INDOOR_METRIC_KEYS if key in resolved}
+
+
 def resolve_indoor_metric_key(
     resolved: Mapping[str, str], values: Mapping[str, Any]
 ) -> str | None:
     """Pick the indoor-temperature metric the pump is configured to use.
 
-    Mirrors the climate platform: ``sensor_mode`` selects BT2 or the external
-    room sensor, and a missing mode falls back to BT2. Returns ``None`` when
-    none of the candidate metrics resolved to an entity.
+    Returns ``None`` when none of the candidate metrics resolved to an entity.
     """
-    mode = values.get("sensor_mode")
-    if mode is None:
-        mode = values.get("use_operation_sensor")
-    for key in (*SensorMode.current_temperature_keys(mode), "bt2"):
-        if key in resolved:
+    candidates = indoor_metric_candidates(resolved, values)
+    return candidates[0] if candidates else None
+
+
+def pick_indoor_metric_key(
+    resolved: Mapping[str, str],
+    values: Mapping[str, Any],
+    rows_by_key: Mapping[str, Sequence[Any]],
+    *,
+    min_rows: int = INDOOR_METRIC_MIN_HOURS,
+) -> str | None:
+    """First configured indoor metric with enough hourly rows, else ``None``.
+
+    A newly added room sensor records nothing for its first hours, which would
+    otherwise silence every statistics-based feature (curve trims, room-gain
+    fit, solar calibration, building metrics) until the recorder caught up.
+    Falling back to the next candidate keeps them running on the previous
+    sensor instead of going dormant; ``min_rows`` is the consumer's own
+    minimum, since what counts as "enough" differs per feature.
+    """
+    for key in indoor_metric_candidates(resolved, values):
+        if len(rows_by_key.get(key, ())) >= min_rows:
             return key
     return None
 

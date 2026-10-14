@@ -67,8 +67,10 @@ from .solar_gain import (
     fit_solar_model,
 )
 from .statistics import (
+    INDOOR_METRIC_MIN_HOURS,
     async_statistics_during_period,
-    resolve_indoor_metric_key,
+    indoor_metric_entity_ids,
+    pick_indoor_metric_key,
     resolve_statistic_entity_ids,
 )
 
@@ -226,6 +228,18 @@ def _median_sorted(values: list[float]) -> float:
     if len(values) % 2:
         return values[index]
     return 0.5 * (values[index - 1] + values[index])
+
+
+def _hourly_series(rows: Mapping[str, Any], entity_id: str) -> dict[int, float]:
+    """``{hour_start: mean}`` for one statistic, skipping incomplete rows."""
+    series: dict[int, float] = {}
+    for row in rows.get(entity_id, []):
+        mean = row.get("mean")
+        start = row.get("start")
+        if mean is None or start is None:
+            continue
+        series[int(start)] = float(mean)
+    return series
 
 
 def curve_deviation_c(
@@ -1068,8 +1082,28 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
     ) -> dict[str, list[Any]]:
         return await async_statistics_during_period(self.hass, statistic_ids, start)
 
-    def _indoor_metric_key(self, resolved: Mapping[str, str]) -> str | None:
-        return resolve_indoor_metric_key(resolved, self._main_values())
+    def _indoor_series(
+        self,
+        resolved: Mapping[str, str],
+        rows: Mapping[str, Any],
+        *,
+        min_hours: int = INDOOR_METRIC_MIN_HOURS,
+    ) -> tuple[str | None, dict[int, float]]:
+        """Indoor series for the configured sensor, else the fallback.
+
+        A newly configured room sensor has no recorder history for its first
+        hours, which would otherwise silence everything that reads the indoor
+        error. ``min_hours`` is how much history this caller needs before the
+        configured sensor replaces BT2.
+        """
+        by_key = {
+            key: _hourly_series(rows, entity_id)
+            for key, entity_id in indoor_metric_entity_ids(resolved).items()
+        }
+        key = pick_indoor_metric_key(
+            resolved, self._main_values(), by_key, min_rows=min_hours
+        )
+        return key, (dict(by_key.get(key, {})) if key else {})
 
     async def _async_hourly_maps(self) -> dict[str, dict[int, float]]:
         resolved = self._resolve_statistic_ids()
@@ -1077,19 +1111,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         rows = await self._async_statistics(
             statistic_ids, dt_util.utcnow() - timedelta(days=CALIBRATION_DAYS)
         )
-        maps: dict[str, dict[int, float]] = {}
-        for key, entity_id in resolved.items():
-            series: dict[int, float] = {}
-            for row in rows.get(entity_id, []):
-                mean = row.get("mean")
-                start = row.get("start")
-                if mean is None or start is None:
-                    continue
-                series[int(start)] = float(mean)
-            maps[key] = series
-        indoor_key = self._indoor_metric_key(resolved)
+        maps: dict[str, dict[int, float]] = {
+            key: _hourly_series(rows, entity_id)
+            for key, entity_id in resolved.items()
+        }
+        indoor_key, indoor = self._indoor_series(
+            resolved, rows, min_hours=MIN_CALIBRATION_SAMPLES
+        )
         if indoor_key:
-            maps["indoor"] = maps[indoor_key]
+            maps["indoor"] = indoor
         if "bt1" in maps:
             maps["outdoor"] = maps["bt1"]
         return maps
@@ -1114,32 +1144,19 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if not outdoor_id or not supply_id:
             return {}, set()
         power_id = resolved.get("heatingpower")
-        indoor_key = self._indoor_metric_key(resolved)
-        indoor_id = resolved.get(indoor_key) if indoor_key else None
         statistic_ids = {outdoor_id, supply_id}
         if power_id:
             statistic_ids.add(power_id)
-        if indoor_id:
-            statistic_ids.add(indoor_id)
+        statistic_ids.update(indoor_metric_entity_ids(resolved).values())
         rows = await self._async_statistics(
             statistic_ids,
             dt_util.utcnow() - timedelta(days=READY_WINDOW_DAYS + 1),
         )
 
-        def _series(entity_id: str) -> dict[int, float]:
-            series: dict[int, float] = {}
-            for row in rows.get(entity_id, []):
-                mean = row.get("mean")
-                start_ts = row.get("start")
-                if mean is None or start_ts is None:
-                    continue
-                series[int(start_ts)] = float(mean)
-            return series
-
-        outdoor = _series(outdoor_id)
-        supply = _series(supply_id)
-        power = _series(power_id) if power_id else {}
-        indoor = _series(indoor_id) if indoor_id else {}
+        outdoor = _hourly_series(rows, outdoor_id)
+        supply = _hourly_series(rows, supply_id)
+        power = _hourly_series(rows, power_id) if power_id else {}
+        _, indoor = self._indoor_series(resolved, rows)
         target = self._main_values().get("indoor_temperature_target")
         target_c = (
             float(target)
@@ -1222,15 +1239,16 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         resolved = self._resolve_statistic_ids()
         outdoor_id = resolved.get("bt1")
         supply_id = resolved.get("cal_heat_temp")
-        indoor_key = self._indoor_metric_key(resolved)
-        indoor_id = resolved.get(indoor_key) if indoor_key else None
-        if not outdoor_id or not supply_id or not indoor_id:
+        if not outdoor_id or not supply_id:
             return None
         target = self._main_values().get("indoor_temperature_target")
         if not isinstance(target, (int, float)) or isinstance(target, bool):
             return None
+        indoor_ids = indoor_metric_entity_ids(resolved)
+        if not indoor_ids:
+            return None
         power_id = resolved.get("heatingpower")
-        statistic_ids = {outdoor_id, supply_id, indoor_id}
+        statistic_ids = {outdoor_id, supply_id, *indoor_ids.values()}
         if power_id:
             statistic_ids.add(power_id)
         start = dt_util.utcnow() - timedelta(days=BASELINE_LEARN_DAYS)
@@ -1240,20 +1258,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             )
         rows = await self._async_statistics(statistic_ids, start)
 
-        def _series(entity_id: str) -> dict[int, float]:
-            series: dict[int, float] = {}
-            for row in rows.get(entity_id, []):
-                mean = row.get("mean")
-                start_ts = row.get("start")
-                if mean is None or start_ts is None:
-                    continue
-                series[int(start_ts)] = float(mean)
-            return series
-
-        outdoor = _series(outdoor_id)
-        supply = _series(supply_id)
-        indoor = _series(indoor_id)
-        power = _series(power_id) if power_id else {}
+        outdoor = _hourly_series(rows, outdoor_id)
+        supply = _hourly_series(rows, supply_id)
+        _, indoor = self._indoor_series(resolved, rows)
+        power = _hourly_series(rows, power_id) if power_id else {}
+        if not indoor:
+            return None
         target_c = float(target)
         observations: list[tuple[float, float, float]] = []
         for ts in sorted(set(outdoor) & set(supply) & set(indoor)):
@@ -1342,30 +1352,24 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         """
         resolved = self._resolve_statistic_ids()
         outdoor_id = resolved.get("bt1")
-        indoor_key = self._indoor_metric_key(resolved)
-        indoor_id = resolved.get(indoor_key) if indoor_key else None
-        if not outdoor_id or not indoor_id:
+        if not outdoor_id:
             return []
         target = self._main_values().get("indoor_temperature_target")
         if not isinstance(target, (int, float)) or isinstance(target, bool):
             return []
+        indoor_ids = indoor_metric_entity_ids(resolved)
+        if not indoor_ids:
+            return []
+        statistic_ids = {outdoor_id, *indoor_ids.values()}
         rows = await self._async_statistics(
-            {outdoor_id, indoor_id},
+            statistic_ids,
             dt_util.utcnow() - timedelta(days=TRIM_WINDOW_DAYS),
         )
 
-        def _series(entity_id: str) -> dict[int, float]:
-            series: dict[int, float] = {}
-            for row in rows.get(entity_id, []):
-                mean = row.get("mean")
-                start = row.get("start")
-                if mean is None or start is None:
-                    continue
-                series[int(start)] = float(mean)
-            return series
-
-        outdoor = _series(outdoor_id)
-        indoor = _series(indoor_id)
+        outdoor = _hourly_series(rows, outdoor_id)
+        _, indoor = self._indoor_series(resolved, rows)
+        if not indoor:
+            return []
         target_c = float(target)
         return [
             (ts, outdoor[ts], indoor[ts] - target_c)

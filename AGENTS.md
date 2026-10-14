@@ -291,6 +291,12 @@ access, so no control is offered when a write would fail.
   (identified from the Auto hours) removed. Gates: median ≤ 1.5 °C and p95
   ≤ 3.0 °C over ≥ 3 days and ≥ 24 heating hours — calibrated to what a 10°
   seven-point table can represent; a tighter median gate is unreachable.
+- Statistics-based curve features (trims, room gain, solar calibration) and
+  the efficiency building metrics resolve the indoor sensor through
+  `statistics.pick_indoor_metric_key`: the configured sensor wins once it has
+  enough hourly rows, otherwise the next candidate (BT2 last) keeps them
+  alive. Never hard-code BT2 or the external sensor; always degrade to
+  "no series" rather than a wrong one.
 
 ---
 

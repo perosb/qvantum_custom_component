@@ -25,7 +25,12 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-from .building import degree_hours, fit_heat_loss, weather_normalized_heating
+from .building import (
+    MIN_FIT_ROWS,
+    degree_hours,
+    fit_heat_loss,
+    weather_normalized_heating,
+)
 from .const import (
     DHW_COMPRESSOR_STATE_HOT_WATER,
     DHW_TANK_VOLUME_L,
@@ -45,7 +50,7 @@ from .plant_analytics import (
 from .solar_gain import SolarModel, build_samples, fit_solar_model, smooth_ghi
 from .statistics import (
     async_statistics_during_period,
-    resolve_indoor_metric_key,
+    pick_indoor_metric_key,
     resolve_statistic_entity_ids,
 )
 
@@ -357,8 +362,11 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
 
         power = dict(mean_series.get("heatingpower", []))
         outdoor = dict(mean_series.get("bt1", []))
-        indoor_key = resolve_indoor_metric_key(
-            {key: key for key in mean_series}, self._main_values()
+        indoor_key = pick_indoor_metric_key(
+            {key: key for key in mean_series},
+            self._main_values(),
+            mean_series,
+            min_rows=MIN_SOLAR_FIT_SAMPLES,
         )
         indoor = dict(mean_series.get(indoor_key, [])) if indoor_key else {}
         if not power or not outdoor or not indoor:
@@ -576,8 +584,11 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         now_ts: float,
     ) -> tuple[float | None, float | None, float | None, bool | None, float]:
         """Heat-loss coefficient, degree hours, normalized use and its trend."""
-        indoor_key = resolve_indoor_metric_key(
-            {key: key for key in mean_series}, self._main_values()
+        indoor_key = pick_indoor_metric_key(
+            {key: key for key in mean_series},
+            self._main_values(),
+            mean_series,
+            min_rows=MIN_FIT_ROWS,
         )
         outdoor_points = mean_series.get("bt1", [])
         indoor_points = mean_series.get(indoor_key, []) if indoor_key else []
