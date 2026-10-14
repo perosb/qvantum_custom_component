@@ -303,7 +303,10 @@ access, so no control is offered when a write would fail.
   `DEFAULT_ENABLED_*` for the same reason — `room_temp_ext` (HTTP) and the
   `room_temp_external` holding sensor — because a disabled entity records no
   statistics, and moving either into a `DEFAULT_DISABLED_*` list silently
-  sends those features back to BT2.
+  sends those features back to BT2. Those lists are the source of truth in
+  both directions: `disable_entities_by_default` clears a stale
+  `disabled_by=INTEGRATION` when a metric moves out again, but never touches a
+  `disabled_by=USER`.
 - Removing the config entry reverts holding 22 to Auto (`async_remove_entry`),
   because nothing would be left to supervise the User-defined table we wrote.
   Reload and HA shutdown deliberately keep it: a reload re-activates from the
