@@ -754,6 +754,38 @@ class TestQvantumCurveSensors:
         assert entity.native_value is None
         assert entity.available is False
 
+    def test_thermal_sensors_report_the_decay_fit(self, mock_device):
+        coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(
+                thermal_time_constant=40.0,
+                thermal_gain_k_per_h=0.05,
+                thermal_mass_kwh_per_k=4.3,
+                thermal_episodes=3,
+                building_coverage_days=30.0,
+            )
+        )
+        tau = QvantumEfficiencySensorEntity(
+            coordinator, "thermal_time_constant", mock_device
+        )
+        mass = QvantumEfficiencySensorEntity(coordinator, "thermal_mass", mock_device)
+
+        assert tau.native_value == 40.0
+        assert tau._attr_native_unit_of_measurement == "h"
+        assert tau.extra_state_attributes["episodes"] == 3
+        assert tau.extra_state_attributes["gain_k_per_h"] == 0.05
+        assert tau.extra_state_attributes["coverage_days"] == 30.0
+        assert mass.native_value == 4.3
+        assert mass._attr_native_unit_of_measurement == "kWh/K"
+
+    def test_thermal_sensors_unavailable_without_a_fit(self, mock_device):
+        coordinator = _efficiency_coordinator(EfficiencySnapshot())
+        tau = QvantumEfficiencySensorEntity(
+            coordinator, "thermal_time_constant", mock_device
+        )
+
+        assert tau.native_value is None
+        assert tau.available is False
+
     def test_solar_model_sensor_reports_trust_and_coefficients(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())
         entity = QvantumCurveSolarModelSensor(
@@ -1059,6 +1091,8 @@ class TestQvantumEfficiencySensors:
             "heat_loss_coefficient",
             "heating_degree_hours",
             "weather_normalized_heating",
+            "thermal_time_constant",
+            "thermal_mass",
             "dhw_standing_loss",
             "compressor_speed_avg",
             "exhaust_fan_speed_avg",

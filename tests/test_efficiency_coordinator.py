@@ -799,3 +799,68 @@ class TestDhwStandingLoss:
             snapshot = await coordinator._async_compute_snapshot()
 
         assert snapshot.dhw_standing_loss == 1.23
+
+async def test_thermal_metrics_reports_the_decay_fit() -> None:
+    """The decay fit drives the time constant and, with UA, the capacity."""
+    coordinator = make_coordinator()
+    hour = 1_000_000
+    indoor: list[tuple[int, float]] = []
+    outdoor: list[tuple[int, float]] = []
+    power: list[tuple[int, float]] = []
+    for delta_t in (10.0, 20.0, 30.0):
+        temperature = 21.0
+        for index in range(4):
+            ts = hour + index * 3600
+            indoor.append((ts, temperature))
+            outdoor.append((ts, temperature - delta_t))
+            power.append((ts, 0.0))
+            temperature += 0.05 - delta_t / 40.0
+        ts = hour + 4 * 3600
+        indoor.append((ts, 21.0))
+        outdoor.append((ts, 21.0 - delta_t))
+        power.append((ts, 900.0))
+        hour = ts + 3600
+    mean_series = {"bt2": indoor, "bt1": outdoor, "heatingpower": power}
+
+    tau, gain, mass, episodes = coordinator._thermal_metrics(mean_series, 106.8)
+
+    assert tau == pytest.approx(40.0)
+    assert gain == pytest.approx(0.05)
+    assert mass == pytest.approx(106.8 * 40.0 / 1000.0)
+    assert episodes == 3
+
+
+def test_thermal_metrics_without_an_indoor_series() -> None:
+    coordinator = make_coordinator()
+
+    assert coordinator._thermal_metrics({}, 106.8) == (None, None, None, 0)
+
+
+def test_thermal_metrics_without_a_loss_coefficient() -> None:
+    """The time constant stands alone; only the capacity needs UA."""
+    coordinator = make_coordinator()
+    hour = 1_000_000
+    indoor: list[tuple[int, float]] = []
+    outdoor: list[tuple[int, float]] = []
+    power: list[tuple[int, float]] = []
+    for delta_t in (10.0, 20.0, 30.0):
+        temperature = 21.0
+        for index in range(4):
+            ts = hour + index * 3600
+            indoor.append((ts, temperature))
+            outdoor.append((ts, temperature - delta_t))
+            power.append((ts, 0.0))
+            temperature += 0.05 - delta_t / 40.0
+        ts = hour + 4 * 3600
+        indoor.append((ts, 21.0))
+        outdoor.append((ts, 21.0 - delta_t))
+        power.append((ts, 900.0))
+        hour = ts + 3600
+
+    tau, _gain, mass, episodes = coordinator._thermal_metrics(
+        {"bt2": indoor, "bt1": outdoor, "heatingpower": power}, None
+    )
+
+    assert tau == pytest.approx(40.0)
+    assert mass is None
+    assert episodes == 3

@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Chauffage normalisé par la météo"
       },
+      "thermal_time_constant": {
+        "name": "Constante de temps de l'enveloppe"
+      },
+      "thermal_mass": {
+        "name": "Masse thermique"
+      },
       "dhw_standing_loss": {
         "name": "Pertes permanentes de l'eau chaude"
       },

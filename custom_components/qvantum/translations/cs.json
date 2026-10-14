@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Počasím normalizované vytápění"
       },
+      "thermal_time_constant": {
+        "name": "Časová konstanta obálky"
+      },
+      "thermal_mass": {
+        "name": "Tepelná kapacita"
+      },
       "dhw_standing_loss": {
         "name": "Ztráta teplé vody v klidu"
       },

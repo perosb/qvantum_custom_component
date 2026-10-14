@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Vejrnormaliseret opvarmning"
       },
+      "thermal_time_constant": {
+        "name": "Tidskonstant for klimaskærmen"
+      },
+      "thermal_mass": {
+        "name": "Termisk masse"
+      },
       "dhw_standing_loss": {
         "name": "Varmtvandstankens standby-tab"
       },

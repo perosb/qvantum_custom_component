@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Wetterbereinigte Heizung"
       },
+      "thermal_time_constant": {
+        "name": "Zeitkonstante der Gebäudehülle"
+      },
+      "thermal_mass": {
+        "name": "Thermische Masse"
+      },
       "dhw_standing_loss": {
         "name": "Standverlust Warmwasser"
       },

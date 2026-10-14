@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Időjárás-normalizált fűtés"
       },
+      "thermal_time_constant": {
+        "name": "Burkolat időállandója"
+      },
+      "thermal_mass": {
+        "name": "Hőkapacitás"
+      },
       "dhw_standing_loss": {
         "name": "Használati melegvíz állási vesztesége"
       },

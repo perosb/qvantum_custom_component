@@ -647,6 +647,12 @@
       "weather_normalized_heating": {
         "name": "Säänormalisoitu lämmitys"
       },
+      "thermal_time_constant": {
+        "name": "Vaipparakenteen aikavakio"
+      },
+      "thermal_mass": {
+        "name": "Lämpökapasiteetti"
+      },
       "dhw_standing_loss": {
         "name": "Käyttöveden varastohäviö"
       },
