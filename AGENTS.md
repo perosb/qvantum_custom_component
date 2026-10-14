@@ -258,6 +258,13 @@ those lists are also the fetch universe, so the client would request a metric
 the API does not return. Create derived entities explicitly in the platform and
 list their keys in `special_sensor_keys` so registry cleanup keeps them.
 
+`diagnostics.py` is the support-dump surface and must stay in step with the
+state it mirrors: a new `CurveSnapshot` or persisted curve field (readiness
+gate, room gain and its source, trims and their evidence, room error,
+extrapolated points, …) is added to `_curve_diagnostics` in the same PR. A
+field missing from the dump cannot be read from a user's report, and a missing
+readiness gate hides why activation is blocked.
+
 Entity `available` must AND its data check with `_coordinator_available` (the
 coordinator's `last_update_success`); HA keeps stale data after a failed poll.
 Availability is not a write guard: write methods call `_require_write_access()`
