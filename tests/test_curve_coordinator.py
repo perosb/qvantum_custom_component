@@ -733,6 +733,48 @@ async def test_a_configured_factor_is_not_overwritten_by_the_fit() -> None:
     assert without_factor._room_gain_source == "bt2"
 
 
+async def test_restore_stamps_an_unknown_active_start() -> None:
+    """A store from before the field existed must not disable the correction.
+
+    Without a start the segment gate closes for every hour, so the room term
+    would never be removed while the curve runs. The stamp is the moment we
+    know the pump follows our table; earlier hours stay uncorrected.
+    """
+    store = FakeStore({"mode": "active", "baseline": BASELINE})
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator.active
+    assert isinstance(coordinator._active_since_ts, float)
+    assert coordinator._state_payload()["active_since_ts"] == (
+        coordinator._active_since_ts
+    )
+    assert store.saved["active_since_ts"] == coordinator._active_since_ts
+
+
+async def test_restore_leaves_a_known_active_start_alone() -> None:
+    store = FakeStore(
+        {"mode": "active", "baseline": BASELINE, "active_since_ts": 1758794400.0}
+    )
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator._active_since_ts == pytest.approx(1758794400.0)
+    assert store.saved is None
+
+
+async def test_restore_does_not_stamp_a_shadow_curve() -> None:
+    store = FakeStore({"mode": "shadow", "baseline": BASELINE})
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert not coordinator.active
+    assert coordinator._active_since_ts is None
+
+
 async def test_active_start_round_trips_through_the_store() -> None:
     store = FakeStore(
         {
