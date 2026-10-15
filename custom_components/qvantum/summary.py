@@ -12,8 +12,10 @@ What goes in (the rule questions the pool can answer):
   heating offset, tap-water start/stop, the pump's own supply limits;
 * the climate the installation has been observed in: the outdoor span and the
   number of heating hours;
-* the identified parameters: room gain (configured *and* fitted), the heat-loss
-  coefficient, the time constant, the thermal mass, the solar model;
+* the identified parameters: room gain (configured, applied *and* fitted — the
+  applied one may simply be the pump's factor, so the fitted slope is what
+  checks the identity), the heat-loss coefficient, the time constant, the
+  thermal mass, the solar model;
 * the derived verdicts, once they exist (snap/sag, cycling, DHW standing loss).
 
 What never goes in: entity ids or names, coordinates, energy totals, schedules,
@@ -65,7 +67,7 @@ _ENTITY_PREFIXES = (
 )
 
 #: Bump when a field is added, removed or changes meaning: the pool groups by it.
-SUMMARY_SCHEMA_VERSION = 1
+SUMMARY_SCHEMA_VERSION = 2  # room gain split into configured / applied / fitted
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -199,10 +201,11 @@ def climate_summary(curve: Any) -> dict[str, Any]:
 def curve_summary(coordinator: Any) -> dict[str, Any] | None:
     """The identified pump room gain, configured against fitted.
 
-    This pair is the first pooled question: does the pump's own
-    ``room_comp_factor`` equal the slope measured on hours it followed our table?
-    One installation fixes the linear map at one factor value; the pool is what
-    decides whether the fitted estimator can be retired.
+    Three numbers, not one: **configured** is the pump's own setting,
+    **applied** is what the correction actually uses (the factor when it is
+    usable, else the fit) and **fitted** is the measured slope. This is the first
+    pooled question — does the configured factor equal the measured slope? — and
+    one installation only fixes the linear map at one factor value.
     """
     if coordinator is None:
         return None
@@ -215,9 +218,15 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "room_gain_configured_c_per_c": _number(
             getattr(coordinator, "_room_gain_factor", None)
         ),
-        "room_gain_fitted_c_per_c": _number(getattr(coordinator, "_room_gain", None)),
-        "room_gain_source": _metric_key(
+        "room_gain_applied_c_per_c": _number(getattr(coordinator, "_room_gain", None)),
+        "room_gain_applied_source": _metric_key(
             getattr(coordinator, "_room_gain_source", None)
+        ),
+        "room_gain_fitted_c_per_c": _number(
+            getattr(coordinator, "_room_gain_fitted", None)
+        ),
+        "room_gain_fitted_source": _metric_key(
+            getattr(coordinator, "_room_gain_fitted_source", None)
         ),
         "median_abs_c": _number(getattr(snapshot, "median_abs_c", None)),
         "p95_abs_c": _number(getattr(snapshot, "p95_abs_c", None)),

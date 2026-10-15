@@ -584,6 +584,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._room_gain_source: str | None = None
         # The pump's own ``room_comp_factor`` as last seen, for diagnostics.
         self._room_gain_factor: float | None = None
+        # The last *fitted* estimate, kept beside the applied gain: the applied
+        # one may simply be the pump's configured factor, and the pool needs the
+        # measured slope to check the identity.
+        self._room_gain_fitted: float | None = None
+        self._room_gain_fitted_source: str | None = None
         # Whether ``_room_gain`` came from that factor: a factor that turns
         # unusable must drop the gain it set rather than leave it applied.
         self._room_gain_from_factor = False
@@ -665,6 +670,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "room_gain": self._room_gain,
             "room_gain_source": self._room_gain_source,
             "room_gain_from_factor": self._room_gain_from_factor,
+            "room_gain_fitted": self._room_gain_fitted,
+            "room_gain_fitted_source": self._room_gain_fitted_source,
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "mode": self._mode,
             "revert_pending": self._revert_pending,
@@ -773,6 +780,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if room_gain_source in INDOOR_METRIC_KEYS:
             self._room_gain_source = str(room_gain_source)
         self._room_gain_from_factor = bool(data.get("room_gain_from_factor", False))
+        room_gain_fitted = data.get("room_gain_fitted")
+        if isinstance(room_gain_fitted, (int, float)) and not isinstance(
+            room_gain_fitted, bool
+        ):
+            self._room_gain_fitted = float(room_gain_fitted)
+        fitted_source = data.get("room_gain_fitted_source")
+        if fitted_source in INDOOR_METRIC_KEYS:
+            self._room_gain_fitted_source = str(fitted_source)
         margins = data.get("indoor_margins")
         if isinstance(margins, list):
             for item in margins:
@@ -1558,6 +1573,21 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         )
         await self._async_persist()
 
+    async def _async_store_fitted_room_gain(self, gain: float, source: str) -> None:
+        """Keep the measured slope beside whatever is applied.
+
+        Diagnostics only: the applied gain may be the pump's configured factor,
+        and the fitted number is what tells us whether that identity holds.
+        """
+        if gain == self._room_gain_fitted and source == self._room_gain_fitted_source:
+            return
+        self._room_gain_fitted = gain
+        self._room_gain_fitted_source = source
+        _LOGGER.debug(
+            "Room-compensation gain fitted from %s: %.2f °C/°C", source, gain
+        )
+        await self._async_persist()
+
     async def _async_clear_room_gain(self) -> None:
         """Drop the stored gain: an unusable factor means no correction."""
         self._room_gain = None
@@ -1680,12 +1710,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
     ) -> None:
         """Refresh the fitted room-compensation gain (best effort).
 
-        The fit is the fallback for a pump that reports no usable
-        ``room_comp_factor``; when the factor exists it already *is* the gain,
-        and fitting over it would only add noise to a known number.
+        The fit runs even when the pump reports a usable ``room_comp_factor``:
+        it no longer decides what is applied (the factor does), but it is the
+        measurement that tells us whether the factor *is* the gain — the pair
+        the pooled checks compare.
         """
-        if values is not None and self._configured_room_gain(values) is not None:
-            return
+        configured = (
+            self._configured_room_gain(values) if values is not None else None
+        )
         try:
             identified = await self._async_room_gain()
         except asyncio.CancelledError:
@@ -1694,6 +1726,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             _LOGGER.debug("Room-compensation gain unavailable: %s", err)
             return
         if identified is None:
+            return
+        await self._async_store_fitted_room_gain(*identified)
+        if configured is not None:
+            # The pump's own factor stays applied; the fit is the cross-check.
             return
         await self._async_store_room_gain(*identified, label="observed Auto hours")
 

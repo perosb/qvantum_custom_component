@@ -192,7 +192,7 @@ What it contains:
 | device | manufacturer, model, firmware version (device metadata, never user data) |
 | plant | `sensor_mode`, `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
 | climate | the outdoor span the installation has been observed in, heating hours |
-| curve | configured vs fitted room gain and its source, the readiness median/p95, the solar model (`a`, `b`, trust, days) |
+| curve | room gain configured vs applied vs fitted (with their sources), the readiness median/p95, the solar model (`a`, `b`, trust, days) |
 | fitted | heat-loss coefficient, time constant, thermal mass, DHW standing loss, cycling, SCOP, aux share, health grade |
 | verdicts | reserved for the derived analysis results (currently empty) |
 

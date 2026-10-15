@@ -142,6 +142,8 @@ def _curve_coordinator() -> SimpleNamespace:
         _room_gain_source="room_temp_external",
         _room_gain_factor=5.0,
         _room_gain_from_factor=True,
+        _room_gain_fitted=5.08,
+        _room_gain_fitted_source="room_temp_external",
         _active_since_ts=1758790800.0,
         _model=_solar_model(),
         _calibrated_at="2026-09-25T10:00:00+00:00",
@@ -517,6 +519,10 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["model_daily"]["b_jackknife_min_m2"] == 1.5
     assert curve["calibrated_at"] == "2026-09-25T10:00:00+00:00"
     assert curve["calibration_ok"] is False
+    # The measured slope beside the applied gain: the applied one may just be
+    # the pump's configured factor.
+    assert curve["room_gain_fitted"] == 5.08
+    assert curve["room_gain_fitted_source"] == "room_temp_external"
     # Whether the warm-house brake can act at all.
     assert curve["indoor_cap_armed"] is True
     assert curve["indoor_margin_c"] == 0.4
