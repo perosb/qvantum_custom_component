@@ -27,6 +27,9 @@ from collections.abc import Mapping
 from datetime import date
 from typing import Any
 
+from homeassistant.helpers import device_registry as dr
+
+from .const import DOMAIN
 from .statistics import INDOOR_METRIC_KEYS
 
 #: Characters allowed in the few strings that travel. Device metadata and our own
@@ -131,6 +134,21 @@ def plant_summary(values: Mapping[str, Any]) -> dict[str, Any]:
     return {key: _number(values.get(key)) for key in PLANT_KEYS}
 
 
+def device_metadata(hass: Any, device_id: str) -> Any:
+    """The HA device entry for a pump id, or ``None``.
+
+    ``coordinator.device_id`` is the *pump's* API id (cloud id or Modbus
+    serial), never a device-registry id: the entry is found by the identifier
+    the integration registered. The registry is absent in a stripped harness, so
+    this is best effort — an export without metadata beats no export.
+    """
+    try:
+        registry = dr.async_get(hass)
+    except (KeyError, RuntimeError):
+        return None
+    return registry.async_get_device(identifiers={(DOMAIN, f"qvantum-{device_id}")})
+
+
 def device_summary(device: Any) -> dict[str, Any]:
     """Manufacturer/model/firmware — device metadata, never user data."""
     if device is None:
@@ -144,13 +162,18 @@ def device_summary(device: Any) -> dict[str, Any]:
 
 
 def climate_summary(curve: Any) -> dict[str, Any]:
-    """The outdoor range the installation has been observed in, and how much."""
-    if curve is None:
+    """The outdoor range the installation has been observed in, and how much.
+
+    Both live on the curve **snapshot** (``coordinator.data``): readiness and
+    baseline fields travel with the snapshot, not with the coordinator.
+    """
+    snapshot = getattr(curve, "data", None) if curve is not None else None
+    if snapshot is None:
         return {"outdoor_min_c": None, "outdoor_max_c": None, "heating_hours": None}
     return {
-        "outdoor_min_c": _number(getattr(curve, "baseline_outdoor_min_c", None)),
-        "outdoor_max_c": _number(getattr(curve, "baseline_outdoor_max_c", None)),
-        "heating_hours": _number(getattr(curve, "baseline_learned_hours", None)),
+        "outdoor_min_c": _number(getattr(snapshot, "baseline_outdoor_min_c", None)),
+        "outdoor_max_c": _number(getattr(snapshot, "baseline_outdoor_max_c", None)),
+        "heating_hours": _number(getattr(snapshot, "baseline_learned_hours", None)),
     }
 
 

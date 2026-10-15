@@ -933,6 +933,10 @@
           "description": "Zvýšit přívodní teplotu před předpovídaným ochlazením"
         }
       }
+    },
+    "export_summary": {
+      "name": "Exportovat souhrn",
+      "description": "Zapíše volitelný souhrn instalace do souboru pro přiložení k hlášení; nic se neposílá"
     }
   }
 }

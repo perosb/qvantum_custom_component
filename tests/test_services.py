@@ -132,11 +132,11 @@ class TestQvantumServices:
             side_effect=lambda func, *args: func(*args)
         )
         registry = MagicMock()
-        registry.async_get.return_value = SimpleNamespace(
-            manufacturer="Qvantum", model="QE-6", sw_version=None, hw_version=None
+        registry.async_get_device.return_value = SimpleNamespace(
+            manufacturer="Qvantum", model="QE-6", sw_version="2026.10.4", hw_version=None
         )
 
-        with patch("custom_components.qvantum.services.dr") as patched_registry:
+        with patch("custom_components.qvantum.summary.dr") as patched_registry:
             patched_registry.async_get.return_value = registry
             await async_setup_services(mock_hass)
             service_func = mock_hass.services.async_register.call_args_list[3][1][
@@ -149,6 +149,13 @@ class TestQvantumServices:
         summary = result["qvantum"]["summary"]
         assert summary["plant"]["room_comp_factor"] == 5.0
         assert summary["transport"] == "modbus"
+        # The pump id is the API id, so the device is found by the identifier
+        # the integration registered — not by treating the id as a registry id.
+        registry.async_get_device.assert_called_once_with(
+            identifiers={("qvantum", "qvantum-3010100111111111")}
+        )
+        assert summary["device"]["model"] == "QE-6"
+        assert summary["device"]["firmware"] == "2026.10.4"
         assert result["qvantum"]["path"] == str(target)
         written = json.loads(target.read_text(encoding="utf-8"))
         assert written == summary

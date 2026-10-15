@@ -933,6 +933,10 @@
           "description": "Höj framledningen före ett prognostiserat köldknäpp"
         }
       }
+    },
+    "export_summary": {
+      "name": "Exportera sammanfattning",
+      "description": "Skriv en opt-in-sammanfattning av anläggningen till en fil så den kan bifogas i ett ärende; inget skickas någonstans"
     }
   }
 }

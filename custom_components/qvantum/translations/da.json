@@ -933,6 +933,10 @@
           "description": "Hæv fremløbstemperaturen før et varslet kuldetab"
         }
       }
+    },
+    "export_summary": {
+      "name": "Eksportér oversigt",
+      "description": "Skriv et opt-in-resumé af anlægget til en fil, så det kan vedhæftes en sag; der sendes intet"
     }
   }
 }

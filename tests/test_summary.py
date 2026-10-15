@@ -42,8 +42,20 @@ IDENTIFIER_STRINGS = (
 
 
 def curve_coordinator(**overrides):
-    """A curve coordinator stub with the identified gain pair."""
-    snapshot = SimpleNamespace(median_abs_c=1.26, p95_abs_c=3.87, ready=False)
+    """A curve coordinator stub with the identified gain pair.
+
+    The baseline/climate fields live on the **snapshot** (``coordinator.data``),
+    not on the coordinator — a stub that puts them on the coordinator would hide
+    a broken field path.
+    """
+    snapshot = SimpleNamespace(
+        median_abs_c=1.26,
+        p95_abs_c=3.87,
+        ready=False,
+        baseline_outdoor_min_c=3.4,
+        baseline_outdoor_max_c=14.1,
+        baseline_learned_hours=148,
+    )
     values = {
         "active": True,
         "data": snapshot,
@@ -53,9 +65,6 @@ def curve_coordinator(**overrides):
         "_model": SimpleNamespace(a_w_per_k=111.1, b_m2=0.0, trust=0.69),
         "_daily_model": SimpleNamespace(b_m2=1.875, trust=0.69, n_days=26),
         "_baseline": dict.fromkeys(CURVE_KEYS, 20.0),
-        "baseline_outdoor_min_c": 3.4,
-        "baseline_outdoor_max_c": 14.1,
-        "baseline_learned_hours": 148,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -158,6 +167,17 @@ def test_summary_degrades_without_a_curve_or_efficiency() -> None:
     assert set(payload["fitted"]) == set(FITTED_EFFICIENCY_KEYS)
     assert all(value is None for value in payload["fitted"].values())
     assert payload["verdicts"] == {}
+
+
+def test_climate_comes_from_the_curve_snapshot() -> None:
+    """The observed span and heating hours are snapshot fields."""
+    payload = build()
+
+    assert payload["climate"] == {
+        "outdoor_min_c": 3.4,
+        "outdoor_max_c": 14.1,
+        "heating_hours": 148,
+    }
 
 
 def test_the_gain_pair_travels_because_the_pool_needs_it() -> None:

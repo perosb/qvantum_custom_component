@@ -933,6 +933,10 @@
           "description": "Raise supply ahead of a forecast cold snap"
         }
       }
+    },
+    "export_summary": {
+      "name": "Export summary",
+      "description": "Write an opt-in installation summary to a file so it can be attached to an issue; nothing is sent anywhere"
     }
   }
 }

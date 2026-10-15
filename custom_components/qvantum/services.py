@@ -4,7 +4,6 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
-from homeassistant.helpers import device_registry as dr
 import homeassistant.helpers.config_validation as cv
 
 from .client.exceptions import (
@@ -13,7 +12,7 @@ from .client.exceptions import (
     APIRateLimitError,
 )
 from .const import DOMAIN, VERSION
-from .summary import build_summary
+from .summary import build_summary, device_metadata
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,7 +92,7 @@ async def async_export_summary(service_call: ServiceCall) -> Any:
                 "modbus" if getattr(coordinator, "modbus_enabled", False) else "cloud"
             ),
             # The registry is only needed once there is something to export.
-            device=dr.async_get(hass).async_get(device_id) if device_id else None,
+            device=device_metadata(hass, str(device_id)) if device_id else None,
             values=values,
             curve=getattr(runtime, "curve_coordinator", None),
             efficiency=getattr(efficiency, "data", None),
