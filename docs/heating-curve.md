@@ -180,17 +180,38 @@ when the cached table initially disagrees with Auto.
 Room compensation is a second, separate loop the shadow curve does not model:
 with BT2 or an external room sensor the firmware adds a room term to
 `cal_heat_temp`, so at a constant outdoor temperature the supply moves with the
-indoor error. The coordinator identifies that gain (supply °C per °C indoor
-error) from the same Auto hours, fitting the residual against both outdoor and
-the room error, and subtracts `gain × (indoor − target)` from the deviation
-before it feeds the readiness window. Without that, the shadow curve could
-never match a compensating pump closely enough to become `ready`. The gain
-**travels with the indoor sensor it was fitted against**: if the resolver falls
-back to another sensor, or the live payload reports a different one, the
+indoor error (`cal_heat_temp = table − factor × (room − target)`). The
+coordinator subtracts `gain × (indoor − target)` from the deviation before it
+feeds the readiness window; without that, the shadow curve could never match a
+compensating pump closely enough to become `ready`.
+
+**The gain is the pump's own setting.** `room_comp_factor` (holding 13, cloud
+setting of the same name) *is* that factor, so it is read rather than fitted:
+measured on a live pump, 5.0 configured against 5.08 fitted from active hours.
+An absent, zero, non-finite or out-of-range factor, or a `sensor_mode` with no
+indoor reading at all, means **no** correction — never a guessed number. A
+factor that *becomes* unusable (the user zeroes it) drops the gain it set
+rather than leaving it applied: while the curve is active the fit never runs,
+so a stale number would stay wrong for as long as the curve does. Otherwise the
+gain falls back to a fit over observed Auto hours (residual against both
+outdoor and the room error), which is what an installation without a usable
+factor still gets. Whether configured or fitted, the gain **travels with
+the indoor sensor it belongs to**: if the payload reports a different sensor the
 correction is skipped rather than subtracting one sensor's room term from
 another's error. It is persisted and exposed as `room_gain_c_per_c` on the
-deviation sensor, and stays unidentified (no correction) while the pump has no
-room error to learn from.
+deviation sensor, with the pump's raw setting beside it as `room_gain_factor`
+in the diagnostics.
+
+**It only applies to hours the pump followed our table.** The correction is
+valid where `cal_heat_temp` came from the table we wrote — from the start of the
+last active period (`active_since_ts`) until it ended (`last_active_ts`). On
+Auto hours the pump's own control already holds the room term and the learned
+baseline was fitted to it, so subtracting the gain again double-counts: on the
+live pump, applying it to every readiness hour moved the median from 1.17 °C to
+2.67 °C (failing the gate) while the active hours alone gave 1.08 °C (passing).
+Readiness therefore no longer inherits the term from Auto hours, and a pump that
+has never been activated is corrected nowhere — which is exactly its behaviour
+today.
 
 ### Active trims
 
@@ -241,7 +262,8 @@ Entities:
   plus `median_abs_c`, `p95_abs_c`, `max_abs_c` and `window_hours` from the
   readiness window, `baseline_learned_hours`, `baseline_outdoor_min_c`,
   `baseline_outdoor_max_c` from the last baseline fit and `room_gain_c_per_c`
-  (the identified pump room-compensation gain removed from the deviation).
+  (the pump's room-compensation gain — its own `room_comp_factor` when it
+  reports one — removed from the deviation while the pump follows our table).
   `extrapolated_points` lists the curve points outside that observed range:
   their supply comes from the cached table rather than from anything the pump
   was watched doing, so readiness says nothing about them yet.
@@ -272,8 +294,8 @@ full local days: a median absolute deviation ≤ 1.5 °C and a 95th percentile
 baseline fit uses). Idle hours sit at the min-supply clamp and no longer
 describe the curve, and the module's own outdoor / night-day / solar / load
 terms are deliberate — judging them against Auto would block activation
-forever. The room-compensation term the firmware adds is removed first, and
-the pump's room gain is identified from the same Auto hours.
+forever. The room-compensation term the firmware adds is removed first, on the
+hours the pump followed our table, using the pump's own `room_comp_factor`.
 
 The gates are calibrated to what a ten-degree seven-point table can
 represent: even a converged baseline leaves roughly 1 °C of scatter across the

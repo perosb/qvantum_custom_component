@@ -138,6 +138,9 @@ def _curve_coordinator() -> SimpleNamespace:
         _trim_evidence={"curve_30": 12, "curve_minus_30": 0},
         _room_gain=1.8,
         _room_gain_source="room_temp_external",
+        _room_gain_factor=5.0,
+        _room_gain_from_factor=True,
+        _active_since_ts=1758790800.0,
         _model=_solar_model(),
         _calibrated_at="2026-09-25T10:00:00+00:00",
         _last_calibration_ts=1758794400.0,
@@ -492,6 +495,9 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["extrapolated_points"] == ["curve_minus_20", "curve_minus_30"]
     assert curve["room_gain"] == 1.8
     assert curve["room_gain_source"] == "room_temp_external"
+    # The pump's own setting, so a report shows both numbers side by side.
+    assert curve["room_gain_factor"] == 5.0
+    assert curve["room_gain_from_factor"] is True
     assert curve["trim_evidence"] == {"curve_30": 12, "curve_minus_30": 0}
     assert curve["room_error"] == {
         "median_abs_c": 0.6,
@@ -511,6 +517,9 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["calibration_ok"] is False
     assert curve["timestamps"]["last_trim_ts"] == 1758794400.0
     assert curve["timestamps"]["last_active_ts"] is None
+    # Without the start of the active period the readiness window cannot tell
+    # hours the pump followed our table from hours it followed its own.
+    assert curve["timestamps"]["active_since_ts"] == 1758790800.0
     assert curve["indoor_margins"] == [[1758794400.0, 0.5]]
     assert curve["power_samples"] == [1200.0, 1300.0]
     json.dumps(result)
