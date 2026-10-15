@@ -103,10 +103,9 @@ BASELINE_LEARN_REFRESH_HOURS = 6.0
 TRIM_WINDOW_DAYS = 7
 #: Minimum time between trim updates.
 TRIM_REFRESH_HOURS = 24.0
-#: Faster cadence until the first trims exist: the evidence needed for them is
 #: Days of hourly statistics read for the active-hour room-gain measurement.
 ROOM_GAIN_ACTIVE_WINDOW_DAYS = 7
-
+#: Faster cadence until the first trims exist: the evidence needed for them is
 #: already in the 7-day window, so waiting a full day only delays the first
 #: correction. Once any trim is in place the proven daily step takes over.
 TRIM_FIRST_REFRESH_HOURS = 3.0
