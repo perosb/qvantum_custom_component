@@ -157,6 +157,8 @@ class TestQvantumServices:
         assert summary["device"]["model"] == "QE-6"
         assert summary["device"]["firmware"] == "2026.10.4"
         assert result["qvantum"]["path"] == str(target)
+        # The same payload is downloadable while logged in.
+        assert result["qvantum"]["url"] == "/api/qvantum/summary"
         written = json.loads(target.read_text(encoding="utf-8"))
         assert written == summary
         assert "sensor.inomhustemperatur" not in json.dumps(written)

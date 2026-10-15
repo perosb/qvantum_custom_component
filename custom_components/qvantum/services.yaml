@@ -55,4 +55,5 @@ export_summary:
     GitHub issue when a rule needs checking across installations. It contains
     device metadata, control-loop settings, the identified parameters and the
     derived verdicts — never entity ids, names, coordinates or raw series.
-    Nothing is sent anywhere and no issue is opened for you.
+    The same payload can be downloaded from /api/qvantum/summary while logged
+    in. Nothing is sent anywhere and no issue is opened for you.

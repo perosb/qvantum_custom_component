@@ -57,6 +57,7 @@ from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
+from .summary import QvantumSummaryView
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,22 +79,32 @@ type MyConfigEntry = ConfigEntry[RuntimeData]
 #: Bundled Lovelace card, served so the HACS zip needs no separate repo.
 _CARD_URL_PATH = "/qvantum/qvantum-curve-card.js"
 _CARD_REGISTERED = False
+_SUMMARY_VIEW_REGISTERED = False
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Register the bundled Lovelace card asset once per Home Assistant run.
+    """Register the card asset and the summary download once per HA run.
 
     The card is enabled by adding a Lovelace resource pointing at
-    ``_CARD_URL_PATH``; this only serves the JavaScript module. Registration is
-    best-effort and must never block config-entry setup.
+    ``_CARD_URL_PATH``; this only serves the JavaScript module. The summary view
+    (``SUMMARY_URL``) serves the same opt-in payload the export service writes,
+    for logged-in users only. Both are best-effort and must never block
+    config-entry setup.
     """
-    global _CARD_REGISTERED
-    if _CARD_REGISTERED:
-        return True
+    global _CARD_REGISTERED, _SUMMARY_VIEW_REGISTERED
     components = getattr(getattr(hass, "config", None), "components", None)
     if not isinstance(
         components, (set, frozenset, list, tuple)
     ) or "http" not in components:
+        return True
+    if not _SUMMARY_VIEW_REGISTERED:
+        # The opt-in summary download; authenticated, so no token in the URL.
+        try:
+            hass.http.register_view(QvantumSummaryView())
+            _SUMMARY_VIEW_REGISTERED = True
+        except Exception as err:  # noqa: BLE001 — never block setup on a view
+            _LOGGER.debug("Could not register the Qvantum summary view: %s", err)
+    if _CARD_REGISTERED:
         return True
     card_path = Path(__file__).parent / "www" / "qvantum-curve-card.js"
     if not card_path.is_file():

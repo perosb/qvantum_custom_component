@@ -27,10 +27,20 @@ from collections.abc import Mapping
 from datetime import date
 from typing import Any
 
+from aiohttp import web
+from homeassistant.components.http import HomeAssistantView
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN
+from .const import DOMAIN, VERSION
 from .statistics import INDOOR_METRIC_KEYS
+
+#: Where the summary can be downloaded while logged in. The browser session
+#: carries the auth, so no token travels in the URL.
+SUMMARY_URL = "/api/qvantum/summary"
+
+#: The download's filename.
+SUMMARY_FILENAME = "qvantum_summary.json"
 
 #: Characters allowed in the few strings that travel. Device metadata and our own
 #: enum-ish values only: nothing is ever copied from the values payload as text
@@ -234,6 +244,60 @@ def fitted_summary(snapshot: Any) -> dict[str, Any]:
         )
         for key in FITTED_EFFICIENCY_KEYS
     }
+
+
+async def async_build_summary(hass: HomeAssistant) -> dict[str, Any] | None:
+    """Build the summary for the configured entry, or ``None`` when unset.
+
+    Shared by the service and the download view, so the written file, the
+    service response and the download cannot drift apart.
+    """
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        runtime = getattr(entry, "runtime_data", None)
+        coordinator = getattr(runtime, "coordinator", None)
+        if coordinator is None:
+            continue
+        device_id = getattr(coordinator, "device_id", None)
+        data = coordinator.data if isinstance(coordinator.data, dict) else {}
+        values = data.get("values") if isinstance(data.get("values"), dict) else {}
+        efficiency = getattr(runtime, "efficiency_coordinator", None)
+        return build_summary(
+            version=VERSION,
+            transport=(
+                "modbus" if getattr(coordinator, "modbus_enabled", False) else "cloud"
+            ),
+            device=device_metadata(hass, str(device_id)) if device_id else None,
+            values=values,
+            curve=getattr(runtime, "curve_coordinator", None),
+            efficiency=getattr(efficiency, "data", None),
+        )
+    return None
+
+
+class QvantumSummaryView(HomeAssistantView):
+    """Serve the opt-in summary as a download, for logged-in users only."""
+
+    url = SUMMARY_URL
+    name = "api:qvantum:summary"
+    requires_auth = True
+
+    async def get(self, request: web.Request) -> web.Response:
+        """Return the same payload the service writes, as an attachment."""
+        summary = await async_build_summary(request.app["hass"])
+        if summary is None:
+            return web.json_response(
+                {
+                    "exception": "not_loaded",
+                    "details": "The Qvantum integration is not set up",
+                },
+                status=404,
+            )
+        return web.json_response(
+            summary,
+            headers={
+                "Content-Disposition": f'attachment; filename="{SUMMARY_FILENAME}"'
+            },
+        )
 
 
 def build_summary(

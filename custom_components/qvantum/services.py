@@ -11,13 +11,14 @@ from .client.exceptions import (
     APIConnectionError,
     APIRateLimitError,
 )
-from .const import DOMAIN, VERSION
-from .summary import build_summary, device_metadata
+from .const import DOMAIN
+from .summary import (
+    SUMMARY_FILENAME,
+    SUMMARY_URL,
+    async_build_summary,
+)
 
 _LOGGER = logging.getLogger(__name__)
-
-#: Where ``qvantum.export_summary`` writes the opt-in summary (config directory).
-SUMMARY_FILENAME = "qvantum_summary.json"
 
 
 def _normalize_device_id(value: Any) -> str:
@@ -70,52 +71,35 @@ def _write_summary_file(path: str, payload: dict[str, Any]) -> None:
 async def async_export_summary(service_call: ServiceCall) -> Any:
     """Write the opt-in summary to a file and return it.
 
-    The summary carries device metadata, the control-loop settings, the
-    identified parameters and (later) the verdicts. It is built by whitelist, so
-    entity ids, names, coordinates and raw series cannot travel — see
-    ``summary.py`` and the README's field list. Nothing is sent anywhere: this
-    service only writes a file and returns the same payload.
+    The same payload is downloadable at ``SUMMARY_URL`` while logged in, so the
+    file is a convenience rather than the only way out. It carries device
+    metadata, the control-loop settings and the identified parameters; entity
+    ids, names, coordinates and raw series cannot travel — see ``summary.py``.
+    Nothing is sent anywhere and no issue is opened for the user.
     """
     hass = service_call.hass
-    for entry in hass.config_entries.async_entries(DOMAIN):
-        runtime = getattr(entry, "runtime_data", None)
-        coordinator = getattr(runtime, "coordinator", None)
-        if coordinator is None:
-            continue
-        device_id = getattr(coordinator, "device_id", None)
-        data = coordinator.data if isinstance(coordinator.data, dict) else {}
-        values = data.get("values") if isinstance(data.get("values"), dict) else {}
-        efficiency = getattr(runtime, "efficiency_coordinator", None)
-        summary = build_summary(
-            version=VERSION,
-            transport=(
-                "modbus" if getattr(coordinator, "modbus_enabled", False) else "cloud"
-            ),
-            # The registry is only needed once there is something to export.
-            device=device_metadata(hass, str(device_id)) if device_id else None,
-            values=values,
-            curve=getattr(runtime, "curve_coordinator", None),
-            efficiency=getattr(efficiency, "data", None),
-        )
-        path = hass.config.path(SUMMARY_FILENAME)
-        try:
-            await hass.async_add_executor_job(_write_summary_file, path, summary)
-        except OSError as err:
-            _LOGGER.warning("Could not write the summary to %s: %s", path, err)
-            return {
-                "qvantum": {
-                    "summary": summary,
-                    "exception": "write_failed",
-                    "details": str(err),
-                }
+    summary = await async_build_summary(hass)
+    if summary is None:
+        return {
+            "qvantum": {
+                "exception": "not_loaded",
+                "details": "The Qvantum integration is not set up",
             }
-        return {"qvantum": {"summary": summary, "path": path}}
-    return {
-        "qvantum": {
-            "exception": "not_loaded",
-            "details": "The Qvantum integration is not set up",
         }
-    }
+    path = hass.config.path(SUMMARY_FILENAME)
+    try:
+        await hass.async_add_executor_job(_write_summary_file, path, summary)
+    except OSError as err:
+        _LOGGER.warning("Could not write the summary to %s: %s", path, err)
+        return {
+            "qvantum": {
+                "summary": summary,
+                "url": SUMMARY_URL,
+                "exception": "write_failed",
+                "details": str(err),
+            }
+        }
+    return {"qvantum": {"summary": summary, "path": path, "url": SUMMARY_URL}}
 
 
 def _find_curve_coordinator(hass: HomeAssistant):
