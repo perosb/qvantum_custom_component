@@ -709,6 +709,8 @@ class TestQvantumCurveSensors:
                 baseline_outdoor_min_c=-7.5,
                 baseline_outdoor_max_c=12.0,
                 room_gain_c=8.6,
+                indoor_margin_c=0.4,
+                indoor_cap_armed=True,
                 extrapolated_points=("curve_30", "curve_minus_30"),
             )
         )
@@ -721,6 +723,8 @@ class TestQvantumCurveSensors:
         assert attributes["baseline_outdoor_min_c"] == -7.5
         assert attributes["baseline_outdoor_max_c"] == 12.0
         assert attributes["room_gain_c_per_c"] == 8.6
+        assert attributes["indoor_cap_armed"] is True
+        assert attributes["indoor_margin_c"] == 0.4
         assert attributes["extrapolated_points"] == ["curve_30", "curve_minus_30"]
 
     def test_deviation_sensor_unavailable_without_value(self, mock_device):

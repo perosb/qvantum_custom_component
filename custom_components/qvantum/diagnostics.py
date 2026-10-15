@@ -352,6 +352,10 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "solar_c": getattr(snapshot, "solar_c", None),
         "load_c": getattr(snapshot, "load_c", None),
         "capped_by_indoor": getattr(snapshot, "capped_by_indoor", None),
+        # The cap needs a fresh indoor reading: without one it is inert and the
+        # curve has no warm-house brake, which a support dump should show.
+        "indoor_margin_c": getattr(snapshot, "indoor_margin_c", None),
+        "indoor_cap_armed": getattr(snapshot, "indoor_cap_armed", None),
         "clamped": getattr(snapshot, "clamped", None),
         "deviation_c": getattr(snapshot, "deviation_c", None),
         "ready": getattr(snapshot, "ready", None),

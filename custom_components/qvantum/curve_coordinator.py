@@ -237,6 +237,12 @@ class CurveSnapshot:
     room_error_source: str | None = None
     cop_c: float = 0.0
     precharge_c: float = 0.0
+    #: The air-side margin the indoor cap acts on (mean room error over the
+    #: last 24 h) and whether it exists at all: without a fresh indoor reading
+    #: the cap is inert, so a warm house cannot veto a raise and nothing brakes
+    #: the curve when the house is warm.
+    indoor_margin_c: float | None = None
+    indoor_cap_armed: bool = False
 
 
 def freeze_baseline(settings: Mapping[str, Any]) -> dict[str, float] | None:
@@ -2166,6 +2172,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             room_error_p90_abs_c=None if room is None else room.p90_abs_c,
             room_error_samples=0 if room is None else room.samples,
             room_error_source=room_source,
+            indoor_margin_c=indoor_margin,
+            indoor_cap_armed=indoor_margin is not None,
             model=self._model,
             daily_model=self._daily_model,
             calibrated_at=self._calibrated_at,
