@@ -374,6 +374,9 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "room_gain": getattr(coordinator, "_room_gain", None),
         "room_gain_source": getattr(coordinator, "_room_gain_source", None),
         "room_gain_factor": getattr(coordinator, "_room_gain_factor", None),
+        "room_gain_from_factor": bool(
+            getattr(coordinator, "_room_gain_from_factor", False)
+        ),
         # Hours behind each point's trim; 0 means the trim is deliberately 0.
         "trim_evidence": dict(getattr(coordinator, "_trim_evidence", None) or {}),
         "room_error": _curve_room_error_diagnostics(snapshot),

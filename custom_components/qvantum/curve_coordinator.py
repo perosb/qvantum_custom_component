@@ -578,6 +578,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._room_gain_source: str | None = None
         # The pump's own ``room_comp_factor`` as last seen, for diagnostics.
         self._room_gain_factor: float | None = None
+        # Whether ``_room_gain`` came from that factor: a factor that turns
+        # unusable must drop the gain it set rather than leave it applied.
+        self._room_gain_from_factor = False
         self._clamped_state = False
         self._forecast: WeatherForecast | None = None
         self._forecast_ok = False
@@ -655,6 +658,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "baseline_stats": self._baseline_stats,
             "room_gain": self._room_gain,
             "room_gain_source": self._room_gain_source,
+            "room_gain_from_factor": self._room_gain_from_factor,
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "mode": self._mode,
             "revert_pending": self._revert_pending,
@@ -762,6 +766,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         room_gain_source = data.get("room_gain_source")
         if room_gain_source in INDOOR_METRIC_KEYS:
             self._room_gain_source = str(room_gain_source)
+        self._room_gain_from_factor = bool(data.get("room_gain_from_factor", False))
         margins = data.get("indoor_margins")
         if isinstance(margins, list):
             for item in margins:
@@ -1488,11 +1493,17 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         follows the pump when the setting changes.
         """
         configured = self._configured_room_gain(values)
-        if configured is None:
+        if configured is not None:
+            await self._async_store_room_gain(
+                *configured, label="the pump's configured factor", from_factor=True
+            )
             return
-        await self._async_store_room_gain(
-            *configured, label="the pump's configured factor"
-        )
+        if self._room_gain_from_factor:
+            # The factor is gone or unusable, so the pump no longer applies a
+            # room term. Keeping last cycle's number would subtract one anyway
+            # — and while the curve is active the Auto-hour fit never runs to
+            # replace it, so it would stay wrong indefinitely.
+            await self._async_clear_room_gain()
 
     def _configured_room_gain(
         self, values: Mapping[str, Any]
@@ -1517,15 +1528,28 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return None if key is None else (gain, key)
 
     async def _async_store_room_gain(
-        self, gain: float, source: str, *, label: str
+        self, gain: float, source: str, *, label: str, from_factor: bool = False
     ) -> None:
-        if gain == self._room_gain and source == self._room_gain_source:
+        if (
+            gain == self._room_gain
+            and source == self._room_gain_source
+            and from_factor == self._room_gain_from_factor
+        ):
             return
         self._room_gain = gain
         self._room_gain_source = source
+        self._room_gain_from_factor = from_factor
         _LOGGER.info(
             "Room-compensation gain %.2f °C/°C for %s from %s", gain, source, label
         )
+        await self._async_persist()
+
+    async def _async_clear_room_gain(self) -> None:
+        """Drop the stored gain: an unusable factor means no correction."""
+        self._room_gain = None
+        self._room_gain_source = None
+        self._room_gain_from_factor = False
+        _LOGGER.info("Room-compensation gain dropped: no usable pump factor")
         await self._async_persist()
 
     async def _async_room_gain(self) -> tuple[float, str] | None:

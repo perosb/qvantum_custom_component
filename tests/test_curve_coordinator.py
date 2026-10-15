@@ -129,6 +129,7 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._room_gain = None
     coordinator._room_gain_source = None
     coordinator._room_gain_factor = None
+    coordinator._room_gain_from_factor = False
     coordinator._clamped_state = False
     coordinator._forecast = None
     coordinator._forecast_ok = False
@@ -672,6 +673,43 @@ async def test_a_mode_without_an_indoor_reading_has_no_gain() -> None:
     assert coordinator._room_gain is None
 
 
+async def test_an_unusable_factor_drops_the_gain_it_set() -> None:
+    """A factor that turns unusable must not leave its gain applied.
+
+    While the curve is active the Auto-hour fit never runs, so a stale gain
+    would stay wrong for as long as the curve runs.
+    """
+    coordinator = make_coordinator(values=configured_values(), settings=SETTINGS)
+    coordinator._async_persist = AsyncMock()
+    await coordinator._async_sync_room_gain(coordinator._main_values())
+    assert coordinator._room_gain == pytest.approx(5.0)
+    assert coordinator._room_gain_from_factor is True
+
+    # The user zeroes the factor in the app.
+    coordinator._main.data["values"]["room_comp_factor"] = 0.0
+    await coordinator._async_sync_room_gain(coordinator._main_values())
+
+    assert coordinator._room_gain is None
+    assert coordinator._room_gain_source is None
+    assert coordinator._room_gain_from_factor is False
+
+
+async def test_an_unusable_factor_keeps_a_fitted_gain() -> None:
+    """The fallback fit owns the gain when the pump has no factor at all."""
+    coordinator = make_coordinator(
+        values=configured_values(factor=None), settings=SETTINGS
+    )
+    coordinator._async_room_gain = AsyncMock(return_value=(3.0, "bt2"))
+    coordinator._async_persist = AsyncMock()
+    await coordinator._async_refresh_room_gain(coordinator._main_values())
+    assert coordinator._room_gain == pytest.approx(3.0)
+
+    await coordinator._async_sync_room_gain(coordinator._main_values())
+
+    assert coordinator._room_gain == pytest.approx(3.0)
+    assert coordinator._room_gain_source == "bt2"
+
+
 async def test_a_configured_factor_is_not_overwritten_by_the_fit() -> None:
     """The Auto-hour fit is the fallback, not a competitor."""
     with_factor = make_coordinator(values=configured_values(), settings=SETTINGS)
@@ -696,15 +734,24 @@ async def test_a_configured_factor_is_not_overwritten_by_the_fit() -> None:
 
 
 async def test_active_start_round_trips_through_the_store() -> None:
-    store = FakeStore({"active_since_ts": 1758794400.0, "last_active_ts": None})
+    store = FakeStore(
+        {
+            "active_since_ts": 1758794400.0,
+            "last_active_ts": None,
+            "room_gain": 5.0,
+            "room_gain_source": "room_temp_external",
+            "room_gain_from_factor": True,
+        }
+    )
     coordinator = make_coordinator(store=store)
 
     await coordinator.async_restore()
 
     assert coordinator._active_since_ts == pytest.approx(1758794400.0)
-    assert coordinator._state_payload()["active_since_ts"] == pytest.approx(
-        1758794400.0
-    )
+    assert coordinator._room_gain_from_factor is True
+    payload = coordinator._state_payload()
+    assert payload["active_since_ts"] == pytest.approx(1758794400.0)
+    assert payload["room_gain_from_factor"] is True
 
 
 async def test_activation_records_when_the_pump_started_following_us() -> None:

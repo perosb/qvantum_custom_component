@@ -189,10 +189,13 @@ compensating pump closely enough to become `ready`.
 setting of the same name) *is* that factor, so it is read rather than fitted:
 measured on a live pump, 5.0 configured against 5.08 fitted from active hours.
 An absent, zero, non-finite or out-of-range factor, or a `sensor_mode` with no
-indoor reading at all, means **no** correction — never a guessed number — and
-the gain then falls back to a fit over observed Auto hours (residual against
-both outdoor and the room error), which is what an installation without a
-usable factor still gets. Whether configured or fitted, the gain **travels with
+indoor reading at all, means **no** correction — never a guessed number. A
+factor that *becomes* unusable (the user zeroes it) drops the gain it set
+rather than leaving it applied: while the curve is active the fit never runs,
+so a stale number would stay wrong for as long as the curve does. Otherwise the
+gain falls back to a fit over observed Auto hours (residual against both
+outdoor and the room error), which is what an installation without a usable
+factor still gets. Whether configured or fitted, the gain **travels with
 the indoor sensor it belongs to**: if the payload reports a different sensor the
 correction is skipped rather than subtracting one sensor's room term from
 another's error. It is persisted and exposed as `room_gain_c_per_c` on the
