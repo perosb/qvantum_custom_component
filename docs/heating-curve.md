@@ -368,7 +368,12 @@ only act while the curve is active. Enable them with
   hours (the minimum over that horizon, not the last hour). It is one-sided
   upward and skipped when the previous cycle was already capped or at the
   positive total clamp; the indoor cap remains the final veto for a warm
-  house and the pump's max supply bounds every point.
+  house and the pump's max supply bounds every point. The cap needs a **fresh
+  indoor reading** to act at all: it is fed from the room error and keeps 24 h
+  of samples, so without an indoor sensor (`sensor_mode` DISABLED / BT3 / AUX)
+  it is inert and nothing brakes the curve in a warm house. The diagnostics
+  report `indoor_cap_armed` (and `indoor_margin_c`) so that state is visible
+  rather than inferred from a warm room.
 
 ### Solar model
 

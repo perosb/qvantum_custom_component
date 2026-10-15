@@ -2292,6 +2292,38 @@ async def test_snapshot_deviation_removes_room_term() -> None:
     assert snapshot.room_gain_c == pytest.approx(9.0)
 
 
+async def test_snapshot_arms_the_indoor_cap_with_a_room_reading() -> None:
+    """The cap can only brake the curve when an indoor reading exists."""
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.indoor_cap_armed is True
+    # BT2 reads 21.0 and the target is 21.0.
+    assert snapshot.indoor_margin_c == pytest.approx(0.0)
+
+
+async def test_snapshot_leaves_the_indoor_cap_inert_without_a_reading() -> None:
+    """No indoor sensor means no warm-house brake at all, and it is reported."""
+    values = {**VALUES, "bt2": None, "sensor_mode": 0}
+    coordinator = make_coordinator(values=values, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.indoor_cap_armed is False
+    assert snapshot.indoor_margin_c is None
+
+
 async def test_snapshot_deviation_keeps_the_room_term_while_on_auto() -> None:
     """The pump's own curve already holds the term there."""
     values = {

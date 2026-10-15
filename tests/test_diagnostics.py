@@ -116,6 +116,8 @@ def _curve_coordinator() -> SimpleNamespace:
         room_error_p90_abs_c=1.4,
         room_error_samples=96,
         room_error_source="room_temp_external",
+        indoor_margin_c=0.4,
+        indoor_cap_armed=True,
     )
     return SimpleNamespace(
         data=snapshot,
@@ -515,6 +517,9 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["model_daily"]["b_jackknife_min_m2"] == 1.5
     assert curve["calibrated_at"] == "2026-09-25T10:00:00+00:00"
     assert curve["calibration_ok"] is False
+    # Whether the warm-house brake can act at all.
+    assert curve["indoor_cap_armed"] is True
+    assert curve["indoor_margin_c"] == 0.4
     assert curve["timestamps"]["last_trim_ts"] == 1758794400.0
     assert curve["timestamps"]["last_active_ts"] is None
     # Without the start of the active period the readiness window cannot tell

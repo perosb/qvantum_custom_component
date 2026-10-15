@@ -955,6 +955,10 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             "baseline_outdoor_min_c": snapshot.baseline_outdoor_min_c,
             "baseline_outdoor_max_c": snapshot.baseline_outdoor_max_c,
             "room_gain_c_per_c": snapshot.room_gain_c,
+            # The indoor cap needs a fresh indoor reading to act at all; False
+            # means a warm house cannot veto a raise (no indoor sensor).
+            "indoor_cap_armed": snapshot.indoor_cap_armed,
+            "indoor_margin_c": snapshot.indoor_margin_c,
             # The baseline was only observed between the two temperatures
             # above; these points are extrapolated from the cached table, so
             # readiness says nothing about them yet.
