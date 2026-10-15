@@ -8,8 +8,10 @@ from types import SimpleNamespace
 import pytest
 
 from custom_components.qvantum.curve_coordinator import CURVE_KEYS
+from custom_components.qvantum.client.modbus.maps import MODBUS_HOLDING_TO_SETTINGS_MAP
 from custom_components.qvantum.summary import (
     FITTED_EFFICIENCY_KEYS,
+    MODBUS_ONLY_PLANT_KEYS,
     PLANT_KEYS,
     SUMMARY_SCHEMA_VERSION,
     build_summary,
@@ -142,6 +144,34 @@ def test_summary_never_carries_an_identifier() -> None:
         assert not text.startswith(
             ("sensor.", "binary_sensor.", "climate.", "switch.", "number.", "select.")
         )
+
+
+def test_plant_keys_are_canonical_setting_names() -> None:
+    """A raw holding-register key exports as null on every cloud installation."""
+    canonical = set(MODBUS_HOLDING_TO_SETTINGS_MAP.values())
+
+    for key in PLANT_KEYS:
+        assert key in canonical, f"{key} is not a canonical setting name"
+    # Modbus-only fields are declared, not silently promised.
+    assert set(MODBUS_ONLY_PLANT_KEYS) <= set(PLANT_KEYS)
+
+
+def test_a_cloud_payload_leaves_the_supply_limits_null() -> None:
+    """The cloud API does not expose them; a null is the honest answer."""
+    cloud_values = {
+        "sensor_mode": 4,
+        "room_comp_factor": 5.0,
+        "curve_type_heating": 1,
+        "indoor_temperature_offset": 0,
+        "tap_water_start": 45,
+        "tap_water_stop": 50,
+        "stop_heating": 17,
+    }
+
+    plant = plant_summary(cloud_values)
+
+    assert plant["indoor_temperature_offset"] == 0
+    assert plant["max_heating_supply"] is None
 
 
 def test_plant_carries_only_the_whitelisted_settings() -> None:

@@ -59,16 +59,25 @@ SUMMARY_SCHEMA_VERSION = 1
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
+#: Canonical setting names, **not** the raw holding-register keys: the cloud
+#: settings API only speaks the canonical names, so a raw key exports as null for
+#: every cloud installation (``heating_offset`` versus
+#: ``indoor_temperature_offset``). ``test_summary.py`` asserts the whitelist only
+#: contains names that are canonical in ``MODBUS_HOLDING_TO_SETTINGS_MAP``.
 PLANT_KEYS: tuple[str, ...] = (
     "sensor_mode",
     "room_comp_factor",
     "curve_type_heating",
-    "heating_offset",
+    "indoor_temperature_offset",
     "tap_water_start",
     "tap_water_stop",
     "max_heating_supply",
     "stop_heating",
 )
+
+#: The pump's own supply limits are Modbus-only: the cloud API does not expose
+#: them, so those fields are legitimately ``None`` on a cloud export.
+MODBUS_ONLY_PLANT_KEYS: tuple[str, ...] = ("max_heating_supply",)
 
 #: Identified building/envelope figures, straight off the efficiency snapshot.
 FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (
