@@ -121,12 +121,14 @@ def make_coordinator(*, values=None, settings=None, store=None):
     # Throttle baseline learning off by default; dedicated tests re-enable it.
     coordinator._last_baseline_learn_ts = float("inf")
     coordinator._last_active_ts = None
+    coordinator._active_since_ts = None
     coordinator._trims = {}
     coordinator._trim_evidence = {}
     coordinator._last_trim_ts = None
     coordinator._baseline_stats = None
     coordinator._room_gain = None
     coordinator._room_gain_source = None
+    coordinator._room_gain_factor = None
     coordinator._clamped_state = False
     coordinator._forecast = None
     coordinator._forecast_ok = False
@@ -516,6 +518,9 @@ async def test_readiness_room_correction_requires_the_matching_sensor() -> None:
         coordinator._baseline = dict(BASELINE)
         coordinator._room_gain = 9.0
         coordinator._room_gain_source = source
+        # Inside an active segment: the correction is only valid there.
+        coordinator._mode = "active"
+        coordinator._active_since_ts = 0.0
         coordinator._resolve_statistic_ids = MagicMock(
             return_value={
                 "bt1": "sensor.t",
@@ -546,12 +551,179 @@ async def test_readiness_room_correction_requires_the_matching_sensor() -> None:
     assert series[100] == pytest.approx(36.0 - 40.0)
 
 
+async def test_readiness_room_correction_only_inside_active_segments() -> None:
+    """Only hours the pump followed our table carry the room term.
+
+    On Auto hours the pump's own control already holds it and the learned
+    baseline was fitted to that, so subtracting the gain there double-counts:
+    measured on the live pump 2026-10-15, applying it to every readiness hour
+    moved the median from 1.17 °C to 2.67 °C (gate failure) while the active
+    hours alone gave 1.08 °C (pass).
+    """
+    values = {**VALUES, "sensor_mode": 4, "indoor_temperature_target": 20.0}
+    hours = [100 + index * 3600 for index in range(cc.INDOOR_METRIC_MIN_HOURS)]
+    raw = pytest.approx(36.0 - 40.0)
+    corrected = pytest.approx(36.0 - 40.0 - 9.0 * 1.0)
+
+    def build(*, active_since, last_active):
+        coordinator = make_coordinator(values=values, settings=SETTINGS)
+        coordinator._baseline = dict(BASELINE)
+        coordinator._room_gain = 9.0
+        coordinator._room_gain_source = "bt2"
+        coordinator._active_since_ts = active_since
+        coordinator._last_active_ts = last_active
+        coordinator._resolve_statistic_ids = MagicMock(
+            return_value={
+                "bt1": "sensor.t",
+                "cal_heat_temp": "sensor.s",
+                "heatingpower": "sensor.q",
+                "bt2": "sensor.i",
+            }
+        )
+        coordinator._async_statistics = AsyncMock(
+            return_value={
+                "sensor.t": [{"start": ts, "mean": 10.0} for ts in hours],
+                "sensor.s": [{"start": ts, "mean": 40.0} for ts in hours],
+                "sensor.q": [{"start": ts, "mean": 900.0} for ts in hours],
+                "sensor.i": [{"start": ts, "mean": 21.0} for ts in hours],
+            }
+        )
+        return coordinator
+
+    async def first(*, active_since, last_active):
+        series, _ = await build(
+            active_since=active_since, last_active=last_active
+        )._async_readiness_hours()
+        return series[hours[0]]
+
+    # Never activated: every hour is Auto, exactly like today's behaviour.
+    assert await first(active_since=None, last_active=None) == raw
+    # Activated after these hours: they are still Auto hours.
+    assert await first(active_since=hours[-1] + 3600, last_active=None) == raw
+    # Inside the last active segment: the room term is removed.
+    assert (
+        await first(active_since=hours[0] - 1, last_active=hours[-1] + 1)
+        == corrected
+    )
+    # Deactivated before these hours: Auto again.
+    assert (
+        await first(active_since=hours[0] - 7200, last_active=hours[0] - 1) == raw
+    )
+
+
 async def test_restore_keeps_a_known_room_gain_source() -> None:
     store = FakeStore({"room_gain": 9.0, "room_gain_source": "bt2"})
     coordinator = make_coordinator(store=store)
     await coordinator.async_restore()
     assert coordinator._room_gain == pytest.approx(9.0)
     assert coordinator._room_gain_source == "bt2"
+
+
+def configured_values(*, factor=5.0, **overrides):
+    values = {
+        **VALUES,
+        "sensor_mode": 4,
+        "room_temp_external": 20.6,
+        "indoor_temperature_target": 20.1,
+        **overrides,
+    }
+    if factor is not None:
+        values["room_comp_factor"] = factor
+    return values
+
+
+async def test_the_pumps_own_factor_is_the_gain() -> None:
+    """The pump applies ``cal = table − factor · (room − target)``."""
+    coordinator = make_coordinator(values=configured_values(), settings=SETTINGS)
+    coordinator._async_persist = AsyncMock()
+
+    await coordinator._async_sync_room_gain(coordinator._main_values())
+
+    assert coordinator._room_gain == pytest.approx(5.0)
+    assert coordinator._room_gain_source == "room_temp_external"
+    assert coordinator._room_gain_factor == pytest.approx(5.0)
+
+
+@pytest.mark.parametrize("factor", [None, 0.0, -2.0, float("nan"), float("inf"), 99.0])
+async def test_an_unusable_factor_never_invents_a_correction(factor) -> None:
+    """Missing, zero, non-finite or absurd: no correction, as before."""
+    coordinator = make_coordinator(
+        values=configured_values(factor=factor), settings=SETTINGS
+    )
+    coordinator._async_persist = AsyncMock()
+
+    await coordinator._async_sync_room_gain(coordinator._main_values())
+
+    assert coordinator._room_gain is None
+    assert coordinator._room_gain_source is None
+
+
+async def test_a_mode_without_an_indoor_reading_has_no_gain() -> None:
+    """No reading means no room term, whatever the factor says."""
+    coordinator = make_coordinator(
+        values=configured_values(sensor_mode=0, bt2=None), settings=SETTINGS
+    )
+    coordinator._async_persist = AsyncMock()
+
+    await coordinator._async_sync_room_gain(coordinator._main_values())
+
+    # The factor is reported, but nothing is applied.
+    assert coordinator._room_gain_factor == pytest.approx(5.0)
+    assert coordinator._room_gain is None
+
+
+async def test_a_configured_factor_is_not_overwritten_by_the_fit() -> None:
+    """The Auto-hour fit is the fallback, not a competitor."""
+    with_factor = make_coordinator(values=configured_values(), settings=SETTINGS)
+    with_factor._async_room_gain = AsyncMock(return_value=(3.0, "bt2"))
+    with_factor._async_persist = AsyncMock()
+
+    await with_factor._async_refresh_room_gain(with_factor._main_values())
+
+    assert with_factor._async_room_gain.await_count == 0
+    assert with_factor._room_gain is None
+
+    without_factor = make_coordinator(
+        values=configured_values(factor=None), settings=SETTINGS
+    )
+    without_factor._async_room_gain = AsyncMock(return_value=(3.0, "bt2"))
+    without_factor._async_persist = AsyncMock()
+
+    await without_factor._async_refresh_room_gain(without_factor._main_values())
+
+    assert without_factor._room_gain == pytest.approx(3.0)
+    assert without_factor._room_gain_source == "bt2"
+
+
+async def test_active_start_round_trips_through_the_store() -> None:
+    store = FakeStore({"active_since_ts": 1758794400.0, "last_active_ts": None})
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator._active_since_ts == pytest.approx(1758794400.0)
+    assert coordinator._state_payload()["active_since_ts"] == pytest.approx(
+        1758794400.0
+    )
+
+
+async def test_activation_records_when_the_pump_started_following_us() -> None:
+    """``_last_active_ts`` alone cannot say which hours were ours."""
+    coordinator = make_coordinator()
+    assert coordinator._active_since_ts is None
+
+    coordinator._mark_active_started()
+
+    assert isinstance(coordinator._active_since_ts, float)
+    assert coordinator._in_active_segment(time.time()) is False
+    coordinator._mode = "active"
+    assert coordinator._in_active_segment(time.time()) is True
+    assert coordinator._in_active_segment(coordinator._active_since_ts - 60) is False
+
+    coordinator._mode = "shadow"
+    coordinator._last_active_ts = coordinator._active_since_ts + 3600
+    assert coordinator._in_active_segment(coordinator._active_since_ts + 60) is True
+    assert coordinator._in_active_segment(coordinator._active_since_ts + 7200) is False
 
     # An unknown key is ignored rather than carried into the correction.
     for payload in ("nope", 4, None, True):
@@ -2001,6 +2173,38 @@ async def test_snapshot_forecast_failure_blocks_and_falls_back() -> None:
 
 
 async def test_snapshot_deviation_removes_room_term() -> None:
+    """Active hours are the only ones where the term means the same thing."""
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}, live_curve_type=1
+    )
+    coordinator._main.data["values"].update(
+        {
+            "sensor_mode": 4,
+            "room_temp_external": 20.6,
+            "indoor_temperature_target": 20.1,
+        }
+    )
+    coordinator._baseline = dict(BASELINE)
+    coordinator._room_gain = 9.0
+    coordinator._room_gain_source = "room_temp_external"
+    coordinator._mode = "active"
+    coordinator._active_since_ts = time.time() - 3600
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._daylight = MagicMock(return_value=None)
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        snapshot = await coordinator._async_compute_snapshot()
+
+    # Raw deviation is 36.0 − 37.0; the 0.5 °C room error at 9 °C/°C is removed.
+    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.5)
+    assert snapshot.room_gain_c == pytest.approx(9.0)
+
+
+async def test_snapshot_deviation_keeps_the_room_term_while_on_auto() -> None:
+    """The pump's own curve already holds the term there."""
     values = {
         **VALUES,
         "sensor_mode": 4,
@@ -2011,6 +2215,9 @@ async def test_snapshot_deviation_removes_room_term() -> None:
     coordinator._baseline = dict(BASELINE)
     coordinator._room_gain = 9.0
     coordinator._room_gain_source = "room_temp_external"
+    # Activation is on record, but the pump was put back on Auto later.
+    coordinator._active_since_ts = time.time() - 7200
+    coordinator._last_active_ts = time.time() - 3600
     coordinator._async_calibrate = AsyncMock()
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
     coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
@@ -2018,9 +2225,7 @@ async def test_snapshot_deviation_removes_room_term() -> None:
 
     snapshot = await coordinator._async_compute_snapshot()
 
-    # Raw deviation is 36.0 − 37.0; the 0.5 °C room error at 9 °C/°C is removed.
-    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.5)
-    assert snapshot.room_gain_c == pytest.approx(9.0)
+    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0)
 
 
 async def test_snapshot_deviation_skips_a_gain_from_another_sensor() -> None:
@@ -2238,6 +2443,8 @@ async def test_activate_writes_points_offset_then_curve_type() -> None:
         await coordinator.async_set_control_mode("active")
 
     assert coordinator.active
+    # The room correction may only touch hours from here on.
+    assert isinstance(coordinator._active_since_ts, float)
     point_calls = client.set_heating_curve_point.call_args_list
     assert [call.args[1] for call in point_calls] == list(BASELINE)
     assert [call.args[2] for call in point_calls] == [int(v) for v in BASELINE.values()]

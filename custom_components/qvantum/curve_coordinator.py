@@ -40,6 +40,7 @@ from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_res
 from .heating_curve import (
     MAX_SUPPLY_C,
     MIN_SUPPLY_C,
+    ROOM_GAIN_MAX_C,
     TOTAL_MAX_C,
     TRIM_MAX_C,
     DayPhase,
@@ -568,12 +569,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._last_calibration_ok: bool | None = None
         self._last_baseline_learn_ts: float | None = None
         self._last_active_ts: float | None = None
+        self._active_since_ts: float | None = None
         self._trims: dict[str, float] = {}
         self._trim_evidence: dict[str, int] = {}
         self._last_trim_ts: float | None = None
         self._baseline_stats: dict[str, Any] | None = None
         self._room_gain: float | None = None
         self._room_gain_source: str | None = None
+        # The pump's own ``room_comp_factor`` as last seen, for diagnostics.
+        self._room_gain_factor: float | None = None
         self._clamped_state = False
         self._forecast: WeatherForecast | None = None
         self._forecast_ok = False
@@ -645,6 +649,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "calibrated_ts": self._last_calibration_ts,
             "calibration_ok": self._last_calibration_ok,
             "last_active_ts": self._last_active_ts,
+            "active_since_ts": self._active_since_ts,
             "trims": dict(self._trims),
             "trim_evidence": dict(self._trim_evidence),
             "baseline_stats": self._baseline_stats,
@@ -661,6 +666,16 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             },
             "terms": dict(self._terms),
         }
+
+    def _mark_active_started(self) -> None:
+        """Record when the pump started following our table.
+
+        ``_last_active_ts`` marks the end of an active period; without the
+        start the readiness window cannot tell hours where ``cal_heat_temp``
+        followed our own table from hours where it followed the pump's, and the
+        room correction is only valid on the former.
+        """
+        self._active_since_ts = dt_util.utcnow().timestamp()
 
     def _mark_active_ended(self) -> None:
         """Record when the pump last stopped following our table.
@@ -717,6 +732,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             last_active_ts, bool
         ):
             self._last_active_ts = float(last_active_ts)
+        active_since_ts = data.get("active_since_ts")
+        if isinstance(active_since_ts, (int, float)) and not isinstance(
+            active_since_ts, bool
+        ):
+            self._active_since_ts = float(active_since_ts)
         trims = data.get("trims")
         if isinstance(trims, dict):
             for key, value in trims.items():
@@ -949,6 +969,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             int(HeatingCurveType.USER_DEFINED),
         )
         self._mode = "active"
+        self._mark_active_started()
         # A latch from an earlier failed revert is obsolete once the pump
         # follows our table again; keeping it would write 22 back to Auto on
         # the next cycle and silently undo this activation.
@@ -1379,7 +1400,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             if power_id and power.get(ts, 0.0) < MIN_SAMPLE_Q_W:
                 continue
             value = interpolate_supply(points, outdoor[ts]) - supply[ts]
-            if target_c is not None and ts in indoor:
+            if target_c is not None and ts in indoor and self._in_active_segment(ts):
                 value = room_corrected_deviation(
                     value, self._gain_for(indoor_key), indoor[ts] - target_c
                 )
@@ -1457,6 +1478,56 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             observations.append((outdoor[ts], supply[ts]))
         return observations
 
+    async def _async_sync_room_gain(self, values: Mapping[str, Any]) -> None:
+        """Point the room correction at the pump's own factor when it has one.
+
+        The firmware applies ``cal = table − factor · (room − target)``, so its
+        ``room_comp_factor`` *is* the gain the deviation correction removes
+        (measured 2026-10-15: 5.0 configured, 5.08 fitted on active hours).
+        Reading it beats fitting it: no window, no evidence gate, and it
+        follows the pump when the setting changes.
+        """
+        configured = self._configured_room_gain(values)
+        if configured is None:
+            return
+        await self._async_store_room_gain(
+            *configured, label="the pump's configured factor"
+        )
+
+    def _configured_room_gain(
+        self, values: Mapping[str, Any]
+    ) -> tuple[float, str] | None:
+        """The pump's configured room-compensation gain and the sensor it uses.
+
+        ``None`` — today's no-correction behaviour — when the factor is
+        missing, zero, non-finite or above ``ROOM_GAIN_MAX_C``, and when
+        ``sensor_mode`` supplies no indoor reading at all: with no reading
+        there is no room term to remove, so a factor must not invent one.
+        """
+        factor = values.get("room_comp_factor")
+        self._room_gain_factor = (
+            float(factor)
+            if isinstance(factor, (int, float)) and not isinstance(factor, bool)
+            else None
+        )
+        gain = self._room_gain_factor
+        if gain is None or not math.isfinite(gain) or not 0.0 < gain <= ROOM_GAIN_MAX_C:
+            return None
+        key = self._indoor_live_key(values)
+        return None if key is None else (gain, key)
+
+    async def _async_store_room_gain(
+        self, gain: float, source: str, *, label: str
+    ) -> None:
+        if gain == self._room_gain and source == self._room_gain_source:
+            return
+        self._room_gain = gain
+        self._room_gain_source = source
+        _LOGGER.info(
+            "Room-compensation gain %.2f °C/°C for %s from %s", gain, source, label
+        )
+        await self._async_persist()
+
     async def _async_room_gain(self) -> tuple[float, str] | None:
         """Identify the pump's room-compensation gain from observed Auto hours.
 
@@ -1533,7 +1604,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         ):
             return
         self._last_baseline_learn_ts = now_ts
-        await self._async_refresh_room_gain()
+        await self._async_refresh_room_gain(values)
         try:
             observations = await self._async_baseline_observations(
                 since_ts=self._last_active_ts
@@ -1566,8 +1637,17 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         )
         await self._async_persist()
 
-    async def _async_refresh_room_gain(self) -> None:
-        """Refresh the identified room-compensation gain (best effort)."""
+    async def _async_refresh_room_gain(
+        self, values: Mapping[str, Any] | None = None
+    ) -> None:
+        """Refresh the fitted room-compensation gain (best effort).
+
+        The fit is the fallback for a pump that reports no usable
+        ``room_comp_factor``; when the factor exists it already *is* the gain,
+        and fitting over it would only add noise to a known number.
+        """
+        if values is not None and self._configured_room_gain(values) is not None:
+            return
         try:
             identified = await self._async_room_gain()
         except asyncio.CancelledError:
@@ -1577,15 +1657,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return
         if identified is None:
             return
-        gain, source = identified
-        if gain == self._room_gain and source == self._room_gain_source:
-            return
-        self._room_gain = gain
-        self._room_gain_source = source
-        _LOGGER.info(
-            "Room-compensation gain identified: %.2f °C/°C from %s", gain, source
-        )
-        await self._async_persist()
+        await self._async_store_room_gain(*identified, label="observed Auto hours")
 
     async def _async_trim_observations(self) -> list[tuple[int, float, float]]:
         """Hourly ``(ts, BT1, indoor − target)`` pairs from recorder statistics.
@@ -1720,6 +1792,25 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if indoor_key is not None and indoor_key == self._room_gain_source:
             return self._room_gain
         return None
+
+    def _in_active_segment(self, ts: float) -> bool:
+        """True when ``cal_heat_temp`` at ``ts`` followed the table we wrote.
+
+        The room correction is only valid there. On Auto hours the pump's own
+        control already carries the room term — and the learned baseline was
+        fitted to it — so subtracting the gain again double-counts: measured
+        2026-10-15, applying it to every readiness hour moved the median from
+        1.17 °C to 2.67 °C (gate failure) while applying it to the active hours
+        only moved it to 1.08 °C (pass).
+
+        Only the last active segment is known: the store holds when it started
+        and when it ended, not a full history.
+        """
+        if self._active_since_ts is None or ts < self._active_since_ts:
+            return False
+        if self.active:
+            return True
+        return self._last_active_ts is not None and ts < self._last_active_ts
 
     def _room_error(self, values: Mapping[str, Any]) -> float | None:
         """Indoor temperature minus the target, or ``None`` when unknown."""
@@ -1874,6 +1965,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if self._ensure_baseline(values):
             await self._async_persist()
 
+        # The pump's own factor is the gain whenever it reports one; the fitted
+        # fallback runs during baseline learning below.
+        await self._async_sync_room_gain(values)
+
         # Learn what Auto actually delivers while the pump still follows it;
         # once active, cal_heat_temp would mirror our own table.
         await self._async_learn_baseline(values, now_ts)
@@ -1977,10 +2072,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             )
             # The pump adds its room term to cal_heat_temp, so the raw
             # deviation carries a room-dependent part the shadow curve does not
-            # emit; remove it before it feeds the readiness window.
+            # emit; remove it while the pump follows our table, which is the
+            # only regime where the term means the same thing.
             deviation = room_corrected_deviation(
                 deviation,
-                self._gain_for(self._indoor_live_key(values)),
+                self._gain_for(self._indoor_live_key(values))
+                if self._in_active_segment(now_ts)
+                else None,
                 self._room_error(values),
             )
 

@@ -56,6 +56,7 @@ _CURVE_TIMESTAMP_FIELDS = (
     "_last_calibration_ts",
     "_last_baseline_learn_ts",
     "_last_active_ts",
+    "_active_since_ts",
     "_last_trim_ts",
 )
 
@@ -368,9 +369,11 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
             str(point) for point in (getattr(snapshot, "extrapolated_points", None) or ())
         ],
         # The gain is bound to the sensor it was identified from: an unknown
-        # source means no correction is applied at all.
+        # source means no correction is applied at all. ``room_gain_factor``
+        # is the pump's own setting, so a report shows both numbers.
         "room_gain": getattr(coordinator, "_room_gain", None),
         "room_gain_source": getattr(coordinator, "_room_gain_source", None),
+        "room_gain_factor": getattr(coordinator, "_room_gain_factor", None),
         # Hours behind each point's trim; 0 means the trim is deliberately 0.
         "trim_evidence": dict(getattr(coordinator, "_trim_evidence", None) or {}),
         "room_error": _curve_room_error_diagnostics(snapshot),

@@ -295,9 +295,16 @@ access, so no control is offered when a write would fail.
   never override the indoor cap or the total clamp.
 - Adaptive-curve `ready` compares the *learned baseline* (not the adjusted
   shadow) to `cal_heat_temp` on heating hours, with the pump's room term
-  (identified from the Auto hours) removed. Gates: median ≤ 1.5 °C and p95
-  ≤ 3.0 °C over ≥ 3 days and ≥ 24 heating hours — calibrated to what a 10°
-  seven-point table can represent; a tighter median gate is unreachable.
+  removed. Gates: median ≤ 1.5 °C and p95 ≤ 3.0 °C over ≥ 3 days and ≥ 24
+  heating hours — calibrated to what a 10° seven-point table can represent; a
+  tighter median gate is unreachable.
+  The room term is removed **only on hours the pump followed our table**: the
+  gain is the pump's own `room_comp_factor` (never fitted over it) and it is
+  applied inside the last active segment, `active_since_ts` → `last_active_ts`.
+  On Auto hours the pump already holds the term and the baseline was fitted to
+  it, so correcting there double-counts — measured, it moved the readiness
+  median 1.17 °C → 2.67 °C (gate failure) against 1.08 °C on active hours
+  alone. The Auto-hour fit survives as the fallback for a missing factor.
   While the curve is active the pump follows our table, so readiness turns
   self-referential — `sensor.qvantum_adaptive_curve_room_error` (median
   `|indoor − target|` over the same window) is the outcome signal instead.
