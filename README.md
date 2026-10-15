@@ -166,7 +166,9 @@ Writes `config/qvantum_summary.json` and returns the same payload. It exists so 
 rule can be checked across installations — "does the pump's own
 `room_comp_factor` equal the room-gain slope fitted on this house?" cannot be
 answered from one pump. **Nothing is sent anywhere and no issue is opened for
-you**: the file is yours to attach where you choose.
+you**: the file is yours to attach where you choose — the
+[Rule check issue template](.github/ISSUE_TEMPLATE/summary_submission.yml) is
+just a form for pasting it.
 
 ```yaml
 service: qvantum.export_summary
