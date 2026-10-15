@@ -11,6 +11,7 @@ import pytest
 from aiohttp.test_utils import make_mocked_request
 
 from custom_components.qvantum.curve_coordinator import CURVE_KEYS
+from custom_components.qvantum.heating_curve import ActiveRoomGain
 from custom_components.qvantum.client.modbus.maps import MODBUS_HOLDING_TO_SETTINGS_MAP
 from custom_components.qvantum.summary import (
     FITTED_EFFICIENCY_KEYS,
@@ -224,11 +225,13 @@ def test_the_gain_pair_travels_because_the_pool_needs_it() -> None:
 
     # Applied is the pump's factor; fitted is the measured slope. Reporting the
     # same number twice would hide exactly the comparison the pool needs.
-    assert curve["room_gain_configured_c_per_c"] == 5.0
-    assert curve["room_gain_applied_c_per_c"] == 5.0
-    assert curve["room_gain_applied_source"] == "room_temp_external"
-    assert curve["room_gain_fitted_c_per_c"] == 5.08
-    assert curve["room_gain_fitted_source"] == "room_temp_external"
+    gain = curve["room_gain"]
+    assert gain["configured_c_per_c"] == 5.0
+    assert gain["applied_c_per_c"] == 5.0
+    assert gain["applied_source"] == "room_temp_external"
+    assert gain["fitted"]["c_per_c"] == 5.08
+    assert gain["fitted"]["source"] == "room_temp_external"
+    assert gain["fitted"]["window"] == "auto"
     assert curve["daily_solar_b_m2"] == 1.875
     assert curve["daily_solar_days"] == 26
 
@@ -238,7 +241,7 @@ def test_a_foreign_gain_source_is_dropped() -> None:
 
     payload = build(curve=coordinator)
 
-    assert payload["curve"]["room_gain_applied_source"] is None
+    assert payload["curve"]["room_gain"]["applied_source"] is None
     assert "sensor.inomhustemperatur" not in strings_in(payload)
 
 
@@ -364,7 +367,41 @@ def test_the_fitted_gain_is_null_until_a_fit_has_run() -> None:
 
     curve = build(curve=coordinator)["curve"]
 
-    assert curve["room_gain_configured_c_per_c"] == 5.0
-    assert curve["room_gain_applied_c_per_c"] == 5.0
-    assert curve["room_gain_fitted_c_per_c"] is None
-    assert curve["room_gain_fitted_source"] is None
+    gain = curve["room_gain"]
+    assert gain["configured_c_per_c"] == 5.0
+    assert gain["applied_c_per_c"] == 5.0
+    assert gain["fitted"]["c_per_c"] is None
+    assert gain["fitted"]["source"] is None
+    assert gain["fitted"]["window"] == "auto"
+    assert gain["fitted"]["valid"] is False
+
+
+def test_an_active_measurement_travels_with_its_evidence() -> None:
+    """The active-hour slope wins, and says why it may not be trusted."""
+    estimate = ActiveRoomGain(
+        gain_c_per_c=4.33,
+        hours=18,
+        buckets=3,
+        span_c=0.96,
+        source="room_temp_external",
+        std_err_c_per_c=0.40,
+        r2=0.88,
+        residual_std_c=0.15,
+        leave_one_out_c_per_c=2.47,
+        valid=False,
+        notes="one hour carries the estimate (leave-one-out 2.47 °C/°C > 0.50)",
+    )
+
+    fitted = build(curve=curve_coordinator(_room_gain_active=estimate))["curve"][
+        "room_gain"
+    ]["fitted"]
+
+    assert fitted["window"] == "active"
+    assert fitted["c_per_c"] == 4.33
+    assert fitted["source"] == "room_temp_external"
+    assert fitted["valid"] is False
+    assert "leave-one-out" in fitted["notes"]
+    assert fitted["hours"] == 18
+    assert fitted["buckets"] == 3
+    assert fitted["r2"] == 0.88
+    assert fitted["leave_one_out_c_per_c"] == 2.47

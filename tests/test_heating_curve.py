@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from custom_components.qvantum.heating_curve import (
+    room_gain_from_active_hours,
+    ActiveRoomGain,
     BASELINE_MAX_CORRECTION_C,
     BASELINE_MIN_CORRECTION_C,
     COP_FEEDBACK_MAX_C,
@@ -883,3 +885,100 @@ def test_compute_curve_accepts_a_daily_model() -> None:
 
     assert result.solar_c < 0.0
     assert result.adjustment_c <= 0.0
+
+
+# --- active-hour room gain ---------------------------------------------------
+
+#: The table the pump was given, one °C of supply per °C of outdoor.
+ACTIVE_TABLE = {6: 30.0, 8: 28.0, 10: 26.0, 12: 24.0}
+
+
+def active_hours(term: float = 5.0, *, noise: float = 0.0, seed: int = 3):
+    """Synthetic active hours: ``cal = table(outdoor) − term · room error``."""
+    import random
+
+    rng = random.Random(seed)
+    rows = []
+    for outdoor, supply in ACTIVE_TABLE.items():
+        for error in (-0.4, -0.2, 0.0, 0.2, 0.4):
+            wobble = rng.uniform(-noise, noise) if noise else 0.0
+            rows.append((float(outdoor), supply - term * error + wobble, error))
+    return rows
+
+
+def test_active_room_gain_recovers_a_known_slope() -> None:
+    estimate = room_gain_from_active_hours(active_hours(5.0))
+
+    assert isinstance(estimate, ActiveRoomGain)
+    assert estimate.valid
+    assert estimate.gain_c_per_c == pytest.approx(5.0)
+    assert estimate.hours == 20
+    assert estimate.buckets == 4
+    assert estimate.span_c == pytest.approx(0.8)
+    assert estimate.r2 == pytest.approx(1.0)
+    assert estimate.t_stat > 4.0
+    assert estimate.notes == ""
+
+
+def test_active_room_gain_drops_a_lone_outdoor_bucket() -> None:
+    """The leverage immunity: an hour alone in its bucket cannot decide it."""
+    rows = active_hours(5.0)
+    rows.append((14.0, 22.0 - 5.0 * 1.2, 1.2))
+
+    estimate = room_gain_from_active_hours(rows)
+
+    assert estimate.gain_c_per_c == pytest.approx(5.0)
+    assert estimate.hours == 20  # the lone hour is not counted
+    assert estimate.valid
+
+
+def test_active_room_gain_needs_enough_hours_and_buckets() -> None:
+    estimate = room_gain_from_active_hours(active_hours(5.0)[:6])
+
+    assert not estimate.valid
+    assert "buckets" in estimate.notes
+
+
+def test_active_room_gain_rejects_a_slope_that_is_not_a_room_term() -> None:
+    """No term at all: the number is reported, but nothing is published."""
+    estimate = room_gain_from_active_hours(active_hours(0.0, noise=0.4))
+
+    assert not estimate.valid
+    assert "not a room term" in estimate.notes
+    assert estimate.gain_c_per_c < 1.0
+
+
+def test_active_room_gain_refuses_a_window_it_cannot_test() -> None:
+    """Two hours per bucket: dropping one breaks the bucket, so no verdict."""
+    rows = [
+        row for row in active_hours(5.0) if row[2] in (-0.4, 0.4) and row[0] <= 10.0
+    ]
+
+    estimate = room_gain_from_active_hours(rows, min_hours=6, min_buckets=3)
+
+    assert not estimate.valid
+    assert estimate.leave_one_out_c_per_c is None
+    assert "carries it" in estimate.notes
+
+
+def test_active_room_gain_needs_the_room_error_to_move() -> None:
+    rows = [(float(outdoor), supply, 0.3) for outdoor, supply in ACTIVE_TABLE.items()]
+
+    estimate = room_gain_from_active_hours(rows)
+
+    assert not estimate.valid
+    assert "barely moved" in estimate.notes
+
+
+def test_active_room_gain_ignores_unusable_rows() -> None:
+    rows = active_hours(5.0) + [
+        (float("nan"), 20.0, 0.2),
+        (8.0, float("inf"), 0.2),
+        (10.0, 25.0, float("nan")),
+    ]
+
+    estimate = room_gain_from_active_hours(rows)
+
+    assert estimate.valid
+    assert estimate.hours == 20
+    assert estimate.gain_c_per_c == pytest.approx(5.0)

@@ -266,6 +266,25 @@ def _curve_model_diagnostics(model: Any) -> dict[str, Any] | None:
     }
 
 
+def _curve_active_gain_diagnostics(estimate: Any) -> dict[str, Any] | None:
+    """The room gain measured on active hours, with the evidence for it."""
+    if estimate is None:
+        return None
+    return {
+        "gain_c_per_c": getattr(estimate, "gain_c_per_c", None),
+        "source": getattr(estimate, "source", None),
+        "hours": getattr(estimate, "hours", None),
+        "buckets": getattr(estimate, "buckets", None),
+        "span_c": getattr(estimate, "span_c", None),
+        "std_err_c_per_c": getattr(estimate, "std_err_c_per_c", None),
+        "r2": getattr(estimate, "r2", None),
+        "residual_std_c": getattr(estimate, "residual_std_c", None),
+        "leave_one_out_c_per_c": getattr(estimate, "leave_one_out_c_per_c", None),
+        "valid": getattr(estimate, "valid", None),
+        "notes": getattr(estimate, "notes", None),
+    }
+
+
 def _curve_daily_model_diagnostics(model: Any) -> dict[str, Any] | None:
     """Return the day-block identification (the solar term's actual source).
 
@@ -383,6 +402,12 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "room_gain_fitted": getattr(coordinator, "_room_gain_fitted", None),
         "room_gain_fitted_source": getattr(
             coordinator, "_room_gain_fitted_source", None
+        ),
+        # The measurement taken on hours the pump followed our own table: the
+        # only clean slope on an install that runs active permanently. An
+        # invalid estimate is kept with its reason, so a dump explains itself.
+        "room_gain_active": _curve_active_gain_diagnostics(
+            getattr(coordinator, "_room_gain_active", None)
         ),
         "room_gain_from_factor": bool(
             getattr(coordinator, "_room_gain_from_factor", False)

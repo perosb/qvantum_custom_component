@@ -315,6 +315,11 @@ access, so no control is offered when a write would fail.
   it, so correcting there double-counts — measured, it moved the readiness
   median 1.17 °C → 2.67 °C (gate failure) against 1.08 °C on active hours
   alone. The Auto-hour fit survives as the fallback for a missing factor.
+  The *fitted* slope is also measured on active hours (fixed effects per 2 °C
+  outdoor bucket, `room_gain_from_active_hours`), because there our written
+  table is exogenous; it is diagnostics-only, travels with its gates
+  (`valid`/`notes`, hours, buckets, R², leave-one-out) and never becomes the
+  applied gain while the pump reports a factor.
   While the curve is active the pump follows our table, so readiness turns
   self-referential — `sensor.qvantum_adaptive_curve_room_error` (median
   `|indoor − target|` over the same window) is the outcome signal instead.

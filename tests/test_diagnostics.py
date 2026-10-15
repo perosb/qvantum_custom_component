@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from custom_components.qvantum.heating_curve import ActiveRoomGain
 from custom_components.qvantum.curve_coordinator import CurveSnapshot
 from custom_components.qvantum.diagnostics import (
     TO_REDACT,
@@ -143,6 +144,19 @@ def _curve_coordinator() -> SimpleNamespace:
         _room_gain_factor=5.0,
         _room_gain_from_factor=True,
         _room_gain_fitted=5.08,
+        _room_gain_active=ActiveRoomGain(
+            gain_c_per_c=4.33,
+            hours=18,
+            buckets=3,
+            span_c=0.96,
+            source="room_temp_external",
+            std_err_c_per_c=0.4,
+            r2=0.88,
+            residual_std_c=0.15,
+            leave_one_out_c_per_c=2.47,
+            valid=False,
+            notes="one hour carries the estimate",
+        ),
         _room_gain_fitted_source="room_temp_external",
         _active_since_ts=1758790800.0,
         _model=_solar_model(),
@@ -522,6 +536,11 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     # The measured slope beside the applied gain: the applied one may just be
     # the pump's configured factor.
     assert curve["room_gain_fitted"] == 5.08
+    # The active-hour measurement, with the evidence that it is not usable yet.
+    assert curve["room_gain_active"]["gain_c_per_c"] == 4.33
+    assert curve["room_gain_active"]["valid"] is False
+    assert curve["room_gain_active"]["leave_one_out_c_per_c"] == 2.47
+    assert curve["room_gain_active"]["source"] == "room_temp_external"
     assert curve["room_gain_fitted_source"] == "room_temp_external"
     # Whether the warm-house brake can act at all.
     assert curve["indoor_cap_armed"] is True

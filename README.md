@@ -192,9 +192,19 @@ What it contains:
 | device | manufacturer, model, firmware version (device metadata, never user data) |
 | plant | `sensor_mode`, `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
 | climate | the outdoor span the installation has been observed in, heating hours |
-| curve | room gain configured vs applied vs fitted (with their sources), the readiness median/p95, the solar model (`a`, `b`, trust, days) |
+| curve | room gain grouped as `configured` / `applied` / `fitted`, the readiness median/p95, the solar model (`a`, `b`, trust, days) |
 | fitted | heat-loss coefficient, time constant, thermal mass, DHW standing loss, cycling, SCOP, aux share, health grade |
 | verdicts | reserved for the derived analysis results (currently empty) |
+
+The room gain is the part worth explaining, because three numbers that look
+alike are not: **configured** is the pump's own `room_comp_factor`, **applied**
+is what the curve's deviation correction uses (the factor when the pump reports
+a usable one, else the fitted slope) and **fitted** is a *measurement* — taken on
+hours the pump followed our own table when such hours exist, otherwise from Auto
+hours. The measurement carries `valid`, `notes`, the hour count and its
+leave-one-out swing, because on this data one hour can move the number by more
+than the effect being measured. It never changes what is applied: the factor
+does.
 
 What it **never** contains: entity ids or names, coordinates, energy totals,
 schedules, sensor identities, or any raw hourly series. The payload is built by
