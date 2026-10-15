@@ -378,6 +378,12 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "room_gain": getattr(coordinator, "_room_gain", None),
         "room_gain_source": getattr(coordinator, "_room_gain_source", None),
         "room_gain_factor": getattr(coordinator, "_room_gain_factor", None),
+        # The fitted measurement beside the applied gain: the applied one may
+        # just be the configured factor.
+        "room_gain_fitted": getattr(coordinator, "_room_gain_fitted", None),
+        "room_gain_fitted_source": getattr(
+            coordinator, "_room_gain_fitted_source", None
+        ),
         "room_gain_from_factor": bool(
             getattr(coordinator, "_room_gain_from_factor", False)
         ),

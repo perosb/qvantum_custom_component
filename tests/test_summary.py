@@ -68,8 +68,10 @@ def curve_coordinator(**overrides):
         "active": True,
         "data": snapshot,
         "_room_gain_factor": 5.0,
-        "_room_gain": 5.08,
+        "_room_gain": 5.0,
         "_room_gain_source": "room_temp_external",
+        "_room_gain_fitted": 5.08,
+        "_room_gain_fitted_source": "room_temp_external",
         "_model": SimpleNamespace(a_w_per_k=111.1, b_m2=0.0, trust=0.69),
         "_daily_model": SimpleNamespace(b_m2=1.875, trust=0.69, n_days=26),
         "_baseline": dict.fromkeys(CURVE_KEYS, 20.0),
@@ -220,9 +222,13 @@ def test_the_gain_pair_travels_because_the_pool_needs_it() -> None:
     """Configured against fitted: the question the first pool answers."""
     curve = build()["curve"]
 
+    # Applied is the pump's factor; fitted is the measured slope. Reporting the
+    # same number twice would hide exactly the comparison the pool needs.
     assert curve["room_gain_configured_c_per_c"] == 5.0
+    assert curve["room_gain_applied_c_per_c"] == 5.0
+    assert curve["room_gain_applied_source"] == "room_temp_external"
     assert curve["room_gain_fitted_c_per_c"] == 5.08
-    assert curve["room_gain_source"] == "room_temp_external"
+    assert curve["room_gain_fitted_source"] == "room_temp_external"
     assert curve["daily_solar_b_m2"] == 1.875
     assert curve["daily_solar_days"] == 26
 
@@ -232,7 +238,7 @@ def test_a_foreign_gain_source_is_dropped() -> None:
 
     payload = build(curve=coordinator)
 
-    assert payload["curve"]["room_gain_source"] is None
+    assert payload["curve"]["room_gain_applied_source"] is None
     assert "sensor.inomhustemperatur" not in strings_in(payload)
 
 
@@ -350,3 +356,15 @@ def test_the_summary_view_requires_authentication() -> None:
     """The session carries the auth; no token in the URL."""
     assert QvantumSummaryView.requires_auth is True
     assert QvantumSummaryView.url == SUMMARY_URL
+
+
+def test_the_fitted_gain_is_null_until_a_fit_has_run() -> None:
+    """An install whose factor wins reports no fitted number, not the factor."""
+    coordinator = curve_coordinator(_room_gain_fitted=None, _room_gain_fitted_source=None)
+
+    curve = build(curve=coordinator)["curve"]
+
+    assert curve["room_gain_configured_c_per_c"] == 5.0
+    assert curve["room_gain_applied_c_per_c"] == 5.0
+    assert curve["room_gain_fitted_c_per_c"] is None
+    assert curve["room_gain_fitted_source"] is None

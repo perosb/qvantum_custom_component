@@ -130,6 +130,8 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._room_gain_source = None
     coordinator._room_gain_factor = None
     coordinator._room_gain_from_factor = False
+    coordinator._room_gain_fitted = None
+    coordinator._room_gain_fitted_source = None
     coordinator._clamped_state = False
     coordinator._forecast = None
     coordinator._forecast_ok = False
@@ -711,14 +713,18 @@ async def test_an_unusable_factor_keeps_a_fitted_gain() -> None:
 
 
 async def test_a_configured_factor_is_not_overwritten_by_the_fit() -> None:
-    """The Auto-hour fit is the fallback, not a competitor."""
+    """The fit runs as a cross-check; the pump's factor stays applied."""
     with_factor = make_coordinator(values=configured_values(), settings=SETTINGS)
     with_factor._async_room_gain = AsyncMock(return_value=(3.0, "bt2"))
     with_factor._async_persist = AsyncMock()
 
     await with_factor._async_refresh_room_gain(with_factor._main_values())
 
-    assert with_factor._async_room_gain.await_count == 0
+    # The measured slope is kept beside the applied gain: that pair is what
+    # tells us whether the configured factor *is* the gain.
+    assert with_factor._room_gain_fitted == pytest.approx(3.0)
+    assert with_factor._room_gain_fitted_source == "bt2"
+    # Nothing was applied by the fit — the factor owns that.
     assert with_factor._room_gain is None
 
     without_factor = make_coordinator(
