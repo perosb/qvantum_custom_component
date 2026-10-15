@@ -174,6 +174,17 @@ just a form for pasting it.
 service: qvantum.export_summary
 ```
 
+How to get the file:
+
+1. **Download it** — open `/api/qvantum/summary` in your browser while logged in
+   (`http://<your-ha>/api/qvantum/summary`). It returns the file
+   `qvantum_summary.json`; your session cookie carries the auth, so no token is
+   in the URL.
+2. The service also writes `config/qvantum_summary.json`, reachable over Samba,
+   the File editor or SSH.
+3. **Developer tools → Actions** shows the same payload in the service response,
+   which can be copied directly.
+
 What it contains:
 
 | section | fields |

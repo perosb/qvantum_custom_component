@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
+from aiohttp.test_utils import make_mocked_request
 
 from custom_components.qvantum.curve_coordinator import CURVE_KEYS
 from custom_components.qvantum.client.modbus.maps import MODBUS_HOLDING_TO_SETTINGS_MAP
@@ -13,7 +16,10 @@ from custom_components.qvantum.summary import (
     FITTED_EFFICIENCY_KEYS,
     MODBUS_ONLY_PLANT_KEYS,
     PLANT_KEYS,
+    QvantumSummaryView,
+    SUMMARY_FILENAME,
     SUMMARY_SCHEMA_VERSION,
+    SUMMARY_URL,
     build_summary,
     device_summary,
     plant_summary,
@@ -287,3 +293,60 @@ def test_verdicts_can_be_attached_when_they_exist() -> None:
     )
 
     assert payload["verdicts"]["gain_vs_factor"]["delta"] == 0.08
+
+
+def summary_request(*, entry: bool = True):
+    """A mocked request whose app carries a hass with (or without) an entry."""
+    hass = MagicMock()
+    if not entry:
+        hass.config_entries.async_entries.return_value = []
+    else:
+        runtime = SimpleNamespace(
+            coordinator=SimpleNamespace(
+                data={"values": VALUES},
+                device_id="3010100111111111",
+                modbus_enabled=True,
+            ),
+            efficiency_coordinator=SimpleNamespace(data=efficiency_snapshot()),
+            curve_coordinator=curve_coordinator(),
+        )
+        hass.config_entries.async_entries.return_value = [
+            SimpleNamespace(runtime_data=runtime)
+        ]
+    request = make_mocked_request("GET", SUMMARY_URL)
+    request.app["hass"] = hass
+    return request
+
+
+async def test_the_summary_view_serves_a_download() -> None:
+    """The browser downloads the same whitelist-built payload as the file."""
+    with patch("custom_components.qvantum.summary.dr") as patched_registry:
+        patched_registry.async_get.return_value = MagicMock(
+            async_get_device=MagicMock(return_value=None)
+        )
+        response = await QvantumSummaryView().get(summary_request())
+
+    assert response.status == 200
+    disposition = response.headers["Content-Disposition"]
+    assert "attachment" in disposition
+    assert SUMMARY_FILENAME in disposition
+    payload = json.loads(response.text)
+    assert payload["schema_version"] == SUMMARY_SCHEMA_VERSION
+    assert payload["plant"]["room_comp_factor"] == 5.0
+    assert payload["climate"]["heating_hours"] == 148
+    for identifier in IDENTIFIER_STRINGS:
+        assert identifier not in response.text
+
+
+async def test_the_summary_view_reports_a_missing_entry() -> None:
+    """No configured entry: 404 rather than an empty summary."""
+    response = await QvantumSummaryView().get(summary_request(entry=False))
+
+    assert response.status == 404
+    assert json.loads(response.text)["exception"] == "not_loaded"
+
+
+def test_the_summary_view_requires_authentication() -> None:
+    """The session carries the auth; no token in the URL."""
+    assert QvantumSummaryView.requires_auth is True
+    assert QvantumSummaryView.url == SUMMARY_URL
