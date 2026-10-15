@@ -1,0 +1,62 @@
+name: Rule check (summary submission)
+description: Share the opt-in installation summary so a rule can be checked across installations
+title: "[rule check]: "
+labels: ["summary"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Some questions cannot be answered from one installation: does the pump's own
+        `room_comp_factor` equal the room-gain slope fitted on *this* house? Is a 41 h
+        time constant normal for a house like this? Is the solar `a`-gap consistent?
+
+        The summary contains device metadata, the control-loop settings and the
+        identified parameters only — **no entity ids, no names, no coordinates and no
+        raw measurement series**. It is built by whitelist, and a test asserts it is
+        free of identifiers.
+
+  - type: markdown
+    attributes:
+      value: |
+        Run **Developer tools → Actions → `qvantum.export_summary`**, then paste the
+        contents of `config/qvantum_summary.json` below (the service response works
+        too). Nothing is sent anywhere automatically.
+
+  - type: dropdown
+    id: question
+    attributes:
+      label: What should be checked?
+      options:
+        - Room gain — configured factor against the fitted slope
+        - Cold-snap sag — is pre-charge worth building?
+        - Thermal identification — time constant and heat loss
+        - Solar model — aperture and the hourly/daily `a` gap
+        - DHW standing loss or compressor cycling
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: The summary
+      description: Paste `config/qvantum_summary.json` here.
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed
+    attributes:
+      label: What did you see? (optional)
+      description: For example the room error, the readiness figures, or what you expected.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked that the summary contains no entity ids, names or coordinates.
+          required: true
