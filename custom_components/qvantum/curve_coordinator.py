@@ -807,6 +807,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             for key in ("cop_feedback", "precharge"):
                 if key in terms:
                     self._terms[key] = bool(terms[key])
+        if self.active and self._active_since_ts is None:
+            # A store written before this field existed, or an activation this
+            # process never saw, leaves the start unknown. Stamp the moment the
+            # pump is known to follow our table rather than guess earlier hours:
+            # those stay uncorrected, and the readiness window rolls clean in
+            # three local days.
+            self._mark_active_started()
+            await self._async_persist()
 
     async def async_set_terms(
         self,

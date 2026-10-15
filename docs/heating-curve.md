@@ -211,7 +211,10 @@ live pump, applying it to every readiness hour moved the median from 1.17 °C to
 2.67 °C (failing the gate) while the active hours alone gave 1.08 °C (passing).
 Readiness therefore no longer inherits the term from Auto hours, and a pump that
 has never been activated is corrected nowhere — which is exactly its behaviour
-today.
+today. A store written before `active_since_ts` existed (an upgrade, or an
+activation this process never saw) stamps the moment of that load instead of
+guessing when control began: the hours before it stay uncorrected and the
+three-day window rolls clean.
 
 ### Active trims
 

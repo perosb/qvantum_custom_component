@@ -300,7 +300,9 @@ access, so no control is offered when a write would fail.
   tighter median gate is unreachable.
   The room term is removed **only on hours the pump followed our table**: the
   gain is the pump's own `room_comp_factor` (never fitted over it) and it is
-  applied inside the last active segment, `active_since_ts` → `last_active_ts`.
+  applied inside the last active segment, `active_since_ts` → `last_active_ts`
+  (a store without a start stamps the current load, so older hours stay
+  uncorrected rather than guessed).
   On Auto hours the pump already holds the term and the baseline was fitted to
   it, so correcting there double-counts — measured, it moved the readiness
   median 1.17 °C → 2.67 °C (gate failure) against 1.08 °C on active hours
