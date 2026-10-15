@@ -252,6 +252,14 @@ counters, tap-water comfort, solar exposure and the headline efficiency
 figures (COP/SCOP/aux share/health) stay in the main UI. Controls are never
 diagnostics; `alarm_active` is a PROBLEM, not a diagnostic.
 
+The summary export (`qvantum.export_summary`, `summary.py`) is **whitelist-built**
+and must stay identifier-free: fields are picked explicitly and coerced to
+numbers, booleans or short enumerated strings, never free text from the values
+payload. A new field goes into the module's whitelists **and** bumps
+`SUMMARY_SCHEMA_VERSION` (the pool groups by it); `tests/test_summary.py` asserts
+the payload carries no entity ids or names. It writes a file and returns it — it
+never sends anything and never opens an issue.
+
 Derived metrics (`cop_*`, `scop_total`, `aux_heat_share`, …) are computed in HA
 after the poll. Never add them to `DEFAULT_ENABLED_*` / `DEFAULT_DISABLED_*`:
 those lists are also the fetch universe, so the client would request a metric

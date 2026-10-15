@@ -933,6 +933,10 @@
           "description": "Növelje az előremenő hőmérsékletet a várható hidegbetörés előtt"
         }
       }
+    },
+    "export_summary": {
+      "name": "Összegzés exportálása",
+      "description": "Opcionális összegzést ír az üzemről fájlba, hogy csatolhasd egy hibajegyhez; semmi nem kerül elküldésre"
     }
   }
 }

@@ -160,6 +160,35 @@ data:
   precharge: true
 ```
 
+#### `qvantum.export_summary`
+
+Writes `config/qvantum_summary.json` and returns the same payload. It exists so a
+rule can be checked across installations — "does the pump's own
+`room_comp_factor` equal the room-gain slope fitted on this house?" cannot be
+answered from one pump. **Nothing is sent anywhere and no issue is opened for
+you**: the file is yours to attach where you choose.
+
+```yaml
+service: qvantum.export_summary
+```
+
+What it contains:
+
+| section | fields |
+|---|---|
+| device | manufacturer, model, firmware version (device metadata, never user data) |
+| plant | `sensor_mode`, `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
+| climate | the outdoor span the installation has been observed in, heating hours |
+| curve | configured vs fitted room gain and its source, the readiness median/p95, the solar model (`a`, `b`, trust, days) |
+| fitted | heat-loss coefficient, time constant, thermal mass, DHW standing loss, cycling, SCOP, aux share, health grade |
+| verdicts | reserved for the derived analysis results (currently empty) |
+
+What it **never** contains: entity ids or names, coordinates, energy totals,
+schedules, sensor identities, or any raw hourly series. The payload is built by
+whitelist in `summary.py` — every field is picked explicitly and coerced to a
+number, a boolean or a short enumerated string — and a test asserts the result is
+free of identifiers.
+
 #### Elevate Access
 
 Cloud HTTP only: the **Elevate Access** button grants temporary access to advanced settings and maintenance functions; local Modbus does not create these entities.

@@ -933,6 +933,10 @@
           "description": "Augmenter la température de départ avant une vague de froid prévue"
         }
       }
+    },
+    "export_summary": {
+      "name": "Exporter le résumé",
+      "description": "Écrit un résumé opt-in de l'installation dans un fichier à joindre à un ticket ; rien n'est envoyé"
     }
   }
 }

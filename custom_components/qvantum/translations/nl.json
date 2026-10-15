@@ -933,6 +933,10 @@
           "description": "Verhoog de aanvoertemperatuur vóór een voorspelde koude-inval"
         }
       }
+    },
+    "export_summary": {
+      "name": "Samenvatting exporteren",
+      "description": "Schrijf een opt-in samenvatting van de installatie naar een bestand om aan een issue te koppelen; er wordt niets verzonden"
     }
   }
 }

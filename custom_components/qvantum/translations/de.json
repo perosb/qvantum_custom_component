@@ -933,6 +933,10 @@
           "description": "Vorlauftemperatur vor einem prognostizierten Kälteeinbruch anheben"
         }
       }
+    },
+    "export_summary": {
+      "name": "Zusammenfassung exportieren",
+      "description": "Schreibt eine Opt-in-Zusammenfassung der Anlage in eine Datei zum Anhängen an ein Issue; es wird nichts gesendet"
     }
   }
 }

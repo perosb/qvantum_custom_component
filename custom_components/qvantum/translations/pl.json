@@ -933,6 +933,10 @@
           "description": "Podnieś temperaturę zasilania przed prognozowanym ochłodzeniem"
         }
       }
+    },
+    "export_summary": {
+      "name": "Eksportuj podsumowanie",
+      "description": "Zapisuje opcjonalne podsumowanie instalacji do pliku do załączenia w zgłoszeniu; nic nie jest wysyłane"
     }
   }
 }

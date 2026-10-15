@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any
 
@@ -10,9 +11,13 @@ from .client.exceptions import (
     APIConnectionError,
     APIRateLimitError,
 )
-from .const import DOMAIN
+from .const import DOMAIN, VERSION
+from .summary import build_summary, device_metadata
 
 _LOGGER = logging.getLogger(__name__)
+
+#: Where ``qvantum.export_summary`` writes the opt-in summary (config directory).
+SUMMARY_FILENAME = "qvantum_summary.json"
 
 
 def _normalize_device_id(value: Any) -> str:
@@ -53,6 +58,64 @@ SET_CURVE_TERMS_SCHEMA = vol.Schema(
         vol.Optional("precharge"): cv.boolean,
     }
 )
+
+
+def _write_summary_file(path: str, payload: dict[str, Any]) -> None:
+    """Write the summary where the user can pick it up (executor thread)."""
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+
+
+async def async_export_summary(service_call: ServiceCall) -> Any:
+    """Write the opt-in summary to a file and return it.
+
+    The summary carries device metadata, the control-loop settings, the
+    identified parameters and (later) the verdicts. It is built by whitelist, so
+    entity ids, names, coordinates and raw series cannot travel — see
+    ``summary.py`` and the README's field list. Nothing is sent anywhere: this
+    service only writes a file and returns the same payload.
+    """
+    hass = service_call.hass
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        runtime = getattr(entry, "runtime_data", None)
+        coordinator = getattr(runtime, "coordinator", None)
+        if coordinator is None:
+            continue
+        device_id = getattr(coordinator, "device_id", None)
+        data = coordinator.data if isinstance(coordinator.data, dict) else {}
+        values = data.get("values") if isinstance(data.get("values"), dict) else {}
+        efficiency = getattr(runtime, "efficiency_coordinator", None)
+        summary = build_summary(
+            version=VERSION,
+            transport=(
+                "modbus" if getattr(coordinator, "modbus_enabled", False) else "cloud"
+            ),
+            # The registry is only needed once there is something to export.
+            device=device_metadata(hass, str(device_id)) if device_id else None,
+            values=values,
+            curve=getattr(runtime, "curve_coordinator", None),
+            efficiency=getattr(efficiency, "data", None),
+        )
+        path = hass.config.path(SUMMARY_FILENAME)
+        try:
+            await hass.async_add_executor_job(_write_summary_file, path, summary)
+        except OSError as err:
+            _LOGGER.warning("Could not write the summary to %s: %s", path, err)
+            return {
+                "qvantum": {
+                    "summary": summary,
+                    "exception": "write_failed",
+                    "details": str(err),
+                }
+            }
+        return {"qvantum": {"summary": summary, "path": path}}
+    return {
+        "qvantum": {
+            "exception": "not_loaded",
+            "details": "The Qvantum integration is not set up",
+        }
+    }
 
 
 def _find_curve_coordinator(hass: HomeAssistant):
@@ -175,5 +238,13 @@ async def async_setup_services(hass: HomeAssistant):
         service="set_curve_terms",
         service_func=set_curve_terms,
         schema=SET_CURVE_TERMS_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    hass.services.async_register(
+        domain=DOMAIN,
+        service="export_summary",
+        service_func=async_export_summary,
+        schema=vol.Schema({}),
         supports_response=SupportsResponse.OPTIONAL,
     )

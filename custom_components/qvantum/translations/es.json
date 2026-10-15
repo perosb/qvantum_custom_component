@@ -933,6 +933,10 @@
           "description": "Aumentar la impulsión antes de una ola de frío prevista"
         }
       }
+    },
+    "export_summary": {
+      "name": "Exportar resumen",
+      "description": "Escribe un resumen opcional de la instalación en un archivo para adjuntarlo a una incidencia; no se envía nada"
     }
   }
 }

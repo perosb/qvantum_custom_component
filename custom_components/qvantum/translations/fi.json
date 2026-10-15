@@ -933,6 +933,10 @@
           "description": "Nosta menolämpötilaa ennen ennustettua kylmäjaksoa"
         }
       }
+    },
+    "export_summary": {
+      "name": "Vie yhteenveto",
+      "description": "Kirjoittaa valinnaisen yhteenvedon laitteistosta tiedostoon liitettäväksi ongelmaan; mitään ei lähetetä"
     }
   }
 }
