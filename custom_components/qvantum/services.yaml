@@ -46,3 +46,13 @@ set_curve_terms:
       example: true
       selector:
         boolean:
+
+export_summary:
+  name: export_summary
+  description: >-
+    Write an opt-in summary of the installation to
+    config/qvantum_summary.json and return it, so it can be attached to a
+    GitHub issue when a rule needs checking across installations. It contains
+    device metadata, control-loop settings, the identified parameters and the
+    derived verdicts — never entity ids, names, coordinates or raw series.
+    Nothing is sent anywhere and no issue is opened for you.

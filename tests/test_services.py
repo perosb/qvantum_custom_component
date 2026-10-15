@@ -1,5 +1,7 @@
 """Tests for Qvantum services."""
 
+import json
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import voluptuous as vol
@@ -74,7 +76,7 @@ class TestQvantumServices:
         await async_setup_services(mock_hass)
 
         # Verify all services were registered
-        assert mock_hass.services.async_register.call_count == 3
+        assert mock_hass.services.async_register.call_count == 4
 
         # Check first call (extra_hot_water)
         first_call = mock_hass.services.async_register.call_args_list[0]
@@ -96,6 +98,77 @@ class TestQvantumServices:
         assert third_call[1]["service"] == "set_curve_terms"
         assert "service_func" in third_call[1]
         assert "schema" in third_call[1]
+
+        # Check fourth call (export_summary)
+        fourth_call = mock_hass.services.async_register.call_args_list[3]
+        assert fourth_call[1]["domain"] == DOMAIN
+        assert fourth_call[1]["service"] == "export_summary"
+        assert "service_func" in fourth_call[1]
+        assert "schema" in fourth_call[1]
+
+    @pytest.mark.asyncio
+    async def test_export_summary_writes_and_returns_the_payload(
+        self, mock_hass, mock_api, tmp_path
+    ):
+        """The export writes a file and returns it; nothing is sent anywhere."""
+        entry = MagicMock()
+        entry.runtime_data.coordinator = mock_api
+        entry.runtime_data.efficiency_coordinator = None
+        entry.runtime_data.curve_coordinator = None
+        mock_api.data = {
+            "values": {
+                "room_comp_factor": 5.0,
+                "sensor_mode": 4,
+                # Must never reach the payload.
+                "external_room_temp_entity": "sensor.inomhustemperatur",
+            }
+        }
+        mock_api.device_id = "3010100111111111"
+        mock_api.modbus_enabled = True
+        mock_hass.config_entries.async_entries.return_value = [entry]
+        target = tmp_path / "qvantum_summary.json"
+        mock_hass.config.path = MagicMock(return_value=str(target))
+        mock_hass.async_add_executor_job = AsyncMock(
+            side_effect=lambda func, *args: func(*args)
+        )
+        registry = MagicMock()
+        registry.async_get.return_value = SimpleNamespace(
+            manufacturer="Qvantum", model="QE-6", sw_version=None, hw_version=None
+        )
+
+        with patch("custom_components.qvantum.services.dr") as patched_registry:
+            patched_registry.async_get.return_value = registry
+            await async_setup_services(mock_hass)
+            service_func = mock_hass.services.async_register.call_args_list[3][1][
+                "service_func"
+            ]
+            service_call = MagicMock()
+            service_call.hass = mock_hass
+            result = await service_func(service_call)
+
+        summary = result["qvantum"]["summary"]
+        assert summary["plant"]["room_comp_factor"] == 5.0
+        assert summary["transport"] == "modbus"
+        assert result["qvantum"]["path"] == str(target)
+        written = json.loads(target.read_text(encoding="utf-8"))
+        assert written == summary
+        assert "sensor.inomhustemperatur" not in json.dumps(written)
+
+    @pytest.mark.asyncio
+    async def test_export_summary_without_a_configured_entry(self, mock_hass):
+        """No entry means no summary, and no exception."""
+        mock_hass.config_entries.async_entries.return_value = []
+
+        await async_setup_services(mock_hass)
+        service_func = mock_hass.services.async_register.call_args_list[3][1][
+            "service_func"
+        ]
+        service_call = MagicMock()
+        service_call.hass = mock_hass
+
+        result = await service_func(service_call)
+
+        assert result["qvantum"]["exception"] == "not_loaded"
 
     @pytest.mark.asyncio
     async def test_extra_hot_water_service_success(self, mock_hass, mock_api):
