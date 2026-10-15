@@ -20,7 +20,7 @@ import logging
 import math
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
@@ -51,8 +51,10 @@ from .heating_curve import (
     interpolate_supply,
     normalize_baseline,
     precharge_adjustment_c,
+    ActiveRoomGain,
     room_compensation_gain,
     room_corrected_deviation,
+    room_gain_from_active_hours,
     trim_evidence_hours,
     trim_residuals,
 )
@@ -102,6 +104,9 @@ TRIM_WINDOW_DAYS = 7
 #: Minimum time between trim updates.
 TRIM_REFRESH_HOURS = 24.0
 #: Faster cadence until the first trims exist: the evidence needed for them is
+#: Days of hourly statistics read for the active-hour room-gain measurement.
+ROOM_GAIN_ACTIVE_WINDOW_DAYS = 7
+
 #: already in the 7-day window, so waiting a full day only delays the first
 #: correction. Once any trim is in place the proven daily step takes over.
 TRIM_FIRST_REFRESH_HOURS = 3.0
@@ -518,6 +523,55 @@ def _daily_from_state(state: Any) -> SolarDailyModel | None:
         return None
 
 
+def _active_gain_to_state(estimate: ActiveRoomGain | None) -> dict[str, Any] | None:
+    if estimate is None:
+        return None
+    return {
+        "gain": estimate.gain_c_per_c,
+        "source": estimate.source,
+        "hours": estimate.hours,
+        "buckets": estimate.buckets,
+        "span": estimate.span_c,
+        "std_err": estimate.std_err_c_per_c,
+        "r2": estimate.r2,
+        "residual": estimate.residual_std_c,
+        "loo": estimate.leave_one_out_c_per_c,
+        "valid": estimate.valid,
+        "notes": estimate.notes,
+    }
+
+
+def _active_gain_from_state(state: Any) -> ActiveRoomGain | None:
+    if not isinstance(state, dict):
+        return None
+
+    def optional(raw: Any) -> float | None:
+        if raw is None or isinstance(raw, bool):
+            return None
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return None
+        return value if math.isfinite(value) else None
+
+    try:
+        return ActiveRoomGain(
+            gain_c_per_c=float(state["gain"]),
+            source=str(state["source"]) if state.get("source") else None,
+            hours=int(state.get("hours", 0)),
+            buckets=int(state.get("buckets", 0)),
+            span_c=float(state.get("span", 0.0)),
+            std_err_c_per_c=optional(state.get("std_err")),
+            r2=optional(state.get("r2")),
+            residual_std_c=optional(state.get("residual")),
+            leave_one_out_c_per_c=optional(state.get("loo")),
+            valid=bool(state.get("valid", False)),
+            notes=str(state.get("notes", "")),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def _model_from_state(state: Any) -> SolarModel | None:
     if not isinstance(state, dict):
         return None
@@ -589,6 +643,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         # measured slope to check the identity.
         self._room_gain_fitted: float | None = None
         self._room_gain_fitted_source: str | None = None
+        # The active-hour measurement, kept beside the fitted one: it is the
+        # only clean slope on an installation that runs active permanently.
+        self._room_gain_active: ActiveRoomGain | None = None
+        self._room_gain_active_ts: float | None = None
         # Whether ``_room_gain`` came from that factor: a factor that turns
         # unusable must drop the gain it set rather than leave it applied.
         self._room_gain_from_factor = False
@@ -672,6 +730,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "room_gain_from_factor": self._room_gain_from_factor,
             "room_gain_fitted": self._room_gain_fitted,
             "room_gain_fitted_source": self._room_gain_fitted_source,
+            "room_gain_active": _active_gain_to_state(self._room_gain_active),
+            "room_gain_active_ts": self._room_gain_active_ts,
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "mode": self._mode,
             "revert_pending": self._revert_pending,
@@ -788,6 +848,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         fitted_source = data.get("room_gain_fitted_source")
         if fitted_source in INDOOR_METRIC_KEYS:
             self._room_gain_fitted_source = str(fitted_source)
+        self._room_gain_active = _active_gain_from_state(data.get("room_gain_active"))
+        active_ts = data.get("room_gain_active_ts")
+        if isinstance(active_ts, (int, float)) and not isinstance(active_ts, bool):
+            self._room_gain_active_ts = float(active_ts)
         margins = data.get("indoor_margins")
         if isinstance(margins, list):
             for item in margins:
@@ -1596,6 +1660,84 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         _LOGGER.info("Room-compensation gain dropped: no usable pump factor")
         await self._async_persist()
 
+    async def _async_room_gain_from_active(self) -> ActiveRoomGain | None:
+        """Measure the room term on hours the pump followed **our** table.
+
+        On Auto the pump's own control carries the room term, so a fit there
+        measures a closed loop; while the curve is active our written table is
+        exogenous and the room term is what moves the supply inside an outdoor
+        bucket. Diagnostics only — the applied gain stays the pump's factor.
+
+        Needs the start of the active segment (``active_since_ts``): without it
+        there is no way to tell our hours from the pump's.
+        """
+        if self._active_since_ts is None:
+            return None
+        resolved = self._resolve_statistic_ids()
+        outdoor_id = resolved.get("bt1")
+        supply_id = resolved.get("cal_heat_temp")
+        if not outdoor_id or not supply_id:
+            return None
+        target = self._main_values().get("indoor_temperature_target")
+        if not isinstance(target, (int, float)) or isinstance(target, bool):
+            return None
+        indoor_ids = indoor_metric_entity_ids(resolved)
+        if not indoor_ids:
+            return None
+        power_id = resolved.get("heatingpower")
+        statistic_ids = {outdoor_id, supply_id, *indoor_ids.values()}
+        if power_id:
+            statistic_ids.add(power_id)
+        since = max(
+            dt_util.utcnow() - timedelta(days=ROOM_GAIN_ACTIVE_WINDOW_DAYS),
+            datetime.fromtimestamp(self._active_since_ts, tz=timezone.utc),
+        )
+        rows = await self._async_statistics(statistic_ids, since)
+        outdoor = _hourly_series(rows, outdoor_id)
+        supply = _hourly_series(rows, supply_id)
+        indoor_key, indoor = self._indoor_series(resolved, rows)
+        power = _hourly_series(rows, power_id) if power_id else {}
+        if not indoor or indoor_key is None:
+            return None
+        target_c = float(target)
+        observations = [
+            (outdoor[ts], supply[ts], indoor[ts] - target_c)
+            for ts in sorted(set(outdoor) & set(supply) & set(indoor))
+            if ts >= self._active_since_ts
+            and (not power_id or power.get(ts, 0.0) >= MIN_SAMPLE_Q_W)
+        ]
+        estimate = room_gain_from_active_hours(observations)
+        # Bind the measurement to the sensor it was taken against.
+        return replace(estimate, source=indoor_key)
+
+    async def _async_refresh_active_room_gain(self, now_ts: float) -> None:
+        """Run the active-hour measurement at most every few hours."""
+        if not self.active or self._active_since_ts is None:
+            return
+        if (
+            self._room_gain_active_ts is not None
+            and now_ts - self._room_gain_active_ts
+            < BASELINE_LEARN_REFRESH_HOURS * 3600.0
+        ):
+            return
+        self._room_gain_active_ts = now_ts
+        try:
+            estimate = await self._async_room_gain_from_active()
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa: BLE001 — measurement is best effort
+            _LOGGER.debug("Active-hour room-gain measurement unavailable: %s", err)
+            return
+        if estimate is not None:
+            self._room_gain_active = estimate
+            _LOGGER.debug(
+                "Room gain measured on active hours: %.2f °C/°C (valid=%s, %s)",
+                estimate.gain_c_per_c,
+                estimate.valid,
+                estimate.notes or "no notes",
+            )
+        await self._async_persist()
+
     async def _async_room_gain(self) -> tuple[float, str] | None:
         """Identify the pump's room-compensation gain from observed Auto hours.
 
@@ -2042,6 +2184,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         # The pump's own factor is the gain whenever it reports one; the fitted
         # fallback runs during baseline learning below.
         await self._async_sync_room_gain(values)
+        # …and while the curve is active, measure the term on our own hours.
+        await self._async_refresh_active_room_gain(now_ts)
 
         # Learn what Auto actually delivers while the pump still follows it;
         # once active, cal_heat_temp would mirror our own table.

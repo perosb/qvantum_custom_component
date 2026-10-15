@@ -17,6 +17,7 @@ from homeassistant.exceptions import HomeAssistantError
 from custom_components.qvantum import curve_coordinator as cc
 from custom_components.qvantum.const import HP_STATUS_HEATING
 from custom_components.qvantum.heating_curve import (
+    ActiveRoomGain,
     COP_FEEDBACK_MAX_C,
     PRECHARGE_MAX_C,
     TOTAL_MAX_C,
@@ -131,6 +132,8 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._room_gain_factor = None
     coordinator._room_gain_from_factor = False
     coordinator._room_gain_fitted = None
+    coordinator._room_gain_active = None
+    coordinator._room_gain_active_ts = None
     coordinator._room_gain_fitted_source = None
     coordinator._clamped_state = False
     coordinator._forecast = None
@@ -3129,3 +3132,126 @@ async def test_snapshot_applies_the_day_block_solar_term() -> None:
     censored = await coordinator._async_compute_snapshot()
 
     assert censored.solar_c == 0.0
+
+
+def active_gain_hours():
+    """Hourly statistics for the active-hour measurement (seconds, like HA)."""
+    # The indoor picker needs its minimum history before it resolves a key.
+    hours = [1_760_000_000 + index * 3600 for index in range(30)]
+    rows = {}
+    for ts in hours:
+        rows.setdefault("sensor.t", []).append({"start": ts, "mean": 8.0})
+        rows.setdefault("sensor.s", []).append({"start": ts, "mean": 28.0})
+        rows.setdefault("sensor.i", []).append({"start": ts, "mean": 20.0})
+        rows.setdefault("sensor.q", []).append({"start": ts, "mean": 900.0})
+    return hours, rows
+
+
+async def test_the_active_gain_is_measured_on_our_own_hours() -> None:
+    """The slope comes from the active segment, against the resolved sensor."""
+    hours, rows = active_gain_hours()
+    coordinator = make_coordinator(values={**VALUES, "sensor_mode": 4}, settings=SETTINGS)
+    coordinator._active_since_ts = hours[0] - 1
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "heatingpower": "sensor.q",
+            "bt2": "sensor.i",
+        }
+    )
+    coordinator._async_statistics = AsyncMock(return_value=rows)
+
+    estimate = await coordinator._async_room_gain_from_active()
+
+    assert estimate is not None
+    assert estimate.source == "bt2"
+    # Flat statistics: no slope, so nothing is published.
+    assert not estimate.valid
+
+
+async def test_the_active_gain_ignores_hours_before_the_segment() -> None:
+    """Only hours after ``active_since_ts`` count as ours."""
+    hours, rows = active_gain_hours()
+    coordinator = make_coordinator(values={**VALUES, "sensor_mode": 4}, settings=SETTINGS)
+    coordinator._active_since_ts = hours[-2]  # only the last two hours
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "heatingpower": "sensor.q",
+            "bt2": "sensor.i",
+        }
+    )
+    coordinator._async_statistics = AsyncMock(return_value=rows)
+
+    estimate = await coordinator._async_room_gain_from_active()
+
+    assert estimate is not None
+    # Only the two in-segment hours were considered, and they carry no spread.
+    assert estimate.hours == 2
+    assert not estimate.valid
+
+
+async def test_the_active_gain_needs_a_segment_start() -> None:
+    """Without the stamp there is no way to tell our hours from the pump's."""
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+
+    assert await coordinator._async_room_gain_from_active() is None
+
+
+async def test_the_active_gain_refresh_is_throttled_and_persisted() -> None:
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._mode = "active"
+    coordinator._active_since_ts = 1_760_000_000.0
+    coordinator._async_persist = AsyncMock()
+    coordinator._async_room_gain_from_active = AsyncMock(
+        return_value=ActiveRoomGain(
+            gain_c_per_c=4.33, hours=18, buckets=3, span_c=0.9, valid=True
+        )
+    )
+
+    await coordinator._async_refresh_active_room_gain(1_760_100_000.0)
+    assert coordinator._async_room_gain_from_active.await_count == 1
+    assert coordinator._room_gain_active.gain_c_per_c == pytest.approx(4.33)
+    assert coordinator._async_persist.await_count == 1
+
+    # A second call within the refresh window does nothing.
+    await coordinator._async_refresh_active_room_gain(1_760_100_100.0)
+    assert coordinator._async_room_gain_from_active.await_count == 1
+
+
+async def test_the_active_gain_round_trips_through_the_store() -> None:
+    store = FakeStore(
+        {
+            "room_gain_active": {
+                "gain": 4.33,
+                "source": "room_temp_external",
+                "hours": 18,
+                "buckets": 3,
+                "span": 0.96,
+                "std_err": 0.4,
+                "r2": 0.88,
+                "residual": 0.15,
+                "loo": 2.47,
+                "valid": False,
+                "notes": "one hour carries the estimate",
+            },
+            "room_gain_active_ts": 1_760_100_000.0,
+        }
+    )
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    estimate = coordinator._room_gain_active
+    assert estimate is not None
+    assert estimate.gain_c_per_c == pytest.approx(4.33)
+    assert estimate.source == "room_temp_external"
+    assert estimate.hours == 18
+    assert estimate.leave_one_out_c_per_c == pytest.approx(2.47)
+    assert estimate.valid is False
+    assert coordinator._room_gain_active_ts == pytest.approx(1_760_100_000.0)
+    assert coordinator._state_payload()["room_gain_active"]["gain"] == pytest.approx(
+        4.33
+    )

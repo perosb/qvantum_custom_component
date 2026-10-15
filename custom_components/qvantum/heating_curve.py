@@ -98,6 +98,21 @@ ROOM_GAIN_MIN_SPAN_C = 0.3
 #: Upper bound on the identified gain (supply °C per °C room error).
 ROOM_GAIN_MAX_C = 25.0
 
+#: Outdoor bucket width for the active-hour measurement. Wide enough that a
+#: bucket holds several hours, narrow enough that the table's own slope inside
+#: it is negligible.
+ROOM_GAIN_ACTIVE_BUCKET_C = 2.0
+#: Gates for a publishable active-hour measurement.
+ROOM_GAIN_ACTIVE_MIN_HOURS = 18
+ROOM_GAIN_ACTIVE_MIN_BUCKETS = 3
+ROOM_GAIN_ACTIVE_MIN_BUCKET_HOURS = 2
+#: The measurement may not hinge on a single hour: on the live pump one hour
+#: moved the two-regressor fit between 4.40 and 6.24 °C/°C.
+ROOM_GAIN_ACTIVE_MAX_LOO_C = 0.5
+#: …and it has to be distinguishable from zero and actually explain the supply.
+ROOM_GAIN_ACTIVE_MIN_T = 4.0
+ROOM_GAIN_ACTIVE_MIN_R2 = 0.8
+
 #: Recency half-life for the indoor-error trim observations.
 TRIM_HALF_LIFE_DAYS = 2.0
 #: Hourly observations in an outdoor bucket before it carries evidence.
@@ -557,6 +572,207 @@ def room_compensation_gain(
     # b2 is the room slope; g = −b2.
     slope_error = (s_oo * s_er - s_oe * s_or) / determinant
     return _clamp(-slope_error, 0.0, max_gain_c)
+
+
+@dataclass(frozen=True)
+class ActiveRoomGain:
+    """A room-gain measurement from hours the pump followed **our** table.
+
+    ``valid`` is ``False`` whenever an evidence gate fails; callers then publish
+    nothing rather than a guess. The evidence travels with the number so a
+    reader can weigh it — the leave-one-out swing is the one that showed the
+    two-regressor fit being decided by a single high-leverage hour.
+    """
+
+    gain_c_per_c: float
+    hours: int
+    buckets: int
+    span_c: float
+    #: The indoor metric the slope was measured against, so a caller can bind it
+    #: to that sensor instead of applying it to another one's room error.
+    source: str | None = None
+    std_err_c_per_c: float | None = None
+    r2: float | None = None
+    residual_std_c: float | None = None
+    leave_one_out_c_per_c: float | None = None
+    valid: bool = False
+    notes: str = ""
+
+    @property
+    def t_stat(self) -> float | None:
+        """Slope over its standard error, or ``None`` when unknown."""
+        if not self.std_err_c_per_c:
+            return None
+        return self.gain_c_per_c / self.std_err_c_per_c
+
+
+def room_gain_from_active_hours(
+    observations: Sequence[tuple[float, float, float]],
+    *,
+    bucket_c: float = ROOM_GAIN_ACTIVE_BUCKET_C,
+    min_hours: int = ROOM_GAIN_ACTIVE_MIN_HOURS,
+    min_buckets: int = ROOM_GAIN_ACTIVE_MIN_BUCKETS,
+    min_bucket_hours: int = ROOM_GAIN_ACTIVE_MIN_BUCKET_HOURS,
+    min_span_c: float = ROOM_GAIN_MIN_SPAN_C,
+    max_loo_c: float = ROOM_GAIN_ACTIVE_MAX_LOO_C,
+    min_t: float = ROOM_GAIN_ACTIVE_MIN_T,
+    min_r2: float = ROOM_GAIN_ACTIVE_MIN_R2,
+    max_gain_c: float = ROOM_GAIN_MAX_C,
+) -> ActiveRoomGain:
+    """Measure the pump's room term from hours it followed our own table.
+
+    ``observations`` are ``(outdoor, cal_heat_temp, indoor − target)`` triples
+    measured **while the curve is active**: the pump's flow-line target is then
+    our written table plus its room term, so the room term is what moves the
+    supply inside an outdoor bucket.
+
+    Bucketing by outdoor temperature and centring inside each bucket absorbs the
+    table's shape — including its integer rounding — without fitting it, and an
+    hour that sits alone in its bucket is dropped. That is what makes this
+    robust where the two-regressor fit is decided by one hour.
+
+    The pump *lowers* its target when the room is warm, so the slope is negative
+    and the gain is ``−slope``. On Auto hours the same measurement would be
+    meaningless: the pump's own control carries the term there.
+    """
+    clean: list[tuple[float, float, float]] = []
+    for outdoor, supply, error in observations:
+        values = (float(outdoor), float(supply), float(error))
+        if all(math.isfinite(value) for value in values):
+            clean.append(values)
+
+    errors = [error for _, _, error in clean]
+    span_c = max(errors) - min(errors) if errors else 0.0
+
+    def unusable(notes: str) -> ActiveRoomGain:
+        return ActiveRoomGain(
+            gain_c_per_c=0.0,
+            hours=len(clean),
+            buckets=0,
+            span_c=span_c,
+            notes=notes,
+        )
+
+    if not clean:
+        return unusable("no usable hours")
+    if span_c < min_span_c:
+        return unusable(
+            f"the room error barely moved ({span_c:.2f} °C < {min_span_c:.2f})"
+        )
+
+    groups: dict[float, list[tuple[float, float]]] = {}
+    for outdoor, supply, error in clean:
+        groups.setdefault(round(outdoor / bucket_c), []).append((error, supply))
+    usable = [group for group in groups.values() if len(group) >= min_bucket_hours]
+    hours = sum(len(group) for group in usable)
+    if len(usable) < min_buckets or hours < min_hours:
+        return ActiveRoomGain(
+            gain_c_per_c=0.0,
+            hours=hours,
+            buckets=len(usable),
+            span_c=span_c,
+            notes=(
+                f"needs {min_buckets} outdoor buckets with {min_bucket_hours}+ hours "
+                f"and {min_hours} hours in total, has {len(usable)} and {hours}"
+            ),
+        )
+
+    def fit(rows: Sequence[tuple[float, float]], n_buckets: int):
+        """Centred single-slope fit: slope, se, r², residual std."""
+        xs: list[float] = []
+        ys: list[float] = []
+        for group in rows:
+            mean_error = sum(row[0] for row in group) / len(group)
+            mean_supply = sum(row[1] for row in group) / len(group)
+            for error, supply in group:
+                xs.append(error - mean_error)
+                ys.append(supply - mean_supply)
+        sxx = sum(value * value for value in xs)
+        if sxx <= 1e-12:
+            return None
+        sxy = sum(x * y for x, y in zip(xs, ys))
+        slope = sxy / sxx
+        residual = [y - slope * x for x, y in zip(xs, ys)]
+        dof = max(1, len(xs) - n_buckets - 1)
+        variance = sum(value * value for value in residual) / dof
+        mean_y = sum(ys) / len(ys)
+        total = sum((y - mean_y) ** 2 for y in ys)
+        return (
+            slope,
+            math.sqrt(variance / sxx),
+            1.0 - sum(value * value for value in residual) / total if total else None,
+            math.sqrt(variance),
+        )
+
+    fitted = fit(usable, len(usable))
+    if fitted is None:
+        return ActiveRoomGain(
+            gain_c_per_c=0.0,
+            hours=hours,
+            buckets=len(usable),
+            span_c=span_c,
+            notes="the room error does not vary inside the buckets",
+        )
+    slope, std_err, r2, residual_std = fitted
+    gain = -slope
+
+    # Leave-one-out: the swing that tells whether one hour carries the number.
+    swings: list[float] = []
+    for group_index, group in enumerate(usable):
+        for row_index in range(len(group)):
+            thinned = list(usable)
+            thinned[group_index] = [
+                row for index, row in enumerate(group) if index != row_index
+            ]
+            thinned = [item for item in thinned if len(item) >= min_bucket_hours]
+            if len(thinned) < min_buckets:
+                continue
+            other = fit(thinned, len(thinned))
+            if other is not None:
+                swings.append(abs(-other[0] - gain))
+    leave_one_out = max(swings) if swings else None
+
+    notes = ""
+    valid = True
+    if not 0.0 < gain <= max_gain_c:
+        valid = False
+        notes = (
+            f"the measured slope is not a room term ({gain:+.2f} °C/°C): the pump "
+            "does not visibly compensate on these hours"
+        )
+    elif leave_one_out is None:
+        valid = False
+        notes = "too few hours per bucket to test whether one hour carries it"
+    elif leave_one_out > max_loo_c:
+        valid = False
+        notes = (
+            f"one hour carries the estimate (leave-one-out {leave_one_out:.2f} "
+            f"°C/°C > {max_loo_c:.2f})"
+        )
+    elif std_err <= 0.0 or abs(gain / std_err) < min_t:
+        valid = False
+        notes = (
+            "the slope is not distinguishable from zero "
+            f"(t = {gain / std_err if std_err else float('nan'):+.1f} < {min_t:.1f})"
+        )
+    elif r2 is not None and r2 < min_r2:
+        valid = False
+        notes = (
+            f"the room error explains too little of the supply (R² {r2:.2f} < "
+            f"{min_r2:.2f})"
+        )
+    return ActiveRoomGain(
+        gain_c_per_c=gain,
+        hours=hours,
+        buckets=len(usable),
+        span_c=span_c,
+        std_err_c_per_c=std_err,
+        r2=r2,
+        residual_std_c=residual_std,
+        leave_one_out_c_per_c=leave_one_out,
+        valid=valid,
+        notes=notes,
+    )
 
 
 def room_corrected_deviation(
