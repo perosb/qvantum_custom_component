@@ -94,6 +94,15 @@ touches — gets its own branch from the latest `main`; never append it to that
 PR's branch. Before pushing to a PR branch, check `gh pr view <n> --json state`:
 a merged PR's branch is gone, so branch from `main` again.
 
+`/root/.gitconfig` does not survive a container restart, so both the identity and
+the credential helper have to be set **per repo**:
+
+```bash
+git config --local user.name "Per Osbäck"
+git config --local user.email "982752+perosb@users.noreply.github.com"
+git config --local credential.helper '!gh auth git-credential'   # or push fails on username
+```
+
 **Worktrees live in `${TMPDIR:-/tmp}`.** Never create `<repo>-pr-<n>` next to the
 checkout. Never switch the primary checkout to inspect a PR (another session may
 own it). Exception: a fresh single-session clone (CI) — use that checkout, no
@@ -301,6 +310,13 @@ access, so no control is offered when a write would fail.
   by default, persisted in the curve Store, and enabled via
   `qvantum.set_curve_terms`. They only apply while the curve is active and
   never override the indoor cap or the total clamp.
+  That veto needs a **fresh indoor reading**: `_push_indoor_margin` feeds it from
+  the room error and keeps 24 h of samples, so with `sensor_mode` DISABLED / BT3
+  / AUX (or a sensor that has been unavailable for a day) the cap is inert and
+  nothing brakes a warm house. The diagnostics and the deviation sensor report
+  `indoor_cap_armed` / `indoor_margin_c` so that state is visible rather than
+  inferred from a warm room — do not lean on the cap as a guarantee without
+  checking it.
 - Adaptive-curve `ready` compares the *learned baseline* (not the adjusted
   shadow) to `cal_heat_temp` on heating hours, with the pump's room term
   removed. Gates: median ≤ 1.5 °C and p95 ≤ 3.0 °C over ≥ 3 days and ≥ 24
