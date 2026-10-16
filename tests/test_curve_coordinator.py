@@ -3251,7 +3251,9 @@ async def test_the_active_gain_round_trips_through_the_store() -> None:
     assert estimate.hours == 18
     assert estimate.leave_one_out_c_per_c == pytest.approx(2.47)
     assert estimate.valid is False
-    assert coordinator._room_gain_active_ts == pytest.approx(1_760_100_000.0)
+    # The attempt stamp is not persisted: a reload measures again at once
+    # rather than waiting out the throttle with a stamp from the previous run.
+    assert coordinator._room_gain_active_ts is None
     assert coordinator._state_payload()["room_gain_active"]["gain"] == pytest.approx(
         4.33
     )
