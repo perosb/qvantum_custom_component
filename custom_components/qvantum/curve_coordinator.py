@@ -730,7 +730,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "room_gain_fitted": self._room_gain_fitted,
             "room_gain_fitted_source": self._room_gain_fitted_source,
             "room_gain_active": _active_gain_to_state(self._room_gain_active),
-            "room_gain_active_ts": self._room_gain_active_ts,
+            # ``_room_gain_active_ts`` is deliberately *not* persisted: the
+            # throttle bounds steady-state work, and a reload is the natural
+            # moment to measure again — a persisted stamp made a fixed build
+            # wait up to six hours before its first attempt.
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "mode": self._mode,
             "revert_pending": self._revert_pending,
@@ -848,9 +851,6 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if fitted_source in INDOOR_METRIC_KEYS:
             self._room_gain_fitted_source = str(fitted_source)
         self._room_gain_active = _active_gain_from_state(data.get("room_gain_active"))
-        active_ts = data.get("room_gain_active_ts")
-        if isinstance(active_ts, (int, float)) and not isinstance(active_ts, bool):
-            self._room_gain_active_ts = float(active_ts)
         margins = data.get("indoor_margins")
         if isinstance(margins, list):
             for item in margins:
