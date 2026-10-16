@@ -196,6 +196,14 @@ What it contains:
 | fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day**), cycling, SCOP, aux share, health grade |
 | verdicts | reserved for the derived analysis results (currently empty) |
 
+Run it **while the curve is active** when the room gain is the point: active hours
+are the only regime where that number measures the pump rather than the pump's own
+control loop. Everything else — the plant settings, the observed climate span, the
+identified envelope figures, the cycling and DHW numbers — is mode-independent, and
+a shadow-mode dump still carries the last active-hour measurement if the curve ran
+recently. The payload says which case it is: `curve.active`, and inside
+`room_gain.fitted` the `window`, `valid` and `notes`.
+
 The room gain is the part worth explaining, because three numbers that look
 alike are not: **configured** is the pump's own `room_comp_factor`, **applied**
 is what the curve's deviation correction uses (the factor when the pump reports
