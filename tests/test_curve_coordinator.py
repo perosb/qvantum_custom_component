@@ -3255,3 +3255,70 @@ async def test_the_active_gain_round_trips_through_the_store() -> None:
     assert coordinator._state_payload()["room_gain_active"]["gain"] == pytest.approx(
         4.33
     )
+
+
+async def test_the_active_gain_fetches_a_full_window_for_the_picker() -> None:
+    """A young segment must not starve the indoor picker of its history.
+
+    Measured on the live instance 2026-10-16: a 24 h segment held 23 hourly
+    rows and the picker needs 24, so the measurement silently produced nothing.
+    """
+    hours, rows = active_gain_hours()
+    coordinator = make_coordinator(values={**VALUES, "sensor_mode": 4}, settings=SETTINGS)
+    coordinator._active_since_ts = hours[-3]
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "heatingpower": "sensor.q",
+            "bt2": "sensor.i",
+        }
+    )
+    coordinator._async_statistics = AsyncMock(return_value=rows)
+
+    await coordinator._async_room_gain_from_active()
+
+    start = coordinator._async_statistics.await_args.args[1]
+    assert start < datetime.now(timezone.utc) - timedelta(days=6)
+
+
+async def test_the_active_gain_explains_why_it_cannot_measure() -> None:
+    """No indoor series: a reason in the dump, not a bare null."""
+    coordinator = make_coordinator(values={**VALUES, "sensor_mode": 4}, settings=SETTINGS)
+    coordinator._active_since_ts = 1_760_000_000.0
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={"bt1": "sensor.t", "cal_heat_temp": "sensor.s", "bt2": "sensor.i"}
+    )
+    coordinator._async_statistics = AsyncMock(return_value={})
+
+    estimate = await coordinator._async_room_gain_from_active()
+
+    assert estimate is not None
+    assert estimate.valid is False
+    assert "no indoor series" in estimate.notes
+
+
+async def test_a_valid_measurement_survives_a_failed_run() -> None:
+    """A transient "not measurable" must not overwrite a real number."""
+    valid = ActiveRoomGain(
+        gain_c_per_c=4.9, hours=20, buckets=4, span_c=0.9, valid=True
+    )
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._mode = "active"
+    coordinator._active_since_ts = 1_760_000_000.0
+    coordinator._room_gain_active = valid
+    coordinator._async_persist = AsyncMock()
+    coordinator._async_room_gain_from_active = AsyncMock(
+        return_value=ActiveRoomGain(
+            gain_c_per_c=0.0,
+            hours=0,
+            buckets=0,
+            span_c=0.0,
+            valid=False,
+            notes="no indoor series",
+        )
+    )
+
+    await coordinator._async_refresh_active_room_gain(1_760_100_000.0)
+
+    assert coordinator._room_gain_active is valid

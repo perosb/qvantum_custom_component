@@ -57,6 +57,7 @@ _CURVE_TIMESTAMP_FIELDS = (
     "_last_baseline_learn_ts",
     "_last_active_ts",
     "_active_since_ts",
+    "_room_gain_active_ts",
     "_last_trim_ts",
 )
 

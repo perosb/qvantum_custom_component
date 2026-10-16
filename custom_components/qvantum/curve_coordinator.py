@@ -1672,32 +1672,49 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         """
         if self._active_since_ts is None:
             return None
+
+        def cannot(notes: str) -> ActiveRoomGain:
+            """An estimate-shaped answer for "not measurable", with the reason.
+
+            Returning ``None`` here would leave a support dump with a bare null:
+            the caller stores the object, so the dump says *why* there is no
+            measurement.
+            """
+            return ActiveRoomGain(
+                gain_c_per_c=0.0, hours=0, buckets=0, span_c=0.0, valid=False, notes=notes
+            )
+
         resolved = self._resolve_statistic_ids()
         outdoor_id = resolved.get("bt1")
         supply_id = resolved.get("cal_heat_temp")
         if not outdoor_id or not supply_id:
-            return None
+            return cannot("the outdoor or flow-line statistic does not resolve")
         target = self._main_values().get("indoor_temperature_target")
         if not isinstance(target, (int, float)) or isinstance(target, bool):
-            return None
+            return cannot("no indoor target in the payload")
         indoor_ids = indoor_metric_entity_ids(resolved)
         if not indoor_ids:
-            return None
+            return cannot("no indoor metric resolves to an entity")
         power_id = resolved.get("heatingpower")
         statistic_ids = {outdoor_id, supply_id, *indoor_ids.values()}
         if power_id:
             statistic_ids.add(power_id)
-        since = max(
-            dt_util.utcnow() - timedelta(days=ROOM_GAIN_ACTIVE_WINDOW_DAYS),
-            datetime.fromtimestamp(self._active_since_ts, tz=timezone.utc),
-        )
+        # Fetch the *full* window even though only the active segment is used:
+        # the indoor picker needs its own minimum history before it resolves a
+        # sensor, and a segment younger than that has fewer rows — measured
+        # 2026-10-16: a 24 h segment held 23 hourly rows and the measurement
+        # silently produced nothing.
+        since = dt_util.utcnow() - timedelta(days=ROOM_GAIN_ACTIVE_WINDOW_DAYS)
         rows = await self._async_statistics(statistic_ids, since)
         outdoor = _hourly_series(rows, outdoor_id)
         supply = _hourly_series(rows, supply_id)
         indoor_key, indoor = self._indoor_series(resolved, rows)
         power = _hourly_series(rows, power_id) if power_id else {}
         if not indoor or indoor_key is None:
-            return None
+            return cannot(
+                "no indoor series with enough history in the last "
+                f"{ROOM_GAIN_ACTIVE_WINDOW_DAYS} days"
+            )
         target_c = float(target)
         observations = [
             (outdoor[ts], supply[ts], indoor[ts] - target_c)
@@ -1728,7 +1745,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             _LOGGER.debug("Active-hour room-gain measurement unavailable: %s", err)
             return
         if estimate is not None:
-            self._room_gain_active = estimate
+            previous = self._room_gain_active
+            if estimate.valid or previous is None or not previous.valid:
+                # A real measurement survives a transient "not measurable" run;
+                # the reason is only kept when there is nothing better.
+                self._room_gain_active = estimate
             _LOGGER.debug(
                 "Room gain measured on active hours: %.2f °C/°C (valid=%s, %s)",
                 estimate.gain_c_per_c,
