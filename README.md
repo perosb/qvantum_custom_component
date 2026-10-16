@@ -209,10 +209,10 @@ alike are not: **configured** is the pump's own `room_comp_factor`, **applied**
 is what the curve's deviation correction uses (the factor when the pump reports
 a usable one, else the fitted slope) and **fitted** is a *measurement* — taken on
 hours the pump followed our own table when such hours exist, otherwise from Auto
-hours. The measurement carries `valid`, `notes`, the hour count and its
-leave-one-out swing, because on this data one hour can move the number by more
-than the effect being measured. It never changes what is applied: the factor
-does.
+hours. The measurement carries `valid`, `notes`, the hour count, its standard
+error (with `t`) and its leave-one-out swing, because on this data one hour can
+move the number by more than the effect being measured. It never changes what is
+applied: the factor does.
 
 What it **never** contains: entity ids or names, coordinates, energy totals,
 schedules, sensor identities, or any raw hourly series. The payload is built by

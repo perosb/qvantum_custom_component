@@ -404,4 +404,6 @@ def test_an_active_measurement_travels_with_its_evidence() -> None:
     assert fitted["hours"] == 18
     assert fitted["buckets"] == 3
     assert fitted["r2"] == 0.88
+    assert fitted["std_err_c_per_c"] == 0.40
+    assert fitted["t_stat"] == pytest.approx(4.33 / 0.40)
     assert fitted["leave_one_out_c_per_c"] == 2.47

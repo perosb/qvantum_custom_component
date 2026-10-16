@@ -540,6 +540,8 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["room_gain_active"]["gain_c_per_c"] == 4.33
     assert curve["room_gain_active"]["valid"] is False
     assert curve["room_gain_active"]["leave_one_out_c_per_c"] == 2.47
+    assert curve["room_gain_active"]["std_err_c_per_c"] == 0.4
+    assert curve["room_gain_active"]["t_stat"] == pytest.approx(4.33 / 0.4)
     assert curve["room_gain_active"]["source"] == "room_temp_external"
     assert curve["room_gain_fitted_source"] == "room_temp_external"
     # Whether the warm-house brake can act at all.
