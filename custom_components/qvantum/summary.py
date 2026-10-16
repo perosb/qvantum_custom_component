@@ -68,7 +68,7 @@ _ENTITY_PREFIXES = (
 )
 
 #: Bump when a field is added, removed or changes meaning: the pool groups by it.
-SUMMARY_SCHEMA_VERSION = 3  # room gain grouped, with the active measurement
+SUMMARY_SCHEMA_VERSION = 4  # room-gain evidence carries its standard error
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -264,6 +264,11 @@ def room_gain_summary(coordinator: Any) -> dict[str, Any]:
             "hours": _number(getattr(active, "hours", None)),
             "buckets": _number(getattr(active, "buckets", None)),
             "r2": _number(getattr(active, "r2", None)),
+            # The standard error (and its t) is what lets a borderline estimate
+            # be weighed instead of discarded: a low R² with a tight interval is
+            # still evidence, and the pool should decide rather than the gate.
+            "std_err_c_per_c": _number(getattr(active, "std_err_c_per_c", None)),
+            "t_stat": _number(getattr(active, "t_stat", None)),
             "leave_one_out_c_per_c": _number(
                 getattr(active, "leave_one_out_c_per_c", None)
             ),
@@ -280,6 +285,8 @@ def room_gain_summary(coordinator: Any) -> dict[str, Any]:
             "hours": None,
             "buckets": None,
             "r2": None,
+            "std_err_c_per_c": None,
+            "t_stat": None,
             "leave_one_out_c_per_c": None,
         }
     return {
