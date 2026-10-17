@@ -272,6 +272,13 @@ Entities:
   was watched doing, so readiness says nothing about them yet.
   The `ready`/`blocker` attributes describe the baseline-vs-pump window, not
   this sensor's own value. Diagnostic entity, enabled by default.
+  A failed forecast refetch does not immediately turn `blocker` into
+  `forecast`: the previous hourly payload stands while it still covers the
+  current hour and is under `FORECAST_REUSE_HOURS` old, because Open-Meteo
+  answers a small fraction of requests with a 503 well inside its quota and the
+  payload barely moves between two 15-minute cycles. `forecast_reused` in the
+  config-entry diagnostics says whether the last cycle served that cached
+  payload.
 - `sensor.qvantum_adaptive_curve_room_error` — the **outcome**: the median
   `|indoor − target|` over the readiness window, with the signed `median_c`,
   `p90_abs_c`, `samples` and the `source` indoor metric as attributes. Readiness
@@ -312,10 +319,12 @@ trims correct those points once the weather gets there, which is why a winter
 curve should be watched rather than assumed. The 95th percentile replaces an absolute maximum because single
 mode-switch hours are transients, not a curve error. The
 `blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
-`window`, `median`, `max`). `ready` is a signal, not an activation. `ready`
-needs the recorder running with ≥ 90 % window coverage and at least 24 heating
-hours: without hourly statistics the window stays incomplete and `blocker` is
-`window`. The deviation sensor is a Diagnostic entity and is enabled by
+`window`, `median`, `max`). A transient forecast failure counts as missing only
+when no payload covering the current hour is still cached, so a sporadic
+Open-Meteo 503 does not collapse the window. `ready` is a signal, not an
+activation. `ready` needs the recorder running with ≥ 90 % window coverage and
+at least 24 heating hours: without hourly statistics the window stays
+incomplete and `blocker` is `window`. The deviation sensor is a Diagnostic entity and is enabled by
 default; it is informational and no longer feeds the readiness window.
 
 Turning the switch on:

@@ -359,6 +359,7 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "shadow": None if snapshot is None else getattr(snapshot, "shadow", None),
         "revert_pending": bool(getattr(coordinator, "_revert_pending", False)),
         "forecast_ok": bool(getattr(coordinator, "_forecast_ok", False)),
+        "forecast_reused": bool(getattr(coordinator, "_forecast_reused", False)),
         "baseline": dict(baseline) if isinstance(baseline, dict) else {},
         "baseline_auto": getattr(coordinator, "_baseline_auto", None),
         "temp_compensation_curve": getattr(coordinator, "_curve_23", None),

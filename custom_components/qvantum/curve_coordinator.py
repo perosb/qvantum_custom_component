@@ -59,6 +59,7 @@ from .heating_curve import (
     trim_residuals,
 )
 from .open_meteo import (
+    FORECAST_REUSE_HOURS,
     OpenMeteoError,
     WeatherForecast,
     fetch_forecast,
@@ -652,6 +653,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._clamped_state = False
         self._forecast: WeatherForecast | None = None
         self._forecast_ok = False
+        # When the payload in ``_forecast`` was fetched, so a failed refetch can
+        # keep using it while it still covers the current hour.
+        self._forecast_ts: float | None = None
+        # True when the last cycle served the cached payload instead of a
+        # fresh one; surfaced in diagnostics so a stale forecast is visible.
+        self._forecast_reused = False
         self._indoor_margins: deque[tuple[float, float]] = deque(
             maxlen=INDOOR_MARGIN_CYCLES
         )
@@ -1280,6 +1287,45 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if latitude is None or longitude is None:
             raise OpenMeteoError("Home Assistant location is not configured")
         return await fetch_forecast(self.session, latitude, longitude)
+
+    async def _async_refresh_forecast(self, now_ts: float) -> None:
+        """Fetch the forecast; keep the last good one across a failed request.
+
+        Open-Meteo answers a small fraction of requests with a 503 even well
+        inside its quota, and the hourly payload barely moves between two
+        15-minute cycles. Discarding a usable forecast on one such error would
+        flap ``forecast_ok`` and take the readiness window down with it, so an
+        error only keeps the previous payload while it still covers the current
+        hour (:attr:`WeatherForecast.covers`) and is younger than
+        :data:`FORECAST_REUSE_HOURS`. Past that the payload describes the wrong
+        hours, and ``forecast_ok`` turns false as before.
+        """
+        self._forecast_ok = False
+        self._forecast_reused = False
+        try:
+            self._forecast = await self._async_fetch_forecast()
+        except OpenMeteoError as err:
+            _LOGGER.debug("Curve forecast unavailable: %s", err)
+            if not self._forecast_reusable(now_ts):
+                self._forecast = None
+            else:
+                _LOGGER.debug(
+                    "Curve forecast: keeping the %.1f min old payload",
+                    (now_ts - (self._forecast_ts or now_ts)) / 60.0,
+                )
+                self._forecast_ok = True
+                self._forecast_reused = True
+            return
+        self._forecast_ts = now_ts
+        self._forecast_ok = True
+
+    def _forecast_reusable(self, now_ts: float) -> bool:
+        """Whether the cached forecast still describes the current hour."""
+        if self._forecast is None or self._forecast_ts is None:
+            return False
+        if now_ts - self._forecast_ts > FORECAST_REUSE_HOURS * 3600.0:
+            return False
+        return self._forecast.covers(now_ts)
 
     def _calibration_due(self, now_ts: float) -> bool:
         """Throttle calibration attempts, not only successful ones.
@@ -2213,11 +2259,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
 
         self._forecast_ok = False
         if self._baseline is not None:
-            try:
-                self._forecast = await self._async_fetch_forecast()
-                self._forecast_ok = True
-            except OpenMeteoError as err:
-                _LOGGER.debug("Curve forecast unavailable: %s", err)
+            await self._async_refresh_forecast(now_ts)
 
         if self._calibration_due(now_ts):
             await self._async_calibrate(now_ts)

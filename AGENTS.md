@@ -356,6 +356,12 @@ access, so no control is offered when a write would fail.
   calibration retries within the hour when it cannot fetch its inputs
   (`CALIBRATION_RETRY_HOURS`) and waits `CALIBRATION_REFRESH_HOURS` after a
   completed attempt; the flag is persisted and exposed as `calibration_ok`.
+- A failed **forecast** refetch keeps the previous payload while it still
+  covers the current hour and is under `FORECAST_REUSE_HOURS` old (both
+  coordinators, `WeatherForecast.covers`); Open-Meteo 503s sporadically well
+  inside its quota, and dropping a usable payload on one error flapped
+  `forecast_ok` and took the readiness window down with it. `forecast_reused`
+  in the diagnostics distinguishes a served-cached cycle from a fresh fetch.
 - Statistics-based curve features (trims, room gain, solar calibration) and
   the efficiency building metrics resolve the indoor sensor through
   `statistics.pick_indoor_metric_key`: the configured sensor wins once it has

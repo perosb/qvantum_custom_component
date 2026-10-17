@@ -40,7 +40,13 @@ from .const import (
 )
 from .dhw_loss import blend, standing_loss_kwh_per_day
 from .efficiency import aux_heat_share, scop_from_counters
-from .open_meteo import OpenMeteoError, fetch_forecast, fetch_ghi_history
+from .open_meteo import (
+    FORECAST_REUSE_HOURS,
+    OpenMeteoError,
+    WeatherForecast,
+    fetch_forecast,
+    fetch_ghi_history,
+)
 from .plant_analytics import (
     dhw_heat_meter_power_w,
     duty_cycle,
@@ -279,6 +285,9 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         self._solar_model: SolarModel | None = None
         self._solar_daily: SolarDailyModel | None = None
         self._last_solar_fit_ts: float | None = None
+        # Last good forecast and its fetch time, kept across a failed refetch.
+        self._solar_forecast: WeatherForecast | None = None
+        self._solar_forecast_ts: float | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -338,16 +347,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         ghi_now = None
         ghi_peak = None
         peak_in_hours = None
-        try:
-            forecast = await fetch_forecast(
-                self.session,
-                latitude,
-                longitude,
-                future_hours=SOLAR_FORECAST_FUTURE_HOURS,
-            )
-        except OpenMeteoError as err:
-            _LOGGER.debug("Solar forecast unavailable: %s", err)
-        else:
+        forecast = await self._async_forecast(latitude, longitude, now_ts)
+        if forecast is not None:
             ghi_by_hour = forecast.ghi_by_hour()
             ghi_now = smooth_ghi(ghi_by_hour, int(now_ts))
             future = [(ts, ghi) for ts, ghi in ghi_by_hour.items() if ts > now_ts]
@@ -370,6 +371,40 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             peak_in_hours=peak_in_hours,
             gain_w=gain,
         )
+
+    async def _async_forecast(
+        self, latitude: float, longitude: float, now_ts: float
+    ) -> WeatherForecast | None:
+        """The hourly forecast, keeping the last good one across a failed fetch.
+
+        Same policy as the curve coordinator's ``_async_refresh_forecast``: a
+        sporadic 503 must not blank the irradiance figure, so the previous
+        payload stands while it still covers the current hour and is younger
+        than :data:`FORECAST_REUSE_HOURS`.
+        """
+        try:
+            forecast = await fetch_forecast(
+                self.session,
+                latitude,
+                longitude,
+                future_hours=SOLAR_FORECAST_FUTURE_HOURS,
+            )
+        except OpenMeteoError as err:
+            _LOGGER.debug("Solar forecast unavailable: %s", err)
+            if self._solar_forecast_reusable(now_ts):
+                return self._solar_forecast
+            return None
+        self._solar_forecast = forecast
+        self._solar_forecast_ts = now_ts
+        return forecast
+
+    def _solar_forecast_reusable(self, now_ts: float) -> bool:
+        """Whether the cached forecast still describes the current hour."""
+        if self._solar_forecast is None or self._solar_forecast_ts is None:
+            return False
+        if now_ts - self._solar_forecast_ts > FORECAST_REUSE_HOURS * 3600.0:
+            return False
+        return self._solar_forecast.covers(now_ts)
 
     async def _async_refresh_solar_model(
         self,

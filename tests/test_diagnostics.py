@@ -482,6 +482,7 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["shadow"] is False
     assert curve["revert_pending"] is False
     assert curve["forecast_ok"] is True
+    assert curve["forecast_reused"] is False
     assert curve["baseline"]["curve_30"] == 28.0
     assert curve["baseline_auto"] is True
     assert curve["temp_compensation_curve"] == 20
