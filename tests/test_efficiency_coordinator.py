@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -37,6 +37,8 @@ def make_coordinator() -> QvantumEfficiencyCoordinator:
     coordinator._solar_model = None
     coordinator._solar_daily = None
     coordinator._last_solar_fit_ts = None
+    coordinator._solar_forecast = None
+    coordinator._solar_forecast_ts = None
     return coordinator
 
 
@@ -648,6 +650,62 @@ class TestSolar:
 
         assert snapshot.solar_ghi_now is None
         assert snapshot.solar_gain_now_w is None
+
+    async def test_forecast_failure_keeps_last_good_payload(self):
+        """A 503 after a good fetch must not blank the irradiance figure."""
+        coordinator = make_coordinator()
+        coordinator.hass.config.latitude = 59.3
+        coordinator.hass.config.longitude = 18.1
+        fixed = self._fixed_now()
+        now_ts = int(fixed.timestamp())
+        forecast = WeatherForecast(points=(HourlyWeather(now_ts, 5.0, 300.0),))
+        fetch = AsyncMock(side_effect=[forecast, ec.OpenMeteoError("503")])
+        later = fixed + timedelta(minutes=15)
+
+        with (
+            patch.object(ec.dt_util, "utcnow", return_value=fixed),
+            patch.object(ec, "resolve_statistic_entity_ids", return_value={}),
+            patch.object(ec, "fetch_forecast", fetch),
+        ):
+            first = await coordinator._async_compute_snapshot()
+
+        with (
+            patch.object(ec.dt_util, "utcnow", return_value=later),
+            patch.object(ec, "resolve_statistic_entity_ids", return_value={}),
+            patch.object(ec, "fetch_forecast", fetch),
+        ):
+            second = await coordinator._async_compute_snapshot()
+
+        assert first.solar_ghi_now is not None
+        assert second.solar_ghi_now == first.solar_ghi_now
+        assert fetch.await_count == 2
+
+    async def test_forecast_failure_drops_payload_past_reuse_window(self):
+        """The cached payload must not outlive the hours it describes."""
+        coordinator = make_coordinator()
+        coordinator.hass.config.latitude = 59.3
+        coordinator.hass.config.longitude = 18.1
+        fixed = self._fixed_now()
+        now_ts = int(fixed.timestamp())
+        forecast = WeatherForecast(points=(HourlyWeather(now_ts, 5.0, 300.0),))
+        fetch = AsyncMock(side_effect=[forecast, ec.OpenMeteoError("503")])
+        later = fixed + timedelta(hours=4)
+
+        with (
+            patch.object(ec.dt_util, "utcnow", return_value=fixed),
+            patch.object(ec, "resolve_statistic_entity_ids", return_value={}),
+            patch.object(ec, "fetch_forecast", fetch),
+        ):
+            await coordinator._async_compute_snapshot()
+
+        with (
+            patch.object(ec.dt_util, "utcnow", return_value=later),
+            patch.object(ec, "resolve_statistic_entity_ids", return_value={}),
+            patch.object(ec, "fetch_forecast", fetch),
+        ):
+            stale = await coordinator._async_compute_snapshot()
+
+        assert stale.solar_ghi_now is None
 
     async def test_solar_gain_uses_fitted_model(self):
         coordinator = make_coordinator()

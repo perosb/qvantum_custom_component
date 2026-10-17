@@ -138,6 +138,8 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._clamped_state = False
     coordinator._forecast = None
     coordinator._forecast_ok = False
+    coordinator._forecast_ts = None
+    coordinator._forecast_reused = False
     coordinator._indoor_margins = deque(maxlen=INDOOR_MARGIN_CYCLES)
     coordinator._powers = deque(maxlen=POWER_CYCLES)
     coordinator._mode = "shadow"
@@ -1883,6 +1885,71 @@ async def test_fetch_forecast_requires_location() -> None:
         await coordinator._async_fetch_forecast()
 
 
+async def test_refresh_forecast_keeps_last_good_payload_on_error() -> None:
+    """A sporadic 503 must not discard a forecast that still covers now."""
+    coordinator = make_coordinator()
+    good = make_forecast()
+    now = time.time()
+    coordinator._async_fetch_forecast = AsyncMock(
+        side_effect=[good, OpenMeteoError("503")]
+    )
+
+    await coordinator._async_refresh_forecast(now)
+    assert coordinator._forecast_ok is True
+    assert coordinator._forecast is good
+    assert coordinator._forecast_reused is False
+
+    # 15 minutes later the same payload is still the best available.
+    await coordinator._async_refresh_forecast(now + 900)
+    assert coordinator._forecast_ok is True
+    assert coordinator._forecast is good
+    assert coordinator._forecast_reused is True
+
+
+async def test_refresh_forecast_drops_payload_that_no_longer_covers_now() -> None:
+    """Past the covered hours the cached payload describes the wrong time."""
+    coordinator = make_coordinator()
+    now = time.time()
+    stale = make_forecast(hours=1)
+    coordinator._async_fetch_forecast = AsyncMock(
+        side_effect=[stale, OpenMeteoError("503")]
+    )
+
+    await coordinator._async_refresh_forecast(now)
+    await coordinator._async_refresh_forecast(now + 3 * 3600)
+
+    assert coordinator._forecast_ok is False
+    assert coordinator._forecast is None
+
+
+async def test_refresh_forecast_drops_payload_older_than_reuse_window() -> None:
+    """Age alone disqualifies a payload, even if its hours happen to line up."""
+    coordinator = make_coordinator()
+    now = time.time()
+    coordinator._async_fetch_forecast = AsyncMock(
+        side_effect=[make_forecast(), OpenMeteoError("503")]
+    )
+
+    await coordinator._async_refresh_forecast(now)
+    await coordinator._async_refresh_forecast(
+        now + (cc.FORECAST_REUSE_HOURS + 0.5) * 3600
+    )
+
+    assert coordinator._forecast_ok is False
+    assert coordinator._forecast is None
+
+
+async def test_refresh_forecast_without_previous_payload_stays_blocked() -> None:
+    coordinator = make_coordinator()
+    coordinator._async_fetch_forecast = AsyncMock(side_effect=OpenMeteoError("503"))
+
+    await coordinator._async_refresh_forecast(time.time())
+
+    assert coordinator._forecast_ok is False
+    assert coordinator._forecast is None
+    assert coordinator._forecast_reused is False
+
+
 def _solar_maps(now_ts: float, hours: int = 100):
     q: dict[int, float] = {}
     indoor: dict[int, float] = {}
@@ -2268,6 +2335,39 @@ async def test_snapshot_forecast_failure_blocks_and_falls_back() -> None:
 
     assert snapshot.blocker == "forecast"
     assert snapshot.points == BASELINE
+
+
+async def test_snapshot_keeps_readiness_when_forecast_refetch_fails() -> None:
+    """One failed refetch must not blank a window built on a usable forecast."""
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._model = make_model()
+    coordinator._async_calibrate = AsyncMock()
+    now = time.time()
+    midnight = datetime.fromtimestamp(now, timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    window = range(int((midnight - timedelta(days=3)).timestamp()), int(now), 3600)
+    coordinator._async_readiness_hours = AsyncMock(
+        return_value=({ts: 0.5 for ts in window}, set(window))
+    )
+    coordinator._async_room_error_hours = AsyncMock(return_value=({}, None))
+    coordinator._daylight = MagicMock(return_value=None)
+    coordinator._async_fetch_forecast = AsyncMock(
+        side_effect=[make_forecast(), OpenMeteoError("503")]
+    )
+
+    first = await coordinator._async_compute_snapshot()
+    second = await coordinator._async_compute_snapshot()
+
+    assert first.blocker is None
+    assert first.ready is True
+    # The second cycle's request failed but the payload still covers now, so
+    # the readiness window survives instead of degrading to blocker=forecast.
+    assert second.blocker is None
+    assert second.ready is True
+    assert second.median_abs_c == first.median_abs_c
+    assert coordinator._forecast_reused is True
 
 
 async def test_snapshot_deviation_removes_room_term() -> None:

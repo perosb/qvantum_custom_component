@@ -30,6 +30,12 @@ REQUEST_TIMEOUT_S = 20.0
 HISTORY_TIMEOUT_S = 40.0
 DEFAULT_PAST_HOURS = 6
 DEFAULT_FUTURE_HOURS = 12
+#: How long a good forecast may stand in for a failed refetch. The request
+#: covers ``DEFAULT_PAST_HOURS`` hours behind "now", so past that age the hour
+#: that is now "now" is no longer in the payload and the numbers would describe
+#: the wrong time. Inside it, one sporadically failed request must not discard
+#: a forecast that is still usable.
+FORECAST_REUSE_HOURS = float(DEFAULT_PAST_HOURS)
 
 
 class OpenMeteoError(RuntimeError):
@@ -62,6 +68,15 @@ class WeatherForecast:
             if point.hour_ts == hour_ts:
                 return point
         return None
+
+    def covers(self, now_ts: float | int) -> bool:
+        """Whether the point for the hour containing ``now_ts`` is present.
+
+        A forecast that starts after "now" describes the wrong hours: the
+        solar term and the cold-snap pre-charge both read the current hour, so
+        a stale payload would be worse than no payload at all.
+        """
+        return self.at(hour_ts(now_ts)) is not None
 
 
 def hour_ts(timestamp: float | int) -> int:
