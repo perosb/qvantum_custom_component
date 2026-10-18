@@ -11,23 +11,31 @@ custom_components/qvantum/
   __init__.py                 # setup/unload, RuntimeData
   coordinator.py              # poll, derived metrics, extra-DHW helper
   maintenance_coordinator.py  # firmware / elevate-access (cloud)
+  curve_coordinator.py        # adaptive curve: forecast, readiness, trims (Modbus only)
   extra_dhw.py                # ExtraDhwTimer (HA Store + async_call_later)
   calculations.py             # power / tap-water / instantaneous COP
   statistics.py               # shared recorder long-term-statistics helpers
   efficiency.py               # pure COP/SCOP/aux-share math (no HA imports)
+  heating_curve.py            # pure curve math: baseline, trims, room gain (no HA imports)
+  solar_gain.py               # pure hourly + day-block solar fits (no HA imports)
+  open_meteo.py               # forecast fetch, WeatherForecast.covers
   building.py                 # pure degree-hours / heat-loss math (no HA imports)
   dhw_loss.py                 # pure DHW standing-loss math (no HA imports)
   plant_analytics.py          # pure cycling / health-grade math (no HA imports)
   efficiency_coordinator.py   # rolling SCOP / aux / building / DHW / cycling
   entity.py                   # QvantumEntity, icons, write-access mixin
+  diagnostics.py              # config-entry support dump
+  summary.py                  # identifier-free summary export + download view
   config_flow.py
   const.py                    # HA keys; re-exports client constants
   sensor.py, binary_sensor.py, climate.py, number.py, switch.py,
-  button.py, select.py, fan.py, water_heater.py
+  button.py, select.py, fan.py, water_heater.py, calendar.py
+  device_trigger.py, device_condition.py, device_automation_helpers.py
   services.py / services.yaml
   client/                     # vendored comms — no Home Assistant imports
     protocol.py, exceptions.py, constants.py, models.py
     cloud/  modbus/
+  www/                        # Lovelace card (qvantum-curve-card.js)
   translations/               # cs da de en es fi fr hu nl pl sv
   test_data/
 tests/
@@ -428,14 +436,18 @@ access, so no control is offered when a write would fail.
   `statistics.pick_indoor_metric_key`: the configured sensor wins once it has
   enough hourly rows, otherwise the next candidate (BT2 last) keeps them
   alive. Never hard-code BT2 or the external sensor; always degrade to
-  "no series" rather than a wrong one. Both external-room metrics must stay in
-  `DEFAULT_ENABLED_*` for the same reason — `room_temp_ext` (HTTP) and the
-  `room_temp_external` holding sensor — because a disabled entity records no
-  statistics, and moving either into a `DEFAULT_DISABLED_*` list silently
-  sends those features back to BT2. Those lists are the source of truth in
-  both directions: `disable_entities_by_default` clears a stale
-  `disabled_by=INTEGRATION` when a metric moves out again, but never touches a
-  `disabled_by=USER`.
+  "no series" rather than a wrong one. Both external-room metrics must stay
+  enabled, for different reasons: `room_temp_ext` (HTTP) sits in
+  `DEFAULT_ENABLED_HTTP_ONLY_METRICS`, while the `room_temp_external` holding
+  sensor is created explicitly enabled in `sensor.py` and listed in
+  `special_sensor_keys` — it is deliberately in **no** `DEFAULT_ENABLED_*` list,
+  and adding it to one would make `sensor.py` create it a second time under the
+  same unique id.
+  A disabled entity records no statistics, so moving either into a
+  `DEFAULT_DISABLED_*` list silently sends those features back to BT2. Those
+  lists are the source of truth in both directions: `disable_entities_by_default`
+  clears a stale `disabled_by=INTEGRATION` when a metric moves out again, but
+  never touches a `disabled_by=USER`.
 - Removing the config entry reverts holding 22 to Auto (`async_remove_entry`),
   because nothing would be left to supervise the User-defined table we wrote.
   Reload and HA shutdown deliberately keep it: a reload re-activates from the
