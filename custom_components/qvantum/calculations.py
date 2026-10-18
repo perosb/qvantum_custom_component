@@ -489,12 +489,13 @@ class QvantumCalculationsMixin:
 
         Without the compressor, every kWh the element draws is stored in the
         buffer tank (times the heater's efficiency), so the rise measures the
-        volume the balance really sees. The datasheet volume (175 L for every
-        Qvantum model) is the store itself, but `bt30` reads the top of a
-        stratified tank that hot water is drawn from through a plate heat
-        exchanger, so the energy per kelvin the balance can account for is
-        smaller. That effective volume is what this measures, and the DHW COP
-        carries any error in it linearly.
+        volume the balance really sees. The datasheet volume (175 L on the
+        floor-standing models, unpublished and smaller in the wall-mounted
+        QH100) is the store itself, but `bt30` reads the top of a stratified
+        tank that hot water is drawn from through a plate heat exchanger, so the
+        energy per kelvin the balance can account for is smaller. That effective
+        volume is what this measures, and the DHW COP carries any error in it
+        linearly.
         """
         if charge.element_kwh < DHW_TANK_ID_MIN_KWH:
             return None
