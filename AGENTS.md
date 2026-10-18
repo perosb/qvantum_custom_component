@@ -100,6 +100,12 @@ touches — gets its own branch from the latest `main`; never append it to that
 PR's branch. Before pushing to a PR branch, check `gh pr view <n> --json state`:
 a merged PR's branch is gone, so branch from `main` again.
 
+**This file is part of the change, not a follow-up.** A PR that alters
+architecture, derived-metric semantics, persistence or this workflow updates
+`AGENTS.md` in the same PR. The one-concern rule does not defer it: the file is
+injected as the authoritative note for the next session, so a version that still
+describes the old behaviour is worse than no note at all.
+
 `/root/.gitconfig` does not survive a container restart, so both the identity and
 the credential helper have to be set **per repo**:
 
