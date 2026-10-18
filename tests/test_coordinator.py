@@ -2171,13 +2171,15 @@ class TestCopPersistence:
 
     @pytest.mark.asyncio
     async def test_persist_cop_state_payload(self):
-        """The payload carries per-figure timestamps and the legacy shared one."""
+        """The payload carries per-figure timestamps, the legacy shared one and
+        the identified tank volume."""
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": 1.7}
         coordinator._cop_last_times = {
             "cop_heating": datetime(2026, 10, 10, 7, 0, tzinfo=timezone.utc),
             "cop_dhw": datetime(2026, 10, 10, 6, 0, tzinfo=timezone.utc),
         }
+        coordinator._dhw_tank_liters = 143.2
         with (
             patch("time.monotonic", return_value=1000.0),
             patch.object(
@@ -2193,8 +2195,41 @@ class TestCopPersistence:
                 "cop_dhw": 1.7,
                 "cop_heating_updated_at": "2026-10-10T07:00:00+00:00",
                 "cop_dhw_updated_at": "2026-10-10T06:00:00+00:00",
+                "dhw_tank_liters": 143.2,
             }
         )
+
+    @pytest.mark.asyncio
+    async def test_persist_cop_state_writes_the_identified_volume_alone(self):
+        """A learned tank volume is worth saving before any COP is computed."""
+        coordinator = self._make_coordinator()
+        coordinator._dhw_tank_liters = 143.2
+        with (
+            patch("time.monotonic", return_value=1000.0),
+            patch.object(
+                coordinator._cop_store, "async_save", new=AsyncMock()
+            ) as mock_save,
+        ):
+            await coordinator._persist_cop_state()
+
+        mock_save.assert_awaited_once()
+        assert mock_save.await_args.args[0]["dhw_tank_liters"] == 143.2
+
+    @pytest.mark.asyncio
+    async def test_restore_snapshot_with_the_identified_tank_volume(self):
+        coordinator = self._make_coordinator()
+        stored = {
+            "updated_at": "2026-10-10T07:00:00+00:00",
+            "cop_heating": 3.5,
+            "cop_dhw": 1.7,
+            "cop_dhw_updated_at": "2026-10-10T06:00:00+00:00",
+            "dhw_tank_liters": 143.2,
+        }
+        with patch.object(coordinator._cop_store, "async_load", return_value=stored):
+            await coordinator.async_restore_cop_state()
+
+        assert coordinator._dhw_tank_liters == 143.2
+        assert coordinator.dhw_tank_liters() == 143.2
 
     @pytest.mark.asyncio
     async def test_persist_cop_state_without_values_is_a_noop(self):

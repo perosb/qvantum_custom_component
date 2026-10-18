@@ -159,6 +159,43 @@ def _entity_counts(hass: HomeAssistant, entry_id: str | None) -> dict[str, int]:
     return {"total": len(entries), "enabled": enabled}
 
 
+def _iso(value: Any) -> str | None:
+    """ISO timestamp for a store/state field, or None when unusable."""
+    isoformat = getattr(value, "isoformat", None)
+    return isoformat() if callable(isoformat) else None
+
+
+def _cop_diagnostics(coordinator: Any) -> dict[str, Any]:
+    """Return the held COP figures and the DHW charge being measured.
+
+    A DHW COP that is held, not computed, is indistinguishable from a fresh one
+    in the entity state, and the charge segment is where the tank balance comes
+    from. Both have to be readable from a user's report.
+    """
+    figures = getattr(coordinator, "_cop_last", None)
+    figures = figures if isinstance(figures, dict) else {}
+    times = getattr(coordinator, "_cop_last_times", None)
+    times = times if isinstance(times, dict) else {}
+    charge = getattr(coordinator, "_dhw_charge", None)
+    return {
+        "heating": figures.get("cop_heating"),
+        "dhw": figures.get("cop_dhw"),
+        "heating_updated_at": _iso(times.get("cop_heating")),
+        "dhw_updated_at": _iso(times.get("cop_dhw")),
+        "dhw_tank_liters": getattr(coordinator, "_dhw_tank_liters", None),
+        "dhw_charge": None
+        if charge is None
+        else {
+            "started": _iso(getattr(charge, "started", None)),
+            "start_tank_c": getattr(charge, "start_tank", None),
+            "tank_c": getattr(charge, "last_tank", None),
+            "draw_kwh": round(getattr(charge, "draw_kwh", 0.0), 3),
+            "electrical_kwh": round(getattr(charge, "electrical_kwh", 0.0), 3),
+            "compressor_kwh": round(getattr(charge, "compressor_kwh", 0.0), 3),
+        },
+    }
+
+
 def _coordinator_diagnostics(coordinator: Any) -> dict[str, Any]:
     """Return poll state, last values and local derived state."""
     data = getattr(coordinator, "data", None)
@@ -194,6 +231,7 @@ def _coordinator_diagnostics(coordinator: Any) -> dict[str, Any]:
         "device": device if isinstance(device, dict) else {},
         "values": values if isinstance(values, dict) else {},
         "enabled_metrics": enabled_metrics,
+        "cop": _cop_diagnostics(coordinator),
         "dhw_ema": dhw_ema,
         "shower_event_history_count": len(
             getattr(coordinator, "_shower_event_history", None) or []

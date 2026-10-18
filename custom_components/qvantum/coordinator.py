@@ -38,7 +38,7 @@ from .client.protocol import (
     QvantumModbusClientProtocol,
 )
 from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
-from .calculations import QvantumCalculationsMixin
+from .calculations import DhwCharge, QvantumCalculationsMixin
 from .client.constants import alias_heating_curve_settings
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
@@ -249,6 +249,12 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 bool,
             ]
         ] = deque()
+        # The open DHW charge segment (baseline tank, accumulated draw and
+        # electrical input), or None when no charge is running.
+        self._dhw_charge: DhwCharge | None = None
+        # Effective tank volume identified from element-only charges; None until
+        # one has been measured, and persisted with the COP snapshot.
+        self._dhw_tank_liters: float | None = None
         # Last published COP figures, held while the current window is too small.
         self._cop_last: dict[str, float | None] = {}
         # Per-figure computation time. Persisted and restored with the values so
@@ -485,6 +491,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             )
             if updated_at is not None:
                 self._cop_last_times[key] = updated_at
+        self._dhw_tank_liters = self._coerce_store_number(
+            data.get("dhw_tank_liters"), positive=True
+        )
         if self._cop_last:
             _LOGGER.debug("Restored COP snapshot: %s", self._cop_last)
 
@@ -742,8 +751,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         current_state = self._cop_state()
         if current_state == self._last_persisted_cop_state:
             return
-        if self._last_persisted_cop_state is None and not any(
-            self._cop_last.get(key) is not None for key in _COP_KEYS
+        if self._last_persisted_cop_state is None and not (
+            self._dhw_tank_liters is not None
+            or any(self._cop_last.get(key) is not None for key in _COP_KEYS)
         ):
             # Nothing has been computed yet; do not write an empty snapshot on
             # every boot.
@@ -757,6 +767,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             "cop_dhw": self._cop_last.get("cop_dhw"),
             "cop_heating_updated_at": self._cop_time_iso("cop_heating"),
             "cop_dhw_updated_at": self._cop_time_iso("cop_dhw"),
+            "dhw_tank_liters": self._dhw_tank_liters,
         }
         try:
             await self._cop_store.async_save(payload)
@@ -766,12 +777,13 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             _LOGGER.warning("Failed to persist COP state", exc_info=True)
 
     def _cop_state(self) -> tuple:
-        """Change-detection tuple: the rounded figures and their times."""
+        """Change-detection tuple: the rounded figures, their times, the volume."""
         return (
             self._rounded_cop("cop_heating"),
             self._rounded_cop("cop_dhw"),
             self._cop_time_iso("cop_heating"),
             self._cop_time_iso("cop_dhw"),
+            None if self._dhw_tank_liters is None else round(self._dhw_tank_liters, 1),
         )
 
     def _cop_time_iso(self, key: str) -> str | None:
@@ -787,6 +799,14 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
     def cop_last_updated(self, key: str) -> datetime | None:
         """Return when a held COP figure was last computed, if known."""
         return self._cop_last_times.get(key)
+
+    def dhw_tank_liters(self) -> float | None:
+        """Return the effective DHW tank volume, once a charge identified it."""
+        return self._dhw_tank_liters
+
+    def dhw_charge_open(self) -> bool:
+        """Return whether a DHW charge segment is currently being measured."""
+        return self._dhw_charge is not None
 
     def _rounded_cop(self, key: str) -> float | None:
         """Round a held COP figure for change detection, rejecting non-numbers."""
