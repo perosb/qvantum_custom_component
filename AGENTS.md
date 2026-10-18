@@ -182,12 +182,14 @@ workflow. The workflow listens to `published`, `released` **and** `edited`, and
 takes the stability decision from the API rather than from the event payload:
 this repository publishes the draft as a **pre-release** and promotes it later,
 and a promotion arrives with the payload still saying `prerelease: true`. Only a
-release that is stable at that moment bumps `manifest.json`/`const.py`; a
-pre-release commits the notes only. The bump applies to the checkout even when
-there is nothing to commit, so the zip is still rebuilt with the right version,
-and `update_hacs_manifest.py` re-reads both files and fails the run when the
-written version is not the tag — a release must not ship a green run with a
-stale manifest. The workflow pushes over an SSH deploy key that is a ruleset
+release that is stable at that moment commits `manifest.json`/`const.py`; a
+pre-release commits the notes only. A stable bump also applies when there is
+nothing to commit, so the zip is still rebuilt with the right version, and the
+checkout is stamped with the tag right before zipping on **every** run — a
+pre-release zip would otherwise advertise the previous stable version.
+`update_hacs_manifest.py` re-reads both files and fails the run when the written
+version is not the tag, so a release cannot ship a green run with a stale
+manifest. The workflow pushes over an SSH deploy key that is a ruleset
 bypass actor and never force-pushes — it builds the commit on `origin/main` and
 fast-forwards.
 The script

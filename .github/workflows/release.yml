@@ -67,10 +67,10 @@ jobs:
             --polish \
             --themed
 
-      # A pre-release must not move the manifest / VERSION on main. The script
-      # fails the run if the version it wrote is not the tag, so a broken path
-      # or a stale pattern cannot ship a release that advertises the previous
-      # version.
+      # A pre-release must not move the manifest / VERSION on main; only a
+      # stable release commits this bump. The script fails the run if the
+      # version it wrote is not the tag, so a broken path or a stale pattern
+      # cannot ship a release that advertises the wrong version.
       - name: Update manifest.json version to ${{ env.RELEASE_TAG }}
         if: steps.release_state.outputs.stable == 'true'
         run: |
@@ -127,6 +127,15 @@ jobs:
           python3 .github/scripts/generate_release_changelog.py \
             --tag "${{ env.RELEASE_TAG }}" \
             --link-only
+
+      # Stamp the checkout with the tag even when it is not committed, so a
+      # pre-release asset carries its own version instead of the previous stable
+      # one (2026.10.9's zip advertising 2026.10.8). It runs after the commit
+      # step on purpose — a modified file would block the rebase — and is
+      # idempotent, so a stable run just rewrites the same version.
+      - name: Stamp the zip with its own version
+        run: |
+          python3 ${{ github.workspace }}/.github/scripts/update_hacs_manifest.py --version ${{ env.RELEASE_TAG }} --path /custom_components/qvantum/
 
       - name: Create zip
         run: |
