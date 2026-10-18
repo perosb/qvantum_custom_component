@@ -420,11 +420,14 @@ def ensure_tap_water_start_below_stop(start: object, stop: object) -> None:
 
 # DHW capacity calculation defaults
 DHW_SHOWER_TEMP_C = 38.0  # Target shower temperature (°C) — +2°C from Qvantum app
-DHW_TANK_VOLUME_L = 175  # Fallback tank volume (L) — buffer tank per installer spec
+DHW_TANK_VOLUME_L = 175  # buffer tank, same in QE, QG, QG-C and QH-175
 # The DHW COP recovers production from the tank balance `bt30 · V · c`, so the
-# volume is a linear factor on the result. It is identified instead of assumed:
-# an element-only charge stores every kWh it draws, so the rise measures the
-# volume the balance really sees (one sensor, stratified tank, fitted volume).
+# volume is a linear factor on the result. The datasheet figure (175 L for every
+# Qvantum model — the QH indoor module is even named after it) is the store
+# itself, but it is not what the balance sees: DHW is produced instantaneously
+# through a plate heat exchanger from the top of a stratified buffer tank, so
+# `bt30 × 175 L` over-counts the stored energy per kelvin. That effective volume
+# is identified from element-only charges (123 L measured on a QE-6).
 DHW_TANK_LITERS_MIN = 50.0  # Reject an identification outside a plausible tank
 DHW_TANK_LITERS_MAX = 500.0
 DHW_TANK_LITERS_ALPHA = 0.25  # EMA weight of a new identification
