@@ -37,11 +37,62 @@ from .dhw_loss import WATER_KWH_PER_LITER_K
 from .efficiency import (
     COP_MIN_ELECTRICAL_KWH,
     COP_WINDOW_SECONDS,
+    cap_dhw_ratio,
     cop_ratio,
     energy_delta,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _flag(value: object) -> bool:
+    """Truthiness of an optional 0/1 metric.
+
+    A missing metric is unknown, not true: every caller treats unknown as "not
+    demanded", which falls back to the plain ``hp_status`` attribution.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value > 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "on", "yes"}
+    return False
+
+
+def _split_electrical_input(
+    *,
+    hp_status: object,
+    dhw_demand: bool,
+    aux_demand: bool,
+    compressor_kwh: float,
+    aux_kwh: float,
+) -> tuple[float, float, float]:
+    """Attribute one poll interval's electrical input to heating and DHW.
+
+    ``hp_status`` alone cannot do this. The immersion heater charges the DHW
+    tank while the compressor is stopped — the pump then reports ``Idle``,
+    because the register follows the compressor, not the element — or while the
+    compressor heats the house (``Heating``). Booked as heating input, that
+    auxiliary energy collapses the heating COP for a charge it never delivered.
+
+    Returns ``(heating_kwh, dhw_kwh, dhw_compressor_kwh)``. The last figure says
+    how much of the DHW bucket is compressor work, which bounds how high the DHW
+    ratio can physically be — an element-only charge cannot exceed COP 1.
+    """
+    total = compressor_kwh + aux_kwh
+    if hp_status == HP_STATUS_HOT_WATER:
+        return 0.0, total, compressor_kwh
+    if not (dhw_demand and not aux_demand):
+        # No DHW charge, or the auxiliary heat is flagged for space heating.
+        if hp_status == HP_STATUS_HEATING:
+            return total, 0.0, 0.0
+        return 0.0, 0.0, 0.0
+    if hp_status == HP_STATUS_HEATING:
+        # Parallel run: the compressor heats the house, the element the tank.
+        return compressor_kwh, aux_kwh, 0.0
+    # Compressor stopped while DHW is still demanded: the element alone.
+    return 0.0, aux_kwh, 0.0
 
 
 class QvantumCalculationsMixin:
@@ -148,13 +199,17 @@ class QvantumCalculationsMixin:
 
         Space heating: only the electrical energy consumed while ``hp_status``
         is heating is divided into ``heatingenergy`` — the compressor/auxiliary
-        counter is shared with DHW charging.
+        counter is shared with DHW charging. The split per interval comes from
+        ``_split_electrical_input``: auxiliary heat that charges the tank is not
+        heating input, even when the pump reports heating (parallel run) or idle
+        (compressor stopped, element running).
 
         DHW: ``dhwenergy`` meters the draw (secondary side), not the
         compressor's output, so it is combined with the tank energy balance
         ``(bt30_end - bt30_start) · V · c`` to recover production, then divided
         by the electrical consumed in DHW mode. This is an estimate, not a
-        meter, and needs ``bt30``.
+        meter, and needs ``bt30``. A window that holds no compressor work is an
+        element-only charge and is capped at COP 1.
 
         A counter reset drops the window instead of showing a bogus ratio.
         """
@@ -181,13 +236,18 @@ class QvantumCalculationsMixin:
         previous = self._last_cop_energies
         self._last_cop_energies = current
         hp_status = values.get("hp_status")
+        # The demand flags travel with the sample they were read at, so an
+        # interval is attributed with the mode in force at its end.
+        dhw_demand = _flag(values.get("dhwdemand"))
+        aux_demand = _flag(values.get("additiondemand"))
         history = self._cop_history
+        sample = (now, current, hp_status, tank_temp, dhw_demand, aux_demand)
 
         if previous is None:
             # First observation only seeds the window. A snapshot restored from
             # storage is still published so the sensors survive a restart.
             history.clear()
-            history.append((now, current, hp_status, tank_temp))
+            history.append(sample)
             self._set_cop(
                 values,
                 self._cop_last.get("cop_heating"),
@@ -202,7 +262,7 @@ class QvantumCalculationsMixin:
             # ratios measured before it, and the sensor is defined to hold its
             # last value until a new window is measurable.
             history.clear()
-            history.append((now, current, hp_status, tank_temp))
+            history.append(sample)
             self._set_cop(
                 values,
                 self._cop_last.get("cop_heating"),
@@ -210,7 +270,7 @@ class QvantumCalculationsMixin:
             )
             return
 
-        history.append((now, current, hp_status, tank_temp))
+        history.append(sample)
         cutoff = now - timedelta(seconds=COP_WINDOW_SECONDS)
         # Always keep the previous sample as the baseline: if the poll interval
         # exceeds the window, the window would otherwise trim down to the
@@ -221,20 +281,33 @@ class QvantumCalculationsMixin:
         heating_thermal = 0.0
         heating_electrical = 0.0
         dhw_electrical = 0.0
+        dhw_compressor = 0.0
         dhw_draw = 0.0
-        for (_, before, _, _), (_, after, mode, _) in pairwise(history):
-            electrical = (
-                after["compressorenergy"]
-                + after["additionalenergy"]
-                - before["compressorenergy"]
-                - before["additionalenergy"]
+        for (_, before, _, _, _, _), (
+            _,
+            after,
+            mode,
+            _,
+            interval_dhw_demand,
+            interval_aux_demand,
+        ) in pairwise(history):
+            interval_heating, interval_dhw, interval_dhw_compressor = (
+                _split_electrical_input(
+                    hp_status=mode,
+                    dhw_demand=interval_dhw_demand,
+                    aux_demand=interval_aux_demand,
+                    compressor_kwh=(
+                        after["compressorenergy"] - before["compressorenergy"]
+                    ),
+                    aux_kwh=(after["additionalenergy"] - before["additionalenergy"]),
+                )
             )
             dhw_draw += after["dhwenergy"] - before["dhwenergy"]
             if mode == HP_STATUS_HEATING:
                 heating_thermal += after["heatingenergy"] - before["heatingenergy"]
-                heating_electrical += electrical
-            elif mode == HP_STATUS_HOT_WATER:
-                dhw_electrical += electrical
+            heating_electrical += interval_heating
+            dhw_electrical += interval_dhw
+            dhw_compressor += interval_dhw_compressor
 
         # The counters are read as floats, so a sum can land a hair below its
         # nominal value (0.2 -> 0.19999999999999574). Rounding below the
@@ -243,6 +316,7 @@ class QvantumCalculationsMixin:
         heating_electrical = round(heating_electrical, 6)
         dhw_draw = round(dhw_draw, 6)
         dhw_electrical = round(dhw_electrical, 6)
+        dhw_compressor = round(dhw_compressor, 6)
 
         if heating_electrical >= COP_MIN_ELECTRICAL_KWH:
             heating_ratio = cop_ratio(heating_thermal, heating_electrical)
@@ -261,7 +335,9 @@ class QvantumCalculationsMixin:
             production = dhw_draw + (tank_temp - baseline_tank) * (
                 DHW_TANK_VOLUME_L * WATER_KWH_PER_LITER_K
             )
-            dhw_ratio = cop_ratio(production, dhw_electrical)
+            dhw_ratio = cap_dhw_ratio(
+                cop_ratio(production, dhw_electrical), dhw_compressor
+            )
             if dhw_ratio is not None:
                 self._cop_last["cop_dhw"] = dhw_ratio
                 self._cop_last_times["cop_dhw"] = now

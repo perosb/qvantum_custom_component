@@ -25,6 +25,10 @@ MIN_ELECTRICAL_KWH = 1e-6
 #: Thermal deltas below this are ignored for the same reason.
 MIN_THERMAL_KWH = 1e-6
 
+#: A resistive element cannot deliver more heat than the electricity it draws,
+#: so a DHW ratio above this is a measurement error, not a COP.
+RESISTIVE_COP_CEILING = 1.0
+
 #: Instantaneous COP is averaged over a rolling window of counter samples.
 #: A window (not one poll interval) is required because the kWh counters
 #: advance in 0.1 kWh steps, so a single-poll delta is zero most of the time
@@ -81,6 +85,23 @@ def cop_ratio(thermal_kwh: object, electrical_kwh: object) -> float | None:
     if not math.isfinite(ratio) or ratio <= 0.0:
         return None
     return ratio
+
+
+def cap_dhw_ratio(ratio: object, dhw_compressor_kwh: object) -> float | None:
+    """Cap a DHW ratio at the resistive ceiling when no compressor ran.
+
+    A tank charged by the immersion heater alone cannot exceed COP 1. A higher
+    estimate means the stored energy was over-counted — a single tank sensor
+    reads the stratified top hotter than the mean, or the assumed tank volume
+    is too large — so the ratio is clamped rather than published.
+    """
+    value = _finite(ratio)
+    if value is None:
+        return None
+    compressor = _finite(dhw_compressor_kwh)
+    if compressor is None or compressor < MIN_ELECTRICAL_KWH:
+        return min(value, RESISTIVE_COP_CEILING)
+    return value
 
 
 def aux_heat_share(additional_kwh: object, compressor_kwh: object) -> float | None:

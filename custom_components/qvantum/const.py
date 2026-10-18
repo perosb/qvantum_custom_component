@@ -333,6 +333,13 @@ REQUIRED_METRICS = [
     "powertotal",
     "fanspeedselector",
     "curve_type_heating",
+    # Required by the instantaneous COP's mode attribution. The immersion
+    # heater can charge the DHW tank while the compressor is stopped (the pump
+    # then reports Idle) or while it heats the house (Heating), so hp_status
+    # alone books that energy as heating input. Both flags are also binary
+    # sensors that can be disabled, and a disabled entity is not fetched.
+    "dhwdemand",
+    "additiondemand",
     *HEATING_CURVE_HTTP_KEYS.values(),
 ]
 

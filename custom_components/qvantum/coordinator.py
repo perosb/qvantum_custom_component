@@ -234,12 +234,20 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._last_dhwenergy_time: datetime | None = None
         # Cumulative energy counters from the previous poll, for instantaneous COP.
         self._last_cop_energies: dict[str, float] | None = None
-        # Rolling window of (timestamp, counters, hp_status, bt30) samples for
-        # the COP ratios; the kWh counters advance in 0.1 kWh steps, so one poll
-        # is not a measurement, the mode decides which electrical energy is
-        # heating, and the tank temperature recovers DHW production.
+        # Rolling window of (timestamp, counters, hp_status, bt30, dhwdemand,
+        # additiondemand) samples for the COP ratios; the kWh counters advance
+        # in 0.1 kWh steps, so one poll is not a measurement, the mode and the
+        # demand flags decide which electrical energy is heating, and the tank
+        # temperature recovers DHW production.
         self._cop_history: deque[
-            tuple[datetime, dict[str, float], int | None, float | None]
+            tuple[
+                datetime,
+                dict[str, float],
+                int | None,
+                float | None,
+                bool,
+                bool,
+            ]
         ] = deque()
         # Last published COP figures, held while the current window is too small.
         self._cop_last: dict[str, float | None] = {}
