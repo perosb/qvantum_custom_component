@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -259,6 +260,38 @@ async def test_cloud_mode_structure(hass):
     assert result["maintenance"]["firmware_versions"]["display_fw_version"] == "1.2.3"
     assert result["maintenance"]["firmware_changed"] is False
     json.dumps(result)  # diagnostics must stay JSON-serializable
+
+
+@pytest.mark.asyncio
+async def test_cop_diagnostics_reports_held_figures_and_the_open_charge(hass):
+    """A held COP and the DHW charge it measures are part of the support dump."""
+    coordinator = _coordinator()
+    coordinator._cop_last = {"cop_heating": 3.4, "cop_dhw": 1.0}
+    coordinator._cop_last_times = {
+        "cop_heating": datetime(2026, 10, 18, 8, 0, tzinfo=timezone.utc),
+        "cop_dhw": datetime(2026, 10, 18, 9, 0, tzinfo=timezone.utc),
+    }
+    coordinator._dhw_tank_liters = 143.2
+    coordinator._dhw_charge = SimpleNamespace(
+        started=datetime(2026, 10, 18, 9, 3, tzinfo=timezone.utc),
+        start_tank=57.3,
+        last_tank=64.1,
+        draw_kwh=0.2,
+        electrical_kwh=1.4,
+        compressor_kwh=0.0,
+    )
+    runtime = _runtime(coordinator, maintenance=_maintenance())
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    cop = result["coordinator"]["cop"]
+    assert cop["heating"] == 3.4
+    assert cop["dhw"] == 1.0
+    assert cop["heating_updated_at"] == "2026-10-18T08:00:00+00:00"
+    assert cop["dhw_tank_liters"] == 143.2
+    assert cop["dhw_charge"]["started"] == "2026-10-18T09:03:00+00:00"
+    assert cop["dhw_charge"]["start_tank_c"] == 57.3
+    assert cop["dhw_charge"]["electrical_kwh"] == 1.4
+    json.dumps(result)
 
 
 @pytest.mark.asyncio

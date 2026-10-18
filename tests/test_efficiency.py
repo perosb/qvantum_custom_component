@@ -15,8 +15,10 @@ from custom_components.qvantum.calculations import (
     _split_electrical_input,
 )
 from custom_components.qvantum.const import (
+    DHW_CHARGE_MAX_SECONDS,
     HP_STATUS_HEATING,
     HP_STATUS_HOT_WATER,
+    DHW_TANK_VOLUME_L,
     HP_STATUS_IDLE,
 )
 from custom_components.qvantum.efficiency import (
@@ -46,6 +48,8 @@ class _Calculator(QvantumCalculationsMixin):
         ] = deque()
         self._cop_last: dict[str, float | None] = {}
         self._cop_last_times: dict[str, datetime] = {}
+        self._dhw_charge = None
+        self._dhw_tank_liters: float | None = None
 
 
 def _values(**overrides):
@@ -297,8 +301,10 @@ class TestCalculateCop:
         draw = _values(dhwenergy=52.0, bt30=40.0)
         calculator._calculate_cop(draw)
         assert draw["cop_dhw"] is None
-        # The recharge returns the tank to its starting temperature using
-        # 0.5 kWh of DHW-mode electrical.
+        # The recharge returns the tank to 50 °C using 0.5 kWh of DHW-mode
+        # electrical. Production is the stored energy against the 40 °C the
+        # charge started from (10 K · 175 L · c = 2.03 kWh); the metered draw
+        # happened before the charge and is already in that baseline.
         charge = _values(
             dhwenergy=52.0,
             bt30=50.0,
@@ -306,13 +312,14 @@ class TestCalculateCop:
             hp_status=HP_STATUS_HOT_WATER,
         )
         calculator._calculate_cop(charge)
-        # production = 2 kWh drawn + 0 kWh tank change -> 2 / 0.5.
-        assert charge["cop_dhw"] == pytest.approx(4.0)
+        assert charge["cop_dhw"] == pytest.approx(4.07, rel=1e-3)
 
-        # A quiet poll keeps the last value instead of dropping to unavailable.
+        # A quiet poll closes the charge and keeps the last value instead of
+        # dropping to unavailable.
         hold = _values(dhwenergy=52.0, bt30=50.0, compressorenergy=40.5)
         calculator._calculate_cop(hold)
-        assert hold["cop_dhw"] == pytest.approx(4.0)
+        assert hold["cop_dhw"] == pytest.approx(4.07, rel=1e-3)
+        assert calculator._dhw_charge is None
 
     def test_dhw_cop_requires_the_tank_temperature(self):
         calculator = _Calculator()
@@ -446,6 +453,160 @@ class TestCalculateCop:
 
         # 2 kWh drawn + 0.20 kWh tank gain over 0.5 kWh of compressor work.
         assert values["cop_dhw"] == pytest.approx(4.407, abs=1e-3)
+
+    def test_charge_segment_adds_the_draw_inside_the_charge(self):
+        """A draw during the charge is production the tank balance cannot see."""
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=60.0))
+        # A shower during the recharge: 2 kWh drawn while the tank falls 2 K,
+        # on top of 0.5 kWh of compressor work.
+        values = _values(
+            hp_status=HP_STATUS_HOT_WATER,
+            dhwenergy=52.0,
+            compressorenergy=40.5,
+            bt30=58.0,
+        )
+        calculator._calculate_cop(values)
+
+        # 2 kWh drawn − 0.41 kWh of tank loss, over 0.5 kWh of compressor work.
+        assert values["cop_dhw"] == pytest.approx(1.593 / 0.5, rel=1e-2)
+
+    def test_element_only_charge_identifies_the_tank_volume(self):
+        """2 kWh of element into a 12 K rise measures the effective volume."""
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        charge = _values(
+            hp_status=HP_STATUS_IDLE,
+            dhwdemand=1,
+            additionalenergy=12.0,
+            bt30=62.0,
+        )
+
+        calculator._calculate_cop(charge)
+
+        # 2 kWh / (12 K · c) = 143 L, not the 175 L datasheet figure. The charge
+        # itself is already measured with it; nothing is persisted until the
+        # charge closes.
+        assert calculator._dhw_tank_volume() == pytest.approx(143.3, rel=1e-3)
+        assert calculator._dhw_tank_liters is None
+        calculator._calculate_cop(
+            _values(hp_status=HP_STATUS_IDLE, additionalenergy=12.0, bt30=62.0)
+        )
+        assert calculator._dhw_tank_liters == pytest.approx(143.3, rel=1e-3)
+        assert calculator._dhw_tank_volume() == pytest.approx(143.3, rel=1e-3)
+
+        # The next charge is measured with the identified volume.
+        fresh = _Calculator()
+        fresh._dhw_tank_liters = calculator._dhw_tank_liters
+        fresh._calculate_cop(_values(bt30=50.0))
+        with_compressor = _values(
+            hp_status=HP_STATUS_HOT_WATER,
+            compressorenergy=40.5,
+            bt30=56.0,
+        )
+        fresh._calculate_cop(with_compressor)
+        # 6 K · 143 L · c = 1.0 kWh over 0.5 kWh; 175 L would have said 2.44.
+        assert with_compressor["cop_dhw"] == pytest.approx(2.0, rel=1e-2)
+
+    def test_tank_volume_is_not_identified_from_a_compressor_charge(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        charge = _values(
+            hp_status=HP_STATUS_HOT_WATER,
+            compressorenergy=42.0,
+            bt30=62.0,
+        )
+
+        calculator._calculate_cop(charge)
+
+        assert calculator._dhw_tank_liters is None
+        assert calculator._dhw_tank_volume() == DHW_TANK_VOLUME_L
+
+    def test_tank_volume_identification_needs_enough_stored_energy(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        charge = _values(
+            hp_status=HP_STATUS_IDLE,
+            dhwdemand=1,
+            additionalenergy=10.5,
+            bt30=62.0,
+        )
+
+        calculator._calculate_cop(charge)
+
+        assert calculator._dhw_tank_liters is None
+        assert calculator._dhw_tank_volume() == DHW_TANK_VOLUME_L
+
+    def test_tank_volume_identification_rejects_an_implausible_volume(self):
+        """A 1 K rise on 20 kWh is not a tank measurement."""
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        charge = _values(
+            hp_status=HP_STATUS_IDLE,
+            dhwdemand=1,
+            additionalenergy=30.0,
+            bt30=51.0,
+        )
+
+        calculator._calculate_cop(charge)
+
+        assert calculator._dhw_tank_liters is None
+
+    def test_charge_segment_restarts_after_the_maximum_duration(self):
+        """A demand flag that never clears must not keep an ancient baseline."""
+        calculator = _Calculator()
+        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=timezone.utc)
+        t_stuck = t0 + timedelta(seconds=DHW_CHARGE_MAX_SECONDS + 60)
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=t0,
+        ):
+            calculator._calculate_cop(_values(bt30=50.0))
+            calculator._calculate_cop(
+                _values(
+                    hp_status=HP_STATUS_IDLE,
+                    dhwdemand=1,
+                    additionalenergy=10.4,
+                    bt30=51.0,
+                )
+            )
+        assert calculator._dhw_charge is not None
+        assert calculator._dhw_charge.start_tank == 50.0
+
+        values = _values(
+            hp_status=HP_STATUS_IDLE,
+            dhwdemand=1,
+            additionalenergy=14.0,
+            bt30=60.0,
+        )
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=t_stuck,
+        ):
+            calculator._calculate_cop(values)
+
+        # The baseline restarted at the last poll's tank instead of counting
+        # ten hours of standing loss as missing production.
+        assert calculator._dhw_charge is not None
+        assert calculator._dhw_charge.start_tank == 51.0
+        assert calculator._dhw_charge.electrical_kwh == pytest.approx(3.6)
+
+    def test_counter_reset_drops_the_charge_segment(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        calculator._calculate_cop(
+            _values(
+                hp_status=HP_STATUS_IDLE,
+                dhwdemand=1,
+                additionalenergy=10.4,
+                bt30=51.0,
+            )
+        )
+        assert calculator._dhw_charge is not None
+
+        calculator._calculate_cop(_values(additionalenergy=1.0, bt30=51.0))
+
+        assert calculator._dhw_charge is None
 
     def test_idle_window_does_not_publish(self):
         calculator = _Calculator()

@@ -612,13 +612,14 @@ class QvantumCopSensor(QvantumBaseSensorEntity):
     """Coefficient of performance from the energy counters.
 
     Dimensionless: state class MEASUREMENT, no unit. The values are derived on
-    the main coordinator each poll in both transports from a rolling window of
-    counter samples. The last value is held across mode changes and small
-    windows until a counter reset or restart; a DHW charge must not blank the
-    heating figure. The space-heating figure divides only heating-mode
-    electrical into the heating output; the DHW figure estimates production
-    from the tank balance (drawn energy plus stored-energy change) divided by
-    DHW-mode electrical.
+    the main coordinator each poll in both transports. The space-heating figure
+    is a rolling window of counter samples that divides only heating-mode
+    electrical into the heating output. The DHW figure is measured over one
+    charge segment — production from the tank balance (drawn energy plus
+    stored-energy change against the level the charge started from) divided by
+    DHW electrical — and is capped at 1.0 when the charge was element-only. The
+    last value is held across mode changes and small windows until a counter
+    reset or restart; a DHW charge must not blank the heating figure.
     """
 
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -637,16 +638,20 @@ class QvantumCopSensor(QvantumBaseSensorEntity):
     @property
     def extra_state_attributes(self):
         """Return how the ratio was attributed and how old the held value is."""
-        attribution = (
-            "tank-balance estimate over a rolling window"
-            if self._metric_key == "cop_dhw"
-            else "heating-mode energy-counter delta over a rolling window"
-        )
-        attributes = {
-            "hp_status": self._values.get("hp_status"),
-            "attribution": attribution,
-            "window_seconds": COP_WINDOW_SECONDS,
-        }
+        if self._metric_key == "cop_dhw":
+            attributes = {
+                "attribution": "tank-balance estimate over one DHW charge",
+                "charge_open": self.coordinator.dhw_charge_open(),
+                "tank_liters": self.coordinator.dhw_tank_liters(),
+            }
+        else:
+            attributes = {
+                "attribution": (
+                    "heating-mode energy-counter delta over a rolling window"
+                ),
+                "window_seconds": COP_WINDOW_SECONDS,
+            }
+        attributes["hp_status"] = self._values.get("hp_status")
         # The value is held across idle periods and restarts, so expose when it
         # was last computed; a held value is not a current measurement.
         updated_at = self.coordinator.cop_last_updated(self._metric_key)

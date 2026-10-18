@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from itertools import pairwise
 from typing import Any, Callable
 
@@ -28,6 +29,12 @@ from .const import (
     DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC,
     DHW_SHOWER_DURATION_MIN,
     DHW_SHOWER_TEMP_C,
+    DHW_CHARGE_MAX_SECONDS,
+    DHW_TANK_ID_MIN_KWH,
+    DHW_TANK_ID_MIN_RISE_C,
+    DHW_TANK_LITERS_ALPHA,
+    DHW_TANK_LITERS_MAX,
+    DHW_TANK_LITERS_MIN,
     DHW_TANK_VOLUME_L,
     HP_STATUS_HEATING,
     HP_STATUS_HOT_WATER,
@@ -93,6 +100,26 @@ def _split_electrical_input(
         return compressor_kwh, aux_kwh, 0.0
     # Compressor stopped while DHW is still demanded: the element alone.
     return 0.0, aux_kwh, 0.0
+
+
+@dataclass
+class DhwCharge:
+    """One DHW charging segment, measured from its own baseline.
+
+    The tank balance only means something against the level the charge started
+    from. A fixed window would mix the tank cooling before the charge with the
+    charge itself, so production is accumulated per segment instead.
+    """
+
+    started: datetime
+    start_tank: float | None
+    last_tank: float | None
+    draw_kwh: float = 0.0
+    electrical_kwh: float = 0.0
+    compressor_kwh: float = 0.0
+    # Evidence gathered while only the element ran (see _identified_dhw_liters).
+    element_kwh: float = 0.0
+    element_rise_c: float = 0.0
 
 
 class QvantumCalculationsMixin:
@@ -208,8 +235,10 @@ class QvantumCalculationsMixin:
         compressor's output, so it is combined with the tank energy balance
         ``(bt30_end - bt30_start) · V · c`` to recover production, then divided
         by the electrical consumed in DHW mode. This is an estimate, not a
-        meter, and needs ``bt30``. A window that holds no compressor work is an
-        element-only charge and is capped at COP 1.
+        meter, and needs ``bt30``. It is measured over one charge segment (see
+        ``_update_dhw_charge``) rather than over the heating window, and its
+        tank volume is identified from element-only charges rather than taken
+        from the datasheet.
 
         A counter reset drops the window instead of showing a bogus ratio.
         """
@@ -263,6 +292,8 @@ class QvantumCalculationsMixin:
             # last value until a new window is measurable.
             history.clear()
             history.append(sample)
+            # The open charge lost its baseline with the counters.
+            self._dhw_charge = None
             self._set_cop(
                 values,
                 self._cop_last.get("cop_heating"),
@@ -270,6 +301,7 @@ class QvantumCalculationsMixin:
             )
             return
 
+        previous_tank = history[-1][3] if history else None
         history.append(sample)
         cutoff = now - timedelta(seconds=COP_WINDOW_SECONDS)
         # Always keep the previous sample as the baseline: if the poll interval
@@ -280,9 +312,6 @@ class QvantumCalculationsMixin:
 
         heating_thermal = 0.0
         heating_electrical = 0.0
-        dhw_electrical = 0.0
-        dhw_compressor = 0.0
-        dhw_draw = 0.0
         for (_, before, _, _, _, _), (
             _,
             after,
@@ -291,32 +320,22 @@ class QvantumCalculationsMixin:
             interval_dhw_demand,
             interval_aux_demand,
         ) in pairwise(history):
-            interval_heating, interval_dhw, interval_dhw_compressor = (
-                _split_electrical_input(
-                    hp_status=mode,
-                    dhw_demand=interval_dhw_demand,
-                    aux_demand=interval_aux_demand,
-                    compressor_kwh=(
-                        after["compressorenergy"] - before["compressorenergy"]
-                    ),
-                    aux_kwh=(after["additionalenergy"] - before["additionalenergy"]),
-                )
+            interval_heating, _, _ = _split_electrical_input(
+                hp_status=mode,
+                dhw_demand=interval_dhw_demand,
+                aux_demand=interval_aux_demand,
+                compressor_kwh=(after["compressorenergy"] - before["compressorenergy"]),
+                aux_kwh=(after["additionalenergy"] - before["additionalenergy"]),
             )
-            dhw_draw += after["dhwenergy"] - before["dhwenergy"]
             if mode == HP_STATUS_HEATING:
                 heating_thermal += after["heatingenergy"] - before["heatingenergy"]
             heating_electrical += interval_heating
-            dhw_electrical += interval_dhw
-            dhw_compressor += interval_dhw_compressor
 
         # The counters are read as floats, so a sum can land a hair below its
         # nominal value (0.2 -> 0.19999999999999574). Rounding below the
         # 0.1 kWh counter resolution keeps the threshold comparison exact.
         heating_thermal = round(heating_thermal, 6)
         heating_electrical = round(heating_electrical, 6)
-        dhw_draw = round(dhw_draw, 6)
-        dhw_electrical = round(dhw_electrical, 6)
-        dhw_compressor = round(dhw_compressor, 6)
 
         if heating_electrical >= COP_MIN_ELECTRICAL_KWH:
             heating_ratio = cop_ratio(heating_thermal, heating_electrical)
@@ -324,28 +343,185 @@ class QvantumCalculationsMixin:
                 self._cop_last["cop_heating"] = heating_ratio
                 self._cop_last_times["cop_heating"] = now
 
-        baseline_tank = history[0][3]
-        if (
-            dhw_electrical >= COP_MIN_ELECTRICAL_KWH
-            and tank_temp is not None
-            and baseline_tank is not None
-        ):
-            # Production recovered from the tank balance: what was drawn plus
-            # what stayed in (or came out of) the tank over the window.
-            production = dhw_draw + (tank_temp - baseline_tank) * (
-                DHW_TANK_VOLUME_L * WATER_KWH_PER_LITER_K
-            )
-            dhw_ratio = cap_dhw_ratio(
-                cop_ratio(production, dhw_electrical), dhw_compressor
-            )
-            if dhw_ratio is not None:
-                self._cop_last["cop_dhw"] = dhw_ratio
-                self._cop_last_times["cop_dhw"] = now
+        self._update_dhw_charge(
+            now=now,
+            tank_temp=tank_temp,
+            previous_tank=previous_tank,
+            previous=previous,
+            current=current,
+            hp_status=hp_status,
+            dhw_demand=dhw_demand,
+            aux_demand=aux_demand,
+        )
 
         self._set_cop(
             values,
             self._cop_last.get("cop_heating"),
             self._cop_last.get("cop_dhw"),
+        )
+
+    def _update_dhw_charge(
+        self,
+        *,
+        now: datetime,
+        tank_temp: float | None,
+        previous_tank: float | None,
+        previous: dict[str, float],
+        current: dict[str, float],
+        hp_status: object,
+        dhw_demand: bool,
+        aux_demand: bool,
+    ) -> None:
+        """Measure the current DHW charge as one segment and publish its COP.
+
+        A charge is a segment, not a window: the tank balance only means
+        something against the level the charge started from. The segment opens
+        on the poll where DHW heating is first demanded — with the tank level of
+        the poll before it, so the first rise is not lost — and closes on the
+        first poll where the demand is gone, which is when the volume
+        identification and the final ratio are taken.
+
+        A demand flag that never clears would carry standing loss for hours, so
+        a segment older than ``DHW_CHARGE_MAX_SECONDS`` restarts its baseline
+        instead of publishing a figure nobody can trust.
+        """
+        charge = self._dhw_charge
+        charging = dhw_demand or hp_status == HP_STATUS_HOT_WATER
+
+        if charge is not None and (
+            now - charge.started
+        ).total_seconds() > DHW_CHARGE_MAX_SECONDS:
+            charge = None
+            self._dhw_charge = None
+
+        if not charging:
+            if charge is None:
+                return
+            self._dhw_charge = None
+            # Identify first: the closing figure is then computed with the
+            # volume this very charge just measured.
+            self._learn_dhw_tank_liters(charge)
+            self._publish_dhw_charge(charge, tank_temp, now)
+            return
+
+        if charge is None:
+            if previous_tank is None:
+                # No tank level to measure from: open at the current one and
+                # start accumulating on the next poll rather than counting this
+                # interval's energy against a baseline it is already part of.
+                self._dhw_charge = DhwCharge(now, tank_temp, tank_temp)
+                return
+            charge = DhwCharge(now, previous_tank, previous_tank)
+            self._dhw_charge = charge
+
+        _, interval_dhw, interval_dhw_compressor = _split_electrical_input(
+            hp_status=hp_status,
+            dhw_demand=dhw_demand,
+            aux_demand=aux_demand,
+            compressor_kwh=current["compressorenergy"] - previous["compressorenergy"],
+            aux_kwh=current["additionalenergy"] - previous["additionalenergy"],
+        )
+        interval_draw = current["dhwenergy"] - previous["dhwenergy"]
+        charge.draw_kwh += interval_draw
+        charge.electrical_kwh += interval_dhw
+        charge.compressor_kwh += interval_dhw_compressor
+        if (
+            interval_dhw_compressor == 0.0
+            and interval_draw == 0.0
+            and hp_status not in (HP_STATUS_HEATING, HP_STATUS_HOT_WATER)
+            and tank_temp is not None
+            and charge.last_tank is not None
+        ):
+            # The compressor is idle and nothing is drawn: the element is the
+            # only heat source, so its energy and the tank rise measure the
+            # same volume. Both sums span every such interval, because the
+            # element counter steps far less often than the tank rises.
+            charge.element_kwh += interval_dhw
+            charge.element_rise_c += tank_temp - charge.last_tank
+        if tank_temp is not None:
+            charge.last_tank = tank_temp
+
+        self._publish_dhw_charge(charge, tank_temp, now)
+
+    def _publish_dhw_charge(
+        self,
+        charge: DhwCharge,
+        tank_temp: float | None,
+        now: datetime,
+    ) -> None:
+        """Publish the ratio for the charge so far (live and at its close)."""
+        if tank_temp is None or charge.start_tank is None:
+            return
+        electrical = round(charge.electrical_kwh, 6)
+        if electrical < COP_MIN_ELECTRICAL_KWH:
+            return
+        # Production recovered from the tank balance: what was drawn since the
+        # charge started plus what stayed in (or came out of) the tank.
+        production = charge.draw_kwh + (tank_temp - charge.start_tank) * (
+            self._dhw_tank_volume() * WATER_KWH_PER_LITER_K
+        )
+        dhw_ratio = cap_dhw_ratio(
+            cop_ratio(production, electrical), charge.compressor_kwh
+        )
+        if dhw_ratio is None:
+            return
+        self._cop_last["cop_dhw"] = dhw_ratio
+        self._cop_last_times["cop_dhw"] = now
+
+    def _dhw_tank_volume(self) -> float:
+        """Effective tank volume for the balance, best measurement first.
+
+        While a charge is open its own element-only stretch is the most direct
+        measurement available; otherwise the volume identified over earlier
+        charges, and only then the datasheet default.
+        """
+        charge = self._dhw_charge
+        if charge is not None:
+            live = self._identified_dhw_liters(charge)
+            if live is not None:
+                return live
+        identified = getattr(self, "_dhw_tank_liters", None)
+        return identified if identified else DHW_TANK_VOLUME_L
+
+    @staticmethod
+    def _identified_dhw_liters(charge: DhwCharge) -> float | None:
+        """Effective tank volume from the element-only stretch of a charge.
+
+        Without the compressor, every kWh the element draws is stored in the
+        tank (times the heater's efficiency), so the rise measures the volume
+        the balance really sees. One tank sensor, a stratified tank and the
+        fitted volume all fold into that figure, while a datasheet constant is
+        wrong for every other installation and biases the DHW COP linearly.
+        """
+        if charge.element_kwh < DHW_TANK_ID_MIN_KWH:
+            return None
+        if charge.element_rise_c < DHW_TANK_ID_MIN_RISE_C:
+            return None
+        liters = charge.element_kwh / (
+            charge.element_rise_c * WATER_KWH_PER_LITER_K
+        )
+        if not DHW_TANK_LITERS_MIN <= liters <= DHW_TANK_LITERS_MAX:
+            return None
+        return liters
+
+    def _learn_dhw_tank_liters(self, charge: DhwCharge) -> None:
+        """Fold a finished charge's element-only evidence into the volume."""
+        liters = self._identified_dhw_liters(charge)
+        if liters is None:
+            return
+        previous = getattr(self, "_dhw_tank_liters", None)
+        self._dhw_tank_liters = (
+            liters
+            if previous is None
+            else DHW_TANK_LITERS_ALPHA * liters
+            + (1.0 - DHW_TANK_LITERS_ALPHA) * previous
+        )
+        _LOGGER.debug(
+            "Identified DHW tank volume: %.0f L from %.1f kWh over %.1f K (EMA -> %.0f L)",
+            liters,
+            charge.element_kwh,
+            charge.element_rise_c,
+            self._dhw_tank_liters,
         )
 
     @staticmethod

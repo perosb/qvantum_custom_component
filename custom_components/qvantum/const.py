@@ -420,7 +420,17 @@ def ensure_tap_water_start_below_stop(start: object, stop: object) -> None:
 
 # DHW capacity calculation defaults
 DHW_SHOWER_TEMP_C = 38.0  # Target shower temperature (°C) — +2°C from Qvantum app
-DHW_TANK_VOLUME_L = 175  # Hot water tank volume (L) — buffer tank per installer spec
+DHW_TANK_VOLUME_L = 175  # Fallback tank volume (L) — buffer tank per installer spec
+# The DHW COP recovers production from the tank balance `bt30 · V · c`, so the
+# volume is a linear factor on the result. It is identified instead of assumed:
+# an element-only charge stores every kWh it draws, so the rise measures the
+# volume the balance really sees (one sensor, stratified tank, fitted volume).
+DHW_TANK_LITERS_MIN = 50.0  # Reject an identification outside a plausible tank
+DHW_TANK_LITERS_MAX = 500.0
+DHW_TANK_LITERS_ALPHA = 0.25  # EMA weight of a new identification
+DHW_TANK_ID_MIN_KWH = 1.5  # Stored energy one identification must measure
+DHW_TANK_ID_MIN_RISE_C = 3.0  # Tank rise one identification must measure
+DHW_CHARGE_MAX_SECONDS = 3 * 3600  # Longer than any charge; restart the baseline
 DHW_DEFAULT_FLOW_LPM = 7.0  # Default shower flow rate when no recent observation (L/min)
 DHW_FLOW_SNAPSHOT_THRESHOLD_LPM = 0.1  # Minimum flow used to sample cold/flow values for tap_water_cap
 DHW_MIN_SHOWER_FLOW_LPM = (
