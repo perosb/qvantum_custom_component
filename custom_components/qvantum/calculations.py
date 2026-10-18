@@ -414,11 +414,12 @@ class QvantumCalculationsMixin:
             charge = DhwCharge(now, previous_tank, previous_tank)
             self._dhw_charge = charge
 
+        compressor_delta = current["compressorenergy"] - previous["compressorenergy"]
         _, interval_dhw, interval_dhw_compressor = _split_electrical_input(
             hp_status=hp_status,
             dhw_demand=dhw_demand,
             aux_demand=aux_demand,
-            compressor_kwh=current["compressorenergy"] - previous["compressorenergy"],
+            compressor_kwh=compressor_delta,
             aux_kwh=current["additionalenergy"] - previous["additionalenergy"],
         )
         interval_draw = current["dhwenergy"] - previous["dhwenergy"]
@@ -427,6 +428,7 @@ class QvantumCalculationsMixin:
         charge.compressor_kwh += interval_dhw_compressor
         if (
             interval_dhw_compressor == 0.0
+            and compressor_delta == 0.0
             and interval_draw == 0.0
             and hp_status not in (HP_STATUS_HEATING, HP_STATUS_HOT_WATER)
             and tank_temp is not None

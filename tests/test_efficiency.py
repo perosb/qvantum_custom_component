@@ -16,9 +16,10 @@ from custom_components.qvantum.calculations import (
 )
 from custom_components.qvantum.const import (
     DHW_CHARGE_MAX_SECONDS,
+    DHW_TANK_VOLUME_L,
+    HP_STATUS_DEFROSTING,
     HP_STATUS_HEATING,
     HP_STATUS_HOT_WATER,
-    DHW_TANK_VOLUME_L,
     HP_STATUS_IDLE,
 )
 from custom_components.qvantum.efficiency import (
@@ -521,6 +522,39 @@ class TestCalculateCop:
 
         assert calculator._dhw_tank_liters is None
         assert calculator._dhw_tank_volume() == DHW_TANK_VOLUME_L
+
+    def test_tank_volume_identification_ignores_a_defrost(self):
+        """A defrost inside the charge runs the compressor; it is not element-only.
+
+        ``_split_electrical_input`` only books compressor energy to DHW under
+        hot water, so the element-only evidence must also check the compressor
+        counter itself — otherwise a defrost's tank change is measured against
+        the element's energy and pollutes the persisted volume.
+        """
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        calculator._calculate_cop(
+            _values(
+                hp_status=HP_STATUS_IDLE,
+                dhwdemand=1,
+                additionalenergy=12.0,
+                bt30=62.0,
+            )
+        )
+        assert calculator._dhw_tank_volume() == pytest.approx(143.3, rel=1e-3)
+
+        defrost = _values(
+            hp_status=HP_STATUS_DEFROSTING,
+            dhwdemand=1,
+            compressorenergy=40.6,
+            additionalenergy=12.0,
+            bt30=67.0,
+        )
+        calculator._calculate_cop(defrost)
+
+        assert calculator._dhw_charge.element_rise_c == pytest.approx(12.0)
+        assert calculator._dhw_charge.element_kwh == pytest.approx(2.0)
+        assert calculator._dhw_tank_volume() == pytest.approx(143.3, rel=1e-3)
 
     def test_tank_volume_identification_needs_enough_stored_energy(self):
         calculator = _Calculator()
