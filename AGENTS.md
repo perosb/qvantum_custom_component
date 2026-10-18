@@ -89,6 +89,12 @@ writes: coordinator helpers (`async_set_extra_tap_water`, `async_write_metric`,
 
 Do not ask permission for these steps. Do not merge unless asked.
 
+`main` takes **squash merges only** and requires **every review thread to be
+resolved**: after pushing a fix, reply in the thread and resolve it, or
+`mergeStateStatus` stays `BLOCKED` with green CI. Every push re-runs the `review`
+workflow, so batch documentation with the code change instead of pushing doc
+fixes afterwards.
+
 **One concern per PR.** A follow-up change — even in a file an open PR already
 touches — gets its own branch from the latest `main`; never append it to that
 PR's branch. Before pushing to a PR branch, check `gh pr view <n> --json state`:
@@ -118,16 +124,26 @@ git worktree remove "${TMPDIR:-/tmp}/qvantum-review-<n>"
 ### Stacked work
 
 Use official `gh stack` (`gh extension install github/gh-stack`). One concern
-per layer; land on `main` in order. Do not hand-stack or rebase a layer onto
-`main`.
+per layer; land on `main` in order.
 
 - Create: `gh stack init <b1> <b2> …` (bottom → top) or `gh stack add` / `link`.
-- Submit: `gh stack submit`.
+- Submit: `gh stack submit`. **`gh stack merge` refuses a stack that was never
+  submitted** — a local `init` alone buys nothing.
 - Sync: `gh stack sync` (atomic `--force-with-lease`). Prefer over `gh stack push`.
 - Merge: `gh stack merge --yes --squash` or `gh stack merge <pr>`.
 
-Fallback if `gh-stack` is missing: child base = parent branch, `Depends on #N`,
-then `git rebase --onto origin/main <old-parent-tip> <child>` after parent squash.
+`gh stack submit --auto` writes each PR body from its commit message, which
+throws away the hand-written `## Summary` that feeds the release changelog —
+write the bodies yourself and submit interactively, or edit them afterwards.
+
+A child PR whose base is the parent branch (with `Depends on #N` in the body) is
+not hand-stacking: it keeps the child diff clean and is the path to use when the
+stack is not submitted. After the parent's squash merge, rebase once with
+`git rebase --onto origin/main <old-parent-tip> <child>` (no conflicts when the
+parent's content is identical), push `--force-with-lease`, then
+`gh pr edit <child> --base main`. Prefer **one PR with two commits** when the
+second change rewrites the first one's code — two review rounds over the same
+function cost more than one.
 
 ## Commits and PRs
 
@@ -301,11 +317,40 @@ access, so no control is offered when a write would fail.
   HTTP paths: `client/cloud/endpoints.py`.
 - Energy counters: `heatingenergy` is space-heating output, but `dhwenergy`
   meters the DHW **draw** (secondary side), not the compressor's DHW output.
-  `cop_dhw` therefore estimates production from the tank balance
-  (`DHW_TANK_VOLUME_L` × `WATER_KWH_PER_LITER_K` × `bt30` change + draw) over
-  the DHW-mode electrical; there is no short-window system COP. The electrical
-  counters (`compressorenergy` + `additionalenergy`) are shared between modes;
-  attribute them by `hp_status` for a per-mode ratio.
+  There is no short-window system COP. The electrical counters
+  (`compressorenergy` + `additionalenergy`) are shared between modes and are
+  split per poll by `_split_electrical_input`: hot water → DHW; space heating
+  with `dhwdemand` and no `additiondemand` → compressor heating, element DHW
+  (parallel top-up); compressor idle with `dhwdemand` → element DHW (the pump
+  reports `Idle` when only the element runs, because `hp_status` follows the
+  compressor). Both flags are disabled-by-default binary sensors, so they sit
+  in `REQUIRED_METRICS` — a disabled entity is not fetched — and without them
+  the split falls back to `hp_status` alone.
+- `cop_heating` is a rolling one-hour window of counter deltas over heating-mode
+  electrical only. `cop_dhw` is measured over **one charge segment**
+  (`_update_dhw_charge`): it opens on DHW demand (or hot water) with the tank
+  level of the poll before it, publishes live, and finalises on the first poll
+  without demand. Production is the draw since the charge started plus the tank
+  change against that baseline; a segment holding no compressor work is
+  element-only and capped at COP 1.0. Two invariants from review, keep them:
+  the interval that clears the demand is **not** booked to the charge, so the
+  closing publish uses `charge.last_tank` (not the current tank), and the
+  element-only evidence must check the **compressor counter** delta —
+  `interval_dhw_compressor` is zero for every status but hot water, so a defrost
+  would otherwise be measured as element heat. A counter reset drops the window
+  and the open charge; a charge older than `DHW_CHARGE_MAX_SECONDS` restarts its
+  baseline.
+- The DHW tank volume in the balance is **identified, not assumed**. On
+  intervals where the compressor is idle and nothing is drawn the element is the
+  only heat source, so `V = Σelement_kWh / (ΣΔbt30 · c)` (gates: ≥ 1.5 kWh,
+  ≥ 3 K, 50–500 L). The datasheet 175 L (QE/QG/QG-C/QH-175; the QGM wall unit
+  QH100 is smaller and unpublished) is only the fallback: `bt30` reads the top
+  of a stratified store that hot water is drawn from through a plate heat
+  exchanger, so `bt30 × 175 L` over-counts (123 L effective on a QE-6). The
+  value is EMA-smoothed, persisted as `dhw_tank_liters` with the COP snapshot,
+  used for the live ratio of the charge it was measured in, exposed on the
+  `cop_dhw` sensor (`charge_open`, `tank_liters`) and in the diagnostics `cop`
+  block — a new COP-store field belongs there in the same PR.
 - Adaptive-curve optional terms (COP feedback, cold-snap pre-charge) are off
   by default, persisted in the curve Store, and enabled via
   `qvantum.set_curve_terms`. They only apply while the curve is active and
