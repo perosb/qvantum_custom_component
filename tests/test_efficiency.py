@@ -9,11 +9,20 @@ from unittest.mock import patch
 
 import pytest
 
-from custom_components.qvantum.calculations import QvantumCalculationsMixin
-from custom_components.qvantum.const import HP_STATUS_HEATING, HP_STATUS_HOT_WATER
+from custom_components.qvantum.calculations import (
+    QvantumCalculationsMixin,
+    _flag,
+    _split_electrical_input,
+)
+from custom_components.qvantum.const import (
+    HP_STATUS_HEATING,
+    HP_STATUS_HOT_WATER,
+    HP_STATUS_IDLE,
+)
 from custom_components.qvantum.efficiency import (
     COP_WINDOW_SECONDS,
     aux_heat_share,
+    cap_dhw_ratio,
     cop_ratio,
     energy_delta,
     scop_from_counters,
@@ -26,7 +35,14 @@ class _Calculator(QvantumCalculationsMixin):
     def __init__(self) -> None:
         self._last_cop_energies: dict[str, float] | None = None
         self._cop_history: deque[
-            tuple[datetime, dict[str, float], int | None, float | None]
+            tuple[
+                datetime,
+                dict[str, float],
+                int | None,
+                float | None,
+                bool,
+                bool,
+            ]
         ] = deque()
         self._cop_last: dict[str, float | None] = {}
         self._cop_last_times: dict[str, datetime] = {}
@@ -40,6 +56,8 @@ def _values(**overrides):
         "additionalenergy": 10.0,
         "hp_status": HP_STATUS_HEATING,
         "bt30": 50.0,
+        "dhwdemand": 0,
+        "additiondemand": 0,
     }
     base.update(overrides)
     return base
@@ -107,6 +125,96 @@ class TestScopFromCounters:
 
     def test_no_thermal_output_is_none(self):
         assert scop_from_counters(0.0, 0.0, 60.0, 40.0) is None
+
+
+class TestCapDhwRatio:
+    """An element-only charge cannot exceed COP 1."""
+
+    def test_element_only_ratio_is_capped(self):
+        assert cap_dhw_ratio(6.1, 0.0) == 1.0
+
+    def test_compressor_work_is_not_capped(self):
+        assert cap_dhw_ratio(2.4, 0.5) == 2.4
+
+    def test_missing_ratio_stays_none(self):
+        assert cap_dhw_ratio(None, 0.0) is None
+
+    def test_unknown_compressor_share_is_capped(self):
+        assert cap_dhw_ratio(3.0, None) == 1.0
+
+
+class TestFlag:
+    def test_metric_values(self):
+        assert _flag(1) is True
+        assert _flag(True) is True
+        assert _flag(0) is False
+        assert _flag("on") is True
+        assert _flag("off") is False
+        assert _flag(None) is False
+        assert _flag(2.5) is True
+
+
+class TestSplitElectricalInput:
+    """Attribution of one poll interval's electrical input."""
+
+    def test_hot_water_books_everything_to_dhw(self):
+        heating, dhw, dhw_compressor = _split_electrical_input(
+            hp_status=HP_STATUS_HOT_WATER,
+            dhw_demand=True,
+            aux_demand=False,
+            compressor_kwh=0.3,
+            aux_kwh=0.1,
+        )
+        assert (heating, dhw, dhw_compressor) == (0.0, 0.4, 0.3)
+
+    def test_heating_without_dhw_demand_books_everything_to_heating(self):
+        heating, dhw, dhw_compressor = _split_electrical_input(
+            hp_status=HP_STATUS_HEATING,
+            dhw_demand=False,
+            aux_demand=True,
+            compressor_kwh=0.3,
+            aux_kwh=0.1,
+        )
+        assert (heating, dhw, dhw_compressor) == (0.4, 0.0, 0.0)
+
+    def test_auxiliary_heat_for_space_heating_stays_heating(self):
+        heating, dhw, _ = _split_electrical_input(
+            hp_status=HP_STATUS_HEATING,
+            dhw_demand=True,
+            aux_demand=True,
+            compressor_kwh=0.3,
+            aux_kwh=0.1,
+        )
+        assert (heating, dhw) == (0.4, 0.0)
+
+    def test_parallel_top_up_splits_by_source(self):
+        heating, dhw, dhw_compressor = _split_electrical_input(
+            hp_status=HP_STATUS_HEATING,
+            dhw_demand=True,
+            aux_demand=False,
+            compressor_kwh=0.3,
+            aux_kwh=0.1,
+        )
+        assert (heating, dhw, dhw_compressor) == (0.3, 0.1, 0.0)
+
+    def test_stopped_compressor_books_only_the_element(self):
+        heating, dhw, dhw_compressor = _split_electrical_input(
+            hp_status=HP_STATUS_IDLE,
+            dhw_demand=True,
+            aux_demand=False,
+            compressor_kwh=0.0,
+            aux_kwh=0.4,
+        )
+        assert (heating, dhw, dhw_compressor) == (0.0, 0.4, 0.0)
+
+    def test_idle_without_dhw_demand_attributes_nothing(self):
+        assert _split_electrical_input(
+            hp_status=HP_STATUS_IDLE,
+            dhw_demand=False,
+            aux_demand=False,
+            compressor_kwh=0.0,
+            aux_kwh=0.0,
+        ) == (0.0, 0.0, 0.0)
 
 
 class TestCalculateCop:
@@ -237,6 +345,107 @@ class TestCalculateCop:
 
         # Only the heating interval counts: 0.6 / 0.2, not 0.6 / 0.5.
         assert values["cop_heating"] == pytest.approx(3.0)
+
+    def test_aux_only_tank_charge_publishes_a_dhw_cop(self):
+        """Compressor stopped, element charging the tank, pump reporting idle."""
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        # 0.4 kWh from the element into a tank that gained 1 K (0.20 kWh).
+        values = _values(
+            hp_status=HP_STATUS_IDLE,
+            dhwdemand=1,
+            additionalenergy=10.4,
+            bt30=51.0,
+        )
+
+        calculator._calculate_cop(values)
+
+        # Production comes from the tank balance; the element alone is ~0.5.
+        assert values["cop_dhw"] == pytest.approx(0.509, abs=1e-3)
+        assert values["cop_heating"] is None
+
+    def test_element_only_charge_is_capped_at_cop_one(self):
+        """A resistive element cannot exceed COP 1, whatever the balance says."""
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        values = _values(
+            hp_status=HP_STATUS_IDLE,
+            dhwdemand=1,
+            additionalenergy=10.4,
+            bt30=62.0,
+        )
+
+        calculator._calculate_cop(values)
+
+        assert values["cop_dhw"] == 1.0
+
+    def test_parallel_dhw_top_up_does_not_dilute_heating_cop(self):
+        """The element charges the tank while the compressor heats the house."""
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        values = _values(
+            heatingenergy=100.6,
+            compressorenergy=40.2,
+            additionalenergy=10.4,
+            dhwdemand=1,
+            bt30=51.0,
+        )
+
+        calculator._calculate_cop(values)
+
+        # 0.6 kWh of house heat against the compressor's 0.2 kWh, not 0.6 kWh.
+        assert values["cop_heating"] == pytest.approx(3.0)
+        assert values["cop_dhw"] == pytest.approx(0.509, abs=1e-3)
+
+    def test_auxiliary_heat_flagged_for_heating_is_not_dhw(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        values = _values(
+            heatingenergy=100.6,
+            compressorenergy=40.1,
+            additionalenergy=10.4,
+            dhwdemand=1,
+            additiondemand=1,
+        )
+
+        calculator._calculate_cop(values)
+
+        assert values["cop_heating"] == pytest.approx(1.2)
+        assert values["cop_dhw"] is None
+
+    def test_missing_demand_flags_keep_the_hp_status_attribution(self):
+        """Without the demand flags the old behaviour must be unchanged."""
+        calculator = _Calculator()
+        baseline = _values()
+        baseline.pop("dhwdemand")
+        baseline.pop("additiondemand")
+        calculator._calculate_cop(baseline)
+        values = _values(
+            heatingenergy=100.6,
+            compressorenergy=40.1,
+            additionalenergy=10.4,
+        )
+        values.pop("dhwdemand")
+        values.pop("additiondemand")
+
+        calculator._calculate_cop(values)
+
+        assert values["cop_heating"] == pytest.approx(1.2)
+
+    def test_compressor_dhw_charge_is_not_capped(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        values = _values(
+            hp_status=HP_STATUS_HOT_WATER,
+            compressorenergy=40.5,
+            dhwenergy=52.0,
+            bt30=51.0,
+        )
+
+        calculator._calculate_cop(values)
+
+        # 2 kWh drawn + 0.20 kWh tank gain over 0.5 kWh of compressor work.
+        assert values["cop_dhw"] == pytest.approx(4.407, abs=1e-3)
 
     def test_idle_window_does_not_publish(self):
         calculator = _Calculator()
