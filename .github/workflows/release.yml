@@ -8,7 +8,13 @@ on:
         required: true
         type: string
   release:
-    types: [published]
+    # `published` fires for a release that goes live, stable or pre-release.
+    # `released` fires when a pre-release is promoted to a stable release
+    # afterwards, and `edited` covers a promotion GitHub reports as an edit
+    # only. Publishing the draft as a pre-release and promoting it later is the
+    # normal path here, so without the last two the manifest would never be
+    # bumped and the release would ship the previous version.
+    types: [published, released, edited]
 
 env:
   COMPONENT_DIR: qvantum
@@ -33,6 +39,22 @@ jobs:
           ref: ${{ env.RELEASE_TAG || github.ref }}
           fetch-depth: 0
 
+      # The event payload freezes the state at publish time: a promotion made
+      # afterwards still arrives as `prerelease: true`, and an edit carries no
+      # usable flag at all. Ask the API what the release is *now*. A manual run
+      # is an explicit recovery of an already stable release.
+      - name: Resolve whether the release is stable
+        id: release_state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "stable=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          prerelease=$(gh api "repos/${{ github.repository }}/releases/tags/${{ env.RELEASE_TAG }}" --jq '.prerelease')
+          echo "stable=$([ "$prerelease" = "false" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Generate release notes
         if: github.event_name == 'release'
         env:
@@ -45,10 +67,12 @@ jobs:
             --polish \
             --themed
 
-      # A pre-release must not move the manifest / VERSION on main. A manual
-      # (workflow_dispatch) run is an explicit recovery for a stable release.
+      # A pre-release must not move the manifest / VERSION on main. The script
+      # fails the run if the version it wrote is not the tag, so a broken path
+      # or a stale pattern cannot ship a release that advertises the previous
+      # version.
       - name: Update manifest.json version to ${{ env.RELEASE_TAG }}
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && !github.event.release.prerelease)
+        if: steps.release_state.outputs.stable == 'true'
         run: |
           python3 ${{ github.workspace }}/.github/scripts/update_hacs_manifest.py --version ${{ env.RELEASE_TAG }} --path /custom_components/qvantum/
 
@@ -69,7 +93,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.release.prerelease }}" != "true" ]; then
+          if [ "${{ steps.release_state.outputs.stable }}" = "true" ]; then
             git add ./custom_components/qvantum/manifest.json ./custom_components/qvantum/const.py
           fi
           if [ -d docs/releases ]; then
@@ -81,18 +105,22 @@ jobs:
             exit 0
           fi
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.release.prerelease }}" != "true" ]; then
-            git commit -m "Update for new version ${{ env.RELEASE_TAG }}"
-          else
+          # Name the commit after what it actually carries: the version bump is
+          # what main must show, a notes-only change is documentation.
+          if git diff --cached --quiet -- ./custom_components/qvantum/manifest.json; then
             git commit -m "docs: release notes for ${{ env.RELEASE_TAG }}"
+          else
+            git commit -m "Update for new version ${{ env.RELEASE_TAG }}"
           fi
 
           git fetch origin main
           git rebase origin/main
           git push origin HEAD:main
 
+      # An edit is not a new publication: leave the body the run already wrote
+      # alone, so a hand-written note is not overwritten by a stray edit.
       - name: Link the release notes
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' && github.event.action != 'edited'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

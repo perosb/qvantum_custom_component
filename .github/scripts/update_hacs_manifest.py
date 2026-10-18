@@ -57,5 +57,21 @@ def update_manifest():
             )
         )
 
+    # Read both files back: a wrong --path, a stale VERSION pattern or a
+    # pre-release tag that does not match it would otherwise leave the release
+    # advertising the previous version while the run stays green.
+    with open(
+        f"{os.getcwd()}/{manifest_path}/manifest.json",
+        encoding="UTF-8",
+    ) as manifestfile:
+        if json.load(manifestfile).get("version") != version:
+            sys.exit(f"manifest.json does not carry version {version}")
+
+    with open(f"{os.getcwd()}/{manifest_path}/const.py", encoding="UTF-8") as file:
+        if not re.search(
+            rf'^VERSION\s*=\s*"{re.escape(version)}"$', file.read(), re.MULTILINE
+        ):
+            sys.exit(f"const.py VERSION is not {version}")
+
 
 update_manifest()
