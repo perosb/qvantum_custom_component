@@ -401,7 +401,11 @@ class QvantumCalculationsMixin:
             # Identify first: the closing figure is then computed with the
             # volume this very charge just measured.
             self._learn_dhw_tank_liters(charge)
-            self._publish_dhw_charge(charge, tank_temp, now)
+            # Publish against the tank the accumulated figures were measured
+            # at: the interval that cleared the demand is not booked to the
+            # charge, so its rise (a compressor tail reaching the stop
+            # temperature) must not be counted as free production either.
+            self._publish_dhw_charge(charge, charge.last_tank, now)
             return
 
         if charge is None:

@@ -523,6 +523,38 @@ class TestCalculateCop:
         assert calculator._dhw_tank_liters is None
         assert calculator._dhw_tank_volume() == DHW_TANK_VOLUME_L
 
+    def test_closing_publish_uses_the_tank_the_figures_were_measured_at(self):
+        """The interval that clears the demand is not booked to the charge.
+
+        A compressor tail can keep heating the tank in that interval, so the
+        closing figure must be measured against the tank level of the last
+        charging poll — otherwise its rise counts as production with no
+        electrical input and inflates the published COP.
+        """
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        # 0.4 kWh of element into a 1 K rise, still charging.
+        calculator._calculate_cop(
+            _values(
+                hp_status=HP_STATUS_IDLE,
+                dhwdemand=1,
+                additionalenergy=10.4,
+                bt30=51.0,
+            )
+        )
+
+        # Demand clears while the tank rises another 5 K on heat that was never
+        # booked to the charge.
+        closing = _values(
+            hp_status=HP_STATUS_IDLE,
+            additionalenergy=10.4,
+            bt30=56.0,
+        )
+        calculator._calculate_cop(closing)
+
+        # 1 K · 175 L · c = 0.20 kWh over 0.4 kWh, not 6 K.
+        assert closing["cop_dhw"] == pytest.approx(0.509, abs=1e-3)
+
     def test_tank_volume_identification_ignores_a_defrost(self):
         """A defrost inside the charge runs the compressor; it is not element-only.
 
