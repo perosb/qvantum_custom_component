@@ -461,6 +461,13 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         ),
         # Hours behind each point's trim; 0 means the trim is deliberately 0.
         "trim_evidence": dict(getattr(coordinator, "_trim_evidence", None) or {}),
+        # Persisted curve counters (reverts, trim updates, days with a clamped
+        # or extrapolated knot); they also travel in the summary export.
+        "counters": (
+            dict(getattr(coordinator, "counters", None) or {})
+            if isinstance(getattr(coordinator, "counters", None), dict)
+            else None
+        ),
         "room_error": _curve_room_error_diagnostics(snapshot),
         "model": _curve_model_diagnostics(getattr(coordinator, "_model", None)),
         # Day-block identification: the aperture the solar term uses when valid.
