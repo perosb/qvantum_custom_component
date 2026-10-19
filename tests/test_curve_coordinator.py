@@ -3483,3 +3483,63 @@ async def test_a_valid_measurement_survives_a_failed_run() -> None:
     await coordinator._async_refresh_active_room_gain(1_760_100_000.0)
 
     assert coordinator._room_gain_active is valid
+
+
+async def test_pump_leaving_user_defined_raises_an_issue_and_pauses() -> None:
+    """An external write to holding 22 must not disappear silently."""
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}
+    )
+    coordinator._mode = "active"
+    coordinator._trims = {"curve_0": 0.5}
+    coordinator._last_trim_ts = 42.0
+    # The pump answered Auto instead of User defined by the time we computed.
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._daylight = MagicMock(return_value=None)
+    coordinator._main.data["values"]["curve_type_heating"] = 0
+
+    with (
+        patch.object(cc.ir, "async_create_issue") as create_issue,
+        patch.object(cc.ir, "async_delete_issue"),
+        patch.object(cc.asyncio, "sleep", AsyncMock()),
+    ):
+        await coordinator._async_compute_snapshot()
+
+    assert coordinator._mode == "shadow"
+    assert coordinator._trims == {}
+    create_issue.assert_called_once()
+    args = create_issue.call_args.args
+    assert args[0] is coordinator.hass
+    assert args[1] == cc.DOMAIN
+    assert args[2].startswith("curve_left_user_defined_")
+    assert create_issue.call_args.kwargs["translation_key"] == (
+        "curve_left_user_defined"
+    )
+    assert create_issue.call_args.kwargs["severity"].name == "WARNING"
+
+
+async def test_active_cycle_clears_a_stale_left_issue() -> None:
+    """Following our table again means the previous issue is obsolete."""
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}, live_curve_type=1
+    )
+    coordinator._mode = "active"
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._daylight = MagicMock(return_value=None)
+
+    with (
+        patch.object(cc.ir, "async_create_issue") as create_issue,
+        patch.object(cc.ir, "async_delete_issue") as delete_issue,
+        patch.object(cc.asyncio, "sleep", AsyncMock()),
+    ):
+        await coordinator._async_compute_snapshot()
+
+    create_issue.assert_not_called()
+    delete_issue.assert_called_once()
+    assert delete_issue.call_args.args[2].startswith("curve_left_user_defined_")

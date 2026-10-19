@@ -947,5 +947,11 @@
       "name": "Export summary",
       "description": "Write an opt-in installation summary to a file so it can be attached to an issue; nothing is sent anywhere"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Heating curve paused",
+      "description": "The pump went back to its own automatic curve, so the integration stopped adjusting it and discarded its corrections. Turn \"Adaptive heating curve: control\" back on to resume. The change may have come from the app or a cloud profile."
+    }
   }
 }

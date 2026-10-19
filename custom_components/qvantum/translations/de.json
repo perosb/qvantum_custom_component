@@ -947,5 +947,11 @@
       "name": "Zusammenfassung exportieren",
       "description": "Schreibt eine Opt-in-Zusammenfassung der Anlage in eine Datei zum Anhängen an ein Issue; es wird nichts gesendet"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Heizkurve pausiert",
+      "description": "Die Pumpe ist zu ihrer eigenen automatischen Kurve zurückgekehrt, daher hat die Integration aufgehört, sie anzupassen, und ihre Korrekturen verworfen. Aktiviere „Adaptive Heizkurve: Steuerung“ erneut, um fortzufahren. Die Änderung kann aus der App oder einem Cloud-Profil stammen."
+    }
   }
 }

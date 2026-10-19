@@ -947,5 +947,11 @@
       "name": "Exportar resumen",
       "description": "Escribe un resumen opcional de la instalación en un archivo para adjuntarlo a una incidencia; no se envía nada"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Curva de calefacción en pausa",
+      "description": "La bomba volvió a su propia curva automática, así que la integración dejó de ajustarla y descartó sus correcciones. Vuelve a activar «Curva de calefacción adaptativa: control» para reanudar. El cambio pudo venir de la app o de un perfil en la nube."
+    }
   }
 }

@@ -347,6 +347,14 @@ is a real limit the user should see, not something to hide by lowering the
 baseline. A lift clears the trims, because the shape changed (same rule as a
 learned correction).
 
+When the pump stops following our table (the app or a cloud profile moved the
+curve type), the coordinator drops to shadow, clears the trims, logs a warning
+and opens the **`curve_left_user_defined`** repair issue, deleted again as soon
+as we are active and the pump follows us. It deliberately does **not** reassert
+the curve type: that would fight a user who chose the pump's own curve in the
+app. Detection lands on the 15-minute cycle boundary, which is why two events
+an hour apart look like a schedule.
+
 `diagnostics.py` is the support-dump surface and must stay in step with the
 state it mirrors: a new `CurveSnapshot` or persisted curve field (readiness
 gate, room gain and its source, trims and their evidence, room error,

@@ -947,5 +947,11 @@
       "name": "Eksportuj podsumowanie",
       "description": "Zapisuje opcjonalne podsumowanie instalacji do pliku do załączenia w zgłoszeniu; nic nie jest wysyłane"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Krzywa grzewcza wstrzymana",
+      "description": "Pompa wróciła do własnej automatycznej krzywej, więc integracja przestała ją korygować i odrzuciła swoje poprawki. Włącz ponownie „Adaptacyjna krzywa grzewcza: sterowanie”, aby wznowić. Zmiana mogła pochodzić z aplikacji lub profilu w chmurze."
+    }
   }
 }
