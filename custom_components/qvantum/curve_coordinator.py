@@ -49,6 +49,7 @@ from .heating_curve import (
     corrected_baseline,
     effective_supply_bounds,
     interpolate_supply,
+    lift_baseline_floor,
     normalize_baseline,
     precharge_adjustment_c,
     ActiveRoomGain,
@@ -1265,6 +1266,27 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         )
         return valid_hours, valid_min, valid_max
 
+    def _lift_baseline_to_floor(self, values: Mapping[str, Any]) -> bool:
+        """Raise warm-end baseline points below the pump's supply floor.
+
+        A knot under the floor is clamped on every computation, so it can
+        never show its trim feedback and the clamp is structural. Runs every
+        cycle, not just at freeze time, so a store written by an older
+        version (or a pump whose minimum supply was raised) is migrated once
+        rather than staying pinned forever.
+        """
+        if self._baseline is None:
+            return False
+        low, _ = self._supply_bounds(values)
+        lifted = lift_baseline_floor(self._baseline, low)
+        if lifted == dict(self._baseline):
+            return False
+        self._baseline = lifted
+        # The shape changed: trims learned against the old baseline are stale.
+        self._trims = {}
+        _LOGGER.info("Heating-curve baseline lifted to the pump's supply floor")
+        return True
+
     def _ensure_baseline(self, values: Mapping[str, Any]) -> bool:
         """Freeze the pump's seven points once; ``True`` when newly frozen."""
         if self._baseline is not None:
@@ -1907,7 +1929,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if candidate is None:
             await self._async_persist()
             return
-        self._baseline = candidate
+        self._baseline = lift_baseline_floor(
+            candidate, self._supply_bounds(values)[0]
+        )
         # The shape changed: any active trims learned against the old baseline
         # are stale (they are only recomputed while active, so clear them here).
         self._trims = {}
@@ -2248,7 +2272,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         now = dt_util.utcnow()
         now_ts = now.timestamp()
 
-        if self._ensure_baseline(values):
+        changed = self._ensure_baseline(values)
+        if self._lift_baseline_to_floor(values):
+            changed = True
+        if changed:
             await self._async_persist()
 
         # The pump's own factor is the gain whenever it reports one; the fitted
