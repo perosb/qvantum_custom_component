@@ -1229,3 +1229,100 @@ class TestNumberAvailabilityAndWriteGuard:
             await entity.async_set_native_value(5.0)
 
         coordinator.client.set_tap_water_capacity_target.assert_not_called()
+
+
+class TestPriorityTimeNumbers:
+    """Holding 73-75: priority windows, Modbus-only settings."""
+
+    @pytest.mark.parametrize(
+        ("metric_key", "value", "expected", "translation_key"),
+        [
+            ("heating_priority_time", 30, 30, "heating_priority_time"),
+            ("cooling_priority_time", 0, 0, "cooling_priority_time"),
+            ("dhw_priority_time", 60, 60, "dhw_priority_time"),
+        ],
+    )
+    def test_init_priority_time(
+        self, mock_coordinator, mock_device, metric_key, value, expected, translation_key
+    ):
+        """The register value is the entity state, 0-180 with a 1 step."""
+        mock_coordinator.data["values"][metric_key] = value
+        entity = QvantumNumberEntity(
+            mock_coordinator, metric_key, 0, 180, 1, mock_device
+        )
+
+        assert entity._metric_key == metric_key
+        assert entity.native_value == expected
+        assert entity._attr_native_min_value == 0
+        assert entity._attr_native_max_value == 180
+        assert entity._attr_native_step == 1
+        assert entity._attr_unique_id == (
+            f"qvantum_number_{metric_key}_test_device_123"
+        )
+        assert entity._attr_translation_key == translation_key
+        # Not a temperature: the base class sets no unit and no device class.
+        assert getattr(entity, "_attr_native_unit_of_measurement", None) is None
+        assert getattr(entity, "_attr_device_class", None) is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("metric_key", "value"),
+        [
+            ("heating_priority_time", 45),
+            ("cooling_priority_time", 0),
+            ("dhw_priority_time", 90),
+        ],
+    )
+    async def test_set_native_value_writes_holding(
+        self, mock_coordinator, mock_device, metric_key, value
+    ):
+        """Writes go through the shared metric writer, which validates the range."""
+        mock_coordinator.data["values"][metric_key] = 30
+        mock_coordinator.async_write_metric = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        entity = QvantumNumberEntity(
+            mock_coordinator, metric_key, 0, 180, 1, mock_device
+        )
+
+        await entity.async_set_native_value(float(value))
+
+        mock_coordinator.async_write_metric.assert_awaited_once_with(
+            "test_device_123", metric_key, value
+        )
+
+    @pytest.mark.asyncio
+    async def test_priority_time_entities_created_in_modbus_mode(
+        self, mock_coordinator, mock_device
+    ):
+        """Entities appear only once the register is in the payload."""
+        mock_coordinator.modbus_enabled = True
+        mock_coordinator.data["values"].update(
+            {
+                "heating_priority_time": 30,
+                "cooling_priority_time": 0,
+                "dhw_priority_time": 60,
+            }
+        )
+        mock_config_entry = MagicMock()
+        from custom_components.qvantum import RuntimeData
+
+        mock_config_entry.runtime_data = RuntimeData(
+            coordinator=mock_coordinator, device=mock_device, client=MagicMock()
+        )
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(
+            MagicMock(), mock_config_entry, async_add_entities
+        )
+
+        entities = async_add_entities.call_args[0][0]
+        keys = {entity._metric_key for entity in entities}
+        assert {
+            "heating_priority_time",
+            "cooling_priority_time",
+            "dhw_priority_time",
+        } <= keys
+        # The register map owns the documented range.
+        by_key = {entity._metric_key: entity for entity in entities}
+        assert by_key["dhw_priority_time"]._attr_native_max_value == 180

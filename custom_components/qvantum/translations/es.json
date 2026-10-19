@@ -721,6 +721,15 @@
       "stop_heating": {
         "name": "Temperatura exterior de parada de calefacción"
       },
+      "heating_priority_time": {
+        "name": "Tiempo de prioridad de calefacción"
+      },
+      "cooling_priority_time": {
+        "name": "Tiempo de prioridad de refrigeración"
+      },
+      "dhw_priority_time": {
+        "name": "Tiempo de prioridad de ACS"
+      },
       "temp_compensation_curve": {
         "name": "Curva de compensación de temperatura"
       },

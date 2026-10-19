@@ -721,6 +721,15 @@
       "stop_heating": {
         "name": "Venkovní teplota zastavení topení"
       },
+      "heating_priority_time": {
+        "name": "Doba priority vytápění"
+      },
+      "cooling_priority_time": {
+        "name": "Doba priority chlazení"
+      },
+      "dhw_priority_time": {
+        "name": "Doba priority TUV"
+      },
       "temp_compensation_curve": {
         "name": "Teplotní kompenzační křivka"
       },

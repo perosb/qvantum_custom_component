@@ -74,7 +74,11 @@ writes: coordinator helpers (`async_set_extra_tap_water`, `async_write_metric`,
   2026.9 `async_get_unit`; client never opens/closes TCP.
 - Prefer named setters. `write_metric` is Modbus. Cloud: `set_smartcontrol` /
   `update_settings` via coordinator helpers.
-- Import maps/types from `client.modbus`.
+- Import maps/types from `client.modbus`. A holding register only reaches the
+  coordinator when `MODBUS_HOLDING_TO_SETTINGS_MAP` gives it a canonical name:
+  `get_settings` filters the payload by that map. A register in
+  `MODBUS_HOLDING_REGISTER_MAP` without a settings-map entry is polled and then
+  dropped, so no entity can ever exist for it (holding 73-75 were that way).
 - Exceptions: `AuthError`, `TransportError`, `RateLimitError`. Aliases in HA/tests:
   `APIAuthError`, `APIConnectionError`, `APIRateLimitError`. Do not name a class
   `ConnectionError`.

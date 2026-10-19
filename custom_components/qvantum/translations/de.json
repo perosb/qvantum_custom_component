@@ -721,6 +721,15 @@
       "stop_heating": {
         "name": "Außentemperatur Heizstopp"
       },
+      "heating_priority_time": {
+        "name": "Prioritätszeit Heizen"
+      },
+      "cooling_priority_time": {
+        "name": "Prioritätszeit Kühlen"
+      },
+      "dhw_priority_time": {
+        "name": "Prioritätszeit Warmwasser"
+      },
       "temp_compensation_curve": {
         "name": "Temperaturkompensationskurve"
       },

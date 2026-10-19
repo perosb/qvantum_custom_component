@@ -721,6 +721,15 @@
       "stop_heating": {
         "name": "Buitentemperatuur stop verwarming"
       },
+      "heating_priority_time": {
+        "name": "Prioriteitstijd verwarming"
+      },
+      "cooling_priority_time": {
+        "name": "Prioriteitstijd koeling"
+      },
+      "dhw_priority_time": {
+        "name": "Prioriteitstijd warm water"
+      },
       "temp_compensation_curve": {
         "name": "Temperatuurcompensatiecurve"
       },
