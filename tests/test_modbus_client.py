@@ -246,8 +246,9 @@ async def test_get_settings_includes_priority_times():
     settings = {item["name"]: item["value"] for item in payload["settings"]}
 
     assert settings["heating_priority_time"] == 30
-    assert settings["cooling_priority_time"] == 0
     assert settings["dhw_priority_time"] == 60
+    # Cooling priority is deliberately unnamed: the app does not offer it.
+    assert "cooling_priority_time" not in settings
 
 
 @pytest.mark.asyncio

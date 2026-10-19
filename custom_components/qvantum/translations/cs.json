@@ -724,9 +724,6 @@
       "heating_priority_time": {
         "name": "Doba priority vytápění"
       },
-      "cooling_priority_time": {
-        "name": "Doba priority chlazení"
-      },
       "dhw_priority_time": {
         "name": "Doba priority TUV"
       },

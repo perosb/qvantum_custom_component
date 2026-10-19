@@ -724,9 +724,6 @@
       "heating_priority_time": {
         "name": "Heating priority time"
       },
-      "cooling_priority_time": {
-        "name": "Cooling priority time"
-      },
       "dhw_priority_time": {
         "name": "DHW priority time"
       },

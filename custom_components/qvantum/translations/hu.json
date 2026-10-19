@@ -724,9 +724,6 @@
       "heating_priority_time": {
         "name": "Fűtési prioritási idő"
       },
-      "cooling_priority_time": {
-        "name": "Hűtési prioritási idő"
-      },
       "dhw_priority_time": {
         "name": "HMV prioritási idő"
       },

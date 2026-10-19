@@ -687,7 +687,8 @@ class TestNumberSetup:
 
         async_add_entities = MagicMock()
 
-        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+        with patch("custom_components.qvantum.number.cleanup_disabled_entities"):
+            await async_setup_entry(hass, mock_config_entry, async_add_entities)
 
         # Check that entities were added
         assert async_add_entities.called
@@ -735,7 +736,8 @@ class TestNumberSetup:
 
         async_add_entities = MagicMock()
 
-        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+        with patch("custom_components.qvantum.number.cleanup_disabled_entities"):
+            await async_setup_entry(hass, mock_config_entry, async_add_entities)
 
         entities = async_add_entities.call_args[0][0]
         by_key = {entity._metric_key: entity for entity in entities}
@@ -1017,7 +1019,8 @@ class TestStopHeating:
             coordinator=mock_coordinator, device=mock_device, client=MagicMock())
 
         async_add_entities = MagicMock()
-        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+        with patch("custom_components.qvantum.number.cleanup_disabled_entities"):
+            await async_setup_entry(hass, mock_config_entry, async_add_entities)
 
         entities = async_add_entities.call_args[0][0]
         entity_keys = [entity._metric_key for entity in entities]
@@ -1177,7 +1180,8 @@ class TestHeatingCurveNumbers:
         )
 
         async_add_entities = MagicMock()
-        await async_setup_entry(hass, mock_config_entry, async_add_entities)
+        with patch("custom_components.qvantum.number.cleanup_disabled_entities"):
+            await async_setup_entry(hass, mock_config_entry, async_add_entities)
 
         entity_keys = [entity._metric_key for entity in async_add_entities.call_args[0][0]]
         assert "temp_compensation_curve" in entity_keys
@@ -1238,7 +1242,6 @@ class TestPriorityTimeNumbers:
         ("metric_key", "value", "expected", "translation_key"),
         [
             ("heating_priority_time", 30, 30, "heating_priority_time"),
-            ("cooling_priority_time", 0, 0, "cooling_priority_time"),
             ("dhw_priority_time", 60, 60, "dhw_priority_time"),
         ],
     )
@@ -1269,7 +1272,6 @@ class TestPriorityTimeNumbers:
         ("metric_key", "value"),
         [
             ("heating_priority_time", 45),
-            ("cooling_priority_time", 0),
             ("dhw_priority_time", 90),
         ],
     )
@@ -1300,7 +1302,6 @@ class TestPriorityTimeNumbers:
         mock_coordinator.data["values"].update(
             {
                 "heating_priority_time": 30,
-                "cooling_priority_time": 0,
                 "dhw_priority_time": 60,
             }
         )
@@ -1312,17 +1313,15 @@ class TestPriorityTimeNumbers:
         )
         async_add_entities = MagicMock()
 
-        await async_setup_entry(
-            MagicMock(), mock_config_entry, async_add_entities
-        )
+        with patch("custom_components.qvantum.number.cleanup_disabled_entities"):
+            await async_setup_entry(
+                MagicMock(), mock_config_entry, async_add_entities
+            )
 
         entities = async_add_entities.call_args[0][0]
         keys = {entity._metric_key for entity in entities}
-        assert {
-            "heating_priority_time",
-            "cooling_priority_time",
-            "dhw_priority_time",
-        } <= keys
+        assert {"heating_priority_time", "dhw_priority_time"} <= keys
+        assert "cooling_priority_time" not in keys
         # The register map owns the documented maximum; the app's 30-minute
         # floor survives it for the active modes, while cooling keeps the
         # documented 0 (an unused circuit legitimately holds it).
@@ -1330,6 +1329,5 @@ class TestPriorityTimeNumbers:
         assert by_key["dhw_priority_time"]._attr_native_max_value == 180
         assert by_key["dhw_priority_time"]._attr_native_min_value == 30
         assert by_key["heating_priority_time"]._attr_native_min_value == 30
-        assert by_key["cooling_priority_time"]._attr_native_min_value == 0
         assert by_key["dhw_priority_time"]._attr_native_step == 30
         assert by_key["dhw_priority_time"]._attr_native_unit_of_measurement == "min"

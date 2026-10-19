@@ -724,9 +724,6 @@
       "heating_priority_time": {
         "name": "Durée de priorité chauffage"
       },
-      "cooling_priority_time": {
-        "name": "Durée de priorité refroidissement"
-      },
       "dhw_priority_time": {
         "name": "Durée de priorité ECS"
       },

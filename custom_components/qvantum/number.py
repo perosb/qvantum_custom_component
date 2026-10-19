@@ -20,7 +20,7 @@ from .const import (
     ensure_tap_water_start_below_stop,
 )
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
-from .entity import QvantumEntity
+from .entity import QvantumEntity, cleanup_disabled_entities
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,9 +43,8 @@ MODBUS_WRITE_METRICS = {
     # sensor source can be recovered and the feed can keep writing.
     "room_temp_external",
     "temp_compensation_curve",  # Holding 23; cloud Auto uses DUT fields instead.
-    # Holding 73-75; the cloud API has no priority-window setting.
+    # Holding 73/75; the cloud API has no priority-window setting.
     "heating_priority_time",
-    "cooling_priority_time",
     "dhw_priority_time",
 }
 
@@ -53,7 +52,6 @@ MODBUS_WRITE_METRICS = {
 PRIORITY_TIME_METRICS = frozenset(
     {
         "heating_priority_time",
-        "cooling_priority_time",
         "dhw_priority_time",
     }
 )
@@ -99,15 +97,14 @@ async def async_setup_entry(
         "room_temp_external": (-5, 40, 0.1),
         "stop_heating": (-30, 30, 1),
         "temp_compensation_curve": (1, 50, 1),
-        # Modbus-only (holding 73-75), in minutes. The register map's 0-180
+        # Modbus-only (holding 73/75), in minutes. The register map's 0-180
         # replaces these bounds; the pump's scheduling is minute-granular, so a
         # 30-minute step keeps the UI from offering values it cannot mean.
-        # Heating and DHW are floored to the app's 30, above the register's
-        # documented 0: a zero window for an active mode lets the other mode
-        # preempt it immediately. Cooling stays at 0 because an unused cooling
-        # circuit legitimately holds 0.
+        # Both are floored to the app's 30, above the register's documented 0:
+        # a zero window for an active mode lets the other mode preempt it
+        # immediately. Cooling priority is deliberately not exposed: the app
+        # does not offer it either.
         "heating_priority_time": (30, 180, 30),
-        "cooling_priority_time": (0, 180, 30),
         "dhw_priority_time": (30, 180, 30),
         **{key: _HEATING_CURVE_POINT_RANGE for key in HEATING_CURVE_OUTDOOR_TEMPS},
     }
@@ -139,6 +136,15 @@ async def async_setup_entry(
             )
 
     async_add_entities(sensors)
+    # Number unique ids carry an extra ``number_`` prefix, so the shared cleanup
+    # expects the metric keys with it. Without this a metric dropped from
+    # NUMBER_CONFIG (cooling priority) would linger as a restored entry.
+    cleanup_disabled_entities(
+        hass,
+        coordinator,
+        {f"number_{metric}" for metric in NUMBER_CONFIG},
+        "number",
+    )
 
     _LOGGER.debug("Setting up platform NUMBER")
 
@@ -262,7 +268,6 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
             case (
                 "temp_compensation_curve"
                 | "heating_priority_time"
-                | "cooling_priority_time"
                 | "dhw_priority_time"
             ):
                 coordinator_update_value = int(value)
