@@ -10,6 +10,5 @@ compatibility_date = "2026-10-01"
 binding = "QVANTUM_SUMMARIES"
 id = "1fe27077134347ebb0cc94a099da8866"
 
-# ADMIN_TOKEN is a secret, never a var:
-#   npx wrangler secret put ADMIN_TOKEN
-# It is only needed to erase an installation's rows on request.
+# No secrets: erasure is authorised by the installation's own token in the
+# path, and the intake payload carries no identifiers.

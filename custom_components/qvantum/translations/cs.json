@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Exportovat souhrn",
       "description": "Zapíše volitelný souhrn instalace do souboru pro přiložení k hlášení; nic se neposílá"
+    },
+    "telemetry_upload": {
+      "name": "Odeslat anonymní souhrn nyní",
+      "description": "Odešle volitelný souhrn okamžitě, místo aby čekal na týdenní odeslání."
+    },
+    "telemetry_delete": {
+      "name": "Smazat odeslané souhrny",
+      "description": "Smaže všechny odeslané řádky této instalace pomocí jejího místního tokenu. Sdílení skončí až po vypnutí i v nastavení."
     }
   },
   "issues": {

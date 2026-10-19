@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Exportera sammanfattning",
       "description": "Skriv en opt-in-sammanfattning av anläggningen till en fil så den kan bifogas i ett ärende; inget skickas någonstans"
+    },
+    "telemetry_upload": {
+      "name": "Skicka anonym sammanfattning nu",
+      "description": "Skickar den valfria sammanfattningen direkt i stället för att vänta på veckouppladdningen."
+    },
+    "telemetry_delete": {
+      "name": "Radera uppladdade sammanfattningar",
+      "description": "Raderar alla uppladdade rader för den här anläggningen med dess lokala token. Delningen upphör först när den också stängs av i inställningarna."
     }
   },
   "issues": {

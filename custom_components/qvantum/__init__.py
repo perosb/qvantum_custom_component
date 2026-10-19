@@ -54,7 +54,7 @@ from .const import (
 from .coordinator import QvantumDataUpdateCoordinator
 from .curve_coordinator import QvantumCurveCoordinator, async_stored_curve_mode
 from .telemetry import async_forget as async_forget_telemetry_state
-from .telemetry import async_maybe_prompt
+from .telemetry import async_maybe_prompt, async_schedule_uploads
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
@@ -460,6 +460,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         await async_maybe_prompt(hass, config_entry.entry_id)
     except Exception as err:  # noqa: BLE001 — optional surface
         _LOGGER.debug("Telemetry prompt unavailable: %s", err)
+    try:
+        config_entry.async_on_unload(
+            await async_schedule_uploads(hass, config_entry.entry_id)
+        )
+    except Exception as err:  # noqa: BLE001 — a timer must not block setup
+        _LOGGER.debug("Could not schedule summary uploads: %s", err)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True

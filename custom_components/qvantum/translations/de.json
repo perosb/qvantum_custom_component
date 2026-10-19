@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Zusammenfassung exportieren",
       "description": "Schreibt eine Opt-in-Zusammenfassung der Anlage in eine Datei zum Anhängen an ein Issue; es wird nichts gesendet"
+    },
+    "telemetry_upload": {
+      "name": "Anonyme Zusammenfassung jetzt senden",
+      "description": "Sendet die optionale Zusammenfassung sofort, statt auf die wöchentliche Übertragung zu warten."
+    },
+    "telemetry_delete": {
+      "name": "Hochgeladene Zusammenfassungen löschen",
+      "description": "Löscht alle hochgeladenen Zeilen dieser Anlage über ihr lokales Token. Die Weitergabe endet erst, wenn sie auch in den Einstellungen abgeschaltet wird."
     }
   },
   "issues": {

@@ -12,6 +12,7 @@ from .client.exceptions import (
     APIRateLimitError,
 )
 from .const import DOMAIN
+from .telemetry import async_delete_telemetry, async_upload_summary
 from .summary import (
     SUMMARY_FILENAME,
     SUMMARY_URL,
@@ -100,6 +101,15 @@ async def async_export_summary(service_call: ServiceCall) -> Any:
             }
         }
     return {"qvantum": {"summary": summary, "path": path, "url": SUMMARY_URL}}
+
+
+def _first_entry(hass: HomeAssistant):
+    """The single Qvantum config entry, or ``None`` when not loaded."""
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        runtime = getattr(entry, "runtime_data", None)
+        if getattr(runtime, "coordinator", None) is not None:
+            return entry
+    return None
 
 
 def _find_curve_coordinator(hass: HomeAssistant):
@@ -222,6 +232,48 @@ async def async_setup_services(hass: HomeAssistant):
         service="set_curve_terms",
         service_func=set_curve_terms,
         schema=SET_CURVE_TERMS_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    async def telemetry_upload(service_call: ServiceCall) -> Any:
+        """Post the anonymous summary now instead of waiting for the week."""
+        hass = service_call.hass
+        entry = _first_entry(hass)
+        if entry is None:
+            return {"qvantum": {"exception": "not_loaded"}}
+        try:
+            sent = await async_upload_summary(hass, entry.entry_id, force=True)
+        except Exception as err:  # noqa: BLE001 — report, never raise at the caller
+            _LOGGER.error("Summary upload failed: %s", err)
+            return {"qvantum": {"exception": "unknown_error", "details": str(err)}}
+        return {"qvantum": {"sent": sent}}
+
+    hass.services.async_register(
+        domain=DOMAIN,
+        service="telemetry_upload",
+        service_func=telemetry_upload,
+        schema=vol.Schema({}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    async def telemetry_delete(service_call: ServiceCall) -> Any:
+        """Erase every uploaded row for this installation."""
+        hass = service_call.hass
+        entry = _first_entry(hass)
+        if entry is None:
+            return {"qvantum": {"exception": "not_loaded"}}
+        try:
+            deleted = await async_delete_telemetry(hass, entry.entry_id)
+        except Exception as err:  # noqa: BLE001 — report, never raise at the caller
+            _LOGGER.error("Could not erase uploaded summaries: %s", err)
+            return {"qvantum": {"exception": "unknown_error", "details": str(err)}}
+        return {"qvantum": {"deleted": deleted}}
+
+    hass.services.async_register(
+        domain=DOMAIN,
+        service="telemetry_delete",
+        service_func=telemetry_delete,
+        schema=vol.Schema({}),
         supports_response=SupportsResponse.OPTIONAL,
     )
 

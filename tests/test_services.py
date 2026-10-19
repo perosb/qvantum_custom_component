@@ -76,7 +76,18 @@ class TestQvantumServices:
         await async_setup_services(mock_hass)
 
         # Verify all services were registered
-        assert mock_hass.services.async_register.call_count == 4
+        registered = {
+            call[1]["service"]
+            for call in mock_hass.services.async_register.call_args_list
+        }
+        assert registered == {
+            "extra_hot_water",
+            "set_curve_control",
+            "set_curve_terms",
+            "telemetry_upload",
+            "telemetry_delete",
+            "export_summary",
+        }
 
         # Check first call (extra_hot_water)
         first_call = mock_hass.services.async_register.call_args_list[0]
@@ -99,12 +110,11 @@ class TestQvantumServices:
         assert "service_func" in third_call[1]
         assert "schema" in third_call[1]
 
-        # Check fourth call (export_summary)
-        fourth_call = mock_hass.services.async_register.call_args_list[3]
-        assert fourth_call[1]["domain"] == DOMAIN
-        assert fourth_call[1]["service"] == "export_summary"
-        assert "service_func" in fourth_call[1]
-        assert "schema" in fourth_call[1]
+        # Every registration carries the domain, a handler and a schema.
+        for call in mock_hass.services.async_register.call_args_list:
+            assert call[1]["domain"] == DOMAIN
+            assert "service_func" in call[1]
+            assert "schema" in call[1]
 
     @pytest.mark.asyncio
     async def test_export_summary_writes_and_returns_the_payload(
@@ -139,9 +149,11 @@ class TestQvantumServices:
         with patch("custom_components.qvantum.summary.dr") as patched_registry:
             patched_registry.async_get.return_value = registry
             await async_setup_services(mock_hass)
-            service_func = mock_hass.services.async_register.call_args_list[3][1][
-                "service_func"
-            ]
+            service_func = next(
+                call[1]["service_func"]
+                for call in mock_hass.services.async_register.call_args_list
+                if call[1]["service"] == "export_summary"
+            )
             service_call = MagicMock()
             service_call.hass = mock_hass
             result = await service_func(service_call)

@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Export summary",
       "description": "Write an opt-in installation summary to a file so it can be attached to an issue; nothing is sent anywhere"
+    },
+    "telemetry_upload": {
+      "name": "Send anonymous summary now",
+      "description": "Posts the opt-in summary immediately instead of waiting for the weekly upload."
+    },
+    "telemetry_delete": {
+      "name": "Delete uploaded summaries",
+      "description": "Erases every uploaded summary row for this installation using its local token. Sharing stops only when it is also turned off in the settings."
     }
   },
   "issues": {

@@ -742,6 +742,17 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             self.hass, DOMAIN, self._left_user_defined_issue_id()
         )
 
+    async def async_reset_counters(self) -> None:
+        """Start a fresh counting period after an accepted upload."""
+        self._counters = {
+            "since": dt_util.utcnow().date().isoformat(),
+            "reverts": 0,
+            "trim_updates": 0,
+            "clamped_days": [],
+            "extrapolated_days": [],
+        }
+        await self._async_persist()
+
     @property
     def counters(self) -> dict[str, Any]:
         """Counters for the summary, as counts rather than date lists."""

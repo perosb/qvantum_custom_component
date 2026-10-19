@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Összegzés exportálása",
       "description": "Opcionális összegzést ír az üzemről fájlba, hogy csatolhasd egy hibajegyhez; semmi nem kerül elküldésre"
+    },
+    "telemetry_upload": {
+      "name": "Névtelen összefoglaló küldése most",
+      "description": "Az opcionális összefoglalót azonnal elküldi a heti feltöltésre várás helyett."
+    },
+    "telemetry_delete": {
+      "name": "Feltöltött összefoglalók törlése",
+      "description": "Törli ennek a rendszernek az összes feltöltött sorát a helyi tokenjével. A megosztás csak akkor szűnik meg, ha a beállításokban is kikapcsolja."
     }
   },
   "issues": {

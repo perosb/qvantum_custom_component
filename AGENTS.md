@@ -335,6 +335,15 @@ on changes under that path and on releases) and is deliberately not part of
 only takes `custom_components/qvantum/`. The deploy skips itself when the
 Cloudflare secrets or the KV namespace id are missing.
 
+`telemetry.py` also owns the uploader: a six-hour check that posts the summary
+at most once a week, only while the consent is granted. The counters reset
+**after** the worker accepted the row, so a failed week retries instead of losing
+its evidence; the installation token travels in the request only, never in the
+exported file. `qvantum.telemetry_upload` forces a send and
+`qvantum.telemetry_delete` erases every row for the installation with that same
+token. The endpoint is a constant, not an option: an URL setting would invite
+sending this data elsewhere without the prompt.
+
 The summary export (`qvantum.export_summary`, `summary.py`) is **whitelist-built**
 and must stay identifier-free — including the `counters` block (curve reverts,
 trim updates and the number of days a clamped or extrapolated knot was actually

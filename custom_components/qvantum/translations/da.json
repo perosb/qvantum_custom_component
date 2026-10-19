@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Eksportér oversigt",
       "description": "Skriv et opt-in-resumé af anlægget til en fil, så det kan vedhæftes en sag; der sendes intet"
+    },
+    "telemetry_upload": {
+      "name": "Send anonymt resumé nu",
+      "description": "Sender det valgfrie resumé med det samme i stedet for at vente på den ugentlige upload."
+    },
+    "telemetry_delete": {
+      "name": "Slet uploadede resuméer",
+      "description": "Sletter alle uploadede rækker for dette anlæg via dets lokale token. Delingen stopper først, når den også slås fra i indstillingerne."
     }
   },
   "issues": {

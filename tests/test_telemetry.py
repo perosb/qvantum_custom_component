@@ -282,3 +282,202 @@ async def test_turning_the_box_off_revokes():
         await flow._async_apply_telemetry_choice(False)
 
     set_consent.assert_awaited_once_with(flow.hass, "entry", False)
+
+
+class FakeResponse:
+    def __init__(self, status: int) -> None:
+        self.status = status
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args) -> bool:
+        return False
+
+
+class FakeSession:
+    def __init__(self, status: int = 200, *, boom: bool = False) -> None:
+        self.status = status
+        self.boom = boom
+        self.posts: list[tuple[str, dict]] = []
+        self.deletes: list[tuple[str, dict]] = []
+
+    def post(self, url, **kwargs):
+        self.posts.append((url, kwargs))
+        if self.boom:
+            raise RuntimeError("network down")
+        return FakeResponse(self.status)
+
+    def delete(self, url, **kwargs):
+        self.deletes.append((url, kwargs))
+        if self.boom:
+            raise RuntimeError("network down")
+        return FakeResponse(self.status)
+
+
+class FakeCurve:
+    def __init__(self) -> None:
+        self.async_reset_counters = AsyncMock()
+
+
+def _runtime_hass(session: FakeSession, curve: FakeCurve | None = None):
+    hass = MagicMock()
+    curve = curve or FakeCurve()
+    entry = MagicMock()
+    entry.entry_id = "entry"
+    entry.runtime_data = MagicMock(curve_coordinator=curve)
+    hass.config_entries.async_entries.return_value = [entry]
+    hass.async_create_task = lambda coro: None
+    return hass, curve
+
+
+def _granted_store(**extra):
+    data = {
+        "consent": telemetry.CONSENT_GRANTED,
+        "token": "a" * 32,
+    }
+    data.update(extra)
+    return FakeStore(data)
+
+
+@pytest.mark.asyncio
+async def test_nothing_is_uploaded_without_consent():
+    store = FakeStore({"consent": telemetry.CONSENT_DECLINED, "token": "a" * 32})
+    session = FakeSession()
+    with (
+        patch.object(telemetry, "_store", return_value=store),
+        patch.object(telemetry, "async_get_clientsession", return_value=session),
+    ):
+        sent = await telemetry.async_upload_summary(MagicMock(), "entry", now=1e9)
+
+    assert sent is False
+    assert session.posts == []
+
+
+@pytest.mark.asyncio
+async def test_a_week_must_have_passed_unless_forced():
+    store = _granted_store(last_upload=1000.0)
+    session = FakeSession()
+    hass, _curve = _runtime_hass(session)
+    with (
+        patch.object(telemetry, "_store", return_value=store),
+        patch.object(telemetry, "async_get_clientsession", return_value=session),
+        patch(
+            "custom_components.qvantum.summary.async_build_summary",
+            AsyncMock(return_value={"schema_version": 5}),
+        ),
+    ):
+        too_soon = await telemetry.async_upload_summary(
+            hass, "entry", now=1000.0 + 2 * 86400
+        )
+        forced = await telemetry.async_upload_summary(hass, "entry", now=1000.0, force=True)
+
+    assert too_soon is False
+    assert len(session.posts) == 1
+    assert forced is True
+
+
+@pytest.mark.asyncio
+async def test_upload_posts_the_token_only_in_the_request_and_resets_counters():
+    store = _granted_store()
+    session = FakeSession()
+    hass, curve = _runtime_hass(session)
+    payload = {"schema_version": 5, "generated_on": "2026-10-19"}
+    with (
+        patch.object(telemetry, "_store", return_value=store),
+        patch.object(telemetry, "async_get_clientsession", return_value=session),
+        patch(
+            "custom_components.qvantum.summary.async_build_summary",
+            AsyncMock(return_value=payload),
+        ),
+    ):
+        sent = await telemetry.async_upload_summary(hass, "entry", now=5000.0)
+
+    assert sent is True
+    url, kwargs = session.posts[0]
+    assert url == telemetry.ENDPOINT
+    assert kwargs["json"] == {**payload, "install_token": "a" * 32}
+    # The written file stays identifier-free: the token is not in the payload.
+    assert "install_token" not in payload
+    assert store.saved[-1]["last_upload"] == 5000.0
+    curve.async_reset_counters.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_upload_keeps_the_counters_and_retries():
+    store = _granted_store(last_upload=1.0)
+    session = FakeSession(status=500)
+    hass, curve = _runtime_hass(session)
+    with (
+        patch.object(telemetry, "_store", return_value=store),
+        patch.object(telemetry, "async_get_clientsession", return_value=session),
+        patch(
+            "custom_components.qvantum.summary.async_build_summary",
+            AsyncMock(return_value={"schema_version": 5}),
+        ),
+    ):
+        sent = await telemetry.async_upload_summary(hass, "entry", now=1e9)
+
+    assert sent is False
+    assert store.saved == []
+    curve.async_reset_counters.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_network_errors_do_not_raise():
+    store = _granted_store()
+    session = FakeSession(boom=True)
+    hass, _curve = _runtime_hass(session)
+    with (
+        patch.object(telemetry, "_store", return_value=store),
+        patch.object(telemetry, "async_get_clientsession", return_value=session),
+        patch(
+            "custom_components.qvantum.summary.async_build_summary",
+            AsyncMock(return_value={"schema_version": 5}),
+        ),
+    ):
+        sent = await telemetry.async_upload_summary(hass, "entry", now=1e9)
+
+    assert sent is False
+
+
+@pytest.mark.asyncio
+async def test_delete_uses_the_local_token():
+    store = _granted_store()
+    session = FakeSession()
+    hass, _curve = _runtime_hass(session)
+    with (
+        patch.object(telemetry, "_store", return_value=store),
+        patch.object(telemetry, "async_get_clientsession", return_value=session),
+    ):
+        deleted = await telemetry.async_delete_telemetry(hass, "entry")
+
+    assert deleted is True
+    assert session.deletes[0][0] == f"{telemetry.ERASE_ENDPOINT}/{'a' * 32}"
+
+
+@pytest.mark.asyncio
+async def test_delete_without_a_token_does_nothing():
+    store = FakeStore({"consent": telemetry.CONSENT_DECLINED})
+    session = FakeSession()
+    hass, _curve = _runtime_hass(session)
+    with (
+        patch.object(telemetry, "_store", return_value=store),
+        patch.object(telemetry, "async_get_clientsession", return_value=session),
+    ):
+        deleted = await telemetry.async_delete_telemetry(hass, "entry")
+
+    assert deleted is False
+    assert session.deletes == []
+
+
+@pytest.mark.asyncio
+async def test_schedule_registers_a_six_hour_check():
+    with patch(
+        "homeassistant.helpers.event.async_track_time_interval"
+    ) as track:
+        unsub = await telemetry.async_schedule_uploads(MagicMock(), "entry")
+
+    assert unsub is track.return_value
+    _hass, _callback, interval = track.call_args.args
+    assert interval == telemetry.UPLOAD_CHECK_INTERVAL
