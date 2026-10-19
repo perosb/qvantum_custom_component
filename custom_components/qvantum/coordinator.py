@@ -1004,9 +1004,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._known_device_ids.discard(device_id)
             return True
         device_entry = dr.async_get(self.hass).async_get(device_id)
+        # A device belongs to exactly one config entry; ``config_entries`` is
+        # deprecated and stops working in HA 2027.10.
         if (
             device_entry is None
-            or self.config_entry.entry_id not in device_entry.config_entries
+            or device_entry.config_entry_id != self.config_entry.entry_id
         ):
             return False
         self._known_device_ids.add(device_id)

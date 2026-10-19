@@ -788,7 +788,7 @@ class TestQvantumDataUpdateCoordinator:
         mock_super_init.return_value = None
         mock_hass = MagicMock()
         device_entry = MagicMock()
-        device_entry.config_entries = {"test_entry_id"}
+        device_entry.config_entry_id = "test_entry_id" 
         mock_hass.data = {
             DOMAIN: MagicMock(),
             "device_registry": MagicMock(),
@@ -4214,7 +4214,7 @@ class TestDeviceLookupWhenHttpDown:
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
 
         ha_device = MagicMock()
-        ha_device.config_entries = {"test_entry_id"}
+        ha_device.config_entry_id = "test_entry_id"
         ha_device.identifiers = {(DOMAIN, "qvantum-test_device_123")}
         ha_device.manufacturer = "Qvantum"
         ha_device.model = "QE-6"
@@ -4429,7 +4429,7 @@ class TestDeviceLookupWhenHttpDown:
         mock_api.probe_identity = AsyncMock(side_effect=Exception("probe failed"))
 
         ha_device = MagicMock()
-        ha_device.config_entries = {"test_entry_id"}
+        ha_device.config_entry_id = "test_entry_id"
         ha_device.identifiers = {(DOMAIN, "qvantum-old_device")}
         ha_device.manufacturer = "Qvantum"
         ha_device.model = "QE-6"
@@ -4467,7 +4467,7 @@ class TestDeviceLookupWhenHttpDown:
         mock_api.get_settings = AsyncMock(return_value={"settings": []})
 
         ha_device = MagicMock()
-        ha_device.config_entries = {"test_entry_id"}
+        ha_device.config_entry_id = "test_entry_id"
         ha_device.identifiers = {(DOMAIN, "qvantum-test_device_123")}
         ha_device.manufacturer = "Qvantum"
         ha_device.model = "QE-6"
@@ -4592,7 +4592,7 @@ class TestDeviceLookupWhenHttpDown:
         coordinator, _ = self._make_coordinator(mock_super_init, modbus=True)
 
         other_entry_device = MagicMock()
-        other_entry_device.config_entries = {"other_entry"}
+        other_entry_device.config_entry_id = "other_entry"
         other_entry_device.identifiers = {(DOMAIN, "qvantum-other")}
         other_entry_device.manufacturer = "Qvantum"
         other_entry_device.model = "QE-other"
