@@ -417,6 +417,12 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "indoor_margin_c": getattr(snapshot, "indoor_margin_c", None),
         "indoor_cap_armed": getattr(snapshot, "indoor_cap_armed", None),
         "clamped": getattr(snapshot, "clamped", None),
+        # Which point wants to leave the pump's supply limits: the baseline
+        # point is what to adjust, so a dump must name it.
+        "clamped_points": [
+            str(point)
+            for point in (getattr(snapshot, "clamped_points", None) or ())
+        ],
         "deviation_c": getattr(snapshot, "deviation_c", None),
         "ready": getattr(snapshot, "ready", None),
         "blocker": getattr(snapshot, "blocker", None),

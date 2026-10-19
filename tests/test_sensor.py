@@ -54,6 +54,7 @@ with patch(
                 QvantumBaseSensorEntity,
                 QvantumCopSensor,
                 QvantumCurveAdjustmentSensor,
+                QvantumCurveCoverageSensor,
                 QvantumCurveDeviationSensor,
                 QvantumCurvePointSensor,
                 QvantumCurveRoomErrorSensor,
@@ -599,6 +600,8 @@ class TestQvantumCurveSensors:
             "adjustment": 1.0,
             "trim": 0.0,
             "evidence_hours": 12,
+            "extrapolated": True,
+            "clamped": False,
         }
         assert entity.suggested_object_id == "adaptive_curve_01_30"
         assert entity._attr_unique_id == "qvantum_adaptive_curve_30_test_device_123"
@@ -628,6 +631,7 @@ class TestQvantumCurveSensors:
             "capped_by_indoor": False,
             "trims": {},
             "clamped": False,
+            "clamped_points": [],
         }
 
         empty = QvantumCurveAdjustmentSensor(
@@ -649,6 +653,30 @@ class TestQvantumCurveSensors:
         assert point.extra_state_attributes["trim"] == 0.4
         assert adjustment.extra_state_attributes["trims"] == {"curve_30": 0.4}
         assert adjustment.extra_state_attributes["clamped"] is True
+
+    def test_point_sensor_names_the_clamped_point(self, mock_device):
+        """A clamped point must say so itself: the baseline is what to adjust."""
+        coordinator = _curve_coordinator(
+            _curve_snapshot(clamped=True, clamped_points=("curve_minus_30",))
+        )
+
+        clamped = QvantumCurvePointSensor(
+            coordinator, "adaptive_curve_minus_30", mock_device
+        )
+        untouched = QvantumCurvePointSensor(
+            coordinator, "adaptive_curve_0", mock_device
+        )
+        adjustment = QvantumCurveAdjustmentSensor(
+            coordinator, "adaptive_curve_adjustment", mock_device
+        )
+
+        assert clamped.extra_state_attributes["clamped"] is True
+        assert clamped.extra_state_attributes["extrapolated"] is True
+        assert untouched.extra_state_attributes["clamped"] is False
+        assert untouched.extra_state_attributes["extrapolated"] is False
+        assert adjustment.extra_state_attributes["clamped_points"] == [
+            "curve_minus_30"
+        ]
 
     def test_point_slugs_sort_like_the_pump_numbers(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())
@@ -733,6 +761,47 @@ class TestQvantumCurveSensors:
             coordinator, "adaptive_curve_deviation", mock_device
         )
 
+        assert entity.available is False
+
+    def test_coverage_sensor_counts_extrapolated_points(self, mock_device):
+        coordinator = _curve_coordinator(
+            _curve_snapshot(
+                baseline_learned_hours=148,
+                baseline_outdoor_min_c=3.4,
+                baseline_outdoor_max_c=14.1,
+                extrapolated_points=("curve_30", "curve_minus_10"),
+                clamped=True,
+                clamped_points=("curve_minus_30",),
+            )
+        )
+        entity = QvantumCurveCoverageSensor(
+            coordinator, "adaptive_curve_coverage", mock_device, False
+        )
+
+        assert entity.native_value == 2
+        assert entity.available is True
+        assert entity._attr_entity_registry_enabled_default is False
+        assert entity.extra_state_attributes == {
+            "observed_outdoor_min_c": 3.4,
+            "observed_outdoor_max_c": 14.1,
+            "baseline_learned_hours": 148,
+            "extrapolated_points": ["curve_30", "curve_minus_10"],
+            "clamped_points": ["curve_minus_30"],
+            "trim_evidence": {"curve_30": 12, "curve_0": 0},
+        }
+
+    def test_coverage_sensor_unavailable_without_observed_span(
+        self, mock_device
+    ):
+        """No span means nothing is known about coverage: never report 0."""
+        coordinator = _curve_coordinator(
+            _curve_snapshot(extrapolated_points=(), baseline_outdoor_min_c=None)
+        )
+        entity = QvantumCurveCoverageSensor(
+            coordinator, "adaptive_curve_coverage", mock_device
+        )
+
+        assert entity.native_value is None
         assert entity.available is False
 
     def test_room_error_sensor_reports_tracking(self, mock_device):
@@ -1461,6 +1530,7 @@ class TestSensorSetup:
         assert "adaptive_curve_deviation" in allowed
         assert "adaptive_curve_room_error" in allowed
         assert "adaptive_curve_solar_model" in allowed
+        assert "adaptive_curve_coverage" in allowed
         assert "expiresAt" not in allowed
         assert "firmware_last_check" not in allowed
 
@@ -1681,6 +1751,11 @@ class TestSensorSetup:
             for entity in entities
             if isinstance(entity, QvantumCurveSolarModelSensor)
         ]
+        coverage = [
+            entity
+            for entity in entities
+            if isinstance(entity, QvantumCurveCoverageSensor)
+        ]
 
         assert len(points) == 7
         assert {(e._attr_unique_id, e._attr_translation_key) for e in points} == {
@@ -1697,6 +1772,10 @@ class TestSensorSetup:
         assert deviations[0]._attr_translation_key == "adaptive_curve_deviation"
         assert room_errors[0]._attr_translation_key == "adaptive_curve_room_error"
         assert models[0]._attr_translation_key == "adaptive_curve_solar_model"
+        # Opt-in: the summary entity is the detail, not the notification.
+        assert len(coverage) == 1
+        assert coverage[0]._attr_translation_key == "adaptive_curve_coverage"
+        assert coverage[0]._attr_entity_registry_enabled_default is False
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_http_does_not_create_curve_sensors(

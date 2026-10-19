@@ -108,7 +108,8 @@ def _curve_coordinator() -> SimpleNamespace:
         calibrated_at="2026-09-25T10:00:00+00:00",
         baseline_auto=True,
         trims={"curve_30": 0.1},
-        clamped=False,
+        clamped=True,
+        clamped_points=("curve_minus_30",),
         baseline_learned_hours=48,
         baseline_outdoor_min_c=-2.0,
         baseline_outdoor_max_c=11.0,
@@ -533,7 +534,8 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["solar_c"] == 0.5
     assert curve["load_c"] == 0.3
     assert curve["capped_by_indoor"] is False
-    assert curve["clamped"] is False
+    assert curve["clamped"] is True
+    assert curve["clamped_points"] == ["curve_minus_30"]
     assert curve["deviation_c"] == 0.2
     assert curve["ready"] is True
     assert curve["blocker"] is None

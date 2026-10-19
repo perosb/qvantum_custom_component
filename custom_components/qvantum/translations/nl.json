@@ -626,6 +626,9 @@
       "adaptive_curve_solar_model": {
         "name": "Adaptieve stooklijn: zonnemodel"
       },
+      "adaptive_curve_coverage": {
+        "name": "Adaptieve stooklijn: dekking"
+      },
       "cop_heating": {
         "name": "COP verwarming"
       },

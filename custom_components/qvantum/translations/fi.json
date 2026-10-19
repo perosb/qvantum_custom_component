@@ -626,6 +626,9 @@
       "adaptive_curve_solar_model": {
         "name": "Adaptiivinen lämmityskäyrä: aurinkomalli"
       },
+      "adaptive_curve_coverage": {
+        "name": "Adaptiivinen lämmityskäyrä: kattavuus"
+      },
       "cop_heating": {
         "name": "COP lämmitys"
       },

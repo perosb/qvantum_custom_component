@@ -626,6 +626,9 @@
       "adaptive_curve_solar_model": {
         "name": "Adaptivní topná křivka: solární model"
       },
+      "adaptive_curve_coverage": {
+        "name": "Adaptivní topná křivka: pokrytí"
+      },
       "cop_heating": {
         "name": "COP topení"
       },

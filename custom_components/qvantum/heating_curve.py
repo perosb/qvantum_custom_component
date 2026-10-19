@@ -167,6 +167,11 @@ class CurveResult:
     capped_by_indoor: bool
     trims: Mapping[str, float] = field(default_factory=dict)
     clamped: bool = False
+    #: The points the pump's supply limits actually bit. ``clamped`` stays a
+    #: bool for the snapshot and the card; this is what tells a user (and a
+    #: support dump) *which* point wants to leave the limits, because the
+    #: baseline point is the thing to adjust then.
+    clamped_points: tuple[str, ...] = ()
     cop_c: float = 0.0
     precharge_c: float = 0.0
 
@@ -1062,7 +1067,7 @@ def compute_curve(
     low, high = effective_supply_bounds(min_supply_c, max_supply_c)
     effective_trims: dict[str, float] = {}
     supplies: list[tuple[str, float]] = []
-    clamped = False
+    clamped_points: list[str] = []
     for key, (_, supply) in zip(CURVE_KEYS, points):
         trim = 0.0
         if point_trims is not None:
@@ -1073,7 +1078,7 @@ def compute_curve(
         value = supply + total + trim
         bounded = _clamp(value, low, high)
         if abs(bounded - value) > 1e-9:
-            clamped = True
+            clamped_points.append(key)
         supplies.append((key, bounded))
 
     return CurveResult(
@@ -1085,7 +1090,8 @@ def compute_curve(
         load_c=load_c,
         capped_by_indoor=capped_by_indoor,
         trims=effective_trims,
-        clamped=clamped,
+        clamped=bool(clamped_points),
+        clamped_points=tuple(clamped_points),
         cop_c=cop_c,
         precharge_c=precharge_c,
     )

@@ -152,6 +152,7 @@ _CURVE_SENSOR_KEYS = frozenset(
         "adaptive_curve_deviation",
         "adaptive_curve_room_error",
         "adaptive_curve_solar_model",
+        "adaptive_curve_coverage",
     }
 )
 
@@ -434,6 +435,14 @@ async def async_setup_entry(
             sensors.append(
                 QvantumCurveSolarModelSensor(
                     curve_coordinator, "adaptive_curve_solar_model", device
+                )
+            )
+            # Opt-in diagnostic: how much of the seven-point curve the learned
+            # baseline has actually seen. It is the one entity that answers
+            # "is the curve only half learned?" without a support dump.
+            sensors.append(
+                QvantumCurveCoverageSensor(
+                    curve_coordinator, "adaptive_curve_coverage", device, False
                 )
             )
     else:
@@ -879,6 +888,13 @@ class QvantumCurvePointSensor(QvantumCurveSensorEntity):
             # 0 means the trim is deliberately 0: the window holds no evidence
             # near this outdoor temperature.
             "evidence_hours": snapshot.trim_evidence.get(self._curve_key, 0),
+            # Outside the outdoor span the baseline was observed at, so the
+            # supply is extrapolated from the cached table and readiness says
+            # nothing about it yet.
+            "extrapolated": self._curve_key in snapshot.extrapolated_points,
+            # The pump's supply limits bit this point: the baseline point is
+            # what to adjust, not the clamp.
+            "clamped": self._curve_key in snapshot.clamped_points,
         }
 
 
@@ -918,6 +934,7 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
             "capped_by_indoor": snapshot.capped_by_indoor,
             "trims": dict(snapshot.trims),
             "clamped": snapshot.clamped,
+            "clamped_points": list(snapshot.clamped_points),
         }
 
 
@@ -968,6 +985,49 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             # above; these points are extrapolated from the cached table, so
             # readiness says nothing about them yet.
             "extrapolated_points": list(snapshot.extrapolated_points),
+        }
+
+
+class QvantumCurveCoverageSensor(QvantumCurveSensorEntity):
+    """How much of the seven-point curve the learned baseline has seen.
+
+    Readiness only speaks for the outdoor range the baseline was observed at,
+    so the points outside it are extrapolated from the cached table: they get
+    no trim and no readiness verdict until the weather gets there. This sensor
+    makes that visible — the state is the number of extrapolated points, and
+    the attributes name them and say which points the supply limits bit.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:map-marker-radius"
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the number of extrapolated curve points."""
+        snapshot = self.coordinator.data
+        if snapshot is None or snapshot.baseline_outdoor_min_c is None:
+            return None
+        return len(snapshot.extrapolated_points)
+
+    @property
+    def available(self) -> bool:
+        """Only meaningful once the baseline has an observed span."""
+        return super().available and self.native_value is not None
+
+    @property
+    def extra_state_attributes(self):
+        """Return the observed span plus the points outside it."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        return {
+            "observed_outdoor_min_c": snapshot.baseline_outdoor_min_c,
+            "observed_outdoor_max_c": snapshot.baseline_outdoor_max_c,
+            "baseline_learned_hours": snapshot.baseline_learned_hours,
+            "extrapolated_points": list(snapshot.extrapolated_points),
+            "clamped_points": list(snapshot.clamped_points),
+            "trim_evidence": dict(snapshot.trim_evidence),
         }
 
 

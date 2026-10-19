@@ -626,6 +626,9 @@
       "adaptive_curve_solar_model": {
         "name": "Adaptive heating curve: solar model"
       },
+      "adaptive_curve_coverage": {
+        "name": "Adaptive heating curve: coverage"
+      },
       "cop_heating": {
         "name": "COP heating"
       },
