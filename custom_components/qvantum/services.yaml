@@ -57,3 +57,16 @@ export_summary:
     derived verdicts — never entity ids, names, coordinates or raw series.
     The same payload can be downloaded from /api/qvantum/summary while logged
     in. Nothing is sent anywhere and no issue is opened for you.
+
+telemetry_upload:
+  name: telemetry_upload
+  description: >-
+    Posts the anonymous summary immediately instead of waiting for the weekly
+    upload. Does nothing unless sharing was granted in the repair prompt.
+
+telemetry_delete:
+  name: telemetry_delete
+  description: >-
+    Erases every uploaded summary row for this installation, using the local
+    installation token. Sharing stops only when it is also turned off in the
+    integration's settings.

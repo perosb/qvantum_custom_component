@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Exporter le résumé",
       "description": "Écrit un résumé opt-in de l'installation dans un fichier à joindre à un ticket ; rien n'est envoyé"
+    },
+    "telemetry_upload": {
+      "name": "Envoyer le résumé anonyme maintenant",
+      "description": "Envoie le résumé facultatif immédiatement au lieu d'attendre l'envoi hebdomadaire."
+    },
+    "telemetry_delete": {
+      "name": "Supprimer les résumés envoyés",
+      "description": "Supprime toutes les lignes envoyées de cette installation via son jeton local. Le partage ne cesse qu'une fois également désactivé dans les réglages."
     }
   },
   "issues": {

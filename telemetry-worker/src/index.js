@@ -14,8 +14,10 @@
  *  - no analytics, no cookies, no third-party calls.
  *
  * Auth: the payload is identifier-free by construction, so the intake is open
- * and protected by strict shape validation plus a size limit. Erasing an
- * installation needs `ADMIN_TOKEN`, which never ships to clients.
+ * and protected by strict shape validation plus a size limit. Erasure needs the
+ * installation's own token in the path — a 128-bit value generated locally by
+ * the integration, so it works as the capability: whoever holds it may delete
+ * those rows, and nobody else can.
  */
 
 const PAYLOAD_MAX_BYTES = 16 * 1024;
@@ -78,10 +80,6 @@ async function ingest(request, env) {
 }
 
 async function erase(request, env, install) {
-  const auth = request.headers.get("authorization") ?? "";
-  if (!env.ADMIN_TOKEN || auth !== `Bearer ${env.ADMIN_TOKEN}`) {
-    return json({ error: "unauthorized" }, 401);
-  }
   if (!INSTALL_TOKEN.test(install)) return json({ error: "bad install token" }, 400);
 
   let cursor;

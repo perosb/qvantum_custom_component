@@ -22,7 +22,7 @@ class FakeKV {
   }
 }
 
-const env = () => ({ QVANTUM_SUMMARIES: new FakeKV(), ADMIN_TOKEN: "admin-secret" });
+const env = () => ({ QVANTUM_SUMMARIES: new FakeKV() });
 const token = "a".repeat(32);
 const payload = (over = {}) => ({
   schema_version: 5,
@@ -95,22 +95,20 @@ test("health answers without touching storage", async () => {
   assert.deepEqual(await response.json(), { ok: true });
 });
 
-test("erasure needs the admin token and only drops that installation", async () => {
+test("erasure needs the install token and only drops that installation", async () => {
   const e = env();
   await worker.fetch(post(payload()), e);
   await worker.fetch(post(payload({ install_token: "b".repeat(32) })), e);
 
-  const unauthorized = await worker.fetch(
-    new Request(`https://worker.test/install/${token}`, { method: "DELETE" }),
+  const malformed = await worker.fetch(
+    new Request("https://worker.test/install/short", { method: "DELETE" }),
     e,
   );
-  assert.equal(unauthorized.status, 401);
+  assert.equal(malformed.status, 400);
+  assert.equal(e.QVANTUM_SUMMARIES.map.size, 2);
 
   const erased = await worker.fetch(
-    new Request(`https://worker.test/install/${token}`, {
-      method: "DELETE",
-      headers: { authorization: "Bearer admin-secret" },
-    }),
+    new Request(`https://worker.test/install/${token}`, { method: "DELETE" }),
     e,
   );
   assert.equal(erased.status, 200);

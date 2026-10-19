@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Eksportuj podsumowanie",
       "description": "Zapisuje opcjonalne podsumowanie instalacji do pliku do załączenia w zgłoszeniu; nic nie jest wysyłane"
+    },
+    "telemetry_upload": {
+      "name": "Wyślij anonimowe podsumowanie teraz",
+      "description": "Wysyła opcjonalne podsumowanie natychmiast, zamiast czekać na cotygodniowe wysyłanie."
+    },
+    "telemetry_delete": {
+      "name": "Usuń wysłane podsumowania",
+      "description": "Usuwa wszystkie wysłane wiersze tej instalacji przy użyciu jej lokalnego tokena. Udostępnianie ustaje dopiero po wyłączeniu go także w ustawieniach."
     }
   },
   "issues": {

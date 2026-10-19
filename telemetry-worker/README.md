@@ -33,9 +33,10 @@ Nothing is sent unless a user answered **"Bidra"** in the repair prompt.
 
 `GET /health` — `{"ok": true}`.
 
-`DELETE /install/<install_token>` — erases every row for that installation.
-Requires `Authorization: Bearer $ADMIN_TOKEN`; the token is a Worker secret and
-is never shipped to clients.
+`DELETE /install/<install_token>` — erases every row for that installation. The
+token in the path **is** the credential: 128 bits, generated locally by the
+integration, so only the installation that produced the rows can erase them.
+No shared secret is needed, which is why the Worker has no secrets at all.
 
 ## Deliberate limits
 
@@ -45,6 +46,7 @@ is never shipped to clients.
 | Cookies, analytics, third-party calls | nothing to gain, one more processor to disclose |
 | Free-text fields | the summary is numbers, booleans and short enums; the intake rejects identifier-shaped keys |
 | Auth on `/ingest` | the payload is identifier-free and TTL-bounded; a shared secret in an open-source client is not a secret |
+| Auth on `DELETE` beyond the token | the install token is 128 random bits and only selects its own rows |
 
 ## Deploy
 
@@ -61,8 +63,7 @@ and one request per installation per week is nowhere near it. KV's free tier
 One-time setup:
 
 ```bash
-npx wrangler secret put ADMIN_TOKEN   # only for erasure
-gh secret set CF_API_TOKEN  --body "<token with Workers KV edit>"
+gh secret set CF_API_TOKEN  --body "<token with Workers Scripts + KV edit>"
 gh secret set CF_ACCOUNT_ID --body "<account id>"
 ```
 

@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Samenvatting exporteren",
       "description": "Schrijf een opt-in samenvatting van de installatie naar een bestand om aan een issue te koppelen; er wordt niets verzonden"
+    },
+    "telemetry_upload": {
+      "name": "Anonieme samenvatting nu versturen",
+      "description": "Verstuurt de optionele samenvatting meteen in plaats van te wachten op de wekelijkse upload."
+    },
+    "telemetry_delete": {
+      "name": "Verstuurde samenvattingen verwijderen",
+      "description": "Verwijdert alle verstuurde rijen van deze installatie met zijn lokale token. Delen stopt pas als het ook in de instellingen wordt uitgezet."
     }
   },
   "issues": {

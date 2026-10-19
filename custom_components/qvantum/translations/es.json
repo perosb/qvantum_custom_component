@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Exportar resumen",
       "description": "Escribe un resumen opcional de la instalación en un archivo para adjuntarlo a una incidencia; no se envía nada"
+    },
+    "telemetry_upload": {
+      "name": "Enviar resumen anónimo ahora",
+      "description": "Envía el resumen opcional de inmediato en lugar de esperar a la subida semanal."
+    },
+    "telemetry_delete": {
+      "name": "Borrar resúmenes subidos",
+      "description": "Borra todas las filas subidas de esta instalación usando su token local. El envío solo cesa cuando también se desactiva en los ajustes."
     }
   },
   "issues": {

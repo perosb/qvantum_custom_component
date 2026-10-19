@@ -948,6 +948,14 @@
     "export_summary": {
       "name": "Vie yhteenveto",
       "description": "Kirjoittaa valinnaisen yhteenvedon laitteistosta tiedostoon liitettäväksi ongelmaan; mitään ei lähetetä"
+    },
+    "telemetry_upload": {
+      "name": "Lähetä anonyymi yhteenveto nyt",
+      "description": "Lähettää valinnaisen yhteenvedon heti viikoittaista lähetystä odottamatta."
+    },
+    "telemetry_delete": {
+      "name": "Poista lähetetyt yhteenvedot",
+      "description": "Poistaa tämän asennuksen kaikki lähetetyt rivit sen paikallisella tunnisteella. Jakaminen loppuu vasta, kun se kytketään pois myös asetuksissa."
     }
   },
   "issues": {
