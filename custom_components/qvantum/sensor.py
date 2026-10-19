@@ -409,6 +409,15 @@ async def async_setup_entry(
                     coordinator, "room_temp_external", device, True
                 )
             )
+        if "compressor_power" in values:
+            # Compressor electrical input (input 93). Enabled by default so the
+            # recorder keeps the series `compressor_power_avg` reads — a
+            # disabled entity records no long-term statistics.
+            sensors.append(
+                QvantumCompressorPowerSensor(
+                    coordinator, "compressor_power", device, True
+                )
+            )
         curve_coordinator = getattr(
             config_entry.runtime_data, "curve_coordinator", None
         )
@@ -516,6 +525,7 @@ async def async_setup_entry(
             {
                 "display_fw_version",
                 "room_temp_external",
+                "compressor_power",
                 *_CURVE_SENSOR_KEYS,
             }
         )
@@ -725,6 +735,18 @@ class QvantumPowerEntity(QvantumBaseSensorEntity):
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = UnitOfPower.WATT
+
+
+class QvantumCompressorPowerSensor(QvantumPowerEntity):
+    """Compressor electrical input in W (Modbus input 93).
+
+    Machine-internal telemetry, so it sits under diagnostics; it is enabled by
+    default because `compressor_power_avg` reads its long-term statistics and a
+    disabled entity records none.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:lightning-bolt-outline"
 
 
 class QvantumCurrentEntity(QvantumBaseSensorEntity):

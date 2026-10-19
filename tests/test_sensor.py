@@ -54,6 +54,7 @@ with patch(
                 QvantumBaseSensorEntity,
                 QvantumCopSensor,
                 QvantumCurveAdjustmentSensor,
+                QvantumCompressorPowerSensor,
                 QvantumCurveCoverageSensor,
                 QvantumCurveDeviationSensor,
                 QvantumCurvePointSensor,
@@ -1531,6 +1532,7 @@ class TestSensorSetup:
         assert "adaptive_curve_room_error" in allowed
         assert "adaptive_curve_solar_model" in allowed
         assert "adaptive_curve_coverage" in allowed
+        assert "compressor_power" in allowed
         assert "expiresAt" not in allowed
         assert "firmware_last_check" not in allowed
 
@@ -1714,6 +1716,7 @@ class TestSensorSetup:
 
         mock_config_entry.options = {CONF_MODBUS_TCP: True}
         mock_coordinator.modbus_enabled = True
+        mock_coordinator.data["values"]["compressor_power"] = 480.0
         mock_config_entry.runtime_data.curve_coordinator = _curve_coordinator(
             _curve_snapshot()
         )
@@ -1756,6 +1759,11 @@ class TestSensorSetup:
             for entity in entities
             if isinstance(entity, QvantumCurveCoverageSensor)
         ]
+        compressor_power = [
+            entity
+            for entity in entities
+            if isinstance(entity, QvantumCompressorPowerSensor)
+        ]
 
         assert len(points) == 7
         assert {(e._attr_unique_id, e._attr_translation_key) for e in points} == {
@@ -1772,6 +1780,11 @@ class TestSensorSetup:
         assert deviations[0]._attr_translation_key == "adaptive_curve_deviation"
         assert room_errors[0]._attr_translation_key == "adaptive_curve_room_error"
         assert models[0]._attr_translation_key == "adaptive_curve_solar_model"
+        # Enabled by default: compressor_power_avg reads its statistics.
+        assert len(compressor_power) == 1
+        assert compressor_power[0]._attr_entity_registry_enabled_default is True
+        assert compressor_power[0]._attr_entity_category.name == "DIAGNOSTIC"
+        assert compressor_power[0]._attr_native_unit_of_measurement == "W"
         # Opt-in: the summary entity is the detail, not the notification.
         assert len(coverage) == 1
         assert coverage[0]._attr_translation_key == "adaptive_curve_coverage"

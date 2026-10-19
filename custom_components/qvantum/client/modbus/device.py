@@ -78,7 +78,10 @@ def build_metrics_payload(
             continue
 
     compressor_power = 0.0
-    raw_power = metrics.pop("compressor_power", 0.0)
+    # Kept in the payload: the compressor-power diagnostic sensor records the
+    # statistics `compressor_power_avg` reads. Popping it left that average
+    # permanently None because no entity (and therefore no series) existed.
+    raw_power = metrics.get("compressor_power", 0.0)
     try:
         compressor_power = float(raw_power)
     except (TypeError, ValueError):
