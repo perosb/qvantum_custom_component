@@ -669,6 +669,32 @@ def test_compute_curve_applies_trims_and_pump_bounds() -> None:
     assert unclamped.trims == {key: 0.0 for key in BASELINE}
 
 
+def test_flat_warm_end_survives_a_trim_difference() -> None:
+    """A baseline lifted to the pump floor makes +30/+20 equal, not rising.
+
+    Per-point trims are fitted independently, so a sub-degree difference on a
+    flat warm end would invert the table (a colder knot asking for less heat)
+    and the write guard would revert the whole curve. The final table is
+    projected onto the non-decreasing shape instead.
+    """
+    flat = {**BASELINE, "curve_30": 20.0, "curve_20": 20.0}
+    result = compute_curve(
+        baseline=flat,
+        now_ts=BASE_HOUR,
+        forecast_temperature=forecast_map(5.0),
+        ghi_by_hour={},
+        point_trims={"curve_20": -0.5},
+        precharge_c=1.0,
+        min_supply_c=20.0,
+        max_supply_c=60.0,
+    )
+
+    supplies = [value for _, value in result.points]
+    assert supplies == sorted(supplies)
+    assert result.as_dict()["curve_30"] == pytest.approx(21.0)
+    assert result.as_dict()["curve_20"] == pytest.approx(21.0)
+
+
 def test_compute_curve_cold_trend_raises_all_points() -> None:
     result = compute_curve(
         baseline=BASELINE,

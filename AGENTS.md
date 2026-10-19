@@ -345,7 +345,12 @@ applied — the register range and the non-decreasing shape still normalize as
 for any baseline, but a point above the pump's own maximum is left alone: that
 is a real limit the user should see, not something to hide by lowering the
 baseline. A lift clears the trims, because the shape changed (same rule as a
-learned correction).
+learned correction). A lift also makes the two warmest knots **equal**, so the
+per-point trims — fitted independently — can invert them by a tenth of a degree
+while a positive shared adjustment holds both above the floor. `compute_curve`
+therefore projects the final table onto the non-decreasing shape (raising the
+warmer knot) instead of letting the write guard revert the whole curve; the
+guard's failure message says "limits or shape" because it cannot tell which.
 
 When the pump stops following our table (the app or a cloud profile moved the
 curve type), the coordinator drops to shadow, clears the trims, logs a warning
