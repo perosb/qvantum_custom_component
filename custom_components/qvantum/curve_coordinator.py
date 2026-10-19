@@ -28,6 +28,7 @@ from zoneinfo import ZoneInfo
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -686,6 +687,32 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             update_interval=UPDATE_INTERVAL,
         )
 
+    def _left_user_defined_issue_id(self) -> str:
+        """Repair issue for a pump that stopped following our table."""
+        entry_id = getattr(getattr(self, "config_entry", None), "entry_id", None)
+        return f"curve_left_user_defined_{entry_id or 'entry'}"
+
+    def _async_raise_left_user_defined(self) -> None:
+        """Tell the user the pump left User defined; we cannot reassert it.
+
+        The write may come from the app or the cloud profile, so silently
+        giving up (the previous behaviour) left the house on the pump's own
+        curve with no notification at all.
+        """
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            self._left_user_defined_issue_id(),
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="curve_left_user_defined",
+        )
+
+    def _async_clear_left_user_defined(self) -> None:
+        ir.async_delete_issue(
+            self.hass, DOMAIN, self._left_user_defined_issue_id()
+        )
+
     @property
     def baseline(self) -> dict[str, float] | None:
         return self._baseline
@@ -1154,6 +1181,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         values = self._main_values()
         if values.get("curve_type_heating") != HeatingCurveType.USER_DEFINED:
             # Someone moved the pump off User defined; stop claiming control.
+            # It may be the app or the cloud profile, so notify instead of
+            # disappearing quietly: the trims are dropped here.
+            _LOGGER.warning(
+                "Pump went back to its own curve (type %s); adaptive curve"
+                " paused and re-enable it to resume",
+                values.get("curve_type_heating"),
+            )
+            self._async_raise_left_user_defined()
             self._mode = "shadow"
             self._mark_active_ended()
             self._trims = {}
@@ -1161,6 +1196,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             await self._async_persist()
             self.async_update_listeners()
             return
+        self._async_clear_left_user_defined()
         low, high = self._supply_bounds(values)
         if not points_within_limits(
             dict(result.points), min_supply_c=low, max_supply_c=high

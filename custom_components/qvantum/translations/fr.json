@@ -947,5 +947,11 @@
       "name": "Exporter le résumé",
       "description": "Écrit un résumé opt-in de l'installation dans un fichier à joindre à un ticket ; rien n'est envoyé"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Courbe de chauffage en pause",
+      "description": "La pompe est revenue à sa propre courbe automatique, l'intégration a donc cessé de l'ajuster et abandonné ses corrections. Réactivez « Courbe de chauffage adaptative: contrôle » pour reprendre. Le changement peut provenir de l'application ou d'un profil cloud."
+    }
   }
 }

@@ -947,5 +947,11 @@
       "name": "Samenvatting exporteren",
       "description": "Schrijf een opt-in samenvatting van de installatie naar een bestand om aan een issue te koppelen; er wordt niets verzonden"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Stooklijn gepauzeerd",
+      "description": "De pomp is teruggegaan naar zijn eigen automatische curve, dus de integratie stopte met aanpassen en gooide de correcties weg. Zet \"Adaptieve stooklijn: regeling\" weer aan om door te gaan. De wijziging kan van de app of een cloudprofiel komen."
+    }
   }
 }

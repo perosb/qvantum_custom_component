@@ -947,5 +947,11 @@
       "name": "Vie yhteenveto",
       "description": "Kirjoittaa valinnaisen yhteenvedon laitteistosta tiedostoon liitettäväksi ongelmaan; mitään ei lähetetä"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Lämmityskäyrä keskeytetty",
+      "description": "Pumppu palasi omaan automaattiseen käyräänsä, joten integraatio lopetti sen säätämisen ja hylkäsi korjauksensa. Jatka kytkemällä \"Adaptiivinen lämmityskäyrä: ohjaus\" takaisin päälle. Muutos on voinut tulla sovelluksesta tai pilviprofiilista."
+    }
   }
 }

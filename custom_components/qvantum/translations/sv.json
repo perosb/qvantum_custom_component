@@ -947,5 +947,11 @@
       "name": "Exportera sammanfattning",
       "description": "Skriv en opt-in-sammanfattning av anläggningen till en fil så den kan bifogas i ett ärende; inget skickas någonstans"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Värmekurvan pausad",
+      "description": "Pumpen gick tillbaka till sin egen automatiska kurva, så integrationen slutade justera den och släppte sina korrigeringar. Slå på \"Adaptiv värmekurva: styrning\" igen för att återuppta. Ändringen kan ha gjorts i appen eller via en molnprofil."
+    }
   }
 }

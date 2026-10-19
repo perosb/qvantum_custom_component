@@ -947,5 +947,11 @@
       "name": "Összegzés exportálása",
       "description": "Opcionális összegzést ír az üzemről fájlba, hogy csatolhasd egy hibajegyhez; semmi nem kerül elküldésre"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Fűtési görbe szüneteltetve",
+      "description": "A szivattyú visszatért a saját automatikus görbéjéhez, így az integráció leállította a görbe módosítását és eldobta a korrekcióit. A folytatáshoz kapcsolja vissza az „Adaptív fűtési görbe: vezérlés” kapcsolót. A változás az appból vagy felhőprofilból érkezhetett."
+    }
   }
 }

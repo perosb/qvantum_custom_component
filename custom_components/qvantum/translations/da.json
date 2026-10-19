@@ -947,5 +947,11 @@
       "name": "Eksportér oversigt",
       "description": "Skriv et opt-in-resumé af anlægget til en fil, så det kan vedhæftes en sag; der sendes intet"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Varmekurve sat på pause",
+      "description": "Pumpen skiftede tilbage til sin egen automatiske kurve, så integrationen holdt op med at justere den og kasserede sine korrektioner. Slå »Adaptiv varmekurve: styring« til igen for at fortsætte. Ændringen kan være kommet fra appen eller en cloudprofil."
+    }
   }
 }

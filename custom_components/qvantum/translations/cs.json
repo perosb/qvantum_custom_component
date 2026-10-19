@@ -947,5 +947,11 @@
       "name": "Exportovat souhrn",
       "description": "Zapíše volitelný souhrn instalace do souboru pro přiložení k hlášení; nic se neposílá"
     }
+  },
+  "issues": {
+    "curve_left_user_defined": {
+      "title": "Topná křivka pozastavena",
+      "description": "Čerpadlo se vrátilo ke své vlastní automatické křivce, takže integrace přestala křivku upravovat a zahodila své korekce. Chcete-li pokračovat, zapněte znovu „Adaptivní topná křivka: řízení“. Změnu mohla provést aplikace nebo cloudový profil."
+    }
   }
 }
