@@ -22,6 +22,7 @@ from typing import Any, Mapping
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -279,6 +280,16 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         self._dhw_idle_start: tuple[float, float] | None = None
         self._dhw_idle_last: tuple[float, float] | None = None
         self._dhw_standing_loss: float | None = None
+        # Only the EMA is persisted; an open window is deliberately dropped on
+        # restart because the tank may have been drawn while nothing sampled it
+        # and resuming would book that draw as standing loss.
+        # Same guard as the curve coordinator: a test harness (or any host
+        # without a real config dir) has no storage, and persistence is optional.
+        self._store = (
+            Store(hass, 1, f"{DOMAIN}.efficiency.{config_entry.entry_id}")
+            if isinstance(getattr(getattr(hass, "config", None), "config_dir", None), str)
+            else None
+        )
         # Solar state: the session is created lazily, the model is fitted by
         # this coordinator so the gain works without the Modbus-only curve one.
         self._session: Any = None
@@ -846,6 +857,39 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             return None
         return tank
 
+    async def async_restore(self) -> None:
+        """Restore the standing-loss EMA so a restart does not blank it.
+
+        The open free-cooling window is not restored: the restart means the tank
+        went unsampled, so a draw during the downtime would be charged as
+        standing loss. A fresh window starts on the next idle poll.
+        """
+        store = getattr(self, "_store", None)
+        if store is None:
+            return
+        try:
+            data = await store.async_load()
+        except Exception as err:  # noqa: BLE001 — restore is best effort
+            _LOGGER.debug("Could not restore efficiency state: %s", err)
+            return
+        if not isinstance(data, dict):
+            return
+        value = _finite(data.get("dhw_standing_loss"))
+        if value is not None and value > 0.0:
+            self._dhw_standing_loss = value
+
+    def _schedule_dhw_save(self) -> None:
+        """Persist the EMA after a short delay (one save per burst)."""
+        store = getattr(self, "_store", None)
+        if store is None:
+            return
+        try:
+            store.async_delay_save(
+                lambda: {"dhw_standing_loss": self._dhw_standing_loss}, 60
+            )
+        except Exception:  # noqa: BLE001 — persistence must not break the poll
+            _LOGGER.debug("Could not schedule efficiency state save", exc_info=True)
+
     def _update_dhw_standing_loss(self, now_ts: float) -> float | None:
         """Track free-cooling windows and EMA the accepted daily loss."""
         tank = self._dhw_is_idle(self._main_values())
@@ -884,3 +928,4 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             self._dhw_standing_loss = blend(
                 getattr(self, "_dhw_standing_loss", None), sample
             )
+            self._schedule_dhw_save()

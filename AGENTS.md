@@ -395,6 +395,11 @@ access, so no control is offered when a write would fail.
   would otherwise be measured as element heat. A counter reset drops the window
   and the open charge; a charge older than `DHW_CHARGE_MAX_SECONDS` restarts its
   baseline.
+- `dhw_standing_loss` is an EMA persisted in `qvantum.efficiency.<entry_id>`
+  and restored before the first refresh, so a restart no longer blanks it. The
+  **open free-cooling window is deliberately not persisted**: the tank went
+  unsampled across the restart, and resuming would book an unobserved draw as
+  standing loss. A fresh window starts on the next idle poll.
 - The DHW tank volume in the balance is **identified, not assumed**. On
   intervals where the compressor is idle and nothing is drawn the element is the
   only heat source, so `V = Σelement_kWh / (ΣΔbt30 · c)` (gates: ≥ 1.5 kWh,

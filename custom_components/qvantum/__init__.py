@@ -423,6 +423,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         hass, config_entry, coordinator
     )
     try:
+        await efficiency_coordinator.async_restore()
+    except Exception as err:  # noqa: BLE001 — a blank EMA is not a setup error
+        _LOGGER.debug("Efficiency state restore failed: %s", err)
+    try:
         await efficiency_coordinator.async_refresh()
     except asyncio.CancelledError:
         raise
