@@ -891,13 +891,15 @@
           "modbus_unit_id": "ID jednotky",
           "modbus_scan_interval": "Interval dotazování Modbus (sekundy)",
           "modbus_write": "Povolit zápis přes Modbus",
-          "external_room_temp_entity": "Zdroj externí pokojové teploty"
+          "external_room_temp_entity": "Zdroj externí pokojové teploty",
+          "telemetry": "Sdílet anonymní provozní data"
         },
         "data_description": {
           "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund.",
           "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku.",
           "scan_interval": "Jak často se dotazuje cloudové API Qvantum. Výchozí je 120 sekund.",
-          "external_room_temp_entity": "Senzor, jehož hodnota se odesílá do tepelného čerpadla jako externí pokojová teplota při každém dotazu, když je povolen zápis přes Modbus. Vyžaduje režim externího senzoru v aplikaci; prázdné pole funkci vypne."
+          "external_room_temp_entity": "Senzor, jehož hodnota se odesílá do tepelného čerpadla jako externí pokojová teplota při každém dotazu, když je povolen zápis přes Modbus. Vyžaduje režim externího senzoru v aplikaci; prázdné pole funkci vypne.",
+          "telemetry": "Týdenní souhrn bez identifikátorů (model, firmware, nastavení instalace, zjištěné veličiny a několik čítačů). Nikdy neodesílá jména, ID entit, souřadnice, součty energie ani série."
         },
         "description": "Nastavení aktuálního režimu připojení. Pro přepnutí mezi cloudem a Modbusem použijte nové nastavení.",
         "title": "Možnosti"
@@ -952,6 +954,29 @@
     "curve_left_user_defined": {
       "title": "Topná křivka pozastavena",
       "description": "Čerpadlo se vrátilo ke své vlastní automatické křivce, takže integrace přestala křivku upravovat a zahodila své korekce. Chcete-li pokračovat, zapněte znovu „Adaptivní topná křivka: řízení“. Změnu mohla provést aplikace nebo cloudový profil."
+    },
+    "telemetry_consent": {
+      "title": "Sdílet anonymní provozní data?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Sdílet anonymní provozní data?",
+            "description": "Pomozte vylepšit adaptivní topnou křivku na dalších instalacích. Jednou týdně se odešle krátký souhrn bez identifikátorů: model čerpadla a firmware, nastavení instalace, zjištěné veličiny (tepelná ztráta, časová konstanta, zesílení místnosti, solární model) a několik čítačů. Neobsahuje jména, ID entit, souřadnice, součty energie ani série. Před vaší odpovědí se nic neodesílá. Můžete to kdykoli změnit v nastavení integrace; vypnutím se sdílení zastaví. Odmítnutí nemá vliv na adaptivní křivku.",
+            "menu_options": {
+              "grant": "Přispět",
+              "decline": "Ne, děkuji"
+            }
+          },
+          "grant": {
+            "title": "Děkujeme",
+            "description": "Z této instalace bude každý týden sdílen anonymní souhrn. Můžete jej vypnout v nastavení integrace."
+          },
+          "decline": {
+            "title": "Nic se neodešle",
+            "description": "Sdílení můžete zapnout později v nastavení integrace."
+          }
+        }
+      }
     }
   }
 }

@@ -891,13 +891,15 @@
           "modbus_unit_id": "Yksikkö-ID",
           "modbus_scan_interval": "Modbus-skannausväli (sekuntia)",
           "modbus_write": "Ota kirjoitus käyttöön Modbusin kautta",
-          "external_room_temp_entity": "Ulkoisen huonelämpötilan lähde"
+          "external_room_temp_entity": "Ulkoisen huonelämpötilan lähde",
+          "telemetry": "Jaa anonyymejä käyttötietoja"
         },
         "data_description": {
           "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia.",
           "modbus_write": "Aktivoimalla Modbus-kirjoituksen hyväksyt täyden vastuun kaikista rajapinnan kautta kirjoitetuista arvoista. Valmistaja ei ole vastuussa virheellisten tai sallitun alueen ulkopuolella olevien arvojen aiheuttamista ongelmista, ja tällaiset toimenpiteet voivat mitätöidä takuun ja/tai vaikuttaa tuotteen käyttöikään ja suorituskykyyn.",
           "scan_interval": "Kuinka usein Qvantum-pilvi-API:a kysellään. Oletus on 120 sekuntia.",
-          "external_room_temp_entity": "Anturi, jonka arvo lähetetään lämpöpumpulle ulkoisena huonelämpötilana jokaisella kyselyllä, kun Modbus-kirjoitus on käytössä. Sovelluksen ulkoisen huoneanturin tila edellyttää tätä; jätä tyhjäksi poistaaksesi käytöstä."
+          "external_room_temp_entity": "Anturi, jonka arvo lähetetään lämpöpumpulle ulkoisena huonelämpötilana jokaisella kyselyllä, kun Modbus-kirjoitus on käytössä. Sovelluksen ulkoisen huoneanturin tila edellyttää tätä; jätä tyhjäksi poistaaksesi käytöstä.",
+          "telemetry": "Viikoittainen, tunnisteeton yhteenveto (malli, firmware, asennuksen asetukset, tunnistetut suureet ja muutama laskuri). Ei koskaan lähetä nimiä, entity-id:itä, koordinaatteja, energiasummia tai sarjoja."
         },
         "description": "Nykyisen yhteystilan asetukset. Käytä uudelleenmääritystä vaihtaaksesi pilven ja Modbusin välillä.",
         "title": "Asetukset"
@@ -952,6 +954,29 @@
     "curve_left_user_defined": {
       "title": "Lämmityskäyrä keskeytetty",
       "description": "Pumppu palasi omaan automaattiseen käyräänsä, joten integraatio lopetti sen säätämisen ja hylkäsi korjauksensa. Jatka kytkemällä \"Adaptiivinen lämmityskäyrä: ohjaus\" takaisin päälle. Muutos on voinut tulla sovelluksesta tai pilviprofiilista."
+    },
+    "telemetry_consent": {
+      "title": "Jaetaanko anonyymejä käyttötietoja?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Jaetaanko anonyymejä käyttötietoja?",
+            "description": "Auta parantamaan mukautuvaa lämmityskäyrää muilla asennuksilla. Kerran viikossa lähetetään pieni, tunnisteeton yhteenveto: pumpun malli ja firmware, asennuksen asetukset, tunnistetut suureet (lämpöhäviö, aikavakio, huonevahvistus, aurinkomalli) sekä muutama laskuri. Mukana ei ole nimiä, entity-id:itä, koordinaatteja, energiasummia tai sarjoja. Mitään ei lähetetä ennen vastaustasi. Voit muuttaa tätä milloin tahansa integraation asetuksissa; pois päältä kytkeminen lopettaa jakamisen. Kieltäytyminen ei vaikuta mukautuvaan käyrään.",
+            "menu_options": {
+              "grant": "Osallistu",
+              "decline": "Ei kiitos"
+            }
+          },
+          "grant": {
+            "title": "Kiitos",
+            "description": "Tästä asennuksesta jaetaan viikoittainen anonyymi yhteenveto. Voit kytkeä sen pois integraation asetuksissa."
+          },
+          "decline": {
+            "title": "Mitään ei lähetetä",
+            "description": "Voit ottaa jakamisen käyttöön myöhemmin integraation asetuksissa."
+          }
+        }
+      }
     }
   }
 }

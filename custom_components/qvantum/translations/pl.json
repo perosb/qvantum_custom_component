@@ -891,13 +891,15 @@
           "modbus_unit_id": "ID jednostki",
           "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)",
           "modbus_write": "Włącz zapis przez Modbus",
-          "external_room_temp_entity": "Źródło zewnętrznej temperatury pokojowej"
+          "external_room_temp_entity": "Źródło zewnętrznej temperatury pokojowej",
+          "telemetry": "Udostępniaj anonimowe dane eksploatacyjne"
         },
         "data_description": {
           "modbus_scan_interval": "Jak często odpytywać pompę ciepła przez Modbus TCP. Niższe wartości dają prawie rzeczywistą dokładność przepływu i objętości. Minimum to 5 sekund. Domyślnie 15 sekund.",
           "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu.",
           "scan_interval": "Jak często odpytywane jest API chmury Qvantum. Domyślnie 120 sekund.",
-          "external_room_temp_entity": "Czujnik, którego wartość jest przesyłana do pompy ciepła jako zewnętrzna temperatura pokojowa przy każdym odpytywaniu, gdy zapis przez Modbus jest włączony. Wymagany przez tryb czujnika zewnętrznego w aplikacji; pozostaw puste, aby wyłączyć."
+          "external_room_temp_entity": "Czujnik, którego wartość jest przesyłana do pompy ciepła jako zewnętrzna temperatura pokojowa przy każdym odpytywaniu, gdy zapis przez Modbus jest włączony. Wymagany przez tryb czujnika zewnętrznego w aplikacji; pozostaw puste, aby wyłączyć.",
+          "telemetry": "Cotygodniowe podsumowanie bez identyfikatorów (model, firmware, ustawienia instalacji, zidentyfikowane wielkości i kilka liczników). Nigdy nie wysyła nazw, identyfikatorów encji, współrzędnych, sum energii ani serii."
         },
         "description": "Ustawienia bieżącego trybu połączenia. Użyj rekonfiguracji, aby przełączyć między chmurą a Modbusem.",
         "title": "Opcje"
@@ -952,6 +954,29 @@
     "curve_left_user_defined": {
       "title": "Krzywa grzewcza wstrzymana",
       "description": "Pompa wróciła do własnej automatycznej krzywej, więc integracja przestała ją korygować i odrzuciła swoje poprawki. Włącz ponownie „Adaptacyjna krzywa grzewcza: sterowanie”, aby wznowić. Zmiana mogła pochodzić z aplikacji lub profilu w chmurze."
+    },
+    "telemetry_consent": {
+      "title": "Udostępnić anonimowe dane eksploatacyjne?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Udostępnić anonimowe dane eksploatacyjne?",
+            "description": "Pomóż ulepszyć adaptacyjną krzywą grzewczą w innych instalacjach. Raz w tygodniu wysyłane jest krótkie podsumowanie bez identyfikatorów: model pompy i firmware, ustawienia instalacji, zidentyfikowane wielkości (straty ciepła, stała czasowa, wzmocnienie pomieszczenia, model solarny) oraz kilka liczników. Nie ma w nim nazw, identyfikatorów encji, współrzędnych, sum energii ani serii. Nic nie jest wysyłane przed Twoją odpowiedzią. Możesz to zmienić w dowolnym momencie w ustawieniach integracji; wyłączenie zatrzymuje udostępnianie. Odmowa nie wpływa na adaptacyjną krzywą.",
+            "menu_options": {
+              "grant": "Wspieram",
+              "decline": "Nie, dziękuję"
+            }
+          },
+          "grant": {
+            "title": "Dziękujemy",
+            "description": "Co tydzień będzie udostępniane anonimowe podsumowanie tej instalacji. Możesz to wyłączyć w ustawieniach integracji."
+          },
+          "decline": {
+            "title": "Nic nie zostanie wysłane",
+            "description": "Udostępnianie możesz włączyć później w ustawieniach integracji."
+          }
+        }
+      }
     }
   }
 }

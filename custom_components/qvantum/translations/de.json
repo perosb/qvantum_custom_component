@@ -891,13 +891,15 @@
           "modbus_unit_id": "Geräte-ID",
           "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)",
           "modbus_write": "Schreiben über Modbus aktivieren",
-          "external_room_temp_entity": "Externe Raumtemperaturquelle"
+          "external_room_temp_entity": "Externe Raumtemperaturquelle",
+          "telemetry": "Anonyme Betriebsdaten teilen"
         },
         "data_description": {
           "modbus_scan_interval": "Wie oft die Wärmepumpe über Modbus TCP abgefragt wird. Niedrigere Werte ermöglichen nahezu Echtzeit-Durchfluss- und Volumenmessung. Minimum sind 5 Sekunden. Standard sind 15 Sekunden.",
           "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen.",
           "scan_interval": "Wie oft die Qvantum-Cloud-API abgefragt wird. Standard sind 120 Sekunden.",
-          "external_room_temp_entity": "Sensor, dessen Wert bei aktiviertem Modbus-Schreiben bei jedem Abruf als externe Raumtemperatur an die Wärmepumpe übertragen wird. Erforderlich für den externen Raumtemperaturmodus der App; leer lassen zum Deaktivieren."
+          "external_room_temp_entity": "Sensor, dessen Wert bei aktiviertem Modbus-Schreiben bei jedem Abruf als externe Raumtemperatur an die Wärmepumpe übertragen wird. Erforderlich für den externen Raumtemperaturmodus der App; leer lassen zum Deaktivieren.",
+          "telemetry": "Eine wöchentliche, identifierfreie Zusammenfassung (Modell, Firmware, Anlageneinstellungen, identifizierte Größen und einige Zähler). Sendet nie Namen, Entity-IDs, Koordinaten, Energiesummen oder Reihen."
         },
         "description": "Einstellungen für den aktuellen Verbindungsmodus. Über Rekonfiguration zwischen Cloud und Modbus wechseln.",
         "title": "Optionen"
@@ -952,6 +954,29 @@
     "curve_left_user_defined": {
       "title": "Heizkurve pausiert",
       "description": "Die Pumpe ist zu ihrer eigenen automatischen Kurve zurückgekehrt, daher hat die Integration aufgehört, sie anzupassen, und ihre Korrekturen verworfen. Aktiviere „Adaptive Heizkurve: Steuerung“ erneut, um fortzufahren. Die Änderung kann aus der App oder einem Cloud-Profil stammen."
+    },
+    "telemetry_consent": {
+      "title": "Anonyme Betriebsdaten teilen?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Anonyme Betriebsdaten teilen?",
+            "description": "Hilf mit, die adaptive Heizkurve auf anderen Anlagen zu verbessern. Einmal pro Woche wird eine kleine, identifierfreie Zusammenfassung gesendet: Pumpenmodell und Firmware, Anlageneinstellungen, die identifizierten Größen (Wärmeverlust, Zeitkonstante, Raumgewinn, Solarmodell) und einige Zähler. Keine Namen, Entity-IDs, Koordinaten, Energiesummen oder Reihen. Vor deiner Antwort wird nichts gesendet. Du kannst dies jederzeit in den Einstellungen der Integration ändern; Ausschalten beendet die Weitergabe. Ein Nein beeinflusst die adaptive Heizkurve nicht.",
+            "menu_options": {
+              "grant": "Beitragen",
+              "decline": "Nein danke"
+            }
+          },
+          "grant": {
+            "title": "Danke",
+            "description": "Eine wöchentliche anonyme Zusammenfassung dieser Anlage wird geteilt. Du kannst sie in den Einstellungen der Integration abschalten."
+          },
+          "decline": {
+            "title": "Es wird nichts gesendet",
+            "description": "Du kannst die Weitergabe später in den Einstellungen der Integration aktivieren."
+          }
+        }
+      }
     }
   }
 }

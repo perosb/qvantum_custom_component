@@ -891,13 +891,15 @@
           "modbus_unit_id": "Egységazonosító",
           "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)",
           "modbus_write": "Modbus alapú írás engedélyezése",
-          "external_room_temp_entity": "Külső szobahőmérséklet-forrás"
+          "external_room_temp_entity": "Külső szobahőmérséklet-forrás",
+          "telemetry": "Névtelen üzemeltetési adatok megosztása"
         },
         "data_description": {
           "modbus_scan_interval": "Milyen gyakran kérdezze le a hőszivattyút Modbus TCP-n. Az alacsonyabb értékek közel valós idejű áramlás- és térfogatpontosságot adnak. Minimum 5 másodperc. Alapértelmezett 15 másodperc.",
           "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét.",
           "scan_interval": "Milyen gyakran kérdezi le a Qvantum felhő API-t. Alapértelmezés: 120 másodperc.",
-          "external_room_temp_entity": "Érzékelő, amelynek értékét a hőszivattyú külső szobahőmérsékletként kapja meg minden lekérdezésnél, ha a Modbus-írás engedélyezve van. Az alkalmazás külső érzékelő módjához szükséges; hagyd üresen a kikapcsoláshoz."
+          "external_room_temp_entity": "Érzékelő, amelynek értékét a hőszivattyú külső szobahőmérsékletként kapja meg minden lekérdezésnél, ha a Modbus-írás engedélyezve van. Az alkalmazás külső érzékelő módjához szükséges; hagyd üresen a kikapcsoláshoz.",
+          "telemetry": "Heti, azonosító nélküli összefoglaló (modell, firmware, rendszerbeállítások, azonosított értékek és néhány számláló). Soha nem küld neveket, entity-azonosítókat, koordinátákat, energiaösszegeket vagy sorozatokat."
         },
         "description": "Az aktuális kapcsolódási mód beállításai. A felhő és a Modbus közötti váltáshoz használja az újrakonfigurálást.",
         "title": "Beállítások"
@@ -952,6 +954,29 @@
     "curve_left_user_defined": {
       "title": "Fűtési görbe szüneteltetve",
       "description": "A szivattyú visszatért a saját automatikus görbéjéhez, így az integráció leállította a görbe módosítását és eldobta a korrekcióit. A folytatáshoz kapcsolja vissza az „Adaptív fűtési görbe: vezérlés” kapcsolót. A változás az appból vagy felhőprofilból érkezhetett."
+    },
+    "telemetry_consent": {
+      "title": "Megoszt névtelen üzemeltetési adatokat?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Megoszt névtelen üzemeltetési adatokat?",
+            "description": "Segíts jobbá tenni az adaptív fűtési görbét más rendszereken. Hetente egyszer egy kis, azonosító nélküli összefoglaló kerül elküldésre: szivattyúmodell és firmware, rendszerbeállítások, az azonosított értékek (hőveszteség, időállandó, helyiség-erősítés, napmodell), valamint néhány számláló. Nem tartalmaz neveket, entity-azonosítókat, koordinátákat, energiaösszegeket vagy sorozatokat. A válasz előtt semmi nem kerül elküldésre. Ezt bármikor módosíthatja az integráció beállításaiban; kikapcsolva a megosztás leáll. Az elutasítás nem érinti az adaptív görbét.",
+            "menu_options": {
+              "grant": "Hozzájárulok",
+              "decline": "Nem, köszönöm"
+            }
+          },
+          "grant": {
+            "title": "Köszönjük",
+            "description": "Hetente egy névtelen összefoglaló kerül megosztásra erről a rendszerről. Az integráció beállításaiban kikapcsolhatja."
+          },
+          "decline": {
+            "title": "Semmi nem kerül elküldésre",
+            "description": "A megosztást később az integráció beállításaiban kapcsolhatja be."
+          }
+        }
+      }
     }
   }
 }
