@@ -329,7 +329,9 @@ adaptive curve does not imply it, and a README notice is not consent. A grant
 can be revoked and the state removed; removing the entry calls `async_forget`.
 
 The summary export (`qvantum.export_summary`, `summary.py`) is **whitelist-built**
-and must stay identifier-free: fields are picked explicitly and coerced to
+and must stay identifier-free — including the `counters` block (curve reverts,
+trim updates and the number of days a clamped or extrapolated knot was actually
+lived with, plus the date they were reset at; counts, never a log of when): fields are picked explicitly and coerced to
 numbers, booleans or short enumerated strings, never free text from the values
 payload. A new field goes into the module's whitelists **and** bumps
 `SUMMARY_SCHEMA_VERSION` (the pool groups by it); `tests/test_summary.py` asserts

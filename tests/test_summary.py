@@ -22,6 +22,7 @@ from custom_components.qvantum.summary import (
     SUMMARY_SCHEMA_VERSION,
     SUMMARY_URL,
     build_summary,
+    counters_summary as summary_counters_summary,
     device_summary,
     plant_summary,
 )
@@ -407,3 +408,35 @@ def test_an_active_measurement_travels_with_its_evidence() -> None:
     assert fitted["std_err_c_per_c"] == 0.40
     assert fitted["t_stat"] == pytest.approx(4.33 / 0.40)
     assert fitted["leave_one_out_c_per_c"] == 2.47
+
+
+def test_counters_block_is_exported_and_absent_on_cloud():
+    """How often the cold/warm end was exercised, as counts."""
+    coordinator = SimpleNamespace(
+        counters={
+            "since": "2026-10-01",
+            "reverts": 2,
+            "trim_updates": 6,
+            "days_clamped": 3,
+            "days_extrapolated": 4,
+        }
+    )
+
+    counters = summary_counters_summary(coordinator)
+
+    assert counters == {
+        "since": "2026-10-01",
+        "reverts": 2,
+        "trim_updates": 6,
+        "days_clamped": 3,
+        "days_extrapolated": 4,
+    }
+    # No curve coordinator (cloud mode) means no counters at all.
+    assert summary_counters_summary(None) is None
+    assert summary_counters_summary(SimpleNamespace()) is None
+
+
+def test_schema_version_covers_the_counters_block():
+    from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
+
+    assert SUMMARY_SCHEMA_VERSION >= 5

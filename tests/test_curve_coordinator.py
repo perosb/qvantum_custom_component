@@ -148,6 +148,13 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._terms = {"cop_feedback": False, "precharge": False}
     coordinator._cop_reference = {}
     coordinator._cop_samples = {}
+    coordinator._counters = {
+        "since": "2026-01-01",
+        "reverts": 0,
+        "trim_updates": 0,
+        "clamped_days": [],
+        "extrapolated_days": [],
+    }
     coordinator._listeners = {}
     coordinator.data = None
     coordinator.hass = MagicMock()
@@ -3570,3 +3577,79 @@ async def test_switching_off_logs_at_info_not_warning(caplog) -> None:
     levels = {record.levelname for record in caplog.records}
     assert "INFO" in levels
     assert "WARNING" not in levels
+
+
+class TestCurveCounters:
+    """Counters for the pooled summary: rates, not logs."""
+
+    def test_days_are_counted_from_the_date_lists(self):
+        coordinator = make_coordinator()
+        coordinator._counters = {
+            "since": "2026-10-01",
+            "reverts": 2,
+            "trim_updates": 5,
+            "clamped_days": ["2026-10-01", "2026-10-02"],
+            "extrapolated_days": ["2026-10-02"],
+        }
+
+        assert coordinator.counters == {
+            "since": "2026-10-01",
+            "reverts": 2,
+            "trim_updates": 5,
+            "days_clamped": 2,
+            "days_extrapolated": 1,
+        }
+
+    async def test_revert_and_trim_updates_are_counted(self):
+        coordinator, _client = make_writable_coordinator()
+        coordinator._mode = "active"
+        coordinator._trims = {"curve_0": 0.5}
+
+        await coordinator.async_set_control_mode("shadow")
+
+        assert coordinator.counters["reverts"] == 1
+        assert coordinator.counters["trim_updates"] == 0
+
+    async def test_a_day_is_marked_once_in_each_category(self):
+        coordinator, _client = make_writable_coordinator()
+        coordinator._mode = "active"
+        now = 1_760_000_000.0
+
+        await coordinator._async_mark_counter_days(("curve_30",), (), now)
+        await coordinator._async_mark_counter_days(("curve_30",), ("curve_30",), now)
+
+        assert coordinator.counters["days_clamped"] == 1
+        assert coordinator.counters["days_extrapolated"] == 1
+
+    async def test_shadow_does_not_mark_a_day(self):
+        """In shadow the table never reaches the pump, so nothing is lived."""
+        coordinator, _client = make_writable_coordinator()
+
+        await coordinator._async_mark_counter_days(("curve_30",), ("curve_30",), 1e9)
+
+        assert coordinator.counters["days_clamped"] == 0
+        assert coordinator.counters["days_extrapolated"] == 0
+
+    async def test_counters_survive_a_restart(self):
+        store = FakeStore(
+            {
+                "counters": {
+                    "since": "2026-10-01",
+                    "reverts": 3,
+                    "trim_updates": 7,
+                    "clamped_days": ["2026-10-01", "nope", 5],
+                    "extrapolated_days": ["2026-10-03"],
+                }
+            }
+        )
+        coordinator = make_coordinator(store=store)
+
+        await coordinator.async_restore()
+
+        counters = coordinator.counters
+        assert counters["reverts"] == 3
+        assert counters["trim_updates"] == 7
+        # Unusable entries are dropped, valid dates kept.
+        assert counters["days_clamped"] == 1
+        assert counters["days_extrapolated"] == 1
+        assert counters["since"] == "2026-10-01"

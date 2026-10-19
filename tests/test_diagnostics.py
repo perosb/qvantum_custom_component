@@ -141,6 +141,13 @@ def _curve_coordinator() -> SimpleNamespace:
         },
         _trims={"curve_30": 0.1},
         _trim_evidence={"curve_30": 12, "curve_minus_30": 0},
+        counters={
+            "since": "2026-10-01",
+            "reverts": 2,
+            "trim_updates": 6,
+            "days_clamped": 3,
+            "days_extrapolated": 4,
+        },
         _room_gain=1.8,
         _room_gain_source="room_temp_external",
         _room_gain_factor=5.0,
@@ -552,6 +559,13 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     # The pump's own setting, so a report shows both numbers side by side.
     assert curve["room_gain_factor"] == 5.0
     assert curve["room_gain_from_factor"] is True
+    assert curve["counters"] == {
+        "since": "2026-10-01",
+        "reverts": 2,
+        "trim_updates": 6,
+        "days_clamped": 3,
+        "days_extrapolated": 4,
+    }
     assert curve["trim_evidence"] == {"curve_30": 12, "curve_minus_30": 0}
     assert curve["room_error"] == {
         "median_abs_c": 0.6,

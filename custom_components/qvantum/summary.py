@@ -17,7 +17,9 @@ What goes in (the rule questions the pool can answer):
   slope is what checks the identity, and it carries ``valid``/``notes`` plus its
   evidence), the heat-loss coefficient, the time constant, the thermal mass and
   the solar model;
-* the derived verdicts, once they exist (snap/sag, cycling, DHW standing loss).
+* the derived verdicts, once they exist (snap/sag, cycling, DHW standing loss);
+* the curve counters (reverts, trim updates, days the warm or cold end was
+  clamped or extrapolated) with the date they were reset at.
 
 What never goes in: entity ids or names, coordinates, energy totals, schedules,
 sensor identities, or any raw hourly series. See ``docs`` and the README section
@@ -68,7 +70,7 @@ _ENTITY_PREFIXES = (
 )
 
 #: Bump when a field is added, removed or changes meaning: the pool groups by it.
-SUMMARY_SCHEMA_VERSION = 4  # room-gain evidence carries its standard error
+SUMMARY_SCHEMA_VERSION = 5  # counters block: reverts, clamped/extrapolated days
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -242,6 +244,33 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
     }
 
 
+#: Curves-side counters: how often the installation actually lived with a
+#: clamped or extrapolated knot, and how often the table changed. Counts only —
+#: the pool needs a rate, never a log of when.
+COUNTER_KEYS: tuple[str, ...] = (
+    "since",
+    "reverts",
+    "trim_updates",
+    "days_clamped",
+    "days_extrapolated",
+)
+
+
+def counters_summary(coordinator: Any) -> dict[str, Any] | None:
+    """The curve's counters for the pooled questions, or ``None`` on cloud."""
+    counters = getattr(coordinator, "counters", None)
+    if not isinstance(counters, Mapping):
+        return None
+    return {
+        key: (
+            _short_string(counters.get(key))
+            if key == "since"
+            else _number(counters.get(key))
+        )
+        for key in COUNTER_KEYS
+    }
+
+
 def room_gain_summary(coordinator: Any) -> dict[str, Any]:
     """The room gain in three parts, with the evidence behind the measurement.
 
@@ -391,6 +420,7 @@ def build_summary(
         "plant": plant_summary(values or {}),
         "climate": climate_summary(curve),
         "curve": curve_summary(curve),
+        "counters": counters_summary(curve),
         "fitted": fitted_summary(efficiency),
         "verdicts": dict(verdicts or {}),
     }
