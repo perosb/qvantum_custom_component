@@ -1323,8 +1323,13 @@ class TestPriorityTimeNumbers:
             "cooling_priority_time",
             "dhw_priority_time",
         } <= keys
-        # The register map owns the documented range; the step and unit are ours.
+        # The register map owns the documented maximum; the app's 30-minute
+        # floor survives it for the active modes, while cooling keeps the
+        # documented 0 (an unused circuit legitimately holds it).
         by_key = {entity._metric_key: entity for entity in entities}
         assert by_key["dhw_priority_time"]._attr_native_max_value == 180
+        assert by_key["dhw_priority_time"]._attr_native_min_value == 30
+        assert by_key["heating_priority_time"]._attr_native_min_value == 30
+        assert by_key["cooling_priority_time"]._attr_native_min_value == 0
         assert by_key["dhw_priority_time"]._attr_native_step == 30
         assert by_key["dhw_priority_time"]._attr_native_unit_of_measurement == "min"
