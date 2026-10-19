@@ -328,6 +328,13 @@ starts on the first start with this version) with a two-choice fix flow in
 adaptive curve does not imply it, and a README notice is not consent. A grant
 can be revoked and the state removed; removing the entry calls `async_forget`.
 
+The intake for that export lives in `telemetry-worker/` (a Cloudflare Worker +
+KV). It is deployed by its **own** workflow (`.github/workflows/telemetry-worker.yml`,
+on changes under that path and on releases) and is deliberately not part of
+`release.yml`: a Cloudflare outage must never block a HACS release, and the zip
+only takes `custom_components/qvantum/`. The deploy skips itself when the
+Cloudflare secrets or the KV namespace id are missing.
+
 The summary export (`qvantum.export_summary`, `summary.py`) is **whitelist-built**
 and must stay identifier-free — including the `counters` block (curve reverts,
 trim updates and the number of days a clamped or extrapolated knot was actually
