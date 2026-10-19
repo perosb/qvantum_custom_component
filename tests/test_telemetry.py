@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.qvantum import repairs as qvantum_repairs
+from custom_components.qvantum import config_flow as qvantum_config_flow
 from custom_components.qvantum import telemetry
 from custom_components.qvantum.repairs import TelemetryConsentFlow, async_create_fix_flow
 
@@ -200,3 +201,81 @@ async def test_fix_flow_records_a_decline():
 async def test_unknown_issue_is_rejected():
     with pytest.raises(ValueError):
         await async_create_fix_flow(MagicMock(), "not_ours", None)
+
+
+def _options_flow():
+    from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+    entry = MagicMock()
+    entry.entry_id = "entry"
+    entry.data = {}
+    entry.options = {}
+    flow = QvantumOptionsFlowHandler(entry)
+    flow.hass = MagicMock()
+    return flow
+
+
+@pytest.mark.asyncio
+async def test_options_box_reflects_the_stored_consent():
+    """The checkbox must show the decision, not a silent default."""
+    flow = _options_flow()
+    with patch.object(
+        qvantum_config_flow, "async_load_state",
+        AsyncMock(return_value={"consent": telemetry.CONSENT_GRANTED}),
+    ):
+        form = await flow.async_step_init()
+
+    schema = form["data_schema"].schema
+    key = next(k for k in schema if getattr(k, "schema", None) == "telemetry")
+    assert key.default() is True
+
+
+@pytest.mark.asyncio
+async def test_untouched_box_is_not_a_decision():
+    """Opening the options for the scan interval must not decline for you."""
+    flow = _options_flow()
+    with (
+        patch.object(
+            qvantum_config_flow, "async_load_state", AsyncMock(return_value={})
+        ),
+        patch.object(
+            qvantum_config_flow, "async_set_consent", AsyncMock()
+        ) as set_consent,
+    ):
+        await flow._async_apply_telemetry_choice(False)
+
+    set_consent.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_changed_box_records_the_decision():
+    flow = _options_flow()
+    with (
+        patch.object(
+            qvantum_config_flow, "async_load_state", AsyncMock(return_value={})
+        ),
+        patch.object(
+            qvantum_config_flow, "async_set_consent", AsyncMock()
+        ) as set_consent,
+    ):
+        await flow._async_apply_telemetry_choice(True)
+
+    set_consent.assert_awaited_once_with(flow.hass, "entry", True)
+
+
+@pytest.mark.asyncio
+async def test_turning_the_box_off_revokes():
+    flow = _options_flow()
+    with (
+        patch.object(
+            qvantum_config_flow,
+            "async_load_state",
+            AsyncMock(return_value={"consent": telemetry.CONSENT_GRANTED}),
+        ),
+        patch.object(
+            qvantum_config_flow, "async_set_consent", AsyncMock()
+        ) as set_consent,
+    ):
+        await flow._async_apply_telemetry_choice(False)
+
+    set_consent.assert_awaited_once_with(flow.hass, "entry", False)

@@ -891,13 +891,15 @@
           "modbus_unit_id": "Enheds-ID",
           "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)",
           "modbus_write": "Aktivér skrivning via Modbus",
-          "external_room_temp_entity": "Kilde til ekstern rumtemperatur"
+          "external_room_temp_entity": "Kilde til ekstern rumtemperatur",
+          "telemetry": "Del anonyme driftsdata"
         },
         "data_description": {
           "modbus_scan_interval": "Hvor ofte varmepumpen skal forespørges over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder.",
           "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne.",
           "scan_interval": "Hvor ofte Qvantum-cloud-API'et polles. Standard er 120 sekunder.",
-          "external_room_temp_entity": "Sensor, hvis værdi sendes til varmepumpen som ekstern rumtemperatur ved hver poll, når Modbus-skrivning er aktiveret. Kræves af appens tilstand for ekstern rumtemperatur; lad feltet stå tomt for at deaktivere."
+          "external_room_temp_entity": "Sensor, hvis værdi sendes til varmepumpen som ekstern rumtemperatur ved hver poll, når Modbus-skrivning er aktiveret. Kræves af appens tilstand for ekstern rumtemperatur; lad feltet stå tomt for at deaktivere.",
+          "telemetry": "Et ugentligt resumé uden identifikatorer (model, firmware, anlægsindstillinger, identificerede størrelser og nogle tællere). Sender aldrig navne, entity-id'er, koordinater, energitotaler eller serier."
         },
         "description": "Indstillinger for den aktuelle forbindelsestilstand. Brug genkonfiguration til at skifte mellem sky og Modbus.",
         "title": "Indstillinger"
@@ -955,12 +957,11 @@
     },
     "telemetry_consent": {
       "title": "Del anonyme driftsdata?",
-      "description": "Hjælp med at gøre den adaptive varmekurve bedre på andre anlæg. Én gang om ugen sendes et lille resumé uden identifikatorer: pumpemodel og firmware, anlægsindstillinger, de identificerede størrelser (varmetab, tidskonstant, rumforstærkning, solmodel) samt nogle tællere (pauser, fastlåste punkter, trim-opdateringer). Ingen navne, entity-id'er, koordinater, energitotaler eller serier. Intet sendes, før du svarer, og du kan trække samtykket tilbage og få data slettet når som helst. Et nej påvirker ikke den adaptive varmekurve.",
       "fix_flow": {
         "step": {
           "init": {
             "title": "Del anonyme driftsdata?",
-            "description": "Hjælp med at gøre den adaptive varmekurve bedre på andre anlæg. Én gang om ugen sendes et lille resumé uden identifikatorer: pumpemodel og firmware, anlægsindstillinger, de identificerede størrelser (varmetab, tidskonstant, rumforstærkning, solmodel) samt nogle tællere (pauser, fastlåste punkter, trim-opdateringer). Ingen navne, entity-id'er, koordinater, energitotaler eller serier. Intet sendes, før du svarer, og du kan trække samtykket tilbage og få data slettet når som helst. Et nej påvirker ikke den adaptive varmekurve.",
+            "description": "Hjælp med at gøre den adaptive varmekurve bedre på andre anlæg. Én gang om ugen sendes et lille resumé uden identifikatorer: pumpemodel og firmware, anlægsindstillinger, de identificerede størrelser (varmetab, tidskonstant, rumforstærkning, solmodel) samt nogle tællere. Ingen navne, entity-id'er, koordinater, energitotaler eller serier. Intet sendes, før du svarer. Du kan ændre det når som helst i integrationens indstillinger; slår du det fra, stopper delingen. Et nej påvirker ikke den adaptive varmekurve.",
             "menu_options": {
               "grant": "Bidrag",
               "decline": "Nej tak"
@@ -968,11 +969,11 @@
           },
           "grant": {
             "title": "Tak",
-            "description": "Et ugentligt anonymt resumé deles fra dette anlæg."
+            "description": "Et ugentligt anonymt resumé deles fra dette anlæg. Du kan slå det fra i integrationens indstillinger."
           },
           "decline": {
             "title": "Intet sendes",
-            "description": "Du kan skifte mening senere via samme spørgsmål."
+            "description": "Du kan slå deling til senere i integrationens indstillinger."
           }
         }
       }

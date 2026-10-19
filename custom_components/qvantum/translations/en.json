@@ -891,13 +891,15 @@
           "modbus_unit_id": "Unit ID",
           "modbus_scan_interval": "Modbus scan interval (seconds)",
           "modbus_write": "Enable writing via Modbus",
-          "external_room_temp_entity": "External room temperature source"
+          "external_room_temp_entity": "External room temperature source",
+          "telemetry": "Share anonymous operating data"
         },
         "data_description": {
           "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds.",
           "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
           "scan_interval": "How often to poll the Qvantum cloud API. Default is 120 seconds.",
-          "external_room_temp_entity": "Sensor whose value is sent to the heat pump as the external room temperature on every poll while Modbus writing is enabled. Required by the app's external room sensor mode; leave empty to disable."
+          "external_room_temp_entity": "Sensor whose value is sent to the heat pump as the external room temperature on every poll while Modbus writing is enabled. Required by the app's external room sensor mode; leave empty to disable.",
+          "telemetry": "A weekly, identifier-free summary (model, firmware, plant settings, identified figures and a few counters). Never sends names, entity ids, coordinates, energy totals or series."
         },
         "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
         "title": "Options"
@@ -955,12 +957,11 @@
     },
     "telemetry_consent": {
       "title": "Share anonymous operating data?",
-      "description": "Help make the adaptive curve work on other installations. Once a week a small, identifier-free summary is sent: pump model and firmware, plant settings, the identified figures (heat loss, time constant, room gain, solar model) and a few counters (pauses, clamped points, trim updates). No names, entity ids, coordinates, energy totals or series are included. Nothing is sent before you answer, and you can revoke this and delete the data at any time. Declining does not affect the adaptive curve.",
       "fix_flow": {
         "step": {
           "init": {
             "title": "Share anonymous operating data?",
-            "description": "Help make the adaptive curve work on other installations. Once a week a small, identifier-free summary is sent: pump model and firmware, plant settings, the identified figures (heat loss, time constant, room gain, solar model) and a few counters (pauses, clamped points, trim updates). No names, entity ids, coordinates, energy totals or series are included. Nothing is sent before you answer, and you can revoke this and delete the data at any time. Declining does not affect the adaptive curve.",
+            "description": "Help make the adaptive curve work on other installations. Once a week a small, identifier-free summary is sent: pump model and firmware, plant settings, the identified figures (heat loss, time constant, room gain, solar model) and a few counters. No names, entity ids, coordinates, energy totals or series are included. Nothing is sent before you answer. You can change this at any time in the integration's settings; turning it off stops the sharing. Declining does not affect the adaptive curve.",
             "menu_options": {
               "grant": "Contribute",
               "decline": "No thanks"
@@ -968,11 +969,11 @@
           },
           "grant": {
             "title": "Thank you",
-            "description": "A weekly anonymous summary will be shared from this installation."
+            "description": "A weekly anonymous summary will be shared from this installation. You can turn it off in the integration's settings."
           },
           "decline": {
             "title": "Nothing will be sent",
-            "description": "You can still change your mind later from this prompt's topic."
+            "description": "You can enable sharing later in the integration's settings."
           }
         }
       }

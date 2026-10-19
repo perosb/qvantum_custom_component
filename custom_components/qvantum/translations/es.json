@@ -891,13 +891,15 @@
           "modbus_unit_id": "ID de unidad",
           "modbus_scan_interval": "Intervalo de exploración Modbus (segundos)",
           "modbus_write": "Activar escritura mediante Modbus",
-          "external_room_temp_entity": "Fuente de temperatura ambiente externa"
+          "external_room_temp_entity": "Fuente de temperatura ambiente externa",
+          "telemetry": "Compartir datos de funcionamiento anónimos"
         },
         "data_description": {
           "modbus_scan_interval": "Con qué frecuencia se consulta la bomba de calor por Modbus TCP. Valores más bajos dan precisión casi en tiempo real de caudal y volumen. El mínimo es 5 segundos. El valor predeterminado es 15 segundos.",
           "modbus_write": "Al activar la escritura Modbus, aceptas la plena responsabilidad de cualquier valor escrito a través de la interfaz. El fabricante no es responsable de los problemas causados por valores incorrectos o fuera de rango, y tales acciones pueden anular la garantía y/o afectar el ciclo de vida y el rendimiento del producto.",
           "scan_interval": "Con qué frecuencia se consulta la API en la nube de Qvantum. Predeterminado: 120 segundos.",
-          "external_room_temp_entity": "Sensor cuyo valor se envía a la bomba de calor como temperatura ambiente externa en cada sondeo cuando la escritura Modbus está activada. Requerido por el modo de sensor externo de la aplicación; déjalo vacío para desactivarlo."
+          "external_room_temp_entity": "Sensor cuyo valor se envía a la bomba de calor como temperatura ambiente externa en cada sondeo cuando la escritura Modbus está activada. Requerido por el modo de sensor externo de la aplicación; déjalo vacío para desactivarlo.",
+          "telemetry": "Un resumen semanal sin identificadores (modelo, firmware, ajustes de la instalación, magnitudes identificadas y algunos contadores). Nunca envía nombres, identificadores de entidad, coordenadas, totales de energía ni series."
         },
         "description": "Ajustes del modo de conexión actual. Usa reconfigurar para cambiar entre nube y Modbus.",
         "title": "Opciones"
@@ -955,12 +957,11 @@
     },
     "telemetry_consent": {
       "title": "¿Compartir datos de funcionamiento anónimos?",
-      "description": "Ayuda a mejorar la curva adaptativa en otras instalaciones. Una vez por semana se envía un resumen pequeño sin identificadores: modelo y firmware de la bomba, ajustes de la instalación, las magnitudes identificadas (pérdida de calor, constante de tiempo, ganancia de la sala, modelo solar) y algunos contadores (pausas, puntos limitados, actualizaciones de ajustes). No se incluyen nombres, identificadores de entidad, coordenadas, totales de energía ni series. No se envía nada antes de que respondas, y puedes retirar el consentimiento y borrar los datos cuando quieras. Decir que no no afecta a la curva adaptativa.",
       "fix_flow": {
         "step": {
           "init": {
             "title": "¿Compartir datos de funcionamiento anónimos?",
-            "description": "Ayuda a mejorar la curva adaptativa en otras instalaciones. Una vez por semana se envía un resumen pequeño sin identificadores: modelo y firmware de la bomba, ajustes de la instalación, las magnitudes identificadas (pérdida de calor, constante de tiempo, ganancia de la sala, modelo solar) y algunos contadores (pausas, puntos limitados, actualizaciones de ajustes). No se incluyen nombres, identificadores de entidad, coordenadas, totales de energía ni series. No se envía nada antes de que respondas, y puedes retirar el consentimiento y borrar los datos cuando quieras. Decir que no no afecta a la curva adaptativa.",
+            "description": "Ayuda a mejorar la curva adaptativa en otras instalaciones. Una vez por semana se envía un resumen pequeño sin identificadores: modelo y firmware de la bomba, ajustes de la instalación, las magnitudes identificadas (pérdida de calor, constante de tiempo, ganancia de la sala, modelo solar) y algunos contadores. No se incluyen nombres, identificadores de entidad, coordenadas, totales de energía ni series. No se envía nada antes de que respondas. Puedes cambiarlo en cualquier momento en los ajustes de la integración; desactivarlo detiene el envío. Decir que no no afecta a la curva adaptativa.",
             "menu_options": {
               "grant": "Contribuir",
               "decline": "No, gracias"
@@ -968,11 +969,11 @@
           },
           "grant": {
             "title": "Gracias",
-            "description": "Se compartirá un resumen anónimo semanal de esta instalación."
+            "description": "Se compartirá un resumen anónimo semanal de esta instalación. Puedes desactivarlo en los ajustes de la integración."
           },
           "decline": {
             "title": "No se enviará nada",
-            "description": "Puedes cambiar de opinión más adelante desde la misma pregunta."
+            "description": "Puedes activar el envío más tarde en los ajustes de la integración."
           }
         }
       }

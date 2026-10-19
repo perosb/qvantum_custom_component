@@ -30,6 +30,7 @@ from homeassistant.helpers.selector import (
 from .client.cloud import QvantumCloudClient
 from .client.exceptions import APIAuthError, APIConnectionError, APIRateLimitError
 from .client.modbus.device import IdentityProbeError, async_probe_identity
+from .telemetry import CONSENT_GRANTED, async_load_state, async_set_consent
 from .const import (
     DEFAULT_MODBUS_HOST,
     DEFAULT_MODBUS_PORT,
@@ -48,6 +49,7 @@ from .const import (
     CONF_MODBUS_TCP,
     CONF_MODBUS_UNIT_ID,
     CONF_MODBUS_WRITE,
+    CONF_TELEMETRY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -565,9 +567,17 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                 {**self.options, **normalized},
                 user_input.get(CONF_EXTERNAL_ROOM_TEMP_ENTITY),
             )
+            await self._async_apply_telemetry_choice(user_input.get(CONF_TELEMETRY))
             return self.async_create_entry(title="", data=result)
 
         entry = self._source_entry()
+        # The consent lives in its own store, not in the options payload.
+        telemetry_state = await async_load_state(
+            self.hass, self._config_entry.entry_id
+        )
+        telemetry_granted = (
+            telemetry_state.get("consent") == CONSENT_GRANTED
+        )
         if self._modbus_enabled():
             data_schema = vol.Schema(
                 {
@@ -613,6 +623,9 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                             )
                         ),
                     ): bool,
+                    vol.Optional(
+                        CONF_TELEMETRY, default=telemetry_granted
+                    ): bool,
                     vol.Optional(CONF_EXTERNAL_ROOM_TEMP_ENTITY): (
                         _external_room_temp_selector()
                     ),
@@ -627,6 +640,9 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                         ),
                     ): vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL)),
+                    vol.Optional(
+                        CONF_TELEMETRY, default=telemetry_granted
+                    ): bool,
                 }
             )
 
@@ -643,6 +659,22 @@ class QvantumOptionsFlowHandler(OptionsFlow):
             )
 
         return self.async_show_form(step_id="init", data_schema=data_schema)
+
+    async def _async_apply_telemetry_choice(self, choice: object) -> None:
+        """Record a *changed* consent; an untouched box is not a decision.
+
+        The checkbox reflects the stored state, so only a difference from it
+        is an answer. Without this guard, opening the options for the scan
+        interval would silently decline on behalf of a user who never decided.
+        """
+        state = await async_load_state(self.hass, self._config_entry.entry_id)
+        current = state.get("consent")
+        granted = bool(choice)
+        if granted == (current == CONSENT_GRANTED):
+            return
+        await async_set_consent(
+            self.hass, self._config_entry.entry_id, granted
+        )
 
 
 class CannotConnect(HomeAssistantError):

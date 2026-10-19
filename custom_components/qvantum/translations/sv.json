@@ -891,13 +891,15 @@
           "modbus_unit_id": "Enhets-ID",
           "modbus_scan_interval": "Modbus-skanningsintervall (sekunder)",
           "modbus_write": "Aktivera skrivning via Modbus",
-          "external_room_temp_entity": "Källa för extern inomhustemperatur"
+          "external_room_temp_entity": "Källa för extern inomhustemperatur",
+          "telemetry": "Dela anonyma driftdata"
         },
         "data_description": {
           "modbus_scan_interval": "Hur ofta värmepumpen pollas via Modbus TCP. Lägre värden ger nästan realtidsnoggrannhet för flöde och volym. Minimum är 5 sekunder. Standard är 15 sekunder.",
           "modbus_write": "Genom att aktivera Modbus-skrivning tar du fullt ansvar för alla värden som skrivs via gränssnittet. Tillverkaren ansvarar inte för problem orsakade av felaktiga eller utanför intervallet liggande värden, och sådana åtgärder kan ogiltigförklara garantin och/eller påverka produktens livslängd och prestanda.",
           "scan_interval": "Hur ofta Qvantum-moln-API:et pollas. Standard är 120 sekunder.",
-          "external_room_temp_entity": "Sensor vars värde skickas till värmepumpen som extern inomhustemperatur vid varje poll när Modbus-skrivning är aktiverad. Krävs av appens läge för extern inomhussensor; lämna tom för att inaktivera."
+          "external_room_temp_entity": "Sensor vars värde skickas till värmepumpen som extern inomhustemperatur vid varje poll när Modbus-skrivning är aktiverad. Krävs av appens läge för extern inomhussensor; lämna tom för att inaktivera.",
+          "telemetry": "En veckovis sammanfattning utan identifierare (modell, firmware, anläggningsinställningar, identifierade storheter och några räknare). Skickar aldrig namn, entity-id, koordinater, energitotaler eller serier."
         },
         "description": "Inställningar för aktuellt anslutningsläge. Använd omkonfiguration för att växla mellan moln och Modbus.",
         "title": "Alternativ"
@@ -955,12 +957,11 @@
     },
     "telemetry_consent": {
       "title": "Dela anonyma driftdata?",
-      "description": "Hjälp till att göra den adaptiva kurvan bättre på andra anläggningar. En gång i veckan skickas en liten sammanfattning utan identifierare: pumpmodell och firmware, anläggningsinställningar, de identifierade storheterna (värmeförlust, tidskonstant, rumstermost, solmodell) samt några räknare (pauser, klampade punkter, trim-uppdateringar). Inga namn, entity-id, koordinater, energitotaler eller serier ingår. Inget skickas innan du svarar, och du kan återkalla samtycket och radera uppgifterna när som helst. Ett nej påverkar inte den adaptiva kurvan.",
       "fix_flow": {
         "step": {
           "init": {
             "title": "Dela anonyma driftdata?",
-            "description": "Hjälp till att göra den adaptiva kurvan bättre på andra anläggningar. En gång i veckan skickas en liten sammanfattning utan identifierare: pumpmodell och firmware, anläggningsinställningar, de identifierade storheterna (värmeförlust, tidskonstant, rumstermost, solmodell) samt några räknare (pauser, klampade punkter, trim-uppdateringar). Inga namn, entity-id, koordinater, energitotaler eller serier ingår. Inget skickas innan du svarar, och du kan återkalla samtycket och radera uppgifterna när som helst. Ett nej påverkar inte den adaptiva kurvan.",
+            "description": "Hjälp till att göra den adaptiva kurvan bättre på andra anläggningar. En gång i veckan skickas en liten sammanfattning utan identifierare: pumpmodell och firmware, anläggningsinställningar, de identifierade storheterna (värmeförlust, tidskonstant, rumstermost, solmodell) samt några räknare. Inga namn, entity-id, koordinater, energitotaler eller serier ingår. Inget skickas innan du svarar. Du kan ändra detta när som helst i integrationens inställningar; stäng av så upphör delningen. Ett nej påverkar inte den adaptiva kurvan.",
             "menu_options": {
               "grant": "Bidra",
               "decline": "Nej tack"
@@ -968,11 +969,11 @@
           },
           "grant": {
             "title": "Tack",
-            "description": "En veckovis anonym sammanfattning delas från den här anläggningen."
+            "description": "En veckovis anonym sammanfattning delas från den här anläggningen. Du kan stänga av det i integrationens inställningar."
           },
           "decline": {
             "title": "Inget skickas",
-            "description": "Du kan ändra dig senare via samma fråga."
+            "description": "Du kan slå på delning senare i integrationens inställningar."
           }
         }
       }

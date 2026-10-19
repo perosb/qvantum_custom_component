@@ -891,13 +891,15 @@
           "modbus_unit_id": "ID d'unité",
           "modbus_scan_interval": "Intervalle de scan Modbus (secondes)",
           "modbus_write": "Activer l'écriture via Modbus",
-          "external_room_temp_entity": "Source de température ambiante externe"
+          "external_room_temp_entity": "Source de température ambiante externe",
+          "telemetry": "Partager des données de fonctionnement anonymes"
         },
         "data_description": {
           "modbus_scan_interval": "Fréquence d'interrogation de la pompe à chaleur via Modbus TCP. Des valeurs plus basses offrent une précision quasi temps réel du débit et du volume. Minimum 5 secondes. Par défaut 15 secondes.",
           "modbus_write": "En activant l'écriture Modbus, vous acceptez l'entière responsabilité de toutes les valeurs écrites via l'interface. Le fabricant n'est pas responsable des problèmes causés par des valeurs incorrectes ou hors limites, et de telles actions peuvent annuler la garantie et/ou affecter le cycle de vie et les performances du produit.",
           "scan_interval": "Fréquence d'interrogation de l'API cloud Qvantum. Par défaut : 120 secondes.",
-          "external_room_temp_entity": "Capteur dont la valeur est transmise à la pompe à chaleur comme température ambiante externe à chaque interrogation lorsque l'écriture Modbus est activée. Requis par le mode capteur externe de l'application ; laisser vide pour désactiver."
+          "external_room_temp_entity": "Capteur dont la valeur est transmise à la pompe à chaleur comme température ambiante externe à chaque interrogation lorsque l'écriture Modbus est activée. Requis par le mode capteur externe de l'application ; laisser vide pour désactiver.",
+          "telemetry": "Un résumé hebdomadaire sans identifiant (modèle, firmware, réglages de l'installation, grandeurs identifiées et quelques compteurs). N'envoie jamais de noms, identifiants d'entité, coordonnées, totaux d'énergie ni séries."
         },
         "description": "Paramètres du mode de connexion actuel. Utilisez la reconfiguration pour basculer entre le cloud et Modbus.",
         "title": "Options"
@@ -955,12 +957,11 @@
     },
     "telemetry_consent": {
       "title": "Partager des données de fonctionnement anonymes ?",
-      "description": "Aidez à améliorer la courbe adaptative sur d'autres installations. Une fois par semaine, un petit résumé sans identifiant est envoyé : modèle et firmware de la pompe, réglages de l'installation, les grandeurs identifiées (déperdition, constante de temps, gain de la pièce, modèle solaire) et quelques compteurs (pauses, points limités, mises à jour des corrections). Aucun nom, identifiant d'entité, coordonnée, total d'énergie ni série n'est inclus. Rien n'est envoyé avant votre réponse, et vous pouvez retirer votre consentement et faire supprimer les données à tout moment. Un refus ne change rien à la courbe adaptative.",
       "fix_flow": {
         "step": {
           "init": {
             "title": "Partager des données de fonctionnement anonymes ?",
-            "description": "Aidez à améliorer la courbe adaptative sur d'autres installations. Une fois par semaine, un petit résumé sans identifiant est envoyé : modèle et firmware de la pompe, réglages de l'installation, les grandeurs identifiées (déperdition, constante de temps, gain de la pièce, modèle solaire) et quelques compteurs (pauses, points limités, mises à jour des corrections). Aucun nom, identifiant d'entité, coordonnée, total d'énergie ni série n'est inclus. Rien n'est envoyé avant votre réponse, et vous pouvez retirer votre consentement et faire supprimer les données à tout moment. Un refus ne change rien à la courbe adaptative.",
+            "description": "Aidez à améliorer la courbe adaptative sur d'autres installations. Une fois par semaine, un petit résumé sans identifiant est envoyé : modèle et firmware de la pompe, réglages de l'installation, les grandeurs identifiées (déperdition, constante de temps, gain de la pièce, modèle solaire) et quelques compteurs. Aucun nom, identifiant d'entité, coordonnée, total d'énergie ni série n'est inclus. Rien n'est envoyé avant votre réponse. Vous pouvez modifier cela à tout moment dans les réglages de l'intégration ; le désactiver arrête le partage. Un refus ne change rien à la courbe adaptative.",
             "menu_options": {
               "grant": "Contribuer",
               "decline": "Non merci"
@@ -968,11 +969,11 @@
           },
           "grant": {
             "title": "Merci",
-            "description": "Un résumé anonyme hebdomadaire de cette installation sera partagé."
+            "description": "Un résumé anonyme hebdomadaire de cette installation sera partagé. Vous pouvez le désactiver dans les réglages de l'intégration."
           },
           "decline": {
             "title": "Rien ne sera envoyé",
-            "description": "Vous pourrez changer d'avis plus tard via la même question."
+            "description": "Vous pourrez activer le partage plus tard dans les réglages de l'intégration."
           }
         }
       }
