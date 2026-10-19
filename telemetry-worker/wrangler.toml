@@ -4,12 +4,11 @@ name = "qvantum-summaries"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
 
-# Create once with:
-#   npx wrangler kv namespace create QVANTUM_SUMMARIES
-# and paste the id below. The preview id is optional.
+# Namespace QVANTUM_SUMMARIES, created 2026-10-19. The deploy skips itself while
+# this is still the placeholder (see .github/workflows/telemetry-worker.yml).
 [[kv_namespaces]]
 binding = "QVANTUM_SUMMARIES"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "1fe27077134347ebb0cc94a099da8866"
 
 # ADMIN_TOKEN is a secret, never a var:
 #   npx wrangler secret put ADMIN_TOKEN
