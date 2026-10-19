@@ -844,6 +844,60 @@ def _trim_hours(
     ]
 
 
+LOW_WARM_END = dict(zip(CURVE_KEYS, (16.8, 18.6, 27.5, 35.9, 45.7, 57.5, 59.4)))
+
+
+async def test_snapshot_lifts_a_stored_baseline_to_the_supply_floor() -> None:
+    """A baseline written by an older version must migrate, not stay pinned."""
+    values = {**VALUES, "min_heating_supply": 20, "max_heating_supply": 60}
+    coordinator = make_coordinator(values=values, settings=SETTINGS)
+    coordinator._baseline = dict(LOW_WARM_END)
+    coordinator._trims = {"curve_30": 0.4}
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert coordinator.baseline[CURVE_KEYS[0]] == pytest.approx(20.0)
+    assert coordinator.baseline[CURVE_KEYS[1]] == pytest.approx(20.0)
+    assert coordinator.baseline[CURVE_KEYS[2]] == pytest.approx(27.5)
+    assert snapshot.baseline == coordinator.baseline
+    # The shape changed, so trims learned against it are stale.
+    assert coordinator._trims == {}
+
+
+async def test_learned_baseline_is_lifted_to_the_supply_floor() -> None:
+    coordinator = make_coordinator(
+        values={**VALUES, "min_heating_supply": 20},
+        settings=SETTINGS,
+    )
+    coordinator._baseline = dict(BASELINE)
+    coordinator._async_baseline_observations = AsyncMock(
+        return_value=_curve_observations(-3.0)
+    )
+    coordinator._last_baseline_learn_ts = None
+
+    with patch.object(cc, "corrected_baseline", return_value=dict(LOW_WARM_END)):
+        await coordinator._async_learn_baseline(
+            {**VALUES, **SETTINGS, "min_heating_supply": 20}, 1000.0
+        )
+
+    assert coordinator.baseline[CURVE_KEYS[0]] == pytest.approx(20.0)
+    assert coordinator.baseline[CURVE_KEYS[1]] == pytest.approx(20.0)
+
+
+def test_lift_baseline_floor_is_idempotent_and_needs_a_baseline() -> None:
+    coordinator = make_coordinator(values={"min_heating_supply": 20})
+    assert coordinator._lift_baseline_to_floor(coordinator._main_values()) is False
+
+    coordinator._baseline = dict(LOW_WARM_END)
+    assert coordinator._lift_baseline_to_floor(coordinator._main_values()) is True
+    assert coordinator._lift_baseline_to_floor(coordinator._main_values()) is False
+    assert coordinator.baseline[CURVE_KEYS[0]] == pytest.approx(20.0)
+
+
 def test_supply_bounds_from_values() -> None:
     coordinator = make_coordinator(
         values={"min_heating_supply": 20, "max_heating_supply": 60}

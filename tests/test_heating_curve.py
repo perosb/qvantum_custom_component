@@ -33,6 +33,7 @@ from custom_components.qvantum.heating_curve import (
     effective_supply_bounds,
     interpolate_supply,
     load_adjustment_c,
+    lift_baseline_floor,
     night_day_adjustment_c,
     normalize_baseline,
     outdoor_adjustment_c,
@@ -395,6 +396,59 @@ def test_corrected_baseline_shifts_and_keeps_shape() -> None:
     # Outside the observed range the cached shape is kept, shifted by the fit.
     assert learned["curve_30"] == pytest.approx(22.0)
     assert learned["curve_minus_30"] == pytest.approx(57.0)
+
+
+LOW_WARM_END = {
+    "curve_30": 16.8,
+    "curve_20": 18.6,
+    "curve_10": 27.5,
+    "curve_0": 35.9,
+    "curve_minus_10": 45.7,
+    "curve_minus_20": 57.5,
+    "curve_minus_30": 59.4,
+}
+
+
+def test_lift_baseline_floor_raises_only_the_pinned_warm_end() -> None:
+    """A knot under the pump's minimum is clamped every hour: lift it.
+
+    The warm end of a learned baseline can land below the floor the firmware
+    accepts, which pins those points, hides their trim feedback and makes the
+    clamping structural instead of weather-driven.
+    """
+    lifted = lift_baseline_floor(LOW_WARM_END, 20.0)
+
+    assert lifted["curve_30"] == 20.0
+    assert lifted["curve_20"] == 20.0
+    # Everything already inside the bounds is untouched.
+    for key in ("curve_10", "curve_0", "curve_minus_10", "curve_minus_20"):
+        assert lifted[key] == LOW_WARM_END[key]
+    # Still a valid, non-decreasing table toward colder outdoor.
+    supplies = list(lifted.values())
+    assert supplies == sorted(supplies)
+
+
+def test_lift_baseline_floor_without_a_floor_is_a_noop() -> None:
+    # The register default is 10 °C, so a warm end of 16.8 stays as it is.
+    assert lift_baseline_floor(LOW_WARM_END) == LOW_WARM_END
+
+
+def test_lift_baseline_floor_never_applies_the_pump_ceiling() -> None:
+    """Only the floor is lifted: a demand above the pump's max stays visible.
+
+    The register range still normalizes (90 → the 80 °C register maximum) as
+    it does for any baseline; the pump's own maximum (e.g. 45 °C) is not
+    applied here, so the node keeps asking for what the house needs.
+    """
+    lifted = lift_baseline_floor(
+        {**LOW_WARM_END, "curve_minus_20": 60.0}, 20.0
+    )
+
+    assert lifted["curve_minus_20"] == 60.0
+    # The register ceiling, not a pump limit, is what trims an out-of-range row.
+    assert lift_baseline_floor(
+        {**LOW_WARM_END, "curve_minus_30": 90.0}, 20.0
+    )["curve_minus_30"] == MAX_SUPPLY_C
 
 
 def test_corrected_baseline_rejects_small_or_thin_data() -> None:

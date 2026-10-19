@@ -327,6 +327,16 @@ points, attributes = observed span, `clamped_points`, `trim_evidence`) and is
 deliberately **disabled by default**: the repairs issue, when it exists, is the
 notification and this is the detail.
 
+The frozen baseline is lifted to the pump's **minimum** heating supply every
+cycle (`lift_baseline_floor` / `_lift_baseline_to_floor`): a knot under the
+floor is clamped on every computation, so it never shows its trim feedback and
+the clamp is structural rather than weather-driven. Only the pump's floor is
+applied — the register range and the non-decreasing shape still normalize as
+for any baseline, but a point above the pump's own maximum is left alone: that
+is a real limit the user should see, not something to hide by lowering the
+baseline. A lift clears the trims, because the shape changed (same rule as a
+learned correction).
+
 `diagnostics.py` is the support-dump surface and must stay in step with the
 state it mirrors: a new `CurveSnapshot` or persisted curve field (readiness
 gate, room gain and its source, trims and their evidence, room error,

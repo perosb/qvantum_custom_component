@@ -250,6 +250,32 @@ def interpolate_supply(
     return points[-1][1]
 
 
+def lift_baseline_floor(
+    baseline: Mapping[str, float], min_supply_c: float | None = None
+) -> dict[str, float]:
+    """Raise baseline points that sit below the pump's minimum supply.
+
+    A knot under the pump's floor is not a request the firmware can follow:
+    every computation clamps it, so the point cannot show its trim feedback
+    and the clamping is structural rather than weather-driven — the warm end
+    stays pinned at the floor whatever the weather does. The baseline must
+    live inside the same bounds the supplied points are clamped to.
+
+    Only the pump's floor is applied. The table still goes through
+    ``normalize_baseline``, so the register range (10–80 °C) and the
+    non-decreasing shape toward colder outdoor apply as for any baseline; a
+    point inside the register range above the pump's own maximum is left
+    alone, because that is a genuine demand the pump cannot meet and lowering
+    it would hide that.
+    """
+    points = normalize_baseline(baseline)
+    low, _ = effective_supply_bounds(min_supply_c, None)
+    return {
+        key: max(supply, low)
+        for key, (_, supply) in zip(CURVE_KEYS, points)
+    }
+
+
 def curve_slope(points: Sequence[tuple[float, float]], outdoor_c: float) -> float:
     """Local ``d(supply)/d(outdoor)``; negative for a heating curve."""
     warmer = interpolate_supply(points, outdoor_c + 1.0)
