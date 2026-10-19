@@ -274,8 +274,8 @@ enough. Verify in a `/tmp` worktree — never by switching the primary checkout
 
 **Flag**
 
-- Wrong Modbus register or cloud endpoint; holding vs input (holding 88 =
-  `sg_enabled`, not a runtime counter).
+- Wrong Modbus register or cloud endpoint; holding vs input (input 88 =
+  `compressor_run_time` — the runtime counter lives in the input space).
 - Cloud-only entities in Modbus mode, or the reverse.
 - `client/` importing HA, or HA `isinstance` on transport.
 - Missing translations/tests, or coverage below **92%**.
