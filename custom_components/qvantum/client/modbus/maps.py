@@ -229,6 +229,15 @@ HEATING_CURVE_OUTDOOR_TEMPS: dict[str, int] = {
 # the client instead of letting the pump answer Modbus exception 0x03.
 # ``dhw_outlet_temp`` is omitted: the datasheet row mixes a 40-60 min/max with
 # a 0/1/2 status enum.
+#
+# The app's "Temperatur ut" setting (Normal / + / ++) *does* change the drawn
+# DHW temperature — measured 2026-10-19 at a steady 4.9 L/min with a 62-65 C
+# tank: Normal held the secondary outlet at 51.7 C while ++ reached 56.2 C and
+# was still climbing. No holding register moved for it: 53 and 56-61 stayed
+# identical across the levels, and the complete 0-88 block was unchanged. The
+# level is therefore applied outside the Modbus map (cloud-side or an
+# undocumented address), so it cannot be exposed as an entity over Modbus and
+# ``dhw_outlet_temp`` must not be written as if it carried the level.
 MODBUS_HOLDING_RANGE: dict[str, tuple[float, float]] = {
     "unit_on_off": (0, 1),
     "operation_mode": (0, 2),
