@@ -36,7 +36,7 @@ The field list is in the [README](../README.md#qvantumexport_summary); in short:
 
 | block | example content |
 |---|---|
-| device | manufacturer, model, firmware versions |
+| device | manufacturer, model, firmware versions — `model` is empty on local Modbus, which reports serial and firmware only |
 | plant | sensor mode, room-compensation factor, curve type, offsets, tap-water start/stop, the pump's supply limits |
 | climate | the outdoor span observed, heating hours |
 | curve | room gain (configured / applied / fitted, with validity, evidence hours, standard error, leave-one-out swing), readiness median and p95, the solar model |

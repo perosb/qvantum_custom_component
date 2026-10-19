@@ -189,7 +189,7 @@ What it contains:
 
 | section | fields |
 |---|---|
-| device | manufacturer, model, firmware version (device metadata, never user data) |
+| device | manufacturer, model, firmware version (device metadata, never user data). **`model` is empty on local Modbus**: the pump reports serial and firmware only, and the model exists only for an entry that was created through the cloud |
 | plant | `sensor_mode`, `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
 | climate | the outdoor span the installation has been observed in, heating hours |
 | curve | room gain grouped as `configured` / `applied` / `fitted`, the readiness median/p95, the solar model (`a`, `b`, trust, days) |
