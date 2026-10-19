@@ -227,7 +227,10 @@ async def test_options_box_reflects_the_stored_consent():
 
     schema = form["data_schema"].schema
     key = next(k for k in schema if getattr(k, "schema", None) == "telemetry")
-    assert key.default() is True
+    # ``default`` is either the value or a factory, depending on the schema
+    # implementation; unwrap it the same way the config-flow tests do.
+    default = key.default
+    assert (default() if callable(default) else default) is True
 
 
 @pytest.mark.asyncio
