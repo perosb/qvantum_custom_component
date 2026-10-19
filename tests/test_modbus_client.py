@@ -235,6 +235,22 @@ async def test_get_settings_includes_heating_curve():
 
 
 @pytest.mark.asyncio
+async def test_get_settings_includes_priority_times():
+    """Holding 73-75 are only read when they have a canonical settings name."""
+    _connection, client = _client()
+    client.unit.holding[73] = 30
+    client.unit.holding[74] = 0
+    client.unit.holding[75] = 60
+
+    payload = await client.get_settings("dev1")
+    settings = {item["name"]: item["value"] for item in payload["settings"]}
+
+    assert settings["heating_priority_time"] == 30
+    assert settings["cooling_priority_time"] == 0
+    assert settings["dhw_priority_time"] == 60
+
+
+@pytest.mark.asyncio
 async def test_get_metrics_after_close_raises():
     _connection, client = _client()
     await client.close()

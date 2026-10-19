@@ -721,6 +721,15 @@
       "stop_heating": {
         "name": "Ulkolämpötila lämmityksen pysäytys"
       },
+      "heating_priority_time": {
+        "name": "Lämmityksen prioriteettiaika"
+      },
+      "cooling_priority_time": {
+        "name": "Jäähdytyksen prioriteettiaika"
+      },
+      "dhw_priority_time": {
+        "name": "Käyttöveden prioriteettiaika"
+      },
       "temp_compensation_curve": {
         "name": "Lämpötilakompensaatiokäyrä"
       },

@@ -721,6 +721,15 @@
       "stop_heating": {
         "name": "Temperatura zewnętrzna wyłączenia ogrzewania"
       },
+      "heating_priority_time": {
+        "name": "Czas priorytetu grzania"
+      },
+      "cooling_priority_time": {
+        "name": "Czas priorytetu chłodzenia"
+      },
+      "dhw_priority_time": {
+        "name": "Czas priorytetu CWU"
+      },
       "temp_compensation_curve": {
         "name": "Krzywa kompensacji temperatury"
       },

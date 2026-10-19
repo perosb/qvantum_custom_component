@@ -43,6 +43,10 @@ MODBUS_WRITE_METRICS = {
     # sensor source can be recovered and the feed can keep writing.
     "room_temp_external",
     "temp_compensation_curve",  # Holding 23; cloud Auto uses DUT fields instead.
+    # Holding 73-75; the cloud API has no priority-window setting.
+    "heating_priority_time",
+    "cooling_priority_time",
+    "dhw_priority_time",
 }
 
 # Number metrics that represent temperatures (°C).
@@ -85,6 +89,10 @@ async def async_setup_entry(
         "room_temp_external": (-5, 40, 0.1),
         "stop_heating": (-30, 30, 1),
         "temp_compensation_curve": (1, 50, 1),
+        # Modbus-only (holding 73-75); the register map's 0-180 replaces these.
+        "heating_priority_time": (0, 180, 1),
+        "cooling_priority_time": (0, 180, 1),
+        "dhw_priority_time": (0, 180, 1),
         **{key: _HEATING_CURVE_POINT_RANGE for key in HEATING_CURVE_OUTDOOR_TEMPS},
     }
     if coordinator.modbus_enabled:
@@ -226,7 +234,12 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 response = await self.coordinator.async_write_metric(
                     self._hpid, self._metric_key, coordinator_update_value
                 )
-            case "temp_compensation_curve":
+            case (
+                "temp_compensation_curve"
+                | "heating_priority_time"
+                | "cooling_priority_time"
+                | "dhw_priority_time"
+            ):
                 coordinator_update_value = int(value)
                 response = await self.coordinator.async_write_metric(
                     self._hpid, self._metric_key, coordinator_update_value

@@ -203,6 +203,12 @@ MODBUS_HOLDING_TO_SETTINGS_MAP = {
     "curve_10": "curve_10",
     "curve_20": "curve_20",
     "curve_30": "curve_30",
+    # Priority windows (holding 73-75) have no cloud equivalent, but they need a
+    # canonical name here or ``get_settings`` filters them out of the payload
+    # and no entity can ever be created for them.
+    "heating_priority_time": "heating_priority_time",
+    "cooling_priority_time": "cooling_priority_time",
+    "dhw_priority_time": "dhw_priority_time",
 }
 
 # Outdoor temperature (°C) for each user-defined heating-curve holding (24-30).
