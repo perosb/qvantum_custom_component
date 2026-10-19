@@ -39,6 +39,10 @@ def make_coordinator() -> QvantumEfficiencyCoordinator:
     coordinator._last_solar_fit_ts = None
     coordinator._solar_forecast = None
     coordinator._solar_forecast_ts = None
+    coordinator._dhw_idle_start = None
+    coordinator._dhw_idle_last = None
+    coordinator._dhw_standing_loss = None
+    coordinator._store = None
     return coordinator
 
 
@@ -999,3 +1003,83 @@ class TestSolarDaily:
         assert daily.n_days >= 20
         assert daily.b_m2 > 0.0
         assert daily.notes.startswith("days=")
+
+
+class TestDhwStandingLossPersistence:
+    """The EMA survives a restart; the open window deliberately does not."""
+
+    class _Store:
+        def __init__(self, data=None):
+            self.data = data
+            self.saved: list[dict] = []
+            self.delayed: list[object] = []
+
+        async def async_load(self):
+            return self.data
+
+        def async_delay_save(self, factory, delay):
+            self.delayed.append(factory)
+            self.saved.append(factory())
+
+    @pytest.mark.asyncio
+    async def test_restore_reads_the_stored_ema(self):
+        coordinator = make_coordinator()
+        coordinator._store = self._Store({"dhw_standing_loss": 1.25})
+        coordinator._dhw_standing_loss = None
+
+        await coordinator.async_restore()
+
+        assert coordinator._dhw_standing_loss == pytest.approx(1.25)
+
+    @pytest.mark.asyncio
+    async def test_restore_ignores_unusable_payloads(self):
+        for payload in (None, {}, {"dhw_standing_loss": "x"}, {"dhw_standing_loss": -1.0}):
+            coordinator = make_coordinator()
+            coordinator._store = self._Store(payload)
+
+            await coordinator.async_restore()
+
+            assert coordinator._dhw_standing_loss is None
+            # The open window is never restored: it would book unobserved draws.
+            assert coordinator._dhw_idle_start is None
+
+    @pytest.mark.asyncio
+    async def test_restore_without_a_store_is_a_noop(self):
+        coordinator = make_coordinator()
+        await coordinator.async_restore()
+        assert coordinator._dhw_standing_loss is None
+
+    def test_window_close_persists_the_blended_value(self):
+        coordinator = make_coordinator()
+        store = self._Store()
+        coordinator._store = store
+        coordinator._main.data = {
+            "values": {"bt30": 55.0, "bf1_l_min": 0.0, "hp_status": 0}
+        }
+        coordinator._update_dhw_standing_loss(1000.0)
+        coordinator._main.data = {
+            "values": {"bt30": 53.0, "bf1_l_min": 0.0, "hp_status": 0}
+        }
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        coordinator._main.data = {
+            "values": {"bt30": 53.0, "bf1_l_min": 6.0, "hp_status": 0}
+        }
+        value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
+
+        assert value is not None
+        assert store.saved[-1] == {"dhw_standing_loss": pytest.approx(value)}
+
+    def test_discarded_window_does_not_persist(self):
+        coordinator = make_coordinator()
+        store = self._Store()
+        coordinator._store = store
+        coordinator._main.data = {
+            "values": {"bt30": 55.0, "bf1_l_min": 0.0, "hp_status": 0}
+        }
+        coordinator._update_dhw_standing_loss(1000.0)
+        coordinator._main.data = {
+            "values": {"bt30": 54.0, "bf1_l_min": 6.0, "hp_status": 0}
+        }
+        coordinator._update_dhw_standing_loss(1000.0 + 2 * 3600)
+
+        assert store.saved == []
