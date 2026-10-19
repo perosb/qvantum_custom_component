@@ -49,14 +49,15 @@ MODBUS_WRITE_METRICS = {
     "dhw_priority_time",
 }
 
-# Number metrics whose register counts minutes.
-MINUTE_NUMBER_METRICS = frozenset(
+#: Number metrics whose register counts minutes.
+PRIORITY_TIME_METRICS = frozenset(
     {
         "heating_priority_time",
         "cooling_priority_time",
         "dhw_priority_time",
     }
 )
+MINUTE_NUMBER_METRICS = PRIORITY_TIME_METRICS
 
 # Number metrics that represent temperatures (°C).
 TEMPERATURE_NUMBER_METRICS = frozenset(
@@ -116,9 +117,11 @@ async def async_setup_entry(
             documented = metric_range(metric_key)
             if documented is not None:
                 low, high = documented
-                # A configured floor above the documented minimum is the app's
-                # own policy and must survive the register-map override.
-                if configured_min > low:
+                # Only the priority times carry an app floor above the
+                # documented minimum. Every other metric keeps the register
+                # map's range: raising e.g. tap_water_start's minimum to the
+                # cloud value would reject writes the datasheet allows.
+                if metric_key in PRIORITY_TIME_METRICS and configured_min > low:
                     low = configured_min
                 NUMBER_CONFIG[metric_key] = (low, high, step_val)
 
