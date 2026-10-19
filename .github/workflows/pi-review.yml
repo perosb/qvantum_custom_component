@@ -105,7 +105,7 @@ jobs:
           # stay enabled, so the reviewer can verify a claim but cannot read
           # credentials or run commands.
           cat /tmp/pr.diff | pi --provider openrouter --model "$PI_MODEL" \
-            --thinking high \
+            --thinking max \
             --system-prompt "$(cat .github/pi/review-prompt.md)" \
             -p --no-session --tools repo_grep,repo_read --mode json > /tmp/pi-events.jsonl
           [ -s /tmp/pi-events.jsonl ]
