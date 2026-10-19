@@ -7,6 +7,7 @@ link added to the GitHub release body.
 | Version | Released | Highlights |
 | --- | --- | --- |
 | [2026.10.9](2026.10.9.md) | 2026-10-19 | More reliable weather-based calculations |
+| [2026.10.10](2026.10.10.md) | 2026-10-19 | Forecasts stay available during brief service interruptions |
 | [2026.10.8](2026.10.8.md) | 2026-10-16 | Clearer release announcements |
 | [2026.10.7](2026.10.7.md) | 2026-10-15 | More reliable adaptive-curve readiness |
 | [2026.10.6](2026.10.6.md) | 2026-10-14 | Clearer release highlights |
