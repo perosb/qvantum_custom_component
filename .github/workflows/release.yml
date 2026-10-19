@@ -147,6 +147,14 @@ jobs:
             --tag "${{ env.RELEASE_TAG }}" \
             --link-only
 
+      # The asset is the tag, not the branch tip: the commit above is a change
+      # *to main*, while the zip must contain what was tagged. Without this the
+      # promotion/recovery runs would ship main-tip code under the tag version.
+      - name: Check out the tag for the asset
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
+        run: |
+          git checkout --force --detach "${{ env.RELEASE_TAG }}"
+
       # Stamp the checkout with the tag even when it is not committed, so a
       # pre-release asset carries its own version instead of the previous stable
       # one (2026.10.9's zip advertising 2026.10.8). It runs after the commit

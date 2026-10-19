@@ -200,6 +200,9 @@ pre-release zip would otherwise advertise the previous stable version.
 The job builds its commit on the **branch tip**, not on the tag: a promotion
 regenerates notes the pre-release run already committed, and rebasing a
 tag-based commit onto `main` conflicts on `docs/releases/<tag>.md` (2026.10.10).
+The **asset** is the opposite: after pushing, the workflow checks the tag out
+again before stamping and zipping, so a promotion or recovery run cannot ship
+branch-tip code under the tag version.
 `update_hacs_manifest.py` re-reads both files and fails the run when the written
 version is not the tag, so a release cannot ship a green run with a stale
 manifest. The workflow pushes over an SSH deploy key that is a ruleset
