@@ -658,3 +658,91 @@ class TestSetCurveControlSchema:
         with pytest.raises(vol.Invalid):
             SET_CURVE_CONTROL_SCHEMA({"mode": "on"})
 
+
+
+class TestTelemetryServices:
+    """The two services the consent prompt promises."""
+
+    @staticmethod
+    def _handler(hass, name):
+        return next(
+            call[1]["service_func"]
+            for call in hass.services.async_register.call_args_list
+            if call[1]["service"] == name
+        )
+
+    @pytest.mark.asyncio
+    async def test_nothing_registered_means_not_loaded(self, mock_hass, mock_api):
+        mock_hass.config_entries.async_entries.return_value = []
+        await async_setup_services(mock_hass)
+        call = MagicMock()
+        call.hass = mock_hass
+
+        upload = self._handler(mock_hass, "telemetry_upload")
+        delete = self._handler(mock_hass, "telemetry_delete")
+
+        assert await upload(call) == {"qvantum": {"exception": "not_loaded"}}
+        assert await delete(call) == {"qvantum": {"exception": "not_loaded"}}
+
+    @pytest.mark.asyncio
+    async def test_upload_service_forces_a_send(self, mock_hass, mock_api):
+        entry = MagicMock()
+        entry.entry_id = "entry"
+        entry.runtime_data.coordinator = mock_api
+        mock_hass.config_entries.async_entries.return_value = [entry]
+        call = MagicMock()
+        call.hass = mock_hass
+
+        with patch(
+            "custom_components.qvantum.services.async_upload_summary",
+            AsyncMock(return_value=True),
+        ) as upload:
+            await async_setup_services(mock_hass)
+            result = await self._handler(mock_hass, "telemetry_upload")(call)
+
+        assert result == {"qvantum": {"sent": True}}
+        upload.assert_awaited_once_with(mock_hass, "entry", force=True)
+
+    @pytest.mark.asyncio
+    async def test_delete_service_reports_the_result(self, mock_hass, mock_api):
+        entry = MagicMock()
+        entry.entry_id = "entry"
+        entry.runtime_data.coordinator = mock_api
+        mock_hass.config_entries.async_entries.return_value = [entry]
+        call = MagicMock()
+        call.hass = mock_hass
+
+        with patch(
+            "custom_components.qvantum.services.async_delete_telemetry",
+            AsyncMock(return_value=False),
+        ):
+            await async_setup_services(mock_hass)
+            result = await self._handler(mock_hass, "telemetry_delete")(call)
+
+        assert result == {"qvantum": {"deleted": False}}
+
+    @pytest.mark.asyncio
+    async def test_service_failures_are_reported_not_raised(self, mock_hass, mock_api):
+        entry = MagicMock()
+        entry.entry_id = "entry"
+        entry.runtime_data.coordinator = mock_api
+        mock_hass.config_entries.async_entries.return_value = [entry]
+        call = MagicMock()
+        call.hass = mock_hass
+
+        with (
+            patch(
+                "custom_components.qvantum.services.async_upload_summary",
+                AsyncMock(side_effect=RuntimeError("boom")),
+            ),
+            patch(
+                "custom_components.qvantum.services.async_delete_telemetry",
+                AsyncMock(side_effect=RuntimeError("boom")),
+            ),
+        ):
+            await async_setup_services(mock_hass)
+            upload = await self._handler(mock_hass, "telemetry_upload")(call)
+            delete = await self._handler(mock_hass, "telemetry_delete")(call)
+
+        assert upload["qvantum"]["exception"] == "unknown_error"
+        assert delete["qvantum"]["exception"] == "unknown_error"

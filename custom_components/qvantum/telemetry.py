@@ -120,15 +120,16 @@ async def async_set_consent(
     if granted and not data.get("token"):
         # Random, generated locally, never derived from an identifier.
         data["token"] = secrets.token_hex(16)
-    elif not granted:
-        data.pop("token", None)
+    # The token is deliberately *kept* when consent is withdrawn: it is the
+    # only capability that can erase rows already sent, and the prompt promises
+    # deletion. Only removing the entry forgets it.
     await async_save_state(hass, entry_id, data)
     ir.async_delete_issue(hass, DOMAIN, telemetry_issue_id(entry_id))
     return data
 
 
 async def async_revoke(hass: HomeAssistant, entry_id: str) -> dict[str, Any]:
-    """Withdraw consent and drop the token."""
+    """Withdraw consent; the token stays so the rows can still be erased."""
     return await async_set_consent(hass, entry_id, False)
 
 
@@ -227,11 +228,11 @@ async def async_upload_summary(
 
     state["last_upload"] = current
     await async_save_state(hass, entry_id, state)
-    _reset_counters(hass)
+    await _reset_counters(hass)
     return True
 
 
-def _reset_counters(hass: HomeAssistant) -> None:
+async def _reset_counters(hass: HomeAssistant) -> None:
     """Start a fresh counting period; the uploaded row covers the old one."""
     from .const import DOMAIN
 
@@ -240,7 +241,7 @@ def _reset_counters(hass: HomeAssistant) -> None:
         curve = getattr(runtime, "curve_coordinator", None)
         reset = getattr(curve, "async_reset_counters", None)
         if reset is not None:
-            hass.async_create_task(reset())
+            await reset()
 
 
 async def async_delete_telemetry(hass: HomeAssistant, entry_id: str) -> bool:

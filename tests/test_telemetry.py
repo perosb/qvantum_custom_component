@@ -107,8 +107,9 @@ async def test_grant_creates_a_random_token_and_closes_the_issue():
 
 
 @pytest.mark.asyncio
-async def test_decline_keeps_no_token():
-    store = FakeStore({"first_seen": 1000.0, "token": "deadbeef"})
+async def test_decline_keeps_the_token_for_erasure():
+    """A refusal stops uploads but must leave the deletion capability intact."""
+    store = FakeStore({"first_seen": 1000.0, "token": "c" * 32})
     with (
         patch.object(telemetry, "_store", return_value=store),
         patch.object(telemetry.ir, "async_delete_issue"),
@@ -116,12 +117,23 @@ async def test_decline_keeps_no_token():
         data = await telemetry.async_set_consent(_hass(), "entry", False)
 
     assert data["consent"] == telemetry.CONSENT_DECLINED
+    assert data["token"] == "c" * 32
+
+
+async def test_a_first_decline_creates_no_token():
+    store = FakeStore({"first_seen": 1000.0})
+    with (
+        patch.object(telemetry, "_store", return_value=store),
+        patch.object(telemetry.ir, "async_delete_issue"),
+    ):
+        data = await telemetry.async_set_consent(_hass(), "entry", False)
+
     assert "token" not in data
 
 
 @pytest.mark.asyncio
 async def test_revoke_withdraws_consent():
-    store = FakeStore({"consent": telemetry.CONSENT_GRANTED, "token": "abc"})
+    store = FakeStore({"consent": telemetry.CONSENT_GRANTED, "token": "d" * 32})
     with (
         patch.object(telemetry, "_store", return_value=store),
         patch.object(telemetry.ir, "async_delete_issue"),
@@ -129,7 +141,8 @@ async def test_revoke_withdraws_consent():
         data = await telemetry.async_revoke(_hass(), "entry")
 
     assert data["consent"] == telemetry.CONSENT_DECLINED
-    assert "token" not in data
+    # Kept: it is the only capability that can erase what was already sent.
+    assert data["token"] == "d" * 32
 
 
 @pytest.mark.asyncio
@@ -400,7 +413,7 @@ async def test_upload_posts_the_token_only_in_the_request_and_resets_counters():
     # The written file stays identifier-free: the token is not in the payload.
     assert "install_token" not in payload
     assert store.saved[-1]["last_upload"] == 5000.0
-    curve.async_reset_counters.assert_called()
+    curve.async_reset_counters.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -420,7 +433,7 @@ async def test_a_rejected_upload_keeps_the_counters_and_retries():
 
     assert sent is False
     assert store.saved == []
-    curve.async_reset_counters.assert_not_called()
+    curve.async_reset_counters.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -481,3 +494,32 @@ async def test_schedule_registers_a_six_hour_check():
     assert unsub is track.return_value
     _hass, _callback, interval = track.call_args.args
     assert interval == telemetry.UPLOAD_CHECK_INTERVAL
+
+
+@pytest.mark.asyncio
+async def test_erasure_still_works_after_revoking():
+    """Withdrawing consent must not destroy the capability to delete rows."""
+    store = FakeStore({"consent": telemetry.CONSENT_GRANTED, "token": "b" * 32})
+    with (
+        patch.object(telemetry, "_store", return_value=store),
+        patch.object(telemetry.ir, "async_delete_issue"),
+    ):
+        data = await telemetry.async_revoke(MagicMock(), "entry")
+
+    assert data["consent"] == telemetry.CONSENT_DECLINED
+    assert data["token"] == "b" * 32
+
+
+@pytest.mark.asyncio
+async def test_scheduled_tick_swallows_errors():
+    """The timer callback must never raise into the scheduler."""
+    with patch("homeassistant.helpers.event.async_track_time_interval") as track:
+        await telemetry.async_schedule_uploads(MagicMock(), "entry")
+    tick = track.call_args.args[1]
+
+    with patch.object(
+        telemetry,
+        "async_upload_summary",
+        AsyncMock(side_effect=RuntimeError("boom")),
+    ):
+        await tick(None)  # must not raise
