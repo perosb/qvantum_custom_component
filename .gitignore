@@ -28,3 +28,5 @@ dmypy.json
 docs/*.json
 .opencode/
 .ha-token
+telemetry-worker/node_modules/
+telemetry-worker/.wrangler/

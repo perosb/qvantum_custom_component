@@ -1,0 +1,15 @@
+# Qvantum summary intake. Deployed by .github/workflows/telemetry-worker.yml,
+# never by the release job: a Cloudflare outage must not block a HACS release.
+name = "qvantum-summaries"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Namespace QVANTUM_SUMMARIES, created 2026-10-19. The deploy skips itself while
+# this is still the placeholder (see .github/workflows/telemetry-worker.yml).
+[[kv_namespaces]]
+binding = "QVANTUM_SUMMARIES"
+id = "1fe27077134347ebb0cc94a099da8866"
+
+# ADMIN_TOKEN is a secret, never a var:
+#   npx wrangler secret put ADMIN_TOKEN
+# It is only needed to erase an installation's rows on request.

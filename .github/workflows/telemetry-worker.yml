@@ -1,0 +1,62 @@
+name: Telemetry worker
+
+# Kept out of release.yml on purpose: the HACS asset must never depend on a
+# Cloudflare deploy. This workflow only touches telemetry-worker/ and skips the
+# deploy entirely when the Cloudflare secrets are not configured (forks, and
+# this repository before the namespace exists).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "telemetry-worker/**"
+      - ".github/workflows/telemetry-worker.yml"
+  pull_request:
+    paths:
+      - "telemetry-worker/**"
+      - ".github/workflows/telemetry-worker.yml"
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax check
+        working-directory: telemetry-worker
+        run: node --check src/index.js
+      - name: Unit tests
+        working-directory: telemetry-worker
+        run: node --test
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Deploy
+        working-directory: telemetry-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "Cloudflare secrets are not configured; skipping the deploy."
+            exit 0
+          fi
+          if grep -q REPLACE_WITH_KV_NAMESPACE_ID wrangler.toml; then
+            echo "::notice::KV namespace not created yet; skipping the deploy."
+            exit 0
+          fi
+          npx --yes wrangler@4 deploy
