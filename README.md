@@ -194,6 +194,7 @@ What it contains:
 | climate | the outdoor span the installation has been observed in, heating hours |
 | curve | room gain grouped as `configured` / `applied` / `fitted`, the readiness median/p95, the solar model (`a`, `b`, trust, days) |
 | fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day**), cycling, SCOP, aux share, health grade |
+| counters | curve reverts, trim updates and the number of days a clamped or extrapolated knot was lived with, plus the date they were reset at (*Modbus only*) |
 | verdicts | reserved for the derived analysis results (currently empty) |
 
 Run it **while the curve is active** when the room gain is the point: active hours
@@ -219,6 +220,36 @@ schedules, sensor identities, or any raw hourly series. The payload is built by
 whitelist in `summary.py` — every field is picked explicitly and coerced to a
 number, a boolean or a short enumerated string — and a test asserts the result is
 free of identifiers.
+
+#### Anonymous summary sharing (opt-in)
+
+More installations are needed to answer the curve questions, but **nothing is
+sent unless you say yes**. After a week of use a repair issue asks once:
+
+> **Share anonymous operating data?** — *Bidra* / *Nej tack*
+
+One click. Declining is remembered and the question is not asked again, and it
+never affects the adaptive curve. The answer can be changed at any time in
+**Settings → Devices & services → Qvantum → Configure → "Share anonymous
+operating data"**.
+
+If you accept, the same summary as `qvantum.export_summary` is posted **once a
+week** to a small Cloudflare Worker that stores it with a two-year expiry. The
+installation token travels in the request only, never in the exported file.
+
+```yaml
+# send now instead of waiting for the week
+service: qvantum.telemetry_upload
+
+# erase every row this installation ever sent
+service: qvantum.telemetry_delete
+```
+
+What travels is the [field list above](#qvantumexport_summary) — pump model and
+firmware, plant settings, the identified figures and the counters. It contains
+no names, entity ids, coordinates, energy totals, schedules or series, and the
+intake rejects anything identifier-shaped. The full description, including
+retention and erasure, is in [docs/telemetry.md](docs/telemetry.md).
 
 #### Elevate Access
 
