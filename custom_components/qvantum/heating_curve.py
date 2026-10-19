@@ -261,8 +261,12 @@ def lift_baseline_floor(
     stays pinned at the floor whatever the weather does. The baseline must
     live inside the same bounds the supplied points are clamped to.
 
-    Only the floor is applied: a point above the ceiling is a genuine demand
-    the pump cannot meet, and lowering it silently would hide that.
+    Only the pump's floor is applied. The table still goes through
+    ``normalize_baseline``, so the register range (10–80 °C) and the
+    non-decreasing shape toward colder outdoor apply as for any baseline; a
+    point inside the register range above the pump's own maximum is left
+    alone, because that is a genuine demand the pump cannot meet and lowering
+    it would hide that.
     """
     points = normalize_baseline(baseline)
     low, _ = effective_supply_bounds(min_supply_c, None)

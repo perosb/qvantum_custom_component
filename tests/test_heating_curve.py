@@ -433,11 +433,22 @@ def test_lift_baseline_floor_without_a_floor_is_a_noop() -> None:
     assert lift_baseline_floor(LOW_WARM_END) == LOW_WARM_END
 
 
-def test_lift_baseline_floor_never_lowers_an_upper_point() -> None:
-    """Only the floor is applied: a demand above the ceiling stays visible."""
-    lifted = lift_baseline_floor({**LOW_WARM_END, "curve_minus_30": 90.0}, 20.0)
+def test_lift_baseline_floor_never_applies_the_pump_ceiling() -> None:
+    """Only the floor is lifted: a demand above the pump's max stays visible.
 
-    assert lifted["curve_minus_30"] == MAX_SUPPLY_C
+    The register range still normalizes (90 → the 80 °C register maximum) as
+    it does for any baseline; the pump's own maximum (e.g. 45 °C) is not
+    applied here, so the node keeps asking for what the house needs.
+    """
+    lifted = lift_baseline_floor(
+        {**LOW_WARM_END, "curve_minus_20": 60.0}, 20.0
+    )
+
+    assert lifted["curve_minus_20"] == 60.0
+    # The register ceiling, not a pump limit, is what trims an out-of-range row.
+    assert lift_baseline_floor(
+        {**LOW_WARM_END, "curve_minus_30": 90.0}, 20.0
+    )["curve_minus_30"] == MAX_SUPPLY_C
 
 
 def test_corrected_baseline_rejects_small_or_thin_data() -> None:
