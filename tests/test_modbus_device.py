@@ -402,7 +402,8 @@ class TestPayloadAdapter:
             },
         )
         assert payload["metrics"]["powertotal"] == 5260.0
-        assert "compressor_power" not in payload["metrics"]
+        # Kept: the diagnostic sensor records the series compressor_power_avg reads.
+        assert payload["metrics"]["compressor_power"] == 100
         assert payload["metrics"]["hpid"] == "dev"
 
     def test_compressorenergy_from_mwh_kwh(self):

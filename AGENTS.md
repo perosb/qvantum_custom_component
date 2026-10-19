@@ -79,6 +79,10 @@ writes: coordinator helpers (`async_set_extra_tap_water`, `async_write_metric`,
   `get_settings` filters the payload by that map. A register in
   `MODBUS_HOLDING_REGISTER_MAP` without a settings-map entry is polled and then
   dropped, so no entity can ever exist for it (holding 73-75 were that way).
+  `compressor_power` (input 93) must stay in the modbus metrics payload even
+  though `powertotal` already folds it in: the diagnostic sensor records the
+  long-term statistics `compressor_power_avg` reads, and a popped key left that
+  average permanently `None`.
 - Exceptions: `AuthError`, `TransportError`, `RateLimitError`. Aliases in HA/tests:
   `APIAuthError`, `APIConnectionError`, `APIRateLimitError`. Do not name a class
   `ConnectionError`.
