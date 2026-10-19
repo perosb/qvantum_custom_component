@@ -1210,7 +1210,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if not points_within_limits(
             dict(result.points), min_supply_c=low, max_supply_c=high
         ):
-            await self._async_revert("points outside the pump's supply limits")
+            await self._async_revert(
+                "computed table violates the pump's supply limits or shape"
+            )
             return
 
         client = self._main.client

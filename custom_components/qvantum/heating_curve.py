@@ -1107,6 +1107,19 @@ def compute_curve(
             clamped_points.append(key)
         supplies.append((key, bounded))
 
+    # A heating curve is non-decreasing toward colder outdoor. Per-point trims
+    # are fitted independently, so a *flat* warm end (the baseline lifted to
+    # the pump's floor, e.g. 20/20) can be inverted by a sub-degree trim while
+    # a positive shared adjustment holds both points above that floor. Project
+    # the final table onto the shape instead of letting the write guard revert
+    # the whole curve for a tenth of a degree; raising the warmer knot keeps
+    # the pump's floor as the lower bound.
+    for index in range(1, len(supplies)):
+        key, value = supplies[index]
+        previous = supplies[index - 1][1]
+        if value < previous:
+            supplies[index] = (key, previous)
+
     return CurveResult(
         points=tuple(supplies),
         adjustment_c=total,
