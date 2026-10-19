@@ -3543,3 +3543,30 @@ async def test_active_cycle_clears_a_stale_left_issue() -> None:
     create_issue.assert_not_called()
     delete_issue.assert_called_once()
     assert delete_issue.call_args.args[2].startswith("curve_left_user_defined_")
+
+
+async def test_revert_logs_why_it_happened(caplog) -> None:
+    """A reversion that writes Auto must say why: it looks like an app write."""
+    coordinator, _client = make_writable_coordinator()
+    coordinator._mode = "active"
+    coordinator._trims = {"curve_0": 0.5}
+
+    with caplog.at_level("WARNING"):
+        await coordinator._async_revert("points outside the pump's supply limits")
+
+    assert any(
+        "reverted to Auto" in record.message and "supply limits" in record.message
+        for record in caplog.records
+    )
+
+
+async def test_switching_off_logs_at_info_not_warning(caplog) -> None:
+    coordinator, _client = make_writable_coordinator()
+    coordinator._mode = "active"
+
+    with caplog.at_level("INFO"):
+        await coordinator.async_set_control_mode("shadow")
+
+    levels = {record.levelname for record in caplog.records}
+    assert "INFO" in levels
+    assert "WARNING" not in levels

@@ -966,7 +966,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             if mode == "active":
                 await self._async_activate()
             elif self.active:
-                await self._async_revert()
+                await self._async_revert("switched off")
             else:
                 # Already shadow: never touch a table this module does not
                 # own; only retry a latched safety reversion.
@@ -1000,11 +1000,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             raise
         except Exception as err:  # noqa: BLE001 — transport failures revert
             _LOGGER.warning("Curve write %s failed: %s", label, err)
-            await self._async_revert()
+            await self._async_revert(f"write failed ({label})")
             return None
         if not result_applied(response):
             _LOGGER.warning("Curve write %s was not applied: %s", label, response)
-            await self._async_revert()
+            await self._async_revert(f"write not applied ({label})")
             return None
         return response
 
@@ -1077,7 +1077,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         except asyncio.CancelledError:
             raise
         except Exception as err:  # noqa: BLE001 — verification is mandatory
-            await self._async_revert()
+            await self._async_revert("curve points could not be verified")
             raise HomeAssistantError(f"Could not verify curve points: {err}") from err
         for key, value in points.items():
             reported = readback.get(key)
@@ -1086,7 +1086,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 or isinstance(reported, bool)
                 or int(math.floor(float(reported) + 0.5)) != value
             ):
-                await self._async_revert()
+                await self._async_revert(f"{key} did not stick")
                 raise HomeAssistantError(f"Curve point {key} did not stick")
 
         response = await self._async_write_or_revert(
@@ -1113,9 +1113,18 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         await self._async_persist()
         _LOGGER.info("Adaptive heating curve active (holding 22 = User defined)")
 
-    async def _async_revert(self) -> None:
-        """Safety fallback: write holding 22 back to Auto, stop writing."""
+    async def _async_revert(self, reason: str = "unspecified") -> None:
+        """Safety fallback: write holding 22 back to Auto, stop writing.
+
+        ``reason`` is logged: a reversion that writes Auto is otherwise
+        indistinguishable from the pump leaving User defined on its own, and
+        the two need different answers.
+        """
         was_active = self._mode == "active"
+        if reason == "switched off":
+            _LOGGER.info("Adaptive curve control switched off (holding 22 = Auto)")
+        else:
+            _LOGGER.warning("Adaptive curve reverted to Auto: %s", reason)
         self._mode = "shadow"
         if was_active:
             self._mark_active_ended()
@@ -1172,11 +1181,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
     async def _async_apply_active(self, result: Any) -> None:
         """Write changed points while active; a failure reverts to Auto."""
         if not self.writable:
-            await self._async_revert()
+            await self._async_revert("Modbus writes are disabled")
             return
         device_id = getattr(self._main, "device_id", None)
         if not device_id:
-            await self._async_revert()
+            await self._async_revert("no pump device id")
             return
         values = self._main_values()
         if values.get("curve_type_heating") != HeatingCurveType.USER_DEFINED:
@@ -1201,7 +1210,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if not points_within_limits(
             dict(result.points), min_supply_c=low, max_supply_c=high
         ):
-            await self._async_revert()
+            await self._async_revert("points outside the pump's supply limits")
             return
 
         client = self._main.client
