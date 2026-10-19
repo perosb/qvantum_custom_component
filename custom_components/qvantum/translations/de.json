@@ -626,6 +626,9 @@
       "adaptive_curve_solar_model": {
         "name": "Adaptive Heizkurve: Solarmodell"
       },
+      "adaptive_curve_coverage": {
+        "name": "Adaptive Heizkurve: Abdeckung"
+      },
       "cop_heating": {
         "name": "COP Heizung"
       },

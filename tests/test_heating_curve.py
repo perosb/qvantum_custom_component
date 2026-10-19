@@ -598,6 +598,9 @@ def test_compute_curve_applies_trims_and_pump_bounds() -> None:
     assert result.trims["curve_minus_30"] == 5.0
     assert result.points[-1] == ("curve_minus_30", 60.0)
     assert result.clamped
+    # Which point the limits bit: the boolean alone cannot name the baseline
+    # point that has to move.
+    assert result.clamped_points == ("curve_minus_30",)
 
     unclamped = compute_curve(
         baseline=BASELINE,
@@ -608,6 +611,7 @@ def test_compute_curve_applies_trims_and_pump_bounds() -> None:
         max_supply_c=70.0,
     )
     assert not unclamped.clamped
+    assert unclamped.clamped_points == ()
     assert unclamped.trims == {key: 0.0 for key in BASELINE}
 
 

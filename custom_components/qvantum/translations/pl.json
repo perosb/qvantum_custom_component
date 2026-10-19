@@ -626,6 +626,9 @@
       "adaptive_curve_solar_model": {
         "name": "Adaptacyjna krzywa grzewcza: model słoneczny"
       },
+      "adaptive_curve_coverage": {
+        "name": "Adaptacyjna krzywa grzewcza: pokrycie"
+      },
       "cop_heating": {
         "name": "COP ogrzewanie"
       },

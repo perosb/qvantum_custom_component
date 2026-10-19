@@ -626,6 +626,9 @@
       "adaptive_curve_solar_model": {
         "name": "Adaptív fűtési görbe: szoláris modell"
       },
+      "adaptive_curve_coverage": {
+        "name": "Adaptív fűtési görbe: lefedettség"
+      },
       "cop_heating": {
         "name": "COP fűtés"
       },

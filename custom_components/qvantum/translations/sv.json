@@ -626,6 +626,9 @@
       "adaptive_curve_solar_model": {
         "name": "Adaptiv värmekurva: solmodell"
       },
+      "adaptive_curve_coverage": {
+        "name": "Adaptiv värmekurva: täckning"
+      },
       "cop_heating": {
         "name": "COP värme"
       },

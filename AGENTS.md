@@ -317,12 +317,23 @@ those lists are also the fetch universe, so the client would request a metric
 the API does not return. Create derived entities explicitly in the platform and
 list their keys in `special_sensor_keys` so registry cleanup keeps them.
 
+A curve point's own sensor is the per-point surface: it carries `baseline`,
+`trim`, `evidence_hours`, `extrapolated` and `clamped`, because which knot the
+pump's limits bit (or which one the baseline never observed) is what decides
+whether the baseline point has to move. `clamped` on `CurveResult` and the
+snapshot stays a bool for the card; `clamped_points` names them.
+`adaptive_curve_coverage` is the aggregate (state = number of extrapolated
+points, attributes = observed span, `clamped_points`, `trim_evidence`) and is
+deliberately **disabled by default**: the repairs issue, when it exists, is the
+notification and this is the detail.
+
 `diagnostics.py` is the support-dump surface and must stay in step with the
 state it mirrors: a new `CurveSnapshot` or persisted curve field (readiness
 gate, room gain and its source, trims and their evidence, room error,
-extrapolated points, …) is added to `_curve_diagnostics` in the same PR. A
-field missing from the dump cannot be read from a user's report, and a missing
-readiness gate hides why activation is blocked.
+extrapolated points, which points the supply limits clamped, …) is added to
+`_curve_diagnostics` in the same PR. A field missing from the dump cannot be
+read from a user's report, and a missing readiness gate hides why activation is
+blocked.
 
 Entity `available` must AND its data check with `_coordinator_available` (the
 coordinator's `last_update_success`); HA keeps stale data after a failed poll.

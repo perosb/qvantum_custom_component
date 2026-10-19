@@ -1520,6 +1520,10 @@ async def test_snapshot_clamps_to_pump_supply_limits() -> None:
     snapshot = await coordinator._async_compute_snapshot()
 
     assert snapshot.clamped
+    # The snapshot names the points the pump's limits bit, so the adjustment
+    # sensor and a support dump can point at the baseline knot to move.
+    assert snapshot.clamped_points
+    assert set(snapshot.clamped_points) <= set(snapshot.points)
     assert snapshot.trims == {}
     assert all(20.0 <= value <= 45.0 for value in snapshot.points.values())
 
@@ -1540,6 +1544,7 @@ async def test_snapshot_active_records_clamp() -> None:
         snapshot = await coordinator._async_compute_snapshot()
 
     assert snapshot.clamped
+    assert snapshot.clamped_points
     assert coordinator._clamped_state is True
 
 

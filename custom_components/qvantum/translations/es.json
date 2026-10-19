@@ -626,6 +626,9 @@
       "adaptive_curve_solar_model": {
         "name": "Curva de calefacción adaptativa: modelo solar"
       },
+      "adaptive_curve_coverage": {
+        "name": "Curva de calefacción adaptativa: cobertura"
+      },
       "cop_heating": {
         "name": "COP calefacción"
       },
