@@ -145,6 +145,8 @@ COP_REFERENCE_MIN_SAMPLES = 12
 WRITE_PAUSE_SECONDS = 1.0
 #: Minimum change in °C before a point is rewritten.
 MIN_WRITE_DELTA_C = 1.0
+#: Days kept per counter; the pool needs a rate, not a log.
+COUNTER_MAX_DAYS = 90
 CONTROL_MODES = ("shadow", "active")
 
 
@@ -343,6 +345,23 @@ def points_within_limits(
             return False
         previous = value
     return True
+
+
+def _counter_days(value: Any) -> list[str]:
+    """Sanitize a persisted list of ISO dates, newest last."""
+    if not isinstance(value, (list, tuple)):
+        return []
+    days: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or len(item) != 10:
+            continue
+        try:
+            datetime.strptime(item, "%Y-%m-%d")
+        except ValueError:
+            continue
+        if item not in days:
+            days.append(item)
+    return days[-COUNTER_MAX_DAYS:]
 
 
 def readiness_window(now_ts: int, tz: ZoneInfo) -> tuple[float, float]:
@@ -672,6 +691,16 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._mode = "shadow"
         self._revert_pending = False
         self._control_lock = asyncio.Lock()
+        # Counters for the pooled summary: totals since ``since`` plus the set
+        # of days the cold/warm end was actually exercised. Counts, not series:
+        # the pool needs "how often", never "when exactly".
+        self._counters: dict[str, Any] = {
+            "since": dt_util.utcnow().date().isoformat(),
+            "reverts": 0,
+            "trim_updates": 0,
+            "clamped_days": [],
+            "extrapolated_days": [],
+        }
         # Optional control-loop terms (off unless explicitly enabled) and the
         # learned COP reference used by the feedback term.
         self._terms: dict[str, bool] = {"cop_feedback": False, "precharge": False}
@@ -712,6 +741,18 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         ir.async_delete_issue(
             self.hass, DOMAIN, self._left_user_defined_issue_id()
         )
+
+    @property
+    def counters(self) -> dict[str, Any]:
+        """Counters for the summary, as counts rather than date lists."""
+        counters = getattr(self, "_counters", None) or {}
+        return {
+            "since": counters.get("since"),
+            "reverts": int(counters.get("reverts") or 0),
+            "trim_updates": int(counters.get("trim_updates") or 0),
+            "days_clamped": len(counters.get("clamped_days") or ()),
+            "days_extrapolated": len(counters.get("extrapolated_days") or ()),
+        }
 
     @property
     def baseline(self) -> dict[str, float] | None:
@@ -776,6 +817,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "mode": self._mode,
             "revert_pending": self._revert_pending,
+            "counters": self._counters,
             "cop_reference": {
                 str(bucket): value for bucket, value in self._cop_reference.items()
             },
@@ -869,6 +911,17 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             for key, hours in evidence.items():
                 if key in CURVE_KEYS and isinstance(hours, int) and not isinstance(hours, bool):
                     self._trim_evidence[key] = hours
+        counters = data.get("counters")
+        if isinstance(counters, dict):
+            self._counters = {
+                "since": counters.get("since") or self._counters["since"],
+                "reverts": int(counters.get("reverts") or 0),
+                "trim_updates": int(counters.get("trim_updates") or 0),
+                "clamped_days": _counter_days(counters.get("clamped_days")),
+                "extrapolated_days": _counter_days(
+                    counters.get("extrapolated_days")
+                ),
+            }
         stats = data.get("baseline_stats")
         if isinstance(stats, dict):
             self._baseline_stats = {
@@ -1121,6 +1174,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         the two need different answers.
         """
         was_active = self._mode == "active"
+        if was_active:
+            self._counters["reverts"] = int(self._counters.get("reverts") or 0) + 1
         if reason == "switched off":
             _LOGGER.info("Adaptive curve control switched off (holding 22 = Auto)")
         else:
@@ -2111,11 +2166,44 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if not changed and not evidence_changed:
             return
         if changed:
+            self._counters["trim_updates"] = (
+                int(self._counters.get("trim_updates") or 0) + 1
+            )
             _LOGGER.info(
                 "Adaptive-curve trims updated from %s indoor-error hours",
                 len(observations),
             )
         await self._async_persist()
+
+    async def _async_mark_counter_days(
+        self,
+        clamped_points: Iterable[str],
+        extrapolated_points: Iterable[str],
+        now_ts: float,
+    ) -> None:
+        """Record that today exercised a clamped or extrapolated knot.
+
+        Only while active: in shadow the table never reaches the pump, so a
+        clamped point there is not a day the installation lived with it.
+        """
+        if not self.active:
+            return
+        today = datetime.fromtimestamp(now_ts, timezone.utc).date().isoformat()
+        changed = False
+        for points, days_field in (
+            (clamped_points, "clamped_days"),
+            (extrapolated_points, "extrapolated_days"),
+        ):
+            if not points:
+                continue
+            days = self._counters.setdefault(days_field, [])
+            if today in days:
+                continue
+            days.append(today)
+            del days[:-COUNTER_MAX_DAYS]
+            changed = True
+        if changed:
+            await self._async_persist()
 
     def _indoor_live_key(self, values: Mapping[str, Any]) -> str | None:
         """Metric key the live payload supplies the indoor temperature from.
@@ -2467,6 +2555,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 for key, outdoor in HEATING_CURVE_OUTDOOR_TEMPS.items()
                 if not learned_min <= outdoor <= learned_max
             )
+        await self._async_mark_counter_days(
+            getattr(result, "clamped_points", ()) if result is not None else (),
+            extrapolated,
+            now_ts,
+        )
         active_trims = (
             dict(result.trims) if self.active and result is not None else {}
         )
