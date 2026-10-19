@@ -55,6 +55,18 @@ jobs:
           prerelease=$(gh api "repos/${{ github.repository }}/releases/tags/${{ env.RELEASE_TAG }}" --jq '.prerelease')
           echo "stable=$([ "$prerelease" = "false" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
+      # Build the commit on the branch tip, never on the tag. A promotion
+      # regenerates notes that the pre-release run already committed, so a
+      # tag-based commit rebased onto main conflicts on `docs/releases/<tag>.md`
+      # (2026.10.10, run 39277702885). Starting from main also makes the notes
+      # index see the tree it is actually published into.
+      - name: Move to the branch tip
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
+        run: |
+          branch="${{ github.event.repository.default_branch }}"
+          git fetch origin "$branch"
+          git checkout -B release-build "origin/$branch"
+
       - name: Generate release notes
         if: github.event_name == 'release'
         env:
@@ -113,8 +125,15 @@ jobs:
             git commit -m "Update for new version ${{ env.RELEASE_TAG }}"
           fi
 
+          # The commit was built on the branch tip, so this is normally a
+          # no-op; a conflict means main moved underneath the run and the
+          # notes must be regenerated rather than force-pushed.
           git fetch origin main
-          git rebase origin/main
+          if ! git rebase origin/main; then
+            git rebase --abort
+            echo "::error::main moved during the run; rerun the workflow"
+            exit 1
+          fi
           git push origin HEAD:main
 
       # An edit is not a new publication: leave the body the run already wrote
@@ -127,6 +146,14 @@ jobs:
           python3 .github/scripts/generate_release_changelog.py \
             --tag "${{ env.RELEASE_TAG }}" \
             --link-only
+
+      # The asset is the tag, not the branch tip: the commit above is a change
+      # *to main*, while the zip must contain what was tagged. Without this the
+      # promotion/recovery runs would ship main-tip code under the tag version.
+      - name: Check out the tag for the asset
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
+        run: |
+          git checkout --force --detach "${{ env.RELEASE_TAG }}"
 
       # Stamp the checkout with the tag even when it is not committed, so a
       # pre-release asset carries its own version instead of the previous stable
