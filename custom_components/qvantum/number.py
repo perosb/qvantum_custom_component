@@ -101,17 +101,26 @@ async def async_setup_entry(
         # Modbus-only (holding 73-75), in minutes. The register map's 0-180
         # replaces these bounds; the pump's scheduling is minute-granular, so a
         # 30-minute step keeps the UI from offering values it cannot mean.
-        "heating_priority_time": (0, 180, 30),
+        # Heating and DHW are floored to the app's 30, above the register's
+        # documented 0: a zero window for an active mode lets the other mode
+        # preempt it immediately. Cooling stays at 0 because an unused cooling
+        # circuit legitimately holds 0.
+        "heating_priority_time": (30, 180, 30),
         "cooling_priority_time": (0, 180, 30),
-        "dhw_priority_time": (0, 180, 30),
+        "dhw_priority_time": (30, 180, 30),
         **{key: _HEATING_CURVE_POINT_RANGE for key in HEATING_CURVE_OUTDOOR_TEMPS},
     }
     if coordinator.modbus_enabled:
         # The register maps own the documented min/max; keep the HA step.
-        for metric_key, (_, _, step_val) in NUMBER_CONFIG.items():
+        for metric_key, (configured_min, _, step_val) in NUMBER_CONFIG.items():
             documented = metric_range(metric_key)
             if documented is not None:
-                NUMBER_CONFIG[metric_key] = (*documented, step_val)
+                low, high = documented
+                # A configured floor above the documented minimum is the app's
+                # own policy and must survive the register-map override.
+                if configured_min > low:
+                    low = configured_min
+                NUMBER_CONFIG[metric_key] = (low, high, step_val)
 
     # Only create number entities for metrics present in the coordinator's current data.
     # tap_water_capacity_target exists in both cloud and Modbus (derived from
