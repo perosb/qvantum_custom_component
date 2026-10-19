@@ -724,9 +724,6 @@
       "heating_priority_time": {
         "name": "Lämmityksen prioriteettiaika"
       },
-      "cooling_priority_time": {
-        "name": "Jäähdytyksen prioriteettiaika"
-      },
       "dhw_priority_time": {
         "name": "Käyttöveden prioriteettiaika"
       },
