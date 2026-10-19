@@ -3,7 +3,7 @@
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberDeviceClass
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -49,6 +49,15 @@ MODBUS_WRITE_METRICS = {
     "dhw_priority_time",
 }
 
+# Number metrics whose register counts minutes.
+MINUTE_NUMBER_METRICS = frozenset(
+    {
+        "heating_priority_time",
+        "cooling_priority_time",
+        "dhw_priority_time",
+    }
+)
+
 # Number metrics that represent temperatures (°C).
 TEMPERATURE_NUMBER_METRICS = frozenset(
     {
@@ -89,10 +98,12 @@ async def async_setup_entry(
         "room_temp_external": (-5, 40, 0.1),
         "stop_heating": (-30, 30, 1),
         "temp_compensation_curve": (1, 50, 1),
-        # Modbus-only (holding 73-75); the register map's 0-180 replaces these.
-        "heating_priority_time": (0, 180, 1),
-        "cooling_priority_time": (0, 180, 1),
-        "dhw_priority_time": (0, 180, 1),
+        # Modbus-only (holding 73-75), in minutes. The register map's 0-180
+        # replaces these bounds; the pump's scheduling is minute-granular, so a
+        # 30-minute step keeps the UI from offering values it cannot mean.
+        "heating_priority_time": (0, 180, 30),
+        "cooling_priority_time": (0, 180, 30),
+        "dhw_priority_time": (0, 180, 30),
         **{key: _HEATING_CURVE_POINT_RANGE for key in HEATING_CURVE_OUTDOOR_TEMPS},
     }
     if coordinator.modbus_enabled:
@@ -142,6 +153,8 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         if metric_key in TEMPERATURE_NUMBER_METRICS:
             self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
             self._attr_device_class = NumberDeviceClass.TEMPERATURE
+        elif metric_key in MINUTE_NUMBER_METRICS:
+            self._attr_native_unit_of_measurement = UnitOfTime.MINUTES
 
     @property
     def native_min_value(self) -> float:

@@ -1245,23 +1245,23 @@ class TestPriorityTimeNumbers:
     def test_init_priority_time(
         self, mock_coordinator, mock_device, metric_key, value, expected, translation_key
     ):
-        """The register value is the entity state, 0-180 with a 1 step."""
+        """The register value is the entity state, 0-180 minutes in 30-min steps."""
         mock_coordinator.data["values"][metric_key] = value
         entity = QvantumNumberEntity(
-            mock_coordinator, metric_key, 0, 180, 1, mock_device
+            mock_coordinator, metric_key, 0, 180, 30, mock_device
         )
 
         assert entity._metric_key == metric_key
         assert entity.native_value == expected
         assert entity._attr_native_min_value == 0
         assert entity._attr_native_max_value == 180
-        assert entity._attr_native_step == 1
+        assert entity._attr_native_step == 30
         assert entity._attr_unique_id == (
             f"qvantum_number_{metric_key}_test_device_123"
         )
         assert entity._attr_translation_key == translation_key
-        # Not a temperature: the base class sets no unit and no device class.
-        assert getattr(entity, "_attr_native_unit_of_measurement", None) is None
+        # Minutes, not a temperature: no device class.
+        assert entity._attr_native_unit_of_measurement == "min"
         assert getattr(entity, "_attr_device_class", None) is None
 
     @pytest.mark.asyncio
@@ -1323,6 +1323,8 @@ class TestPriorityTimeNumbers:
             "cooling_priority_time",
             "dhw_priority_time",
         } <= keys
-        # The register map owns the documented range.
+        # The register map owns the documented range; the step and unit are ours.
         by_key = {entity._metric_key: entity for entity in entities}
         assert by_key["dhw_priority_time"]._attr_native_max_value == 180
+        assert by_key["dhw_priority_time"]._attr_native_step == 30
+        assert by_key["dhw_priority_time"]._attr_native_unit_of_measurement == "min"
