@@ -350,7 +350,10 @@ learned correction).
 When the pump stops following our table (the app or a cloud profile moved the
 curve type), the coordinator drops to shadow, clears the trims, logs a warning
 and opens the **`curve_left_user_defined`** repair issue, deleted again as soon
-as we are active and the pump follows us. It deliberately does **not** reassert
+as we are active and the pump follows us. That path does **not** write Auto;
+`_async_revert(reason)` does, and it logs the reason at WARNING (INFO when the
+user switched control off), because a reversion we caused is otherwise
+indistinguishable from an external one in the log. It deliberately does **not** reassert
 the curve type: that would fight a user who chose the pump's own curve in the
 app. Detection lands on the 15-minute cycle boundary, which is why two events
 an hour apart look like a schedule.
