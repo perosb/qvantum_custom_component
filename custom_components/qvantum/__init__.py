@@ -53,6 +53,8 @@ from .const import (
 )
 from .coordinator import QvantumDataUpdateCoordinator
 from .curve_coordinator import QvantumCurveCoordinator, async_stored_curve_mode
+from .telemetry import async_forget as async_forget_telemetry_state
+from .telemetry import async_maybe_prompt
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
@@ -452,6 +454,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     # slow poll interval cannot starve the pump's sensor watchdog.
     coordinator.async_configure_external_room_feed()
     config_entry.async_on_unload(coordinator.async_cancel_external_room_feed)
+    # Ask once whether this installation may contribute an anonymous summary.
+    # Best effort: a telemetry prompt must never block setup.
+    try:
+        await async_maybe_prompt(hass, config_entry.entry_id)
+    except Exception as err:  # noqa: BLE001 — optional surface
+        _LOGGER.debug("Telemetry prompt unavailable: %s", err)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True
@@ -836,6 +844,11 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     Best effort: cloud mode, disabled writes, an unreadable curve Store and an
     unreachable pump all skip it without failing the removal.
     """
+    # Nothing left to relate consent to once the entry is gone.
+    try:
+        await async_forget_telemetry_state(hass, config_entry.entry_id)
+    except Exception as err:  # noqa: BLE001 — removal is best effort
+        _LOGGER.debug("Could not drop telemetry state: %s", err)
     if not _modbus_write_enabled(config_entry):
         return
     if await async_stored_curve_mode(hass, config_entry) != "active":

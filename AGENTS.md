@@ -313,6 +313,15 @@ counters, tap-water comfort, solar exposure and the headline efficiency
 figures (COP/SCOP/aux share/health) stay in the main UI. Controls are never
 diagnostics; `alarm_active` is a PROBLEM, not a diagnostic.
 
+**Telemetry is opt-in and never implied.** `telemetry.py` stores only the
+decision and a locally generated random token; it never sends anything. The
+question is a fixable **repair issue** (`telemetry_consent`, raised once after
+`PROMPT_AFTER_DAYS` of use — existing installs are covered because the clock
+starts on the first start with this version) with a two-choice fix flow in
+`repairs.py`. Consent must never be a condition for a feature: enabling the
+adaptive curve does not imply it, and a README notice is not consent. A grant
+can be revoked and the state removed; removing the entry calls `async_forget`.
+
 The summary export (`qvantum.export_summary`, `summary.py`) is **whitelist-built**
 and must stay identifier-free: fields are picked explicitly and coerced to
 numbers, booleans or short enumerated strings, never free text from the values

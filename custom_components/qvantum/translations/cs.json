@@ -952,6 +952,30 @@
     "curve_left_user_defined": {
       "title": "Topná křivka pozastavena",
       "description": "Čerpadlo se vrátilo ke své vlastní automatické křivce, takže integrace přestala křivku upravovat a zahodila své korekce. Chcete-li pokračovat, zapněte znovu „Adaptivní topná křivka: řízení“. Změnu mohla provést aplikace nebo cloudový profil."
+    },
+    "telemetry_consent": {
+      "title": "Sdílet anonymní provozní data?",
+      "description": "Pomozte vylepšit adaptivní topnou křivku na dalších instalacích. Jednou týdně se odešle krátký souhrn bez identifikátorů: model čerpadla a firmware, nastavení instalace, zjištěné veličiny (tepelná ztráta, časová konstanta, zesílení místnosti, solární model) a několik čítačů (pozastavení, omezené body, aktualizace korekcí). Neobsahuje jména, ID entit, souřadnice, součty energie ani série. Před vaší odpovědí se nic neodesílá a souhlas můžete kdykoli odvolat a data nechat smazat. Odmítnutí nemá vliv na adaptivní křivku.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Sdílet anonymní provozní data?",
+            "description": "Pomozte vylepšit adaptivní topnou křivku na dalších instalacích. Jednou týdně se odešle krátký souhrn bez identifikátorů: model čerpadla a firmware, nastavení instalace, zjištěné veličiny (tepelná ztráta, časová konstanta, zesílení místnosti, solární model) a několik čítačů (pozastavení, omezené body, aktualizace korekcí). Neobsahuje jména, ID entit, souřadnice, součty energie ani série. Před vaší odpovědí se nic neodesílá a souhlas můžete kdykoli odvolat a data nechat smazat. Odmítnutí nemá vliv na adaptivní křivku.",
+            "menu_options": {
+              "grant": "Přispět",
+              "decline": "Ne, děkuji"
+            }
+          },
+          "grant": {
+            "title": "Děkujeme",
+            "description": "Z této instalace bude každý týden sdílen anonymní souhrn."
+          },
+          "decline": {
+            "title": "Nic se neodešle",
+            "description": "Rozhodnutí můžete později změnit u stejné otázky."
+          }
+        }
+      }
     }
   }
 }

@@ -952,6 +952,30 @@
     "curve_left_user_defined": {
       "title": "Varmekurve sat på pause",
       "description": "Pumpen skiftede tilbage til sin egen automatiske kurve, så integrationen holdt op med at justere den og kasserede sine korrektioner. Slå »Adaptiv varmekurve: styring« til igen for at fortsætte. Ændringen kan være kommet fra appen eller en cloudprofil."
+    },
+    "telemetry_consent": {
+      "title": "Del anonyme driftsdata?",
+      "description": "Hjælp med at gøre den adaptive varmekurve bedre på andre anlæg. Én gang om ugen sendes et lille resumé uden identifikatorer: pumpemodel og firmware, anlægsindstillinger, de identificerede størrelser (varmetab, tidskonstant, rumforstærkning, solmodel) samt nogle tællere (pauser, fastlåste punkter, trim-opdateringer). Ingen navne, entity-id'er, koordinater, energitotaler eller serier. Intet sendes, før du svarer, og du kan trække samtykket tilbage og få data slettet når som helst. Et nej påvirker ikke den adaptive varmekurve.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Del anonyme driftsdata?",
+            "description": "Hjælp med at gøre den adaptive varmekurve bedre på andre anlæg. Én gang om ugen sendes et lille resumé uden identifikatorer: pumpemodel og firmware, anlægsindstillinger, de identificerede størrelser (varmetab, tidskonstant, rumforstærkning, solmodel) samt nogle tællere (pauser, fastlåste punkter, trim-opdateringer). Ingen navne, entity-id'er, koordinater, energitotaler eller serier. Intet sendes, før du svarer, og du kan trække samtykket tilbage og få data slettet når som helst. Et nej påvirker ikke den adaptive varmekurve.",
+            "menu_options": {
+              "grant": "Bidrag",
+              "decline": "Nej tak"
+            }
+          },
+          "grant": {
+            "title": "Tak",
+            "description": "Et ugentligt anonymt resumé deles fra dette anlæg."
+          },
+          "decline": {
+            "title": "Intet sendes",
+            "description": "Du kan skifte mening senere via samme spørgsmål."
+          }
+        }
+      }
     }
   }
 }

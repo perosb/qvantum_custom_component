@@ -952,6 +952,30 @@
     "curve_left_user_defined": {
       "title": "Curva de calefacción en pausa",
       "description": "La bomba volvió a su propia curva automática, así que la integración dejó de ajustarla y descartó sus correcciones. Vuelve a activar «Curva de calefacción adaptativa: control» para reanudar. El cambio pudo venir de la app o de un perfil en la nube."
+    },
+    "telemetry_consent": {
+      "title": "¿Compartir datos de funcionamiento anónimos?",
+      "description": "Ayuda a mejorar la curva adaptativa en otras instalaciones. Una vez por semana se envía un resumen pequeño sin identificadores: modelo y firmware de la bomba, ajustes de la instalación, las magnitudes identificadas (pérdida de calor, constante de tiempo, ganancia de la sala, modelo solar) y algunos contadores (pausas, puntos limitados, actualizaciones de ajustes). No se incluyen nombres, identificadores de entidad, coordenadas, totales de energía ni series. No se envía nada antes de que respondas, y puedes retirar el consentimiento y borrar los datos cuando quieras. Decir que no no afecta a la curva adaptativa.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "¿Compartir datos de funcionamiento anónimos?",
+            "description": "Ayuda a mejorar la curva adaptativa en otras instalaciones. Una vez por semana se envía un resumen pequeño sin identificadores: modelo y firmware de la bomba, ajustes de la instalación, las magnitudes identificadas (pérdida de calor, constante de tiempo, ganancia de la sala, modelo solar) y algunos contadores (pausas, puntos limitados, actualizaciones de ajustes). No se incluyen nombres, identificadores de entidad, coordenadas, totales de energía ni series. No se envía nada antes de que respondas, y puedes retirar el consentimiento y borrar los datos cuando quieras. Decir que no no afecta a la curva adaptativa.",
+            "menu_options": {
+              "grant": "Contribuir",
+              "decline": "No, gracias"
+            }
+          },
+          "grant": {
+            "title": "Gracias",
+            "description": "Se compartirá un resumen anónimo semanal de esta instalación."
+          },
+          "decline": {
+            "title": "No se enviará nada",
+            "description": "Puedes cambiar de opinión más adelante desde la misma pregunta."
+          }
+        }
+      }
     }
   }
 }

@@ -952,6 +952,30 @@
     "curve_left_user_defined": {
       "title": "Stooklijn gepauzeerd",
       "description": "De pomp is teruggegaan naar zijn eigen automatische curve, dus de integratie stopte met aanpassen en gooide de correcties weg. Zet \"Adaptieve stooklijn: regeling\" weer aan om door te gaan. De wijziging kan van de app of een cloudprofiel komen."
+    },
+    "telemetry_consent": {
+      "title": "Anonieme bedrijfsgegevens delen?",
+      "description": "Help de adaptieve stooklijn beter te maken op andere installaties. Eens per week wordt een kleine samenvatting zonder identificatoren verstuurd: pompmodel en firmware, installatie-instellingen, de geïdentificeerde grootheden (warmteverlies, tijdconstante, ruimtewinst, zonmodel) en enkele tellers (pauzes, begrensde punten, trim-updates). Geen namen, entity-id's, coördinaten, energietotalen of reeksen. Er wordt niets verstuurd voordat je antwoordt, en je kunt de toestemming altijd intrekken en de gegevens laten verwijderen. Een nee verandert niets aan de adaptieve stooklijn.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Anonieme bedrijfsgegevens delen?",
+            "description": "Help de adaptieve stooklijn beter te maken op andere installaties. Eens per week wordt een kleine samenvatting zonder identificatoren verstuurd: pompmodel en firmware, installatie-instellingen, de geïdentificeerde grootheden (warmteverlies, tijdconstante, ruimtewinst, zonmodel) en enkele tellers (pauzes, begrensde punten, trim-updates). Geen namen, entity-id's, coördinaten, energietotalen of reeksen. Er wordt niets verstuurd voordat je antwoordt, en je kunt de toestemming altijd intrekken en de gegevens laten verwijderen. Een nee verandert niets aan de adaptieve stooklijn.",
+            "menu_options": {
+              "grant": "Bijdragen",
+              "decline": "Nee, bedankt"
+            }
+          },
+          "grant": {
+            "title": "Bedankt",
+            "description": "Er wordt wekelijks een anonieme samenvatting van deze installatie gedeeld."
+          },
+          "decline": {
+            "title": "Er wordt niets verstuurd",
+            "description": "Je kunt je later bedenken via dezelfde vraag."
+          }
+        }
+      }
     }
   }
 }

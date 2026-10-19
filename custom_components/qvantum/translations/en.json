@@ -952,6 +952,30 @@
     "curve_left_user_defined": {
       "title": "Heating curve paused",
       "description": "The pump went back to its own automatic curve, so the integration stopped adjusting it and discarded its corrections. Turn \"Adaptive heating curve: control\" back on to resume. The change may have come from the app or a cloud profile."
+    },
+    "telemetry_consent": {
+      "title": "Share anonymous operating data?",
+      "description": "Help make the adaptive curve work on other installations. Once a week a small, identifier-free summary is sent: pump model and firmware, plant settings, the identified figures (heat loss, time constant, room gain, solar model) and a few counters (pauses, clamped points, trim updates). No names, entity ids, coordinates, energy totals or series are included. Nothing is sent before you answer, and you can revoke this and delete the data at any time. Declining does not affect the adaptive curve.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Share anonymous operating data?",
+            "description": "Help make the adaptive curve work on other installations. Once a week a small, identifier-free summary is sent: pump model and firmware, plant settings, the identified figures (heat loss, time constant, room gain, solar model) and a few counters (pauses, clamped points, trim updates). No names, entity ids, coordinates, energy totals or series are included. Nothing is sent before you answer, and you can revoke this and delete the data at any time. Declining does not affect the adaptive curve.",
+            "menu_options": {
+              "grant": "Contribute",
+              "decline": "No thanks"
+            }
+          },
+          "grant": {
+            "title": "Thank you",
+            "description": "A weekly anonymous summary will be shared from this installation."
+          },
+          "decline": {
+            "title": "Nothing will be sent",
+            "description": "You can still change your mind later from this prompt's topic."
+          }
+        }
+      }
     }
   }
 }

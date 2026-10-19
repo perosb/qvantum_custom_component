@@ -952,6 +952,30 @@
     "curve_left_user_defined": {
       "title": "Lämmityskäyrä keskeytetty",
       "description": "Pumppu palasi omaan automaattiseen käyräänsä, joten integraatio lopetti sen säätämisen ja hylkäsi korjauksensa. Jatka kytkemällä \"Adaptiivinen lämmityskäyrä: ohjaus\" takaisin päälle. Muutos on voinut tulla sovelluksesta tai pilviprofiilista."
+    },
+    "telemetry_consent": {
+      "title": "Jaetaanko anonyymejä käyttötietoja?",
+      "description": "Auta parantamaan mukautuvaa lämmityskäyrää muilla asennuksilla. Kerran viikossa lähetetään pieni, tunnisteeton yhteenveto: pumpun malli ja firmware, asennuksen asetukset, tunnistetut suureet (lämpöhäviö, aikavakio, huonevahvistus, aurinkomalli) sekä muutama laskuri (keskeytykset, rajatut pisteet, trim-päivitykset). Mukana ei ole nimiä, entity-id:itä, koordinaatteja, energiasummia tai sarjoja. Mitään ei lähetetä ennen vastaustasi, ja voit perua suostumuksen ja pyytää tietojen poistoa milloin tahansa. Kieltäytyminen ei vaikuta mukautuvaan käyrään.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Jaetaanko anonyymejä käyttötietoja?",
+            "description": "Auta parantamaan mukautuvaa lämmityskäyrää muilla asennuksilla. Kerran viikossa lähetetään pieni, tunnisteeton yhteenveto: pumpun malli ja firmware, asennuksen asetukset, tunnistetut suureet (lämpöhäviö, aikavakio, huonevahvistus, aurinkomalli) sekä muutama laskuri (keskeytykset, rajatut pisteet, trim-päivitykset). Mukana ei ole nimiä, entity-id:itä, koordinaatteja, energiasummia tai sarjoja. Mitään ei lähetetä ennen vastaustasi, ja voit perua suostumuksen ja pyytää tietojen poistoa milloin tahansa. Kieltäytyminen ei vaikuta mukautuvaan käyrään.",
+            "menu_options": {
+              "grant": "Osallistu",
+              "decline": "Ei kiitos"
+            }
+          },
+          "grant": {
+            "title": "Kiitos",
+            "description": "Tästä asennuksesta jaetaan viikoittainen anonyymi yhteenveto."
+          },
+          "decline": {
+            "title": "Mitään ei lähetetä",
+            "description": "Voit muuttaa mieltäsi myöhemmin samasta kysymyksestä."
+          }
+        }
+      }
     }
   }
 }

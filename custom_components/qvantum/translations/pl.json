@@ -952,6 +952,30 @@
     "curve_left_user_defined": {
       "title": "Krzywa grzewcza wstrzymana",
       "description": "Pompa wróciła do własnej automatycznej krzywej, więc integracja przestała ją korygować i odrzuciła swoje poprawki. Włącz ponownie „Adaptacyjna krzywa grzewcza: sterowanie”, aby wznowić. Zmiana mogła pochodzić z aplikacji lub profilu w chmurze."
+    },
+    "telemetry_consent": {
+      "title": "Udostępnić anonimowe dane eksploatacyjne?",
+      "description": "Pomóż ulepszyć adaptacyjną krzywą grzewczą w innych instalacjach. Raz w tygodniu wysyłane jest krótkie podsumowanie bez identyfikatorów: model pompy i firmware, ustawienia instalacji, zidentyfikowane wielkości (straty ciepła, stała czasowa, wzmocnienie pomieszczenia, model solarny) oraz kilka liczników (pauzy, ograniczone punkty, aktualizacje korekt). Nie ma w nim nazw, identyfikatorów encji, współrzędnych, sum energii ani serii. Nic nie jest wysyłane przed Twoją odpowiedzią, a zgodę możesz wycofać i usunąć dane w dowolnym momencie. Odmowa nie wpływa na adaptacyjną krzywą.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Udostępnić anonimowe dane eksploatacyjne?",
+            "description": "Pomóż ulepszyć adaptacyjną krzywą grzewczą w innych instalacjach. Raz w tygodniu wysyłane jest krótkie podsumowanie bez identyfikatorów: model pompy i firmware, ustawienia instalacji, zidentyfikowane wielkości (straty ciepła, stała czasowa, wzmocnienie pomieszczenia, model solarny) oraz kilka liczników (pauzy, ograniczone punkty, aktualizacje korekt). Nie ma w nim nazw, identyfikatorów encji, współrzędnych, sum energii ani serii. Nic nie jest wysyłane przed Twoją odpowiedzią, a zgodę możesz wycofać i usunąć dane w dowolnym momencie. Odmowa nie wpływa na adaptacyjną krzywą.",
+            "menu_options": {
+              "grant": "Wspieram",
+              "decline": "Nie, dziękuję"
+            }
+          },
+          "grant": {
+            "title": "Dziękujemy",
+            "description": "Co tydzień będzie udostępniane anonimowe podsumowanie tej instalacji."
+          },
+          "decline": {
+            "title": "Nic nie zostanie wysłane",
+            "description": "Możesz zmienić zdanie później przy tej samej prośbie."
+          }
+        }
+      }
     }
   }
 }

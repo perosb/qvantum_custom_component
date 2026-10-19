@@ -952,6 +952,30 @@
     "curve_left_user_defined": {
       "title": "Fűtési görbe szüneteltetve",
       "description": "A szivattyú visszatért a saját automatikus görbéjéhez, így az integráció leállította a görbe módosítását és eldobta a korrekcióit. A folytatáshoz kapcsolja vissza az „Adaptív fűtési görbe: vezérlés” kapcsolót. A változás az appból vagy felhőprofilból érkezhetett."
+    },
+    "telemetry_consent": {
+      "title": "Megoszt névtelen üzemeltetési adatokat?",
+      "description": "Segíts jobbá tenni az adaptív fűtési görbét más rendszereken. Hetente egyszer egy kis, azonosító nélküli összefoglaló kerül elküldésre: szivattyúmodell és firmware, rendszerbeállítások, az azonosított értékek (hőveszteség, időállandó, helyiség-erősítés, napmodell), valamint néhány számláló (szüneteltetések, korlátozott pontok, trim-frissítések). Nem tartalmaz neveket, entity-azonosítókat, koordinátákat, energiaösszegeket vagy sorozatokat. A válasz előtt semmi nem kerül elküldésre, és a hozzájárulás bármikor visszavonható, az adatok törölhetők. Az elutasítás nem érinti az adaptív görbét.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Megoszt névtelen üzemeltetési adatokat?",
+            "description": "Segíts jobbá tenni az adaptív fűtési görbét más rendszereken. Hetente egyszer egy kis, azonosító nélküli összefoglaló kerül elküldésre: szivattyúmodell és firmware, rendszerbeállítások, az azonosított értékek (hőveszteség, időállandó, helyiség-erősítés, napmodell), valamint néhány számláló (szüneteltetések, korlátozott pontok, trim-frissítések). Nem tartalmaz neveket, entity-azonosítókat, koordinátákat, energiaösszegeket vagy sorozatokat. A válasz előtt semmi nem kerül elküldésre, és a hozzájárulás bármikor visszavonható, az adatok törölhetők. Az elutasítás nem érinti az adaptív görbét.",
+            "menu_options": {
+              "grant": "Hozzájárulok",
+              "decline": "Nem, köszönöm"
+            }
+          },
+          "grant": {
+            "title": "Köszönjük",
+            "description": "Hetente egy névtelen összefoglaló kerül megosztásra erről a rendszerről."
+          },
+          "decline": {
+            "title": "Semmi nem kerül elküldésre",
+            "description": "Később ugyanezen kérdésnél meggondolhatja magát."
+          }
+        }
+      }
     }
   }
 }
