@@ -186,6 +186,11 @@ Title: `type: Imperative subject`. Body = *why* when the subject is not enough.
 
 Release automation owns `Update for new version <tag>` — leave it to CI.
 
+Title and body are written in **English**, always — the `## Summary` is expanded
+into the per-release changelog, which is English, and a Swedish body leaves the
+release notes untranslatable. Chat and analysis can be Swedish; anything posted
+to GitHub is not.
+
 PR body:
 
 ```markdown
