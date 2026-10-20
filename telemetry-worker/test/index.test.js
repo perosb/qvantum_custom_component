@@ -22,7 +22,7 @@ class FakeKV {
   }
 }
 
-const env = () => ({ QVANTUM_SUMMARIES: new FakeKV() });
+const env = (extra = {}) => ({ QVANTUM_SUMMARIES: new FakeKV(), ...extra });
 const token = "a".repeat(32);
 const payload = (over = {}) => ({
   schema_version: 5,
@@ -116,4 +116,97 @@ test("erasure needs the install token and only drops that installation", async (
   assert.deepEqual([...e.QVANTUM_SUMMARIES.map.keys()], [
     `v5/${"b".repeat(32)}/2026-10-19`,
   ]);
+});
+
+class FakeCache {
+  constructor() {
+    this.map = new Map();
+  }
+  async match(key) {
+    const value = this.map.get(String(key));
+    return value === undefined ? undefined : new Response(String(value));
+  }
+  async put(key, response) {
+    this.map.set(String(key), Number(await response.text()));
+  }
+}
+
+function withCache(limit) {
+  const cache = new FakeCache();
+  globalThis.caches = { default: cache };
+  return { cache, env: env({ RATE_LIMIT_PER_MINUTE: limit }) };
+}
+
+test("throttles after the per-minute budget and says 429", async () => {
+  const { env: e } = withCache(2);
+  try {
+    const first = await worker.fetch(post(payload()), e);
+    const second = await worker.fetch(post(payload({ generated_on: "2026-10-18" })), e);
+    const third = await worker.fetch(post(payload({ generated_on: "2026-10-17" })), e);
+
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(third.status, 429);
+    assert.deepEqual(await third.json(), { error: "too many requests" });
+  } finally {
+    delete globalThis.caches;
+  }
+});
+
+test("fails open when there is no cache (local runs, tests)", async () => {
+  delete globalThis.caches;
+  for (let i = 0; i < 5; i += 1) {
+    const response = await worker.fetch(post(payload()), env());
+    assert.equal(response.status, 200);
+  }
+});
+
+test("rejects an unknown top-level field", async () => {
+  const response = await worker.fetch(post(payload({ note: "hello" })), env());
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /unexpected field: note/);
+});
+
+test("rejects a block that is not an object", async () => {
+  const response = await worker.fetch(post(payload({ plant: "sensor_mode=4" })), env());
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /plant must be an object/);
+});
+
+test("rejects a string field carrying a number", async () => {
+  const response = await worker.fetch(post(payload({ transport: 4 })), env());
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /transport must be a string/);
+});
+
+test("rejects nesting deeper than the contract allows", async () => {
+  let nested = { value: 1 };
+  for (let i = 0; i < 6; i += 1) nested = { level: nested };
+  const response = await worker.fetch(post(payload({ verdicts: nested })), env());
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /nested too deeply/);
+});
+
+test("accepts the real summary shape, four levels deep", async () => {
+  const real = payload({
+    integration_version: "2026.10.10",
+    transport: "modbus",
+    device: { manufacturer: "Qvantum", model: null, firmware: "2026.10.10", hardware: null },
+    plant: { sensor_mode: 4, room_comp_factor: 5.0, max_heating_supply: 60 },
+    climate: { outdoor_min_c: 3.4, outdoor_max_c: 14.1, heating_hours: 148 },
+    curve: {
+      active: true,
+      room_gain: {
+        configured_c_per_c: 5.0,
+        applied_c_per_c: 5.0,
+        fitted: { c_per_c: 4.33, valid: true, hours: 66, std_err_c_per_c: 0.8 },
+      },
+    },
+    counters: { since: "2026-10-12", reverts: 2, trim_updates: 6, days_clamped: 3 },
+    fitted: { heat_loss_w_per_k: 97.6, scop_total: 2.7 },
+    verdicts: {},
+  });
+
+  const response = await worker.fetch(post(real), env());
+  assert.equal(response.status, 200);
 });
