@@ -473,4 +473,16 @@ def test_counters_block_is_exported_and_absent_on_cloud():
 def test_schema_version_covers_the_counters_block():
     from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
 
-    assert SUMMARY_SCHEMA_VERSION >= 5
+    assert SUMMARY_SCHEMA_VERSION >= 6
+
+
+def test_schema_version_bumped_for_the_normalized_standing_loss():
+    """``dhw_standing_loss`` changed meaning, so the pool must not mix versions.
+
+    Version 5 held the raw daily figure at whatever tank temperature its window
+    happened to see; the payload field now carries the coefficient quoted at a
+    fixed tank-to-ambient difference. Both would pool under one key otherwise.
+    """
+    from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
+
+    assert SUMMARY_SCHEMA_VERSION >= 6

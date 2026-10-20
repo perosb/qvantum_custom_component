@@ -70,7 +70,10 @@ _ENTITY_PREFIXES = (
 )
 
 #: Bump when a field is added, removed or changes meaning: the pool groups by it.
-SUMMARY_SCHEMA_VERSION = 5  # counters block: reverts, clamped/extrapolated days
+#: 6: dhw_standing_loss is a normalized coefficient quoted at a fixed
+#: tank-to-ambient difference (and the identified tank volume), not the raw
+#: daily figure at whatever tank temperature the window saw.
+SUMMARY_SCHEMA_VERSION = 6
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.

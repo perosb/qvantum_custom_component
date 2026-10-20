@@ -346,10 +346,19 @@ The summary export (`qvantum.export_summary`, `summary.py`) is
 (curve reverts, trim updates, days a clamped or extrapolated knot was lived with,
 and the date they were reset at — counts, never a log of when): fields are picked
 explicitly and coerced to numbers, booleans or short enumerated strings, never
-free text from the values payload. A new field goes into the module's whitelists
-**and** bumps `SUMMARY_SCHEMA_VERSION` (the pool groups by it);
-`tests/test_summary.py` asserts the payload carries no entity ids or names. It
-writes a file and returns it — it never sends anything and never opens an issue.
+free text from the values payload. `tests/test_summary.py` asserts the payload
+carries no entity ids or names. It writes a file and returns it — it never sends
+anything and never opens an issue.
+
+`SUMMARY_SCHEMA_VERSION` is the pool's grouping key, so it moves for **a new
+field, a removed field, and a field whose meaning changed** — the third is the
+one that gets forgotten. Re-normalizing an existing figure is exactly that: v6
+marks `dhw_standing_loss` as a coefficient quoted at a fixed tank-to-ambient
+difference (identified volume) instead of the raw daily figure at whatever tank
+temperature its window saw, because two such readings pool side by side and
+neither is comparable to the other. When a derived metric changes semantics,
+bump the version **in the same PR** and say in the constant's comment what
+changed and why; a test pins the floor so a silent revert cannot pass.
 
 ## Derived metrics — power, COP, DHW
 
