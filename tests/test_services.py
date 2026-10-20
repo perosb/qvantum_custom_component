@@ -142,7 +142,7 @@ class TestQvantumServices:
             side_effect=lambda func, *args: func(*args)
         )
         registry = MagicMock()
-        registry.async_get_device.return_value = SimpleNamespace(
+        registry.async_get_device_by_identifier.return_value = SimpleNamespace(
             manufacturer="Qvantum", model="QE-6", sw_version="2026.10.4", hw_version=None
         )
 
@@ -163,8 +163,11 @@ class TestQvantumServices:
         assert summary["transport"] == "modbus"
         # The pump id is the API id, so the device is found by the identifier
         # the integration registered — not by treating the id as a registry id.
-        registry.async_get_device.assert_called_once_with(
-            identifiers={("qvantum", "qvantum-3010100111111111")}
+        # The lookup is scoped to the owning entry: identifiers are only unique
+        # per config entry, so ``async_get_device`` is deprecated/ambiguous.
+        registry.async_get_device.assert_not_called()
+        registry.async_get_device_by_identifier.assert_called_once_with(
+            ("qvantum", "qvantum-3010100111111111"), entry.entry_id
         )
         assert summary["device"]["model"] == "QE-6"
         assert summary["device"]["firmware"] == "2026.10.4"

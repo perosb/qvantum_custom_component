@@ -170,19 +170,25 @@ def plant_summary(values: Mapping[str, Any]) -> dict[str, Any]:
     return {key: _number(values.get(key)) for key in PLANT_KEYS}
 
 
-def device_metadata(hass: Any, device_id: str) -> Any:
+def device_metadata(hass: Any, device_id: str, entry_id: str) -> Any:
     """The HA device entry for a pump id, or ``None``.
 
     ``coordinator.device_id`` is the *pump's* API id (cloud id or Modbus
     serial), never a device-registry id: the entry is found by the identifier
-    the integration registered. The registry is absent in a stripped harness, so
-    this is best effort — an export without metadata beats no export.
+    the integration registered, scoped to the owning config entry. Identifiers
+    are only unique *per config entry*, so ``async_get_device(identifiers=…)``
+    is deprecated and ambiguous; ``async_get_device_by_identifier`` is the
+    lookup that stays correct when two entries register the same pump. The
+    registry is absent in a stripped harness, so this is best effort — an
+    export without metadata beats no export.
     """
     try:
         registry = dr.async_get(hass)
     except (KeyError, RuntimeError):
         return None
-    return registry.async_get_device(identifiers={(DOMAIN, f"qvantum-{device_id}")})
+    return registry.async_get_device_by_identifier(
+        (DOMAIN, f"qvantum-{device_id}"), entry_id
+    )
 
 
 def device_summary(device: Any) -> dict[str, Any]:
@@ -360,7 +366,11 @@ async def async_build_summary(hass: HomeAssistant) -> dict[str, Any] | None:
             transport=(
                 "modbus" if getattr(coordinator, "modbus_enabled", False) else "cloud"
             ),
-            device=device_metadata(hass, str(device_id)) if device_id else None,
+            device=(
+                device_metadata(hass, str(device_id), entry.entry_id)
+                if device_id
+                else None
+            ),
             values=values,
             curve=getattr(runtime, "curve_coordinator", None),
             efficiency=getattr(efficiency, "data", None),

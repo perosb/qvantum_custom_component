@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from aiohttp.test_utils import make_mocked_request
 
+from custom_components.qvantum.const import DOMAIN
 from custom_components.qvantum.curve_coordinator import CURVE_KEYS
 from custom_components.qvantum.heating_curve import ActiveRoomGain
 from custom_components.qvantum.client.modbus.maps import MODBUS_HOLDING_TO_SETTINGS_MAP
@@ -23,9 +24,12 @@ from custom_components.qvantum.summary import (
     SUMMARY_URL,
     build_summary,
     counters_summary as summary_counters_summary,
+    device_metadata,
     device_summary,
     plant_summary,
 )
+
+ENTRY_ID = "01JTESTENTRY0000000000000"
 
 #: Values as the coordinator holds them: settings, readings and — crucially —
 #: the user's own entity ids and names. None of the latter may ever travel.
@@ -268,6 +272,30 @@ def test_device_metadata_keeps_names_and_versions() -> None:
     assert summary["hardware"] is None
 
 
+def test_device_metadata_scopes_the_lookup_to_the_entry() -> None:
+    """The lookup is unambiguous: identifier *and* owning config entry."""
+    with patch("custom_components.qvantum.summary.dr") as patched_registry:
+        registry = MagicMock()
+        registry.async_get_device_by_identifier.return_value = "device-entry"
+        patched_registry.async_get.return_value = registry
+
+        found = device_metadata(MagicMock(), "3010100111111111", ENTRY_ID)
+
+    assert found == "device-entry"
+    registry.async_get_device.assert_not_called()
+    registry.async_get_device_by_identifier.assert_called_once_with(
+        (DOMAIN, "qvantum-3010100111111111"), ENTRY_ID
+    )
+
+
+def test_device_metadata_survives_a_stripped_harness() -> None:
+    """No registry: metadata is dropped rather than the export failing."""
+    with patch("custom_components.qvantum.summary.dr") as patched_registry:
+        patched_registry.async_get.side_effect = RuntimeError("no registry")
+
+        assert device_metadata(MagicMock(), "3010100111111111", ENTRY_ID) is None
+
+
 def test_device_summary_without_a_device() -> None:
     assert set(device_summary(None)) == {
         "manufacturer",
@@ -321,7 +349,7 @@ def summary_request(*, entry: bool = True):
             curve_coordinator=curve_coordinator(),
         )
         hass.config_entries.async_entries.return_value = [
-            SimpleNamespace(runtime_data=runtime)
+            SimpleNamespace(runtime_data=runtime, entry_id=ENTRY_ID)
         ]
     request = make_mocked_request("GET", SUMMARY_URL)
     request.app["hass"] = hass
@@ -331,10 +359,16 @@ def summary_request(*, entry: bool = True):
 async def test_the_summary_view_serves_a_download() -> None:
     """The browser downloads the same whitelist-built payload as the file."""
     with patch("custom_components.qvantum.summary.dr") as patched_registry:
-        patched_registry.async_get.return_value = MagicMock(
-            async_get_device=MagicMock(return_value=None)
-        )
+        registry = MagicMock()
+        patched_registry.async_get.return_value = registry
         response = await QvantumSummaryView().get(summary_request())
+
+    # Scoped to the owning entry: identifiers are only unique per config entry,
+    # so the deprecated unscoped ``async_get_device`` must not be used.
+    registry.async_get_device.assert_not_called()
+    registry.async_get_device_by_identifier.assert_called_once_with(
+        (DOMAIN, "qvantum-3010100111111111"), ENTRY_ID
+    )
 
     assert response.status == 200
     disposition = response.headers["Content-Disposition"]

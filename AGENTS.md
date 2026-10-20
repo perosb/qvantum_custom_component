@@ -93,6 +93,15 @@ writes: coordinator helpers (`async_set_extra_tap_water`, `async_write_metric`,
   the datasheet MIN/MAX (`MODBUS_HOLDING_RANGE`) in `client/modbus/model.py`
   before encoding. Never invent registers or ranges — the maps under
   `client/modbus/maps.py` are the datasheet.
+- Device-registry lookups are **scoped to the owning config entry**: use
+  `async_get_device_by_identifier((DOMAIN, ident), entry.entry_id)` (or
+  `async_get_device_by_connection` / `async_get_devices`). Identifiers and
+  connections are only unique *per config entry* since HA 2026.8, so
+  `async_get_device(identifiers=…)` is ambiguous, logs a `homeassistant.helpers.frame`
+  deprecation warning on **every call** (silent until the summary export runs, so
+  a clean startup log proves nothing) and stops working in HA 2027.8. The same
+  applies to `via_device` in `async_get_or_create`/`DeviceInfo` — pass
+  `via_device_id`. Do not create devices or look them up inside `client/`.
 
 ## Git
 
@@ -286,6 +295,9 @@ enough. Verify in a `/tmp` worktree — never by switching the primary checkout
   `compressor_run_time` — the runtime counter lives in the input space).
 - Cloud-only entities in Modbus mode, or the reverse.
 - `client/` importing HA, or HA `isinstance` on transport.
+- An unscoped device-registry lookup (`async_get_device(identifiers=…)`) or a
+  deprecated `via_device` in `DeviceInfo` — both are per-entry now; see
+  *Client vs Home Assistant*.
 - Missing translations/tests, or coverage below **92%**.
 
 ## Tests
