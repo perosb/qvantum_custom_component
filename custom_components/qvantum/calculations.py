@@ -214,6 +214,33 @@ class QvantumCalculationsMixin:
             mode_label="dhw",
         )
 
+    def _calculate_dhw_meter(self, values: dict) -> None:
+        """Feed the poll into the DHW heat-meter comparison window.
+
+        The flow × ΔT estimate can only be integrated where the interval is
+        known: the recorder's hourly means multiply two averages, and a tap
+        draw is minutes long with both signals moving together inside it, so
+        that product lands far below the integral (see ``DhwMeterWindow``). The
+        metered counter rides along in the same window, so both sides cover
+        exactly the same polls.
+
+        The running totals travel in ``values`` for the efficiency coordinator,
+        which owns the thresholds and the warning. They stay bounded: one small
+        bucket per hour, pruned to the window.
+        """
+        now_ts = dt_util.utcnow().timestamp()
+        self._dhw_meter.add(
+            now_ts=now_ts,
+            flow_l_min=values.get("bf1_l_min"),
+            hot_out_c=values.get("bt34"),
+            cold_in_c=values.get("bt33"),
+            meter_kwh=values.get("dhwenergy"),
+        )
+        estimated, metered, draw_hours = self._dhw_meter.totals(now_ts)
+        values["dhw_meter_estimated_kwh"] = round(estimated, 3)
+        values["dhw_meter_metered_kwh"] = round(metered, 3)
+        values["dhw_meter_draw_hours"] = round(draw_hours, 2)
+
     def _calculate_cop(self, values: dict) -> None:
         """Derive the space-heating and DHW COP from the cumulative counters.
 

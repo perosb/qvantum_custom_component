@@ -22,6 +22,13 @@ MIN_WINDOW_HOURS = 4.0
 MIN_DROP_K = 0.5
 #: EMA weight for newly accepted windows.
 EMA_ALPHA = 0.3
+#: Tank-to-ambient difference the published daily figure is quoted at.
+#: A tank at 60 °C in a 20 °C utility room loses twice the heat of one at 40 °C,
+#: so windows at different tank levels are only comparable as a coefficient.
+REFERENCE_DELTA_K = 40.0
+#: A window with a smaller tank-to-ambient difference says nothing about
+#: insulation: the fall is within sensor resolution.
+MIN_DELTA_K = 10.0
 
 
 def _finite(value: object) -> float | None:
@@ -57,6 +64,56 @@ def standing_loss_kwh_per_day(
     if not math.isfinite(value) or value <= 0.0:
         return None
     return value
+
+
+def mean_delta_k(
+    tank_start: object, tank_end: object, ambient: object
+) -> float | None:
+    """Mean tank-to-ambient difference over a free-cooling window.
+
+    ``None`` when any input is unusable or the difference is under
+    :data:`MIN_DELTA_K`, which would turn sensor resolution into a loss figure.
+    """
+    start = _finite(tank_start)
+    end = _finite(tank_end)
+    room = _finite(ambient)
+    if start is None or end is None or room is None:
+        return None
+    delta = (start + end) / 2.0 - room
+    if not math.isfinite(delta) or delta < MIN_DELTA_K:
+        return None
+    return delta
+
+
+def standing_loss_per_k(
+    drop_k: object,
+    hours: object,
+    volume_l: object,
+    delta_k: object,
+) -> float | None:
+    """Daily tank loss per kelvin of tank-to-ambient difference.
+
+    The coefficient is what the tank's insulation determines; the daily kWh
+    figure also depends on how warm the tank happened to be. Normalizing here
+    keeps the EMA from mixing a window after a 69 °C extra-hot-water run with
+    one at the normal setpoint — measured on a real installation, a single hot
+    window moved the published figure by 30 %.
+    """
+    daily = standing_loss_kwh_per_day(drop_k, hours, volume_l)
+    delta = _finite(delta_k)
+    if daily is None or delta is None or delta < MIN_DELTA_K:
+        return None
+    return daily / delta
+
+
+def reference_loss_kwh_per_day(
+    per_k: object, delta_k: float = REFERENCE_DELTA_K
+) -> float | None:
+    """The per-kelvin loss quoted as kWh/d at ``delta_k`` tank-to-ambient."""
+    coefficient = _finite(per_k)
+    if coefficient is None or coefficient <= 0.0:
+        return None
+    return coefficient * delta_k
 
 
 def blend(

@@ -39,7 +39,13 @@ from .const import (
     DOMAIN,
     HP_STATUS_HOT_WATER,
 )
-from .dhw_loss import blend, standing_loss_kwh_per_day
+from .dhw_loss import (
+    REFERENCE_DELTA_K,
+    blend,
+    mean_delta_k,
+    reference_loss_kwh_per_day,
+    standing_loss_per_k,
+)
 from .efficiency import aux_heat_share, scop_from_counters
 from .open_meteo import (
     FORECAST_REUSE_HOURS,
@@ -49,7 +55,6 @@ from .open_meteo import (
     fetch_ghi_history,
 )
 from .plant_analytics import (
-    dhw_heat_meter_power_w,
     duty_cycle,
     health_grade,
     mean_while_running,
@@ -94,13 +99,16 @@ CYCLING_WINDOW_DAYS = 1
 OPERATING_KEYS = ("compressormeasuredspeed", "compressor_power", "fanrpm")
 #: Minimum observed hours before the duty cycle is published.
 MIN_DUTY_CYCLE_HOURS = 12.0
-#: Secondary-side flow / temperatures behind the DHW heat-meter check.
-DHW_METER_KEYS = ("bf1_l_min", "bt33", "bt34")
-#: Window for the heat-meter plausibility comparison.
-DHW_METER_WINDOW_DAYS = 7
-#: Minimum matched draw hours and metered energy before a deviation is published.
-MIN_DHW_METER_HOURS = 6
+#: Draw time and metered energy behind the heat-meter comparison, both read
+#: from the poll-resolution window the main coordinator maintains. Flow is only
+#: above the idle threshold while water actually runs — a few minutes per day on
+#: a normal installation — so an hour of it is enough evidence to compare.
+MIN_DHW_METER_DRAW_HOURS = 1.0
 MIN_DHW_METER_KWH = 0.5
+#: Tank-to-ambient readings behind the standing-loss window, best first: the
+#: pump's own indoor sensor sits in the room the tank stands in, and the
+#: configured room sensor is the fallback when it is not reported.
+DHW_AMBIENT_KEYS = ("bt2", "room_temp_external", "room_temp_ext")
 #: |estimated - metered| above this share of metered is a warning.
 HEAT_METER_WARNING_PERCENT = 20.0
 #: Window for degree hours, normalized heating and the heat-loss fit.
@@ -150,6 +158,8 @@ class EfficiencySnapshot:
     thermal_episodes: int = 0
     normalized_rising: bool | None = None
     dhw_standing_loss: float | None = None
+    dhw_standing_loss_w_per_k: float | None = None
+    dhw_standing_window: dict[str, float | str] | None = None
     compressor_starts_per_hour: float | None = None
     compressor_run_hours_24h: float | None = None
     compressor_speed_avg: float | None = None
@@ -160,7 +170,7 @@ class EfficiencySnapshot:
     dhw_heat_meter_warning: bool | None = None
     dhw_heat_meter_estimated_kwh: float | None = None
     dhw_heat_meter_metered_kwh: float | None = None
-    dhw_heat_meter_hours: int = 0
+    dhw_heat_meter_draw_hours: float = 0.0
     solar_ghi_now: float | None = None
     solar_ghi_peak: float | None = None
     solar_ghi_peak_in_hours: float | None = None
@@ -279,7 +289,11 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         # DHW standing-loss window state (see _update_dhw_standing_loss).
         self._dhw_idle_start: tuple[float, float] | None = None
         self._dhw_idle_last: tuple[float, float] | None = None
-        self._dhw_standing_loss: float | None = None
+        # EMA of the tank's loss per kelvin of tank-to-ambient difference; the
+        # published kWh/d is this coefficient quoted at a fixed difference.
+        self._dhw_standing_loss_per_k: float | None = None
+        # Evidence behind the newest accepted window (hours, drop, ΔT, volume).
+        self._dhw_standing_window: dict[str, Any] | None = None
         # Only the EMA is persisted; an open window is deliberately dropped on
         # restart because the tank may have been drawn while nothing sampled it
         # and resuming would book that draw as standing loss.
@@ -518,15 +532,28 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         operating = resolve_statistic_entity_ids(
             self.hass, self.device_id, OPERATING_KEYS
         )
-        dhw_meter = resolve_statistic_entity_ids(
-            self.hass, self.device_id, DHW_METER_KEYS
-        )
         dhw_standing_loss = self._update_dhw_standing_loss(now_ts)
-        keys = {**counters, **building, **cycling, **operating, **dhw_meter}
+        # The DHW-meter comparison needs no statistics: both sides come from the
+        # poll-resolution window, so it is available on a recorder-less setup.
+        (
+            dhw_meter_deviation,
+            dhw_meter_warning,
+            dhw_meter_estimated_kwh,
+            dhw_meter_metered_kwh,
+            dhw_meter_draw_hours,
+        ) = self._dhw_heat_meter_metrics()
+        keys = {**counters, **building, **cycling, **operating}
         if not keys:
             solar = await self._async_solar({}, now_ts)
             return EfficiencySnapshot(
                 dhw_standing_loss=dhw_standing_loss,
+                dhw_standing_loss_w_per_k=self._standing_loss_w_per_k(),
+                dhw_standing_window=self._dhw_standing_window,
+                dhw_heat_meter_deviation=dhw_meter_deviation,
+                dhw_heat_meter_warning=dhw_meter_warning,
+                dhw_heat_meter_estimated_kwh=dhw_meter_estimated_kwh,
+                dhw_heat_meter_metered_kwh=dhw_meter_metered_kwh,
+                dhw_heat_meter_draw_hours=dhw_meter_draw_hours,
                 solar_ghi_now=solar.ghi_now,
                 solar_ghi_peak=solar.ghi_peak,
                 solar_ghi_peak_in_hours=solar.peak_in_hours,
@@ -546,7 +573,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         }
         mean_series = {
             key: _stat_series(rows.get(entity_id, []), "mean")
-            for key, entity_id in {**building, **operating, **dhw_meter}.items()
+            for key, entity_id in {**building, **operating}.items()
         }
         cycling_series = {
             key: _cumulative_series(rows.get(entity_id, []))
@@ -628,13 +655,6 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         duty = None
         if run_coverage_days * 24.0 >= MIN_DUTY_CYCLE_HOURS:
             duty = duty_cycle(run_hours_delta, run_coverage_days * 24.0)
-        (
-            dhw_meter_deviation,
-            dhw_meter_warning,
-            dhw_meter_estimated_kwh,
-            dhw_meter_metered_kwh,
-            dhw_meter_hours,
-        ) = self._dhw_heat_meter_metrics(mean_series, sum_series, now_ts)
         solar = await self._async_solar(mean_series, now_ts)
         health = health_grade(
             {
@@ -657,6 +677,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             weather_normalized_heating=normalized_heating,
             normalized_rising=normalized_rising,
             dhw_standing_loss=dhw_standing_loss,
+            dhw_standing_loss_w_per_k=self._standing_loss_w_per_k(),
+            dhw_standing_window=self._dhw_standing_window,
             compressor_starts_per_hour=cycling_rate,
             compressor_run_hours_24h=run_hours_delta,
             compressor_speed_avg=speed_avg,
@@ -667,7 +689,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             dhw_heat_meter_warning=dhw_meter_warning,
             dhw_heat_meter_estimated_kwh=dhw_meter_estimated_kwh,
             dhw_heat_meter_metered_kwh=dhw_meter_metered_kwh,
-            dhw_heat_meter_hours=dhw_meter_hours,
+            dhw_heat_meter_draw_hours=dhw_meter_draw_hours,
             solar_ghi_now=solar.ghi_now,
             solar_ghi_peak=solar.ghi_peak,
             solar_ghi_peak_in_hours=solar.peak_in_hours,
@@ -796,49 +818,34 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
 
     def _dhw_heat_meter_metrics(
         self,
-        mean_series: Mapping[str, list[tuple[int, float]]],
-        sum_series: Mapping[str, list[tuple[int, float]]],
-        now_ts: float,
-    ) -> tuple[float | None, bool | None, float | None, float | None, int]:
-        """Compare flow×ΔT DHW heat against the metered dhwenergy counter.
+    ) -> tuple[float | None, bool | None, float | None, float | None, float]:
+        """Compare the flow×ΔT DHW estimate against the metered counter.
 
-        Both sides are integrated over exactly the same hours: an hour needs
-        the flow/temperature samples and the metered counter delta, and only
-        hours with a real draw qualify. Below a minimum of matched hours and
-        metered energy no deviation is published, so one short draw cannot
-        produce a wild percentage.
+        Both sides come from the poll-resolution window the main coordinator
+        maintains, so they cover exactly the same intervals. Integrating there
+        rather than from hourly means is what makes the number usable: the
+        product of two hourly averages (``mean(flow) · mean(ΔT)``) is not the
+        integral of ``flow · ΔT``, and on a real installation it read 0.7 kWh
+        against a 17.3 kWh meter over three days while the poll integral landed
+        within 3 % of the meter.
+
+        Below a minimum of draw time and metered energy no deviation is
+        published, so one short draw cannot produce a wild percentage.
         """
-        window_start = now_ts - DHW_METER_WINDOW_DAYS * 86400.0
-        counter = dict(sum_series.get("dhwenergy", []))
-        flow = dict(mean_series.get("bf1_l_min", []))
-        hot = dict(mean_series.get("bt34", []))
-        cold = dict(mean_series.get("bt33", []))
-
-        estimated_kwh = 0.0
-        metered_kwh = 0.0
-        hours = 0
-        for ts in sorted(set(flow) & set(hot) & set(cold)):
-            if ts < window_start or flow[ts] <= DHW_IDLE_FLOW_LPM:
-                continue
-            power_w = dhw_heat_meter_power_w(flow[ts], hot[ts], cold[ts])
-            if power_w is None:
-                continue
-            previous = counter.get(ts - 3600)
-            current = counter.get(ts)
-            if previous is None or current is None:
-                continue
-            delta = current - previous
-            if delta < 0.0:
-                continue
-            estimated_kwh += power_w / 1000.0
-            metered_kwh += delta
-            hours += 1
-
-        if hours < MIN_DHW_METER_HOURS or metered_kwh < MIN_DHW_METER_KWH:
-            return None, None, estimated_kwh, metered_kwh, hours
+        values = self._main_values()
+        estimated_kwh = _finite(values.get("dhw_meter_estimated_kwh"))
+        metered_kwh = _finite(values.get("dhw_meter_metered_kwh"))
+        draw_hours = _finite(values.get("dhw_meter_draw_hours")) or 0.0
+        if estimated_kwh is None or metered_kwh is None:
+            return None, None, estimated_kwh, metered_kwh, draw_hours
+        if (
+            draw_hours < MIN_DHW_METER_DRAW_HOURS
+            or metered_kwh < MIN_DHW_METER_KWH
+        ):
+            return None, None, estimated_kwh, metered_kwh, draw_hours
         deviation = (estimated_kwh - metered_kwh) / metered_kwh * 100.0
         warning = abs(deviation) >= HEAT_METER_WARNING_PERCENT
-        return deviation, warning, estimated_kwh, metered_kwh, hours
+        return deviation, warning, estimated_kwh, metered_kwh, draw_hours
 
     def _dhw_is_idle(self, values: Mapping[str, Any]) -> float | None:
         """Tank temperature when the DHW circuit is idle, else ``None``."""
@@ -858,11 +865,16 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         return tank
 
     async def async_restore(self) -> None:
-        """Restore the standing-loss EMA so a restart does not blank it.
+        """Restore the standing-loss coefficient so a restart does not blank it.
 
         The open free-cooling window is not restored: the restart means the tank
         went unsampled, so a draw during the downtime would be charged as
         standing loss. A fresh window starts on the next idle poll.
+
+        The coefficient is stored under its own key. A snapshot written before
+        the normalization held the daily figure at whatever tank temperature its
+        window happened to have, which cannot be converted — the old key is
+        deliberately ignored rather than reinterpreted as a coefficient.
         """
         store = getattr(self, "_store", None)
         if store is None:
@@ -874,9 +886,12 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             return
         if not isinstance(data, dict):
             return
-        value = _finite(data.get("dhw_standing_loss"))
+        value = _finite(data.get("dhw_standing_loss_per_k"))
         if value is not None and value > 0.0:
-            self._dhw_standing_loss = value
+            self._dhw_standing_loss_per_k = value
+        window = data.get("dhw_standing_window")
+        if isinstance(window, dict):
+            self._dhw_standing_window = window
 
     def _schedule_dhw_save(self) -> None:
         """Persist the EMA after a short delay (one save per burst)."""
@@ -885,18 +900,22 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             return
         try:
             store.async_delay_save(
-                lambda: {"dhw_standing_loss": self._dhw_standing_loss}, 60
+                lambda: {
+                    "dhw_standing_loss_per_k": self._dhw_standing_loss_per_k,
+                    "dhw_standing_window": self._dhw_standing_window,
+                },
+                60,
             )
         except Exception:  # noqa: BLE001 — persistence must not break the poll
             _LOGGER.debug("Could not schedule efficiency state save", exc_info=True)
 
     def _update_dhw_standing_loss(self, now_ts: float) -> float | None:
-        """Track free-cooling windows and EMA the accepted daily loss."""
+        """Track free-cooling windows and EMA the accepted loss coefficient."""
         tank = self._dhw_is_idle(self._main_values())
-        current = getattr(self, "_dhw_standing_loss", None)
+        current = self._published_standing_loss()
         if tank is None:
             self._close_dhw_window()
-            return getattr(self, "_dhw_standing_loss", None)
+            return self._published_standing_loss()
 
         start = getattr(self, "_dhw_idle_start", None)
         last = getattr(self, "_dhw_idle_last", None)
@@ -907,25 +926,81 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         if last is not None and tank > last[1] + DHW_TEMP_NOISE_K:
             # Reheating began between samples; keep the last measured fall.
             self._close_dhw_window()
-            return getattr(self, "_dhw_standing_loss", None)
+            return self._published_standing_loss()
         self._dhw_idle_last = (now_ts, tank)
         return current
 
+    def _standing_loss_w_per_k(self) -> float | None:
+        """The coefficient in watts per kelvin, for the sensor attributes."""
+        per_k = _finite(getattr(self, "_dhw_standing_loss_per_k", None))
+        if per_k is None or per_k <= 0.0:
+            return None
+        return per_k * 1000.0 / 24.0
+
+    def _published_standing_loss(self) -> float | None:
+        """The coefficient quoted as kWh/d at :data:`REFERENCE_DELTA_K`.
+
+        The raw daily figure a window yields also depends on how warm the tank
+        was, so windows are EMA'd as a per-kelvin coefficient and only quoted
+        at a fixed difference. Measured on a real installation, one window after
+        a 69 °C extra-hot-water run carried the published value from 2.5 to
+        5.1 kWh/d.
+        """
+        return reference_loss_kwh_per_day(
+            getattr(self, "_dhw_standing_loss_per_k", None)
+        )
+
+    def _dhw_ambient(self) -> tuple[float | None, str | None]:
+        """Ambient temperature beside the tank, with the metric it came from."""
+        values = self._main_values()
+        for key in DHW_AMBIENT_KEYS:
+            ambient = _finite(values.get(key))
+            if ambient is not None:
+                return ambient, key
+        return None, None
+
+    def _dhw_volume(self) -> float:
+        """Tank volume behind the balance: identified first, datasheet last."""
+        identified = _finite(getattr(self._main, "dhw_tank_liters", None))
+        if identified is not None and identified > 0.0:
+            return identified
+        return DHW_TANK_VOLUME_L
+
     def _close_dhw_window(self) -> None:
-        """Finalize the open idle window; discard windows too short to trust."""
+        """Finalize the open idle window; discard windows too short to trust.
+
+        A window is only accepted when the ambient beside the tank is known: a
+        fall of a few kelvin is the insulation plus the draw the flow sensor
+        cannot see, and without the tank-to-ambient difference it cannot be
+        turned into a comparable coefficient.
+        """
         start = getattr(self, "_dhw_idle_start", None)
         last = getattr(self, "_dhw_idle_last", None)
         self._dhw_idle_start = None
         self._dhw_idle_last = None
         if start is None or last is None:
             return
-        sample = standing_loss_kwh_per_day(
+        ambient, source = self._dhw_ambient()
+        delta_k = mean_delta_k(start[1], last[1], ambient)
+        volume = self._dhw_volume()
+        sample = standing_loss_per_k(
             start[1] - last[1],
             (last[0] - start[0]) / 3600.0,
-            DHW_TANK_VOLUME_L,
+            volume,
+            delta_k,
         )
-        if sample is not None:
-            self._dhw_standing_loss = blend(
-                getattr(self, "_dhw_standing_loss", None), sample
-            )
-            self._schedule_dhw_save()
+        if sample is None:
+            return
+        self._dhw_standing_loss_per_k = blend(
+            getattr(self, "_dhw_standing_loss_per_k", None), sample
+        )
+        self._dhw_standing_window = {
+            "hours": round((last[0] - start[0]) / 3600.0, 2),
+            "drop_k": round(start[1] - last[1], 2),
+            "tank_mean_c": round((start[1] + last[1]) / 2.0, 1),
+            "ambient_c": None if ambient is None else round(ambient, 1),
+            "ambient_source": source,
+            "delta_k": None if delta_k is None else round(delta_k, 1),
+            "tank_liters": round(volume, 1),
+        }
+        self._schedule_dhw_save()

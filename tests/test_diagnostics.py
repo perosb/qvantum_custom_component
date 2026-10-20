@@ -15,6 +15,9 @@ from custom_components.qvantum.diagnostics import (
     TO_REDACT,
     async_get_config_entry_diagnostics,
 )
+from homeassistant.util import dt as dt_util
+
+from custom_components.qvantum.plant_analytics import DhwMeterWindow
 from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
 
 REDACTED = "**REDACTED**"
@@ -300,6 +303,52 @@ async def test_cop_diagnostics_reports_held_figures_and_the_open_charge(hass):
     assert cop["dhw_charge"]["start_tank_c"] == 57.3
     assert cop["dhw_charge"]["electrical_kwh"] == 1.4
     json.dumps(result)
+
+
+@pytest.mark.asyncio
+async def test_cop_diagnostics_reports_the_dhw_meter_window(hass):
+    """The meter warning is only checkable if its two totals travel with it."""
+    coordinator = _coordinator()
+    window = DhwMeterWindow()
+    # Near now: the dump prunes buckets that left the seven-day window.
+    base = dt_util.utcnow().timestamp() - 120.0
+    window.add(
+        now_ts=base,
+        flow_l_min=5.0,
+        hot_out_c=55.0,
+        cold_in_c=10.0,
+        meter_kwh=0.0,
+    )
+    window.add(
+        now_ts=base + 60.0,
+        flow_l_min=5.0,
+        hot_out_c=55.0,
+        cold_in_c=10.0,
+        meter_kwh=0.3,
+    )
+    coordinator._dhw_meter = window
+    runtime = _runtime(coordinator, maintenance=_maintenance())
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    meter = result["coordinator"]["cop"]["dhw_meter"]
+    assert meter["buckets"] == 1
+    assert meter["estimated_kwh"] > 0.0
+    assert meter["metered_kwh"] == 0.3
+    assert meter["draw_hours"] == pytest.approx(0.02)
+    json.dumps(result)
+
+
+@pytest.mark.asyncio
+async def test_cop_diagnostics_tolerates_a_broken_dhw_meter(hass):
+    """A dump must never fail because the window object misbehaves."""
+    coordinator = _coordinator()
+    coordinator._dhw_meter = SimpleNamespace(
+        totals=MagicMock(side_effect=RuntimeError("x"))
+    )
+    runtime = _runtime(coordinator, maintenance=_maintenance())
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    assert result["coordinator"]["cop"]["dhw_meter"] == {"error": "unavailable"}
 
 
 @pytest.mark.asyncio
