@@ -8,6 +8,8 @@ import pytest
 
 from custom_components.qvantum.plant_analytics import (
     DEFAULT_HEALTH_WEIGHTS,
+    DHW_METER_WINDOW_SECONDS,
+    DhwMeterWindow,
     HealthGrade,
     dhw_heat_meter_power_w,
     duty_cycle,
@@ -143,3 +145,135 @@ class TestHealthGrade:
         assert grade.score == pytest.approx(0.5)
         assert grade.letter == "D"
         assert grade.coverage == pytest.approx(1.0)
+
+
+class TestDhwMeterWindow:
+    """The poll-resolution integral behind the DHW meter comparison."""
+
+    @staticmethod
+    def _polls(window, start, count, *, flow, hot, cold, meter_step, step=60):
+        for index in range(count):
+            window.add(
+                now_ts=start + index * step,
+                flow_l_min=flow,
+                hot_out_c=hot,
+                cold_in_c=cold,
+                meter_kwh=index * meter_step,
+            )
+        return start + count * step
+
+    def test_integrates_the_flow_and_the_meter(self):
+        window = DhwMeterWindow()
+        # 1 L/min at 10 K for one minute is 0.6977 kWh/h → 0.011628 kWh.
+        end = self._polls(window, 1_000_000.0, 11, flow=1.0, hot=20.0, cold=10.0,
+                          meter_step=0.011628)
+
+        estimated, metered, draw_hours = window.totals(end)
+        assert estimated == pytest.approx(10 * 0.011628, rel=1e-3)
+        assert metered == pytest.approx(10 * 0.011628, rel=1e-3)
+        # Ten one-minute intervals were credited, not eleven: the first poll has
+        # no previous sample to measure from.
+        assert draw_hours == pytest.approx(10 / 60.0)
+
+    def test_idle_polls_add_no_estimate(self):
+        window = DhwMeterWindow()
+        end = self._polls(window, 1_000_000.0, 5, flow=0.0, hot=55.0, cold=10.0,
+                          meter_step=0.0)
+
+        estimated, metered, draw_hours = window.totals(end)
+        assert estimated == 0.0
+        assert metered == 0.0
+        assert draw_hours == 0.0
+
+    def test_hotter_water_out_than_the_tank_cannot_freeze_the_estimate(self):
+        """A negative ΔT (sensor swap) contributes nothing, not a negative."""
+        window = DhwMeterWindow()
+        end = self._polls(window, 1_000_000.0, 5, flow=5.0, hot=10.0, cold=30.0,
+                          meter_step=0.2)
+
+        estimated, _, _ = window.totals(end)
+        assert estimated == 0.0
+
+    def test_a_long_poll_gap_is_not_credited(self):
+        window = DhwMeterWindow()
+        window.add(now_ts=1_000_000.0, flow_l_min=5.0, hot_out_c=55.0,
+                   cold_in_c=10.0, meter_kwh=0.0)
+        window.add(now_ts=1_000_000.0 + 3600.0, flow_l_min=5.0, hot_out_c=55.0,
+                   cold_in_c=10.0, meter_kwh=1.0)
+
+        estimated, metered, draw_hours = window.totals(1_000_000.0 + 3600.0)
+        assert estimated == 0.0
+        assert draw_hours == 0.0
+        # The counter step is still real energy and is booked.
+        assert metered == pytest.approx(1.0)
+
+    def test_a_counter_reset_is_skipped(self):
+        window = DhwMeterWindow()
+        window.add(now_ts=1_000_000.0, flow_l_min=None, hot_out_c=None,
+                   cold_in_c=None, meter_kwh=100.0)
+        window.add(now_ts=1_000_060.0, flow_l_min=None, hot_out_c=None,
+                   cold_in_c=None, meter_kwh=2.0)
+
+        _, metered, _ = window.totals(1_000_060.0)
+        assert metered == 0.0
+
+    def test_an_implausible_step_is_skipped(self):
+        window = DhwMeterWindow()
+        window.add(now_ts=1_000_000.0, flow_l_min=None, hot_out_c=None,
+                   cold_in_c=None, meter_kwh=0.0)
+        window.add(now_ts=1_000_060.0, flow_l_min=None, hot_out_c=None,
+                   cold_in_c=None, meter_kwh=50.0)
+
+        _, metered, _ = window.totals(1_000_060.0)
+        assert metered == 0.0
+
+    def test_buckets_are_pruned_to_the_window(self):
+        window = DhwMeterWindow()
+        window.add(now_ts=1_000_000.0, flow_l_min=None, hot_out_c=None,
+                   cold_in_c=None, meter_kwh=1.0)
+        later = 1_000_000.0 + DHW_METER_WINDOW_SECONDS + 7200.0
+        window.add(now_ts=later, flow_l_min=None, hot_out_c=None,
+                   cold_in_c=None, meter_kwh=1.0)
+
+        assert all(
+            bucket >= later - DHW_METER_WINDOW_SECONDS for bucket in window.buckets
+        )
+        _, metered, _ = window.totals(later)
+        assert metered == 0.0
+
+    def test_round_trips_through_the_store(self):
+        window = DhwMeterWindow()
+        end = self._polls(window, 1_000_000.0, 4, flow=2.0, hot=50.0, cold=10.0,
+                          meter_step=0.05)
+        expected = window.totals(end)
+
+        restored = DhwMeterWindow.from_list(window.as_list())
+
+        assert restored.totals(end) == pytest.approx(expected, rel=1e-5)
+
+    def test_from_list_drops_unusable_rows(self):
+        restored = DhwMeterWindow.from_list(
+            [
+                [1_000_000, 1.0, 0.5, 60.0],
+                [1_000_060, "x", 0.5, 60.0],
+                [1_000_120, -1.0, 0.5, 60.0],
+                [1_000_180, 1.0],
+                "not a row",
+                [1_000_240, 2.0, 1.0, None],
+            ]
+        )
+
+        assert len(restored.buckets) == 1
+
+    def test_from_list_tolerates_a_missing_payload(self):
+        assert DhwMeterWindow.from_list(None).buckets == {}
+
+    def test_signature_moves_with_the_newest_bucket(self):
+        window = DhwMeterWindow()
+        assert window.signature() == ()
+        self._polls(window, 1_000_000.0, 2, flow=1.0, hot=20.0, cold=10.0,
+                    meter_step=0.0)
+        first = window.signature()
+        self._polls(window, 1_000_200.0, 2, flow=1.0, hot=20.0, cold=10.0,
+                    meter_step=0.0)
+        assert window.signature() != first

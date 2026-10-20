@@ -27,6 +27,8 @@ def make_coordinator() -> QvantumEfficiencyCoordinator:
         coordinator = QvantumEfficiencyCoordinator.__new__(QvantumEfficiencyCoordinator)
     main = MagicMock()
     main.device_id = "test_device_123"
+    # A MagicMock answers float() with 1.0, which would become a 1 L tank.
+    main.dhw_tank_liters = None
     coordinator._main = main
     coordinator.hass = MagicMock()
     coordinator.data = None
@@ -41,7 +43,8 @@ def make_coordinator() -> QvantumEfficiencyCoordinator:
     coordinator._solar_forecast_ts = None
     coordinator._dhw_idle_start = None
     coordinator._dhw_idle_last = None
-    coordinator._dhw_standing_loss = None
+    coordinator._dhw_standing_loss_per_k = None
+    coordinator._dhw_standing_window = None
     coordinator._store = None
     return coordinator
 
@@ -183,12 +186,13 @@ class TestComputeSnapshot:
         ):
             await coordinator._async_compute_snapshot()
 
+        # The DHW-meter comparison no longer resolves statistics: both sides
+        # come from the poll-resolution window the main coordinator keeps.
         assert [call.args[2] for call in resolve.call_args_list] == [
             ec.COUNTER_KEYS,
             ec.BUILDING_KEYS,
             ec.CYCLING_KEYS,
             ec.OPERATING_KEYS,
-            ec.DHW_METER_KEYS,
         ]
 
     def test_device_id_property(self):
@@ -498,113 +502,84 @@ class TestOperatingPoint:
 
 
 class TestDhwHeatMeter:
-    @staticmethod
-    def _patch_resolve():
-        def fake_resolve(hass, device_id, keys):
-            keys = tuple(keys)
-            if keys == ec.COUNTER_KEYS:
-                return {"dhwenergy": "sensor.dhwenergy"}
-            if keys == ec.DHW_METER_KEYS:
-                return {
-                    "bf1_l_min": "sensor.flow",
-                    "bt33": "sensor.cold",
-                    "bt34": "sensor.hot",
-                }
-            return {}
+    """The deviation reads the poll-resolution window the coordinator keeps.
 
-        return patch.object(ec, "resolve_statistic_entity_ids", fake_resolve)
+    It is deliberately not recomputed from hourly statistics: ``mean(flow) ×
+    mean(ΔT)`` is not the integral of ``flow · ΔT`` (see ``DhwMeterWindow``).
+    """
 
     @staticmethod
-    def _rows(
-        *,
-        now_ts: int,
-        hours: int = 24,
-        kwh_per_hour: float = 0.7,
-    ) -> dict[str, list[dict]]:
-        # 1 L/min over 10 K is 0.6977 kWh/h, so 0.7 kWh/h is ~-0.3% off.
-        def means(value):
-            return [
-                {"start": now_ts - (hours - 1 - index) * 3600, "mean": value}
-                for index in range(hours)
-            ]
-
-        return {
-            "sensor.dhwenergy": [
-                {"start": now_ts - (hours - index) * 3600, "sum": index * kwh_per_hour}
-                for index in range(hours + 1)
-            ],
-            "sensor.flow": means(1.0),
-            "sensor.cold": means(10.0),
-            "sensor.hot": means(20.0),
-        }
+    def _values(coordinator, **values):
+        coordinator._main.data = {"values": values}
 
     async def test_matching_meter_and_estimate(self):
         coordinator = make_coordinator()
-        now_ts = int(datetime.now(timezone.utc).timestamp())
-        with (
-            self._patch_resolve(),
-            patch.object(
-                ec,
-                "async_statistics_during_period",
-                AsyncMock(return_value=self._rows(now_ts=now_ts)),
-            ),
-        ):
+        self._values(
+            coordinator,
+            dhw_meter_estimated_kwh=16.744,
+            dhw_meter_metered_kwh=16.8,
+            dhw_meter_draw_hours=6.5,
+        )
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
             snapshot = await coordinator._async_compute_snapshot()
 
-        assert snapshot.dhw_heat_meter_hours == 24
-        assert snapshot.dhw_heat_meter_estimated_kwh == pytest.approx(16.744, rel=0.01)
-        assert snapshot.dhw_heat_meter_metered_kwh == pytest.approx(16.8, rel=0.01)
+        assert snapshot.dhw_heat_meter_draw_hours == pytest.approx(6.5)
+        assert snapshot.dhw_heat_meter_estimated_kwh == pytest.approx(16.744)
+        assert snapshot.dhw_heat_meter_metered_kwh == pytest.approx(16.8)
         assert snapshot.dhw_heat_meter_deviation == pytest.approx(-0.33, abs=0.05)
         assert snapshot.dhw_heat_meter_warning is False
 
     async def test_low_meter_reading_warns(self):
         coordinator = make_coordinator()
-        now_ts = int(datetime.now(timezone.utc).timestamp())
-        with (
-            self._patch_resolve(),
-            patch.object(
-                ec,
-                "async_statistics_during_period",
-                AsyncMock(
-                    return_value=self._rows(now_ts=now_ts, kwh_per_hour=0.2)
-                ),
-            ),
-        ):
+        self._values(
+            coordinator,
+            dhw_meter_estimated_kwh=16.0,
+            dhw_meter_metered_kwh=8.0,
+            dhw_meter_draw_hours=6.5,
+        )
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
             snapshot = await coordinator._async_compute_snapshot()
 
-        assert snapshot.dhw_heat_meter_deviation > 20.0
+        assert snapshot.dhw_heat_meter_deviation == pytest.approx(100.0)
         assert snapshot.dhw_heat_meter_warning is True
 
-    async def test_below_minimum_is_not_published(self):
+    async def test_below_minimum_draw_time_is_not_published(self):
         coordinator = make_coordinator()
-        now_ts = int(datetime.now(timezone.utc).timestamp())
-        with (
-            self._patch_resolve(),
-            patch.object(
-                ec,
-                "async_statistics_during_period",
-                AsyncMock(return_value=self._rows(now_ts=now_ts, hours=4)),
-            ),
-        ):
+        self._values(
+            coordinator,
+            dhw_meter_estimated_kwh=0.4,
+            dhw_meter_metered_kwh=0.4,
+            dhw_meter_draw_hours=0.2,
+        )
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
             snapshot = await coordinator._async_compute_snapshot()
 
-        assert snapshot.dhw_heat_meter_hours == 4
+        assert snapshot.dhw_heat_meter_draw_hours == pytest.approx(0.2)
         assert snapshot.dhw_heat_meter_deviation is None
         assert snapshot.dhw_heat_meter_warning is None
 
-    async def test_unavailable_without_series(self):
+    async def test_below_minimum_metered_energy_is_not_published(self):
         coordinator = make_coordinator()
-        with (
-            self._patch_resolve(),
-            patch.object(
-                ec, "async_statistics_during_period", AsyncMock(return_value={})
-            ),
-        ):
+        self._values(
+            coordinator,
+            dhw_meter_estimated_kwh=0.4,
+            dhw_meter_metered_kwh=0.3,
+            dhw_meter_draw_hours=9.0,
+        )
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
             snapshot = await coordinator._async_compute_snapshot()
 
         assert snapshot.dhw_heat_meter_deviation is None
         assert snapshot.dhw_heat_meter_warning is None
-        assert snapshot.dhw_heat_meter_hours == 0
+
+    async def test_unavailable_without_the_window(self):
+        coordinator = make_coordinator()
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_heat_meter_deviation is None
+        assert snapshot.dhw_heat_meter_warning is None
+        assert snapshot.dhw_heat_meter_draw_hours == 0.0
 
 
 class TestSolar:
@@ -801,15 +776,63 @@ class TestDhwStandingLoss:
 
     def test_accumulates_and_blends_on_activity(self):
         coordinator = make_coordinator()
-        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
         assert coordinator._update_dhw_standing_loss(1000.0) is None
-        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0)
+        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
         assert coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600) is None
-        self._values(coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0)
+        self._values(coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0, bt2=15.0)
         value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
 
-        expected = 175.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
-        assert value == pytest.approx(expected)
+        # 175 L · 2 K over 8 h, quoted at the 40 K reference: the window itself
+        # sat at 54 - 15 = 39 K, so the published figure is that much higher.
+        daily = 175.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
+        assert value == pytest.approx(daily / 39.0 * 40.0)
+
+    def test_identified_volume_replaces_the_datasheet_volume(self):
+        """The coordinator exposes the identified volume as a method, not an
+        attribute: reading the bound method would silently use 175 L."""
+        coordinator = make_coordinator()
+        coordinator._main.dhw_tank_liters = MagicMock(return_value=120.0)
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        self._values(coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0, bt2=15.0)
+        value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
+
+        assert coordinator._dhw_standing_window["tank_liters"] == 120.0
+        daily = 120.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
+        assert value == pytest.approx(daily / 39.0 * 40.0)
+
+    def test_window_without_ambient_is_discarded(self):
+        """A fall of a few kelvin cannot be turned into a coefficient blind."""
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0)
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        self._values(coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0)
+        assert coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600) is None
+        assert coordinator._dhw_standing_window is None
+
+    def test_ambient_falls_back_to_the_configured_room_sensor(self):
+        coordinator = make_coordinator()
+        self._values(
+            coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0, room_temp_external=19.0
+        )
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(
+            coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0, room_temp_external=19.0
+        )
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        self._values(
+            coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0, room_temp_external=19.0
+        )
+        value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
+
+        assert coordinator._dhw_standing_window["ambient_source"] == "room_temp_external"
+        assert coordinator._dhw_standing_window["ambient_c"] == 19.0
+        assert value is not None
 
     def test_short_window_is_discarded(self):
         coordinator = make_coordinator()
@@ -822,15 +845,15 @@ class TestDhwStandingLoss:
 
     def test_reheating_rise_closes_window_before_the_rise(self):
         coordinator = make_coordinator()
-        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
         coordinator._update_dhw_standing_loss(1000.0)
-        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0)
+        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
         coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
-        self._values(coordinator, bt30=54.0, bf1_l_min=0.0, hp_status=0)
+        self._values(coordinator, bt30=54.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
         value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
 
-        expected = 175.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
-        assert value == pytest.approx(expected)
+        daily = 175.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
+        assert value == pytest.approx(daily / 39.0 * 40.0)
 
     def test_dhw_heating_is_not_idle(self):
         coordinator = make_coordinator()
@@ -858,11 +881,12 @@ class TestDhwStandingLoss:
     async def test_standing_loss_reaches_snapshot(self):
         coordinator = make_coordinator()
         self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)
-        coordinator._dhw_standing_loss = 1.23
+        coordinator._dhw_standing_loss_per_k = 0.06
         with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
             snapshot = await coordinator._async_compute_snapshot()
 
-        assert snapshot.dhw_standing_loss == 1.23
+        assert snapshot.dhw_standing_loss == pytest.approx(2.4)
+        assert snapshot.dhw_standing_loss_w_per_k == pytest.approx(2.5)
 
 async def test_thermal_metrics_reports_the_decay_fit() -> None:
     """The decay fit drives the time constant and, with UA, the capacity."""
@@ -1024,22 +1048,33 @@ class TestDhwStandingLossPersistence:
     @pytest.mark.asyncio
     async def test_restore_reads_the_stored_ema(self):
         coordinator = make_coordinator()
-        coordinator._store = self._Store({"dhw_standing_loss": 1.25})
-        coordinator._dhw_standing_loss = None
+        coordinator._store = self._Store(
+            {"dhw_standing_loss_per_k": 0.0625, "dhw_standing_window": {"hours": 6.0}}
+        )
+        coordinator._dhw_standing_loss_per_k = None
 
         await coordinator.async_restore()
 
-        assert coordinator._dhw_standing_loss == pytest.approx(1.25)
+        assert coordinator._dhw_standing_loss_per_k == pytest.approx(0.0625)
+        assert coordinator._dhw_standing_window == {"hours": 6.0}
 
     @pytest.mark.asyncio
     async def test_restore_ignores_unusable_payloads(self):
-        for payload in (None, {}, {"dhw_standing_loss": "x"}, {"dhw_standing_loss": -1.0}):
+        for payload in (
+            None,
+            {},
+            {"dhw_standing_loss_per_k": "x"},
+            {"dhw_standing_loss_per_k": -1.0},
+            # A snapshot from before the normalization holds a daily figure at
+            # an unknown tank temperature; it cannot be converted and is ignored.
+            {"dhw_standing_loss": 5.11},
+        ):
             coordinator = make_coordinator()
             coordinator._store = self._Store(payload)
 
             await coordinator.async_restore()
 
-            assert coordinator._dhw_standing_loss is None
+            assert coordinator._dhw_standing_loss_per_k is None
             # The open window is never restored: it would book unobserved draws.
             assert coordinator._dhw_idle_start is None
 
@@ -1047,27 +1082,29 @@ class TestDhwStandingLossPersistence:
     async def test_restore_without_a_store_is_a_noop(self):
         coordinator = make_coordinator()
         await coordinator.async_restore()
-        assert coordinator._dhw_standing_loss is None
+        assert coordinator._dhw_standing_loss_per_k is None
 
     def test_window_close_persists_the_blended_value(self):
         coordinator = make_coordinator()
         store = self._Store()
         coordinator._store = store
         coordinator._main.data = {
-            "values": {"bt30": 55.0, "bf1_l_min": 0.0, "hp_status": 0}
+            "values": {"bt30": 55.0, "bf1_l_min": 0.0, "hp_status": 0, "bt2": 15.0}
         }
         coordinator._update_dhw_standing_loss(1000.0)
         coordinator._main.data = {
-            "values": {"bt30": 53.0, "bf1_l_min": 0.0, "hp_status": 0}
+            "values": {"bt30": 53.0, "bf1_l_min": 0.0, "hp_status": 0, "bt2": 15.0}
         }
         coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
         coordinator._main.data = {
-            "values": {"bt30": 53.0, "bf1_l_min": 6.0, "hp_status": 0}
+            "values": {"bt30": 53.0, "bf1_l_min": 6.0, "hp_status": 0, "bt2": 15.0}
         }
         value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
 
         assert value is not None
-        assert store.saved[-1] == {"dhw_standing_loss": pytest.approx(value)}
+        saved = store.saved[-1]
+        assert saved["dhw_standing_loss_per_k"] == pytest.approx(value / 40.0)
+        assert saved["dhw_standing_window"]["delta_k"] == pytest.approx(39.0)
 
     def test_discarded_window_does_not_persist(self):
         coordinator = make_coordinator()

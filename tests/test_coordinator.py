@@ -1998,6 +1998,82 @@ class TestCalculateDhwPower:
         assert values["dhwpower"] == 240.0
 
 
+class TestDhwMeterCalculation:
+    """The per-poll DHW heat-meter window fed from the poll values."""
+
+    @staticmethod
+    def _make_coordinator():
+        return TestCopPersistence()._make_coordinator()
+
+    def _poll(self, coordinator, values, when):
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow", return_value=when
+        ):
+            coordinator._calculate_dhw_meter(values)
+        return values
+
+    def test_first_poll_only_seeds_and_publishes_zeros(self):
+        coordinator = self._make_coordinator()
+        values = {
+            "bf1_l_min": 5.0,
+            "bt34": 55.0,
+            "bt33": 10.0,
+            "dhwenergy": 100.0,
+        }
+        self._poll(coordinator, values, dt_util.utcnow())
+
+        assert values["dhw_meter_estimated_kwh"] == 0.0
+        assert values["dhw_meter_metered_kwh"] == 0.0
+        assert values["dhw_meter_draw_hours"] == 0.0
+
+    def test_a_draw_accumulates_estimate_meter_and_draw_time(self):
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        self._poll(
+            coordinator,
+            {"bf1_l_min": 5.0, "bt34": 55.0, "bt33": 10.0, "dhwenergy": 100.0},
+            start,
+        )
+        values = self._poll(
+            coordinator,
+            {"bf1_l_min": 5.0, "bt34": 55.0, "bt33": 10.0, "dhwenergy": 100.4},
+            start + timedelta(seconds=60),
+        )
+
+        # 5 L/min over 60 s at 45 K = 5 L · 45 K · c ≈ 0.2616 kWh
+        assert values["dhw_meter_estimated_kwh"] == pytest.approx(0.2616, abs=1e-3)
+        assert values["dhw_meter_metered_kwh"] == pytest.approx(0.4)
+        assert values["dhw_meter_draw_hours"] == pytest.approx(0.02)
+
+    def test_a_missing_flow_still_books_the_meter(self):
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        self._poll(coordinator, {"dhwenergy": 100.0}, start)
+        values = self._poll(
+            coordinator, {"dhwenergy": 100.5}, start + timedelta(seconds=60)
+        )
+
+        assert values["dhw_meter_estimated_kwh"] == 0.0
+        assert values["dhw_meter_metered_kwh"] == pytest.approx(0.5)
+
+    def test_unusable_values_are_ignored(self):
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        self._poll(
+            coordinator,
+            {"bf1_l_min": "x", "bt34": None, "bt33": True, "dhwenergy": "y"},
+            start,
+        )
+        values = self._poll(
+            coordinator,
+            {"bf1_l_min": "x", "bt34": None, "bt33": True, "dhwenergy": "y"},
+            start + timedelta(seconds=60),
+        )
+
+        assert values["dhw_meter_estimated_kwh"] == 0.0
+        assert values["dhw_meter_metered_kwh"] == 0.0
+
+
 class TestCopPersistence:
     """Tests for the COP restart snapshot."""
 
@@ -2171,8 +2247,8 @@ class TestCopPersistence:
 
     @pytest.mark.asyncio
     async def test_persist_cop_state_payload(self):
-        """The payload carries per-figure timestamps, the legacy shared one and
-        the identified tank volume."""
+        """The payload carries per-figure timestamps, the legacy shared one, the
+        identified tank volume and the DHW-meter window."""
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": 1.7}
         coordinator._cop_last_times = {
@@ -2196,6 +2272,7 @@ class TestCopPersistence:
                 "cop_heating_updated_at": "2026-10-10T07:00:00+00:00",
                 "cop_dhw_updated_at": "2026-10-10T06:00:00+00:00",
                 "dhw_tank_liters": 143.2,
+                "dhw_meter": [],
             }
         )
 
@@ -2230,6 +2307,62 @@ class TestCopPersistence:
 
         assert coordinator._dhw_tank_liters == 143.2
         assert coordinator.dhw_tank_liters() == 143.2
+
+    @pytest.mark.asyncio
+    async def test_persist_cop_state_carries_the_dhw_meter_window(self):
+        """A week-long comparison must survive a restart, not restart with it."""
+        coordinator = self._make_coordinator()
+        coordinator._dhw_meter.add(
+            now_ts=1_000_000.0,
+            flow_l_min=5.0,
+            hot_out_c=55.0,
+            cold_in_c=10.0,
+            meter_kwh=0.0,
+        )
+        coordinator._dhw_meter.add(
+            now_ts=1_000_060.0,
+            flow_l_min=5.0,
+            hot_out_c=55.0,
+            cold_in_c=10.0,
+            meter_kwh=0.2,
+        )
+        with (
+            patch("time.monotonic", return_value=1000.0),
+            patch.object(
+                coordinator._cop_store, "async_save", new=AsyncMock()
+            ) as mock_save,
+        ):
+            await coordinator._persist_cop_state()
+
+        rows = mock_save.await_args.args[0]["dhw_meter"]
+        assert len(rows) == 1
+        assert rows[0][1] > 0.0
+        assert rows[0][2] == pytest.approx(0.2)
+
+    @pytest.mark.asyncio
+    async def test_restore_reads_the_dhw_meter_window(self):
+        coordinator = self._make_coordinator()
+        stored = {
+            "updated_at": "2026-10-10T07:00:00+00:00",
+            "cop_heating": 3.5,
+            "dhw_meter": [[1_000_000, 1.5, 1.4, 900.0]],
+        }
+        with patch.object(coordinator._cop_store, "async_load", return_value=stored):
+            await coordinator.async_restore_cop_state()
+
+        estimated, metered, draw_hours = coordinator._dhw_meter.totals(1_000_060.0)
+        assert estimated == pytest.approx(1.5)
+        assert metered == pytest.approx(1.4)
+        assert draw_hours == pytest.approx(0.25)
+
+    @pytest.mark.asyncio
+    async def test_restore_ignores_a_broken_dhw_meter_payload(self):
+        coordinator = self._make_coordinator()
+        stored = {"cop_heating": 3.5, "dhw_meter": "nonsense"}
+        with patch.object(coordinator._cop_store, "async_load", return_value=stored):
+            await coordinator.async_restore_cop_state()
+
+        assert coordinator._dhw_meter.buckets == {}
 
     @pytest.mark.asyncio
     async def test_persist_cop_state_without_values_is_a_noop(self):

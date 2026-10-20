@@ -39,6 +39,7 @@ from .client.protocol import (
 )
 from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
 from .calculations import DhwCharge, QvantumCalculationsMixin
+from .plant_analytics import DhwMeterWindow
 from .client.constants import alias_heating_curve_settings
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
@@ -252,6 +253,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # The open DHW charge segment (baseline tank, accumulated draw and
         # electrical input), or None when no charge is running.
         self._dhw_charge: DhwCharge | None = None
+        # Poll-resolution flow × ΔT integral next to the metered DHW counter.
+        # The interval is only known here, so the comparison is built per poll
+        # rather than from hourly means (see DhwMeterWindow). Persisted with
+        # the COP snapshot so a restart does not blank a week-long window.
+        self._dhw_meter = DhwMeterWindow()
         # Effective tank volume identified from element-only charges; None until
         # one has been measured, and persisted with the COP snapshot.
         self._dhw_tank_liters: float | None = None
@@ -494,6 +500,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._dhw_tank_liters = self._coerce_store_number(
             data.get("dhw_tank_liters"), positive=True
         )
+        self._dhw_meter = DhwMeterWindow.from_list(data.get("dhw_meter"))
         if self._cop_last:
             _LOGGER.debug("Restored COP snapshot: %s", self._cop_last)
 
@@ -753,6 +760,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             return
         if self._last_persisted_cop_state is None and not (
             self._dhw_tank_liters is not None
+            or self._dhw_meter.buckets
             or any(self._cop_last.get(key) is not None for key in _COP_KEYS)
         ):
             # Nothing has been computed yet; do not write an empty snapshot on
@@ -768,6 +776,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             "cop_heating_updated_at": self._cop_time_iso("cop_heating"),
             "cop_dhw_updated_at": self._cop_time_iso("cop_dhw"),
             "dhw_tank_liters": self._dhw_tank_liters,
+            "dhw_meter": self._dhw_meter.as_list(),
         }
         try:
             await self._cop_store.async_save(payload)
@@ -777,13 +786,19 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             _LOGGER.warning("Failed to persist COP state", exc_info=True)
 
     def _cop_state(self) -> tuple:
-        """Change-detection tuple: the rounded figures, their times, the volume."""
+        """Change-detection tuple: the figures, their times, the volume, the meter.
+
+        The DHW-meter window moves on every draw, so its bucket signature is
+        part of the tuple; the write throttle still keeps the snapshot to at
+        most one save per persist interval.
+        """
         return (
             self._rounded_cop("cop_heating"),
             self._rounded_cop("cop_dhw"),
             self._cop_time_iso("cop_heating"),
             self._cop_time_iso("cop_dhw"),
             None if self._dhw_tank_liters is None else round(self._dhw_tank_liters, 1),
+            self._dhw_meter.signature(),
         )
 
     def _cop_time_iso(self, key: str) -> str | None:
@@ -1379,6 +1394,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
             self._derive_tap_water_capacity(values)
             self._calculate_cop(values)
+            self._calculate_dhw_meter(values)
             await self._persist_cop_state()
 
             if self.modbus_enabled:

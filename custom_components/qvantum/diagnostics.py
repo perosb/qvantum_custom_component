@@ -15,6 +15,7 @@ from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 
 # Keys that must never leave the instance. ``async_redact_data`` applies these
 # recursively, so they cover config-entry data as well as nested client state.
@@ -177,7 +178,9 @@ def _cop_diagnostics(coordinator: Any) -> dict[str, Any]:
     times = getattr(coordinator, "_cop_last_times", None)
     times = times if isinstance(times, dict) else {}
     charge = getattr(coordinator, "_dhw_charge", None)
+    meter = getattr(coordinator, "_dhw_meter", None)
     return {
+        "dhw_meter": None if meter is None else _dhw_meter_diagnostics(meter),
         "heating": figures.get("cop_heating"),
         "dhw": figures.get("cop_dhw"),
         "heating_updated_at": _iso(times.get("cop_heating")),
@@ -193,6 +196,25 @@ def _cop_diagnostics(coordinator: Any) -> dict[str, Any]:
             "electrical_kwh": round(getattr(charge, "electrical_kwh", 0.0), 3),
             "compressor_kwh": round(getattr(charge, "compressor_kwh", 0.0), 3),
         },
+    }
+
+
+def _dhw_meter_diagnostics(window: Any) -> dict[str, Any]:
+    """The poll-resolution flow × ΔT window behind the DHW meter check.
+
+    The deviation the sensor shows is only as good as the two totals it is
+    built from, and they are accumulated over a week: without this block a
+    report of "the meter warning is on" cannot be checked against the evidence.
+    """
+    try:
+        estimated, metered, draw_hours = window.totals(dt_util.utcnow().timestamp())
+    except Exception:  # noqa: BLE001 — a dump must never fail on this
+        return {"error": "unavailable"}
+    return {
+        "buckets": len(getattr(window, "buckets", {}) or {}),
+        "estimated_kwh": round(estimated, 3),
+        "metered_kwh": round(metered, 3),
+        "draw_hours": round(draw_hours, 2),
     }
 
 

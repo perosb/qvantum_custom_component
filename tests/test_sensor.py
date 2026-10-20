@@ -1051,7 +1051,7 @@ class TestQvantumEfficiencySensors:
                 dhw_heat_meter_deviation=-0.3,
                 dhw_heat_meter_estimated_kwh=16.744,
                 dhw_heat_meter_metered_kwh=16.8,
-                dhw_heat_meter_hours=24,
+                dhw_heat_meter_draw_hours=24.0,
             )
         )
         entity = QvantumDhwHeatMeterSensor(
@@ -1062,7 +1062,7 @@ class TestQvantumEfficiencySensors:
         attributes = entity.extra_state_attributes
         assert attributes["estimated_kwh"] == 16.744
         assert attributes["metered_kwh"] == 16.8
-        assert attributes["hours"] == 24
+        assert attributes["draw_hours"] == 24.0
         assert "flow × ΔT" in attributes["attribution"]
 
     def test_efficiency_sensor_categories(self, mock_device):
@@ -1133,6 +1133,47 @@ class TestQvantumEfficiencySensors:
         assert entity.native_value == 1.2
         assert entity._attr_native_unit_of_measurement == "kWh/d"
         assert "coverage_days" not in entity.extra_state_attributes
+
+    def test_dhw_standing_loss_exposes_the_window(self, mock_device):
+        """The kWh/d figure is only meaningful with its tank-to-ambient basis."""
+        coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(
+                dhw_standing_loss=2.4,
+                dhw_standing_loss_w_per_k=2.5,
+                dhw_standing_window={
+                    "hours": 8.0,
+                    "drop_k": 3.7,
+                    "tank_mean_c": 59.6,
+                    "ambient_c": 20.5,
+                    "ambient_source": "bt2",
+                    "delta_k": 39.1,
+                    "tank_liters": 175.0,
+                },
+            )
+        )
+        entity = QvantumEfficiencySensorEntity(
+            coordinator, "dhw_standing_loss", mock_device
+        )
+
+        attributes = entity.extra_state_attributes
+        assert attributes["loss_w_per_k"] == 2.5
+        assert attributes["reference_delta_k"] == 40.0
+        assert attributes["delta_k"] == 39.1
+        assert attributes["ambient_source"] == "bt2"
+        assert attributes["tank_liters"] == 175.0
+
+    def test_dhw_standing_loss_without_a_window(self, mock_device):
+        coordinator = _efficiency_coordinator(
+            EfficiencySnapshot(dhw_standing_loss=2.4)
+        )
+        entity = QvantumEfficiencySensorEntity(
+            coordinator, "dhw_standing_loss", mock_device
+        )
+
+        attributes = entity.extra_state_attributes
+        assert attributes["reference_delta_k"] == 40.0
+        assert attributes["loss_w_per_k"] is None
+        assert "delta_k" not in attributes
 
     def test_efficiency_sensor_unavailable_without_value(self, mock_device):
         coordinator = _efficiency_coordinator(EfficiencySnapshot())

@@ -351,10 +351,19 @@ The summary export (`qvantum.export_summary`, `summary.py`) is
 (curve reverts, trim updates, days a clamped or extrapolated knot was lived with,
 and the date they were reset at — counts, never a log of when): fields are picked
 explicitly and coerced to numbers, booleans or short enumerated strings, never
-free text from the values payload. A new field goes into the module's whitelists
-**and** bumps `SUMMARY_SCHEMA_VERSION` (the pool groups by it);
-`tests/test_summary.py` asserts the payload carries no entity ids or names. It
-writes a file and returns it — it never sends anything and never opens an issue.
+free text from the values payload. `tests/test_summary.py` asserts the payload
+carries no entity ids or names. It writes a file and returns it — it never sends
+anything and never opens an issue.
+
+`SUMMARY_SCHEMA_VERSION` is the pool's grouping key, so it moves for **a new
+field, a removed field, and a field whose meaning changed** — the third is the
+one that gets forgotten. Re-normalizing an existing figure is exactly that: v6
+marks `dhw_standing_loss` as a coefficient quoted at a fixed tank-to-ambient
+difference (identified volume) instead of the raw daily figure at whatever tank
+temperature its window saw, because two such readings pool side by side and
+neither is comparable to the other. When a derived metric changes semantics,
+bump the version **in the same PR** and say in the constant's comment what
+changed and why; a test pins the floor so a silent revert cannot pass.
 
 ## Derived metrics — power, COP, DHW
 
@@ -385,6 +394,27 @@ writes a file and returns it — it never sends anything and never opens an issu
   free-cooling window is deliberately not persisted**: the tank went unsampled
   across the restart, and resuming would book an unobserved draw as standing
   loss. A fresh window starts on the next idle poll.
+- What that EMA holds is a **coefficient, not a daily figure**: windows are
+  normalized by the tank-to-ambient difference (`bt2` first, the configured room
+  sensor as fallback) and the published kWh/d is the coefficient quoted at
+  `REFERENCE_DELTA_K` (40 K). Without it the number tracked the tank temperature
+  rather than the insulation — one window after a 69 °C extra-hot-water run
+  moved a live install from 2.5 to 5.1 kWh/d. The volume is the identified one
+  when present, and the store key is `dhw_standing_loss_per_k`; a snapshot
+  written under the old key is ignored, never reinterpreted. The newest window's
+  evidence (hours, drop, tank mean, ambient and its source, ΔT, volume) travels
+  as sensor attributes.
+- The DHW heat-meter comparison (`dhw_heat_meter_deviation`) is a
+  **poll-resolution integral**, not a statistics product: `mean(flow) · mean(ΔT)`
+  is not the integral of `flow · ΔT`, and on a live install it read 0.7 kWh
+  against a 17.3 kWh meter over three days where the poll integral landed within
+  2.8 %. `plant_analytics.DhwMeterWindow` accumulates it (hourly buckets, a week
+  long, gap and counter-reset guarded) where the interval is known — the main
+  coordinator's poll — publishes `dhw_meter_estimated_kwh` /
+  `dhw_meter_metered_kwh` / `dhw_meter_draw_hours` in `values`, and is persisted
+  under `dhw_meter` in the COP store. The efficiency coordinator only applies the
+  gates (draw time and metered energy) and the ±20 % warning, so the figure also
+  works without a recorder. Diagnostics dump it as `cop.dhw_meter`.
 - The tank volume in that balance is **identified, not assumed**: with the
   compressor idle and nothing drawn, the element is the only heat source, so
   `V = Σelement_kWh / (ΣΔbt30 · c)` (gates: ≥ 1.5 kWh, ≥ 3 K, 50–500 L). The

@@ -39,6 +39,7 @@ from .const import (
     CURRENT_METRICS,
     PRESSURE_METRICS,
 )
+from .dhw_loss import REFERENCE_DELTA_K
 from .efficiency import COP_WINDOW_SECONDS
 from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 from . import MyConfigEntry
@@ -1266,20 +1267,45 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
             )
         if self._metric_key == "scop_total" and snapshot.scop_total_90d is not None:
             attributes["scop_90d"] = round(snapshot.scop_total_90d, 2)
+        if self._metric_key == "dhw_standing_loss":
+            attributes["attribution"] = (
+                "free-cooling windows, quoted at a fixed tank-to-ambient difference"
+            )
+            attributes["loss_w_per_k"] = self._round(
+                snapshot.dhw_standing_loss_w_per_k
+            )
+            attributes["reference_delta_k"] = REFERENCE_DELTA_K
+            window = snapshot.dhw_standing_window or {}
+            for key in (
+                "hours",
+                "drop_k",
+                "tank_mean_c",
+                "ambient_c",
+                "ambient_source",
+                "delta_k",
+                "tank_liters",
+            ):
+                if key in window:
+                    attributes[key] = window[key]
         return attributes
+
+    @staticmethod
+    def _round(value: float | None) -> float | None:
+        """Three decimals is the resolution the meter itself reports."""
+        return None if value is None else round(value, 3)
 
 
 class QvantumDhwHeatMeterSensor(QvantumEfficiencySensorEntity):
     """Flow×ΔT DHW heat estimate compared with the metered energy counter.
 
     The numeric state is the signed deviation in percent; the integrated
-    estimates and the number of matched draw hours are attributes so the
-    figure can be judged instead of trusted blindly.
+    estimates and the draw time behind them are attributes so the figure can be
+    judged instead of trusted blindly.
     """
 
     @property
     def extra_state_attributes(self):
-        """Return the integrated estimate, the meter and the matched hours."""
+        """Return the integrated estimate, the meter and the draw time."""
         snapshot = self.coordinator.data
         if snapshot is None:
             return None
@@ -1288,17 +1314,13 @@ class QvantumDhwHeatMeterSensor(QvantumEfficiencySensorEntity):
             {
                 "estimated_kwh": self._round(snapshot.dhw_heat_meter_estimated_kwh),
                 "metered_kwh": self._round(snapshot.dhw_heat_meter_metered_kwh),
-                "hours": snapshot.dhw_heat_meter_hours,
+                "draw_hours": round(snapshot.dhw_heat_meter_draw_hours, 2),
                 "attribution": (
-                    "flow × ΔT estimate vs dhwenergy over the last 7 days"
+                    "flow × ΔT integrated per poll vs dhwenergy over 7 days"
                 ),
             }
         )
         return attributes
-
-    @staticmethod
-    def _round(value: float | None) -> float | None:
-        return None if value is None else round(value, 3)
 
 
 class QvantumSolarGainSensor(QvantumEfficiencySensorEntity):
