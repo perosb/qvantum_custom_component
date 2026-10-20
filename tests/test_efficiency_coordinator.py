@@ -788,6 +788,52 @@ class TestDhwStandingLoss:
         daily = 175.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
         assert value == pytest.approx(daily / 39.0 * 40.0)
 
+    def test_identified_volume_replaces_the_datasheet_volume(self):
+        """The coordinator exposes the identified volume as a method, not an
+        attribute: reading the bound method would silently use 175 L."""
+        coordinator = make_coordinator()
+        coordinator._main.dhw_tank_liters = MagicMock(return_value=120.0)
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        self._values(coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0, bt2=15.0)
+        value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
+
+        assert coordinator._dhw_standing_window["tank_liters"] == 120.0
+        daily = 120.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
+        assert value == pytest.approx(daily / 39.0 * 40.0)
+
+    def test_window_without_ambient_is_discarded(self):
+        """A fall of a few kelvin cannot be turned into a coefficient blind."""
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0)
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        self._values(coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0)
+        assert coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600) is None
+        assert coordinator._dhw_standing_window is None
+
+    def test_ambient_falls_back_to_the_configured_room_sensor(self):
+        coordinator = make_coordinator()
+        self._values(
+            coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0, room_temp_external=19.0
+        )
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(
+            coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0, room_temp_external=19.0
+        )
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        self._values(
+            coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0, room_temp_external=19.0
+        )
+        value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
+
+        assert coordinator._dhw_standing_window["ambient_source"] == "room_temp_external"
+        assert coordinator._dhw_standing_window["ambient_c"] == 19.0
+        assert value is not None
+
     def test_short_window_is_discarded(self):
         coordinator = make_coordinator()
         self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)

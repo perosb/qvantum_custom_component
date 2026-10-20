@@ -960,8 +960,14 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         return None, None
 
     def _dhw_volume(self) -> float:
-        """Tank volume behind the balance: identified first, datasheet last."""
-        identified = _finite(getattr(self._main, "dhw_tank_liters", None))
+        """Tank volume behind the balance: identified first, datasheet last.
+
+        The main coordinator exposes the identified volume as a method, so the
+        getter is called when it is one; reading the bound method itself would
+        silently fall through to the datasheet volume for every window.
+        """
+        getter = getattr(self._main, "dhw_tank_liters", None)
+        identified = _finite(getter() if callable(getter) else getter)
         if identified is not None and identified > 0.0:
             return identified
         return DHW_TANK_VOLUME_L
