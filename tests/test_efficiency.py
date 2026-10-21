@@ -653,6 +653,67 @@ class TestCalculateCop:
         )
 
         assert calculator._cop_unattributed_kwh == pytest.approx(0.3)
+    def test_tank_volume_identification_ignores_heat_leaving_the_tank(self):
+        """The rise must be the element's, so nothing else may take heat out.
+
+        Measured on a QE-6 (2026-10-21): extra hot water left the pump idle with
+        the element demanded while the addition shunt had been open
+        (`qn8position` 7) and `heatingpower` read 2.3 kW. That heat leaves the
+        tank, so the same element energy shows up as a smaller rise and the
+        identified volume comes out too large.
+        """
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+
+        # The same 2 kWh / 12 K charge that identifies 143 L when the tank is
+        # the only place the heat can go.
+        with_shunt = _values(
+            hp_status=HP_STATUS_IDLE,
+            dhwdemand=1,
+            additionalenergy=12.0,
+            bt30=62.0,
+            qn8position=7,
+        )
+        calculator._calculate_cop(with_shunt)
+
+        assert calculator._dhw_tank_volume() == pytest.approx(DHW_TANK_VOLUME_L)
+
+    def test_tank_volume_identification_ignores_house_heating_output(self):
+        """The heating counter steps only when the house really took heat.
+
+        The derived `heatingpower` cannot be used here: it is computed after the
+        COP pass and reads zero whenever the compressor is not heating, which is
+        exactly the state being guarded.
+        """
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+
+        with_heating = _values(
+            hp_status=HP_STATUS_IDLE,
+            dhwdemand=1,
+            additionalenergy=12.0,
+            heatingenergy=102.4,
+            bt30=62.0,
+        )
+        calculator._calculate_cop(with_heating)
+
+        assert calculator._dhw_tank_volume() == pytest.approx(DHW_TANK_VOLUME_L)
+
+    def test_tank_volume_identification_keeps_working_without_those_metrics(self):
+        """A payload without them keeps identifying: absence is not heat flow."""
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+
+        charge = _values(
+            hp_status=HP_STATUS_IDLE,
+            dhwdemand=1,
+            additionalenergy=12.0,
+            bt30=62.0,
+        )
+        calculator._calculate_cop(charge)
+
+        assert calculator._dhw_tank_volume() == pytest.approx(143.3, rel=1e-3)
+
     def test_tank_volume_identification_ignores_a_defrost(self):
         """A defrost inside the charge runs the compressor; it is not element-only.
 

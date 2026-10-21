@@ -40,7 +40,10 @@ from .const import (
     HP_STATUS_HOT_WATER,
     SensorMode,
 )
-from .dhw_loss import WATER_KWH_PER_LITER_K
+from .dhw_loss import (
+    WATER_KWH_PER_LITER_K,
+    element_only_tank_balance,
+)
 from .efficiency import (
     COP_MIN_ELECTRICAL_KWH,
     COP_WINDOW_SECONDS,
@@ -412,6 +415,9 @@ class QvantumCalculationsMixin:
             dhw_demand=dhw_demand,
             aux_demand=aux_demand,
             aux_dhw_demand=aux_dhw_demand,
+            # Read straight from the payload: a valve position is not an energy
+            # counter, so it must not enter the window's reset check.
+            shunt_position=values.get("qn8position"),
         )
 
         self._set_cop(
@@ -432,6 +438,7 @@ class QvantumCalculationsMixin:
         dhw_demand: bool,
         aux_demand: bool,
         aux_dhw_demand: bool = False,
+        shunt_position: object = None,
     ) -> None:
         """Measure the current DHW charge as one segment and publish its COP.
 
@@ -484,6 +491,14 @@ class QvantumCalculationsMixin:
             self._dhw_charge = charge
 
         compressor_delta = current["compressorenergy"] - previous["compressorenergy"]
+        # Heat actually delivered to the heating circuit in this interval. The
+        # derived `heatingpower` is computed after this runs and reads zero
+        # whenever the compressor is not heating - exactly the state this guards
+        # - so the counter is the signal that can see the house taking heat out
+        # of the tank. A reset is unknown, and absence is not heat flow.
+        heating_kwh = energy_delta(
+            previous["heatingenergy"], current["heatingenergy"]
+        )
         _, interval_dhw, interval_dhw_compressor, _ = _split_electrical_input(
             hp_status=hp_status,
             dhw_demand=dhw_demand,
@@ -503,6 +518,13 @@ class QvantumCalculationsMixin:
             and hp_status not in (HP_STATUS_HEATING, HP_STATUS_HOT_WATER)
             and tank_temp is not None
             and charge.last_tank is not None
+            # Heat leaving the tank by another path (the addition shunt feeding
+            # the heating circuit, or heat delivered to the house) is missing
+            # from the rise, so it would inflate the identified volume.
+            and element_only_tank_balance(
+                shunt_position=shunt_position,
+                heating_kwh=heating_kwh,
+            )
         ):
             # The compressor is idle and nothing is drawn: the element is the
             # only heat source, so its energy and the tank rise measure the
