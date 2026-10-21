@@ -181,13 +181,28 @@ Room compensation is a second, separate loop the shadow curve does not model:
 with BT2 or an external room sensor the firmware adds a room term to
 `cal_heat_temp`, so at a constant outdoor temperature the supply moves with the
 indoor error (`cal_heat_temp = table − factor × (room − target)`). The
-coordinator subtracts `gain × (indoor − target)` from the deviation before it
-feeds the readiness window; without that, the shadow curve could never match a
-compensating pump closely enough to become `ready`.
+coordinator subtracts `gain × (pump room − target)` from the deviation before
+it feeds the readiness window; without that, the shadow curve could never match
+a compensating pump closely enough to become `ready`.
+
+**Which room value.** In the external-sensor mode (`sensor_mode` = 4) the
+firmware does not use the external value on its own: it averages it with its own
+BT2. Measured on a QE-6, 2026-10-21, the implicit room value behind
+`cal_heat_temp` matched that mean with a median deviation of 0.10 °C, against
+0.32 °C for the external sensor alone and 0.30 °C for BT2. `pump_room_temperature`
+reproduces it (mean in the external mode, the configured sensor everywhere else —
+the regime it was measured in), and `pump_room_c` publishes the value used.
+Removing a term built from one sensor while the pump built it from the mean
+leaves a constant `gain · (BT2 − configured) / 2` bias: 1.7 °C on that install,
+more than the readiness median gate, which is why the median sat at 2.17 °C with
+a raw 1.43 °C underneath. The trims, the indoor cap and `room_error` stay on the
+configured sensor — those describe the house, this describes the pump's input.
 
 **The gain is the pump's own setting.** `room_comp_factor` (holding 13, cloud
 setting of the same name) *is* that factor, so it is read rather than fitted:
 measured on a live pump, 5.0 configured against 5.08 fitted from active hours.
+A +1.1 K step on the indoor target moved `cal_heat_temp` by 5.5 K, which is the
+same 5.0 seen from the other side.
 An absent, zero, non-finite or out-of-range factor, or a `sensor_mode` with no
 indoor reading at all, means **no** correction — never a guessed number. A
 factor that *becomes* unusable (the user zeroes it) drops the gain it set
@@ -201,6 +216,27 @@ correction is skipped rather than subtracting one sensor's room term from
 another's error. It is persisted and exposed as `room_gain_c_per_c` on the
 deviation sensor, with the pump's raw setting beside it as `room_gain_factor`
 in the diagnostics.
+
+**How that relation was measured.** Three reversible steps on the live pump
+(2026-10-21), each read back within one poll cycle:
+
+| Step | Change | `cal_heat_temp` | Says |
+|---|---|---|---|
+| `curve_10` 27 → 29 | +2 K on the written table | 27.7 → 29.6 (+1.9) | the table we write is followed 1:1 |
+| target 20.3 → 21.4 | +1.1 K room error | 27.0 → 32.6 (+5.5) | gain 5.0/K, the pump's own factor |
+| target back to 20.3 | −1.1 K | 32.6 → 27.1 | reversible, no hysteresis |
+
+Two things this rules out, both worth not re-investigating: the curve is
+**not** evaluated on a filtered outdoor temperature (a moving average of BT1 over
+1–12 h was fitted as the pump's input; 1 h fit best with a residual of 0.49 °C
+against 1.26 °C at 4 h), and the write path is not dropping or clamping points
+(holdings 20–26 read back exactly what was written). A gap between the table and
+`cal_heat_temp` is therefore a room-term or settings question, not a curve one.
+
+When fitting anything against `cal_heat_temp`, **include only hours after
+`active_since_ts`**: on Auto hours the pump runs its own curve, which mixes two
+different control laws into one regression and flattened the room gain to 3.2
+instead of 5.0.
 
 **It only applies to hours the pump followed our table.** The correction is
 valid where `cal_heat_temp` came from the table we wrote — from the start of the
