@@ -41,7 +41,7 @@ The field list is in the [README](../README.md#qvantumexport_summary); in short:
 | climate | the outdoor span observed, heating hours |
 | curve | room gain (configured / applied / fitted, with validity, evidence hours, standard error, leave-one-out swing), readiness median and p95, the solar model |
 | fitted | heat loss (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (kWh/day), cycling, SCOP, auxiliary-heat share, health grade |
-| counters | curve reverts, trim updates, days with a clamped or extrapolated knot, and the date the counters were reset at |
+| counters | curve reverts, trim updates, days with an actionable clamped or an extrapolated knot, and the date the counters were reset at |
 
 It **never** contains: entity ids or names, coordinates, energy totals,
 schedules, sensor identities, raw series, or a timestamp finer than a date. The

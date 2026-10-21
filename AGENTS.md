@@ -500,20 +500,27 @@ changed and why; a test pins the floor so a silent revert cannot pass.
   both ways: `disable_entities_by_default` clears a stale
   `disabled_by=INTEGRATION`, but never a `disabled_by=USER`.
 - Point sensors are the per-point surface: each carries `baseline`, `trim`,
-  `evidence_hours`, `extrapolated` and `clamped`, because which knot the pump's
-  limits bit (or which one the baseline never observed) decides whether the
-  baseline point has to move. `clamped` on `CurveResult` and the snapshot stays a
-  bool for the card; `clamped_points` names them. `adaptive_curve_coverage` is the
-  aggregate (state = number of extrapolated points, attributes = observed span,
-  `clamped_points`, `trim_evidence`) and is deliberately **disabled by default**:
-  the repairs issue, when it exists, is the notification and this is the detail.
+  `evidence_hours`, `extrapolated`, `clamped` and `floor_pinned`, because which
+  knot the pump's limits bit (or which one the baseline never observed) decides
+  whether the baseline point has to move. `clamped` on `CurveResult` and the
+  snapshot stays a bool for the card; `clamped_points` names the actionable ones
+  and `floor_pinned_points` the warm end the floor holds down.
+  `adaptive_curve_coverage` is the aggregate (state = number of extrapolated
+  points, attributes = observed span, `clamped_points`, `floor_pinned_points`,
+  `trim_evidence`) and is deliberately **disabled by default**: the repairs
+  issue, when it exists, is the notification and this is the detail.
 - Baseline floor: the frozen baseline is lifted to the pump's **minimum** heating
   supply every cycle (`lift_baseline_floor` / `_lift_baseline_to_floor`) — a knot
   under the floor is clamped on every computation, so it never shows its trim
-  feedback and the clamp is structural rather than weather-driven. Only the
-  pump's floor is applied; a point above the pump's own maximum is left alone (a
-  real limit the user should see), while the register range and the
-  non-decreasing shape normalize as for any baseline. A lift clears the trims (the
+  feedback and the clamp is structural rather than weather-driven. Such a point
+  is reported in `floor_pinned_points`, **not** in `clamped_points`: there is
+  nothing to act on (the floor is the answer), whereas `clamped`/`clamped_points`
+  must keep meaning "adjust the baseline point" — that is what the
+  `days_clamped` counter pools, and a floor pin would otherwise fire at every
+  installation on every mild day. Only the pump's floor is applied; a point
+  above the pump's own maximum is left alone (a real limit the user should see)
+  and stays `clamped`, while the register range and the non-decreasing shape
+  normalize as for any baseline. A lift clears the trims (the
   shape changed, same rule as a learned correction) and makes the two warmest
   knots **equal**, so the independently fitted trims can invert them by a tenth
   of a degree while a positive shared adjustment holds both above the floor.

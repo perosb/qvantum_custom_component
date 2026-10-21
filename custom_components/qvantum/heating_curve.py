@@ -172,6 +172,12 @@ class CurveResult:
     #: support dump) *which* point wants to leave the limits, because the
     #: baseline point is the thing to adjust then.
     clamped_points: tuple[str, ...] = ()
+    #: Points whose baseline already sits on the pump's floor, so a request
+    #: below it (a negative adjustment or trim) is clamped on every
+    #: computation without the user being able to move the baseline point down.
+    #: Kept apart from ``clamped_points`` so that field keeps meaning "something
+    #: to act on", which is also what the ``days_clamped`` counter pools.
+    floor_pinned_points: tuple[str, ...] = ()
     cop_c: float = 0.0
     precharge_c: float = 0.0
 
@@ -1094,6 +1100,7 @@ def compute_curve(
     effective_trims: dict[str, float] = {}
     supplies: list[tuple[str, float]] = []
     clamped_points: list[str] = []
+    floor_pinned_points: list[str] = []
     for key, (_, supply) in zip(CURVE_KEYS, points):
         trim = 0.0
         if point_trims is not None:
@@ -1104,7 +1111,17 @@ def compute_curve(
         value = supply + total + trim
         bounded = _clamp(value, low, high)
         if abs(bounded - value) > 1e-9:
-            clamped_points.append(key)
+            # A baseline point already on the pump's floor (``lift_baseline_floor``
+            # puts it there) cannot express a request below it, and the clamp
+            # repeats on every computation whatever the weather does. Nothing
+            # can be adjusted — the floor is the answer — so it is not a
+            # ``clamped`` point that a user should act on. The ceiling side is
+            # left alone: a demand above the pump's maximum is real and should
+            # stay visible.
+            if bounded > value and supply <= low + 1e-9:
+                floor_pinned_points.append(key)
+            else:
+                clamped_points.append(key)
         supplies.append((key, bounded))
 
     # A heating curve is non-decreasing toward colder outdoor. Per-point trims
@@ -1131,6 +1148,7 @@ def compute_curve(
         trims=effective_trims,
         clamped=bool(clamped_points),
         clamped_points=tuple(clamped_points),
+        floor_pinned_points=tuple(floor_pinned_points),
         cop_c=cop_c,
         precharge_c=precharge_c,
     )

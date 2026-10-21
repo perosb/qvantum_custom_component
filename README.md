@@ -194,7 +194,7 @@ What it contains:
 | climate | the outdoor span the installation has been observed in, heating hours |
 | curve | room gain grouped as `configured` / `applied` / `fitted`, the readiness median/p95, the solar model (`a`, `b`, trust, days) |
 | fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day**), cycling, SCOP, aux share, health grade |
-| counters | curve reverts, trim updates and the number of days a clamped or extrapolated knot was lived with, plus the date they were reset at (*Modbus only*) |
+| counters | curve reverts, trim updates and the number of days an actionable clamped knot or an extrapolated knot was lived with, plus the date they were reset at (*Modbus only*) |
 | verdicts | reserved for the derived analysis results (currently empty) |
 
 Run it **while the curve is active** when the room gain is the point: active hours

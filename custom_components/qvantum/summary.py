@@ -73,7 +73,10 @@ _ENTITY_PREFIXES = (
 #: 6: dhw_standing_loss is a normalized coefficient quoted at a fixed
 #: tank-to-ambient difference (and the identified tank volume), not the raw
 #: daily figure at whatever tank temperature the window saw.
-SUMMARY_SCHEMA_VERSION = 6
+#: 7: days_clamped counts days with a *clamped* knot only; a warm end pinned
+#: on the pump's floor is structural (nothing the baseline can answer) and no
+#: longer counts, so the figure means "days with something to act on".
+SUMMARY_SCHEMA_VERSION = 7
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -255,7 +258,9 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
 
 #: Curves-side counters: how often the installation actually lived with a
 #: clamped or extrapolated knot, and how often the table changed. Counts only —
-#: the pool needs a rate, never a log of when.
+#: the pool needs a rate, never a log of when. ``days_clamped`` deliberately
+#: excludes a warm end pinned on the pump's floor: that clamp is structural and
+#: would otherwise fire on every mild day at every installation.
 COUNTER_KEYS: tuple[str, ...] = (
     "since",
     "reverts",

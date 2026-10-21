@@ -918,6 +918,9 @@ class QvantumCurvePointSensor(QvantumCurveSensorEntity):
             # The pump's supply limits bit this point: the baseline point is
             # what to adjust, not the clamp.
             "clamped": self._curve_key in snapshot.clamped_points,
+            # The baseline already sits on the pump's floor, so the clamp is
+            # structural and there is nothing to adjust.
+            "floor_pinned": self._curve_key in snapshot.floor_pinned_points,
         }
 
 
@@ -958,6 +961,7 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
             "trims": dict(snapshot.trims),
             "clamped": snapshot.clamped,
             "clamped_points": list(snapshot.clamped_points),
+            "floor_pinned_points": list(snapshot.floor_pinned_points),
         }
 
 
@@ -1050,6 +1054,7 @@ class QvantumCurveCoverageSensor(QvantumCurveSensorEntity):
             "baseline_learned_hours": snapshot.baseline_learned_hours,
             "extrapolated_points": list(snapshot.extrapolated_points),
             "clamped_points": list(snapshot.clamped_points),
+            "floor_pinned_points": list(snapshot.floor_pinned_points),
             "trim_evidence": dict(snapshot.trim_evidence),
         }
 
