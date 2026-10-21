@@ -31,6 +31,45 @@ REFERENCE_DELTA_K = 40.0
 MIN_DELTA_K = 10.0
 
 
+
+def element_only_tank_balance(
+    *,
+    shunt_position: object,
+    heating_kwh: object,
+) -> bool:
+    """True when nothing but the element can move heat out of the tank.
+
+    The tank-volume identification divides the element's energy by the tank
+    rise, so every other path out of the tank makes the volume look larger. Two
+    of them are invisible to the compressor and draw checks: the addition shunt
+    (`qn8position`, open when it blends tank water into the heating circuit) and
+    heat delivered to the house, which keeps running on stored tank heat.
+
+    ``heating_kwh`` is the interval's **counter** delta of the heat delivered to
+    the heating circuit, not the derived `heatingpower`: that is computed after
+    this runs (and is zero whenever the compressor is not heating, which is
+    exactly the state being guarded), so any step here means the house really
+    took heat out of the tank. The counter's 0.1 kWh resolution makes "any step"
+    the honest threshold.
+
+    Measured on a QE-6 (2026-10-21): extra hot water left the pump in idle with
+    the element demanded while `qn8position` had been 7 and the heating circuit
+    was taking 2.3 kW — heat was leaving the tank the whole time, which would
+    have biased the identified volume upwards.
+
+    A missing reading is not evidence of heat flow: an install whose payload
+    does not carry these metrics keeps identifying exactly as before, so the
+    guard tightens only where the data exists.
+    """
+    shunt = _finite(shunt_position)
+    if shunt is not None and shunt > 0.0:
+        return False
+    heating = _finite(heating_kwh)
+    if heating is not None and heating > 0.0:
+        return False
+    return True
+
+
 def _finite(value: object) -> float | None:
     """Coerce to a finite float, rejecting bools and non-numeric input."""
     if isinstance(value, bool) or value is None:

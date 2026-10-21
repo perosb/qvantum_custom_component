@@ -427,14 +427,16 @@ def ensure_tap_water_start_below_stop(start: object, stop: object) -> None:
 DHW_SHOWER_TEMP_C = 38.0  # Target shower temperature (°C) — +2°C from Qvantum app
 DHW_TANK_VOLUME_L = 175  # buffer tank of the floor-standing models (QE, QG, QG-C, QH-175)
 # The DHW COP recovers production from the tank balance `bt30 · V · c`, so the
-# volume is a linear factor on the result, and the datasheet figure is only a
-# starting point. Two things move it: DHW is produced instantaneously through a
-# plate heat exchanger from the top of a stratified buffer tank, so `bt30 × V`
-# over-counts the stored energy per kelvin (123 L effective on a 175 L QE-6);
-# and the wall-mounted QH100 of the QGM apartment unit is a smaller store whose
-# volume Qvantum does not publish (135-145 L tap volume against 235 L for the
-# 175 L units). The effective volume is therefore identified from element-only
-# charges instead of assumed.
+# volume is a linear factor on the result. The datasheet figure covers the
+# floor-standing models but not every install: the wall-mounted QH100 of the QGM
+# apartment unit is a smaller store whose volume Qvantum does not publish (135-145
+# L tap volume against 235 L for the 175 L units), and `bt30` reads the top of a
+# stratified tank, so how much energy one kelvin represents depends on how the
+# charge mixes it. Measured on a QE-6 (2026-10-21), an element-only charge gave
+# 1.60 kWh over 7.7 K => 179 L, i.e. the nameplate holds there; an earlier
+# assumption that the top reading over-counts by a wide margin (123 L) was not
+# borne out. The volume is therefore identified from element-only charges
+# instead of assumed.
 DHW_TANK_LITERS_MIN = 50.0  # Reject an identification outside a plausible tank
 DHW_TANK_LITERS_MAX = 500.0
 DHW_TANK_LITERS_ALPHA = 0.25  # EMA weight of a new identification

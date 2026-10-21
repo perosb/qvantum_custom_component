@@ -12,6 +12,7 @@ from custom_components.qvantum.dhw_loss import (
     REFERENCE_DELTA_K,
     WATER_KWH_PER_LITER_K,
     blend,
+    element_only_tank_balance,
     mean_delta_k,
     reference_loss_kwh_per_day,
     standing_loss_kwh_per_day,
@@ -98,3 +99,25 @@ class TestNormalizedLoss:
         assert reference_loss_kwh_per_day(cold_window) == pytest.approx(
             reference_loss_kwh_per_day(hot_window)
         )
+
+
+def test_element_only_tank_balance_rejects_any_other_path_out() -> None:
+    """The identification divides by the rise, so nothing else may take heat.
+
+    Measured on a QE-6 (2026-10-21): extra hot water left the pump idle and the
+    element demanded while the addition shunt had been open (`qn8position` 7)
+    and the heating circuit was taking 2.3 kW - heat was leaving the tank the
+    whole time. ``heating_kwh`` is the interval's heating-counter delta, not the
+    derived power: the counter steps only when the house really received heat.
+    """
+    assert element_only_tank_balance(shunt_position=0, heating_kwh=0.0) is True
+    assert element_only_tank_balance(shunt_position=0, heating_kwh=-0.1) is True
+    assert element_only_tank_balance(shunt_position=7, heating_kwh=0.0) is False
+    assert element_only_tank_balance(shunt_position=0, heating_kwh=0.1) is False
+
+
+def test_element_only_tank_balance_tolerates_missing_readings() -> None:
+    """An install whose payload lacks them keeps identifying as before."""
+    assert element_only_tank_balance(shunt_position=None, heating_kwh=None) is True
+    assert element_only_tank_balance(shunt_position=True, heating_kwh="x") is True
+    assert element_only_tank_balance(shunt_position=0, heating_kwh=float("nan")) is True
