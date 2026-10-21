@@ -45,9 +45,11 @@ class _Calculator(QvantumCalculationsMixin):
                 float | None,
                 bool,
                 bool,
+                bool,
             ]
         ] = deque()
         self._cop_last: dict[str, float | None] = {}
+        self._cop_unattributed_kwh = 0.0
         self._cop_last_times: dict[str, datetime] = {}
         self._dhw_charge = None
         self._dhw_tank_liters: float | None = None
@@ -63,6 +65,7 @@ def _values(**overrides):
         "bt30": 50.0,
         "dhwdemand": 0,
         "additiondemand": 0,
+        "additiondhwdemand": 0,
     }
     base.update(overrides)
     return base
@@ -163,17 +166,17 @@ class TestSplitElectricalInput:
     """Attribution of one poll interval's electrical input."""
 
     def test_hot_water_books_everything_to_dhw(self):
-        heating, dhw, dhw_compressor = _split_electrical_input(
+        heating, dhw, dhw_compressor, unattributed = _split_electrical_input(
             hp_status=HP_STATUS_HOT_WATER,
             dhw_demand=True,
             aux_demand=False,
             compressor_kwh=0.3,
             aux_kwh=0.1,
         )
-        assert (heating, dhw, dhw_compressor) == (0.0, 0.4, 0.3)
+        assert (heating, dhw, dhw_compressor, unattributed) == (0.0, 0.4, 0.3, 0.0)
 
     def test_heating_without_dhw_demand_books_everything_to_heating(self):
-        heating, dhw, dhw_compressor = _split_electrical_input(
+        heating, dhw, dhw_compressor, _ = _split_electrical_input(
             hp_status=HP_STATUS_HEATING,
             dhw_demand=False,
             aux_demand=True,
@@ -183,7 +186,7 @@ class TestSplitElectricalInput:
         assert (heating, dhw, dhw_compressor) == (0.4, 0.0, 0.0)
 
     def test_auxiliary_heat_for_space_heating_stays_heating(self):
-        heating, dhw, _ = _split_electrical_input(
+        heating, dhw, _, _ = _split_electrical_input(
             hp_status=HP_STATUS_HEATING,
             dhw_demand=True,
             aux_demand=True,
@@ -193,7 +196,7 @@ class TestSplitElectricalInput:
         assert (heating, dhw) == (0.4, 0.0)
 
     def test_parallel_top_up_splits_by_source(self):
-        heating, dhw, dhw_compressor = _split_electrical_input(
+        heating, dhw, dhw_compressor, _ = _split_electrical_input(
             hp_status=HP_STATUS_HEATING,
             dhw_demand=True,
             aux_demand=False,
@@ -203,14 +206,14 @@ class TestSplitElectricalInput:
         assert (heating, dhw, dhw_compressor) == (0.3, 0.1, 0.0)
 
     def test_stopped_compressor_books_only_the_element(self):
-        heating, dhw, dhw_compressor = _split_electrical_input(
+        heating, dhw, dhw_compressor, unattributed = _split_electrical_input(
             hp_status=HP_STATUS_IDLE,
             dhw_demand=True,
             aux_demand=False,
             compressor_kwh=0.0,
             aux_kwh=0.4,
         )
-        assert (heating, dhw, dhw_compressor) == (0.0, 0.4, 0.0)
+        assert (heating, dhw, dhw_compressor, unattributed) == (0.0, 0.4, 0.0, 0.0)
 
     def test_idle_without_dhw_demand_attributes_nothing(self):
         assert _split_electrical_input(
@@ -219,7 +222,52 @@ class TestSplitElectricalInput:
             aux_demand=False,
             compressor_kwh=0.0,
             aux_kwh=0.0,
-        ) == (0.0, 0.0, 0.0)
+        ) == (0.0, 0.0, 0.0, 0.0)
+
+    def test_element_dhw_flag_attributes_element_energy_when_idle(self):
+        """The counters step after the demand has cleared; the flag still says.
+
+        Measured 2026-10-21: in all 1 087 counter-step intervals of a 10-day
+        window both ``dhw_demand`` and ``additiondemand`` had cleared, so the
+        element's 3.7 kWh of DHW work was booked nowhere and the charge never
+        accumulated the energy the volume identification needs.
+        """
+        heating, dhw, dhw_compressor, unattributed = _split_electrical_input(
+            hp_status=HP_STATUS_IDLE,
+            dhw_demand=False,
+            aux_demand=False,
+            aux_dhw_demand=True,
+            compressor_kwh=0.0,
+            aux_kwh=0.3,
+        )
+
+        assert (heating, dhw, dhw_compressor, unattributed) == (0.0, 0.3, 0.0, 0.0)
+
+    def test_element_dhw_flag_splits_a_parallel_run(self):
+        """Compressor to the house, element to the tank, without dhw_demand."""
+        heating, dhw, _, unattributed = _split_electrical_input(
+            hp_status=HP_STATUS_HEATING,
+            dhw_demand=False,
+            aux_demand=False,
+            aux_dhw_demand=True,
+            compressor_kwh=0.5,
+            aux_kwh=0.2,
+        )
+
+        assert (heating, dhw, unattributed) == (0.5, 0.2, 0.0)
+
+    def test_unflagged_element_energy_is_counted_not_dropped(self):
+        """A kWh that vanishes is how a COP drifts: report it instead."""
+        heating, dhw, _, unattributed = _split_electrical_input(
+            hp_status=HP_STATUS_IDLE,
+            dhw_demand=False,
+            aux_demand=False,
+            compressor_kwh=0.0,
+            aux_kwh=0.3,
+        )
+
+        assert (heating, dhw) == (0.0, 0.0)
+        assert unattributed == pytest.approx(0.3)
 
 
 class TestCalculateCop:
@@ -555,6 +603,56 @@ class TestCalculateCop:
         # 1 K · 175 L · c = 0.20 kWh over 0.4 kWh, not 6 K.
         assert closing["cop_dhw"] == pytest.approx(0.509, abs=1e-3)
 
+    def test_charge_accrues_element_energy_from_its_own_flag(self):
+        """An element top-up is DHW production even after the demand cleared.
+
+        Measured 2026-10-21: the demand flags read at the moment the coarse
+        energy counters step have almost always cleared, so the element's energy
+        was booked nowhere and the charge never accumulated what the volume
+        identification needs. The element's own DHW flag survives that gap.
+        """
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+
+        calculator._calculate_cop(
+            _values(
+                hp_status=HP_STATUS_IDLE,
+                dhwdemand=0,
+                additiondhwdemand=1,
+                additionalenergy=12.0,
+                bt30=62.0,
+            )
+        )
+
+        assert calculator._dhw_charge is not None
+        assert calculator._dhw_charge.element_kwh == pytest.approx(2.0)
+        assert calculator._dhw_tank_volume() == pytest.approx(143.3, rel=1e-3)
+
+        # The flag clearing closes the charge and persists the identification.
+        calculator._calculate_cop(
+            _values(
+                hp_status=HP_STATUS_IDLE,
+                dhwdemand=0,
+                additiondhwdemand=0,
+                additionalenergy=12.0,
+                bt30=62.0,
+            )
+        )
+        assert calculator._dhw_tank_liters == pytest.approx(143.3, rel=1e-3)
+
+    def test_unflagged_element_energy_is_counted_as_unattributed(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        calculator._calculate_cop(
+            _values(
+                hp_status=HP_STATUS_IDLE,
+                dhwdemand=0,
+                additionalenergy=10.3,
+                bt30=50.2,
+            )
+        )
+
+        assert calculator._cop_unattributed_kwh == pytest.approx(0.3)
     def test_tank_volume_identification_ignores_a_defrost(self):
         """A defrost inside the charge runs the compressor; it is not element-only.
 

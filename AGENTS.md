@@ -395,18 +395,30 @@ changed and why; a test pins the floor so a silent revert cannot pass.
   short-window system COP.
 - The electrical counters (`compressorenergy` + `additionalenergy`) are shared
   between modes and split per poll by `_split_electrical_input`: hot water → DHW;
-  space heating with `dhwdemand` and no `additiondemand` → compressor heating,
-  element DHW (parallel top-up); compressor idle with `dhwdemand` → element DHW
-  (the pump reports `Idle` when only the element runs, because `hp_status`
-  follows the compressor). Both demand flags are disabled-by-default binary
-  sensors and therefore sit in `REQUIRED_METRICS` — a disabled entity is not
-  fetched — and without them the split falls back to `hp_status` alone.
+  space heating → compressor heating with the element DHW when its own flag is
+  set (parallel top-up); compressor idle/defrosting → element DHW (the pump
+  reports `Idle` when only the element runs, because `hp_status` follows the
+  compressor). The **element is attributed by `additiondhwdemand`**, its own
+  DHW flag: measured 2026-10-21, the counters step late (compressor every ~9 min,
+  the element a handful of times a day) and in all 1 087 step intervals of a
+  10-day window both `dhwdemand` and `additiondemand` had already cleared, so a
+  demand-gated split booked the element's DHW energy nowhere — 3.7 kWh of 4.2 kWh
+  in that window, 8 % of the DHW electrical, and it also left `charge.element_kwh`
+  at zero so the volume identification could never fire. All three flags are
+  disabled-by-default binary sensors and therefore sit in `REQUIRED_METRICS` — a
+  disabled entity is not fetched. Energy that still cannot be attributed (an
+  element step with no flag, or a compressor step that landed in an idle
+  interval) is **never dropped silently**: it is returned separately and counted
+  in `cop.unattributed_kwh`, because a vanishing kWh is how a COP drifts.
 - `cop_heating`: rolling one-hour window of counter deltas over heating-mode
   electrical only. `cop_dhw`: **one charge segment** (`_update_dhw_charge`) —
-  opens on DHW demand with the previous poll's tank level, publishes live,
-  finalises on the first poll without demand; production = draw since the charge
-  started + tank change against that baseline, and a segment with no compressor
-  work is element-only, capped at COP 1.0. Two review invariants: the interval
+  opens on DHW demand **or on the element's DHW flag** with the previous poll's
+  tank level (an element top-up after the demand cleared is still DHW
+  production, and without it the segment never carried the element energy the
+  volume identification reads), publishes live, finalises on the first poll
+  without either; production = draw since the charge started + tank change
+  against that baseline, and a segment with no compressor work is element-only,
+  capped at COP 1.0. Two review invariants: the interval
   that clears the demand is **not** booked (closing publish uses
   `charge.last_tank`), and element-only evidence checks the **compressor counter**
   delta (`interval_dhw_compressor` is zero for every status but hot water, so a

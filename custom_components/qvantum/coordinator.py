@@ -236,7 +236,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # Cumulative energy counters from the previous poll, for instantaneous COP.
         self._last_cop_energies: dict[str, float] | None = None
         # Rolling window of (timestamp, counters, hp_status, bt30, dhwdemand,
-        # additiondemand) samples for the COP ratios; the kWh counters advance
+        # additiondemand, additiondhwdemand) samples for the COP ratios; the kWh counters advance
         # in 0.1 kWh steps, so one poll is not a measurement, the mode and the
         # demand flags decide which electrical energy is heating, and the tank
         # temperature recovers DHW production.
@@ -248,8 +248,15 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 float | None,
                 bool,
                 bool,
+                bool,
             ]
         ] = deque()
+        # Electrical energy the split could not attribute to either mode since
+        # this process started (an element step with no demand flag, or a
+        # compressor step that landed while the pump reports idle). It is left
+        # out of both COP ratios, so it is counted here to be visible in a
+        # support dump instead of vanishing.
+        self._cop_unattributed_kwh = 0.0
         # The open DHW charge segment (baseline tank, accumulated draw and
         # electrical input), or None when no charge is running.
         self._dhw_charge: DhwCharge | None = None
