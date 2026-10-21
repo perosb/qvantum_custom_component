@@ -230,8 +230,9 @@ Two things this rules out, both worth not re-investigating: the curve is
 **not** evaluated on a filtered outdoor temperature (a moving average of BT1 over
 1–12 h was fitted as the pump's input; 1 h fit best with a residual of 0.49 °C
 against 1.26 °C at 4 h), and the write path is not dropping or clamping points
-(holdings 20–26 read back exactly what was written). A gap between the table and
-`cal_heat_temp` is therefore a room-term or settings question, not a curve one.
+(holdings 24–30 read back exactly what was written, and the `number` entities
+mirror them). A gap between the table and `cal_heat_temp` is therefore a
+room-term or settings question, not a curve one.
 
 When fitting anything against `cal_heat_temp`, **include only hours after
 `active_since_ts`**: on Auto hours the pump runs its own curve, which mixes two
