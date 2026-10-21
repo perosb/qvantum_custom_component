@@ -54,6 +54,7 @@ from .heating_curve import (
     normalize_baseline,
     precharge_adjustment_c,
     ActiveRoomGain,
+    pump_room_temperature,
     room_compensation_gain,
     room_corrected_deviation,
     room_gain_from_active_hours,
@@ -240,6 +241,10 @@ class CurveSnapshot:
     #: Hours behind each point's trim; 0 means the trim is deliberately 0
     #: because the window holds no evidence near that outdoor temperature.
     trim_evidence: Mapping[str, int] = field(default_factory=dict)
+    #: Room temperature the pump's own room term is computed from (the mean of
+    #: the external value and BT2 in the external mode), so a support dump can
+    #: see which input the removed term used.
+    pump_room_c: float | None = None
     #: Points whose outdoor temperature lies outside the range the baseline
     #: was observed at. Their supply is extrapolated from the cached table, so
     #: readiness says nothing about them until the weather gets there.
@@ -1671,6 +1676,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         supply = _hourly_series(rows, supply_id)
         power = _hourly_series(rows, power_id) if power_id else {}
         indoor_key, indoor = self._indoor_series(resolved, rows)
+        bt2_id = resolved.get("bt2")
+        bt2 = _hourly_series(rows, bt2_id) if bt2_id else {}
         target = self._main_values().get("indoor_temperature_target")
         target_c = (
             float(target)
@@ -1686,9 +1693,17 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             if power_id and power.get(ts, 0.0) < MIN_SAMPLE_Q_W:
                 continue
             value = interpolate_supply(points, outdoor[ts]) - supply[ts]
-            if target_c is not None and ts in indoor and self._in_active_segment(ts):
+            if target_c is not None and self._in_active_segment(ts):
+                # The pump builds its room term from the mean of the external
+                # value and BT2 in the external mode, so removing it needs the
+                # same value; one sensor alone leaves a constant bias.
+                room = pump_room_temperature(
+                    indoor.get(ts), bt2.get(ts), external_mode=self._external_mode()
+                )
                 value = room_corrected_deviation(
-                    value, self._gain_for(indoor_key), indoor[ts] - target_c
+                    value,
+                    self._gain_for(indoor_key),
+                    None if room is None else room - target_c,
                 )
             series[ts] = value
         return series, set(outdoor)
@@ -2240,6 +2255,41 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         key = self._indoor_live_key(values)
         return None if key is None else float(values[key])
 
+    def _external_mode(self) -> bool:
+        """True when the pump reads an external room sensor (holding 9)."""
+        values = self._main_values()
+        mode = values.get("sensor_mode")
+        if mode is None:
+            mode = values.get("use_operation_sensor")
+        return "room_temp_external" in SensorMode.current_temperature_keys(mode)
+
+    def _pump_room_value(self, values: Mapping[str, Any]) -> float | None:
+        """Room temperature the pump's own room term is computed from.
+
+        See ``pump_room_temperature``: in the external mode the firmware blends
+        the external value with BT2, so the term it adds to ``cal_heat_temp``
+        is not the one our configured sensor would predict.
+        """
+        bt2 = values.get("bt2")
+        bt2_c = (
+            float(bt2)
+            if isinstance(bt2, (int, float)) and not isinstance(bt2, bool)
+            else None
+        )
+        return pump_room_temperature(
+            self._indoor_value(values), bt2_c, external_mode=self._external_mode()
+        )
+
+    def _pump_room_error(self, values: Mapping[str, Any]) -> float | None:
+        """``pump room − target``, the error the pump's room term scales."""
+        room = self._pump_room_value(values)
+        target = values.get("indoor_temperature_target")
+        if room is None or not isinstance(target, (int, float)) or isinstance(
+            target, bool
+        ):
+            return None
+        return room - float(target)
+
     def _gain_for(self, indoor_key: str | None) -> float | None:
         """The room gain, but only for the sensor it was learned from.
 
@@ -2540,7 +2590,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 self._gain_for(self._indoor_live_key(values))
                 if self._in_active_segment(now_ts)
                 else None,
-                self._room_error(values),
+                self._pump_room_error(values),
             )
 
         signal = signal_blocker(
@@ -2602,6 +2652,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             room_error_source=room_source,
             indoor_margin_c=indoor_margin,
             indoor_cap_armed=indoor_margin is not None,
+            pump_room_c=self._pump_room_value(values),
             model=self._model,
             daily_model=self._daily_model,
             calibrated_at=self._calibrated_at,

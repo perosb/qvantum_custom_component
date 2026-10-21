@@ -460,6 +460,22 @@ changed and why; a test pins the floor so a silent revert cannot pass.
   exogenous there; it is diagnostics-only, travels with its gates
   (`valid`/`notes`, hours, buckets, R², leave-one-out) and never becomes the
   applied gain while the pump reports a factor.
+- The room **value** in that removal is the pump's own input, not our configured
+  sensor's: in the external mode (`sensor_mode` 4) the firmware blends the
+  external value with BT2. Measured on a QE-6, 2026-10-21: `cal_heat_temp`
+  follows `curve(bt1) + 5.0 · (desired − room)` with `room` the **mean** of the
+  two (median |deviation| 0.10 °C, against 0.32 °C for the external sensor alone
+  and 0.30 °C for BT2), the 5.0 gain confirmed by a +1.1 K target step that moved
+  `cal_heat_temp` by 5.5 K, and a +2 K step on `curve_10` that moved it by 1.9 K
+  (the table is followed 1:1). Removing a term built from one sensor while the
+  pump built it from the mean leaves a constant `gain · (bt2 − configured) / 2`
+  bias — 1.7 °C on that install, i.e. more than the readiness median gate, which
+  is why the median sat at 2.17 °C with a raw 1.43 °C underneath. Hence
+  `pump_room_temperature` (mean blend, guarded to the external mode — the only
+  regime it was measured in) feeds the readiness window and the live
+  `deviation`, while the trims, the indoor cap and `room_error` stay on the
+  configured sensor because those describe the house. `pump_room_c` travels in
+  the snapshot, the deviation sensor and the diagnostics.
 - While the curve is active readiness turns self-referential;
   `sensor.qvantum_adaptive_curve_room_error` (median `|indoor − target|` over the
   same window) is the outcome signal instead. Readiness also only covers the

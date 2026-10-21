@@ -830,6 +830,34 @@ def room_corrected_deviation(
     return deviation_c - gain_c * room_error_c
 
 
+def pump_room_temperature(
+    configured_c: float | None,
+    bt2_c: float | None,
+    *,
+    external_mode: bool,
+) -> float | None:
+    """The room value the pump's own room term is computed from.
+
+    In the external-sensor mode the firmware does not use the external value on
+    its own: measured on a QE-6 (2026-10-21), ``cal_heat_temp`` follows
+    ``curve(bt1) + 5.0 · (desired − room)`` with ``room`` the **mean of the
+    external value and BT2** — median |deviation| 0.10 °C against 0.32 °C for
+    the external sensor alone and 0.30 °C for BT2, while a +1.1 K target step
+    moved ``cal_heat_temp`` by 5.5 K and confirmed the 5.0 gain.
+
+    Removing a room term built from one sensor while the pump built it from the
+    mean leaves a constant bias of ``gain · (bt2 − configured) / 2``, which on
+    that install was ~1.7 °C — more than the readiness median gate. The blend
+    is applied only in the external mode, the one regime it was measured in;
+    everywhere else the configured sensor is what the pump reads.
+    """
+    if configured_c is None:
+        return bt2_c
+    if bt2_c is None or not external_mode:
+        return configured_c
+    return (configured_c + bt2_c) / 2.0
+
+
 def _weighted_median(values: Sequence[tuple[float, float]]) -> float:
     """Median of ``(value, weight)`` pairs; weights need not be normalized."""
     ordered = sorted(values)

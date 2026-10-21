@@ -438,6 +438,10 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         # curve has no warm-house brake, which a support dump should show.
         "indoor_margin_c": getattr(snapshot, "indoor_margin_c", None),
         "indoor_cap_armed": getattr(snapshot, "indoor_cap_armed", None),
+        # Which room value the removed room term used: the firmware blends the
+        # external sensor with BT2 in the external mode, so a dump that only
+        # showed the configured sensor could not explain the deviation.
+        "pump_room_c": getattr(snapshot, "pump_room_c", None),
         "clamped": getattr(snapshot, "clamped", None),
         # Which point wants to leave the pump's supply limits: the baseline
         # point is what to adjust, so a dump must name it.

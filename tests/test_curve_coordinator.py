@@ -556,13 +556,63 @@ async def test_readiness_room_correction_requires_the_matching_sensor() -> None:
         )
         return coordinator
 
-    # The picker falls back to BT2 and the gain came from BT2: corrected.
+    # The picker falls back to BT2 and the gain came from BT2: corrected. The
+    # external series is empty here, so the pump's room value is BT2 alone.
     series, _ = await build(source="bt2")._async_readiness_hours()
     assert series[100] == pytest.approx(36.0 - 40.0 - 9.0 * 1.0)
 
     # Learned from the external sensor, which has no history here: the BT2
     # error is left alone rather than scaled by another sensor's gain.
     series, _ = await build(source="room_temp_external")._async_readiness_hours()
+    assert series[100] == pytest.approx(36.0 - 40.0)
+
+
+async def test_readiness_room_correction_uses_the_pump_room_value() -> None:
+    """The term removed is the one the pump added, not our sensor's alone.
+
+    Measured on a live QE-6 (2026-10-21) in the external mode: ``cal_heat_temp``
+    follows the curve plus a room term on the mean of the external value and
+    BT2. Removing a term built from the external reading alone left a constant
+    ~1.7 °C bias, which is more than the readiness median gate.
+    """
+    values = {**VALUES, "sensor_mode": 4, "indoor_temperature_target": 20.0}
+    hours = [100 + index * 3600 for index in range(cc.INDOOR_METRIC_MIN_HOURS)]
+
+    def build(*, external, bt2):
+        coordinator = make_coordinator(values=values, settings=SETTINGS)
+        coordinator._baseline = dict(BASELINE)
+        coordinator._room_gain = 9.0
+        coordinator._room_gain_source = "room_temp_external"
+        coordinator._mode = "active"
+        coordinator._active_since_ts = 0.0
+        coordinator._resolve_statistic_ids = MagicMock(
+            return_value={
+                "bt1": "sensor.t",
+                "cal_heat_temp": "sensor.s",
+                "heatingpower": "sensor.q",
+                "bt2": "sensor.i",
+                "room_temp_external": "sensor.r",
+            }
+        )
+        rows = {
+            "sensor.t": [{"start": ts, "mean": 10.0} for ts in hours],
+            "sensor.s": [{"start": ts, "mean": 40.0} for ts in hours],
+            "sensor.q": [{"start": ts, "mean": 900.0} for ts in hours],
+            "sensor.i": [{"start": ts, "mean": bt2} for ts in hours],
+        }
+        if external is not None:
+            rows["sensor.r"] = [{"start": ts, "mean": external} for ts in hours]
+        coordinator._async_statistics = AsyncMock(return_value=rows)
+        return coordinator
+
+    # External 20.0 and BT2 21.0: the pump's input is 20.5, so the removed
+    # error is 0.5 and not the external sensor's own 0.0.
+    series, _ = await build(external=20.0, bt2=21.0)._async_readiness_hours()
+    assert series[100] == pytest.approx(36.0 - 40.0 - 9.0 * 0.5)
+
+    # No external history: the picker falls back to BT2, which no longer
+    # matches the gain's source, so nothing is removed at all.
+    series, _ = await build(external=None, bt2=21.0)._async_readiness_hours()
     assert series[100] == pytest.approx(36.0 - 40.0)
 
 
@@ -2492,9 +2542,44 @@ async def test_snapshot_deviation_removes_room_term() -> None:
     with patch.object(cc.asyncio, "sleep", AsyncMock()):
         snapshot = await coordinator._async_compute_snapshot()
 
-    # Raw deviation is 36.0 − 37.0; the 0.5 °C room error at 9 °C/°C is removed.
-    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.5)
+    # Raw deviation is 36.0 − 37.0. The pump builds its room term from the mean
+    # of the external value (20.6) and BT2 (21.0) in the external mode, so the
+    # removed term is 9 °C/°C over that mean's 0.7 °C error, not the external
+    # sensor's 0.5 °C.
+    assert snapshot.pump_room_c == pytest.approx(20.8)
+    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.7)
     assert snapshot.room_gain_c == pytest.approx(9.0)
+
+
+async def test_snapshot_deviation_falls_back_to_one_sensor() -> None:
+    """Without BT2 (or in BT2 mode) the configured value is all the pump has."""
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}, live_curve_type=1
+    )
+    coordinator._main.data["values"].update(
+        {
+            "sensor_mode": 4,
+            "room_temp_external": 20.6,
+            "indoor_temperature_target": 20.1,
+        }
+    )
+    coordinator._main.data["values"].pop("bt2")
+    coordinator._baseline = dict(BASELINE)
+    coordinator._room_gain = 9.0
+    coordinator._room_gain_source = "room_temp_external"
+    coordinator._mode = "active"
+    coordinator._active_since_ts = time.time() - 3600
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._daylight = MagicMock(return_value=None)
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.pump_room_c == pytest.approx(20.6)
+    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.5)
 
 
 async def test_snapshot_arms_the_indoor_cap_with_a_room_reading() -> None:

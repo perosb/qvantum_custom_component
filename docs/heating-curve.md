@@ -271,7 +271,11 @@ Entities:
   `baseline_outdoor_max_c` from the last baseline fit and `room_gain_c_per_c`
   (the pump's room-compensation gain — its own `room_comp_factor` when it
   reports one — removed from the deviation while the pump follows our table).
-  `extrapolated_points` lists the curve points outside that observed range:
+  `extrapolated_points` lists the curve points outside that observed range,
+  and `pump_room_c` is the room value the pump's own compensation term was
+  computed from — in the external-sensor mode the firmware averages the external
+  value with BT2, so that is not the same as the configured sensor's reading and
+  the deviation would carry a constant bias if the term were removed from ours:
   their supply comes from the cached table rather than from anything the pump
   was watched doing, so readiness says nothing about them yet.
   The `ready`/`blocker` attributes describe the baseline-vs-pump window, not
