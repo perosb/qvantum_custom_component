@@ -98,16 +98,29 @@ jobs:
           # from the count (see the changed-paths step) since they add volume,
           # not complexity.
           PI_MODEL: ${{ steps.changed.outputs.review_additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
+          # Opt-in progress log: set the repository variable PI_REVIEW_LOG=1 to
+          # stream the reviewer's thinking, tool calls, usage and retries into
+          # the Actions log. Unset (default) keeps this step as quiet as before.
+          PI_REVIEW_LOG: ${{ vars.PI_REVIEW_LOG }}
         run: |
+          echo "Reviewing $(wc -l < /tmp/pr.diff) diff line(s) with $PI_MODEL (log: ${PI_REVIEW_LOG:-off})"
           # Replace pi's coding-assistant system prompt: it advertises pi's own
           # docs and a broad tool set, which makes a review run wander instead
           # of returning the review JSON. Only the two repo-scoped lookup tools
           # stay enabled, so the reviewer can verify a claim but cannot read
           # credentials or run commands.
+          #
+          # stdout is the JSONL stream: stream_events.py writes it verbatim to
+          # /tmp/pi-events.jsonl (post_review.py reads that file) and, when
+          # PI_REVIEW_LOG is set, prints a readable summary instead of leaving
+          # the run silent for up to 30 minutes. stderr (pi's diagnostics) is
+          # teed for post-mortems.
           cat /tmp/pr.diff | pi --provider openrouter --model "$PI_MODEL" \
             --thinking max \
             --system-prompt "$(cat .github/pi/review-prompt.md)" \
-            -p --no-session --tools repo_grep,repo_read --mode json > /tmp/pi-events.jsonl
+            -p --no-session --tools repo_grep,repo_read --mode json \
+            2> >(tee /tmp/pi-stderr.log >&2) \
+            | python3 -u .github/pi/stream_events.py --output /tmp/pi-events.jsonl
           [ -s /tmp/pi-events.jsonl ]
 
       - name: Post GitHub review
