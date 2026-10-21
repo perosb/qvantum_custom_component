@@ -337,10 +337,14 @@ REQUIRED_METRICS = [
     # Required by the instantaneous COP's mode attribution. The immersion
     # heater can charge the DHW tank while the compressor is stopped (the pump
     # then reports Idle) or while it heats the house (Heating), so hp_status
-    # alone books that energy as heating input. Both flags are also binary
+    # alone books that energy as heating input. All three flags are also binary
     # sensors that can be disabled, and a disabled entity is not fetched.
     "dhwdemand",
     "additiondemand",
+    # The element's own DHW flag: measured 2026-10-21, the demand flags read at
+    # the moment the coarse energy counters step have almost always cleared, so
+    # this is what attributes element energy to the tank instead of losing it.
+    "additiondhwdemand",
     *HEATING_CURVE_HTTP_KEYS.values(),
 ]
 

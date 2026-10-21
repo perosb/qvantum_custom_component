@@ -74,7 +74,8 @@ def _split_electrical_input(
     aux_demand: bool,
     compressor_kwh: float,
     aux_kwh: float,
-) -> tuple[float, float, float]:
+    aux_dhw_demand: bool = False,
+) -> tuple[float, float, float, float]:
     """Attribute one poll interval's electrical input to heating and DHW.
 
     ``hp_status`` alone cannot do this. The immersion heater charges the DHW
@@ -83,23 +84,38 @@ def _split_electrical_input(
     compressor heats the house (``Heating``). Booked as heating input, that
     auxiliary energy collapses the heating COP for a charge it never delivered.
 
-    Returns ``(heating_kwh, dhw_kwh, dhw_compressor_kwh)``. The last figure says
-    how much of the DHW bucket is compressor work, which bounds how high the DHW
-    ratio can physically be — an element-only charge cannot exceed COP 1.
+    The element is attributed by **its own demand flag** first. The energy
+    counters step late (measured 2026-10-21: the compressor every ~9 minutes,
+    the element a handful of times a day), and in all 1 087 step intervals of a
+    10-day window both ``dhw_demand`` and ``additiondemand`` had already
+    cleared — so the demand-gated branches almost never fire and the element's
+    DHW work was booked nowhere.
+
+    Returns ``(heating_kwh, dhw_kwh, dhw_compressor_kwh, unattributed_kwh)``.
+    ``dhw_compressor_kwh`` says how much of the DHW bucket is compressor work,
+    which bounds how high the DHW ratio can physically be — an element-only
+    charge cannot exceed COP 1. Energy that cannot be attributed (an element
+    step with no flag, or a compressor step that landed while the pump reports
+    idle) is returned separately instead of being dropped: it belongs to
+    neither ratio, but a silently vanishing kWh is how a COP drifts.
     """
     total = compressor_kwh + aux_kwh
     if hp_status == HP_STATUS_HOT_WATER:
-        return 0.0, total, compressor_kwh
-    if not (dhw_demand and not aux_demand):
-        # No DHW charge, or the auxiliary heat is flagged for space heating.
-        if hp_status == HP_STATUS_HEATING:
-            return total, 0.0, 0.0
-        return 0.0, 0.0, 0.0
+        return 0.0, total, compressor_kwh, 0.0
+
+    dhw_aux = (
+        aux_kwh if (aux_dhw_demand or (dhw_demand and not aux_demand)) else 0.0
+    )
+    other_aux = aux_kwh - dhw_aux
     if hp_status == HP_STATUS_HEATING:
-        # Parallel run: the compressor heats the house, the element the tank.
-        return compressor_kwh, aux_kwh, 0.0
-    # Compressor stopped while DHW is still demanded: the element alone.
-    return 0.0, aux_kwh, 0.0
+        # The compressor heats the house. The element may still be charging the
+        # tank beside it (the parallel run), which is exactly what its own flag
+        # separates.
+        return compressor_kwh + other_aux, dhw_aux, 0.0, 0.0
+    # Compressor stopped or defrosting: the element can still be charging the
+    # tank, but element work with no DHW flag and a compressor step that landed
+    # in an idle interval belong to neither mode.
+    return 0.0, dhw_aux, 0.0, other_aux + compressor_kwh
 
 
 @dataclass
@@ -296,8 +312,17 @@ class QvantumCalculationsMixin:
         # interval is attributed with the mode in force at its end.
         dhw_demand = _flag(values.get("dhwdemand"))
         aux_demand = _flag(values.get("additiondemand"))
+        aux_dhw_demand = _flag(values.get("additiondhwdemand"))
         history = self._cop_history
-        sample = (now, current, hp_status, tank_temp, dhw_demand, aux_demand)
+        sample = (
+            now,
+            current,
+            hp_status,
+            tank_temp,
+            dhw_demand,
+            aux_demand,
+            aux_dhw_demand,
+        )
 
         if previous is None:
             # First observation only seeds the window. A snapshot restored from
@@ -339,24 +364,31 @@ class QvantumCalculationsMixin:
 
         heating_thermal = 0.0
         heating_electrical = 0.0
-        for (_, before, _, _, _, _), (
+        for (_, before, _, _, _, _, _), (
             _,
             after,
             mode,
             _,
             interval_dhw_demand,
             interval_aux_demand,
+            interval_aux_dhw_demand,
         ) in pairwise(history):
-            interval_heating, _, _ = _split_electrical_input(
+            interval_heating, _, _, u = _split_electrical_input(
                 hp_status=mode,
                 dhw_demand=interval_dhw_demand,
                 aux_demand=interval_aux_demand,
+                aux_dhw_demand=interval_aux_dhw_demand,
                 compressor_kwh=(after["compressorenergy"] - before["compressorenergy"]),
                 aux_kwh=(after["additionalenergy"] - before["additionalenergy"]),
             )
             if mode == HP_STATUS_HEATING:
                 heating_thermal += after["heatingenergy"] - before["heatingenergy"]
             heating_electrical += interval_heating
+            if after is current:
+                # The window is re-walked on every poll, so an interval inside
+                # the hour would be counted again each time; only the one this
+                # poll closed is new evidence.
+                self._cop_unattributed_kwh += u
 
         # The counters are read as floats, so a sum can land a hair below its
         # nominal value (0.2 -> 0.19999999999999574). Rounding below the
@@ -379,6 +411,7 @@ class QvantumCalculationsMixin:
             hp_status=hp_status,
             dhw_demand=dhw_demand,
             aux_demand=aux_demand,
+            aux_dhw_demand=aux_dhw_demand,
         )
 
         self._set_cop(
@@ -398,6 +431,7 @@ class QvantumCalculationsMixin:
         hp_status: object,
         dhw_demand: bool,
         aux_demand: bool,
+        aux_dhw_demand: bool = False,
     ) -> None:
         """Measure the current DHW charge as one segment and publish its COP.
 
@@ -413,7 +447,11 @@ class QvantumCalculationsMixin:
         instead of publishing a figure nobody can trust.
         """
         charge = self._dhw_charge
-        charging = dhw_demand or hp_status == HP_STATUS_HOT_WATER
+        # The element's own DHW flag keeps the segment open after dhw_demand has
+        # cleared: an element top-up is DHW production too, and without it the
+        # charge never accumulated the element energy the volume identification
+        # needs.
+        charging = dhw_demand or aux_dhw_demand or hp_status == HP_STATUS_HOT_WATER
 
         if charge is not None and (
             now - charge.started
@@ -446,10 +484,11 @@ class QvantumCalculationsMixin:
             self._dhw_charge = charge
 
         compressor_delta = current["compressorenergy"] - previous["compressorenergy"]
-        _, interval_dhw, interval_dhw_compressor = _split_electrical_input(
+        _, interval_dhw, interval_dhw_compressor, _ = _split_electrical_input(
             hp_status=hp_status,
             dhw_demand=dhw_demand,
             aux_demand=aux_demand,
+            aux_dhw_demand=aux_dhw_demand,
             compressor_kwh=compressor_delta,
             aux_kwh=current["additionalenergy"] - previous["additionalenergy"],
         )

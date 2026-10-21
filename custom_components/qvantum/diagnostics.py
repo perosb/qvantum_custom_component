@@ -186,6 +186,13 @@ def _cop_diagnostics(coordinator: Any) -> dict[str, Any]:
         "heating_updated_at": _iso(times.get("cop_heating")),
         "dhw_updated_at": _iso(times.get("cop_dhw")),
         "dhw_tank_liters": getattr(coordinator, "_dhw_tank_liters", None),
+        # Electrical energy the mode split could not attribute to either ratio
+        # since this process started. It is left out of both COPs, so a report
+        # that shows it growing points at the counter cadence rather than at the
+        # pumps. Reset on restart by construction.
+        "unattributed_kwh": round(
+            float(getattr(coordinator, "_cop_unattributed_kwh", 0.0) or 0.0), 3
+        ),
         "dhw_charge": None
         if charge is None
         else {
