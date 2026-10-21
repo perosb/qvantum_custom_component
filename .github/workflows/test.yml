@@ -6,10 +6,34 @@ on:
     paths-ignore:
       - "docs/releases/**"
   pull_request:
+    # `labeled`/`unlabeled` so adding or removing the `docs-not-needed` opt-out
+    # re-evaluates the documentation job without an empty commit.
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   release:
     types: [published]
 
 jobs:
+  docs:
+    # Behaviour changes must carry their prose. The rule is deliberately coarse
+    # (any documentation move satisfies it) because the judgement belongs to the
+    # author; `docs-not-needed` opts out explicitly, which the job re-reads when
+    # the label changes.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Documentation follows behaviour
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          python3 .github/scripts/check_docs.py \
+            --base "$BASE_SHA" --head "$HEAD_SHA" --labels-json "$PR_LABELS"
+
   test:
     runs-on: ubuntu-latest
     strategy:

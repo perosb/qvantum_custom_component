@@ -207,6 +207,29 @@ into `docs/releases/<tag>.md`), so write it in user-facing language; `## Test
 plan` is ignored. End the body with `Closes #<n>` when the PR resolves an issue.
 Labels `bug` / `enhancement` / `chore` feed release-drafter.
 
+### Documentation is part of the change (and is checked)
+
+The `docs` job in `test.yml` fails a pull request that touches
+`custom_components/qvantum/**` without also touching `AGENTS.md`, `README.md` or
+`docs/**`. The rule is deliberately coarse — it only asks whether *any* prose
+moved, because "does this need a sentence?" is the author's judgement — and a
+PR that genuinely needs none opts out with the **`docs-not-needed`** label,
+which the job re-reads on `labeled`/`unlabeled` so no empty commit is needed.
+Translations, tests, `docs/releases/**` and the workflows do not count as
+behaviour, so a test-only or tooling PR passes on its own.
+
+Passing the job is not the bar: the automated reviewer (`pi-review.yml`,
+prompt in `.github/pi/review-prompt.md`) also checks that the *sentence which is
+now wrong* is the one that changed. What has to move, when:
+
+| Change | Documentation |
+|---|---|
+| Derived metric, gate, threshold, persisted field, `SUMMARY_SCHEMA_VERSION` meaning | `AGENTS.md` and the metric's section in `docs/` |
+| New snapshot / diagnostics field | the field lists in `AGENTS.md` and `docs/` |
+| New entity, option, service, user-visible behaviour | `docs/` (and `README.md` for the summary export's field list) |
+| A measured constant or protocol behaviour (a probe, a verified register) | the place that documents the measurement, with its numbers |
+| Workflow, tooling, release automation | `AGENTS.md` |
+
 ### Release automation
 
 `release.yml` is the only writer of `manifest.json` / `const.py` (both hold the
