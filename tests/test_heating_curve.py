@@ -39,6 +39,7 @@ from custom_components.qvantum.heating_curve import (
     outdoor_adjustment_c,
     precharge_adjustment_c,
     room_compensation_gain,
+    pump_room_temperature,
     room_corrected_deviation,
     solar_adjustment_c,
     trim_evidence_hours,
@@ -556,6 +557,19 @@ def test_room_corrected_deviation_subtracts_the_room_term() -> None:
     assert room_corrected_deviation(2.0, None, 0.5) == 2.0
     assert room_corrected_deviation(2.0, 9.0, None) == 2.0
     assert room_corrected_deviation(None, 9.0, 0.5) is None
+
+
+def test_pump_room_temperature_blends_only_in_the_external_mode() -> None:
+    """The pump's own room input, as measured on a QE-6 in external mode."""
+    # External mode: the firmware averages the external value with BT2.
+    assert pump_room_temperature(19.8, 20.6, external_mode=True) == pytest.approx(20.2)
+    # BT2 mode (or any other): the configured sensor is what the pump reads.
+    assert pump_room_temperature(20.6, 20.6, external_mode=False) == pytest.approx(20.6)
+    assert pump_room_temperature(19.8, 20.6, external_mode=False) == pytest.approx(19.8)
+    # One reading is enough; none means no term.
+    assert pump_room_temperature(19.8, None, external_mode=True) == pytest.approx(19.8)
+    assert pump_room_temperature(None, 20.6, external_mode=True) == pytest.approx(20.6)
+    assert pump_room_temperature(None, None, external_mode=True) is None
 
 
 def test_trim_evidence_hours_counts_only_qualifying_buckets() -> None:

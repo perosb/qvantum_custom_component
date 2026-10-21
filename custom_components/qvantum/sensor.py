@@ -1008,6 +1008,10 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             # means a warm house cannot veto a raise (no indoor sensor).
             "indoor_cap_armed": snapshot.indoor_cap_armed,
             "indoor_margin_c": snapshot.indoor_margin_c,
+            # In the external mode the pump blends the external value with its
+            # own BT2 for the room term, so this is the input the removed term
+            # used — not the configured sensor's reading.
+            "pump_room_c": snapshot.pump_room_c,
             # The baseline was only observed between the two temperatures
             # above; these points are extrapolated from the cached table, so
             # readiness says nothing about them yet.
