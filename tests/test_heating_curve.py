@@ -655,6 +655,7 @@ def test_compute_curve_applies_trims_and_pump_bounds() -> None:
     # Which point the limits bit: the boolean alone cannot name the baseline
     # point that has to move.
     assert result.clamped_points == ("curve_minus_30",)
+    assert result.floor_pinned_points == ()
 
     unclamped = compute_curve(
         baseline=BASELINE,
@@ -667,6 +668,67 @@ def test_compute_curve_applies_trims_and_pump_bounds() -> None:
     assert not unclamped.clamped
     assert unclamped.clamped_points == ()
     assert unclamped.trims == {key: 0.0 for key in BASELINE}
+
+
+def test_floor_pinned_warm_end_is_not_a_clamped_point() -> None:
+    """A knot on the pump's floor cannot express less heat, and nothing helps.
+
+    ``lift_baseline_floor`` puts the warm end on the pump's minimum, so a
+    negative adjustment or trim is clamped on every computation whatever the
+    weather does. Reporting that as ``clamped`` would point a user at a
+    baseline point with nowhere to go, and it would make the ``days_clamped``
+    counter fire at every installation on every mild day.
+    """
+    flat = {**BASELINE, "curve_30": 20.0, "curve_20": 20.0}
+    result = compute_curve(
+        baseline=flat,
+        now_ts=BASE_HOUR,
+        forecast_temperature=forecast_map(10.0),
+        ghi_by_hour={},
+        point_trims={"curve_20": -0.4},
+        outdoor_horizon_hours=0,
+        min_supply_c=20.0,
+        max_supply_c=60.0,
+    )
+
+    assert result.adjustment_c < 0.0 or result.trims["curve_20"] < 0.0
+    assert result.floor_pinned_points
+    assert set(result.floor_pinned_points) <= {"curve_30", "curve_20"}
+    assert result.clamped is False
+    assert result.clamped_points == ()
+    assert all(value >= 20.0 for _, value in result.points)
+
+
+def test_baseline_above_the_floor_stays_clamped() -> None:
+    """A knot the baseline *could* lower stays actionable, floor or not."""
+    result = compute_curve(
+        baseline={**BASELINE, "curve_30": 21.0},
+        now_ts=BASE_HOUR,
+        forecast_temperature=forecast_map(10.0),
+        ghi_by_hour={},
+        outdoor_horizon_hours=0,
+        precharge_c=0.0,
+        min_supply_c=20.0,
+        max_supply_c=60.0,
+    )
+
+    # No clamp at all here: the point is inside the bounds.
+    assert result.clamped_points == ()
+    assert result.floor_pinned_points == ()
+
+    lowered = compute_curve(
+        baseline={**BASELINE, "curve_30": 20.5, "curve_20": 20.5},
+        now_ts=BASE_HOUR,
+        forecast_temperature=forecast_map(-5.0),
+        ghi_by_hour={},
+        point_trims={"curve_30": -1.0},
+        min_supply_c=20.0,
+        max_supply_c=60.0,
+    )
+
+    assert lowered.clamped is True
+    assert "curve_30" in lowered.clamped_points
+    assert "curve_30" not in lowered.floor_pinned_points
 
 
 def test_flat_warm_end_survives_a_trim_difference() -> None:

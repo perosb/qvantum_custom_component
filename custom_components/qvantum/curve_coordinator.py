@@ -226,6 +226,10 @@ class CurveSnapshot:
     #: the boolean view; which point it is decides whether the baseline point
     #: or the pump's limits are the thing to change.
     clamped_points: tuple[str, ...] = ()
+    #: Points whose baseline already sits on the pump's floor, so a request
+    #: below it is clamped without anything to adjust. Reported apart from
+    #: ``clamped_points``, which stays the actionable list.
+    floor_pinned_points: tuple[str, ...] = ()
     baseline_learned_hours: int | None = None
     baseline_outdoor_min_c: float | None = None
     baseline_outdoor_max_c: float | None = None
@@ -2605,6 +2609,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             trims=active_trims,
             clamped=bool(result is not None and result.clamped),
             clamped_points=() if result is None else result.clamped_points,
+            floor_pinned_points=()
+            if result is None
+            else getattr(result, "floor_pinned_points", ()),
             baseline_learned_hours=learned_hours,
             baseline_outdoor_min_c=learned_min,
             baseline_outdoor_max_c=learned_max,

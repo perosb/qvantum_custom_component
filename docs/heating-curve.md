@@ -245,7 +245,11 @@ could not observe is corrected by the weather the house actually sees.
 
 Computed points are clamped to the pump's own min/max heating supply (holding
 19/20) when those are known, not just the register range 10–80 °C, so a point
-is never written above what the firmware will actually use.
+is never written above what the firmware will actually use. A knot the baseline
+already sits on at that floor — the warm end, after the floor lift — cannot
+express a request below it; that is reported as `floor_pinned` (structural,
+nothing to adjust) rather than `clamped` (a demand the baseline point should
+move to answer).
 
 Entities:
 
@@ -258,7 +262,7 @@ Entities:
   already right.
 - `sensor.qvantum_adaptive_curve_adjustment` — the shared adjustment, with
   `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `cop_c`, `precharge_c`,
-  `trims` and `clamped` attributes.
+  `trims`, `clamped`, `clamped_points` and `floor_pinned_points` attributes.
 - `sensor.qvantum_adaptive_curve_deviation` — computed supply at the measured
   outdoor minus `cal_heat_temp` (input 35), with `shadow`, `ready`, `blocker`
   and `baseline_auto` (baseline frozen while the pump was on Auto) attributes,

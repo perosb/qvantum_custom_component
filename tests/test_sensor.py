@@ -603,6 +603,7 @@ class TestQvantumCurveSensors:
             "evidence_hours": 12,
             "extrapolated": True,
             "clamped": False,
+            "floor_pinned": False,
         }
         assert entity.suggested_object_id == "adaptive_curve_01_30"
         assert entity._attr_unique_id == "qvantum_adaptive_curve_30_test_device_123"
@@ -633,6 +634,7 @@ class TestQvantumCurveSensors:
             "trims": {},
             "clamped": False,
             "clamped_points": [],
+            "floor_pinned_points": [],
         }
 
         empty = QvantumCurveAdjustmentSensor(
@@ -678,6 +680,24 @@ class TestQvantumCurveSensors:
         assert adjustment.extra_state_attributes["clamped_points"] == [
             "curve_minus_30"
         ]
+
+    def test_point_sensor_names_the_floor_pinned_point(self, mock_device):
+        """A knot on the pump's floor says so without claiming an action."""
+        coordinator = _curve_coordinator(
+            _curve_snapshot(clamped=False, floor_pinned_points=("curve_20",))
+        )
+
+        pinned = QvantumCurvePointSensor(coordinator, "adaptive_curve_20", mock_device)
+        untouched = QvantumCurvePointSensor(coordinator, "adaptive_curve_0", mock_device)
+        adjustment = QvantumCurveAdjustmentSensor(
+            coordinator, "adaptive_curve_adjustment", mock_device
+        )
+
+        assert pinned.extra_state_attributes["floor_pinned"] is True
+        assert pinned.extra_state_attributes["clamped"] is False
+        assert untouched.extra_state_attributes["floor_pinned"] is False
+        assert adjustment.extra_state_attributes["floor_pinned_points"] == ["curve_20"]
+        assert adjustment.extra_state_attributes["clamped"] is False
 
     def test_point_slugs_sort_like_the_pump_numbers(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot())
@@ -788,6 +808,7 @@ class TestQvantumCurveSensors:
             "baseline_learned_hours": 148,
             "extrapolated_points": ["curve_30", "curve_minus_10"],
             "clamped_points": ["curve_minus_30"],
+            "floor_pinned_points": [],
             "trim_evidence": {"curve_30": 12, "curve_0": 0},
         }
 

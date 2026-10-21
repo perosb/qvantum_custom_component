@@ -1585,8 +1585,38 @@ async def test_snapshot_clamps_to_pump_supply_limits() -> None:
     # sensor and a support dump can point at the baseline knot to move.
     assert snapshot.clamped_points
     assert set(snapshot.clamped_points) <= set(snapshot.points)
+    assert snapshot.floor_pinned_points == ()
     assert snapshot.trims == {}
     assert all(20.0 <= value <= 45.0 for value in snapshot.points.values())
+
+
+async def test_snapshot_reports_a_floor_pinned_warm_end_apart() -> None:
+    """The warm end on the pump's floor is not an actionable clamp."""
+    warm_end = {**BASELINE, "curve_30": 20.0, "curve_20": 20.0}
+    values = {**VALUES, "min_heating_supply": 20, "max_heating_supply": 60}
+    coordinator = make_coordinator(values=values, settings={**SETTINGS, **warm_end})
+    coordinator._baseline = dict(warm_end)
+    coordinator._async_calibrate = AsyncMock()
+    # A warming trend makes the curve ask for less heat, which the warm end
+    # cannot deliver: its baseline sits on the pump's floor.
+    now_hour = int(time.time()) - (int(time.time()) % 3600)
+    coordinator._async_fetch_forecast = AsyncMock(
+        return_value=WeatherForecast(
+            points=tuple(
+                HourlyWeather(now_hour + index * 3600, 10.0 + 3.0 * index, 0.0)
+                for index in range(7)
+            )
+        )
+    )
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._daylight = MagicMock(return_value=None)
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.floor_pinned_points
+    assert set(snapshot.floor_pinned_points) <= set(snapshot.points)
+    assert snapshot.clamped is False
+    assert snapshot.clamped_points == ()
 
 
 async def test_snapshot_active_records_clamp() -> None:

@@ -445,6 +445,13 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
             str(point)
             for point in (getattr(snapshot, "clamped_points", None) or ())
         ],
+        # The warm end pinned on the pump's floor: clamped on every computation
+        # and not something the baseline can answer, so it is not in the list
+        # above. A dump names them so the two cases stay distinguishable.
+        "floor_pinned_points": [
+            str(point)
+            for point in (getattr(snapshot, "floor_pinned_points", None) or ())
+        ],
         "deviation_c": getattr(snapshot, "deviation_c", None),
         "ready": getattr(snapshot, "ready", None),
         "blocker": getattr(snapshot, "blocker", None),
