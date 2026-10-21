@@ -471,9 +471,15 @@ def test_counters_block_is_exported_and_absent_on_cloud():
 
 
 def test_schema_version_covers_the_counters_block():
+    """``days_clamped`` now counts actionable clamps only, so the floor is 7.
+
+    A floor pin on the pump's minimum supply no longer counts, which mixes v6
+    and v7 counter semantics if a revert slips through; pinning the floor keeps
+    that from passing CI.
+    """
     from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
 
-    assert SUMMARY_SCHEMA_VERSION >= 6
+    assert SUMMARY_SCHEMA_VERSION >= 7
 
 
 def test_schema_version_bumped_for_the_normalized_standing_loss():
@@ -485,4 +491,4 @@ def test_schema_version_bumped_for_the_normalized_standing_loss():
     """
     from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
 
-    assert SUMMARY_SCHEMA_VERSION >= 6
+    assert SUMMARY_SCHEMA_VERSION >= 7
