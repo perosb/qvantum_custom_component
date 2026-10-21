@@ -388,6 +388,14 @@ neither is comparable to the other. When a derived metric changes semantics,
 bump the version **in the same PR** and say in the constant's comment what
 changed and why; a test pins the floor so a silent revert cannot pass.
 
+**Only a version that has shipped needs superseding.** The number exists to keep
+two meanings out of one pool key, so a version that no release has carried has
+no rows to protect: further schema-shaped changes on `main` before the next
+release edit the current number in place and append to its comment instead of
+bumping again. Check the released `manifest.json` (or the latest tag) before
+deciding — at 2026-10-21 the newest stable release is 2026.10.11, which carries
+v6, so v7 is unreleased and folds further changes.
+
 ## Derived metrics — power, COP, DHW
 
 - `heatingenergy` is space-heating output, but `dhwenergy` meters the DHW

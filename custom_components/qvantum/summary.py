@@ -70,6 +70,8 @@ _ENTITY_PREFIXES = (
 )
 
 #: Bump when a field is added, removed or changes meaning: the pool groups by it.
+#: Only a version a *release* has carried needs superseding — an unreleased number
+#: has no rows to protect, so further changes on `main` edit it in place.
 #: 6: dhw_standing_loss is a normalized coefficient quoted at a fixed
 #: tank-to-ambient difference (and the identified tank volume), not the raw
 #: daily figure at whatever tank temperature the window saw.
