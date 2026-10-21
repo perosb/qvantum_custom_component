@@ -48,6 +48,21 @@ correctness. Do not invent nits. Specifically watch for:
   state-reporting entities.
 - Invented endpoints or registers; the maps in `client/modbus/maps.py` and
   paths in `client/cloud/endpoints.py` are the source of truth.
+- **Documentation that did not follow the code.** `AGENTS.md` is injected as the
+  authoritative note for every future session, so a stale sentence there is a
+  defect, not a nit. Flag it when the diff changes behaviour and leaves the
+  affected prose describing the old one, or adds a field/state a support dump
+  must show without documenting it:
+  - a new or changed derived metric, gate, threshold, persisted field or
+    `SUMMARY_SCHEMA_VERSION` meaning → `AGENTS.md` (and the metric's own section);
+  - a new `CurveSnapshot` / efficiency-snapshot / diagnostics field → the
+    documented field list in `AGENTS.md` and `docs/`;
+  - user-visible behaviour, new entities, options or services → `docs/` (and
+    `README.md` when the summary export's field list changes);
+  - a changed measurement constant or protocol (a probe, a verified register
+    behaviour) → the place that documents the measurement.
+  The `docs` CI job only proves *some* documentation moved; check that the
+  sentence which is now wrong is the one that changed.
 
 Skip pre-existing issues on untouched lines. English comments only.
 
