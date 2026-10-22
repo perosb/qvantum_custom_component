@@ -210,12 +210,20 @@ rather than leaving it applied: while the curve is active the fit never runs,
 so a stale number would stay wrong for as long as the curve does. Otherwise the
 gain falls back to a fit over observed Auto hours (residual against both
 outdoor and the room error), which is what an installation without a usable
-factor still gets. Whether configured or fitted, the gain **travels with
-the indoor sensor it belongs to**: if the payload reports a different sensor the
-correction is skipped rather than subtracting one sensor's room term from
-another's error. It is persisted and exposed as `room_gain_c_per_c` on the
-deviation sensor, with the pump's raw setting beside it as `room_gain_factor`
-in the diagnostics.
+factor still gets. That fallback is **not** a re-learning step you have to
+schedule: the applied gain is the setting as last seen, compared on every poll,
+so changing `room_comp_factor` from 5 to 3 takes effect within one cycle and
+needs no re-identification. The fit's window (the curve off, holding 22 on Auto,
+24 heating hours since active control ended, room error moved ≥ 0.3 °C) gates the
+fallback and the diagnostics-only `fitted` slope — nothing that is applied while
+a factor exists. Because the *current* gain is applied retroactively to every
+hour of the readiness window, a factor change moves the reported `deviation` and
+`median_abs_c`; that is the correction following the pump, not a reset.
+Whether configured or fitted, the gain **travels with the indoor sensor it
+belongs to**: if the payload reports a different sensor the correction is
+skipped rather than subtracting one sensor's room term from another's error. It
+is persisted and exposed as `room_gain_c_per_c` on the deviation sensor, with
+the pump's raw setting beside it as `room_gain_factor` in the diagnostics.
 
 **How that relation was measured.** Three reversible steps on the live pump
 (2026-10-21), each read back within one poll cycle:
