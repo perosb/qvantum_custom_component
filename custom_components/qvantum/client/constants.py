@@ -31,6 +31,14 @@ TAP_WATER_CAPACITY_MAPPINGS = {
     (55, 76): 7,
 }
 
+# The same table the other way round: capacity level -> (start, stop). Both
+# directions are needed — the level is what the user picks, the pair is what the
+# transports write and what the Home Assistant entity derives its state from —
+# so the inverse lives here instead of being rebuilt at each call site.
+TAP_WATER_CAPACITY_START_STOP = {
+    level: pair for pair, level in TAP_WATER_CAPACITY_MAPPINGS.items()
+}
+
 # Relay power constants (watts) used to compute total power from relay stages.
 # The base system power is an estimate of the constant power draw of the heat
 # pump when no relays are active (circulation pumps, controls, auxiliaries).

@@ -669,6 +669,46 @@ async def test_set_tap_water_capacity_target_rejects_unknown_level(
     mock_session.patch.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("capacity", "expected_settings"),
+    [
+        # Named levels: the cloud owns the pair, so only the level is written.
+        (2, [{"name": "tap_water_capacity_target", "value": 2}]),
+        (5, [{"name": "tap_water_capacity_target", "value": 5}]),
+        # Custom levels: the cloud has no name for them, so the pair is written.
+        (
+            1,
+            [
+                {"name": "tap_water_stop", "value": 58},
+                {"name": "tap_water_start", "value": 52},
+            ],
+        ),
+        (
+            7,
+            [
+                {"name": "tap_water_stop", "value": 76},
+                {"name": "tap_water_start", "value": 55},
+            ],
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_set_tap_water_capacity_target_writes_the_pair_only_for_custom_levels(
+    mock_session, capacity, expected_settings
+):
+    """Levels 2-5 are a cloud setting; 1/6/7 fall back to the start/stop pair."""
+    cm, _ = mock_session.make_cm_response(status=200, json_data={"success": True})
+    mock_session.patch.return_value = cm
+    client = _authed_client(mock_session)
+
+    await client.set_tap_water_capacity_target("dev1", capacity)
+
+    mock_session.patch.assert_called_once()
+    assert mock_session.patch.call_args.kwargs["json"] == {
+        "settings": expected_settings
+    }
+
+
 def _authed_client(mock_session) -> QvantumCloudClient:
     client = QvantumCloudClient(
         "test@example.com", "password", "test-agent", session=mock_session

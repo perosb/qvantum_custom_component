@@ -14,6 +14,7 @@ from .client.modbus import HEATING_CURVE_OUTDOOR_TEMPS, metric_range
 from .const import (
     HeatingCurveType,
     TAP_WATER_CAPACITY_MAPPINGS,
+    TAP_WATER_CAPACITY_START_STOP,
     TAP_WATER_TEMP_MAX,
     TAP_WATER_TEMP_MIN,
     TAP_WATER_TEMP_STEP,
@@ -219,12 +220,29 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
 
         response = {}
         coordinator_update_value: int | float = value
+        extra_updates: dict[str, int] | None = None
         match self._metric_key:
             case "tap_water_capacity_target":
                 coordinator_update_value = int(value)
                 response = await self.coordinator.client.set_tap_water_capacity_target(
                     self._hpid, coordinator_update_value
                 )
+                # ``native_value`` derives the level from the start/stop pair,
+                # not from the level key, so the pair has to move with the
+                # optimistic update as well: with only the level set, the entity
+                # read the still-cached old pair and showed the previous level
+                # until the next poll even though the pump already had the new
+                # temperatures. The table is the pair the pump holds for a level
+                # in both transports (the cloud reports the level and the same
+                # pair), and this only lands on a write the transport confirmed:
+                # the cloud PATCH answers {"success": true}, so a cloud write is
+                # still poll-driven.
+                pair = TAP_WATER_CAPACITY_START_STOP.get(coordinator_update_value)
+                if pair is not None:
+                    extra_updates = {
+                        "tap_water_start": pair[0],
+                        "tap_water_stop": pair[1],
+                    }
             case "indoor_temperature_offset":
                 coordinator_update_value = int(value)
                 response = await self.coordinator.client.set_indoor_temperature_offset(
@@ -290,6 +308,7 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
             "values",
             self._metric_key,
             coordinator_update_value,
+            extra_updates=extra_updates,
         )
 
     @property
