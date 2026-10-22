@@ -515,11 +515,22 @@ v6, so v7 is unreleased and folds further changes.
   was fitted to it, so correcting there double-counts — measured, it moved the
   readiness median 1.17 °C → 2.67 °C (gate failure) against 1.08 °C on active
   hours alone; the Auto-hour fit survives as the fallback for a missing factor.
+  That fit is **not** how the applied gain is refreshed: the gain is the factor
+  as last seen, re-read every poll by `_async_sync_room_gain`, so a user changing
+  `room_comp_factor` (5 → 3) has the new gain within one cycle and needs no
+  re-identification. The `ROOM_GAIN_MIN_SAMPLES`/Auto-only window gates the
+  fallback and the diagnostics-only `fitted` slope, nothing else — and because
+  the current gain is applied retroactively to the whole readiness window, a
+  factor change legitimately moves `median_abs_c` (it is a better correction,
+  not a new measurement).
   The *fitted* slope (`room_gain_from_active_hours`, fixed effects per 2 °C
   outdoor bucket) is measured on active hours only, because our written table is
   exogenous there; it is diagnostics-only, travels with its gates
   (`valid`/`notes`, hours, buckets, R², leave-one-out) and never becomes the
-  applied gain while the pump reports a factor.
+  applied gain while the pump reports a factor. It lags a factor change until
+  the next Auto segment — the pooled `configured` vs `fitted` comparison is the
+  only thing that notices, which is why it is a cross-check and not a control
+  input.
 - The room **value** in that removal is the pump's own input, not our configured
   sensor's: in the external mode (`sensor_mode` 4) the firmware blends the
   external value with BT2. Measured on a QE-6, 2026-10-21: `cal_heat_temp`
