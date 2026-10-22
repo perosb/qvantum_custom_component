@@ -359,6 +359,58 @@ class TestQvantumNumberEntity:
         # Note: async_set_updated_data would be called if the API response status was correct
 
     @pytest.mark.asyncio
+    async def test_capacity_write_moves_the_pair_before_the_poll(
+        self, mock_coordinator, mock_device
+    ):
+        """The level is derived from the pair, so the write must move both.
+
+        Updating only ``tap_water_capacity_target`` left the entity on the old
+        level until the next poll (15 s local, up to 120 s cloud), because
+        ``native_value`` reads the start/stop pair.
+        """
+        values = mock_coordinator.data["values"]
+        values["tap_water_capacity_target"] = 2
+        values["tap_water_start"] = 52
+        values["tap_water_stop"] = 62
+        mock_coordinator.client.set_tap_water_capacity_target = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+        assert entity.native_value == 2
+
+        await entity.async_set_native_value(3)
+
+        assert values["tap_water_start"] == 55
+        assert values["tap_water_stop"] == 69
+        assert entity.native_value == 3
+        mock_coordinator.async_set_updated_data.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_capacity_write_failure_keeps_the_old_pair(
+        self, mock_coordinator, mock_device
+    ):
+        """A write the pump did not confirm moves nothing."""
+        values = mock_coordinator.data["values"]
+        values["tap_water_capacity_target"] = 2
+        values["tap_water_start"] = 52
+        values["tap_water_stop"] = 62
+        mock_coordinator.client.set_tap_water_capacity_target = AsyncMock(
+            return_value={"status": "FAILED"}
+        )
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+
+        await entity.async_set_native_value(3)
+
+        assert values["tap_water_start"] == 52
+        assert values["tap_water_stop"] == 62
+        assert entity.native_value == 2
+        mock_coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_async_set_native_value_room_comp_factor(
         self, mock_coordinator, mock_device
     ):

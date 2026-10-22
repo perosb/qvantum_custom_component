@@ -23,6 +23,7 @@ from .client.constants import (
     RELAY_STAGE_POWER_MAP,
     SETTING_UPDATE_APPLIED,
     TAP_WATER_CAPACITY_MAPPINGS,
+    TAP_WATER_CAPACITY_START_STOP,
 )
 
 DOMAIN = "qvantum"
