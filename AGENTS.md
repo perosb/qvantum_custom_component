@@ -348,10 +348,15 @@ in `values` before the next poll, so a setting whose *state* is derived from
 another key must move that key too via `extra_updates`. DHW capacity is the
 example: the write lands as the start/stop pair and `native_value` derives the
 level from that pair, so updating only `tap_water_capacity_target` showed the
-previous level until the next poll (15 s local, up to 120 s cloud) even though
-the pump already held the new temperatures. `TAP_WATER_CAPACITY_START_STOP` in
-`client/constants.py` is the inverse of `TAP_WATER_CAPACITY_MAPPINGS`; both
-transports and the entity use it instead of rebuilding the inverse.
+previous level until the next poll even though the pump already held the new
+temperatures. `TAP_WATER_CAPACITY_START_STOP` in `client/constants.py` is the
+inverse of `TAP_WATER_CAPACITY_MAPPINGS`; both transports and the entity use it
+instead of rebuilding the inverse. Cloud writes levels 2-5 as the level setting
+and only 1/6/7 as a start/stop pair, but that PATCH answers
+`{"success": true}`, which is not APPLIED, so a cloud capacity write stays
+poll-driven (up to 120 s) and only the Modbus pair write applies optimistically;
+the same is true of every other settings-PATCH write, and
+`client.models.result_applied` is why.
 
 ## Telemetry
 

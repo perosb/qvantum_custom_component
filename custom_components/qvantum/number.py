@@ -227,13 +227,16 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 response = await self.coordinator.client.set_tap_water_capacity_target(
                     self._hpid, coordinator_update_value
                 )
-                # The write lands as a start/stop pair, and ``native_value``
-                # derives the level from that pair, not from the level key. So
-                # the pair has to move with the optimistic update as well: with
-                # only the level set, the entity read the still-cached old pair
-                # and showed the previous level until the next poll (15 s local,
-                # up to 120 s cloud) even though the pump already had the new
-                # temperatures.
+                # ``native_value`` derives the level from the start/stop pair,
+                # not from the level key, so the pair has to move with the
+                # optimistic update as well: with only the level set, the entity
+                # read the still-cached old pair and showed the previous level
+                # until the next poll even though the pump already had the new
+                # temperatures. The table is the pair the pump holds for a level
+                # in both transports (the cloud reports the level and the same
+                # pair), and this only lands on a write the transport confirmed:
+                # the cloud PATCH answers {"success": true}, so a cloud write is
+                # still poll-driven.
                 pair = TAP_WATER_CAPACITY_START_STOP.get(coordinator_update_value)
                 if pair is not None:
                     extra_updates = {

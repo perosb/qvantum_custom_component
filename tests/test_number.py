@@ -411,6 +411,36 @@ class TestQvantumNumberEntity:
         mock_coordinator.async_set_updated_data.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_capacity_write_without_applied_state_waits_for_the_poll(
+        self, mock_coordinator, mock_device
+    ):
+        """The cloud settings PATCH answers ``{"success": true}``, not APPLIED.
+
+        Nothing is applied optimistically there, so the entity keeps the pair
+        the last poll returned and corrects itself on the next one (up to
+        120 s in cloud mode). Moving the level or the pair would be inventing a
+        state the endpoint never reported.
+        """
+        values = mock_coordinator.data["values"]
+        values["tap_water_capacity_target"] = 2
+        values["tap_water_start"] = 52
+        values["tap_water_stop"] = 62
+        mock_coordinator.client.set_tap_water_capacity_target = AsyncMock(
+            return_value={"success": True}
+        )
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+
+        await entity.async_set_native_value(3)
+
+        assert values["tap_water_capacity_target"] == 2
+        assert values["tap_water_start"] == 52
+        assert values["tap_water_stop"] == 62
+        assert entity.native_value == 2
+        mock_coordinator.async_set_updated_data.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_async_set_native_value_room_comp_factor(
         self, mock_coordinator, mock_device
     ):
