@@ -985,6 +985,10 @@
           }
         }
       }
+    },
+    "tap_water_capacity_mismatch": {
+      "title": "Capacidad de agua caliente desconocida",
+      "description": "La bomba mantiene {start} / {stop} °C como arranque/parada de agua caliente, una pareja que no corresponde a ninguno de los niveles de capacidad de la aplicación. El número de capacidad muestra «desconocido» en lugar de redondear a un nivel: el nivel más cercano según la temperatura de parada sería {nearest} y el nivel informado por la aplicación/la nube es {reported}. Elige un nivel de capacidad para volver a escribir una pareja coincidente."
     }
   }
 }

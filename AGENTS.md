@@ -358,6 +358,22 @@ poll-driven (up to 120 s) and only the Modbus pair write applies optimistically;
 the same is true of every other settings-PATCH write, and
 `client.models.result_applied` is why.
 
+The pair is also the **truth about the level**, not a key to look one up with:
+no holding register carries the capacity target, so Modbus derives it, and the
+pump can move the pair on its own (measured on a QE-4, 2026-10-22: 55/71 → 55/65
+with no user action) while the app keeps showing level 5. A pair outside
+`TAP_WATER_CAPACITY_MAPPINGS` is therefore **not** rounded to a nearest level
+(that reported 55/65 as 2): `_derive_tap_water_capacity` leaves
+`tap_water_capacity_target` at the transport's own label (cloud) or `None`
+(Modbus), `native_value` answers only from the pair and reports `unknown`, the
+entity stays available (its own key may be `None` — that is the one exemption in
+the number platform's availability check) with
+`start_stop_pair`/`pair_mapped`/`nearest_capacity`/`reported_capacity`
+attributes, and `_async_sync_tap_water_capacity_issue` keeps a
+`tap_water_capacity_mismatch` repair issue (WARNING, not fixable) in step with
+the mismatch — including a cloud level that disagrees with a mapped pair.
+`nearest_tap_water_capacity_level` is only the issue's hint, never the state.
+
 ## Telemetry
 
 **Opt-in and never implied.** `telemetry.py` stores only the decision and a

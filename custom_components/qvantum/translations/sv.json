@@ -985,6 +985,10 @@
           }
         }
       }
+    },
+    "tap_water_capacity_mismatch": {
+      "title": "Varmvattenkapaciteten är okänd",
+      "description": "Pumpen har {start} / {stop} °C som start/stopp för varmvatten, ett par som inte motsvarar någon av kapacitetsnivåerna i appen. Kapacitetssiffran visar ”okänd” i stället för att avrunda till en nivå: närmaste nivå enligt stopptemperaturen är {nearest} och nivån som appen/molnet rapporterar är {reported}. Välj en kapacitetsnivå för att skriva ett matchande par igen."
     }
   }
 }

@@ -18,6 +18,7 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
 from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
 from homeassistant.helpers.event import async_track_time_interval
@@ -68,6 +69,7 @@ from .const import (
     HTTP_CLOUD_LOOKUP_TIMEOUT,
     TAP_WATER_CAPACITY_MAPPINGS,
     default_metric_creates_entity,
+    nearest_tap_water_capacity_level,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -1174,34 +1176,85 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         return settings_dict
 
     def _derive_tap_water_capacity(self, values: dict) -> None:
-        """Derive tap_water_capacity_target from tap_water_start/stop when absent.
+        """Reconcile the capacity level with the start/stop pair the pump holds.
 
-        Uses TAP_WATER_CAPACITY_MAPPINGS to convert the (start, stop) temperature
-        pair into a capacity level (1–7) and stores it back into values.
+        The pair is the truth: those are the temperatures that heat the tank,
+        the level is only the app's label for them. Modbus reports no level at
+        all (no holding register carries it), so it is derived from the pair;
+        cloud reports both, and they can diverge — writing ``tap_water_start`` /
+        ``tap_water_stop`` directly leaves the cloud's level behind. A pump can
+        also move the pair on its own (reported on a QE-4, 2026-10-22: 55/71 ->
+        55/65 with no user action) while the app still shows level 5.
+
+        A pair outside the table is no longer rounded to the nearest level: that
+        showed a plausible but wrong number, which is worse than nothing when an
+        automation compares it. The level key is kept (filled in with the
+        derived level on Modbus, the transport's own label on cloud) so the
+        number entity still exists, reads its state from the pair and reports
+        ``unknown``; ``_async_sync_tap_water_capacity_issue`` raises a repair
+        issue naming the pair.
         """
-        if values.get("tap_water_capacity_target") is not None:
-            return
         tap_start = values.get("tap_water_start")
         tap_stop = values.get("tap_water_stop")
-        if tap_start is None or tap_stop is None:
-            return
-        capacity = TAP_WATER_CAPACITY_MAPPINGS.get((tap_start, tap_stop))
-        if capacity is not None:
+        reported = values.get("tap_water_capacity_target")
+        capacity = None
+        if tap_start is not None and tap_stop is not None:
+            capacity = TAP_WATER_CAPACITY_MAPPINGS.get((tap_start, tap_stop))
+        # Keep the transport's own label when there is one. When there is none
+        # (Modbus) the key is filled in anyway — with None for an unmapped pair,
+        # so the entity is created and can report `unknown` instead of vanishing.
+        if reported is None:
             values["tap_water_capacity_target"] = capacity
-        else:
-            # use nearest tap_stop for unmapped pairs and log a debug message
-            if isinstance(tap_stop, (int, float)):
-                nearest_pair = min(
-                    TAP_WATER_CAPACITY_MAPPINGS.keys(), key=lambda pair: abs(pair[1] - tap_stop)
-                )
-                nearest_capacity = TAP_WATER_CAPACITY_MAPPINGS[nearest_pair]
-                values["tap_water_capacity_target"] = nearest_capacity
-            _LOGGER.debug(
-                "No tap water capacity mapping found for start=%s and stop=%s, using nearest capacity=%s based on stop temperature",
-                tap_start,
-                tap_stop,
-                values.get("tap_water_capacity_target", "none"),
-            )
+        nearest = nearest_tap_water_capacity_level(tap_stop)
+
+        mismatch = None
+        pair_known = tap_start is not None and tap_stop is not None
+        if capacity is None and pair_known and nearest is not None:
+            # A pair that is not a number is not a level either, but nothing can
+            # be said about which one it is close to — no issue for that.
+            mismatch = {
+                "start": tap_start,
+                "stop": tap_stop,
+                "reported": reported,
+                "nearest": nearest,
+            }
+        elif capacity is not None and reported is not None and reported != capacity:
+            mismatch = {
+                "start": tap_start,
+                "stop": tap_stop,
+                "reported": reported,
+                "nearest": capacity,
+            }
+        self._tap_water_capacity_mismatch = mismatch
+
+    def _tap_water_capacity_issue_id(self) -> str:
+        """Repair issue for a capacity level that is not the pair's level."""
+        entry_id = getattr(getattr(self, "config_entry", None), "entry_id", None)
+        return f"tap_water_capacity_mismatch_{entry_id or 'entry'}"
+
+    def _async_sync_tap_water_capacity_issue(self) -> None:
+        """Raise or clear the repair issue for an unrepresentable capacity level."""
+        mismatch = getattr(self, "_tap_water_capacity_mismatch", None)
+        issue_id = self._tap_water_capacity_issue_id()
+        if mismatch is None:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+            return
+        reported = mismatch["reported"]
+        nearest = mismatch["nearest"]
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="tap_water_capacity_mismatch",
+            translation_placeholders={
+                "start": str(mismatch["start"]),
+                "stop": str(mismatch["stop"]),
+                "reported": "none" if reported is None else str(reported),
+                "nearest": str(nearest),
+            },
+        )
 
     async def _sync_modbus_extra_dhw_timer(
         self, values: dict[str, Any], *, poll_started: float
@@ -1400,6 +1453,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 await self._refresh_modbus_sw_version()
 
             self._derive_tap_water_capacity(values)
+            self._async_sync_tap_water_capacity_issue()
             self._calculate_cop(values)
             self._calculate_dhw_meter(values)
             await self._persist_cop_state()

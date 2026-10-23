@@ -985,6 +985,10 @@
           }
         }
       }
+    },
+    "tap_water_capacity_mismatch": {
+      "title": "Varmtvandskapacitet er ukendt",
+      "description": "Pumpen holder {start} / {stop} °C som start/stop for varmt vand – et par, der ikke svarer til nogen af appens kapacitetsniveauer. Kapacitetstallet viser »ukendt« i stedet for at runde til et niveau: det nærmeste niveau efter stoppemperaturen er {nearest}, og niveauet, som appen/skyen rapporterer, er {reported}. Vælg et kapacitetsniveau for at skrive et passende par igen."
     }
   }
 }

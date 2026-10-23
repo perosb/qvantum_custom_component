@@ -212,11 +212,11 @@ class TestQvantumNumberEntity:
         assert entity._attr_native_step == 5
 
     def test_state(self, mock_coordinator, mock_device):
-        """Test getting entity state."""
+        """The fixture's (55, 75) pair is not a level, so the state is unknown."""
         entity = QvantumNumberEntity(
             mock_coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
         )
-        assert entity.native_value == 4
+        assert entity.native_value is None
 
     def test_state_with_mapping_capacity_1(self, mock_device):
         """Test getting entity state when stop/start match capacity 1 mapping."""
@@ -261,7 +261,11 @@ class TestQvantumNumberEntity:
         assert entity.native_value == 6  # Should return mapped value
 
     def test_state_with_no_mapping(self, mock_device):
-        """Test getting entity state when stop/start don't match any mapping."""
+        """An unmapped pair reports unknown instead of a nearest-match guess.
+
+        Issue #421: 55/65 was shown as 2 (nearest stop 62) while the app and
+        the pump showed 5. A plausible wrong number is worse than nothing.
+        """
         from unittest.mock import Mock
         from unittest.mock import AsyncMock
 
@@ -279,7 +283,7 @@ class TestQvantumNumberEntity:
         entity = QvantumNumberEntity(
             coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
         )
-        assert entity.native_value == 3  # Should return stored value
+        assert entity.native_value is None
 
     def test_state_with_none_stop(self, mock_device):
         """Test getting entity state when tap_water_stop is None."""
@@ -329,6 +333,86 @@ class TestQvantumNumberEntity:
             mock_coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
         )
         assert entity.available is True
+
+    def test_available_when_derived_level_key_is_none(self, mock_device):
+        """The level key is None on Modbus when the pair is unmapped.
+
+        The entity must still exist and be available so it can report
+        ``unknown``; otherwise the control would silently disappear.
+        """
+        from unittest.mock import Mock
+
+        coordinator = Mock()
+        coordinator.data = {
+            "values": {
+                "tap_water_capacity_target": None,
+                "tap_water_stop": 65,
+                "tap_water_start": 55,
+                "hpid": "test_device_123",
+            }
+        }
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+        coordinator.last_update_success = True
+        coordinator.modbus_enabled = False
+        coordinator.config_entry = MagicMock()
+        coordinator.config_entry.runtime_data.maintenance_coordinator.data = {
+            "access_level": {"writeAccessLevel": 20}
+        }
+
+        entity = QvantumNumberEntity(
+            coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+        assert entity.available is True
+        assert entity.native_value is None
+
+    def test_capacity_attributes_report_the_pair(self, mock_device):
+        """Attributes show the pair, whether it maps, and what the cloud says."""
+        from unittest.mock import Mock
+
+        coordinator = Mock()
+        coordinator.data = {
+            "values": {
+                "tap_water_capacity_target": 5,
+                "tap_water_stop": 65,
+                "tap_water_start": 55,
+                "hpid": "test_device_123",
+            }
+        }
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+
+        entity = QvantumNumberEntity(
+            coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+        assert entity.extra_state_attributes == {
+            "start_stop_pair": [55, 65],
+            "pair_mapped": False,
+            "nearest_capacity": 2,  # stop 65 -> 62
+            "reported_capacity": 5,
+        }
+
+    def test_capacity_attributes_when_pair_maps(self, mock_coordinator, mock_device):
+        """A mapped pair needs no nearest hint."""
+        mock_coordinator.data["values"].update(
+            {"tap_water_start": 55, "tap_water_stop": 70}
+        )
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+        )
+        assert entity.extra_state_attributes == {
+            "start_stop_pair": [55, 70],
+            "pair_mapped": True,
+            "nearest_capacity": None,
+            "reported_capacity": 4,
+        }
+
+    def test_other_metrics_have_no_capacity_attributes(
+        self, mock_coordinator, mock_device
+    ):
+        """Only the capacity entity grows attributes."""
+        entity = QvantumNumberEntity(
+            mock_coordinator, "tap_water_stop", 50, 80, 1, mock_device
+        )
+        assert entity.extra_state_attributes is None
 
     def test_available_false(self, mock_coordinator, mock_device):
         """Test entity availability when data is missing."""

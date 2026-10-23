@@ -985,6 +985,10 @@
           }
         }
       }
+    },
+    "tap_water_capacity_mismatch": {
+      "title": "Käyttöveden kapasiteetti on tuntematon",
+      "description": "Pumppu pitää {start} / {stop} °C käyttöveden aloitus/lopetuslämpötilana – paria, joka ei vastaa mitään sovelluksen kapasiteettitasoa. Kapasiteettiluku näyttää ”tuntematon” sen sijaan, että se pyöristettäisiin tasolle: lähin taso lopetuslämpötilan mukaan olisi {nearest} ja sovelluksen/pilven ilmoittama taso on {reported}. Valitse kapasiteettitaso, niin vastaava pari kirjoitetaan uudelleen."
     }
   }
 }

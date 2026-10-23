@@ -985,6 +985,10 @@
           }
         }
       }
+    },
+    "tap_water_capacity_mismatch": {
+      "title": "Hot-water capacity is unknown",
+      "description": "The pump holds {start} / {stop} °C as hot-water start/stop, a pair that is not one of the capacity levels the app offers. The capacity number shows \"unknown\" instead of rounding it to a level: the closest level by stop temperature would be {nearest}, and the level the app/cloud reports is {reported}. Pick a capacity level to write a matching pair again."
     }
   }
 }
