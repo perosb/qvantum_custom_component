@@ -985,6 +985,10 @@
           }
         }
       }
+    },
+    "tap_water_capacity_mismatch": {
+      "title": "Nieznana pojemność ciepłej wody",
+      "description": "Pompa utrzymuje {start} / {stop} °C jako start/stop ciepłej wody — para, która nie odpowiada żadnemu poziomowi pojemności w aplikacji. Liczba pojemności pokazuje „nieznana” zamiast zaokrąglać do poziomu: najbliższy poziom według temperatury stop to {nearest}, a poziom zgłaszany przez aplikację/chmurę to {reported}. Wybierz poziom pojemności, aby ponownie zapisać pasującą parę."
     }
   }
 }

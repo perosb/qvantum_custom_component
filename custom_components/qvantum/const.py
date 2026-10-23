@@ -424,6 +424,19 @@ def ensure_tap_water_start_below_stop(start: object, stop: object) -> None:
         )
 
 
+def nearest_tap_water_capacity_level(stop: object) -> int | None:
+    """Return the capacity level whose stop temperature is closest to ``stop``.
+
+    Only used to describe an unmapped pair (the repair issue's hint); it is
+    never presented as the entity's state. ``None`` when ``stop`` is missing or
+    not a number, so a caller does not have to convert first.
+    """
+    if isinstance(stop, bool) or not isinstance(stop, (int, float)):
+        return None
+    nearest_pair = min(TAP_WATER_CAPACITY_MAPPINGS, key=lambda pair: abs(pair[1] - stop))
+    return TAP_WATER_CAPACITY_MAPPINGS[nearest_pair]
+
+
 # DHW capacity calculation defaults
 DHW_SHOWER_TEMP_C = 38.0  # Target shower temperature (°C) — +2°C from Qvantum app
 DHW_TANK_VOLUME_L = 175  # buffer tank of the floor-standing models (QE, QG, QG-C, QH-175)

@@ -19,6 +19,7 @@ from .const import (
     TAP_WATER_TEMP_MIN,
     TAP_WATER_TEMP_STEP,
     ensure_tap_water_start_below_stop,
+    nearest_tap_water_capacity_level,
 )
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity, cleanup_disabled_entities
@@ -315,13 +316,41 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
     def native_value(self):
         """Get metric from API data."""
         if self._metric_key == "tap_water_capacity_target":
-            # Map (start, stop) pairs to capacity values using TAP_WATER_CAPACITY_MAPPINGS
-            stop = self._values.get("tap_water_stop")
-            start = self._values.get("tap_water_start")
-            if (start, stop) in TAP_WATER_CAPACITY_MAPPINGS:
-                return TAP_WATER_CAPACITY_MAPPINGS[(start, stop)]
+            # The (start, stop) pair is what heats the tank; the level is the
+            # app's label for it, so the pair wins whenever both temperatures
+            # are known. A pair outside the table is not rounded to a nearest
+            # level — that showed a plausible but wrong number (issue #421:
+            # 55/65 displayed as 2 while the app and the pump showed 5) — and
+            # reports `unknown` instead. The coordinator raises a repair issue
+            # for it; the attributes below show what the pump and the app hold.
+            pair = (
+                self._values.get("tap_water_start"),
+                self._values.get("tap_water_stop"),
+            )
+            if pair[0] is not None and pair[1] is not None:
+                return TAP_WATER_CAPACITY_MAPPINGS.get(pair)
 
         return self._values.get(self._metric_key)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object] | None:
+        """Describe how the capacity level was derived for the pair."""
+        if self._metric_key != "tap_water_capacity_target":
+            return None
+        start = self._values.get("tap_water_start")
+        stop = self._values.get("tap_water_stop")
+        pair_mapped = (start, stop) in TAP_WATER_CAPACITY_MAPPINGS
+        return {
+            "start_stop_pair": [start, stop],
+            "pair_mapped": pair_mapped,
+            # Only a hint for the repair issue's text; never the state.
+            "nearest_capacity": (
+                None if pair_mapped else nearest_tap_water_capacity_level(stop)
+            ),
+            # What the transport itself reported (cloud sends a level; Modbus
+            # has no such register), `None` when there is nothing to compare.
+            "reported_capacity": self._values.get(self._metric_key),
+        }
 
     @property
     def available(self):
@@ -331,7 +360,13 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                 self._metric_key not in MODBUS_WRITE_METRICS
                 or self._is_modbus_write_allowed()
             )
-            and self._values.get(self._metric_key) is not None
+            # The capacity level is derived from the start/stop pair, so its own
+            # key may legitimately be None on Modbus; the entity still exists and
+            # reports `unknown` rather than disappearing.
+            and (
+                self._metric_key == "tap_water_capacity_target"
+                or self._values.get(self._metric_key) is not None
+            )
             and self._has_write_access
             and (
                 # User-defined curve points only apply when holding 22 is User defined.

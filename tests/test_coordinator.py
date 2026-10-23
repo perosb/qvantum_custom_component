@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from custom_components.qvantum import coordinator as coordinator_module
 from custom_components.qvantum.coordinator import (
     async_apply_setting,
     handle_setting_update_response,
@@ -1626,6 +1627,8 @@ class TestDeriveTapWaterCapacity:
             mock_config_entry.data = {}
             mock_config_entry.unique_id = "test_device_123"
             coordinator = QvantumDataUpdateCoordinator(mock_hass, mock_config_entry, client=make_client_mock())
+            # The base __init__ is patched out above; the repair issue needs hass.
+            coordinator.hass = mock_hass
         return coordinator
 
     def test_known_mapping_sets_capacity(self):
@@ -1680,45 +1683,151 @@ class TestDeriveTapWaterCapacity:
         coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] is None
 
-    def test_unknown_pair_estimates_capacity_and_warns(self):
-        """An unknown (start, stop) pair estimates capacity based on nearest stop and logs a warning."""
-        coordinator = self._make_coordinator()
-        values = {
-            "tap_water_capacity_target": None,
-            "tap_water_start": 99,
-            "tap_water_stop": 99,
-        }
-        with patch("custom_components.qvantum.coordinator._LOGGER") as mock_logger:
-            coordinator._derive_tap_water_capacity(values)
-        assert values["tap_water_capacity_target"] == 7  # Nearest stop=76 -> capacity=7
-        mock_logger.debug.assert_called_once()
+    def test_unknown_pair_is_not_estimated(self):
+        """An unmapped pair gets no level, so the entity reports unknown (#421).
 
-    def test_unknown_pair_estimates_capacity_mid_range(self):
-        """An unknown pair with stop=72 estimates capacity 5 (closest to stop=71)."""
+        The old nearest-stop guess reported 55/65 as level 2 while the app and
+        the pump showed 5.
+        """
         coordinator = self._make_coordinator()
         values = {
             "tap_water_capacity_target": None,
             "tap_water_start": 55,
-            "tap_water_stop": 72,
+            "tap_water_stop": 65,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        assert values["tap_water_capacity_target"] is None
+        assert coordinator._tap_water_capacity_mismatch == {
+            "start": 55,
+            "stop": 65,
+            "reported": None,
+            "nearest": 2,  # stop 65 -> 62
+        }
+
+    def test_unknown_pair_keeps_reported_cloud_level(self):
+        """Cloud's own label survives for the attribute and the repair issue."""
+        coordinator = self._make_coordinator()
+        values = {
+            "tap_water_capacity_target": 5,
+            "tap_water_start": 55,
+            "tap_water_stop": 65,
         }
         coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] == 5
+        assert coordinator._tap_water_capacity_mismatch == {
+            "start": 55,
+            "stop": 65,
+            "reported": 5,
+            "nearest": 2,
+        }
 
-    def test_non_integer_values_leave_none_and_warn(self):
-        """String values for tap_water_start/stop cannot match integer mapping keys."""
+    def test_reported_level_that_disagrees_with_the_pair_is_a_mismatch(self):
+        """55/70 is level 4; a cloud level of 5 is stale and must be reported."""
         coordinator = self._make_coordinator()
-        values = {"tap_water_capacity_target": None, "tap_water_start": "55", "tap_water_stop": "70"}
-        with patch("custom_components.qvantum.coordinator._LOGGER") as mock_logger:
-            coordinator._derive_tap_water_capacity(values)
+        values = {
+            "tap_water_capacity_target": 5,
+            "tap_water_start": 55,
+            "tap_water_stop": 70,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        assert coordinator._tap_water_capacity_mismatch == {
+            "start": 55,
+            "stop": 70,
+            "reported": 5,
+            "nearest": 4,
+        }
+
+    def test_agreement_is_not_a_mismatch(self):
+        """Cloud level 4 with pair 55/70 is consistent."""
+        coordinator = self._make_coordinator()
+        values = {
+            "tap_water_capacity_target": 4,
+            "tap_water_start": 55,
+            "tap_water_stop": 70,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        assert coordinator._tap_water_capacity_mismatch is None
+
+    def test_non_integer_values_are_not_a_mismatch(self):
+        """String values cannot match the integer table, but nothing is known."""
+        coordinator = self._make_coordinator()
+        values = {
+            "tap_water_capacity_target": None,
+            "tap_water_start": "55",
+            "tap_water_stop": "70",
+        }
+        coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] is None
-        mock_logger.debug.assert_called_once()
+        assert coordinator._tap_water_capacity_mismatch is None
 
     def test_capacity_key_absent_treated_as_none(self):
-        """tap_water_capacity_target absent from dict is treated the same as None."""
+        """tap_water_capacity_target absent from dict is filled in from the pair."""
         coordinator = self._make_coordinator()
         values = {"tap_water_start": 55, "tap_water_stop": 70}
         coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] == 4
+
+    def test_missing_pair_is_not_a_mismatch(self):
+        """One absent temperature says nothing about the level."""
+        coordinator = self._make_coordinator()
+        values = {"tap_water_capacity_target": None, "tap_water_start": 55}
+        coordinator._derive_tap_water_capacity(values)
+        assert coordinator._tap_water_capacity_mismatch is None
+
+    def test_issue_raised_for_an_unmapped_pair(self):
+        """The user is told which pair the pump holds, not shown a guess."""
+        coordinator = self._make_coordinator()
+        values = {
+            "tap_water_capacity_target": 5,
+            "tap_water_start": 55,
+            "tap_water_stop": 65,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        with patch.object(
+            coordinator_module.ir, "async_create_issue"
+        ) as create_issue, patch.object(
+            coordinator_module.ir, "async_delete_issue"
+        ) as delete_issue:
+            coordinator._async_sync_tap_water_capacity_issue()
+        delete_issue.assert_not_called()
+        kwargs = create_issue.call_args.kwargs
+        assert kwargs["translation_key"] == "tap_water_capacity_mismatch"
+        assert kwargs["translation_placeholders"] == {
+            "start": "55",
+            "stop": "65",
+            "reported": "5",
+            "nearest": "2",
+        }
+        assert create_issue.call_args.args[2].startswith(
+            "tap_water_capacity_mismatch_"
+        )
+
+    def test_issue_cleared_when_the_pair_maps_again(self):
+        """A capacity write or the pump moving back clears the issue."""
+        coordinator = self._make_coordinator()
+        values = {
+            "tap_water_capacity_target": None,
+            "tap_water_start": 55,
+            "tap_water_stop": 71,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        with patch.object(
+            coordinator_module.ir, "async_create_issue"
+        ) as create_issue, patch.object(
+            coordinator_module.ir, "async_delete_issue"
+        ) as delete_issue:
+            coordinator._async_sync_tap_water_capacity_issue()
+        create_issue.assert_not_called()
+        delete_issue.assert_called_once()
+
+    def test_issue_cleared_before_the_first_poll(self):
+        """No mismatch recorded yet (restart, no poll) means no issue."""
+        coordinator = self._make_coordinator()
+        with patch.object(
+            coordinator_module.ir, "async_delete_issue"
+        ) as delete_issue:
+            coordinator._async_sync_tap_water_capacity_issue()
+        delete_issue.assert_called_once()
 
 
 class TestCalculateHeatingPower:

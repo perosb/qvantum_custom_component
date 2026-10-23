@@ -985,6 +985,10 @@
           }
         }
       }
+    },
+    "tap_water_capacity_mismatch": {
+      "title": "Capacité d'eau chaude inconnue",
+      "description": "La pompe maintient {start} / {stop} °C comme départ/arrêt d'eau chaude, une paire qui ne correspond à aucun des niveaux de capacité proposés par l'application. Le nombre de capacité affiche « inconnu » au lieu d'arrondir à un niveau : le niveau le plus proche selon la température d'arrêt serait {nearest} et le niveau signalé par l'application/le cloud est {reported}. Choisissez un niveau de capacité pour réécrire une paire correspondante."
     }
   }
 }

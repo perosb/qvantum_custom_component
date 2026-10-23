@@ -985,6 +985,10 @@
           }
         }
       }
+    },
+    "tap_water_capacity_mismatch": {
+      "title": "Ismeretlen használivíz-kapacitás",
+      "description": "A szivattyú {start} / {stop} °C-ot tart a használivíz indítás/leállítás értékeként – ez a pár nem felel meg az alkalmazás egyetlen kapacitásszintjének sem. A kapacitásszám „ismeretlen” értéket mutat, ahelyett hogy egy szintre kerekítene: a leállítási hőmérséklet szerinti legközelebbi szint {nearest}, az alkalmazás/felhő által jelentett szint pedig {reported}. Válasszon kapacitásszintet a megfelelő pár újbóli beírásához."
     }
   }
 }
