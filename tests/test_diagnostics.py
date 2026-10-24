@@ -17,6 +17,7 @@ from custom_components.qvantum.diagnostics import (
 )
 from homeassistant.util import dt as dt_util
 
+from custom_components.qvantum.open_meteo import HourlyWeather, WeatherForecast, hour_ts
 from custom_components.qvantum.plant_analytics import DhwMeterWindow
 from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
 
@@ -126,6 +127,15 @@ def _curve_coordinator() -> SimpleNamespace:
         indoor_margin_c=0.4,
         indoor_cap_armed=True,
     )
+    # Wind-bearing current hour plus an hour without a reading: the dump must
+    # report the first and treat the second as "not measured", not as calm.
+    now_hour = hour_ts(dt_util.utcnow().timestamp())
+    forecast = WeatherForecast(
+        points=(
+            HourlyWeather(now_hour, 6.0, 0.0, wind_ms=4.2),
+            HourlyWeather(now_hour + 3600, 5.5, 0.0, wind_ms=None),
+        )
+    )
     return SimpleNamespace(
         data=snapshot,
         active=True,
@@ -133,6 +143,7 @@ def _curve_coordinator() -> SimpleNamespace:
         _mode="active",
         _revert_pending=False,
         _forecast_ok=True,
+        _forecast=forecast,
         _baseline={"curve_30": 28.0, "curve_minus_30": 52.0},
         _daily_model=_solar_daily_model(),
         _baseline_auto=True,
@@ -579,6 +590,10 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["revert_pending"] is False
     assert curve["forecast_ok"] is True
     assert curve["forecast_reused"] is False
+    # The site proxy behind any future wind figure: the 10 m grid value at the
+    # current hour, and whether the payload carried wind at all.
+    assert curve["forecast_wind_ms"] == pytest.approx(4.2)
+    assert curve["forecast_wind_available"] is True
     assert curve["baseline"]["curve_30"] == 28.0
     assert curve["baseline_auto"] is True
     assert curve["temp_compensation_curve"] == 20
