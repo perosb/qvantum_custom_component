@@ -105,10 +105,22 @@ MIN_DUTY_CYCLE_HOURS = 12.0
 #: a normal installation — so an hour of it is enough evidence to compare.
 MIN_DHW_METER_DRAW_HOURS = 1.0
 MIN_DHW_METER_KWH = 0.5
-#: Tank-to-ambient readings behind the standing-loss window, best first: the
-#: pump's own indoor sensor sits in the room the tank stands in, and the
-#: configured room sensor is the fallback when it is not reported.
+#: Tank-to-ambient readings behind the standing-loss window, best first. BT2 is
+#: a wired room-air sensor (the installer chooses the room: ours hangs in a
+#: hallway, not where the unit stands), so it is the air around the
+#: installation rather than a measurement of the tank's room; the configured
+#: room sensor is the fallback when it is not reported. The preference stands
+#: because both read room air, but an installation whose tank stands somewhere
+#: colder than BT2's room gets a biased figure and nothing in the payload says
+#: so.
 DHW_AMBIENT_KEYS = ("bt2", "room_temp_external", "room_temp_ext")
+#: Below this, a BT2 is not an ambient reading: without a probe it holds the
+#: firmware's placeholder (-30 C, reported on a QE4 2026-10-23). Deliberately
+#: lower than the curve's room band (-10 C): a tank in an unheated garage can
+#: sit at -5 C and its window is still valid, while the placeholder is not a
+#: temperature at all. The window divides by the tank-to-ambient difference, so
+#: averaging -30 C in would publish ~40 % of the true coefficient.
+BT2_PLACEHOLDER_MAX_C = -25.0
 #: |estimated - metered| above this share of metered is a warning.
 HEAT_METER_WARNING_PERCENT = 20.0
 #: Window for degree hours, normalized heating and the heat-loss fit.
@@ -951,12 +963,38 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         )
 
     def _dhw_ambient(self) -> tuple[float | None, str | None]:
-        """Ambient temperature beside the tank, with the metric it came from."""
+        """Ambient temperature beside the tank, with the metric it came from.
+
+        BT2 comes first because it is a wired room-air sensor the installer
+        placed, but only while it is a probe the pump can read: an install
+        without one keeps the firmware's -30 C placeholder there and the pump's
+        own room value comes from the configured sensor. Its ``BT2 Detected``
+        bit (input 86) settles that where the transport carries one; where it
+        does not (cloud, older firmware) the placeholder is recognised by its
+        value. Either way the window falls through to the configured room
+        sensor instead of dividing by an 85 K difference instead of ~34 K.
+        """
         values = self._main_values()
+        bit = values.get("bt2_detected")
+        bt2_not_detected = (
+            isinstance(bit, (int, float))
+            and not isinstance(bit, bool)
+            and int(bit) != 1
+        )
         for key in DHW_AMBIENT_KEYS:
             ambient = _finite(values.get(key))
-            if ambient is not None:
-                return ambient, key
+            if ambient is None:
+                continue
+            if key == "bt2" and (
+                bt2_not_detected or ambient <= BT2_PLACEHOLDER_MAX_C
+            ):
+                _LOGGER.debug(
+                    "Ignoring BT2 %s C as the tank ambient (detected=%s)",
+                    ambient,
+                    bit,
+                )
+                continue
+            return ambient, key
         return None, None
 
     def _dhw_volume(self) -> float:
