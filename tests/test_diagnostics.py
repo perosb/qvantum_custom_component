@@ -311,8 +311,13 @@ async def test_cop_diagnostics_reports_the_dhw_meter_window(hass):
     """The meter warning is only checkable if its two totals travel with it."""
     coordinator = _coordinator()
     window = DhwMeterWindow()
-    # Near now: the dump prunes buckets that left the seven-day window.
-    base = dt_util.utcnow().timestamp() - 120.0
+    # Near now (the dump prunes buckets that left the seven-day window), but
+    # pinned inside one hour: two samples 60 s apart straddled an hour
+    # boundary whenever the suite ran in the first minute after one, and the
+    # dump then reported two buckets.
+    base = dt_util.utcnow().timestamp()
+    base -= base % 3600.0
+    base += 10.0
     window.add(
         now_ts=base,
         flow_l_min=5.0,
