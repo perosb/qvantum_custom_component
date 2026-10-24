@@ -424,8 +424,9 @@ two meanings out of one pool key, so a version that no release has carried has
 no rows to protect: further schema-shaped changes on `main` before the next
 release edit the current number in place and append to its comment instead of
 bumping again. Check the released `manifest.json` (or the latest tag) before
-deciding — at 2026-10-21 the newest stable release is 2026.10.11, which carries
-v6, so v7 is unreleased and folds further changes.
+deciding — 2026.10.13 is the newest stable release, it carries **v7**, so v8 is
+the first number that needs a row of its own (and v8 therefore may not fold
+further changes once it ships; before that, edit it in place as usual).
 
 ## Derived metrics — power, COP, DHW
 
