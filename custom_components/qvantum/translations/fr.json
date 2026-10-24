@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Préchargement",
           "description": "Augmenter la température de départ avant une vague de froid prévue"
+        },
+        "wind": {
+          "name": "Vent",
+          "description": "Augmenter la température de départ lorsqu'une sensibilité au vent identifiée signale une perte supplémentaire"
         }
       }
     },

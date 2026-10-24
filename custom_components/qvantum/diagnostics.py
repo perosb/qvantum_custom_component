@@ -465,6 +465,9 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "outdoor_c": getattr(snapshot, "outdoor_c", None),
         "night_day_c": getattr(snapshot, "night_day_c", None),
         "solar_c": getattr(snapshot, "solar_c", None),
+        # Wind's contribution: 0 whenever the optional term is off or the
+        # model's wind column failed its gates, which a dump must show.
+        "wind_c": getattr(snapshot, "wind_c", None),
         "load_c": getattr(snapshot, "load_c", None),
         "capped_by_indoor": getattr(snapshot, "capped_by_indoor", None),
         # The cap needs a fresh indoor reading: without one it is inert and the

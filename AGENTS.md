@@ -673,8 +673,21 @@ further changes once it ships; before that, edit it in place as usual).
 - `SolarDailyModel` reports `w_per_ms`/`w_std_err`/`w_t_stat`/`wind_hours`
   /`wind_valid`/`wind_notes` and the four-column `a_w_per_k_4col`/`b_m2_4col`,
   all in `diagnostics.curve.model_daily`. `SUMMARY_SCHEMA_VERSION` is **8**: the
-  four wind fields are new, and a schema without them cannot express "this
-  installation has no identifiable wind term".
+  four wind fields plus the applied `wind_c` are new, and a schema without them
+  cannot express "this installation has no identifiable wind term".
+- The **wind term** is optional and off by default: `"wind"` in the curve
+  store's `terms` dict, toggled through `qvantum.set_curve_terms` like
+  `cop_feedback`/`precharge` (there is no options checkbox; the sibling optional
+  terms have none either, so adding one for wind alone would be the
+  inconsistency). `compute_curve(wind_by_hour=…, wind_enabled=…)` adds
+  `wind_adjustment_c` — `−slope · (w · v̄ · ΔT) / a`, one-sided, `0…WIND_MAX_C`
+  (2 °C), with `v̄` the mean of the *available* hours in the next
+  `WIND_SMOOTH_HOURS` (3) — a missing hour is skipped, never counted as calm
+  and `a` from the same day-block model — to the shared adjustment, still under
+  the indoor cap and the total clamp. It needs `wind_valid`, a wind reading for
+  the current hour (missing is *not* calm) and `indoor_target > outdoor`,
+  otherwise 0. `CurveSnapshot.wind_c` travels to `diagnostics.curve`, the
+  adjustment sensor's attributes and the summary.
 - A failed **forecast** refetch keeps the previous payload while it still covers
   the current hour and is under `FORECAST_REUSE_HOURS` old (both coordinators,
   `WeatherForecast.covers`): Open-Meteo 503s sporadically well inside its quota,

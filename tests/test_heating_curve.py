@@ -22,6 +22,7 @@ from custom_components.qvantum.heating_curve import (
     ROOM_GAIN_MIN_SPAN_C,
     SOLAR_MAX_C,
     TOTAL_MAX_C,
+    WIND_MAX_C,
     TRIM_MAX_C,
     CurveResult,
     DayPhase,
@@ -42,9 +43,11 @@ from custom_components.qvantum.heating_curve import (
     room_compensation_gain,
     pump_room_reading,
     room_corrected_deviation,
+    smooth_wind,
     solar_adjustment_c,
     trim_evidence_hours,
     trim_residuals,
+    wind_adjustment_c,
 )
 from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
 
@@ -1220,3 +1223,102 @@ def test_active_room_gain_ignores_unusable_rows() -> None:
     assert estimate.valid
     assert estimate.hours == 20
     assert estimate.gain_c_per_c == pytest.approx(5.0)
+
+
+def make_wind_model(
+    *,
+    a: float = 152.0,
+    w: float = 2.5,
+    wind_valid: bool = True,
+) -> SolarDailyModel:
+    return SolarDailyModel(
+        a_w_per_k=a,
+        b_m2=1.9,
+        c_w=-600.0,
+        trust=0.7,
+        r2=0.92,
+        n_days=40,
+        valid=True,
+        w_per_ms=w if wind_valid else None,
+        w_std_err=0.4,
+        w_t_stat=6.0,
+        wind_hours=720,
+        wind_valid=wind_valid,
+    )
+
+
+def test_wind_adjustment_is_one_sided_and_bounded() -> None:
+    """Wind only raises the supply, and never past WIND_MAX_C."""
+    points = normalize_baseline(BASELINE)
+    conditions = {BASE_HOUR + step * 3600: 5.0 for step in range(3)}
+
+    term = wind_adjustment_c(
+        make_wind_model(), conditions, BASE_HOUR, points, 0.0, 20.0
+    )
+    assert 0.0 < term < WIND_MAX_C
+
+    # An extreme coefficient and wind hit the cap instead of running away.
+    capped = wind_adjustment_c(
+        make_wind_model(w=200.0), conditions, BASE_HOUR, points, -20.0, 25.0
+    )
+    assert capped == pytest.approx(WIND_MAX_C)
+
+
+def test_wind_adjustment_needs_the_gates_the_data_and_a_positive_delta_t() -> None:
+    """No coefficient, no wind reading, or a warm-warm day means no term."""
+    points = normalize_baseline(BASELINE)
+    conditions = {BASE_HOUR + step * 3600: 5.0 for step in range(3)}
+
+    assert (
+        wind_adjustment_c(None, conditions, BASE_HOUR, points, 0.0, 20.0) == 0.0
+    )
+    assert (
+        wind_adjustment_c(
+            make_wind_model(wind_valid=False), conditions, BASE_HOUR, points, 0.0, 20.0
+        )
+        == 0.0
+    )
+    # "Not measured" is not calm: no wind data means no term.
+    assert wind_adjustment_c(make_wind_model(), {}, BASE_HOUR, points, 0.0, 20.0) == 0.0
+    # Indoor at or below outdoor: wind cannot raise a loss that does not exist.
+    assert (
+        wind_adjustment_c(make_wind_model(), conditions, BASE_HOUR, points, 22.0, 20.0)
+        == 0.0
+    )
+    assert (
+        wind_adjustment_c(make_wind_model(), conditions, BASE_HOUR, points, 0.0, None)
+        == 0.0
+    )
+
+
+def test_smooth_wind_averages_the_next_hours() -> None:
+    conditions = {BASE_HOUR: 2.0, BASE_HOUR + 3600: 4.0, BASE_HOUR + 7200: 6.0}
+
+    assert smooth_wind(conditions, BASE_HOUR) == pytest.approx(4.0)
+    # Only the hours that exist count, and a stale payload is not calm.
+    assert smooth_wind(conditions, BASE_HOUR + 3600) == pytest.approx(5.0)
+    assert smooth_wind({}, BASE_HOUR) is None
+    assert smooth_wind({BASE_HOUR - 3600: 9.0}, BASE_HOUR) is None
+
+
+def test_compute_curve_applies_wind_only_when_enabled() -> None:
+    """The switch gates the term; the model's own gates gate the value."""
+    conditions = {BASE_HOUR + step * 3600: 6.0 for step in range(3)}
+    kwargs = dict(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature={BASE_HOUR: 0.0},
+        ghi_by_hour={},
+        daily_model=make_wind_model(),
+        indoor_target_c=20.0,
+        wind_by_hour=conditions,
+    )
+
+    off = compute_curve(**kwargs)
+    assert off.wind_c == 0.0
+
+    on = compute_curve(**kwargs, wind_enabled=True)
+    assert on.wind_c > 0.0
+    assert on.adjustment_c == pytest.approx(
+        off.adjustment_c + on.wind_c, abs=1e-6
+    ) or on.adjustment_c == pytest.approx(TOTAL_MAX_C)

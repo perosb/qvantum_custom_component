@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Wstępne ładowanie",
           "description": "Podnieś temperaturę zasilania przed prognozowanym ochłodzeniem"
+        },
+        "wind": {
+          "name": "Wiatr",
+          "description": "Podnieś temperaturę zasilania, gdy zidentyfikowana wrażliwość na wiatr wskazuje dodatkowe straty"
         }
       }
     },

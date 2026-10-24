@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Precarga",
           "description": "Aumentar la impulsión antes de una ola de frío prevista"
+        },
+        "wind": {
+          "name": "Viento",
+          "description": "Aumentar la impulsión cuando una sensibilidad al viento identificada indique una pérdida adicional"
         }
       }
     },

@@ -72,6 +72,14 @@ NIGHT_DAY_HORIZON_H = 24
 
 #: Solar term clamp (only ever reduces the curve).
 SOLAR_MAX_C = 2.0
+#: Wind can only *raise* the supply (extra envelope loss), and a forecast wind
+#: is a grid value rather than the wind at the house, so the term is bounded
+#: tightly: it is the smallest of the optional terms on purpose.
+WIND_MAX_C: float = 2.0
+#: Hours averaged for the wind term. A gust in one forecast hour is noise; the
+#: envelope response integrates over hours, which is what the calm average of
+#: the next hours approximates.
+WIND_SMOOTH_HOURS: int = 3
 
 #: Load term clamp (only ever reduces the curve).
 LOAD_MAX_C = 0.5
@@ -180,6 +188,10 @@ class CurveResult:
     floor_pinned_points: tuple[str, ...] = ()
     cop_c: float = 0.0
     precharge_c: float = 0.0
+    #: Wind's extra envelope loss as supply degrees, one-sided (0…WIND_MAX_C),
+    #: computed only while the optional term is enabled and the model's wind
+    #: column passed its gates.
+    wind_c: float = 0.0
 
     def as_dict(self) -> dict[str, float]:
         return {key: round(supply, 2) for key, supply in self.points}
@@ -420,6 +432,67 @@ def solar_adjustment_c(
     slope = curve_slope(points, reference)
     raw = slope * (gain_w / loss_w_per_k)
     return _clamp(raw, -SOLAR_MAX_C, 0.0)
+
+
+def smooth_wind(
+    wind_by_hour: Mapping[int, float], now_ts: int, *, hours: int = WIND_SMOOTH_HOURS
+) -> float | None:
+    """Mean of the *available* hours in the next ``hours``, or ``None``.
+
+    Hours missing from the payload are skipped rather than counted as calm, so a
+    partially covered window still yields a mean; ``None`` only when none of them
+    carries a reading, because a payload without wind is "not measured" and a
+    wind term must not act on a claim of calm.
+    """
+    now_hour = now_ts - (now_ts % 3600)
+    values = [
+        float(wind_by_hour[now_hour + step * 3600])
+        for step in range(max(1, hours))
+        if now_hour + step * 3600 in wind_by_hour
+    ]
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def wind_adjustment_c(
+    daily: SolarDailyModel | None,
+    wind_by_hour: Mapping[int, float],
+    now_ts: int,
+    points: Sequence[tuple[float, float]],
+    outdoor_c: float | None,
+    indoor_target_c: float | None,
+) -> float:
+    """Wind's extra envelope loss in W → supply degrees, one-sided and bounded.
+
+    Wind multiplies the loss, so the extra watts at wind ``v`` are
+    ``w · v · ΔT`` with ``w`` the coefficient identified per installation. It is
+    converted with the *same* pair it was identified with (``a`` from the same
+    day-block model) and the local curve slope, exactly like the solar term, and
+    capped at :data:`WIND_MAX_C`. Returns 0.0 whenever anything is missing or
+    the model's wind column did not pass its gates — no term beats a guess.
+    """
+    if daily is None or not daily.wind_valid:
+        return 0.0
+    w_per_ms = daily.w_per_ms
+    loss_w_per_k = daily.a_w_per_k
+    if w_per_ms is None or w_per_ms <= 0.0 or loss_w_per_k <= 0.0:
+        return 0.0
+    wind_ms = smooth_wind(wind_by_hour, now_ts)
+    if wind_ms is None or wind_ms <= 0.0:
+        return 0.0
+    if outdoor_c is None or indoor_target_c is None:
+        return 0.0
+    delta_t = indoor_target_c - outdoor_c
+    if delta_t <= 0.0:
+        return 0.0
+    extra_w = w_per_ms * wind_ms * delta_t
+    # ``curve_slope`` is d(supply)/d(outdoor), i.e. negative: colder outside
+    # means more supply. Extra loss therefore needs the negated slope, which is
+    # the same conversion the solar term uses with its sign (a gain lowers the
+    # supply, a loss raises it).
+    slope = curve_slope(points, outdoor_c)
+    return _clamp(-slope * extra_w / loss_w_per_k, 0.0, WIND_MAX_C)
 
 
 def load_adjustment_c(
@@ -1146,6 +1219,8 @@ def compute_curve(
     max_supply_c: float | None = None,
     cop_c: float = 0.0,
     precharge_c: float = 0.0,
+    wind_by_hour: Mapping[int, float] | None = None,
+    wind_enabled: bool = False,
 ) -> CurveResult:
     """Baseline + outdoor + night/day + solar + load → seven supply points.
 
@@ -1178,6 +1253,18 @@ def compute_curve(
     solar_c = solar_adjustment_c(
         model, ghi_by_hour, now_ts, points, forecast_now, daily_model
     )
+    wind_c = (
+        wind_adjustment_c(
+            daily_model,
+            wind_by_hour or {},
+            now_ts,
+            points,
+            forecast_now,
+            indoor_target_c,
+        )
+        if wind_enabled
+        else 0.0
+    )
     load_c = load_adjustment_c(
         model,
         q_actual_w,
@@ -1189,7 +1276,7 @@ def compute_curve(
     )
 
     total = _clamp(
-        outdoor_c + night_day_c + solar_c + load_c + cop_c + precharge_c,
+        outdoor_c + night_day_c + solar_c + load_c + cop_c + precharge_c + wind_c,
         -TOTAL_MAX_C,
         TOTAL_MAX_C,
     )
@@ -1261,4 +1348,5 @@ def compute_curve(
         floor_pinned_points=tuple(floor_pinned_points),
         cop_c=cop_c,
         precharge_c=precharge_c,
+        wind_c=wind_c,
     )

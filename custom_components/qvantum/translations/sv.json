@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Förladdning",
           "description": "Höj framledningen före ett prognostiserat köldknäpp"
+        },
+        "wind": {
+          "name": "Vind",
+          "description": "Höj framledningen när en identifierad vindkänslighet visar på extra värmeförlust"
         }
       }
     },

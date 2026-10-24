@@ -17,6 +17,7 @@ from homeassistant.exceptions import HomeAssistantError
 from custom_components.qvantum import curve_coordinator as cc
 from custom_components.qvantum.const import HP_STATUS_HEATING
 from custom_components.qvantum.heating_curve import (
+    WIND_MAX_C,
     ActiveRoomGain,
     COP_FEEDBACK_MAX_C,
     PRECHARGE_MAX_C,
@@ -91,10 +92,16 @@ class FakeStore:
         self.saved = data
 
 
-def make_forecast(*, temperature: float = 10.0, ghi: float = 0.0, hours: int = 7):
+def make_forecast(
+    *,
+    temperature: float = 10.0,
+    ghi: float = 0.0,
+    hours: int = 7,
+    wind_ms: float | None = None,
+):
     now_hour = int(time.time()) - (int(time.time()) % 3600)
     points = tuple(
-        HourlyWeather(now_hour + index * 3600, temperature, ghi)
+        HourlyWeather(now_hour + index * 3600, temperature, ghi, wind_ms=wind_ms)
         for index in range(hours)
     )
     return WeatherForecast(points=points)
@@ -146,7 +153,7 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._mode = "shadow"
     coordinator._revert_pending = False
     coordinator._control_lock = asyncio.Lock()
-    coordinator._terms = {"cop_feedback": False, "precharge": False}
+    coordinator._terms = {"cop_feedback": False, "precharge": False, "wind": False}
     coordinator._cop_reference = {}
     coordinator._cop_samples = {}
     coordinator._counters = {
@@ -2713,6 +2720,39 @@ async def test_readiness_hours_ignore_a_missing_bt2() -> None:
     assert series[100] == pytest.approx(36.0 - 40.0)
 
 
+async def test_snapshot_applies_the_wind_term_only_when_enabled() -> None:
+    """The switch reaches the snapshot; the model's gates decide the value."""
+    def build(*, wind: bool):
+        coordinator, _client = make_writable_coordinator(
+            settings={"curve_type_heating": 1}, live_curve_type=1
+        )
+        coordinator._main.data["values"].update(
+            {"sensor_mode": 4, "room_temp_external": 20.0, "indoor_temperature_target": 21.0}
+        )
+        coordinator._baseline = dict(BASELINE)
+        coordinator._daily_model = make_daily_model(
+            w_per_ms=2.5, w_std_err=0.4, w_t_stat=6.0, wind_hours=720, wind_valid=True
+        )
+        coordinator._terms["wind"] = wind
+        coordinator._mode = "active"
+        coordinator._active_since_ts = time.time() - 3600
+        coordinator._async_calibrate = AsyncMock()
+        coordinator._async_fetch_forecast = AsyncMock(
+            return_value=make_forecast(temperature=0.0, wind_ms=6.0)
+        )
+        coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+        coordinator._async_trim_observations = AsyncMock(return_value=[])
+        coordinator._daylight = MagicMock(return_value=None)
+        return coordinator
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        off = await build(wind=False)._async_compute_snapshot()
+        on = await build(wind=True)._async_compute_snapshot()
+
+    assert off.wind_c == 0.0
+    assert 0.0 < on.wind_c <= WIND_MAX_C
+
+
 async def test_snapshot_arms_the_indoor_cap_with_a_room_reading() -> None:
     """The cap can only brake the curve when an indoor reading exists."""
     coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
@@ -3366,8 +3406,18 @@ class TestCopFeedback:
 
         await coordinator.async_set_terms(cop_feedback=True)
 
-        assert coordinator.terms == {"cop_feedback": True, "precharge": False}
+        assert coordinator.terms == {
+            "cop_feedback": True,
+            "precharge": False,
+            "wind": False,
+        }
         assert store.saved["terms"]["cop_feedback"] is True
+
+        await coordinator.async_set_terms(wind=True)
+
+        # The wind term is off by default like the other optional terms, and
+        # enabling it only makes the model's own gates reachable.
+        assert store.saved["terms"]["wind"] is True
 
     @pytest.mark.asyncio
     async def test_restore_terms_and_reference(self):
@@ -3382,7 +3432,11 @@ class TestCopFeedback:
 
         await coordinator.async_restore()
 
-        assert coordinator.terms == {"cop_feedback": True, "precharge": False}
+        assert coordinator.terms == {
+            "cop_feedback": True,
+            "precharge": False,
+            "wind": False,
+        }
         assert coordinator._cop_reference == {0: 3.5}
         assert coordinator._cop_samples == {0: 20}
 
