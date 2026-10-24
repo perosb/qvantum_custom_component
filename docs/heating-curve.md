@@ -465,7 +465,14 @@ only act while the curve is active. Enable them with
 ### Solar model
 
 The fit uses recorder long-term statistics (`heatingpower`, outdoor and indoor
-temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily. An
+temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily. The
+same requests also carry 10 m wind (`wind_speed_10m`, in m/s rather than the
+API's default km/h), and the day blocks hold it as `Σ(v·ΔT)` — the form wind
+takes physically, since it multiplies the envelope loss instead of shifting it.
+Nothing consumes that column yet: no wind term is applied to the curve until a
+coefficient has been identified for *this* installation, and a payload without
+wind produces the same days with `wind_hours = 0`, because "not measured" is
+not "calm". An
 attempt that cannot fetch its inputs retries within the hour instead of waiting
 the full day, so one network hiccup does not freeze the model; a completed
 attempt — fit accepted or rejected — waits the full interval, because the

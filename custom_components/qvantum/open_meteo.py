@@ -1,8 +1,8 @@
 """Open-Meteo access for the custom heating-curve module.
 
-Fetches hourly outdoor temperature plus shortwave radiation (GHI) for the
-near forecast window, and historical GHI for solar-gain calibration. No API
-key is required. The caller passes the Home Assistant ``aiohttp`` client
+Fetches hourly outdoor temperature, shortwave radiation (GHI) and 10 m wind
+speed for the near forecast window, and historical GHI + wind for the
+day-block calibration. No API key is required. The caller passes the Home Assistant ``aiohttp`` client
 session, so this module stays free of Home Assistant imports and never owns
 a session.
 
@@ -44,11 +44,17 @@ class OpenMeteoError(RuntimeError):
 
 @dataclass(frozen=True)
 class HourlyWeather:
-    """One hour of outdoor temperature and GHI (UTC hour start)."""
+    """One hour of outdoor temperature, GHI and wind (UTC hour start).
+
+    ``wind_ms`` is ``None`` when the payload carried no wind for that hour:
+    "no wind data" and "calm" are different claims, and only one of them may
+    feed a model.
+    """
 
     hour_ts: int
     temperature_c: float
     ghi_wm2: float
+    wind_ms: float | None = None
 
 
 @dataclass(frozen=True)
@@ -62,6 +68,19 @@ class WeatherForecast:
 
     def temperature_by_hour(self) -> dict[int, float]:
         return {point.hour_ts: point.temperature_c for point in self.points}
+
+    def wind_by_hour(self) -> dict[int, float]:
+        """Hours that carry a wind reading; unknown hours stay absent."""
+        return {
+            point.hour_ts: point.wind_ms
+            for point in self.points
+            if point.wind_ms is not None
+        }
+
+    @property
+    def wind_available(self) -> bool:
+        """True when the payload carried wind at all (a model input, not a term)."""
+        return any(point.wind_ms is not None for point in self.points)
 
     def at(self, hour_ts: int) -> HourlyWeather | None:
         for point in self.points:
@@ -114,6 +133,9 @@ def _base_params(latitude: float, longitude: float) -> dict[str, str]:
         "longitude": f"{longitude:.6f}",
         "timezone": "UTC",
         "timeformat": "unixtime",
+        # The API defaults to km/h; every consumer here works in m/s, and a
+        # silent unit mismatch on wind would look like a calibration result.
+        "wind_speed_unit": "ms",
     }
 
 
@@ -126,8 +148,8 @@ def forecast_url(
 ) -> str:
     params = {
         **_base_params(latitude, longitude),
-        "hourly": "temperature_2m,shortwave_radiation",
-        "current": "temperature_2m,shortwave_radiation",
+        "hourly": "temperature_2m,shortwave_radiation,wind_speed_10m",
+        "current": "temperature_2m,shortwave_radiation,wind_speed_10m",
         "past_hours": str(past_hours),
         "forecast_hours": str(future_hours),
     }
@@ -139,7 +161,7 @@ def history_url(
 ) -> str:
     params = {
         **_base_params(latitude, longitude),
-        "hourly": "shortwave_radiation",
+        "hourly": "shortwave_radiation,wind_speed_10m",
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
     }
@@ -155,8 +177,11 @@ def parse_forecast(payload: Any) -> WeatherForecast:
     times = _series(hourly, "time")
     temperatures = _series(hourly, "temperature_2m")
     irradiances = _series(hourly, "shortwave_radiation")
+    winds = _series(hourly, "wind_speed_10m")
     points: dict[int, HourlyWeather] = {}
-    for ts_raw, temperature, ghi in zip(times, temperatures, irradiances):
+    for index, (ts_raw, temperature, ghi) in enumerate(
+        zip(times, temperatures, irradiances)
+    ):
         if ts_raw is None or temperature is None or ghi is None:
             continue
         ts = _safe_hour_ts(ts_raw)
@@ -166,10 +191,13 @@ def parse_forecast(payload: Any) -> WeatherForecast:
             # A corrupt hour must stay missing: max(0.0, NaN) would launder
             # it into a valid-looking calm hour and bias calibration.
             continue
+        wind_ms = _finite_float(winds[index]) if index < len(winds) else None
         points[ts] = HourlyWeather(
             hour_ts=ts,
             temperature_c=temperature_c,
             ghi_wm2=max(0.0, ghi_wm2),
+            # Unknown wind stays unknown: a missing field must not read as calm.
+            wind_ms=None if wind_ms is None else max(0.0, wind_ms),
         )
 
     current = payload.get("current")
@@ -179,8 +207,10 @@ def parse_forecast(payload: Any) -> WeatherForecast:
         if existing is not None:
             temperature_raw = current.get("temperature_2m")
             ghi_raw = current.get("shortwave_radiation")
+            wind_raw = current.get("wind_speed_10m")
             temperature_c = existing.temperature_c
             ghi_wm2 = existing.ghi_wm2
+            wind_ms = existing.wind_ms
             if temperature_raw is not None:
                 candidate = _finite_float(temperature_raw)
                 if candidate is not None:
@@ -189,10 +219,15 @@ def parse_forecast(payload: Any) -> WeatherForecast:
                 candidate = _finite_float(ghi_raw)
                 if candidate is not None:
                     ghi_wm2 = max(0.0, candidate)
+            if wind_raw is not None:
+                candidate = _finite_float(wind_raw)
+                if candidate is not None:
+                    wind_ms = max(0.0, candidate)
             points[ts] = HourlyWeather(
                 hour_ts=ts,
                 temperature_c=temperature_c,
                 ghi_wm2=ghi_wm2,
+                wind_ms=wind_ms,
             )
 
     if not points:
@@ -200,14 +235,22 @@ def parse_forecast(payload: Any) -> WeatherForecast:
     return WeatherForecast(points=tuple(points[key] for key in sorted(points)))
 
 
-def parse_ghi_history(payload: Any) -> dict[int, float]:
-    """Parse a historical GHI response into ``{hour_ts: W/m²}``."""
-    hourly = payload.get("hourly") if isinstance(payload, dict) else None
-    if not isinstance(hourly, dict):
-        raise OpenMeteoError("missing hourly block")
+@dataclass(frozen=True)
+class WeatherHistory:
+    """Historical hourly GHI and wind, keyed by UTC hour start."""
 
+    ghi_by_hour: dict[int, float]
+    wind_by_hour: dict[int, float]
+
+    @property
+    def wind_available(self) -> bool:
+        return bool(self.wind_by_hour)
+
+
+def _parse_series(hourly: Mapping[str, Any], key: str) -> dict[int, float]:
+    """One optional hourly series as ``{hour_ts: value}``, non-negative."""
     times = _series(hourly, "time")
-    values = _series(hourly, "shortwave_radiation")
+    values = _series(hourly, key)
     series: dict[int, float] = {}
     for ts_raw, value in zip(times, values):
         if ts_raw is None or value is None:
@@ -218,6 +261,22 @@ def parse_ghi_history(payload: Any) -> dict[int, float]:
             continue
         series[ts] = max(0.0, numeric)
     return series
+
+
+def parse_history(payload: Any) -> WeatherHistory:
+    """Parse a historical response into GHI plus wind (wind may be absent)."""
+    hourly = payload.get("hourly") if isinstance(payload, dict) else None
+    if not isinstance(hourly, dict):
+        raise OpenMeteoError("missing hourly block")
+    return WeatherHistory(
+        ghi_by_hour=_parse_series(hourly, "shortwave_radiation"),
+        wind_by_hour=_parse_series(hourly, "wind_speed_10m"),
+    )
+
+
+def parse_ghi_history(payload: Any) -> dict[int, float]:
+    """Parse a historical GHI response into ``{hour_ts: W/m²}``."""
+    return parse_history(payload).ghi_by_hour
 
 
 async def _get_json(
@@ -253,6 +312,29 @@ async def fetch_forecast(
     return parse_forecast(payload)
 
 
+async def fetch_weather_history(
+    session: aiohttp.ClientSession,
+    latitude: float,
+    longitude: float,
+    start: date,
+    end: date,
+) -> WeatherHistory:
+    """Fetch hourly GHI + wind history, historical-forecast first, archive fallback."""
+    last_error: OpenMeteoError | None = None
+    for base_url in (HISTORICAL_FORECAST_URL, ARCHIVE_URL):
+        url = history_url(base_url, latitude, longitude, start, end)
+        try:
+            payload = await _get_json(session, url, timeout_s=HISTORY_TIMEOUT_S)
+            history = parse_history(payload)
+        except OpenMeteoError as err:
+            last_error = err
+            continue
+        if history.ghi_by_hour:
+            return history
+        last_error = OpenMeteoError("empty GHI history")
+    raise OpenMeteoError(f"GHI history unavailable: {last_error}")
+
+
 async def fetch_ghi_history(
     session: aiohttp.ClientSession,
     latitude: float,
@@ -260,17 +342,6 @@ async def fetch_ghi_history(
     start: date,
     end: date,
 ) -> dict[int, float]:
-    """Fetch hourly GHI history, historical-forecast first, archive fallback."""
-    last_error: OpenMeteoError | None = None
-    for base_url in (HISTORICAL_FORECAST_URL, ARCHIVE_URL):
-        url = history_url(base_url, latitude, longitude, start, end)
-        try:
-            payload = await _get_json(session, url, timeout_s=HISTORY_TIMEOUT_S)
-            series = parse_ghi_history(payload)
-        except OpenMeteoError as err:
-            last_error = err
-            continue
-        if series:
-            return series
-        last_error = OpenMeteoError("empty GHI history")
-    raise OpenMeteoError(f"GHI history unavailable: {last_error}")
+    """Fetch hourly GHI history (thin wrapper over :func:`fetch_weather_history`)."""
+    history = await fetch_weather_history(session, latitude, longitude, start, end)
+    return history.ghi_by_hour

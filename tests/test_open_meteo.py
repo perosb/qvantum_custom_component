@@ -22,6 +22,7 @@ from custom_components.qvantum.open_meteo import (
     hour_ts,
     parse_forecast,
     parse_ghi_history,
+    parse_history,
 )
 
 BASE = 1_760_000_000 - (1_760_000_000 % 3600)
@@ -87,7 +88,10 @@ def test_forecast_url_contains_expected_params() -> None:
     assert query["longitude"] == ["18.100000"]
     assert query["timezone"] == ["UTC"]
     assert query["timeformat"] == ["unixtime"]
-    assert query["hourly"] == ["temperature_2m,shortwave_radiation"]
+    assert query["hourly"] == ["temperature_2m,shortwave_radiation,wind_speed_10m"]
+    # m/s, not the API default km/h: a silent unit mismatch would read as a
+    # calibration result.
+    assert query["wind_speed_unit"] == ["ms"]
     assert query["past_hours"] == ["6"]
     assert query["forecast_hours"] == ["12"]
 
@@ -101,7 +105,8 @@ def test_history_url_contains_dates() -> None:
     assert url.startswith(HISTORICAL_FORECAST_URL)
     assert query["start_date"] == ["2026-01-01"]
     assert query["end_date"] == ["2026-02-01"]
-    assert query["hourly"] == ["shortwave_radiation"]
+    assert query["hourly"] == ["shortwave_radiation,wind_speed_10m"]
+    assert query["wind_speed_unit"] == ["ms"]
 
 
 def test_parse_forecast_sorts_and_overrides_current_hour() -> None:
@@ -375,3 +380,64 @@ async def test_get_json_maps_transport_and_payload_errors() -> None:
     session = FakeSession([FakeResponse(["not", "a", "dict"])])
     with pytest.raises(OpenMeteoError, match="unexpected payload"):
         await fetch_forecast(session, 0.0, 0.0)
+
+
+def test_forecast_carries_wind_and_keeps_unknown_hours_absent() -> None:
+    """Wind is optional per hour: absent must not read as calm."""
+    payload = {
+        "hourly": {
+            "time": [BASE, BASE + 3600],
+            "temperature_2m": [4.0, 4.5],
+            "shortwave_radiation": [0.0, 120.0],
+            "wind_speed_10m": [3.4, None],
+        }
+    }
+    forecast = parse_forecast(payload)
+
+    assert forecast.wind_by_hour() == {BASE: 3.4}
+    assert forecast.wind_available is True
+    assert forecast.at(BASE + 3600).wind_ms is None
+
+
+def test_forecast_without_a_wind_field_still_parses() -> None:
+    """A model that omits wind must not break the forecast the curve runs on."""
+    payload = {
+        "hourly": {
+            "time": [BASE],
+            "temperature_2m": [4.0],
+            "shortwave_radiation": [0.0],
+        }
+    }
+    forecast = parse_forecast(payload)
+
+    assert forecast.wind_by_hour() == {}
+    assert forecast.wind_available is False
+
+
+def test_parse_history_returns_ghi_and_wind() -> None:
+    payload = {
+        "hourly": {
+            "time": [BASE, BASE + 3600],
+            "shortwave_radiation": [0.0, 120.0],
+            "wind_speed_10m": [2.0, 5.5],
+        }
+    }
+    history = parse_history(payload)
+
+    assert history.ghi_by_hour == {BASE: 0.0, BASE + 3600: 120.0}
+    assert history.wind_by_hour == {BASE: 2.0, BASE + 3600: 5.5}
+    assert history.wind_available is True
+
+
+def test_parse_history_without_wind_is_not_calm() -> None:
+    payload = {
+        "hourly": {
+            "time": [BASE],
+            "shortwave_radiation": [80.0],
+        }
+    }
+    history = parse_history(payload)
+
+    assert history.ghi_by_hour == {BASE: 80.0}
+    assert history.wind_by_hour == {}
+    assert history.wind_available is False

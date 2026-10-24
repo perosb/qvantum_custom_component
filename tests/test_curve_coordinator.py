@@ -46,6 +46,7 @@ from custom_components.qvantum.open_meteo import (
     HourlyWeather,
     OpenMeteoError,
     WeatherForecast,
+    WeatherHistory,
 )
 from custom_components.qvantum.solar_gain import (
     SolarDailyModel,
@@ -2117,7 +2118,7 @@ async def test_calibrate_fits_and_persists_model() -> None:
     coordinator._async_hourly_maps = AsyncMock(
         return_value={"heatingpower": q, "indoor": indoor, "outdoor": outdoor}
     )
-    with patch.object(cc, "fetch_ghi_history", AsyncMock(return_value=ghi)):
+    with patch.object(cc, "fetch_weather_history", AsyncMock(return_value=WeatherHistory(ghi, {}))):
         await coordinator._async_calibrate(now_ts)
 
     assert coordinator.model is not None
@@ -2139,7 +2140,7 @@ async def test_calibrate_skips_when_location_missing() -> None:
 async def test_calibrate_skips_when_history_unavailable() -> None:
     coordinator = make_coordinator()
     with patch.object(
-        cc, "fetch_ghi_history", AsyncMock(side_effect=OpenMeteoError("no history"))
+        cc, "fetch_weather_history", AsyncMock(side_effect=OpenMeteoError("no history"))
     ):
         await coordinator._async_calibrate(time.time())
 
@@ -2153,7 +2154,7 @@ async def test_calibrate_skips_when_too_few_samples() -> None:
     coordinator._async_hourly_maps = AsyncMock(
         return_value={"heatingpower": q, "indoor": indoor, "outdoor": outdoor}
     )
-    with patch.object(cc, "fetch_ghi_history", AsyncMock(return_value=ghi)):
+    with patch.object(cc, "fetch_weather_history", AsyncMock(return_value=WeatherHistory(ghi, {}))):
         await coordinator._async_calibrate(now_ts)
 
     assert coordinator.model is None
@@ -2172,7 +2173,7 @@ async def test_calibrate_keeps_previous_model_on_invalid_fit() -> None:
             "outdoor": {ts: 5.0 for ts in q},
         }
     )
-    with patch.object(cc, "fetch_ghi_history", AsyncMock(return_value={ts: 0.0 for ts in q})):
+    with patch.object(cc, "fetch_weather_history", AsyncMock(return_value=WeatherHistory({ts: 0.0 for ts in q}, {}))):
         await coordinator._async_calibrate(now_ts)
 
     assert coordinator.model is previous
@@ -2182,7 +2183,7 @@ async def test_failed_fetch_is_retried_within_the_hour() -> None:
     """One transient network failure must not cost a day of staleness."""
     coordinator = make_coordinator(store=FakeStore())
     with patch.object(
-        cc, "fetch_ghi_history", AsyncMock(side_effect=OpenMeteoError("down"))
+        cc, "fetch_weather_history", AsyncMock(side_effect=OpenMeteoError("down"))
     ):
         await coordinator._async_calibrate(2000.0)
 
@@ -2213,7 +2214,7 @@ async def test_completed_attempt_waits_the_full_refresh_interval() -> None:
         }
     )
     with patch.object(
-        cc, "fetch_ghi_history", AsyncMock(return_value={ts: 0.0 for ts in q})
+        cc, "fetch_weather_history", AsyncMock(return_value=WeatherHistory({ts: 0.0 for ts in q}, {}))
     ):
         await coordinator._async_calibrate(now_ts)
 
@@ -2229,7 +2230,7 @@ async def test_completed_attempt_waits_the_full_refresh_interval() -> None:
 async def test_calibration_retry_flag_round_trips_through_the_store() -> None:
     coordinator = make_coordinator(store=FakeStore())
     with patch.object(
-        cc, "fetch_ghi_history", AsyncMock(side_effect=OpenMeteoError("down"))
+        cc, "fetch_weather_history", AsyncMock(side_effect=OpenMeteoError("down"))
     ):
         await coordinator._async_calibrate(2000.0)
     payload = coordinator._store.saved
@@ -3462,7 +3463,7 @@ async def test_calibrate_fits_and_persists_the_daily_model() -> None:
     coordinator._async_hourly_maps = AsyncMock(
         return_value={"heatingpower": q, "indoor": indoor, "outdoor": outdoor}
     )
-    with patch.object(cc, "fetch_ghi_history", AsyncMock(return_value=ghi)):
+    with patch.object(cc, "fetch_weather_history", AsyncMock(return_value=WeatherHistory(ghi, {}))):
         await coordinator._async_calibrate(now_ts)
 
     daily = coordinator.daily_model
@@ -3481,7 +3482,7 @@ async def test_daily_model_round_trips_through_the_store() -> None:
     coordinator._async_hourly_maps = AsyncMock(
         return_value={"heatingpower": q, "indoor": indoor, "outdoor": outdoor}
     )
-    with patch.object(cc, "fetch_ghi_history", AsyncMock(return_value=ghi)):
+    with patch.object(cc, "fetch_weather_history", AsyncMock(return_value=WeatherHistory(ghi, {}))):
         await coordinator._async_calibrate(now_ts)
     payload = coordinator._store.saved
 
@@ -3512,7 +3513,7 @@ async def test_daily_model_replaces_an_unidentifiable_window() -> None:
         }
     )
     with patch.object(
-        cc, "fetch_ghi_history", AsyncMock(return_value={ts: 0.0 for ts in q})
+        cc, "fetch_weather_history", AsyncMock(return_value=WeatherHistory({ts: 0.0 for ts in q}, {}))
     ):
         await coordinator._async_calibrate(now_ts)
 

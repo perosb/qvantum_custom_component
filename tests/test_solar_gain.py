@@ -812,3 +812,56 @@ def test_aggregate_days_ignores_unparsable_values() -> None:
 
     assert len(days) == 1
     assert days[0].hours == 3
+
+
+def test_aggregate_days_adds_the_wind_interaction_column() -> None:
+    """Wind multiplies the envelope loss, so the column is Σ(v·ΔT)."""
+    start = NOW - 2 * 86400
+    start -= start % 86400
+    keys = [start + index * 3600 for index in range(48)]
+    q_heat = {ts: 400.0 for ts in keys}
+    indoor = {ts: 21.0 for ts in keys}
+    outdoor = {ts: 5.0 for ts in keys}
+    ghi = {ts: 100.0 for ts in keys}
+    wind = {ts: 4.0 for ts in keys}
+
+    days = aggregate_days(q_heat, indoor, outdoor, ghi, wind)
+
+    assert len(days) == 2
+    for day in days:
+        assert day.wind_hours == 24
+        assert day.sum_wind_ms_h == pytest.approx(4.0 * 24)
+        # ΔT is 16 K every hour.
+        assert day.sum_wind_delta_t_k_m_s == pytest.approx(4.0 * 16.0 * 24)
+        # The other columns are untouched by the extra input.
+        assert day.sum_delta_t_k == pytest.approx(16.0 * 24)
+
+
+def test_aggregate_days_without_wind_reports_no_wind_hours() -> None:
+    """No wind payload is "not measured", not a calm day."""
+    q_heat, indoor, outdoor, ghi = make_censored_history(days=3, noise=0.0)
+
+    days = aggregate_days(q_heat, indoor, outdoor, ghi)
+
+    assert days
+    assert all(day.wind_hours == 0 for day in days)
+    assert all(day.sum_wind_delta_t_k_m_s == 0.0 for day in days)
+
+
+def test_aggregate_days_counts_only_hours_with_a_wind_reading() -> None:
+    """A partially covered day keeps its other sums and its wind evidence count."""
+    start = NOW - 86400
+    start -= start % 86400
+    keys = [start + index * 3600 for index in range(24)]
+    q_heat = {ts: 400.0 for ts in keys}
+    indoor = {ts: 21.0 for ts in keys}
+    outdoor = {ts: 5.0 for ts in keys}
+    ghi = {ts: 0.0 for ts in keys}
+    wind = {keys[0]: 6.0, keys[1]: 2.0}
+
+    day = aggregate_days(q_heat, indoor, outdoor, ghi, wind)[0]
+
+    assert day.hours == 24
+    assert day.wind_hours == 2
+    assert day.sum_wind_ms_h == pytest.approx(8.0)
+    assert day.sum_wind_delta_t_k_m_s == pytest.approx((6.0 + 2.0) * 16.0)

@@ -17,6 +17,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
+from .open_meteo import hour_ts as weather_hour_ts
+
 # Keys that must never leave the instance. ``async_redact_data`` applies these
 # recursively, so they cover config-entry data as well as nested client state.
 TO_REDACT = {
@@ -414,6 +416,15 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
     snapshot = getattr(coordinator, "data", None)
     main_values = getattr(coordinator, "_main_values", None)
     live = main_values() if callable(main_values) else {}
+    forecast = getattr(coordinator, "_forecast", None)
+    wind_ms = None
+    wind_available = False
+    if forecast is not None:
+        # The site proxy behind any wind figure: Open-Meteo's 10 m grid wind,
+        # not the wind at the house. A dump has to show it to be judgeable.
+        wind_by_hour = forecast.wind_by_hour()
+        wind_available = bool(wind_by_hour)
+        wind_ms = wind_by_hour.get(weather_hour_ts(dt_util.utcnow().timestamp()))
     points = getattr(snapshot, "points", None)
     trims = getattr(coordinator, "_trims", None)
     baseline = getattr(coordinator, "_baseline", None)
@@ -429,6 +440,8 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "revert_pending": bool(getattr(coordinator, "_revert_pending", False)),
         "forecast_ok": bool(getattr(coordinator, "_forecast_ok", False)),
         "forecast_reused": bool(getattr(coordinator, "_forecast_reused", False)),
+        "forecast_wind_ms": wind_ms,
+        "forecast_wind_available": wind_available,
         "baseline": dict(baseline) if isinstance(baseline, dict) else {},
         "baseline_auto": getattr(coordinator, "_baseline_auto", None),
         "temp_compensation_curve": getattr(coordinator, "_curve_23", None),
