@@ -52,7 +52,7 @@ from .open_meteo import (
     OpenMeteoError,
     WeatherForecast,
     fetch_forecast,
-    fetch_ghi_history,
+    fetch_weather_history,
 )
 from .plant_analytics import (
     duty_cycle,
@@ -476,13 +476,14 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
 
         try:
             today = dt_util.utcnow().date()
-            ghi_history = await fetch_ghi_history(
+            history = await fetch_weather_history(
                 self.session,
                 latitude,
                 longitude,
                 today - timedelta(days=SOLAR_FIT_WINDOW_DAYS),
                 today,
             )
+            ghi_history = history.ghi_by_hour
         except OpenMeteoError as err:
             _LOGGER.debug("Solar history unavailable: %s", err)
             return
@@ -491,7 +492,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         # keeps the sunny idle hours (q = 0) the pump's room term created, so
         # it is the one that can see a positive aperture at all.
         self._solar_daily = fit_daily_solar_model(
-            aggregate_days(power, indoor, outdoor, ghi_history)
+            aggregate_days(power, indoor, outdoor, ghi_history, history.wind_by_hour)
         )
 
         samples = build_samples(power, indoor, outdoor, ghi_history)

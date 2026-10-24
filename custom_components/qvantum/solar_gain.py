@@ -472,6 +472,17 @@ class SolarDay:
     q_heat_wh: float
     hours: int
     heating_hours: int
+    #: ``Σ(v·ΔT)`` over the hours that carried a wind reading, in
+    #: K·h·(m/s): the wind interaction column of a day balance, since wind
+    #: multiplies the envelope loss rather than shifting it by a constant.
+    sum_wind_delta_t_k_m_s: float = 0.0
+    #: ``Σv`` over those hours, in (m/s)·h — the plain wind column, kept for
+    #: the comparison fit that has no physical meaning but shows whether the
+    #: interaction is doing the work.
+    sum_wind_ms_h: float = 0.0
+    #: Hours with a wind reading. Zero means the payload carried no wind, which
+    #: is "not measured", not "calm".
+    wind_hours: int = 0
 
 
 @dataclass(frozen=True)
@@ -508,11 +519,14 @@ def aggregate_days(
     indoor_by_hour: Mapping[int, float],
     outdoor_by_hour: Mapping[int, float],
     ghi_by_hour: Mapping[int, float],
+    wind_by_hour: Mapping[int, float] | None = None,
 ) -> list[SolarDay]:
     """Sum hourly maps into UTC day blocks.
 
     Every hour present in all four series contributes; non-finite rows are
-    skipped rather than poisoning a day's sums.
+    skipped rather than poisoning a day's sums. ``wind_by_hour`` is optional: a
+    payload without wind still produces the same days, with ``wind_hours`` 0 —
+    the wind columns are evidence, and absent evidence must not look like calm.
     """
     buckets: dict[int, dict[str, float]] = {}
     for ts in sorted(
@@ -532,12 +546,28 @@ def aggregate_days(
         day_ts = hour - (hour % (DAILY_BLOCK_HOURS * 3600))
         bucket = buckets.setdefault(
             day_ts,
-            {"sum_delta_t": 0.0, "sum_ghi": 0.0, "q_heat": 0.0, "hours": 0, "heat": 0},
+            {
+                "sum_delta_t": 0.0,
+                "sum_ghi": 0.0,
+                "q_heat": 0.0,
+                "sum_wind_dt": 0.0,
+                "sum_wind": 0.0,
+                "hours": 0,
+                "heat": 0,
+                "wind_hours": 0,
+            },
         )
         bucket["sum_delta_t"] += delta_t
         bucket["sum_ghi"] += max(0.0, irradiance)
         bucket["q_heat"] += max(0.0, q_heat)
         bucket["hours"] += 1
+        wind_ms = None if wind_by_hour is None else wind_by_hour.get(ts)
+        if isinstance(wind_ms, (int, float)) and not isinstance(wind_ms, bool):
+            wind = float(wind_ms)
+            if math.isfinite(wind):
+                bucket["sum_wind_dt"] += max(0.0, wind) * delta_t
+                bucket["sum_wind"] += max(0.0, wind)
+                bucket["wind_hours"] += 1
         if q_heat >= MIN_SAMPLE_Q_W and delta_t >= MIN_SAMPLE_DELTA_T_K:
             bucket["heat"] += 1
     return [
@@ -548,6 +578,9 @@ def aggregate_days(
             q_heat_wh=bucket["q_heat"],
             hours=int(bucket["hours"]),
             heating_hours=int(bucket["heat"]),
+            sum_wind_delta_t_k_m_s=bucket["sum_wind_dt"],
+            sum_wind_ms_h=bucket["sum_wind"],
+            wind_hours=int(bucket["wind_hours"]),
         )
         for day_ts, bucket in sorted(buckets.items())
     ]

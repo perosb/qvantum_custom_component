@@ -30,7 +30,7 @@ custom_components/qvantum/
   # pure math, no HA imports:
   efficiency.py, heating_curve.py, solar_gain.py, building.py,
   dhw_loss.py, plant_analytics.py
-  open_meteo.py               # forecast fetch, WeatherForecast.covers
+  open_meteo.py               # forecast/history fetch (temperature, GHI, wind)
   client/                     # vendored comms — no Home Assistant imports
     protocol.py, exceptions.py, constants.py, models.py
     cloud/  modbus/
@@ -640,6 +640,16 @@ v6, so v7 is unreleased and folds further changes.
   within the hour when it cannot fetch its inputs (`CALIBRATION_RETRY_HOURS`) and
   waits `CALIBRATION_REFRESH_HOURS` after a completed attempt; the flag is
   persisted and exposed as `calibration_ok`.
+- Wind is fetched but **not used**: `open_meteo.forecast_url`/`history_url`
+  request `wind_speed_10m` with `wind_speed_unit=ms` (the API default is km/h,
+  and a silent unit mismatch would read as a calibration result), `HourlyWeather
+  .wind_ms` is `None` for an hour without a reading (never 0.0 — "not measured"
+  is not "calm"), and `SolarDay` carries `sum_wind_delta_t_k_m_s`/`sum_wind_ms_h`
+  /`wind_hours`. `aggregate_days(wind_by_hour=None)` keeps its old behaviour, so
+  the efficiency coordinator and any other caller that does not pass wind is
+  unaffected. No term, option or sensor exists until a coefficient is identified
+  per installation; `diagnostics.curve` reports `forecast_wind_ms` and
+  `forecast_wind_available` so the site proxy is judgeable.
 - A failed **forecast** refetch keeps the previous payload while it still covers
   the current hour and is under `FORECAST_REUSE_HOURS` old (both coordinators,
   `WeatherForecast.covers`): Open-Meteo 503s sporadically well inside its quota,

@@ -67,7 +67,7 @@ from .open_meteo import (
     OpenMeteoError,
     WeatherForecast,
     fetch_forecast,
-    fetch_ghi_history,
+    fetch_weather_history,
 )
 from .solar_gain import (
     MIN_SAMPLE_Q_W,
@@ -1511,13 +1511,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return
         try:
             today = dt_util.utcnow().date()
-            ghi = await fetch_ghi_history(
+            history = await fetch_weather_history(
                 self.session,
                 latitude,
                 longitude,
                 today - timedelta(days=CALIBRATION_DAYS),
                 today,
             )
+            ghi = history.ghi_by_hour
             maps = await self._async_hourly_maps()
         except Exception as err:  # noqa: BLE001 — calibration is best effort
             _LOGGER.debug("Solar calibration unavailable: %s", err)
@@ -1539,6 +1540,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 maps.get("indoor", {}),
                 maps.get("outdoor", {}),
                 ghi,
+                history.wind_by_hour,
             )
         )
 

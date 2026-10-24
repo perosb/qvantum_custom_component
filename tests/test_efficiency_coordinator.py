@@ -16,7 +16,11 @@ from custom_components.qvantum.efficiency_coordinator import (
     _cumulative_series,
     _window_delta,
 )
-from custom_components.qvantum.open_meteo import HourlyWeather, WeatherForecast
+from custom_components.qvantum.open_meteo import (
+    HourlyWeather,
+    WeatherForecast,
+    WeatherHistory,
+)
 from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
 
 
@@ -737,7 +741,7 @@ class TestSolar:
                     )
                 ),
             ),
-            patch.object(ec, "fetch_ghi_history", AsyncMock(return_value=ghi_history)),
+            patch.object(ec, "fetch_weather_history", AsyncMock(return_value=WeatherHistory(ghi_history, {}))),
             patch.object(ec, "fit_solar_model", MagicMock(return_value=model)) as fit,
         ):
             snapshot = await coordinator._async_compute_snapshot()
@@ -761,7 +765,7 @@ class TestSolar:
             valid=True,
         )
         coordinator._last_solar_fit_ts = 1_000_000.0
-        with patch.object(ec, "fetch_ghi_history", AsyncMock()) as history:
+        with patch.object(ec, "fetch_weather_history", AsyncMock()) as history:
             await coordinator._async_refresh_solar_model(
                 {}, 1_000_000.0 + 60.0, 59.3, 18.1
             )
@@ -1073,7 +1077,7 @@ class TestSolarDaily:
             )
 
         with patch.object(
-            ec, "fetch_ghi_history", AsyncMock(return_value=ghi_history)
+            ec, "fetch_weather_history", AsyncMock(return_value=WeatherHistory(ghi_history, {}))
         ):
             await coordinator._async_refresh_solar_model(
                 mean_series, now_ts, 59.3, 18.1

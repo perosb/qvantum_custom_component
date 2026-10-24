@@ -465,11 +465,21 @@ only act while the curve is active. Enable them with
 ### Solar model
 
 The fit uses recorder long-term statistics (`heatingpower`, outdoor and indoor
-temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily. An
-attempt that cannot fetch its inputs retries within the hour instead of waiting
-the full day, so one network hiccup does not freeze the model; a completed
-attempt — fit accepted or rejected — waits the full interval, because the
-inputs cannot change in an hour.
+temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily. The
+same requests also carry 10 m wind (`wind_speed_10m`, in m/s rather than the
+API's default km/h), and the day blocks hold it as `Σ(v·ΔT)` — the form wind
+takes physically, since it multiplies the envelope loss instead of shifting it.
+Nothing consumes that column yet: no wind term is applied to the curve until a
+coefficient has been identified for *this* installation, and a payload without
+wind produces the same days with `wind_hours = 0`, because "not measured" is
+not "calm". The config-entry diagnostics report `forecast_wind_ms` (the 10 m
+grid value for the current hour, i.e. the site proxy any wind figure would rest
+on) and `forecast_wind_available` (whether the payload carried wind at all).
+
+An attempt that cannot fetch its inputs retries within the hour instead of
+waiting the full day, so one network hiccup does not freeze the model; a
+completed attempt — fit accepted or rejected — waits the full interval, because
+the inputs cannot change in an hour.
 `a` (W/K), `b` (m²) and a continuous trust in [0, 1] from `b`'s t-statistic
 are computed from your house's data — nothing is hand-tuned. Weak evidence
 keeps the solar term tiny automatically, and GHI is smoothed with an
