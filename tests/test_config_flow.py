@@ -986,3 +986,99 @@ class TestQvantumOptionsFlow:
         data = mock_create_entry.call_args.kwargs["data"]
         assert "external_room_temp_entity" not in data
 
+
+class TestCurveTermsInOptions:
+    """The optional curve terms live in the Configure dialog too.
+
+    The coordinator owns the flags (its own store), so the dialog reads them
+    from there and writes back through ``async_set_terms`` — the options payload
+    never carries a second copy that could drift.
+    """
+
+    def _entry(self, curve, *, modbus: bool = True):
+        from types import SimpleNamespace
+
+        from homeassistant.config_entries import ConfigEntry
+
+        entry = ConfigEntry(
+            version=1,
+            minor_version=1,
+            domain="qvantum",
+            title="Test",
+            data={},
+            options={"modbus_tcp": modbus},
+            source="user",
+            unique_id="test_unique_id",
+            discovery_keys={},
+            subentries_data={},
+        )
+        entry.runtime_data = SimpleNamespace(curve_coordinator=curve)
+        return entry
+
+    @pytest.mark.asyncio
+    async def test_modbus_form_lists_the_four_terms_with_their_state(self, hass):
+        from unittest.mock import MagicMock
+
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        curve = MagicMock()
+        curve.terms = {
+            "solar": False,
+            "cop_feedback": True,
+            "precharge": False,
+            "wind": True,
+        }
+        flow = QvantumOptionsFlowHandler(self._entry(curve))
+
+        result = await flow.async_step_init()
+
+        defaults = _schema_defaults(result)
+        assert defaults["curve_solar_term"] is False
+        assert defaults["curve_cop_feedback_term"] is True
+        assert defaults["curve_precharge_term"] is False
+        assert defaults["curve_wind_term"] is True
+
+    @pytest.mark.asyncio
+    async def test_submitting_the_dialog_applies_the_terms(self, hass):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        curve = MagicMock()
+        curve.terms = {"solar": True, "cop_feedback": False, "precharge": False, "wind": False}
+        curve.async_set_terms = AsyncMock()
+        flow = QvantumOptionsFlowHandler(self._entry(curve))
+        payload = {
+            "modbus_host": "hp.local",
+            "modbus_port": 502,
+            "modbus_unit_id": 1,
+            "modbus_scan_interval": 15,
+            "curve_solar_term": False,
+            "curve_cop_feedback_term": False,
+            "curve_precharge_term": True,
+            "curve_wind_term": True,
+        }
+
+        with patch.object(flow, "async_create_entry") as create_entry:
+            create_entry.return_value = {"type": "create_entry"}
+            await flow.async_step_init(payload)
+
+        curve.async_set_terms.assert_awaited_once_with(
+            solar=False, cop_feedback=False, precharge=True, wind=True
+        )
+        # The switches are the coordinator's, not the options payload's.
+        saved = create_entry.call_args.kwargs["data"]
+        assert not any(key.startswith("curve_") for key in saved)
+
+    @pytest.mark.asyncio
+    async def test_cloud_form_has_no_terms(self, hass):
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        flow = QvantumOptionsFlowHandler(
+            self._entry(None, modbus=False)
+        )
+
+        result = await flow.async_step_init()
+
+        defaults = _schema_defaults(result)
+        assert not [key for key in defaults if key.startswith("curve_")]

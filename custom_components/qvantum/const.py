@@ -123,6 +123,14 @@ CONF_MODBUS_SCAN_INTERVAL = "modbus_scan_interval"
 # than ~5 minutes.
 CONF_EXTERNAL_ROOM_TEMP_ENTITY = "external_room_temp_entity"
 CONF_TELEMETRY = "telemetry"
+# Options-dialog field names for the optional curve terms. They are *not*
+# persisted in the options payload: the curve coordinator owns the flags in its
+# own store, so the dialog reads them from there and writes back through
+# ``async_set_terms`` — one source of truth, and the service keeps working.
+CONF_CURVE_SOLAR = "curve_solar_term"
+CONF_CURVE_COP = "curve_cop_feedback_term"
+CONF_CURVE_PRECHARGE = "curve_precharge_term"
+CONF_CURVE_WIND = "curve_wind_term"
 # EMA time constant (seconds) for the fed value: smooths sensor noise while
 # still following the room temperature within minutes.
 EXTERNAL_ROOM_TEMP_EMA_TAU = 300.0

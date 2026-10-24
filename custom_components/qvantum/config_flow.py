@@ -32,6 +32,10 @@ from .client.exceptions import APIAuthError, APIConnectionError, APIRateLimitErr
 from .client.modbus.device import IdentityProbeError, async_probe_identity
 from .telemetry import CONSENT_GRANTED, async_load_state, async_set_consent
 from .const import (
+    CONF_CURVE_COP,
+    CONF_CURVE_PRECHARGE,
+    CONF_CURVE_SOLAR,
+    CONF_CURVE_WIND,
     DEFAULT_MODBUS_HOST,
     DEFAULT_MODBUS_PORT,
     DEFAULT_MODBUS_SCAN_INTERVAL,
@@ -514,6 +518,27 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
+def _curve_term_schema(curve) -> dict:
+    """The optional curve-term switches, pre-filled from the coordinator.
+
+    Off unless the coordinator says otherwise; an entry without a curve
+    coordinator (cloud mode) gets no fields at all, because none of the terms
+    exist there.
+    """
+    if curve is None:
+        return {}
+    terms = getattr(curve, "terms", {}) or {}
+    defaults = {
+        CONF_CURVE_SOLAR: bool(terms.get("solar", True)),
+        CONF_CURVE_COP: bool(terms.get("cop_feedback", False)),
+        CONF_CURVE_PRECHARGE: bool(terms.get("precharge", False)),
+        CONF_CURVE_WIND: bool(terms.get("wind", False)),
+    }
+    return {
+        vol.Optional(field, default=value): bool for field, value in defaults.items()
+    }
+
+
 class QvantumOptionsFlowHandler(OptionsFlow):
     """Handles the options flow."""
 
@@ -534,6 +559,37 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                 entry.data.get(CONF_MODBUS_TCP, False),
             )
         )
+
+    def _curve_coordinator(self):
+        """The curve coordinator, when this entry has one loaded.
+
+        The optional curve terms belong to it (persisted in its own store), so
+        the dialog reads its flags and writes back through ``async_set_terms``
+        instead of keeping a second copy in the options payload.
+        """
+        runtime = getattr(self._source_entry(), "runtime_data", None)
+        return getattr(runtime, "curve_coordinator", None)
+
+    async def _async_apply_curve_terms(self, user_input) -> None:
+        """Persist the four term switches the dialog submitted, if any."""
+        if not self._modbus_enabled():
+            return
+        curve = self._curve_coordinator()
+        if curve is None:
+            return
+        names = {
+            "solar": CONF_CURVE_SOLAR,
+            "cop_feedback": CONF_CURVE_COP,
+            "precharge": CONF_CURVE_PRECHARGE,
+            "wind": CONF_CURVE_WIND,
+        }
+        updates = {
+            name: bool(user_input[field])
+            for name, field in names.items()
+            if user_input.get(field) is not None
+        }
+        if updates:
+            await curve.async_set_terms(**updates)
 
     async def async_step_init(self, user_input=None):
         """Handle options flow for the current connection mode only."""
@@ -568,6 +624,7 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                 user_input.get(CONF_EXTERNAL_ROOM_TEMP_ENTITY),
             )
             await self._async_apply_telemetry_choice(user_input.get(CONF_TELEMETRY))
+            await self._async_apply_curve_terms(user_input)
             return self.async_create_entry(title="", data=result)
 
         entry = self._source_entry()
@@ -629,6 +686,7 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                     vol.Optional(CONF_EXTERNAL_ROOM_TEMP_ENTITY): (
                         _external_room_temp_selector()
                     ),
+                    **_curve_term_schema(self._curve_coordinator()),
                 }
             )
         else:

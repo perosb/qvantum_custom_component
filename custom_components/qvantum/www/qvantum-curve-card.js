@@ -85,6 +85,9 @@ const STRINGS = {
     tOutdoor: "Outdoor",
     tNight: "Night/day",
     tSolar: "Solar",
+    tCop: "COP",
+    tPrecharge: "Pre-charge",
+    tWind: "Wind",
     tLoad: "Load",
     tTrims: "Trims",
     tTotal: "Total",
@@ -115,6 +118,9 @@ const STRINGS = {
     tOutdoor: "Ute",
     tNight: "Natt/dag",
     tSolar: "Sol",
+    tCop: "COP",
+    tPrecharge: "Förladdning",
+    tWind: "Vind",
     tLoad: "Last",
     tTrims: "Trimmar",
     tTotal: "Totalt",
@@ -470,6 +476,9 @@ class QvantumCurveCard extends HTMLElement {
         outdoor: num(attr(adj, "outdoor_c")),
         night: num(attr(adj, "night_day_c")),
         solar: num(attr(adj, "solar_c")),
+        cop: num(attr(adj, "cop_c")),
+        precharge: num(attr(adj, "precharge_c")),
+        wind: num(attr(adj, "wind_c")),
         load: num(attr(adj, "load_c")),
         trims: attr(adj, "trims"),
         clamped: attr(adj, "clamped") === true,
@@ -785,10 +794,16 @@ class QvantumCurveCard extends HTMLElement {
       `<span class="term ${cls}"><span class="label">${esc(
         label,
       )}</span><span class="value">${esc(signed(value))} K</span></span>`;
+    // Solar is on by default; the other three are opt-in and off unless the
+    // user enabled them, so an idle optional term would only add a "+0.0 K"
+    // chip. They appear once they act.
     const terms = [
       term(t.tOutdoor, a.outdoor),
       term(t.tNight, a.night),
       term(t.tSolar, a.solar),
+      ...(a.cop ? [term(t.tCop, a.cop)] : []),
+      ...(a.precharge ? [term(t.tPrecharge, a.precharge)] : []),
+      ...(a.wind ? [term(t.tWind, a.wind)] : []),
       term(t.tLoad, a.load),
       term(t.tTrims, trimSum),
       term(t.tTotal, a.total, "total"),

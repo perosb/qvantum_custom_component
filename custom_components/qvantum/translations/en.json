@@ -892,14 +892,22 @@
           "modbus_scan_interval": "Modbus scan interval (seconds)",
           "modbus_write": "Enable writing via Modbus",
           "external_room_temp_entity": "External room temperature source",
-          "telemetry": "Share anonymous operating data"
+          "telemetry": "Share anonymous operating data",
+          "curve_solar_term": "Solar term",
+          "curve_cop_feedback_term": "COP-feedback term",
+          "curve_precharge_term": "Pre-charge term",
+          "curve_wind_term": "Wind term"
         },
         "data_description": {
           "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds.",
           "modbus_write": "By activating Modbus writing, you accept full responsibility for any values written through the interface. The manufacturer is not liable for issues caused by incorrect or out-of-range values, and such actions may void the warranty and/or affect the lifecycle and performance of the product.",
           "scan_interval": "How often to poll the Qvantum cloud API. Default is 120 seconds.",
           "external_room_temp_entity": "Sensor whose value is sent to the heat pump as the external room temperature on every poll while Modbus writing is enabled. Required by the app's external room sensor mode; leave empty to disable.",
-          "telemetry": "A weekly, identifier-free summary (model, firmware, plant settings, identified figures and a few counters). Never sends names, entity ids, coordinates, energy totals or series."
+          "telemetry": "A weekly, identifier-free summary (model, firmware, plant settings, identified figures and a few counters). Never sends names, entity ids, coordinates, energy totals or series.",
+          "curve_solar_term": "Lowers the supply by the identified solar gain; identified and measured, so on by default.",
+          "curve_cop_feedback_term": "Reduces the supply while the measured COP is below its learned reference",
+          "curve_precharge_term": "Raises the supply ahead of a forecast cold snap",
+          "curve_wind_term": "Raises the supply while an identified wind sensitivity reports extra loss"
         },
         "description": "Settings for the current connection mode. Use reconfigure to switch between cloud and Modbus.",
         "title": "Options"
@@ -946,6 +954,10 @@
         "wind": {
           "name": "Wind",
           "description": "Raise supply while an identified wind sensitivity reports extra envelope loss"
+        },
+        "solar": {
+          "name": "Solar term",
+          "description": "Lowers the supply by the identified solar gain; identified and measured, so on by default."
         }
       }
     },

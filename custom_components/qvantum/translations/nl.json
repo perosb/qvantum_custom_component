@@ -892,14 +892,22 @@
           "modbus_scan_interval": "Modbus-scaninterval (seconden)",
           "modbus_write": "Schrijven via Modbus inschakelen",
           "external_room_temp_entity": "Bron voor externe kamertemperatuur",
-          "telemetry": "Anonieme bedrijfsgegevens delen"
+          "telemetry": "Anonieme bedrijfsgegevens delen",
+          "curve_solar_term": "Zonterm",
+          "curve_cop_feedback_term": "COP-terugkoppeling",
+          "curve_precharge_term": "Voorverwarmen",
+          "curve_wind_term": "Windterm"
         },
         "data_description": {
           "modbus_scan_interval": "Hoe vaak de warmtepomp via Modbus TCP wordt gepolld. Lagere waarden geven bijna realtime debiet- en volumenauwkeurigheid. Minimum is 5 seconden. Standaard is 15 seconden.",
           "modbus_write": "Door het activeren van Modbus-schrijven aanvaardt u volledige verantwoordelijkheid voor alle waarden die via de interface worden geschreven. De fabrikant is niet aansprakelijk voor problemen veroorzaakt door onjuiste of buiten bereik vallende waarden, en dergelijke acties kunnen de garantie en/of de levensduur en prestaties van het product beïnvloeden.",
           "scan_interval": "Hoe vaak de Qvantum-cloud-API wordt gepolld. Standaard is 120 seconden.",
           "external_room_temp_entity": "Sensor waarvan de waarde bij elke poll als externe kamertemperatuur naar de warmtepomp wordt geschreven wanneer Modbus-schrijven is ingeschakeld. Vereist door de externe sensormodus in de app; leeg laten om uit te schakelen.",
-          "telemetry": "Een wekelijkse samenvatting zonder identificatoren (model, firmware, installatie-instellingen, geïdentificeerde grootheden en enkele tellers). Verstuurt nooit namen, entity-id's, coördinaten, energietotalen of reeksen."
+          "telemetry": "Een wekelijkse samenvatting zonder identificatoren (model, firmware, installatie-instellingen, geïdentificeerde grootheden en enkele tellers). Verstuurt nooit namen, entity-id's, coördinaten, energietotalen of reeksen.",
+          "curve_solar_term": "Verlaagt de aanvoer met de geïdentificeerde zonnewinst; geïdentificeerd en gemeten, daarom standaard aan.",
+          "curve_cop_feedback_term": "Verlaagt de aanvoer zolang de gemeten COP onder zijn geleerde referentie ligt",
+          "curve_precharge_term": "Verhoogt de aanvoer vóór een voorspelde koude-inval",
+          "curve_wind_term": "Verhoogt de aanvoer zolang een geïdentificeerde windgevoeligheid extra verlies meldt"
         },
         "description": "Instellingen voor de huidige verbindingsmodus. Gebruik herconfiguratie om te wisselen tussen cloud en Modbus.",
         "title": "Opties"
@@ -946,6 +954,10 @@
         "wind": {
           "name": "Wind",
           "description": "Verhoog de aanvoertemperatuur wanneer een geïdentificeerde windgevoeligheid extra warmteverlies meldt"
+        },
+        "solar": {
+          "name": "Zonterm",
+          "description": "Verlaagt de aanvoer met de geïdentificeerde zonnewinst; geïdentificeerd en gemeten, daarom standaard aan."
         }
       }
     },

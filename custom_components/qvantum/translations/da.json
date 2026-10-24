@@ -892,14 +892,22 @@
           "modbus_scan_interval": "Modbus-scanningsinterval (sekunder)",
           "modbus_write": "Aktivér skrivning via Modbus",
           "external_room_temp_entity": "Kilde til ekstern rumtemperatur",
-          "telemetry": "Del anonyme driftsdata"
+          "telemetry": "Del anonyme driftsdata",
+          "curve_solar_term": "Solterm",
+          "curve_cop_feedback_term": "COP-feedback",
+          "curve_precharge_term": "Foropladning",
+          "curve_wind_term": "Vindterm"
         },
         "data_description": {
           "modbus_scan_interval": "Hvor ofte varmepumpen skal forespørges over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder.",
           "modbus_write": "Ved at aktivere skrivning via Modbus accepterer du fuldt ansvar for eventuelle værdier, der skrives gennem grænsefladen. Producenten er ikke ansvarlig for problemer forårsaget af forkerte eller uden for intervallet værdier, og sådanne handlinger kan ugyldiggøre garantien og/eller påvirke produktets levetid og ydeevne.",
           "scan_interval": "Hvor ofte Qvantum-cloud-API'et polles. Standard er 120 sekunder.",
           "external_room_temp_entity": "Sensor, hvis værdi sendes til varmepumpen som ekstern rumtemperatur ved hver poll, når Modbus-skrivning er aktiveret. Kræves af appens tilstand for ekstern rumtemperatur; lad feltet stå tomt for at deaktivere.",
-          "telemetry": "Et ugentligt resumé uden identifikatorer (model, firmware, anlægsindstillinger, identificerede størrelser og nogle tællere). Sender aldrig navne, entity-id'er, koordinater, energitotaler eller serier."
+          "telemetry": "Et ugentligt resumé uden identifikatorer (model, firmware, anlægsindstillinger, identificerede størrelser og nogle tællere). Sender aldrig navne, entity-id'er, koordinater, energitotaler eller serier.",
+          "curve_solar_term": "Sænker fremløbet med det identificerede soludbytte; identificeret og målt, derfor aktiv som standard.",
+          "curve_cop_feedback_term": "Sænker fremløbet, mens den målte COP ligger under sin indlærte reference",
+          "curve_precharge_term": "Hæver fremløbet forud for et varslet kuldetryk",
+          "curve_wind_term": "Hæver fremløbet, mens en identificeret vindfølsomhed viser ekstra tab"
         },
         "description": "Indstillinger for den aktuelle forbindelsestilstand. Brug genkonfiguration til at skifte mellem sky og Modbus.",
         "title": "Indstillinger"
@@ -946,6 +954,10 @@
         "wind": {
           "name": "Vind",
           "description": "Hæv fremløbstemperaturen, når en identificeret vindfølsomhed viser ekstra varmetab"
+        },
+        "solar": {
+          "name": "Solterm",
+          "description": "Sænker fremløbet med det identificerede soludbytte; identificeret og målt, derfor aktiv som standard."
         }
       }
     },

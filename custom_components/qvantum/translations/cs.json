@@ -892,14 +892,22 @@
           "modbus_scan_interval": "Interval dotazování Modbus (sekundy)",
           "modbus_write": "Povolit zápis přes Modbus",
           "external_room_temp_entity": "Zdroj externí pokojové teploty",
-          "telemetry": "Sdílet anonymní provozní data"
+          "telemetry": "Sdílet anonymní provozní data",
+          "curve_solar_term": "Solární člen",
+          "curve_cop_feedback_term": "Zpětná vazba COP",
+          "curve_precharge_term": "Předehřev",
+          "curve_wind_term": "Větrný člen"
         },
         "data_description": {
           "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund.",
           "modbus_write": "Povolením zápisu přes Modbus přebíráte plnou odpovědnost za všechny hodnoty zapsané přes rozhraní. Výrobce nenese odpovědnost za problémy způsobené nesprávnými nebo mimo rozsah hodnotami a takové akce mohou zrušit záruku a/nebo ovlivnit životnost a výkon výrobku.",
           "scan_interval": "Jak často se dotazuje cloudové API Qvantum. Výchozí je 120 sekund.",
           "external_room_temp_entity": "Senzor, jehož hodnota se odesílá do tepelného čerpadla jako externí pokojová teplota při každém dotazu, když je povolen zápis přes Modbus. Vyžaduje režim externího senzoru v aplikaci; prázdné pole funkci vypne.",
-          "telemetry": "Týdenní souhrn bez identifikátorů (model, firmware, nastavení instalace, zjištěné veličiny a několik čítačů). Nikdy neodesílá jména, ID entit, souřadnice, součty energie ani série."
+          "telemetry": "Týdenní souhrn bez identifikátorů (model, firmware, nastavení instalace, zjištěné veličiny a několik čítačů). Nikdy neodesílá jména, ID entit, souřadnice, součty energie ani série.",
+          "curve_solar_term": "Snižuje výstupní teplotu o zjištěný solární zisk; zjištěno a změřeno, proto je ve výchozím stavu zapnuto.",
+          "curve_cop_feedback_term": "Snižuje výstupní teplotu, dokud je měřené COP pod naučenou referencí",
+          "curve_precharge_term": "Zvyšuje výstupní teplotu před předpovězeným ochlazením",
+          "curve_wind_term": "Zvyšuje výstupní teplotu, když zjištěná citlivost na vítr ukazuje dodatečné ztráty"
         },
         "description": "Nastavení aktuálního režimu připojení. Pro přepnutí mezi cloudem a Modbusem použijte nové nastavení.",
         "title": "Možnosti"
@@ -946,6 +954,10 @@
         "wind": {
           "name": "Vítr",
           "description": "Zvyšte výstupní teplotu, když zjištěná citlivost na vítr ukazuje dodatečné ztráty"
+        },
+        "solar": {
+          "name": "Solární člen",
+          "description": "Snižuje výstupní teplotu o zjištěný solární zisk; zjištěno a změřeno, proto je ve výchozím stavu zapnuto."
         }
       }
     },

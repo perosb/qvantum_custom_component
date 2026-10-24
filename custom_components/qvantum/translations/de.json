@@ -892,14 +892,22 @@
           "modbus_scan_interval": "Modbus-Scan-Intervall (Sekunden)",
           "modbus_write": "Schreiben über Modbus aktivieren",
           "external_room_temp_entity": "Externe Raumtemperaturquelle",
-          "telemetry": "Anonyme Betriebsdaten teilen"
+          "telemetry": "Anonyme Betriebsdaten teilen",
+          "curve_solar_term": "Solarterm",
+          "curve_cop_feedback_term": "COP-Rückmeldung",
+          "curve_precharge_term": "Vorlade-Term",
+          "curve_wind_term": "Windterm"
         },
         "data_description": {
           "modbus_scan_interval": "Wie oft die Wärmepumpe über Modbus TCP abgefragt wird. Niedrigere Werte ermöglichen nahezu Echtzeit-Durchfluss- und Volumenmessung. Minimum sind 5 Sekunden. Standard sind 15 Sekunden.",
           "modbus_write": "Durch die Aktivierung des Modbus-Schreibens übernehmen Sie die volle Verantwortung für alle über die Schnittstelle geschriebenen Werte. Der Hersteller haftet nicht für Probleme, die durch falsche oder außerhalb des Bereichs liegende Werte verursacht werden, und solche Maßnahmen können die Garantie und/oder die Lebensdauer und Leistung des Produkts beeinträchtigen.",
           "scan_interval": "Wie oft die Qvantum-Cloud-API abgefragt wird. Standard sind 120 Sekunden.",
           "external_room_temp_entity": "Sensor, dessen Wert bei aktiviertem Modbus-Schreiben bei jedem Abruf als externe Raumtemperatur an die Wärmepumpe übertragen wird. Erforderlich für den externen Raumtemperaturmodus der App; leer lassen zum Deaktivieren.",
-          "telemetry": "Eine wöchentliche, identifierfreie Zusammenfassung (Modell, Firmware, Anlageneinstellungen, identifizierte Größen und einige Zähler). Sendet nie Namen, Entity-IDs, Koordinaten, Energiesummen oder Reihen."
+          "telemetry": "Eine wöchentliche, identifierfreie Zusammenfassung (Modell, Firmware, Anlageneinstellungen, identifizierte Größen und einige Zähler). Sendet nie Namen, Entity-IDs, Koordinaten, Energiesummen oder Reihen.",
+          "curve_solar_term": "Senkt den Vorlauf um den identifizierten Solarertrag; identifiziert und gemessen, daher standardmäßig aktiv.",
+          "curve_cop_feedback_term": "Senkt den Vorlauf, solange die gemessene COP unter ihrer gelernten Referenz liegt",
+          "curve_precharge_term": "Hebt den Vorlauf vor einem prognostizierten Kälteeinbruch an",
+          "curve_wind_term": "Hebt den Vorlauf an, solange eine identifizierte Windempfindlichkeit zusätzlichen Verlust meldet"
         },
         "description": "Einstellungen für den aktuellen Verbindungsmodus. Über Rekonfiguration zwischen Cloud und Modbus wechseln.",
         "title": "Optionen"
@@ -946,6 +954,10 @@
         "wind": {
           "name": "Wind",
           "description": "Vorlauftemperatur anheben, wenn eine identifizierte Windempfindlichkeit zusätzlichen Wärmeverlust meldet"
+        },
+        "solar": {
+          "name": "Solarterm",
+          "description": "Senkt den Vorlauf um den identifizierten Solarertrag; identifiziert und gemessen, daher standardmäßig aktiv."
         }
       }
     },

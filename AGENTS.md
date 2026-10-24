@@ -685,10 +685,15 @@ further changes once it ships; before that, edit it in place as usual).
   four wind fields plus the applied `wind_c` are new, and a schema without them
   cannot express "this installation has no identifiable wind term".
 - The **wind term** is optional and off by default: `"wind"` in the curve
-  store's `terms` dict, toggled through `qvantum.set_curve_terms` like
-  `cop_feedback`/`precharge` (there is no options checkbox; the sibling optional
-  terms have none either, so adding one for wind alone would be the
-  inconsistency). `compute_curve(wind_by_hour=…, wind_enabled=…)` adds
+  store's `terms` dict. All four terms (`solar`, `cop_feedback`, `precharge`,
+  `wind`) now have a switch in the **Configure** dialog as well as in
+  `qvantum.set_curve_terms`; the dialog reads the flags from the coordinator and
+  writes them back through `async_set_terms`, so the options payload never holds
+  a second copy. Only `solar` defaults to on: it is identified and measured
+  (t ≈ 3, R² 0.92, jackknife gate) while the other three are heuristic or
+  unproven, and the rule to keep is **identified/measured terms on, heuristic
+  ones off**. A switch can only silence a valid model, never force an invalid
+  one to act. `compute_curve(wind_by_hour=…, wind_enabled=…)` adds
   `wind_adjustment_c` — `−slope · (w · v̄ · ΔT) / a`, one-sided, `0…WIND_MAX_C`
   (2 °C), with `v̄` the mean of the *available* hours in the next
   `WIND_SMOOTH_HOURS` (3) — a missing hour is skipped, never counted as calm
