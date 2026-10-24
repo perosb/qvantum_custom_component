@@ -88,6 +88,7 @@ const STRINGS = {
     tCop: "COP",
     tPrecharge: "Pre-charge",
     tWind: "Wind",
+    off: "off",
     tLoad: "Load",
     tTrims: "Trims",
     tTotal: "Total",
@@ -121,6 +122,7 @@ const STRINGS = {
     tCop: "COP",
     tPrecharge: "Förladdning",
     tWind: "Vind",
+    off: "av",
     tLoad: "Last",
     tTrims: "Trimmar",
     tTotal: "Totalt",
@@ -479,6 +481,10 @@ class QvantumCurveCard extends HTMLElement {
         cop: num(attr(adj, "cop_c")),
         precharge: num(attr(adj, "precharge_c")),
         wind: num(attr(adj, "wind_c")),
+        // Which terms are switched on, and whether the wind column could be
+        // identified at all: "on but idle" must not look like "off".
+        terms: attr(adj, "terms") || {},
+        windValid: attr(adj, "wind_valid") !== false,
         load: num(attr(adj, "load_c")),
         trims: attr(adj, "trims"),
         clamped: attr(adj, "clamped") === true,
@@ -545,6 +551,7 @@ class QvantumCurveCard extends HTMLElement {
       .chip.bad { background: rgba(229,57,53,0.18); }
       .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
       .terms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+      .term.idle { opacity: 0.6; }
       .term {
         display: inline-flex; flex-direction: column; align-items: center;
         min-width: 54px; padding: 4px 8px; border-radius: 8px;
@@ -793,17 +800,31 @@ class QvantumCurveCard extends HTMLElement {
     const term = (label, value, cls = "") =>
       `<span class="term ${cls}"><span class="label">${esc(
         label,
-      )}</span><span class="value">${esc(signed(value))} K</span></span>`;
-    // Solar is on by default; the other three are opt-in and off unless the
-    // user enabled them, so an idle optional term would only add a "+0.0 K"
-    // chip. They appear once they act.
+      )}</span><span class="value">${esc(
+        value === null ? "–" : `${signed(value)} K`,
+      )}</span></span>`;
+    // Solar is on by default; the other three are opt-in. An enabled term is
+    // shown even while idle (+0.0 K), so "switched on but no effect" is
+    // distinguishable from "switched off" — and the wind chip reads "–" when
+    // the column could not be identified, rather than claiming calm.
+    const optional = (enabled, label, value, valid = true) =>
+      enabled ? [term(label, valid ? value : null, valid ? "" : "idle")] : [];
+    // Wind is the one term worth showing while switched off: whether the
+    // coefficient is identifiable is a property of the house and its weather,
+    // and knowing that is exactly what decides whether to switch it on. "Off
+    // and not identifiable" stays quiet — there is nothing to see or act on.
+    const windChip = a.terms.wind
+      ? term(t.tWind, a.windValid ? a.wind : null, a.windValid ? "" : "idle")
+      : a.windValid
+        ? term(`${t.tWind} (${t.off})`, null, "idle")
+        : "";
     const terms = [
       term(t.tOutdoor, a.outdoor),
       term(t.tNight, a.night),
       term(t.tSolar, a.solar),
-      ...(a.cop ? [term(t.tCop, a.cop)] : []),
-      ...(a.precharge ? [term(t.tPrecharge, a.precharge)] : []),
-      ...(a.wind ? [term(t.tWind, a.wind)] : []),
+      ...optional(a.terms.cop_feedback, t.tCop, a.cop),
+      ...optional(a.terms.precharge, t.tPrecharge, a.precharge),
+      ...(windChip ? [windChip] : []),
       term(t.tLoad, a.load),
       term(t.tTrims, trimSum),
       term(t.tTotal, a.total, "total"),

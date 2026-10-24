@@ -329,7 +329,12 @@ Entities:
   already right.
 - `sensor.qvantum_adaptive_curve_adjustment` — the shared adjustment, with
   `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `cop_c`, `precharge_c`,
-  `trims`, `clamped`, `clamped_points` and `floor_pinned_points` attributes.
+  `wind_c`, `terms` (which of the four are switched on), `wind_valid`, `trims`,
+  `clamped`, `clamped_points` and `floor_pinned_points` attributes. The card
+  uses `terms`/`wind_valid` to tell "switched on but idle" from "switched off",
+  and to show the wind chip while it is off when the coefficient is
+  identifiable — that is the state that decides whether switching it on is
+  worth anything.
 - `sensor.qvantum_adaptive_curve_deviation` — computed supply at the measured
   outdoor minus `cal_heat_temp` (input 35), with `shadow`, `ready`, `blocker`
   and `baseline_auto` (baseline frozen while the pump was on Auto) attributes,

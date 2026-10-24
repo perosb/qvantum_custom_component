@@ -608,6 +608,34 @@ class TestQvantumCurveSensors:
         assert entity.suggested_object_id == "adaptive_curve_01_30"
         assert entity._attr_unique_id == "qvantum_adaptive_curve_30_test_device_123"
 
+    def test_adjustment_sensor_reports_which_terms_are_on(self, mock_device):
+        """The card needs "on but idle" to be distinguishable from "off".
+
+        Wind in particular is 0 most of the time — calm weather, or a column
+        that cannot be identified — so the switch state and the column's
+        identifiability both travel with the adjustment.
+        """
+        coordinator = _curve_coordinator(_curve_snapshot())
+        coordinator._terms = {
+            "solar": True,
+            "cop_feedback": False,
+            "precharge": False,
+            "wind": True,
+        }
+        entity = QvantumCurveAdjustmentSensor(
+            coordinator, "adaptive_curve_adjustment", mock_device
+        )
+
+        attributes = entity.extra_state_attributes
+
+        assert attributes["terms"] == {
+            "solar": True,
+            "cop_feedback": False,
+            "precharge": False,
+            "wind": True,
+        }
+        assert attributes["wind_valid"] is None  # no daily model in the fixture
+
     def test_point_sensor_unavailable_without_point(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot(points={}))
         entity = QvantumCurvePointSensor(coordinator, "adaptive_curve_minus_30", mock_device)
@@ -631,6 +659,8 @@ class TestQvantumCurveSensors:
             "cop_c": 0.0,
             "precharge_c": 0.0,
             "wind_c": 0.0,
+            "terms": {},
+            "wind_valid": None,
             "capped_by_indoor": False,
             "trims": {},
             "clamped": False,
