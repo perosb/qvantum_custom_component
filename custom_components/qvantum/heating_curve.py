@@ -1221,6 +1221,7 @@ def compute_curve(
     precharge_c: float = 0.0,
     wind_by_hour: Mapping[int, float] | None = None,
     wind_enabled: bool = False,
+    solar_enabled: bool = True,
 ) -> CurveResult:
     """Baseline + outdoor + night/day + solar + load → seven supply points.
 
@@ -1250,8 +1251,12 @@ def compute_curve(
     night_day_c = night_day_adjustment_c(
         now_ts, daylight, amplitude_c=night_amplitude_c
     )
-    solar_c = solar_adjustment_c(
-        model, ghi_by_hour, now_ts, points, forecast_now, daily_model
+    solar_c = (
+        solar_adjustment_c(
+            model, ghi_by_hour, now_ts, points, forecast_now, daily_model
+        )
+        if solar_enabled
+        else 0.0
     )
     wind_c = (
         wind_adjustment_c(

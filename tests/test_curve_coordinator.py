@@ -2720,6 +2720,34 @@ async def test_readiness_hours_ignore_a_missing_bt2() -> None:
     assert series[100] == pytest.approx(36.0 - 40.0)
 
 
+async def test_snapshot_applies_the_solar_term_only_when_enabled() -> None:
+    """Solar is on by default, and switchable off for an A/B on one's own house."""
+    def build(*, solar: bool):
+        coordinator, _client = make_writable_coordinator(
+            settings={"curve_type_heating": 1}, live_curve_type=1
+        )
+        coordinator._baseline = dict(BASELINE)
+        coordinator._model = make_model()
+        coordinator._terms["solar"] = solar
+        coordinator._mode = "active"
+        coordinator._active_since_ts = time.time() - 3600
+        coordinator._async_calibrate = AsyncMock()
+        coordinator._async_fetch_forecast = AsyncMock(
+            return_value=make_forecast(temperature=0.0, ghi=600.0)
+        )
+        coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+        coordinator._async_trim_observations = AsyncMock(return_value=[])
+        coordinator._daylight = MagicMock(return_value=None)
+        return coordinator
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        off = await build(solar=False)._async_compute_snapshot()
+        on = await build(solar=True)._async_compute_snapshot()
+
+    assert off.solar_c == 0.0
+    assert on.solar_c < 0.0
+
+
 async def test_snapshot_applies_the_wind_term_only_when_enabled() -> None:
     """The switch reaches the snapshot; the model's gates decide the value."""
     def build(*, wind: bool):

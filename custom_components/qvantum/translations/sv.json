@@ -892,14 +892,22 @@
           "modbus_scan_interval": "Modbus-skanningsintervall (sekunder)",
           "modbus_write": "Aktivera skrivning via Modbus",
           "external_room_temp_entity": "Källa för extern inomhustemperatur",
-          "telemetry": "Dela anonyma driftdata"
+          "telemetry": "Dela anonyma driftdata",
+          "curve_solar_term": "Solterm",
+          "curve_cop_feedback_term": "COP-feedback-term",
+          "curve_precharge_term": "Förladdningsterm",
+          "curve_wind_term": "Vindterm"
         },
         "data_description": {
           "modbus_scan_interval": "Hur ofta värmepumpen pollas via Modbus TCP. Lägre värden ger nästan realtidsnoggrannhet för flöde och volym. Minimum är 5 sekunder. Standard är 15 sekunder.",
           "modbus_write": "Genom att aktivera Modbus-skrivning tar du fullt ansvar för alla värden som skrivs via gränssnittet. Tillverkaren ansvarar inte för problem orsakade av felaktiga eller utanför intervallet liggande värden, och sådana åtgärder kan ogiltigförklara garantin och/eller påverka produktens livslängd och prestanda.",
           "scan_interval": "Hur ofta Qvantum-moln-API:et pollas. Standard är 120 sekunder.",
           "external_room_temp_entity": "Sensor vars värde skickas till värmepumpen som extern inomhustemperatur vid varje poll när Modbus-skrivning är aktiverad. Krävs av appens läge för extern inomhussensor; lämna tom för att inaktivera.",
-          "telemetry": "En veckovis sammanfattning utan identifierare (modell, firmware, anläggningsinställningar, identifierade storheter och några räknare). Skickar aldrig namn, entity-id, koordinater, energitotaler eller serier."
+          "telemetry": "En veckovis sammanfattning utan identifierare (modell, firmware, anläggningsinställningar, identifierade storheter och några räknare). Skickar aldrig namn, entity-id, koordinater, energitotaler eller serier.",
+          "curve_solar_term": "Sänker framledningen med den identifierade solinstrålningen; identifierad och mätt, därför på som default.",
+          "curve_cop_feedback_term": "Sänker framledningen när uppmätt COP ligger under sitt inlärda referensvärde",
+          "curve_precharge_term": "Höjer framledningen inför ett prognosticerat köldryck",
+          "curve_wind_term": "Höjer framledningen när en identifierad vindkänslighet visar extra förlust"
         },
         "description": "Inställningar för aktuellt anslutningsläge. Använd omkonfiguration för att växla mellan moln och Modbus.",
         "title": "Alternativ"
@@ -946,6 +954,10 @@
         "wind": {
           "name": "Vind",
           "description": "Höj framledningen när en identifierad vindkänslighet visar på extra värmeförlust"
+        },
+        "solar": {
+          "name": "Solterm",
+          "description": "Sänker framledningen med den identifierade solinstrålningen; identifierad och mätt, därför på som default."
         }
       }
     },

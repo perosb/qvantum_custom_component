@@ -892,14 +892,22 @@
           "modbus_scan_interval": "Modbus lekérdezési időköz (másodperc)",
           "modbus_write": "Modbus alapú írás engedélyezése",
           "external_room_temp_entity": "Külső szobahőmérséklet-forrás",
-          "telemetry": "Névtelen üzemeltetési adatok megosztása"
+          "telemetry": "Névtelen üzemeltetési adatok megosztása",
+          "curve_solar_term": "Napsugárzás-tag",
+          "curve_cop_feedback_term": "COP-visszacsatolás",
+          "curve_precharge_term": "Előfűtés",
+          "curve_wind_term": "Széltag"
         },
         "data_description": {
           "modbus_scan_interval": "Milyen gyakran kérdezze le a hőszivattyút Modbus TCP-n. Az alacsonyabb értékek közel valós idejű áramlás- és térfogatpontosságot adnak. Minimum 5 másodperc. Alapértelmezett 15 másodperc.",
           "modbus_write": "A Modbus-írás aktiválásával teljes felelősséget vállal a felületen keresztül írt értékekért. A gyártó nem vállal felelősséget a helytelen vagy tartományon kívüli értékek által okozott problémákért, és az ilyen műveletek érvénytelenítheti a garanciát és/vagy befolyásolhatja a termék élettartamát és teljesítményét.",
           "scan_interval": "Milyen gyakran kérdezi le a Qvantum felhő API-t. Alapértelmezés: 120 másodperc.",
           "external_room_temp_entity": "Érzékelő, amelynek értékét a hőszivattyú külső szobahőmérsékletként kapja meg minden lekérdezésnél, ha a Modbus-írás engedélyezve van. Az alkalmazás külső érzékelő módjához szükséges; hagyd üresen a kikapcsoláshoz.",
-          "telemetry": "Heti, azonosító nélküli összefoglaló (modell, firmware, rendszerbeállítások, azonosított értékek és néhány számláló). Soha nem küld neveket, entity-azonosítókat, koordinátákat, energiaösszegeket vagy sorozatokat."
+          "telemetry": "Heti, azonosító nélküli összefoglaló (modell, firmware, rendszerbeállítások, azonosított értékek és néhány számláló). Soha nem küld neveket, entity-azonosítókat, koordinátákat, energiaösszegeket vagy sorozatokat.",
+          "curve_solar_term": "Az azonosított napnyereséggel csökkenti az előremenőt; azonosított és mért, ezért alapértelmezés szerint be.",
+          "curve_cop_feedback_term": "Csökkenti az előremenőt, amíg a mért COP a tanult referencia alatt van",
+          "curve_precharge_term": "Megemeli az előremenőt a jelzett hidegbetörés előtt",
+          "curve_wind_term": "Megemeli az előremenőt, ha az azonosított szélérzékenység többletveszteséget jelez"
         },
         "description": "Az aktuális kapcsolódási mód beállításai. A felhő és a Modbus közötti váltáshoz használja az újrakonfigurálást.",
         "title": "Beállítások"
@@ -946,6 +954,10 @@
         "wind": {
           "name": "Szél",
           "description": "Emelje az előremenő hőmérsékletet, ha az azonosított szélérzékenység többlethőveszteséget jelez"
+        },
+        "solar": {
+          "name": "Napsugárzás-tag",
+          "description": "Az azonosított napnyereséggel csökkenti az előremenőt; azonosított és mért, ezért alapértelmezés szerint be."
         }
       }
     },

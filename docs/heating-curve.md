@@ -160,7 +160,7 @@ pump's current seven-point table (holding 24–30) as the baseline and computes
 | night/day | local sunrise/sunset (Home Assistant location); amplitude is a fraction of the forecast's diurnal supply swing (curve slope × outdoor range), bounded |
 | solar | self-calibrating `a`/`b`/`trust` model from recorder statistics (`heatingpower`, indoor, outdoor) plus Open-Meteo GHI history, identified on **day blocks** (see [Solar model](#solar-model)); gain in W → °C through the local baseline slope |
 | load | one-sided reduction when measured heating power is below the model demand at the target indoor temperature |
-| optional | COP feedback, cold-snap pre-charge and/or wind, **off by default** — see [Optional terms](#optional-terms) |
+| optional | COP feedback, cold-snap pre-charge and/or wind, **off by default**; the solar term can be switched off — see [Optional terms](#optional-terms) |
 
 Indoor deviation from the target is a **cap** only (a warm house blocks upward
 adjustment, a cold house blocks downward), it never drives a term. Points are
@@ -419,8 +419,13 @@ connection writes holding 22 back to Auto and turns the switch off. If the
 pump is instead moved off User defined, the coordinator returns to shadow
 without touching holding 22. A revert that cannot be written is latched and
 retried, so a lost connection cannot leave the integration claiming control.
-Optional terms (`qvantum.set_curve_terms`) are persisted with the rest of the
-curve state and default to off.
+Optional terms are persisted with the rest of the curve state and have a switch
+in the integration's **Configure** dialog as well as in
+`qvantum.set_curve_terms`. COP feedback, pre-charge and wind default to off; the
+**solar term defaults to on** because it is identified and measured on your own
+history, and it can be switched off for an A/B (the room error is the outcome to
+compare). A switch can silence a valid model, never force an invalid one — so
+"on" with an unidentifiable coefficient still applies nothing.
 
 **One writer:** disable Home Assistant automations that write the curve offset
 (holding 15) while the switch is on, otherwise solar gain is applied twice.

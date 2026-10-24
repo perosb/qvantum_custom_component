@@ -30,13 +30,23 @@ set_curve_control:
 set_curve_terms:
   name: set_curve_terms
   description: >-
-    Optional adaptive heating-curve control terms, off by default. COP
-    feedback reduces the computed supply when the measured COP falls below
-    its learned reference; pre-charge raises it ahead of a forecast cold
-    snap; wind raises it while a wind sensitivity identified for this
-    installation reports extra envelope loss. Modbus only, and the terms only
-    act while the curve is active.
+    Optional adaptive heating-curve control terms. Solar is on by default (it
+    lowers the supply by an identified solar gain); COP feedback, pre-charge
+    and wind are off by default. COP feedback reduces the computed supply when
+    the measured COP falls below its learned reference; pre-charge raises it
+    ahead of a forecast cold snap; wind raises it while a wind sensitivity
+    identified for this installation reports extra envelope loss. The same
+    switches are in the integration's Configure dialog. Modbus only, and the
+    terms only act while the curve is active.
   fields:
+    solar:
+      description: >-
+        Enable or disable the solar term. On by default; it only acts while
+        this installation's aperture passed its gates.
+      example: true
+      selector:
+        boolean:
+
     cop_feedback:
       description: Enable or disable the COP-feedback term
       example: true

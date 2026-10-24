@@ -892,14 +892,22 @@
           "modbus_scan_interval": "Interwał skanowania Modbus (sekundy)",
           "modbus_write": "Włącz zapis przez Modbus",
           "external_room_temp_entity": "Źródło zewnętrznej temperatury pokojowej",
-          "telemetry": "Udostępniaj anonimowe dane eksploatacyjne"
+          "telemetry": "Udostępniaj anonimowe dane eksploatacyjne",
+          "curve_solar_term": "Człon słoneczny",
+          "curve_cop_feedback_term": "Sprzężenie COP",
+          "curve_precharge_term": "Wstępne ładowanie",
+          "curve_wind_term": "Człon wiatrowy"
         },
         "data_description": {
           "modbus_scan_interval": "Jak często odpytywać pompę ciepła przez Modbus TCP. Niższe wartości dają prawie rzeczywistą dokładność przepływu i objętości. Minimum to 5 sekund. Domyślnie 15 sekund.",
           "modbus_write": "Aktywując zapis przez Modbus, bierzesz pełną odpowiedzialność za wszelkie wartości zapisane przez interfejs. Producent nie ponosi odpowiedzialności za problemy spowodowane przez nieprawidłowe lub wykraczające poza zakres wartości, a takie działania mogą unieważnić gwarancję i/lub wpłynąć na żywotność i wydajność produktu.",
           "scan_interval": "Jak często odpytywane jest API chmury Qvantum. Domyślnie 120 sekund.",
           "external_room_temp_entity": "Czujnik, którego wartość jest przesyłana do pompy ciepła jako zewnętrzna temperatura pokojowa przy każdym odpytywaniu, gdy zapis przez Modbus jest włączony. Wymagany przez tryb czujnika zewnętrznego w aplikacji; pozostaw puste, aby wyłączyć.",
-          "telemetry": "Cotygodniowe podsumowanie bez identyfikatorów (model, firmware, ustawienia instalacji, zidentyfikowane wielkości i kilka liczników). Nigdy nie wysyła nazw, identyfikatorów encji, współrzędnych, sum energii ani serii."
+          "telemetry": "Cotygodniowe podsumowanie bez identyfikatorów (model, firmware, ustawienia instalacji, zidentyfikowane wielkości i kilka liczników). Nigdy nie wysyła nazw, identyfikatorów encji, współrzędnych, sum energii ani serii.",
+          "curve_solar_term": "Obniża zasilanie o zidentyfikowany zysk słoneczny; zidentyfikowany i zmierzony, dlatego domyślnie włączony.",
+          "curve_cop_feedback_term": "Obniża zasilanie, gdy zmierzony COP jest poniżej wyuczonego odniesienia",
+          "curve_precharge_term": "Podnosi zasilanie przed prognozowanym spadkiem temperatury",
+          "curve_wind_term": "Podnosi zasilanie, gdy zidentyfikowana wrażliwość na wiatr wskazuje dodatkowe straty"
         },
         "description": "Ustawienia bieżącego trybu połączenia. Użyj rekonfiguracji, aby przełączyć między chmurą a Modbusem.",
         "title": "Opcje"
@@ -946,6 +954,10 @@
         "wind": {
           "name": "Wiatr",
           "description": "Podnieś temperaturę zasilania, gdy zidentyfikowana wrażliwość na wiatr wskazuje dodatkowe straty"
+        },
+        "solar": {
+          "name": "Człon słoneczny",
+          "description": "Obniża zasilanie o zidentyfikowany zysk słoneczny; zidentyfikowany i zmierzony, dlatego domyślnie włączony."
         }
       }
     },

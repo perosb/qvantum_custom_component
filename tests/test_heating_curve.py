@@ -1322,3 +1322,21 @@ def test_compute_curve_applies_wind_only_when_enabled() -> None:
     assert on.adjustment_c == pytest.approx(
         off.adjustment_c + on.wind_c, abs=1e-6
     ) or on.adjustment_c == pytest.approx(TOTAL_MAX_C)
+
+
+def test_compute_curve_applies_solar_only_when_enabled() -> None:
+    """The solar switch silences a valid model; it cannot create one."""
+    kwargs = dict(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature={BASE_HOUR: 0.0},
+        ghi_by_hour=ghi_flat(),
+        model=make_model(),
+    )
+
+    on = compute_curve(**kwargs)
+    assert on.solar_c < 0.0
+
+    off = compute_curve(**kwargs, solar_enabled=False)
+    assert off.solar_c == 0.0
+    assert off.adjustment_c > on.adjustment_c

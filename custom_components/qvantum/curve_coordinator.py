@@ -722,6 +722,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         # Optional control-loop terms (off unless explicitly enabled) and the
         # learned COP reference used by the feedback term.
         self._terms: dict[str, bool] = {
+            # Identified and measured, so on by default — unlike the heuristic
+            # and unproven terms below. Still switchable: a user may want the
+            # curve without it, and an A/B is how they judge it on their house.
+            "solar": True,
             "cop_feedback": False,
             "precharge": False,
             # Off by default like the other optional terms, and doubly gated:
@@ -1016,7 +1020,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     self._cop_samples[bucket] = max(0, int(value))
         terms = data.get("terms")
         if isinstance(terms, dict):
-            for key in ("cop_feedback", "precharge", "wind"):
+            for key in ("solar", "cop_feedback", "precharge", "wind"):
                 if key in terms:
                     self._terms[key] = bool(terms[key])
         if self.active and self._active_since_ts is None:
@@ -1031,6 +1035,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
     async def async_set_terms(
         self,
         *,
+        solar: bool | None = None,
         cop_feedback: bool | None = None,
         precharge: bool | None = None,
         wind: bool | None = None,
@@ -1041,6 +1046,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         curve while active, so enabling one in shadow mode has no write
         effect until the curve is activated.
         """
+        if solar is not None:
+            self._terms["solar"] = bool(solar)
         if cop_feedback is not None:
             self._terms["cop_feedback"] = bool(cop_feedback)
         if precharge is not None:
@@ -2592,6 +2599,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     self._forecast.wind_by_hour() if self._forecast is not None else {}
                 ),
                 wind_enabled=bool(self._terms.get("wind")),
+                solar_enabled=bool(self._terms.get("solar", True)),
             )
         if result is not None:
             clamped = self.active and result.clamped
