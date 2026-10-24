@@ -79,9 +79,10 @@ _ENTITY_PREFIXES = (
 #: on the pump's floor is structural (nothing the baseline can answer) and no
 #: longer counts, so the figure means "days with something to act on".
 #: 8: adds the wind column of the day balance (`daily_wind_w_per_ms`,
-#: `daily_wind_t_stat`, `daily_wind_hours`, `daily_wind_valid`). The fields are
-#: new, so v7 rows stay valid for their own fields — but the pool key must not
-#: mix a schema where "no wind term" was not expressible with one where it is.
+#: `daily_wind_t_stat`, `daily_wind_hours`, `daily_wind_valid`) and the applied
+#: term (`wind_c`). The fields are new, so v7 rows stay valid for their own
+#: fields — but the pool key must not mix a schema where "no wind term" was not
+#: expressible with one where it is.
 SUMMARY_SCHEMA_VERSION = 8
 
 #: Plant settings that describe the control loops. Everything else in the
@@ -267,6 +268,7 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "daily_wind_t_stat": _number(getattr(daily, "w_t_stat", None)),
         "daily_wind_hours": _number(getattr(daily, "wind_hours", None)),
         "daily_wind_valid": bool(getattr(daily, "wind_valid", False)),
+        "wind_c": _number(getattr(snapshot, "wind_c", None)),
     }
 
 

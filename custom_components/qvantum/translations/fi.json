@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Esilämmitys",
           "description": "Nosta menolämpötilaa ennen ennustettua kylmäjaksoa"
+        },
+        "wind": {
+          "name": "Tuuli",
+          "description": "Nosta menolämpötilaa, kun tunnistettu tuuliherkkyys osoittaa lisähäviötä"
         }
       }
     },

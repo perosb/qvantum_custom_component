@@ -58,6 +58,7 @@ SET_CURVE_TERMS_SCHEMA = vol.Schema(
     {
         vol.Optional("cop_feedback"): cv.boolean,
         vol.Optional("precharge"): cv.boolean,
+        vol.Optional("wind"): cv.boolean,
     }
 )
 
@@ -221,6 +222,7 @@ async def async_setup_services(hass: HomeAssistant):
             await curve_coordinator.async_set_terms(
                 cop_feedback=data.get("cop_feedback"),
                 precharge=data.get("precharge"),
+                wind=data.get("wind"),
             )
         except Exception as err:
             _LOGGER.error("Failed to set curve terms %s: %s", data, err)

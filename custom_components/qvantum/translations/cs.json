@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Předehřev",
           "description": "Zvýšit přívodní teplotu před předpovídaným ochlazením"
+        },
+        "wind": {
+          "name": "Vítr",
+          "description": "Zvyšte výstupní teplotu, když zjištěná citlivost na vítr ukazuje dodatečné ztráty"
         }
       }
     },

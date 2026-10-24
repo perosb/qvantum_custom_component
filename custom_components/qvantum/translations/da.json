@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Forvarmning",
           "description": "Hæv fremløbstemperaturen før et varslet kuldetab"
+        },
+        "wind": {
+          "name": "Vind",
+          "description": "Hæv fremløbstemperaturen, når en identificeret vindfølsomhed viser ekstra varmetab"
         }
       }
     },

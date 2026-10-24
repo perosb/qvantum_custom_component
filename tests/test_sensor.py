@@ -630,6 +630,7 @@ class TestQvantumCurveSensors:
             "load_c": 0.9,
             "cop_c": 0.0,
             "precharge_c": 0.0,
+            "wind_c": 0.0,
             "capped_by_indoor": False,
             "trims": {},
             "clamped": False,

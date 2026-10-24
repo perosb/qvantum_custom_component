@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Voorverwarming",
           "description": "Verhoog de aanvoertemperatuur vóór een voorspelde koude-inval"
+        },
+        "wind": {
+          "name": "Wind",
+          "description": "Verhoog de aanvoertemperatuur wanneer een geïdentificeerde windgevoeligheid extra warmteverlies meldt"
         }
       }
     },

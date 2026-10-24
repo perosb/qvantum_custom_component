@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Vorladen",
           "description": "Vorlauftemperatur vor einem prognostizierten Kälteeinbruch anheben"
+        },
+        "wind": {
+          "name": "Wind",
+          "description": "Vorlauftemperatur anheben, wenn eine identifizierte Windempfindlichkeit zusätzlichen Wärmeverlust meldet"
         }
       }
     },

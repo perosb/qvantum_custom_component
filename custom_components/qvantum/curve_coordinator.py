@@ -265,6 +265,9 @@ class CurveSnapshot:
     room_error_source: str | None = None
     cop_c: float = 0.0
     precharge_c: float = 0.0
+    #: Wind's contribution to the shared adjustment, 0 whenever the term is off
+    #: or the model's wind column failed its gates.
+    wind_c: float = 0.0
     #: The air-side margin the indoor cap acts on (mean room error over the
     #: last 24 h) and whether it exists at all: without a fresh indoor reading
     #: the cap is inert, so a warm house cannot veto a raise and nothing brakes
@@ -718,7 +721,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         }
         # Optional control-loop terms (off unless explicitly enabled) and the
         # learned COP reference used by the feedback term.
-        self._terms: dict[str, bool] = {"cop_feedback": False, "precharge": False}
+        self._terms: dict[str, bool] = {
+            "cop_feedback": False,
+            "precharge": False,
+            # Off by default like the other optional terms, and doubly gated:
+            # the model's wind column must pass its own evidence gates before
+            # this switch can do anything.
+            "wind": False,
+        }
         self._cop_reference: dict[int, float] = {}
         self._cop_samples: dict[int, int] = {}
 
@@ -1006,7 +1016,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     self._cop_samples[bucket] = max(0, int(value))
         terms = data.get("terms")
         if isinstance(terms, dict):
-            for key in ("cop_feedback", "precharge"):
+            for key in ("cop_feedback", "precharge", "wind"):
                 if key in terms:
                     self._terms[key] = bool(terms[key])
         if self.active and self._active_since_ts is None:
@@ -1023,6 +1033,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         *,
         cop_feedback: bool | None = None,
         precharge: bool | None = None,
+        wind: bool | None = None,
     ) -> None:
         """Enable or disable the optional control-loop terms.
 
@@ -1034,6 +1045,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             self._terms["cop_feedback"] = bool(cop_feedback)
         if precharge is not None:
             self._terms["precharge"] = bool(precharge)
+        if wind is not None:
+            self._terms["wind"] = bool(wind)
         await self._async_persist()
         self.async_update_listeners()
 
@@ -2575,6 +2588,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 max_supply_c=high,
                 cop_c=cop_c,
                 precharge_c=precharge_c,
+                wind_by_hour=(
+                    self._forecast.wind_by_hour() if self._forecast is not None else {}
+                ),
+                wind_enabled=bool(self._terms.get("wind")),
             )
         if result is not None:
             clamped = self.active and result.clamped
@@ -2709,4 +2726,5 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             extrapolated_points=extrapolated,
             cop_c=0.0 if result is None else result.cop_c,
             precharge_c=0.0 if result is None else result.precharge_c,
+            wind_c=0.0 if result is None else result.wind_c,
         )

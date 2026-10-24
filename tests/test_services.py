@@ -558,7 +558,7 @@ class TestSetCurveTermsService:
         result = await service_func(service_call)
 
         curve.async_set_terms.assert_awaited_once_with(
-            cop_feedback=True, precharge=None
+            cop_feedback=True, precharge=None, wind=None
         )
         assert result == {
             "qvantum": {"terms": {"cop_feedback": True, "precharge": False}}
@@ -568,7 +568,7 @@ class TestSetCurveTermsService:
     async def test_omits_absent_flags(self, mock_hass):
         curve = MagicMock()
         curve.async_set_terms = AsyncMock()
-        curve.terms = {"cop_feedback": False, "precharge": False}
+        curve.terms = {"cop_feedback": False, "precharge": False, "wind": False}
         self._register(mock_hass, curve)
         service_func = await self._service_func(mock_hass)
 
@@ -579,7 +579,7 @@ class TestSetCurveTermsService:
         await service_func(service_call)
 
         curve.async_set_terms.assert_awaited_once_with(
-            cop_feedback=None, precharge=None
+            cop_feedback=None, precharge=None, wind=None
         )
 
     @pytest.mark.asyncio
@@ -597,7 +597,7 @@ class TestSetCurveTermsService:
         await service_func(service_call)
 
         curve.async_set_terms.assert_awaited_once_with(
-            cop_feedback=None, precharge=True
+            cop_feedback=None, precharge=True, wind=None
         )
 
     @pytest.mark.asyncio

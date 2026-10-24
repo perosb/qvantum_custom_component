@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Előmelegítés",
           "description": "Növelje az előremenő hőmérsékletet a várható hidegbetörés előtt"
+        },
+        "wind": {
+          "name": "Szél",
+          "description": "Emelje az előremenő hőmérsékletet, ha az azonosított szélérzékenység többlethőveszteséget jelez"
         }
       }
     },

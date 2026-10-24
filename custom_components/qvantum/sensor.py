@@ -957,6 +957,9 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
             "load_c": snapshot.load_c,
             "cop_c": snapshot.cop_c,
             "precharge_c": snapshot.precharge_c,
+            # One-sided (0…WIND_MAX_C) and 0 unless the optional wind term is
+            # enabled and the identified coefficient passed its gates.
+            "wind_c": snapshot.wind_c,
             "capped_by_indoor": snapshot.capped_by_indoor,
             "trims": dict(snapshot.trims),
             "clamped": snapshot.clamped,

@@ -942,6 +942,10 @@
         "precharge": {
           "name": "Pre-charge",
           "description": "Raise supply ahead of a forecast cold snap"
+        },
+        "wind": {
+          "name": "Wind",
+          "description": "Raise supply while an identified wind sensitivity reports extra envelope loss"
         }
       }
     },
