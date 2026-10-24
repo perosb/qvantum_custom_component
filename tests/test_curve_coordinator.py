@@ -2655,6 +2655,23 @@ async def test_snapshot_reports_the_blend_source() -> None:
     assert snapshot.pump_room_source == "blended"
 
 
+def test_indoor_series_skips_a_placeholder_bt2() -> None:
+    """A -30 C BT2 series is not an indoor record, so nothing is picked.
+
+    The configured external sensor has no history yet here; before the guard
+    the picker fell back to BT2 and every statistics-based feature (trims,
+    room error, building figures) ran on -30 C.
+    """
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    sentinel = [{"start": 100 + index * 3600, "mean": -30.0} for index in range(48)]
+    key, series = coordinator._indoor_series(
+        {"room_temp_external": "sensor.external", "bt2": "sensor.indoor"},
+        {"sensor.indoor": sentinel},
+    )
+    assert key is None
+    assert series == {}
+
+
 async def test_readiness_hours_ignore_a_missing_bt2() -> None:
     """The readiness window must not shift by ~130 K on a placeholder BT2."""
     values = {

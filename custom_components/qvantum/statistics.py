@@ -54,6 +54,12 @@ INDOOR_METRIC_KEYS: tuple[str, ...] = (
 )
 #: Hourly rows a newly configured sensor needs before it replaces the fallback.
 INDOOR_METRIC_MIN_HOURS = 24
+#: A series whose hourly median sits outside this is not a room temperature.
+#: Without a probe BT2 keeps recording the firmware's placeholder (-30 C,
+#: reported on a QE4 2026-10-23) as a perfectly ordinary series, so a row count
+#: alone cannot tell a room sensor from a disconnected one.
+INDOOR_SERIES_MIN_C = -10.0
+INDOOR_SERIES_MAX_C = 45.0
 
 
 def indoor_metric_candidates(
@@ -93,6 +99,56 @@ def resolve_indoor_metric_key(
     return candidates[0] if candidates else None
 
 
+def _series_values(rows: Sequence[Any]) -> list[float]:
+    """The hourly means of a series, whatever shape the caller keeps them in.
+
+    Callers pass either ``{hour_ts: mean}`` (the curve coordinator's hourly
+    maps) or ``[(hour_ts, mean), …]`` (the efficiency coordinator's series), so
+    the extractor accepts both instead of forcing every caller to convert.
+    """
+    values: list[float] = []
+    for row in rows.values() if isinstance(rows, Mapping) else rows:
+        value = None
+        if isinstance(row, Mapping):
+            value = row.get("mean")
+        elif isinstance(row, (tuple, list)) and len(row) >= 2:
+            value = row[1]
+        elif isinstance(row, (int, float)) and not isinstance(row, bool):
+            value = row
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            values.append(float(value))
+    return values
+
+
+def indoor_series_is_plausible(rows: Sequence[Any]) -> bool:
+    """True when a series could be a record of a room's temperature.
+
+    The median, not a mean or a single row, so one bad hour does not disqualify
+    a real sensor and one good hour does not rescue a disconnected one. A series
+    with no numbers at all is left to the row-count decision — this only answers
+    the temperature question.
+    """
+    values = sorted(_series_values(rows))
+    if not values:
+        return True
+    median = values[len(values) // 2]
+    return INDOOR_SERIES_MIN_C <= median <= INDOOR_SERIES_MAX_C
+
+
+def _bt2_is_reported_missing(values: Mapping[str, Any]) -> bool:
+    """True when the pump's ``BT2 Detected`` bit (input 86) says it is unfitted.
+
+    Only Modbus reports the bit; the cloud does not, so ``None`` keeps the
+    value-based decision in charge.
+    """
+    bit = values.get("bt2_detected")
+    return (
+        isinstance(bit, (int, float))
+        and not isinstance(bit, bool)
+        and int(bit) != 1
+    )
+
+
 def pick_indoor_metric_key(
     resolved: Mapping[str, str],
     values: Mapping[str, Any],
@@ -100,7 +156,7 @@ def pick_indoor_metric_key(
     *,
     min_rows: int = INDOOR_METRIC_MIN_HOURS,
 ) -> str | None:
-    """First configured indoor metric with enough hourly rows, else ``None``.
+    """First configured indoor metric with enough usable hourly rows.
 
     A newly added room sensor records nothing for its first hours, which would
     otherwise silence every statistics-based feature (curve trims, room-gain
@@ -108,10 +164,27 @@ def pick_indoor_metric_key(
     Falling back to the next candidate keeps them running on the previous
     sensor instead of going dormant; ``min_rows`` is the consumer's own
     minimum, since what counts as "enough" differs per feature.
+
+    A candidate is only used when it *is* a temperature record: BT2 is skipped
+    when the pump reports no probe, and any series whose median is not a room
+    temperature is skipped too. That series exists on installs without a BT2 —
+    it records -30 C just like a real sensor records 20 C — and feeding it to
+    the trims, the heat-loss fit or the thermal-mass identification turns every
+    one of them into a plausible-looking wrong number (a -50 K room error puts
+    the trims on their clamp). No series is better than that.
     """
     for key in indoor_metric_candidates(resolved, values):
-        if len(rows_by_key.get(key, ())) >= min_rows:
-            return key
+        if key == "bt2" and _bt2_is_reported_missing(values):
+            continue
+        rows = rows_by_key.get(key, ())
+        if len(rows) < min_rows:
+            continue
+        if not indoor_series_is_plausible(rows):
+            _LOGGER.debug(
+                "Ignoring indoor series %s: median is not a room temperature", key
+            )
+            continue
+        return key
     return None
 
 

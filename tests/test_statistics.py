@@ -186,3 +186,83 @@ async def test_statistics_uses_recorder_executor_and_maps_errors():
             await stats.async_statistics_during_period(hass, {"sensor.x"}, start)
             == {}
         )
+
+
+def test_pick_indoor_metric_key_skips_a_placeholder_bt2_series() -> None:
+    """A BT2 without a probe records -30 C as an ordinary series.
+
+    Reported on a QE4 (2026-10-23). The fallback exists so a freshly added
+    sensor does not silence the analytics, but "has rows" is not "is a room":
+    feeding -30 C to the trims, the heat-loss fit or the thermal-mass
+    identification turns each of them into a plausible-looking wrong number.
+    """
+    from custom_components.qvantum.const import SensorMode
+
+    resolved = {"room_temp_external": "sensor.external", "bt2": "sensor.indoor"}
+    values = {"sensor_mode": SensorMode.EXTERNAL}
+    fresh = [{"start": index, "mean": 19.5} for index in range(2)]
+    sentinel = [{"start": index, "mean": -30.0} for index in range(720)]
+    room = [{"start": index, "mean": 19.5} for index in range(720)]
+
+    # The configured sensor has no history yet: the placeholder is not a
+    # fallback, so there is no series at all.
+    assert (
+        stats.pick_indoor_metric_key(
+            resolved, values, {"room_temp_external": fresh, "bt2": sentinel}
+        )
+        is None
+    )
+    # A real BT2 still serves as the fallback.
+    assert (
+        stats.pick_indoor_metric_key(
+            resolved, values, {"room_temp_external": fresh, "bt2": room}
+        )
+        == "bt2"
+    )
+
+
+def test_pick_indoor_metric_key_skips_a_bt2_the_pump_says_is_missing() -> None:
+    """The bit is authoritative where the transport carries it (Modbus)."""
+    from custom_components.qvantum.const import SensorMode
+
+    resolved = {"room_temp_external": "sensor.external", "bt2": "sensor.indoor"}
+    values = {"sensor_mode": SensorMode.EXTERNAL, "bt2_detected": 0}
+    fresh = [{"start": index, "mean": 19.5} for index in range(2)]
+    room = [{"start": index, "mean": 19.5} for index in range(720)]
+
+    # Plausible-looking values, but the pump says there is no probe.
+    assert (
+        stats.pick_indoor_metric_key(
+            resolved, values, {"room_temp_external": fresh, "bt2": room}
+        )
+        is None
+    )
+    # A cloud payload has no bit: the values decide, and they look like a room.
+    assert (
+        stats.pick_indoor_metric_key(
+            resolved,
+            {"sensor_mode": SensorMode.EXTERNAL},
+            {"room_temp_external": fresh, "bt2": room},
+        )
+        == "bt2"
+    )
+
+
+def test_indoor_series_is_plausible_uses_the_median() -> None:
+    """One bad hour does not disqualify a sensor, one good hour does not save it."""
+    assert stats.indoor_series_is_plausible(
+        [{"start": index, "mean": 20.0} for index in range(24)]
+    )
+    # A single -30 row among real ones: still a room record.
+    mixed = [{"start": index, "mean": 20.0} for index in range(24)]
+    mixed.append({"start": 99, "mean": -30.0})
+    assert stats.indoor_series_is_plausible(mixed)
+    # Mostly the placeholder with one real row: not a room record.
+    mostly = [{"start": index, "mean": -30.0} for index in range(24)]
+    mostly.append({"start": 99, "mean": 20.0})
+    assert not stats.indoor_series_is_plausible(mostly)
+    # Every series shape the callers pass is understood.
+    assert stats.indoor_series_is_plausible({1: 20.0, 2: 21.0})
+    assert stats.indoor_series_is_plausible([(1, 20.0), (2, 21.0)])
+    # Nothing numeric: the row-count decision owns that question.
+    assert stats.indoor_series_is_plausible([{"start": 1}])

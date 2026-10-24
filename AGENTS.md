@@ -492,10 +492,15 @@ v6, so v7 is unreleased and folds further changes.
   while averaging a placeholder in would divide by 85 K instead of ~34 K and
   publish ~40 % of the true coefficient. The window then falls through to
   `room_temp_external`/`room_temp_ext`, or is discarded when neither exists.
-  **Still open:** the statistics picker still treats a placeholder BT2 as an
-  indoor series, so the building metrics, the thermal-mass fit and the solar
-  calibration can inherit it when the configured sensor has fewer than
-  `INDOOR_METRIC_MIN_HOURS`/`MIN_SOLAR_FIT_SAMPLES` of history.
+  The statistics picker applies the same rule: `pick_indoor_metric_key` skips a
+  candidate whose series median is not a room temperature
+  (`INDOOR_SERIES_MIN_C`/`INDOOR_SERIES_MAX_C`, −10…45 °C — a placeholder
+  records −30 °C as an ordinary series), and skips BT2 outright when the pump
+  reports no probe. That matters because the picker's fallback exists for a
+  newly configured sensor with no history: without the guard it selected the
+  placeholder, and a −50 K room error puts the trims on their clamp and inflates
+  the heat-loss coefficient, the time constant and the solar aperture. No series
+  beats a plausible wrong one.
 - The DHW heat-meter comparison (`dhw_heat_meter_deviation`) is a
   **poll-resolution integral**, not a statistics product: `mean(flow) · mean(ΔT)`
   is not the integral of `flow · ΔT`, and on a live install it read 0.7 kWh
