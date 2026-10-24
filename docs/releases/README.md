@@ -6,6 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
+| [2026.10.13](2026.10.13.md) | 2026-10-24 | Missing room sensors no longer distort heat-pump readings |
 | [2026.10.12](2026.10.12.md) | 2026-10-23 | More reliable and protected summaries |
 | [2026.10.9](2026.10.9.md) | 2026-10-19 | More reliable weather-based calculations |
 | [2026.10.10](2026.10.10.md) | 2026-10-19 | Forecasts stay available during brief service interruptions |
