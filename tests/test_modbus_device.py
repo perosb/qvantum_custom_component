@@ -6,6 +6,7 @@ from modbus_connection.mock import MockModbusConnection
 from custom_components.qvantum.const import (
     BINARY_SENSOR_NAMES,
     MODBUS_ONLY_BINARY_SENSORS,
+    REQUIRED_MODBUS_METRICS,
 )
 from custom_components.qvantum.client.modbus.maps import (
     HEATING_CURVE_OUTDOOR_TEMPS,
@@ -48,6 +49,19 @@ class TestRegisterMapAlignment:
             assert field.address == address
             assert field.signed is (data_type == "int16")
             assert (field.scale or 1.0) == scale
+
+    def test_bt2_detected_is_the_datasheet_bit(self):
+        """``BT2 Detected`` is input 86, inside the block the client reads.
+
+        The curve's pump-room blend needs it: an unconnected BT2 reads -30 C,
+        the firmware's placeholder, and blending that puts the removed room
+        term ~26 K off.
+        """
+        assert MODBUS_INPUT_REGISTER_MAP["bt2_detected"] == (86, "uint16", 1.0)
+        field = QvantumInputs.declared_fields["bt2_detected"]
+        assert field.address == 86
+        assert field.signed is False
+        assert "bt2_detected" in REQUIRED_MODBUS_METRICS
 
     def test_relay_bits_use_bitmask_register(self):
         bitmask_address = MODBUS_INPUT_REGISTER_MAP["relays_bitmask"][0]
@@ -405,6 +419,23 @@ class TestPayloadAdapter:
         # Kept: the diagnostic sensor records the series compressor_power_avg reads.
         assert payload["metrics"]["compressor_power"] == 100
         assert payload["metrics"]["hpid"] == "dev"
+
+    def test_bt2_detected_survives_the_enabled_metric_filter(self):
+        """No entity exposes the bit, so only REQUIRED_MODBUS_METRICS keeps it.
+
+        The payload is filtered by the enabled metrics; without the keep-list
+        entry the key silently disappears and the curve blends a -30 C
+        placeholder again.
+        """
+        assert "bt2_detected" in REQUIRED_MODBUS_METRICS
+        kept = build_metrics_payload(
+            "dev", {"bt2_detected": 0}, enabled_metrics=["bt2_detected", "bt1"]
+        )
+        assert kept["metrics"]["bt2_detected"] == 0
+        dropped = build_metrics_payload(
+            "dev", {"bt2_detected": 0}, enabled_metrics=["bt1"]
+        )
+        assert "bt2_detected" not in dropped["metrics"]
 
     def test_compressorenergy_from_mwh_kwh(self):
         payload = build_metrics_payload(

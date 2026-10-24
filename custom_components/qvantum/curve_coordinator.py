@@ -54,7 +54,8 @@ from .heating_curve import (
     normalize_baseline,
     precharge_adjustment_c,
     ActiveRoomGain,
-    pump_room_temperature,
+    PumpRoomReading,
+    pump_room_reading,
     room_compensation_gain,
     room_corrected_deviation,
     room_gain_from_active_hours,
@@ -245,6 +246,11 @@ class CurveSnapshot:
     #: the external value and BT2 in the external mode), so a support dump can
     #: see which input the removed term used.
     pump_room_c: float | None = None
+    #: Which input produced it: ``blended``, ``configured``, ``bt2`` or
+    #: ``none``. A BT2 the pump reports as not detected is not blended (it holds
+    #: the firmware's -30 C placeholder), so this says whether a deviation
+    #: figure rests on the measured blend at all.
+    pump_room_source: str | None = None
     #: Points whose outdoor temperature lies outside the range the baseline
     #: was observed at. Their supply is extrapolated from the cached table, so
     #: readiness says nothing about them until the weather gets there.
@@ -1678,12 +1684,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         indoor_key, indoor = self._indoor_series(resolved, rows)
         bt2_id = resolved.get("bt2")
         bt2 = _hourly_series(rows, bt2_id) if bt2_id else {}
-        target = self._main_values().get("indoor_temperature_target")
+        live = self._main_values()
+        target = live.get("indoor_temperature_target")
         target_c = (
             float(target)
             if isinstance(target, (int, float)) and not isinstance(target, bool)
             else None
         )
+        external_mode = self._external_mode()
+        bt2_detected = self._bt2_detected(live)
         try:
             points = normalize_baseline(self._baseline)
         except (TypeError, ValueError):
@@ -1697,9 +1706,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 # The pump builds its room term from the mean of the external
                 # value and BT2 in the external mode, so removing it needs the
                 # same value; one sensor alone leaves a constant bias.
-                room = pump_room_temperature(
-                    indoor.get(ts), bt2.get(ts), external_mode=self._external_mode()
-                )
+                room = pump_room_reading(
+                    indoor.get(ts),
+                    bt2.get(ts),
+                    external_mode=external_mode,
+                    bt2_detected=bt2_detected,
+                ).value_c
                 value = room_corrected_deviation(
                     value,
                     self._gain_for(indoor_key),
@@ -2263,12 +2275,24 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             mode = values.get("use_operation_sensor")
         return "room_temp_external" in SensorMode.current_temperature_keys(mode)
 
-    def _pump_room_value(self, values: Mapping[str, Any]) -> float | None:
+    def _bt2_detected(self, values: Mapping[str, Any]) -> float | None:
+        """The datasheet's ``BT2 Detected`` bit (input 86), when reported.
+
+        Modbus carries it (0=No, 1=Yes, 2=Detecting) and the cloud does not, so
+        ``None`` means "not reported", never "no probe".
+        """
+        bit = values.get("bt2_detected")
+        if isinstance(bit, bool) or not isinstance(bit, (int, float)):
+            return None
+        return float(bit)
+
+    def _pump_room_reading(self, values: Mapping[str, Any]) -> PumpRoomReading:
         """Room temperature the pump's own room term is computed from.
 
-        See ``pump_room_temperature``: in the external mode the firmware blends
-        the external value with BT2, so the term it adds to ``cal_heat_temp``
-        is not the one our configured sensor would predict.
+        See ``pump_room_reading``: in the external mode the firmware blends the
+        external value with BT2, so the term it adds to ``cal_heat_temp`` is not
+        the one our configured sensor would predict — but only while BT2 is a
+        probe the pump can read, which its own ``BT2 Detected`` bit reports.
         """
         bt2 = values.get("bt2")
         bt2_c = (
@@ -2276,9 +2300,20 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             if isinstance(bt2, (int, float)) and not isinstance(bt2, bool)
             else None
         )
-        return pump_room_temperature(
-            self._indoor_value(values), bt2_c, external_mode=self._external_mode()
+        return pump_room_reading(
+            self._indoor_value(values),
+            bt2_c,
+            external_mode=self._external_mode(),
+            bt2_detected=self._bt2_detected(values),
         )
+
+    def _pump_room_value(self, values: Mapping[str, Any]) -> float | None:
+        """The pump room value alone; see ``_pump_room_reading``."""
+        return self._pump_room_reading(values).value_c
+
+    def _pump_room_source(self, values: Mapping[str, Any]) -> str:
+        """Which input the removed room term used (``blended``/``configured``/…)."""
+        return self._pump_room_reading(values).source
 
     def _pump_room_error(self, values: Mapping[str, Any]) -> float | None:
         """``pump room − target``, the error the pump's room term scales."""
@@ -2653,6 +2688,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             indoor_margin_c=indoor_margin,
             indoor_cap_armed=indoor_margin is not None,
             pump_room_c=self._pump_room_value(values),
+            pump_room_source=self._pump_room_source(values),
             model=self._model,
             daily_model=self._daily_model,
             calibrated_at=self._calibrated_at,

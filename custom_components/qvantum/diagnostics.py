@@ -412,6 +412,8 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         return None
 
     snapshot = getattr(coordinator, "data", None)
+    main_values = getattr(coordinator, "_main_values", None)
+    live = main_values() if callable(main_values) else {}
     points = getattr(snapshot, "points", None)
     trims = getattr(coordinator, "_trims", None)
     baseline = getattr(coordinator, "_baseline", None)
@@ -449,6 +451,11 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         # external sensor with BT2 in the external mode, so a dump that only
         # showed the configured sensor could not explain the deviation.
         "pump_room_c": getattr(snapshot, "pump_room_c", None),
+        # Which input that value came from, and what the pump says about BT2:
+        # an unconnected probe holds the firmware's -30 C placeholder, so the
+        # blend is skipped and the deviation rests on the configured sensor.
+        "pump_room_source": getattr(snapshot, "pump_room_source", None),
+        "bt2_detected": live.get("bt2_detected"),
         "clamped": getattr(snapshot, "clamped", None),
         # Which point wants to leave the pump's supply limits: the baseline
         # point is what to adjust, so a dump must name it.

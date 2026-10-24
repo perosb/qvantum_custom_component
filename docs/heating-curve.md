@@ -198,6 +198,22 @@ more than the readiness median gate, which is why the median sat at 2.17 °C wit
 a raw 1.43 °C underneath. The trims, the indoor cap and `room_error` stay on the
 configured sensor — those describe the house, this describes the pump's input.
 
+The blend is only used while BT2 is a probe the pump can read. An installation
+without an interior sensor keeps the firmware's placeholder there — a QE4 owner
+reported a fixed −30 °C (2026-10-23) — and the pump's own room value then comes
+from the external sensor alone. Averaging that placeholder in would put the
+removed term about 26 K off (`gain · 26 K` on the deviation, which is 13 K even
+at the minimum gain), so readiness could never pass. Three gates apply: the
+datasheet's `BT2 Detected` register (input 86: `0=No`, `1=Yes`,
+`2=Detecting` — read over Modbus only) must report `1`; the value must be a room
+temperature and within 10 K of the configured reading (measured on a live QE-6
+over 30 days, the two sensors were 0.54 K apart at the median and 0.85 K at
+most, so the bound only catches a placeholder or a stuck probe); and the
+resulting value is checked again, because in the modes without an indoor sensor
+the configured reading falls back to BT2. Without a usable BT2 the configured
+sensor is used alone, or nothing at all — `pump_room_source` says which
+(`blended`, `configured`, `bt2` or `none`).
+
 **The gain is the pump's own setting.** `room_comp_factor` (holding 13, cloud
 setting of the same name) *is* that factor, so it is read rather than fitted:
 measured on a live pump, 5.0 configured against 5.08 fitted from active hours.
@@ -316,13 +332,16 @@ Entities:
   `baseline_outdoor_max_c` from the last baseline fit and `room_gain_c_per_c`
   (the pump's room-compensation gain — its own `room_comp_factor` when it
   reports one — removed from the deviation while the pump follows our table).
-  `extrapolated_points` lists the curve points outside that observed range,
-  and `pump_room_c` is the room value the pump's own compensation term was
-  computed from — in the external-sensor mode the firmware averages the external
-  value with BT2, so that is not the same as the configured sensor's reading and
-  the deviation would carry a constant bias if the term were removed from ours:
+  `extrapolated_points` lists the curve points outside that observed range:
   their supply comes from the cached table rather than from anything the pump
-  was watched doing, so readiness says nothing about them yet.
+  was watched doing, so readiness says nothing about them yet. `pump_room_c` is
+  the room value the pump's own compensation term was computed from — in the
+  external-sensor mode the firmware averages the external value with BT2, so
+  that is not the same as the configured sensor's reading and the deviation
+  would carry a constant bias if the term were removed from ours — and
+  `pump_room_source` says which input produced it (`blended`, `configured`,
+  `bt2` or `none`), so a figure built without the blend (an unconnected BT2
+  reports −30 °C) is recognisable in the same attributes.
   The `ready`/`blocker` attributes describe the baseline-vs-pump window, not
   this sensor's own value. Diagnostic entity, enabled by default.
   A failed forecast refetch does not immediately turn `blocker` into
