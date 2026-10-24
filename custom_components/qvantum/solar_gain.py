@@ -96,6 +96,21 @@ DAILY_MAX_B_M2: float = 10.0
 #: of a shoulder-season window is simply low-information (R² 0.33 with 6 kWh
 #: days), which is a fact about the window, not about the aperture.
 DAILY_JACKKNIFE_BAND: float = 0.5
+#: Wind evidence behind the fourth column: hours (not days) that carried a wind
+#: reading in the usable days. A shoulder-season window of mild days can hold
+#: hundreds of hours and still identify nothing, because the signal lives in the
+#: *cold and windy* hours — so the gate is on evidence, never on a day count.
+DAILY_MIN_WIND_HOURS: int = 200
+#: Same confidence bar as the aperture: a wind coefficient that cannot clear
+#: this is indistinguishable from the season it is fitted in.
+DAILY_MIN_WIND_T_STAT: float = 2.5
+#: No single day may carry the wind estimate either.
+DAILY_WIND_JACKKNIFE_BAND: float = 0.5
+#: The reference speed the plausibility bound is quoted at: wind may at most
+#: double the envelope loss at 5 m/s, which is already an extremely exposed
+#: house. Larger ``w`` is a collinearity artifact (the column absorbing ΔT).
+DAILY_WIND_REFERENCE_MS: float = 5.0
+DAILY_MAX_WIND_FRACTION: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -507,6 +522,26 @@ class SolarDailyModel:
     b_jackknife_max_m2: float | None = None
     valid: bool = False
     notes: str = ""
+    #: Wind sensitivity from the fourth column, in W/K per (m/s): the envelope
+    #: loss the wind adds, so `a + w·v` is the loss at wind `v`. `wind_valid`
+    #: is False whenever a gate fails — the term is then not applied at all,
+    #: exactly like an invalid aperture. A None `w_per_ms` means the fit was
+    #: never attempted (no wind evidence in the window).
+    w_per_ms: float | None = None
+    w_std_err: float | None = None
+    w_t_stat: float | None = None
+    #: Hours with a wind reading behind the fit — the evidence count the gate
+    #: reads, reported whether or not the coefficient passed.
+    wind_hours: int = 0
+    wind_valid: bool = False
+    #: Notes for the wind column alone, so a dump can say "no term" and why
+    #: without hiding the solar model's own state.
+    wind_notes: str = ""
+    #: What the four-column fit says about ``a``/``b``. Reported so a dump shows
+    #: whether adding wind moved them — the gate that rejects a column which
+    #: merely absorbs ΔT or GHI.
+    a_w_per_k_4col: float | None = None
+    b_m2_4col: float | None = None
 
     @property
     def effective_b_m2(self) -> float:
@@ -586,24 +621,25 @@ def aggregate_days(
     ]
 
 
-def _invert_3x3(matrix: Sequence[Sequence[float]]) -> list[list[float]]:
+def _invert_square(matrix: Sequence[Sequence[float]]) -> list[list[float]]:
     """Gauss-Jordan inverse with partial pivoting; raises on a singular design."""
+    size = len(matrix)
     scale = max((abs(value) for row in matrix for value in row), default=0.0)
     if scale <= 0.0:
         raise ValueError("singular design")
     aug = [
-        [float(matrix[row][col]) for col in range(3)]
-        + [1.0 if row == column else 0.0 for column in range(3)]
-        for row in range(3)
+        [float(matrix[row][col]) for col in range(size)]
+        + [1.0 if row == column else 0.0 for column in range(size)]
+        for row in range(size)
     ]
-    for col in range(3):
-        pivot_row = max(range(col, 3), key=lambda row: abs(aug[row][col]))
+    for col in range(size):
+        pivot_row = max(range(col, size), key=lambda row: abs(aug[row][col]))
         if abs(aug[pivot_row][col]) <= 1e-12 * scale:
             raise ValueError("singular design")
         aug[col], aug[pivot_row] = aug[pivot_row], aug[col]
         divisor = aug[col][col]
         aug[col] = [value / divisor for value in aug[col]]
-        for row in range(3):
+        for row in range(size):
             if row == col:
                 continue
             factor = aug[row][col]
@@ -611,7 +647,50 @@ def _invert_3x3(matrix: Sequence[Sequence[float]]) -> list[list[float]]:
                 aug[row] = [
                     value - factor * base for value, base in zip(aug[row], aug[col])
                 ]
-    return [row[3:] for row in aug]
+    return [row[size:] for row in aug]
+
+
+def _invert_3x3(matrix: Sequence[Sequence[float]]) -> list[list[float]]:
+    """Three-by-three case of :func:`_invert_square`."""
+    return _invert_square(matrix)
+
+
+def _ols_columns(
+    columns: Sequence[Sequence[float]], targets: Sequence[float]
+) -> tuple[tuple[float, ...], tuple[float, ...], float]:
+    """Plain least squares → ``(beta, stderr, r2)`` for any number of columns.
+
+    Raises ``ValueError`` when there are fewer rows than coefficients or the
+    design matrix is singular.
+    """
+    k = len(columns)
+    n = len(targets)
+    if n < k + 1:
+        raise ValueError("too few rows")
+    xtx = [
+        [sum(a * b for a, b in zip(columns[i], columns[j])) for j in range(k)]
+        for i in range(k)
+    ]
+    xty = [sum(a * b for a, b in zip(columns[i], targets)) for i in range(k)]
+    inverse = _invert_square(xtx)
+    beta = tuple(
+        sum(inverse[i][j] * xty[j] for j in range(k)) for i in range(k)
+    )
+    residuals = [
+        target - sum(beta[j] * columns[j][index] for j in range(k))
+        for index, target in enumerate(targets)
+    ]
+    ss_res = sum(value * value for value in residuals)
+    mean_y = sum(targets) / n
+    ss_tot = sum((target - mean_y) ** 2 for target in targets)
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > 1e-9 else 0.0
+    sigma2 = ss_res / (n - k)
+    stderr = tuple(
+        math.sqrt(max(0.0, sigma2 * inverse[i][i])) for i in range(k)
+    )
+    if not all(math.isfinite(value) for value in beta + stderr):
+        raise ValueError("non-finite fit")
+    return beta, stderr, r2
 
 
 def _ols_three(
@@ -620,45 +699,9 @@ def _ols_three(
     x3: Sequence[float],
     y: Sequence[float],
 ) -> tuple[tuple[float, float, float], tuple[float, float, float], float]:
-    """Plain least squares for three regressors → ``(beta, stderr, r2)``.
-
-    Raises ``ValueError`` when there are fewer rows than coefficients or the
-    design matrix is singular.
-    """
-    rows = list(zip(x1, x2, x3, y))
-    n = len(rows)
-    if n < 4:
-        raise ValueError("too few rows")
-    columns = (
-        [row[0] for row in rows],
-        [row[1] for row in rows],
-        [row[2] for row in rows],
-    )
-    targets = [row[3] for row in rows]
-    xtx = [
-        [sum(a * b for a, b in zip(columns[i], columns[j])) for j in range(3)]
-        for i in range(3)
-    ]
-    xty = [sum(a * b for a, b in zip(columns[i], targets)) for i in range(3)]
-    inverse = _invert_3x3(xtx)
-    beta = tuple(
-        sum(inverse[i][j] * xty[j] for j in range(3)) for i in range(3)
-    )
-    residuals = [
-        target - sum(beta[j] * columns[j][index] for j in range(3))
-        for index, target in enumerate(targets)
-    ]
-    ss_res = sum(value * value for value in residuals)
-    mean_y = sum(targets) / n
-    ss_tot = sum((target - mean_y) ** 2 for target in targets)
-    r2 = 1.0 - ss_res / ss_tot if ss_tot > 1e-9 else 0.0
-    sigma2 = ss_res / (n - 3)
-    stderr = tuple(
-        math.sqrt(max(0.0, sigma2 * inverse[i][i])) for i in range(3)
-    )
-    if not all(math.isfinite(value) for value in beta + stderr):
-        raise ValueError("non-finite fit")
-    return beta, stderr, r2
+    """Three-regressor case of :func:`_ols_columns`."""
+    beta, stderr, r2 = _ols_columns((x1, x2, x3), y)
+    return (beta[0], beta[1], beta[2]), (stderr[0], stderr[1], stderr[2]), r2  # type: ignore[return-value]
 
 
 def _fit_daily_rows(
@@ -683,6 +726,132 @@ def _fit_daily_rows(
     return a, b, intercept / float(DAILY_BLOCK_HOURS), se_b, t_stat, r2
 
 
+def _fit_daily_wind_rows(
+    days: Sequence[SolarDay],
+) -> tuple[float, float, float, float, float, float | None, float]:
+    """Four-column day-block OLS → ``(a, b, c, w, se_w, t_w, r2)``.
+
+    The fourth column is ``Σ(v·ΔT)``: wind multiplies the envelope loss, so the
+    balance reads ``Q = a·ΣΔT + w·Σ(v·ΔT) + 24c − b·ΣGHI``. ``a`` and ``b`` are
+    reported with it, because the whole point of the extra column is that they
+    may *move* — the caller compares them against the three-column fit.
+    """
+    n = len(days)
+    beta, stderr, r2 = _ols_columns(
+        (
+            [day.sum_delta_t_k for day in days],
+            [day.sum_ghi_wm2 for day in days],
+            [1.0] * n,
+            [day.sum_wind_delta_t_k_m_s for day in days],
+        ),
+        [day.q_heat_wh for day in days],
+    )
+    a, minus_b, intercept, w = beta
+    se_w = stderr[3]
+    t_w = None if se_w <= 1e-12 else w / se_w
+    return a, -minus_b, intercept / float(DAILY_BLOCK_HOURS), w, se_w, t_w, r2
+
+
+def _fit_wind_coefficient(
+    days: Sequence[SolarDay],
+    *,
+    a_three: float,
+    b_three: float,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Identify ``w`` from the interaction column, gated on evidence.
+
+    Returns ``(solar_fields, wind_fields)``. The solar fields are what the
+    four-column fit says about ``a``/``b``; the wind fields carry ``w`` and
+    whether it may act. Every gate that fails produces ``wind_valid=False`` and
+    a note — never a smaller, "probably fine" coefficient.
+    """
+    wind_hours = sum(day.wind_hours for day in days)
+    wind: dict[str, Any] = {
+        "wind_hours": wind_hours,
+        "wind_notes": "",
+        "wind_valid": False,
+        "w_per_ms": None,
+        "w_std_err": None,
+        "w_t_stat": None,
+    }
+    solar: dict[str, Any] = {}
+    if wind_hours < DAILY_MIN_WIND_HOURS:
+        wind["wind_notes"] = (
+            f"wind hours {wind_hours} < {DAILY_MIN_WIND_HOURS}"
+            if wind_hours
+            else "no wind data in the window"
+        )
+        return solar, wind
+
+    n_days = len(days)
+    try:
+        a4, b4, _c4, w, se_w, t_w, _r2 = _fit_daily_wind_rows(days)
+    except ValueError as err:
+        wind["wind_notes"] = f"wind fit failed: {err}"
+        return solar, wind
+
+    measured = {
+        "w_per_ms": w,
+        "w_std_err": se_w,
+        "w_t_stat": t_w,
+    }
+    wind.update(measured)
+    solar["a_w_per_k_4col"] = a4
+    solar["b_m2_4col"] = b4
+
+    if t_w is None:
+        wind["wind_notes"] = "w t-stat unavailable"
+        return solar, wind
+    if w < 0.0:
+        wind["wind_notes"] = f"w < 0 (w={w:.2f} W/K per m/s)"
+        return solar, wind
+    limit = a_three * DAILY_MAX_WIND_FRACTION / DAILY_WIND_REFERENCE_MS
+    if w > limit:
+        wind["wind_notes"] = (
+            f"w {w:.2f} > {limit:.2f} W/K per m/s "
+            f"({DAILY_MAX_WIND_FRACTION:.0%} of a at {DAILY_WIND_REFERENCE_MS:.0f} m/s)"
+        )
+        return solar, wind
+    if t_w < DAILY_MIN_WIND_T_STAT:
+        wind["wind_notes"] = f"t {t_w:.2f} < {DAILY_MIN_WIND_T_STAT:.1f}"
+        return solar, wind
+    if not (
+        DAILY_JACKKNIFE_BAND * b_three <= b4 <= (1.0 + DAILY_JACKKNIFE_BAND) * b_three
+    ):
+        wind["wind_notes"] = (
+            f"aperture moved to {b4:.2f} m² from {b_three:.2f} m²: "
+            "the wind column is absorbing the solar signal"
+        )
+        return solar, wind
+
+    # No single day may carry the wind estimate either.
+    jackknife: list[float] = []
+    for index in range(n_days):
+        try:
+            jackknife.append(
+                _fit_daily_wind_rows(days[:index] + days[index + 1 :])[3]
+            )
+        except ValueError:
+            jackknife.append(float("nan"))
+    if not all(math.isfinite(value) for value in jackknife):
+        wind["wind_notes"] = "wind jackknife fit failed"
+        return solar, wind
+    band = DAILY_WIND_JACKKNIFE_BAND
+    if not all(band * w <= value <= (1.0 + band) * w for value in jackknife):
+        wind["wind_notes"] = (
+            f"wind jackknife {min(jackknife):.2f}-{max(jackknife):.2f} "
+            f"vs {w:.2f}"
+        )
+        return solar, wind
+
+    wind["wind_valid"] = True
+    wind["wind_notes"] = (
+        f"hours={wind_hours} w={w:.2f} t={t_w:.2f} "
+        f"jackknife={min(jackknife):.2f}-{max(jackknife):.2f}"
+    )
+    return solar, wind
+
+
 def fit_daily_solar_model(days: Sequence[SolarDay]) -> SolarDailyModel:
     """Identify ``a``/``c``/``b`` from UTC day blocks, gated on evidence.
 
@@ -699,6 +868,7 @@ def fit_daily_solar_model(days: Sequence[SolarDay]) -> SolarDailyModel:
         and day.heating_hours >= DAILY_MIN_HEATING_HOURS
     ]
     n_days = len(usable)
+    wind_hours = sum(day.wind_hours for day in usable)
     empty: dict[str, Any] = {
         "a_w_per_k": 0.0,
         "b_m2": 0.0,
@@ -706,6 +876,10 @@ def fit_daily_solar_model(days: Sequence[SolarDay]) -> SolarDailyModel:
         "trust": 0.0,
         "r2": 0.0,
         "n_days": n_days,
+        # Reported on every return: a dump must be able to say "no wind term"
+        # and how much wind evidence the window held.
+        "wind_hours": wind_hours,
+        "wind_notes": "no wind term: the solar balance was not valid in this window",
         "valid": False,
     }
     if n_days < DAILY_MIN_DAYS:
@@ -781,6 +955,10 @@ def fit_daily_solar_model(days: Sequence[SolarDay]) -> SolarDailyModel:
         )
 
     trust = max(0.0, min(1.0, _trust_from_t_stat(t_stat)))
+    # The wind column is only attempted where the three-column balance has
+    # already been shown to hold: a fourth regressor added to a model that
+    # cannot explain the day is a fitting exercise, not an identification.
+    wind_solar, wind = _fit_wind_coefficient(ordered, a_three=a, b_three=b)
     return SolarDailyModel(
         a_w_per_k=a,
         b_m2=b,
@@ -799,6 +977,8 @@ def fit_daily_solar_model(days: Sequence[SolarDay]) -> SolarDailyModel:
             f"days={n_days} t={t_stat:.2f} r2={r2:.3f} "
             f"jackknife={min(jackknife):.2f}-{max(jackknife):.2f}"
         ),
+        **wind_solar,
+        **wind,
     )
 
 

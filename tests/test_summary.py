@@ -79,7 +79,15 @@ def curve_coordinator(**overrides):
         "_room_gain_fitted": 5.08,
         "_room_gain_fitted_source": "room_temp_external",
         "_model": SimpleNamespace(a_w_per_k=111.1, b_m2=0.0, trust=0.69),
-        "_daily_model": SimpleNamespace(b_m2=1.875, trust=0.69, n_days=26),
+        "_daily_model": SimpleNamespace(
+            b_m2=1.875,
+            trust=0.69,
+            n_days=26,
+            w_per_ms=2.4,
+            w_t_stat=4.8,
+            wind_hours=612,
+            wind_valid=True,
+        ),
         "_baseline": dict.fromkeys(CURVE_KEYS, 20.0),
     }
     values.update(overrides)
@@ -239,6 +247,13 @@ def test_the_gain_pair_travels_because_the_pool_needs_it() -> None:
     assert gain["fitted"]["window"] == "auto"
     assert curve["daily_solar_b_m2"] == 1.875
     assert curve["daily_solar_days"] == 26
+    # The wind column of the same balance: the pool's "how often is a wind
+    # term identifiable" question needs the coefficient, its t and the
+    # evidence count, plus whether the gates let it act.
+    assert curve["daily_wind_w_per_ms"] == 2.4
+    assert curve["daily_wind_t_stat"] == 4.8
+    assert curve["daily_wind_hours"] == 612
+    assert curve["daily_wind_valid"] is True
 
 
 def test_a_foreign_gain_source_is_dropped() -> None:
@@ -492,3 +507,15 @@ def test_schema_version_bumped_for_the_normalized_standing_loss():
     from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
 
     assert SUMMARY_SCHEMA_VERSION >= 7
+
+
+def test_schema_version_bumped_for_the_wind_column():
+    """A schema without wind fields cannot be pooled with one that has them.
+
+    The fields are additive, but ``daily_wind_valid`` is what makes "this
+    installation has no identifiable wind term" expressible; pooling v7 rows
+    with v8 would read a missing field as an answer.
+    """
+    from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
+
+    assert SUMMARY_SCHEMA_VERSION >= 8

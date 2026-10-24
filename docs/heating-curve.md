@@ -469,12 +469,28 @@ temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily. The
 same requests also carry 10 m wind (`wind_speed_10m`, in m/s rather than the
 API's default km/h), and the day blocks hold it as `Σ(v·ΔT)` — the form wind
 takes physically, since it multiplies the envelope loss instead of shifting it.
-Nothing consumes that column yet: no wind term is applied to the curve until a
-coefficient has been identified for *this* installation, and a payload without
-wind produces the same days with `wind_hours = 0`, because "not measured" is
-not "calm". The config-entry diagnostics report `forecast_wind_ms` (the 10 m
-grid value for the current hour, i.e. the site proxy any wind figure would rest
-on) and `forecast_wind_available` (whether the payload carried wind at all).
+The column is fitted as a **fourth regressor** of the same daily balance —
+`Q = a·ΣΔT + w·Σ(v·ΔT) + 24c − b·ΣGHI`, because wind multiplies the envelope
+loss rather than shifting it — and only where the three-column balance is
+already valid. A payload without wind produces the same days with
+`wind_hours = 0`, because "not measured" is not "calm".
+
+`w` is reported with `wind_valid`, which is false whenever a gate fails: fewer
+than 200 hours of wind evidence, `t < 2.5`, a negative coefficient, a
+coefficient that would more than double the loss at 5 m/s, an aperture that
+moved outside the three-column jackknife band (the wind column absorbing the
+solar signal), or a solution resting on a single day. **No wind term is applied
+to the curve yet** — `w` is identified and published so a support dump (and the
+summary pool) can answer whether an installation can identify one at all; the
+term itself is the next change. The config-entry diagnostics report
+`forecast_wind_ms` (the 10 m grid value for the current hour, i.e. the site
+proxy any wind figure would rest on), `forecast_wind_available`, and the whole
+wind column under `model_daily`.
+
+Note what the input is: 10 m wind on a weather-grid cell, not the wind at the
+house. Shelter is a site property no payload carries, so the coefficient is
+per-installation and biased low where the grid over-reports — "no identifiable
+term" is a normal, correct outcome for a sheltered location.
 
 An attempt that cannot fetch its inputs retries within the hour instead of
 waiting the full day, so one network hiccup does not freeze the model; a
