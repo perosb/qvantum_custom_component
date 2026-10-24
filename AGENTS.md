@@ -478,9 +478,13 @@ v6, so v7 is unreleased and folds further changes.
   written under the old key is ignored, never reinterpreted. The newest window's
   evidence (hours, drop, tank mean, ambient and its source, ΔT, volume) travels
   as sensor attributes.
-- The ambient is only a BT2 that is a **temperature**: without a probe the
-  sensor holds the firmware's placeholder (a QE4 owner reported a fixed −30 °C,
-  2026-10-23), and the pump's room value then comes from the configured sensor.
+- The ambient is only a BT2 that is a **temperature** — and BT2 is a wired
+  room-air sensor whose room the installer picks (ours hangs in a hallway, not
+  beside the unit), so it proxies the tank's surroundings rather than measuring
+  them; an install whose tank stands colder than BT2's room gets a biased
+  figure that no payload can flag. Without a probe the sensor holds the
+  firmware's placeholder (a QE4 owner reported a fixed −30 °C, 2026-10-23), and
+  the pump's room value then comes from the configured sensor.
   `bt2` is skipped when `BT2 Detected` (input 86) says it is not fitted, or when
   it reads at or below `BT2_PLACEHOLDER_MAX_C` (−25 °C — the cloud carries no
   bit, so the value has to say it). The bound is deliberately lower than the
