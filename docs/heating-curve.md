@@ -476,10 +476,14 @@ already valid. A payload without wind produces the same days with
 `wind_hours = 0`, because "not measured" is not "calm".
 
 `w` is reported with `wind_valid`, which is false whenever a gate fails: fewer
-than 200 hours of wind evidence, `t < 2.5`, a negative coefficient, a
-coefficient that would more than double the loss at 5 m/s, an aperture that
+than 200 hours that are both cold and windy (ΔT ≥ 15 K and wind ≥ 4 m/s — a
+windy mild hour is a reading, not evidence), `t < 2.5`, a negative coefficient,
+a coefficient that would more than double the loss at 5 m/s, an aperture that
 moved outside the three-column jackknife band (the wind column absorbing the
-solar signal), or a solution resting on a single day.
+solar signal), two window halves that disagree on `w` (a drift rather than a
+sensitivity), or a solution resting on a single day. The collinearity of the
+interaction column is published with the coefficient but not gated: measured
+1.6–2.2 on real windows, so it is not what breaks such a fit.
 
 The **wind term** is optional and off by default
 (`qvantum.set_curve_terms: wind: true`), like the other optional terms. When

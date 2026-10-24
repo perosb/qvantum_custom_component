@@ -20,7 +20,7 @@ from custom_components.qvantum.solar_gain import (
     SolarDay,
     SolarModel,
     SolarSample,
-    DAILY_MIN_WIND_HOURS,
+    DAILY_MIN_COLD_WIND_HOURS,
     DAILY_MIN_WIND_T_STAT,
     _median,
     _ols_three,
@@ -817,6 +817,24 @@ def test_aggregate_days_ignores_unparsable_values() -> None:
     assert days[0].hours == 3
 
 
+def test_aggregate_days_counts_only_cold_and_windy_hours_as_evidence() -> None:
+    """A windy mild hour is a reading, not evidence for the interaction."""
+    start = NOW - 86400
+    start -= start % 86400
+    keys = [start + index * 3600 for index in range(24)]
+    q_heat = {ts: 400.0 for ts in keys}
+    indoor = {ts: 21.0 for ts in keys}
+    # 12 h at ΔT 19 K, 12 h at ΔT 5 K, wind 5 m/s throughout.
+    outdoor = {ts: (2.0 if index < 12 else 16.0) for index, ts in enumerate(keys)}
+    ghi = {ts: 0.0 for ts in keys}
+    wind = {ts: 5.0 for ts in keys}
+
+    day = aggregate_days(q_heat, indoor, outdoor, ghi, wind)[0]
+
+    assert day.wind_hours == 24
+    assert day.cold_wind_hours == 12
+
+
 def test_aggregate_days_adds_the_wind_interaction_column() -> None:
     """Wind multiplies the envelope loss, so the column is Σ(v·ΔT)."""
     start = NOW - 2 * 86400
@@ -880,6 +898,7 @@ def _wind_days(
     noise: float = 40.0,
     seed: int = 7,
     wind_of_day=None,
+    w_of_day=None,
 ):
     """Synthetic day blocks with a known wind sensitivity.
 
@@ -888,17 +907,20 @@ def _wind_days(
     """
     rng = random.Random(seed)
     base = 1_760_000_000 - (1_760_000_000 % 86400)
-    wind_of_day = wind_of_day or (lambda index: 4.0 + 2.0 * math.cos(index / 4.0))
+    wind_of_day = wind_of_day or (lambda index: 5.0 + 2.0 * math.cos(index / 4.0))
     days = []
     for index in range(n_days):
-        delta_t = 21.0 - (6.0 + 4.0 * math.sin(index / 5.0))
+        # Cold every day (ΔT 15–25 K) so the hours qualify as evidence, with the
+        # wind cycle out of phase so the interaction is not a ΔT proxy.
+        delta_t = 20.0 + 5.0 * math.sin(index / 5.0)
         ghi = max(0.0, 120.0 + 400.0 * math.sin(index / 3.0))
         wind = wind_of_day(index)
+        day_w = w if w_of_day is None else w_of_day(index)
         sum_dt = delta_t * 24
         sum_ghi = ghi * 24
         sum_wind_dt = wind * delta_t * 24
         q_heat = (
-            a * sum_dt + w * sum_wind_dt + 24 * c - b * sum_ghi
+            a * sum_dt + day_w * sum_wind_dt + 24 * c - b * sum_ghi
             + rng.uniform(-noise, noise)
         )
         days.append(
@@ -912,6 +934,7 @@ def _wind_days(
                 sum_wind_delta_t_k_m_s=sum_wind_dt,
                 sum_wind_ms_h=wind * 24,
                 wind_hours=24,
+                cold_wind_hours=24,
             )
         )
     return days
@@ -964,21 +987,26 @@ def test_wind_term_is_invalid_without_wind_data() -> None:
     assert model.wind_notes == "no wind data in the window"
 
 
-def test_wind_needs_evidence_hours_not_days() -> None:
-    """A solar-valid window with sparse wind evidence still gives no term.
+def test_wind_needs_cold_windy_hours_not_just_wind_hours() -> None:
+    """A solar-valid window with plenty of *mild* wind hours gives no term.
 
-    The three-column fit never sees wind, so the window stays valid: exactly
-    the case the gate exists for, and the one a day-count regression would
-    otherwise pass (30 days, 4 wind hours each).
+    Measured on a real install (2026-10-24): a mild September–October window held
+    156 h at ΔT ≥ 10 K, and the coefficient fitted there was an artifact. The
+    evidence gate therefore counts hours that are both cold and windy.
     """
-    days = [replace(day, wind_hours=4) for day in _wind_days(w=2.5)]
+    days = [
+        replace(day, wind_hours=24, cold_wind_hours=4) for day in _wind_days(w=2.5)
+    ]
     model = fit_daily_solar_model(days)
 
     assert model.valid
     assert model.wind_valid is False
     assert model.w_per_ms is None
-    assert model.wind_hours == 30 * 4 < DAILY_MIN_WIND_HOURS
-    assert f"wind hours {30 * 4} < {DAILY_MIN_WIND_HOURS}" in model.wind_notes
+    assert model.wind_hours == 30 * 24
+    assert model.wind_cold_hours == 30 * 4 < DAILY_MIN_COLD_WIND_HOURS
+    assert (
+        f"cold+windy hours {30 * 4} < {DAILY_MIN_COLD_WIND_HOURS}" in model.wind_notes
+    )
 
 
 def test_wind_fit_is_attempted_only_where_the_balance_is_valid() -> None:
@@ -1021,3 +1049,30 @@ def test_wind_column_collinear_with_delta_t_is_rejected() -> None:
 
     assert model.wind_valid is False
     assert "wind fit failed" in model.wind_notes
+
+
+def test_wind_coefficient_that_drifts_between_halves_is_rejected() -> None:
+    """A window whose two halves disagree is a drift, not a sensitivity.
+
+    Reconstructed from the probe run of 2026-10-24: a mild 30-day window fitted
+    4.5 W/K per m/s with halves of 8.66 and 4.44, and a 60-day window fitted
+    −1.06 and 5.93 — the sign flip a mild window produces. Every older gate
+    (t, sign, plausibility, aperture band, jackknife) passed on that artifact.
+    """
+    days = _wind_days(w_of_day=lambda index: 4.0 if index < 15 else 1.0)
+    model = fit_daily_solar_model(days)
+
+    assert model.valid
+    assert model.wind_valid is False
+    assert model.w_first_half_ms is not None and model.w_first_half_ms > 3.0
+    assert model.w_second_half_ms is not None and model.w_second_half_ms < 1.5
+    assert "halves disagree" in model.wind_notes
+
+
+def test_wind_coefficient_reports_its_collinearity() -> None:
+    """The VIF is published, so a dump can show it was not the problem."""
+    model = fit_daily_solar_model(_wind_days(w=2.5))
+
+    assert model.wind_valid is True
+    assert model.wind_vif is not None and model.wind_vif < 5.0
+    assert model.wind_cold_hours == 30 * 24

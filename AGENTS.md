@@ -655,16 +655,25 @@ further changes once it ships; before that, edit it in place as usual).
   the interaction form is the physical one; a plain `+ w·Σv` offset is not
   fitted. `_fit_wind_coefficient` runs **only where the three-column balance is
   already valid**, and `wind_valid` is False whenever a gate fails — the term is
-  then not applied at all, exactly like an invalid aperture. Gates: at least
-  `DAILY_MIN_WIND_HOURS` (200) hours with a wind reading in the usable days —
-  evidence hours, never a day count, because a mild window can hold hundreds of
-  hours and still identify nothing; `t_w ≥ DAILY_MIN_WIND_T_STAT` (2.5);
-  `w ≥ 0`; `w ≤ a / DAILY_WIND_REFERENCE_MS` at `DAILY_MAX_WIND_FRACTION`
-  (wind may at most double the loss at 5 m/s); the four-column aperture must stay
-  inside the three-column jackknife band (otherwise the column is absorbing the
-  solar signal); and no single day may carry `w` (wind jackknife). Measured on a
-  live install, 30 winter days carry ~3× the power of 60 shoulder-season days,
-  which is why the gate is evidence-shaped — see
+  then not applied at all, exactly like an invalid aperture. Gates, in order:
+  at least `DAILY_MIN_COLD_WIND_HOURS` (200) hours that are **cold and windy**
+  (`ΔT ≥ WIND_EVIDENCE_MIN_DELTA_T_K` 15 K, `v ≥ WIND_EVIDENCE_MIN_MS` 4 m/s) —
+  a windy mild hour is a reading, not evidence, and the probe measured a mild
+  September–October window holding 156 h at ΔT ≥ 10 K but only 37 at the shipped
+  threshold; `w ≥ 0`; `w ≤ a / DAILY_WIND_REFERENCE_MS` at
+  `DAILY_MAX_WIND_FRACTION` (wind may at most double the loss at 5 m/s);
+  `t_w ≥ 2.5`; the four-column aperture inside the three-column jackknife band
+  (otherwise the column is absorbing the solar signal); **both halves of the
+  window agreeing on `w`** within `DAILY_WIND_HALF_BAND` (±50 %) and both
+  positive; and a wind jackknife inside its own band. The half-split is the gate
+  that rejects a *drift*: the same probe found a mild 30-day window fitting
+  4.50 W/K per m/s with halves of 8.66/4.44 and a 60-day window fitting
+  −1.06/5.93 — opposite signs — while every older gate passed. The VIF of the
+  interaction column against `{ΣΔT, ΣGHI, const}` is **reported, not gated**
+  (measured 1.6–2.2 on real windows: collinearity is not what breaks it).
+  With evidence the estimator is unbiased: on a synthetic winter at this
+  install's noise level (≈4 kWh/day) it returns 0.11 ± 0.25 with no term and
+  3.11 ± 0.25 for a true 3.0 W/K per m/s. See
   `~/.pi/agent/plans/qvantum-wind-term.md`.
 - Wind is a **site proxy**: Open-Meteo returns 10 m wind on a grid cell, and
   shelter from trees, neighbours and terrain is invisible in the payload. The
