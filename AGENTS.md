@@ -681,7 +681,8 @@ further changes once it ships; before that, edit it in place as usual).
   terms have none either, so adding one for wind alone would be the
   inconsistency). `compute_curve(wind_by_hour=…, wind_enabled=…)` adds
   `wind_adjustment_c` — `−slope · (w · v̄ · ΔT) / a`, one-sided, `0…WIND_MAX_C`
-  (2 °C), with `v̄` the mean of the next `WIND_SMOOTH_HOURS` (3) forecast hours
+  (2 °C), with `v̄` the mean of the *available* hours in the next
+  `WIND_SMOOTH_HOURS` (3) — a missing hour is skipped, never counted as calm
   and `a` from the same day-block model — to the shared adjustment, still under
   the indoor cap and the total clamp. It needs `wind_valid`, a wind reading for
   the current hour (missing is *not* calm) and `indoor_target > outdoor`,

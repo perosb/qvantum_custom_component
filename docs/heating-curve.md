@@ -489,7 +489,8 @@ enabled *and* `wind_valid`, it adds
 wind_c = −slope · (w · v̄ · (indoor_target − outdoor)) / a     0 ≤ wind_c ≤ 2 °C
 ```
 
-with `v̄` the mean of the next three forecast hours, `a` the loss coefficient
+with `v̄` the mean of the available hours in the next three (a missing hour is
+skipped, never counted as calm), `a` the loss coefficient
 from the *same* day-block model (so the W → °C conversion is self-consistent,
 exactly as for solar) and `−slope` because extra loss raises the supply. It is
 one-sided and bounded, folded into the shared adjustment, and still subject to

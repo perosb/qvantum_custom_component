@@ -437,9 +437,11 @@ def solar_adjustment_c(
 def smooth_wind(
     wind_by_hour: Mapping[int, float], now_ts: int, *, hours: int = WIND_SMOOTH_HOURS
 ) -> float | None:
-    """Mean wind over the next ``hours`` hours, or ``None`` without data.
+    """Mean of the *available* hours in the next ``hours``, or ``None``.
 
-    ``None`` rather than 0.0: a payload without wind is "not measured", and a
+    Hours missing from the payload are skipped rather than counted as calm, so a
+    partially covered window still yields a mean; ``None`` only when none of them
+    carries a reading, because a payload without wind is "not measured" and a
     wind term must not act on a claim of calm.
     """
     now_hour = now_ts - (now_ts % 3600)
