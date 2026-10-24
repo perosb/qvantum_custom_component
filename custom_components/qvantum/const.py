@@ -378,6 +378,11 @@ REQUIRED_MODBUS_METRICS = [
     # Required by the always-created filter calendar; the diagnostic sensor
     # that also exposes this metric can be disabled independently.
     "ventilation_filter_time_left",
+    # "BT2 Detected" (input 86): the curve's pump-room blend must see it even
+    # though no entity exposes it, because the payload is filtered by the
+    # enabled metrics and an unread bit silently turns a missing probe into a
+    # -30 C room temperature.
+    "bt2_detected",
 ]
 
 # Sensor type classification (substring match in _get_sensor_type).

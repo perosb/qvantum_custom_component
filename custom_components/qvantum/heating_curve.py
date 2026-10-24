@@ -830,32 +830,114 @@ def room_corrected_deviation(
     return deviation_c - gain_c * room_error_c
 
 
-def pump_room_temperature(
+#: A room probe cannot read below this: an unconnected BT2 falls back to the
+#: firmware's own placeholder (reported as -30 C on a QE4, 2026-10-23), which
+#: would put the pump's room value ~26 K off. Cold-setback rooms stay well above
+#: it, so the bound only rejects a placeholder or a dead probe.
+BT2_MIN_PLAUSIBLE_C = -10.0
+BT2_MAX_PLAUSIBLE_C = 45.0
+#: Two indoor readings further apart than this are not two views of one room.
+#: Measured on a live QE-6 over 30 days, |bt2 - external| was median 0.54 C,
+#: p95 0.77 C and max 0.85 C, so this only catches a stuck or placeholder probe
+#: - not the normal offset between the pump's sensor and the room sensor.
+BT2_MAX_DIVERGENCE_C = 10.0
+
+
+def _room_reading_is_plausible(value: object) -> bool:
+    """True for a number that could be an indoor temperature."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return BT2_MIN_PLAUSIBLE_C <= float(value) <= BT2_MAX_PLAUSIBLE_C
+
+
+def _bt2_is_usable(
+    configured_c: float | None, bt2_c: object, bt2_detected: object
+) -> bool:
+    """True when BT2 is a probe the pump can actually read in this room.
+
+    ``bt2_detected`` is the datasheet's ``BT2 Detected`` input register
+    (86: 0=No, 1=Yes, 2=Detecting) and is authoritative when the transport
+    carries it - Modbus does, the cloud does not. Only a confirmed probe (1)
+    counts; 0 and 2 are "no probe" and "not yet decided". Without the bit
+    (cloud, or firmware that does not report it) the value itself decides.
+    """
+    if not _room_reading_is_plausible(bt2_c):
+        return False
+    if (
+        isinstance(bt2_detected, (int, float))
+        and not isinstance(bt2_detected, bool)
+        and int(bt2_detected) != 1
+    ):
+        return False
+    if configured_c is None:
+        return True
+    return abs(float(bt2_c) - float(configured_c)) <= BT2_MAX_DIVERGENCE_C
+
+
+@dataclass(frozen=True)
+class PumpRoomReading:
+    """The room value the pump's room term used, and where it came from.
+
+    ``source`` is one of ``blended`` (configured + BT2 mean), ``configured``
+    (BT2 unusable, not in the external mode, or missing), ``bt2`` (configured
+    unknown) and ``none`` (no plausible room reading at all). It travels to the
+    snapshot, the deviation sensor and the support dump, because *which* value
+    was removed decides whether a deviation figure can be read at all.
+    """
+
+    value_c: float | None
+    source: str
+
+
+def pump_room_reading(
     configured_c: float | None,
     bt2_c: float | None,
     *,
     external_mode: bool,
-) -> float | None:
+    bt2_detected: float | None = None,
+) -> PumpRoomReading:
     """The room value the pump's own room term is computed from.
 
     In the external-sensor mode the firmware does not use the external value on
     its own: measured on a QE-6 (2026-10-21), ``cal_heat_temp`` follows
-    ``curve(bt1) + 5.0 · (desired − room)`` with ``room`` the **mean of the
-    external value and BT2** — median |deviation| 0.10 °C against 0.32 °C for
-    the external sensor alone and 0.30 °C for BT2, while a +1.1 K target step
+    ``curve(bt1) + 5.0 * (desired - room)`` with ``room`` the **mean of the
+    external value and BT2** - median |deviation| 0.10 C against 0.32 C for
+    the external sensor alone and 0.30 C for BT2, while a +1.1 K target step
     moved ``cal_heat_temp`` by 5.5 K and confirmed the 5.0 gain.
 
     Removing a room term built from one sensor while the pump built it from the
-    mean leaves a constant bias of ``gain · (bt2 − configured) / 2``, which on
-    that install was ~1.7 °C — more than the readiness median gate. The blend
-    is applied only in the external mode, the one regime it was measured in;
+    mean leaves a constant bias of ``gain * (bt2 - configured) / 2``, which on
+    that install was ~1.7 C - more than the readiness median gate. The blend is
+    applied only in the external mode, the one regime it was measured in;
     everywhere else the configured sensor is what the pump reads.
+
+    That measurement was taken with a fitted BT2. An install without one holds
+    the firmware's placeholder (reported as -30 C on a QE4, 2026-10-23) while
+    the pump's own room value comes from the external sensor alone, so the blend
+    is gated on BT2 being a *probe* (``_bt2_is_usable``) and, independently, on
+    the resulting value being a room temperature at all: in the DISABLED/BT3/AUX
+    modes there is no mode-specific indoor metric, the configured value falls
+    back to BT2, and the BT2 gate alone would hand that placeholder straight
+    through. Degrading to the configured sensor (or to nothing) costs the ~0.3 C
+    single-sensor bias; blending a placeholder costs ``gain * 26 K``.
     """
+    usable = _bt2_is_usable(configured_c, bt2_c, bt2_detected)
     if configured_c is None:
-        return bt2_c
-    if bt2_c is None or not external_mode:
-        return configured_c
-    return (configured_c + bt2_c) / 2.0
+        reading = PumpRoomReading(
+            float(bt2_c) if usable and bt2_c is not None else None,
+            "bt2" if usable else "none",
+        )
+    elif usable and external_mode:
+        reading = PumpRoomReading(
+            (float(configured_c) + float(bt2_c)) / 2.0, "blended"
+        )
+    else:
+        reading = PumpRoomReading(configured_c, "configured")
+    if reading.value_c is not None and not _room_reading_is_plausible(
+        reading.value_c
+    ):
+        return PumpRoomReading(None, "none")
+    return reading
 
 
 def _weighted_median(values: Sequence[tuple[float, float]]) -> float:

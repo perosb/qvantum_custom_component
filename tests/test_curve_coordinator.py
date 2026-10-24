@@ -2582,6 +2582,119 @@ async def test_snapshot_deviation_falls_back_to_one_sensor() -> None:
     assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.5)
 
 
+async def test_snapshot_ignores_a_bt2_the_pump_reports_as_missing() -> None:
+    """A -30 C placeholder must never reach the removed room term.
+
+    Reported by a QE4 owner (2026-10-23) in the external mode: BT2 reads the
+    firmware's placeholder because no interior probe is fitted. Averaging it in
+    puts the pump's room value ~26 K off, i.e. ~130 K on the deviation at gain
+    5, and readiness could never pass. ``BT2 Detected`` (input 86) says so.
+    """
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}, live_curve_type=1
+    )
+    coordinator._main.data["values"].update(
+        {
+            "sensor_mode": 4,
+            "room_temp_external": 20.6,
+            "bt2": -30.0,
+            "bt2_detected": 0.0,
+            "indoor_temperature_target": 20.1,
+        }
+    )
+    coordinator._baseline = dict(BASELINE)
+    coordinator._room_gain = 9.0
+    coordinator._room_gain_source = "room_temp_external"
+    coordinator._mode = "active"
+    coordinator._active_since_ts = time.time() - 3600
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._daylight = MagicMock(return_value=None)
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        snapshot = await coordinator._async_compute_snapshot()
+
+    # The external reading alone, not the -4.7 C mean.
+    assert snapshot.pump_room_c == pytest.approx(20.6)
+    assert snapshot.pump_room_source == "configured"
+    # Removed term is the external sensor's own 0.5 C error, not 26 K.
+    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.5)
+
+
+async def test_snapshot_reports_the_blend_source() -> None:
+    """A detected BT2 is blended, and the dump says so."""
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}, live_curve_type=1
+    )
+    coordinator._main.data["values"].update(
+        {
+            "sensor_mode": 4,
+            "room_temp_external": 20.6,
+            "bt2": 21.0,
+            "bt2_detected": 1.0,
+            "indoor_temperature_target": 20.1,
+        }
+    )
+    coordinator._baseline = dict(BASELINE)
+    coordinator._room_gain = 9.0
+    coordinator._room_gain_source = "room_temp_external"
+    coordinator._mode = "active"
+    coordinator._active_since_ts = time.time() - 3600
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._daylight = MagicMock(return_value=None)
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.pump_room_c == pytest.approx(20.8)
+    assert snapshot.pump_room_source == "blended"
+
+
+async def test_readiness_hours_ignore_a_missing_bt2() -> None:
+    """The readiness window must not shift by ~130 K on a placeholder BT2."""
+    values = {
+        **VALUES,
+        "sensor_mode": 4,
+        "bt2": -30.0,
+        "bt2_detected": 0.0,
+        "indoor_temperature_target": 20.0,
+    }
+    hours = [100 + index * 3600 for index in range(cc.INDOOR_METRIC_MIN_HOURS)]
+    coordinator = make_coordinator(values=values, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._room_gain = 9.0
+    coordinator._room_gain_source = "room_temp_external"
+    coordinator._mode = "active"
+    coordinator._active_since_ts = 0.0
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "heatingpower": "sensor.q",
+            "bt2": "sensor.i",
+            "room_temp_external": "sensor.r",
+        }
+    )
+    coordinator._async_statistics = AsyncMock(
+        return_value={
+            "sensor.t": [{"start": ts, "mean": 10.0} for ts in hours],
+            "sensor.s": [{"start": ts, "mean": 40.0} for ts in hours],
+            "sensor.q": [{"start": ts, "mean": 900.0} for ts in hours],
+            "sensor.r": [{"start": ts, "mean": 20.0} for ts in hours],
+            "sensor.i": [{"start": ts, "mean": -30.0} for ts in hours],
+        }
+    )
+
+    series, _ = await coordinator._async_readiness_hours()
+    # External 20.0 against a 20.0 target: nothing removed, nothing invented.
+    assert series[100] == pytest.approx(36.0 - 40.0)
+
+
 async def test_snapshot_arms_the_indoor_cap_with_a_room_reading() -> None:
     """The cap can only brake the curve when an indoor reading exists."""
     coordinator = make_coordinator(values=VALUES, settings=SETTINGS)

@@ -1012,6 +1012,10 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             # own BT2 for the room term, so this is the input the removed term
             # used — not the configured sensor's reading.
             "pump_room_c": snapshot.pump_room_c,
+            # "blended" only while BT2 is a detected probe: an unconnected BT2
+            # holds -30 C, and blending that would put the removed room term
+            # ~26 K off (readiness could never pass).
+            "pump_room_source": snapshot.pump_room_source,
             # The baseline was only observed between the two temperatures
             # above; these points are extrapolated from the cached table, so
             # readiness says nothing about them yet.

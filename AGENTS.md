@@ -573,11 +573,33 @@ v6, so v7 is unreleased and folds further changes.
   pump built it from the mean leaves a constant `gain · (bt2 − configured) / 2`
   bias — 1.7 °C on that install, i.e. more than the readiness median gate, which
   is why the median sat at 2.17 °C with a raw 1.43 °C underneath. Hence
-  `pump_room_temperature` (mean blend, guarded to the external mode — the only
-  regime it was measured in) feeds the readiness window and the live
-  `deviation`, while the trims, the indoor cap and `room_error` stay on the
-  configured sensor because those describe the house. `pump_room_c` travels in
-  the snapshot, the deviation sensor and the diagnostics.
+  `pump_room_reading` (mean blend, guarded to the
+  external mode — the only regime it was measured in) feeds the readiness window
+  and the live `deviation`, while the trims, the indoor cap and `room_error`
+  stay on the configured sensor because those describe the house. That
+  measurement was taken with a **fitted** BT2: without a probe the sensor holds
+  the firmware's placeholder (a QE4 owner reported a fixed −30 °C, 2026-10-23),
+  and the pump's room value then comes from the external sensor alone. Blending
+  the placeholder puts `room` ~26 K off, i.e. `gain · 26 K` on the deviation
+  (13 K at gain 0.5, 130 K at 5) — the readiness gate cannot pass at any gain.
+  The blend is therefore gated three times: the datasheet's `BT2 Detected`
+  input register 86 (0=No, 1=Yes, 2=Detecting — Modbus only; the cloud reports
+  no such bit) must say 1; the value must be a room temperature
+  (`BT2_MIN_PLAUSIBLE_C`/`BT2_MAX_PLAUSIBLE_C`, −10…45 °C) and within
+  `BT2_MAX_DIVERGENCE_C` (10 K — |bt2 − external| on a live QE-6 was median
+  0.54 °C, p95 0.77 °C, max 0.85 °C over 30 days) of the configured reading;
+  and the **resulting** value is gated again, because in `DISABLED`/`BT3`/`AUX`
+  modes `_indoor_live_key` falls back to `bt2`, so "configured" *is* the
+  placeholder there. Degrading to the configured sensor costs the ~0.3 °C
+  single-sensor bias; no reading is better than a 26 K error. `bt2_detected` is
+  in `REQUIRED_MODBUS_METRICS` because the payload is filtered by enabled
+  metrics and no entity exposes it, and it sits inside the 0–104 input block the
+  client already reads (no extra I/O). `pump_room_c` and `pump_room_source`
+  (`blended`/`configured`/`bt2`/`none`) travel in the snapshot, the deviation
+  sensor and the diagnostics, next to `bt2_detected`. The efficiency figures
+  are not covered yet: `DHW_AMBIENT_KEYS` still prefers `bt2`, so a
+  placeholder-BT2 install understates `dhw_standing_loss` by ~60 % (planned
+  follow-up).
 - While the curve is active readiness turns self-referential;
   `sensor.qvantum_adaptive_curve_room_error` (median `|indoor − target|` over the
   same window) is the outcome signal instead. Readiness also only covers the
