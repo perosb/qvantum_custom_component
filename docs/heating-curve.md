@@ -292,7 +292,13 @@ room-gain fit read when the pump runs an external room sensor, not BT2. A
 freshly configured sensor has no recorder history for its first hours, so the
 indoor resolver falls back to the next candidate (BT2 last) until it has
 ≈ a day of hourly rows — otherwise the trims, room-gain fit, solar calibration
-and the building metrics would all go dormant on a sensor change. A reference
+and the building metrics would all go dormant on a sensor change. A candidate
+only qualifies while its series is a record of a room: BT2 is skipped when the
+pump reports no probe, and any series whose hourly median lies outside
+−10…45 °C is skipped too. Without that, an installation with no interior sensor
+would fall back to a BT2 series that records −30 °C — a −50 K room error puts
+the trims on their clamp and inflates the heat-loss coefficient, the time
+constant and the solar aperture. No series beats a plausible wrong one. A reference
 point with no observed hours within 7.5 °C stays at 0 — no evidence, no
 correction — each trim is capped at ±2 °C and updated with a damped step, so it
 converges and stops when the error is gone. Updates are at most once a day once
