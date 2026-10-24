@@ -965,14 +965,29 @@ def test_wind_term_is_invalid_without_wind_data() -> None:
 
 
 def test_wind_needs_evidence_hours_not_days() -> None:
-    """Five days of wind is not a coefficient, however good the solar fit."""
+    """A solar-valid window with sparse wind evidence still gives no term.
+
+    The three-column fit never sees wind, so the window stays valid: exactly
+    the case the gate exists for, and the one a day-count regression would
+    otherwise pass (30 days, 4 wind hours each).
+    """
+    days = [replace(day, wind_hours=4) for day in _wind_days(w=2.5)]
+    model = fit_daily_solar_model(days)
+
+    assert model.valid
+    assert model.wind_valid is False
+    assert model.w_per_ms is None
+    assert model.wind_hours == 30 * 4 < DAILY_MIN_WIND_HOURS
+    assert f"wind hours {30 * 4} < {DAILY_MIN_WIND_HOURS}" in model.wind_notes
+
+
+def test_wind_fit_is_attempted_only_where_the_balance_is_valid() -> None:
+    """Too few days: no solar model, and the dump says why there is no wind."""
     model = fit_daily_solar_model(_wind_days(n_days=5, w=2.5))
 
+    assert model.valid is False
     assert model.wind_valid is False
-    assert model.wind_hours == 5 * 24 < DAILY_MIN_WIND_HOURS
-    assert model.w_per_ms is None
-    # The fourth column is only attempted where the three-column balance already
-    # holds, so the note names the solar model rather than the wind evidence.
+    assert model.wind_hours == 5 * 24
     assert "solar balance was not valid" in model.wind_notes
 
 
