@@ -834,6 +834,64 @@ class TestDhwStandingLoss:
         assert coordinator._dhw_standing_window["ambient_c"] == 19.0
         assert value is not None
 
+    def test_ambient_skips_a_bt2_the_pump_says_is_missing(self):
+        """A -30 C placeholder would divide by 85 K instead of ~34 K.
+
+        Reported on a QE4 (2026-10-23): no interior probe, BT2 holds the
+        firmware's placeholder. The standing-loss window must fall through to
+        the configured room sensor rather than publish ~40 % of the truth.
+        """
+        coordinator = make_coordinator()
+        sentinel = {"bt30": 55.0, "bf1_l_min": 0.0, "hp_status": 0, "bt2": -30.0}
+        self._values(
+            coordinator,
+            **sentinel,
+            bt2_detected=0,
+            room_temp_external=19.0,
+        )
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(
+            coordinator, **{**sentinel, "bt30": 53.0}, bt2_detected=0,
+            room_temp_external=19.0,
+        )
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        self._values(
+            coordinator, **{**sentinel, "bt30": 53.0, "bf1_l_min": 6.0},
+            bt2_detected=0, room_temp_external=19.0,
+        )
+        value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
+
+        assert coordinator._dhw_standing_window["ambient_source"] == "room_temp_external"
+        assert coordinator._dhw_standing_window["ambient_c"] == 19.0
+        daily = 175.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
+        assert value == pytest.approx(daily / (54.0 - 19.0) * 40.0)
+
+    def test_ambient_skips_the_placeholder_without_a_bit(self):
+        """Cloud mode carries no ``BT2 Detected``: the value has to say it."""
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0, bt2=-30.0)
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0, bt2=-30.0)
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        self._values(coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0, bt2=-30.0)
+        assert coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600) is None
+        assert coordinator._dhw_standing_window is None
+
+    def test_ambient_keeps_a_cold_but_real_bt2(self):
+        """A tank in an unheated room is not a placeholder: -5 C is valid."""
+        coordinator = make_coordinator()
+        self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0, bt2=-5.0)
+        coordinator._update_dhw_standing_loss(1000.0)
+        self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0, bt2=-5.0)
+        coordinator._update_dhw_standing_loss(1000.0 + 8 * 3600)
+        self._values(
+            coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0, bt2=-5.0
+        )
+        value = coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600)
+
+        assert coordinator._dhw_standing_window["ambient_source"] == "bt2"
+        assert value is not None
+
     def test_short_window_is_discarded(self):
         coordinator = make_coordinator()
         self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)

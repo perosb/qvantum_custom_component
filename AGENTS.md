@@ -478,6 +478,20 @@ v6, so v7 is unreleased and folds further changes.
   written under the old key is ignored, never reinterpreted. The newest window's
   evidence (hours, drop, tank mean, ambient and its source, ΔT, volume) travels
   as sensor attributes.
+- The ambient is only a BT2 that is a **temperature**: without a probe the
+  sensor holds the firmware's placeholder (a QE4 owner reported a fixed −30 °C,
+  2026-10-23), and the pump's room value then comes from the configured sensor.
+  `bt2` is skipped when `BT2 Detected` (input 86) says it is not fitted, or when
+  it reads at or below `BT2_PLACEHOLDER_MAX_C` (−25 °C — the cloud carries no
+  bit, so the value has to say it). The bound is deliberately lower than the
+  curve's room band: a tank in an unheated garage at −5 °C is a valid window,
+  while averaging a placeholder in would divide by 85 K instead of ~34 K and
+  publish ~40 % of the true coefficient. The window then falls through to
+  `room_temp_external`/`room_temp_ext`, or is discarded when neither exists.
+  **Still open:** the statistics picker still treats a placeholder BT2 as an
+  indoor series, so the building metrics, the thermal-mass fit and the solar
+  calibration can inherit it when the configured sensor has fewer than
+  `INDOOR_METRIC_MIN_HOURS`/`MIN_SOLAR_FIT_SAMPLES` of history.
 - The DHW heat-meter comparison (`dhw_heat_meter_deviation`) is a
   **poll-resolution integral**, not a statistics product: `mean(flow) · mean(ΔT)`
   is not the integral of `flow · ΔT`, and on a live install it read 0.7 kWh
@@ -596,10 +610,8 @@ v6, so v7 is unreleased and folds further changes.
   metrics and no entity exposes it, and it sits inside the 0–104 input block the
   client already reads (no extra I/O). `pump_room_c` and `pump_room_source`
   (`blended`/`configured`/`bt2`/`none`) travel in the snapshot, the deviation
-  sensor and the diagnostics, next to `bt2_detected`. The efficiency figures
-  are not covered yet: `DHW_AMBIENT_KEYS` still prefers `bt2`, so a
-  placeholder-BT2 install understates `dhw_standing_loss` by ~60 % (planned
-  follow-up).
+  sensor and the diagnostics, next to `bt2_detected`. The DHW standing-loss
+  ambient applies the same rule separately (see below).
 - While the curve is active readiness turns self-referential;
   `sensor.qvantum_adaptive_curve_room_error` (median `|indoor − target|` over the
   same window) is the outcome signal instead. Readiness also only covers the
