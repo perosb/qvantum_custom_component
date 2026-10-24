@@ -1204,6 +1204,26 @@ class QvantumCurveSolarModelSensor(QvantumCurveSensorEntity):
                     else None,
                     "valid": daily.valid,
                     "notes": daily.notes,
+                    # Wind column of the same balance. It stays off unless a
+                    # coefficient for *this* installation passes its gates, so
+                    # the reason it is not acting belongs here rather than in a
+                    # repair issue: the user cannot change the weather, and an
+                    # issue would nag forever on a sheltered site.
+                    "wind_valid": daily.wind_valid,
+                    "wind_c": round(snapshot.wind_c, 2),
+                    "wind_w_per_ms": (
+                        None
+                        if daily.w_per_ms is None
+                        else round(daily.w_per_ms, 2)
+                    ),
+                    "wind_t_stat": (
+                        None
+                        if daily.w_t_stat is None
+                        else round(daily.w_t_stat, 2)
+                    ),
+                    "wind_hours": daily.wind_hours,
+                    "wind_cold_hours": daily.wind_cold_hours,
+                    "wind_notes": daily.wind_notes,
                 }
             ),
         }

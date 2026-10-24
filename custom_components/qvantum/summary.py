@@ -267,6 +267,8 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "daily_wind_w_per_ms": _number(getattr(daily, "w_per_ms", None)),
         "daily_wind_t_stat": _number(getattr(daily, "w_t_stat", None)),
         "daily_wind_hours": _number(getattr(daily, "wind_hours", None)),
+        "daily_wind_cold_hours": _number(getattr(daily, "wind_cold_hours", None)),
+        "daily_wind_vif": _number(getattr(daily, "wind_vif", None)),
         "daily_wind_valid": bool(getattr(daily, "wind_valid", False)),
         "wind_c": _number(getattr(snapshot, "wind_c", None)),
     }
