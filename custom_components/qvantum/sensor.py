@@ -960,6 +960,14 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
             # One-sided (0…WIND_MAX_C) and 0 unless the optional wind term is
             # enabled and the identified coefficient passed its gates.
             "wind_c": snapshot.wind_c,
+            # Which optional terms the user switched on, and whether the wind
+            # column is identifiable at all. Without both, a term that is on but
+            # idle (calm weather, or no evidence) looks exactly like one that is
+            # switched off, which is the common case for wind.
+            "terms": dict(getattr(self.coordinator, "terms", {}) or {}),
+            "wind_valid": (
+                None if snapshot.daily_model is None else snapshot.daily_model.wind_valid
+            ),
             "capped_by_indoor": snapshot.capped_by_indoor,
             "trims": dict(snapshot.trims),
             "clamped": snapshot.clamped,
