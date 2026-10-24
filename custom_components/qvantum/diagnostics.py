@@ -380,6 +380,17 @@ def _curve_daily_model_diagnostics(model: Any) -> dict[str, Any] | None:
         "b_jackknife_max_m2": getattr(model, "b_jackknife_max_m2", None),
         "valid": getattr(model, "valid", None),
         "notes": getattr(model, "notes", None),
+        # The fourth column: whether this window could identify a wind
+        # coefficient at all, and what the extra column did to a/b. A missing
+        # term must be explainable from the dump alone.
+        "w_per_ms": getattr(model, "w_per_ms", None),
+        "w_std_err": getattr(model, "w_std_err", None),
+        "w_t_stat": getattr(model, "w_t_stat", None),
+        "wind_hours": getattr(model, "wind_hours", None),
+        "wind_valid": getattr(model, "wind_valid", None),
+        "wind_notes": getattr(model, "wind_notes", None),
+        "a_w_per_k_4col": getattr(model, "a_w_per_k_4col", None),
+        "b_m2_4col": getattr(model, "b_m2_4col", None),
     }
 
 

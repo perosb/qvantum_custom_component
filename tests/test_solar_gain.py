@@ -20,6 +20,8 @@ from custom_components.qvantum.solar_gain import (
     SolarDay,
     SolarModel,
     SolarSample,
+    DAILY_MIN_WIND_HOURS,
+    DAILY_MIN_WIND_T_STAT,
     _median,
     _ols_three,
     _recency_weights,
@@ -29,6 +31,7 @@ from custom_components.qvantum.solar_gain import (
     aggregate_days,
     build_samples,
     effective_solar_model,
+    _fit_wind_coefficient,
     fit_daily_solar_model,
     fit_solar_model,
     smooth_ghi,
@@ -865,3 +868,156 @@ def test_aggregate_days_counts_only_hours_with_a_wind_reading() -> None:
     assert day.wind_hours == 2
     assert day.sum_wind_ms_h == pytest.approx(8.0)
     assert day.sum_wind_delta_t_k_m_s == pytest.approx((6.0 + 2.0) * 16.0)
+
+
+def _wind_days(
+    n_days: int = 30,
+    *,
+    a: float = 150.0,
+    w: float = 2.5,
+    b: float = 2.0,
+    c: float = 120.0,
+    noise: float = 40.0,
+    seed: int = 7,
+    wind_of_day=None,
+):
+    """Synthetic day blocks with a known wind sensitivity.
+
+    ``wind_of_day`` defaults to a pattern deliberately out of phase with the
+    outdoor cycle, so the interaction column is not collinear with ΣΔT.
+    """
+    rng = random.Random(seed)
+    base = 1_760_000_000 - (1_760_000_000 % 86400)
+    wind_of_day = wind_of_day or (lambda index: 4.0 + 2.0 * math.cos(index / 4.0))
+    days = []
+    for index in range(n_days):
+        delta_t = 21.0 - (6.0 + 4.0 * math.sin(index / 5.0))
+        ghi = max(0.0, 120.0 + 400.0 * math.sin(index / 3.0))
+        wind = wind_of_day(index)
+        sum_dt = delta_t * 24
+        sum_ghi = ghi * 24
+        sum_wind_dt = wind * delta_t * 24
+        q_heat = (
+            a * sum_dt + w * sum_wind_dt + 24 * c - b * sum_ghi
+            + rng.uniform(-noise, noise)
+        )
+        days.append(
+            SolarDay(
+                day_ts=base + index * 86400,
+                sum_delta_t_k=sum_dt,
+                sum_ghi_wm2=sum_ghi,
+                q_heat_wh=q_heat,
+                hours=24,
+                heating_hours=24,
+                sum_wind_delta_t_k_m_s=sum_wind_dt,
+                sum_wind_ms_h=wind * 24,
+                wind_hours=24,
+            )
+        )
+    return days
+
+
+def test_wind_coefficient_is_recovered_from_the_interaction_column() -> None:
+    """A known wind sensitivity comes back, with its evidence count."""
+    model = fit_daily_solar_model(_wind_days(w=2.5))
+
+    assert model.valid
+    assert model.wind_valid
+    assert model.wind_hours == 30 * 24
+    assert model.w_per_ms == pytest.approx(2.5, abs=0.4)
+    assert model.w_t_stat is not None and model.w_t_stat >= DAILY_MIN_WIND_T_STAT
+    assert "w=" in model.wind_notes
+
+
+def test_wind_term_is_invalid_without_wind_data() -> None:
+    """No wind payload is "not measured": no coefficient, and the solar model
+    is untouched."""
+    days = _wind_days(w=2.5)
+    for day in days:
+        day_windless = SolarDay(
+            day_ts=day.day_ts,
+            sum_delta_t_k=day.sum_delta_t_k,
+            sum_ghi_wm2=day.sum_ghi_wm2,
+            q_heat_wh=day.q_heat_wh,
+            hours=day.hours,
+            heating_hours=day.heating_hours,
+        )
+        assert day_windless.wind_hours == 0
+    windless = [
+        SolarDay(
+            day_ts=day.day_ts,
+            sum_delta_t_k=day.sum_delta_t_k,
+            sum_ghi_wm2=day.sum_ghi_wm2,
+            q_heat_wh=day.q_heat_wh,
+            hours=day.hours,
+            heating_hours=day.heating_hours,
+        )
+        for day in days
+    ]
+
+    model = fit_daily_solar_model(windless)
+
+    assert model.valid
+    assert model.wind_valid is False
+    assert model.w_per_ms is None
+    assert model.wind_hours == 0
+    assert model.wind_notes == "no wind data in the window"
+
+
+def test_wind_needs_evidence_hours_not_days() -> None:
+    """A solar-valid window with sparse wind evidence still gives no term.
+
+    The three-column fit never sees wind, so the window stays valid: exactly
+    the case the gate exists for, and the one a day-count regression would
+    otherwise pass (30 days, 4 wind hours each).
+    """
+    days = [replace(day, wind_hours=4) for day in _wind_days(w=2.5)]
+    model = fit_daily_solar_model(days)
+
+    assert model.valid
+    assert model.wind_valid is False
+    assert model.w_per_ms is None
+    assert model.wind_hours == 30 * 4 < DAILY_MIN_WIND_HOURS
+    assert f"wind hours {30 * 4} < {DAILY_MIN_WIND_HOURS}" in model.wind_notes
+
+
+def test_wind_fit_is_attempted_only_where_the_balance_is_valid() -> None:
+    """Too few days: no solar model, and the dump says why there is no wind."""
+    model = fit_daily_solar_model(_wind_days(n_days=5, w=2.5))
+
+    assert model.valid is False
+    assert model.wind_valid is False
+    assert model.wind_hours == 5 * 24
+    assert "solar balance was not valid" in model.wind_notes
+
+
+def test_negative_wind_sensitivity_is_rejected() -> None:
+    """Wind cannot reduce the envelope loss; a negative w is the season."""
+    model = fit_daily_solar_model(_wind_days(w=-2.0))
+
+    assert model.wind_valid is False
+    assert model.w_per_ms is not None and model.w_per_ms < 0
+    assert "w < 0" in model.wind_notes
+
+
+def test_absurd_wind_sensitivity_is_rejected() -> None:
+    """A coefficient that would multiply the loss at 5 m/s is the fit failing.
+
+    Tested through the gate itself: with a large true ``w`` the three-column
+    balance misattributes it into ``b`` first, so the reachable path to this
+    check is a small stated loss against a large recovered coefficient.
+    """
+    _solar, wind = _fit_wind_coefficient(
+        _wind_days(a=150.0, w=15.0), a_three=50.0, b_three=2.0
+    )
+
+    assert wind["wind_valid"] is False
+    assert "W/K per m/s" in wind["wind_notes"]
+
+
+def test_wind_column_collinear_with_delta_t_is_rejected() -> None:
+    """A constant wind makes the interaction column a copy of ΣΔT."""
+    model = fit_daily_solar_model(_wind_days(w=2.5, wind_of_day=lambda _i: 4.0))
+
+    assert model.wind_valid is False
+    assert "wind fit failed" in model.wind_notes

@@ -192,7 +192,7 @@ What it contains:
 | device | manufacturer, model, firmware version (device metadata, never user data). **`model` is empty on local Modbus**: the pump reports serial and firmware only, and the model exists only for an entry that was created through the cloud |
 | plant | `sensor_mode`, `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
 | climate | the outdoor span the installation has been observed in, heating hours |
-| curve | room gain grouped as `configured` / `applied` / `fitted`, the readiness median/p95, the solar model (`a`, `b`, trust, days) |
+| curve | room gain grouped as `configured` / `applied` / `fitted`, the readiness median/p95, the solar model (`a`, `b`, trust, days) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours behind it and whether its gates let it act) |
 | fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day**), cycling, SCOP, aux share, health grade |
 | counters | curve reverts, trim updates and the number of days an actionable clamped knot or an extrapolated knot was lived with, plus the date they were reset at (*Modbus only*) |
 | verdicts | reserved for the derived analysis results (currently empty) |

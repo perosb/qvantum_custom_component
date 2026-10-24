@@ -226,6 +226,14 @@ def _solar_daily_model() -> SolarDailyModel:
         b_jackknife_max_m2=2.2,
         valid=True,
         notes="days=25 t=3.00 r2=0.920 jackknife=1.50-2.20",
+        w_per_ms=2.4,
+        w_std_err=0.5,
+        w_t_stat=4.8,
+        wind_hours=612,
+        wind_valid=True,
+        wind_notes="hours=612 w=2.40 t=4.80 jackknife=2.1-2.7",
+        a_w_per_k_4col=150.0,
+        b_m2_4col=1.85,
     )
 
 
@@ -654,6 +662,11 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["model_daily"]["n_days"] == 25
     assert curve["model_daily"]["valid"] is True
     assert curve["model_daily"]["b_jackknife_min_m2"] == 1.5
+    # The fourth column: a dump must explain a missing wind term on its own.
+    assert curve["model_daily"]["w_per_ms"] == pytest.approx(2.4)
+    assert curve["model_daily"]["wind_hours"] == 612
+    assert curve["model_daily"]["wind_valid"] is True
+    assert curve["model_daily"]["b_m2_4col"] == pytest.approx(1.85)
     assert curve["calibrated_at"] == "2026-09-25T10:00:00+00:00"
     assert curve["calibration_ok"] is False
     # The measured slope beside the applied gain: the applied one may just be

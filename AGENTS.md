@@ -424,8 +424,9 @@ two meanings out of one pool key, so a version that no release has carried has
 no rows to protect: further schema-shaped changes on `main` before the next
 release edit the current number in place and append to its comment instead of
 bumping again. Check the released `manifest.json` (or the latest tag) before
-deciding — at 2026-10-21 the newest stable release is 2026.10.11, which carries
-v6, so v7 is unreleased and folds further changes.
+deciding — 2026.10.13 is the newest stable release, it carries **v7**, so v8 is
+the first number that needs a row of its own (and v8 therefore may not fold
+further changes once it ships; before that, edit it in place as usual).
 
 ## Derived metrics — power, COP, DHW
 
@@ -640,16 +641,40 @@ v6, so v7 is unreleased and folds further changes.
   within the hour when it cannot fetch its inputs (`CALIBRATION_RETRY_HOURS`) and
   waits `CALIBRATION_REFRESH_HOURS` after a completed attempt; the flag is
   persisted and exposed as `calibration_ok`.
-- Wind is fetched but **not used**: `open_meteo.forecast_url`/`history_url`
-  request `wind_speed_10m` with `wind_speed_unit=ms` (the API default is km/h,
-  and a silent unit mismatch would read as a calibration result), `HourlyWeather
-  .wind_ms` is `None` for an hour without a reading (never 0.0 — "not measured"
-  is not "calm"), and `SolarDay` carries `sum_wind_delta_t_k_m_s`/`sum_wind_ms_h`
+- Wind is **identified but not applied** (#427). `open_meteo` requests
+  `wind_speed_10m` with `wind_speed_unit=ms` (the API default is km/h, and a
+  silent unit mismatch would read as a calibration result), `HourlyWeather.wind_ms`
+  is `None` for an hour without a reading (never 0.0 — "not measured" is not
+  "calm"), and `SolarDay` carries `sum_wind_delta_t_k_m_s`/`sum_wind_ms_h`
   /`wind_hours`. `aggregate_days(wind_by_hour=None)` keeps its old behaviour, so
-  the efficiency coordinator and any other caller that does not pass wind is
-  unaffected. No term, option or sensor exists until a coefficient is identified
-  per installation; `diagnostics.curve` reports `forecast_wind_ms` and
-  `forecast_wind_available` so the site proxy is judgeable.
+  any caller that does not pass wind is unaffected. `diagnostics.curve` reports
+  `forecast_wind_ms`/`forecast_wind_available` (the site proxy) and, in
+  `model_daily`, the wind column's state.
+- The coefficient comes from a **fourth column** of the same day balance:
+  `Q = a·ΣΔT + w·Σ(v·ΔT) + 24c − b·ΣGHI`. Wind multiplies the envelope loss, so
+  the interaction form is the physical one; a plain `+ w·Σv` offset is not
+  fitted. `_fit_wind_coefficient` runs **only where the three-column balance is
+  already valid**, and `wind_valid` is False whenever a gate fails — the term is
+  then not applied at all, exactly like an invalid aperture. Gates: at least
+  `DAILY_MIN_WIND_HOURS` (200) hours with a wind reading in the usable days —
+  evidence hours, never a day count, because a mild window can hold hundreds of
+  hours and still identify nothing; `t_w ≥ DAILY_MIN_WIND_T_STAT` (2.5);
+  `w ≥ 0`; `w ≤ a / DAILY_WIND_REFERENCE_MS` at `DAILY_MAX_WIND_FRACTION`
+  (wind may at most double the loss at 5 m/s); the four-column aperture must stay
+  inside the three-column jackknife band (otherwise the column is absorbing the
+  solar signal); and no single day may carry `w` (wind jackknife). Measured on a
+  live install, 30 winter days carry ~3× the power of 60 shoulder-season days,
+  which is why the gate is evidence-shaped — see
+  `~/.pi/agent/plans/qvantum-wind-term.md`.
+- Wind is a **site proxy**: Open-Meteo returns 10 m wind on a grid cell, and
+  shelter from trees, neighbours and terrain is invisible in the payload. The
+  coefficient is therefore identified per installation and is biased low where
+  the grid over-reports; "no term" is the expected answer for a sheltered site.
+- `SolarDailyModel` reports `w_per_ms`/`w_std_err`/`w_t_stat`/`wind_hours`
+  /`wind_valid`/`wind_notes` and the four-column `a_w_per_k_4col`/`b_m2_4col`,
+  all in `diagnostics.curve.model_daily`. `SUMMARY_SCHEMA_VERSION` is **8**: the
+  four wind fields are new, and a schema without them cannot express "this
+  installation has no identifiable wind term".
 - A failed **forecast** refetch keeps the previous payload while it still covers
   the current hour and is under `FORECAST_REUSE_HOURS` old (both coordinators,
   `WeatherForecast.covers`): Open-Meteo 503s sporadically well inside its quota,
