@@ -1009,9 +1009,13 @@
         }
       }
     },
-    "tap_water_capacity_mismatch": {
+    "tap_water_capacity_unmapped": {
       "title": "Varmvattenkapaciteten är okänd",
-      "description": "Pumpen har {start} / {stop} °C som start/stopp för varmvatten. Det paret finns inte i kapacitetstabellen den här integrationen känner till: tabellen är från före en firmwareändring som lade nivåerna ungefär 1 °C isär, så nivån går inte att namnge och kapacitetssiffran visar ”okänd” i stället för en gissning. Start- och stopptemperaturen är sanningen och går fortfarande att ändra. Nivån som appen/molnet rapporterar är {reported}."
+      "description": "Pumpen har {start} / {stop} °C som start/stopp för varmvatten. Det paret finns inte i kapacitetstabellen den här integrationen känner till: tabellen är från före en firmwareändring som lade nivåerna ungefär 1 °C isär, så nivån går inte att namnge och kapacitetssiffran visar ”okänd” i stället för en gissning. Start- och stopptemperaturen är sanningen och går fortfarande att ändra."
+    },
+    "tap_water_capacity_level_conflict": {
+      "title": "Appen rapporterar en nivå som inte stämmer med temperaturerna",
+      "description": "Pumpen har {start} / {stop} °C som start/stopp för varmvatten, vilket är kapacitetsnivå {pair_level} i den här integrationens tabell — men appen/molnet rapporterar nivå {reported}. Det är temperaturerna som värmer tanken och som kapacitetssiffran följer; nivåetiketten är den som är inaktuell."
     }
   }
 }

@@ -1009,9 +1009,13 @@
         }
       }
     },
-    "tap_water_capacity_mismatch": {
+    "tap_water_capacity_unmapped": {
       "title": "Käyttöveden kapasiteetti on tuntematon",
-      "description": "Pumppu pitää {start} / {stop} °C käyttöveden aloitus/lopetuslämpötilana. Pari ei ole tämän integraation kapasiteettitaulukossa: taulukko on firmware-muutosta edeltävältä ajalta, jossa tasot ovat noin 1 °C:n välein, joten tasoa ei voi nimetä ja kapasiteettiluku näyttää ”tuntematon” arvauksen sijaan. Aloitus- ja lopetuslämpötilat ovat totuus ja pysyvät muokattavina. Sovelluksen/pilven ilmoittama taso on {reported}."
+      "description": "Pumppu pitää {start} / {stop} °C käyttöveden aloitus/lopetuslämpötilana. Pari ei ole tämän integraation kapasiteettitaulukossa: taulukko on firmware-muutosta edeltävältä ajalta, jossa tasot ovat noin 1 °C:n välein, joten tasoa ei voi nimetä ja kapasiteettiluku näyttää ”tuntematon” arvauksen sijaan. Aloitus- ja lopetuslämpötilat ovat totuus ja pysyvät muokattavina."
+    },
+    "tap_water_capacity_level_conflict": {
+      "title": "Sovellus ilmoittaa tason, joka ei vastaa lämpötiloja",
+      "description": "Pumppu pitää {start} / {stop} °C käyttöveden aloitus/lopetuslämpötilana, mikä on tämän integraation taulukossa kapasiteettitaso {pair_level} — mutta sovellus/pilvi ilmoittaa tason {reported}. Lämpötilat lämmittävät varaajan ja niitä kapasiteettiluku seuraa; tason nimike on vanhentunut."
     }
   }
 }
