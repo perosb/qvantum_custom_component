@@ -383,9 +383,14 @@ the state and never in the issue text.
 
 **The table is firmware-specific and must not be "fixed" by guessing.** It has
 been unchanged since #270 and predates Qvantum's change, which is the firmware in
-the field — not only newer pumps: the levels now sit about 1 °C apart (a
-reporting QE4 shows **55/65 = level 5**, and its app no longer writes 55/71), so
-no current pump is expected to match the table. Keep the pair as the truth and the level `unknown`;
+the field — not only newer pumps, and Qvantum installs that firmware
+**automatically and mandatorily**, so no pump stays behind: the levels now sit
+about 1 °C apart (a reporting QE4 shows **55/65 = level 5**, and its app no
+longer writes 55/71), so no current pump is expected to match the table. The old
+table is therefore on a countdown, and the pair is the only stable control
+surface: one current-firmware pump's seven `(level, start, stop)` readings map the
+fleet, so the mapping is learnable — it is the *level write path* (a level
+resolved through the stale table) that is the remaining hazard, not the label. Keep the pair as the truth and the level `unknown`;
 re-pointing the table silently retargets every level write for every user, so it
 waits for evidence — a per-firmware mapping accumulated from cloud rows (level
 and pair arrive together there; Modbus has no level) or a published table. Note
