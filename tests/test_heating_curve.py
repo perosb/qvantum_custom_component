@@ -16,6 +16,7 @@ from custom_components.qvantum.heating_curve import (
     MIN_SUPPLY_C,
     NIGHT_DAY_MAX_C,
     OUTDOOR_MAX_C,
+    REACH_MARGIN_KNOTS,
     PRECHARGE_MAX_C,
     ROOM_GAIN_MAX_C,
     ROOM_GAIN_MIN_SAMPLES,
@@ -27,8 +28,10 @@ from custom_components.qvantum.heating_curve import (
     CurveResult,
     DayPhase,
     PumpRoomReading,
+    CURVE_KEYS,
     compute_curve,
     cop_feedback_adjustment_c,
+    points_in_reach,
     corrected_baseline,
     curve_slope,
     diurnal_swing_c,
@@ -1340,3 +1343,65 @@ def test_compute_curve_applies_solar_only_when_enabled() -> None:
     off = compute_curve(**kwargs, solar_enabled=False)
     assert off.solar_c == 0.0
     assert off.adjustment_c > on.adjustment_c
+
+
+class TestPointsInReach:
+    """Which knots the write path may skip: the reach of the forecast."""
+
+    def test_no_forecast_and_no_outdoor_writes_everything(self):
+        assert points_in_reach({}) == CURVE_KEYS
+        assert points_in_reach({0: None, 3600: "x"}, outdoor_c=None) == CURVE_KEYS
+
+    def test_a_mild_forecast_leaves_the_cold_end_alone(self):
+        # 3.4 … 14.1 °C uses the 10→20, 10→0 and 0→−10 segments; −20 and −30
+        # cannot be reached before the next refetch.
+        assert points_in_reach({0: 3.4, 3600: 14.1}) == (
+            "curve_20",
+            "curve_10",
+            "curve_0",
+            "curve_minus_10",
+        )
+
+    def test_the_measured_temperature_is_part_of_the_reach(self):
+        # A forecast that is warm but a measured outdoor of 9.3 °C.
+        assert points_in_reach({0: 12.0}, outdoor_c=9.3) == (
+            "curve_20",
+            "curve_10",
+            "curve_0",
+            "curve_minus_10",
+        )
+
+    def test_a_temperature_on_a_knot_uses_the_segment_above_it(self):
+        # Exactly 10 °C sits on the knot, and the 10→20 segment is in play for
+        # anything warmer, so +20 must stay in reach. A missing forecast is a
+        # bracket around the measured reading, never all seven knots.
+        assert points_in_reach({}, outdoor_c=10.0) == (
+            "curve_20",
+            "curve_10",
+            "curve_0",
+            "curve_minus_10",
+        )
+
+    def test_one_knot_of_margin_absorbs_a_cold_forecast_error(self):
+        # Forecast bottom 3.4 °C: one knot below that (0) is the last reachable
+        # segment's warm end, and the margin keeps −10 so a 10 K colder hour
+        # still finds both endpoints written.
+        reach = points_in_reach({0: 3.4})
+        assert reach[-1] == "curve_minus_10"
+        assert REACH_MARGIN_KNOTS == 1
+
+    def test_a_cold_forecast_reaches_the_cold_end(self):
+        reach = points_in_reach({0: -25.0})
+        assert reach == ("curve_minus_20", "curve_minus_30")
+
+    def test_no_margin_on_the_warm_side(self):
+        # A warm overshoot only moves the pump onto a flatter, floored part of
+        # the curve, so the warmest knot is not kept for it.
+        assert points_in_reach({0: 18.0}, outdoor_c=19.0) == (
+            "curve_20",
+            "curve_10",
+            "curve_0",
+        )
+
+    def test_fewer_margins_shrink_the_scope(self):
+        assert points_in_reach({0: 3.4}, margin_knots=0)[-1] == "curve_0"

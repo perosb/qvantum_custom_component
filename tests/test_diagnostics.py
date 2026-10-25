@@ -192,6 +192,7 @@ def _curve_coordinator() -> SimpleNamespace:
         _last_trim_ts=1758794400.0,
         _indoor_margins=[(1758794400.0, 0.5)],
         _main_values=lambda: {"heating_power_mean_w": 1450.0},
+        _write_scope=("curve_10", "curve_0"),
     )
 
 
@@ -693,6 +694,7 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     # of a single sample would be the aliasing this replaced.
     assert curve["load_power_mean_w"] == 1450.0
     assert curve["load_power_coverage_hours"] is None
+    assert curve["write_scope"] == ["curve_10", "curve_0"]
     json.dumps(result)
 
 
@@ -726,4 +728,5 @@ async def test_curve_diagnostics_tolerates_malformed_state(hass):
     assert curve_result["indoor_margins"] == []
     assert curve_result["load_power_mean_w"] is None
     assert curve_result["load_power_coverage_hours"] is None
+    assert curve_result["write_scope"] == []
     json.dumps(result)

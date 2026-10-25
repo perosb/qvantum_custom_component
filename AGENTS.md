@@ -834,6 +834,30 @@ further changes once it ships; before that, edit it in place as usual).
   `compute_curve` therefore projects the final table onto the non-decreasing shape
   (raising the warmer knot) instead of letting the write guard revert the whole
   curve; the guard's message says "limits or shape" because it cannot tell which.
+- **Writes are masked and hysteretic**, not "whatever changed":
+  `points_in_reach` (in `heating_curve.py`) keeps only the knots the forecast
+  can reach — the pair bracketing the coldest and warmest usable hour, plus
+  `REACH_MARGIN_KNOTS` (1) **below the coldest hour only**, so a forecast 10 K
+  too warm still finds every reachable segment with both endpoints written; a
+  warm overshoot only moves the pump onto a flatter, floored part of the curve.
+  The scope needs a reading, not a forecast: without one it follows the measured
+  `bt1` alone (a bracket, not all seven), and only when neither is usable are
+  all seven written — a missing forecast must not silently widen the scope.
+  A knot outside the scope keeps the value the pump already holds, so a point
+  sensor may show the ideal while the pump holds an older integer — that is why
+  `diagnostics.curve.write_scope` lists the knots of the last active cycle.
+  Inside the scope a knot is rewritten only when the continuous point is
+  `MIN_WRITE_DELTA_C` (0.75 K) from the pump's value: plain rounding already
+  rewrites at 0.5 K, so a knot whose baseline+trim ends near .5 (or a shared
+  adjustment near zero) flipped every cycle — measured on a live install, the
+  +10 knot changed 32 times in two days. The extra quarter degree is the dead
+  band; the error against the ideal stays under it on top of the register's own
+  1 °C grid. The table is then projected onto the non-decreasing shape and
+  validated as what the pump will **end up** with (holding a stale knot can
+  invert it: +30 = 21 beside +20 = 20), not as the computed one. A knot the
+  projection raises is written even outside the scope, and so is one left
+  outside the pump's own limits when they move (a lowered
+  `max_heating_supply` must not revert the curve) or one that is unreadable.
 - When the pump stops following our table (the app or a cloud profile moved the
   curve type), the coordinator drops to shadow, clears the trims, logs a warning
   and opens **`curve_left_user_defined`**, deleted again as soon as we are
