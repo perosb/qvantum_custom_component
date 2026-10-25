@@ -113,8 +113,11 @@ cloud-only / Modbus-only ones through coordinator helpers
 
 ## Git
 
-**Never push to `main`** (no force). Land only via PR; squash-merge only when
-asked. `main` takes squash merges only and requires **every review thread
+**Never push to `main`** (no force). Land only via PR and squash-merge it **once
+CI is green** — the standing instruction is to merge then, without asking first,
+unless a request says otherwise ("do not merge", "leave it open for review",
+"stack it"). Waiting for CI is the only gate; a red or pending check is never
+merged. `main` takes squash merges only and requires **every review thread
 resolved**: after pushing a fix, reply in the thread and resolve it, or
 `mergeStateStatus` stays `BLOCKED` with green CI. Every push re-runs the `review`
 workflow, so batch documentation with the code change.
@@ -126,7 +129,7 @@ workflow, so batch documentation with the code change.
 5. Keep the PR `## Summary` current as the diff evolves — it feeds the
    per-release changelog.
 
-Do not ask permission for these steps. Do not merge unless asked.
+Do not ask permission for these steps, and merge on green (see above).
 
 **One concern per PR.** A follow-up — even in a file an open PR touches — gets
 its own branch from the latest `main`, never an append to that PR's branch.
