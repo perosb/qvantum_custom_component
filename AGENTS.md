@@ -840,7 +840,9 @@ further changes once it ships; before that, edit it in place as usual).
   `REACH_MARGIN_KNOTS` (1) **below the coldest hour only**, so a forecast 10 K
   too warm still finds every reachable segment with both endpoints written; a
   warm overshoot only moves the pump onto a flatter, floored part of the curve.
-  No forecast (or no usable hour and no measured outdoor) returns all seven.
+  The scope needs a reading, not a forecast: without one it follows the measured
+  `bt1` alone (a bracket, not all seven), and only when neither is usable are
+  all seven written — a missing forecast must not silently widen the scope.
   A knot outside the scope keeps the value the pump already holds, so a point
   sensor may show the ideal while the pump holds an older integer — that is why
   `diagnostics.curve.write_scope` lists the knots of the last active cycle.

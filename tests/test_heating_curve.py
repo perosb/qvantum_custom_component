@@ -1373,8 +1373,14 @@ class TestPointsInReach:
 
     def test_a_temperature_on_a_knot_uses_the_segment_above_it(self):
         # Exactly 10 °C sits on the knot, and the 10→20 segment is in play for
-        # anything warmer, so +20 must stay in reach.
-        assert "curve_20" in points_in_reach({}, outdoor_c=10.0)
+        # anything warmer, so +20 must stay in reach. A missing forecast is a
+        # bracket around the measured reading, never all seven knots.
+        assert points_in_reach({}, outdoor_c=10.0) == (
+            "curve_20",
+            "curve_10",
+            "curve_0",
+            "curve_minus_10",
+        )
 
     def test_one_knot_of_margin_absorbs_a_cold_forecast_error(self):
         # Forecast bottom 3.4 °C: one knot below that (0) is the last reachable

@@ -321,9 +321,11 @@ def points_in_reach(
 
     ``margin_knots`` keeps that many knots beyond the coldest forecast hour, so
     a forecast that is too warm still leaves the reachable segments covered.
-    Without a forecast — or without a single usable hour and no measured
-    outdoor temperature — every knot is returned: nothing is known, so nothing
-    may be skipped.
+
+    A reading is enough, a forecast is not required: without one the scope
+    follows ``outdoor_c`` alone, so it is the bracket around that temperature.
+    Only when neither the forecast nor ``outdoor_c`` is usable is every knot
+    returned — nothing is known then, so nothing may be skipped.
     """
     reachable: list[float] = []
     candidates: list[object] = [outdoor_c, *forecast_temperature.values()]

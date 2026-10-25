@@ -483,9 +483,12 @@ the registers hold whole degrees:
   forecast hour — a forecast 10 K too warm still leaves every reachable segment
   with both endpoints written. There is no margin on the warm side: a warm
   overshoot only moves the pump onto a flatter, lower part of the curve that the
-  supply floor already covers. A missing forecast means every knot is in scope.
-  A sensor can therefore show the ideal value for a knot the pump holds older —
-  `write_scope` in the diagnostics lists the knots of the last active cycle.
+  supply floor already covers. The scope needs a reading, not a forecast: with
+  no forecast it follows the measured outdoor temperature alone (a bracket
+  around that reading), and only when neither exists are all seven knots in
+  scope. A sensor can therefore show the ideal value for a knot the pump holds
+  older — `write_scope` in the diagnostics lists the knots of the last active
+  cycle.
 - **A dead band per knot.** A knot is rewritten only when the computed value is
   0.75 °C away from the integer on the pump. Plain rounding rewrites at 0.5 °C,
   and a knot whose baseline plus trim ends near .5 — or a shared adjustment
