@@ -6,6 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
+| [2026.10.19](2026.10.19.md) | 2026-10-25 | Clearer capacity guidance |
 | [2026.10.18](2026.10.18.md) | 2026-10-25 | Wind data and reliable estimates |
 | [2026.10.13](2026.10.13.md) | 2026-10-24 | Missing room sensors no longer distort heat-pump readings |
 | [2026.10.12](2026.10.12.md) | 2026-10-23 | More reliable and protected summaries |
