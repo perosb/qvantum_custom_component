@@ -436,10 +436,10 @@
         "name": "Limite supérieure ballon eau chaude"
       },
       "tap_water_cap": {
-        "name": "Capacité eau chaude"
+        "name": "Douches restantes"
       },
       "tap_water_minutes": {
-        "name": "Eau chaude restante"
+        "name": "Minutes de douche restantes"
       },
       "additionalenergy": {
         "name": "Énergie d'appoint"

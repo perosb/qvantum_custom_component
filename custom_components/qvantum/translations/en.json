@@ -436,10 +436,10 @@
         "name": "Hot water tank upper limit"
       },
       "tap_water_cap": {
-        "name": "Hot water capacity"
+        "name": "Showers remaining"
       },
       "tap_water_minutes": {
-        "name": "Hot water remaining"
+        "name": "Remaining shower minutes"
       },
       "additionalenergy": {
         "name": "Additional energy"

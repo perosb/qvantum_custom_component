@@ -436,10 +436,10 @@
         "name": "Käyttövesivaraajan yläraja"
       },
       "tap_water_cap": {
-        "name": "Käyttövesikapasiteetti"
+        "name": "Suihkuja jäljellä"
       },
       "tap_water_minutes": {
-        "name": "Käyttövettä jäljellä"
+        "name": "Jäljellä olevat suihkuminuutit"
       },
       "additionalenergy": {
         "name": "Lisäenergia"

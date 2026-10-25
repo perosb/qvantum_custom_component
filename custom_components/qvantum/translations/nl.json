@@ -436,10 +436,10 @@
         "name": "Warmwater tank bovenste limiet"
       },
       "tap_water_cap": {
-        "name": "Warmwater capaciteit"
+        "name": "Resterende douches"
       },
       "tap_water_minutes": {
-        "name": "Warmwater resterend"
+        "name": "Resterende doucheminuten"
       },
       "additionalenergy": {
         "name": "Extra energie"

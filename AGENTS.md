@@ -463,6 +463,14 @@ further changes once it ships; before that, edit it in place as usual).
 
 ## Derived metrics — power, COP, DHW
 
+- The two DHW-comfort sensors are **estimates from a tank model**, and their
+  names say what they are: `tap_water_minutes` → "Remaining shower minutes" is
+  `(V/flow)·ln((tank − cold)/(38 − cold))`, the time until the tap falls to the
+  38 °C shower temperature at the EMA of the observed shower flow, and
+  `tap_water_cap` → "Showers remaining" is those minutes divided by the EMA
+  shower duration. Neither is a volume, an energy or the capacity *level*
+  (`tap_water_capacity_target`, which is the app's 1–7). The flow and duration
+  only update while water runs, so the figures hold their last shower's values.
 - `heatingenergy` is space-heating output, but `dhwenergy` meters the DHW
   **draw** (secondary side), not the compressor's DHW output. There is no
   short-window system COP.
