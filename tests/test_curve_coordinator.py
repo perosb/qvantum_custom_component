@@ -3557,6 +3557,30 @@ async def test_calibrate_fits_and_persists_the_daily_model() -> None:
     assert coordinator._store.saved["daily_model"]["n_days"] == daily.n_days
 
 
+async def test_recalibrate_bypasses_the_daily_throttle() -> None:
+    """The service exists for the case where waiting a day is the wrong answer.
+
+    A sensor change or a fixed data gap leaves the figures stale *now*; the
+    throttle bounds archive fetches, so a manual attempt must ignore it.
+    """
+    coordinator = make_coordinator(store=FakeStore())
+    coordinator._last_calibration_ts = time.time()  # an attempt a moment ago
+    coordinator._last_calibration_ok = True
+    assert coordinator._calibration_due(time.time()) is False
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._daily_model = make_daily_model(
+        wind_hours=264, wind_cold_hours=37, wind_valid=False, wind_notes="too few"
+    )
+
+    result = await coordinator.async_recalibrate()
+
+    coordinator._async_calibrate.assert_awaited_once()
+    assert result["calibration_ok"] is True
+    assert result["wind_hours"] == 264
+    assert result["wind_valid"] is False
+    assert result["wind_notes"] == "too few"
+
+
 async def test_the_wind_column_round_trips_with_the_daily_model() -> None:
     """A restart must not blank the wind column until the next calibration.
 

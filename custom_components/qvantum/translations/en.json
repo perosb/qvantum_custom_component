@@ -972,6 +972,10 @@
     "telemetry_delete": {
       "name": "Delete uploaded summaries",
       "description": "Erases every uploaded summary row for this installation using its local token. Sharing stops only when it is also turned off in the settings."
+    },
+    "recalibrate": {
+      "name": "Recalibrate",
+      "description": "Re-run the day-block calibration now instead of waiting for the next daily attempt. Identifies the solar aperture and the wind column from your history; writes nothing to the heat pump."
     }
   },
   "issues": {

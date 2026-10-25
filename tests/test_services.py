@@ -87,6 +87,7 @@ class TestQvantumServices:
             "telemetry_upload",
             "telemetry_delete",
             "export_summary",
+            "recalibrate",
         }
 
         # Check first call (extra_hot_water)
@@ -184,9 +185,9 @@ class TestQvantumServices:
         mock_hass.config_entries.async_entries.return_value = []
 
         await async_setup_services(mock_hass)
-        service_func = mock_hass.services.async_register.call_args_list[3][1][
-            "service_func"
-        ]
+        # Look the handler up by name: a positional index breaks every time a
+        # service is added before this one.
+        service_func = _service_func(mock_hass, "export_summary")
         service_call = MagicMock()
         service_call.hass = mock_hass
 
@@ -758,3 +759,59 @@ class TestTelemetryServices:
 
         assert upload["qvantum"]["exception"] == "unknown_error"
         assert delete["qvantum"]["exception"] == "unknown_error"
+
+
+def _service_func(hass, name: str):
+    """The handler registered under ``name`` (order-independent)."""
+    return next(
+        call.kwargs["service_func"]
+        for call in hass.services.async_register.call_args_list
+        if call.kwargs.get("service") == name
+    )
+
+
+class TestRecalibrateService:
+    """Forcing a calibration attempt instead of waiting for the daily cycle."""
+
+    @pytest.mark.asyncio
+    async def test_returns_what_the_attempt_produced(self, mock_hass):
+        from custom_components.qvantum.services import async_setup_services
+
+        curve = MagicMock()
+        curve.async_recalibrate = AsyncMock(
+            return_value={
+                "calibration_ok": True,
+                "daily_model_valid": False,
+                "daily_model_days": 11,
+                "wind_valid": False,
+                "wind_hours": 264,
+                "wind_notes": "cold+windy hours 37 < 200",
+            }
+        )
+        entry = MagicMock()
+        entry.runtime_data.curve_coordinator = curve
+        mock_hass.config_entries.async_entries.return_value = [entry]
+
+        await async_setup_services(mock_hass)
+        service_call = MagicMock()
+        service_call.hass = mock_hass
+
+        result = await _service_func(mock_hass, "recalibrate")(service_call)
+
+        curve.async_recalibrate.assert_awaited_once_with()
+        assert result["qvantum"]["wind_hours"] == 264
+        assert result["qvantum"]["calibration_ok"] is True
+
+    @pytest.mark.asyncio
+    async def test_without_a_curve_coordinator_it_reports_an_error(self, mock_hass):
+        from custom_components.qvantum.services import async_setup_services
+
+        mock_hass.config_entries.async_entries.return_value = []
+        await async_setup_services(mock_hass)
+        service_call = MagicMock()
+        service_call.hass = mock_hass
+
+        result = await _service_func(mock_hass, "recalibrate")(service_call)
+
+        assert result["qvantum"]["exception"] == "unknown_error"
+        assert "Modbus" in result["qvantum"]["details"]

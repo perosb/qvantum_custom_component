@@ -972,6 +972,10 @@
     "telemetry_delete": {
       "name": "Poista lähetetyt yhteenvedot",
       "description": "Poistaa tämän asennuksen kaikki lähetetyt rivit sen paikallisella tunnisteella. Jakaminen loppuu vasta, kun se kytketään pois myös asetuksissa."
+    },
+    "recalibrate": {
+      "name": "Kalibroi uudelleen",
+      "description": "Aja päiväkalibrointi nyt uudelleen sen sijaan, että odottaisit seuraavaa päivittäistä yritystä. Tunnistaa aurinkotuoton ja tuulisarakkeen historiasta; ei kirjoita mitään lämpöpumppuun."
     }
   },
   "issues": {

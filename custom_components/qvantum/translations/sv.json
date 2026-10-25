@@ -972,6 +972,10 @@
     "telemetry_delete": {
       "name": "Radera uppladdade sammanfattningar",
       "description": "Raderar alla uppladdade rader för den här anläggningen med dess lokala token. Delningen upphör först när den också stängs av i inställningarna."
+    },
+    "recalibrate": {
+      "name": "Kalibrera om",
+      "description": "Kör om dygnskalibreringen nu i stället för att vänta på nästa dygnsförsök. Identifierar solinstrålningen och vindkolumnen från din historik; skriver inget till värmepumpen."
     }
   },
   "issues": {

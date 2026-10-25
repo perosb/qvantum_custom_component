@@ -67,6 +67,14 @@ set_curve_terms:
       selector:
         boolean:
 
+recalibrate:
+  name: recalibrate
+  description: >-
+    Re-run the day-block calibration now instead of waiting for the next
+    attempt (at most once a day). Identifies the solar aperture and the wind
+    column from the recorder history and Open-Meteo; it writes nothing to the
+    heat pump. Modbus only.
+
 export_summary:
   name: export_summary
   description: >-

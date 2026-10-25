@@ -972,6 +972,10 @@
     "telemetry_delete": {
       "name": "Borrar resúmenes subidos",
       "description": "Borra todas las filas subidas de esta instalación usando su token local. El envío solo cesa cuando también se desactiva en los ajustes."
+    },
+    "recalibrate": {
+      "name": "Recalibrar",
+      "description": "Volver a ejecutar la calibración diaria ahora en lugar de esperar al siguiente intento. Identifica la ganancia solar y la columna de viento desde el historial; no escribe nada en la bomba."
     }
   },
   "issues": {
