@@ -299,20 +299,25 @@ def test_adaptive_curve_entity_names_share_one_prefix_per_locale():
     failures: list[str] = []
     for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
-        sensors = data.get("entity", {}).get("sensor", {})
         prefixes: dict[str, set[str]] = {}
-        for key, value in sensors.items():
-            # The seven point sensors carry an index in their prefix
-            # ("… curve 1"), so only the feature-level ones are comparable.
-            if not key.startswith("adaptive_curve_"):
+        # Every platform: the family spans sensors, the control switch and, in
+        # some locales, select/number entities. A guard that only reads
+        # entity.sensor cannot see the switch drift away from the rest.
+        for platform, entries in data.get("entity", {}).items():
+            if not isinstance(entries, dict):
                 continue
-            if re.search(r"adaptive_curve_(minus_)?\d+", key):
-                continue
-            name = value.get("name") if isinstance(value, dict) else None
-            if not isinstance(name, str):
-                continue
-            prefix = separator.split(name, maxsplit=1)[0]
-            prefixes.setdefault(prefix, set()).add(key)
+            for key, value in entries.items():
+                if not key.startswith("adaptive_curve_"):
+                    continue
+                # The seven point sensors carry an index in their prefix
+                # ("… curve 1"), so only the feature-level ones are comparable.
+                if re.search(r"adaptive_curve_(minus_)?\d+", key):
+                    continue
+                name = value.get("name") if isinstance(value, dict) else None
+                if not isinstance(name, str):
+                    continue
+                prefix = separator.split(name, maxsplit=1)[0]
+                prefixes.setdefault(prefix, set()).add(f"{platform}.{key}")
         if len(prefixes) > 1:
             failures.append(f"{path.name}: {dict(prefixes)}")
     assert not failures, "inconsistent adaptive-curve prefixes: " + "; ".join(failures)
