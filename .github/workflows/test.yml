@@ -13,6 +13,32 @@ on:
     types: [published]
 
 jobs:
+  changes:
+    # A docs-only change cannot break the integration, so the test matrix is
+    # skipped for it: a prose fix should not wait for a two-minute install and
+    # suite. `code` is true for any non-documentation file, and always true when
+    # there is no PR to diff against (a push to main, a release).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
+            | grep -Ev '^(docs/|LICENSE$|[^/]+\.md$)' | grep -q .; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   docs:
     # Behaviour changes must carry their prose. The rule is deliberately coarse
     # (any documentation move satisfies it) because the judgement belongs to the
@@ -35,6 +61,11 @@ jobs:
             --base "$BASE_SHA" --head "$HEAD_SHA" --labels-json "$PR_LABELS"
 
   test:
+    needs: changes
+    # Skipped only when every changed file is prose (docs/, *.md at the repo
+    # root, LICENSE) — see the `changes` job. A skipped job is not a failure;
+    # the ruleset requires no specific check.
+    if: needs.changes.result != 'success' || needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -76,6 +107,8 @@ jobs:
         with:
           category: "integration"
   dependabot:
+    # `test` may be skipped (docs-only PR), which is why the condition below
+    # does not require it to have run.
     needs: [test, validate]
     runs-on: ubuntu-latest
     permissions:
