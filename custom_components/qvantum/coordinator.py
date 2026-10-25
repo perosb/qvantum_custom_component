@@ -1205,25 +1205,27 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # so the entity is created and can report `unknown` instead of vanishing.
         if reported is None:
             values["tap_water_capacity_target"] = capacity
-        nearest = nearest_tap_water_capacity_level(tap_stop)
+        # Only a numeric pair can be judged against the table at all; the level
+        # the old table would name is *not* part of the mismatch any more — the
+        # table predates the firmware change, so a level number would point at
+        # one the pump no longer uses.
+        pair_is_numeric = nearest_tap_water_capacity_level(tap_stop) is not None
 
         mismatch = None
         pair_known = tap_start is not None and tap_stop is not None
-        if capacity is None and pair_known and nearest is not None:
+        if capacity is None and pair_known and pair_is_numeric:
             # A pair that is not a number is not a level either, but nothing can
             # be said about which one it is close to — no issue for that.
             mismatch = {
                 "start": tap_start,
                 "stop": tap_stop,
                 "reported": reported,
-                "nearest": nearest,
             }
         elif capacity is not None and reported is not None and reported != capacity:
             mismatch = {
                 "start": tap_start,
                 "stop": tap_stop,
                 "reported": reported,
-                "nearest": capacity,
             }
         self._tap_water_capacity_mismatch = mismatch
 
