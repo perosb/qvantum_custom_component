@@ -63,6 +63,18 @@ class TestRegisterMapAlignment:
         assert field.signed is False
         assert "bt2_detected" in REQUIRED_MODBUS_METRICS
 
+    def test_gp2_speed_is_reported_in_tenths_of_a_percent(self):
+        """GP2 (input 29) is tenths, despite the datasheet's whole percent.
+
+        The app and the register were read side by side mid-draw on a QE-6
+        (2026-10-25): 5-8 % in the app was 29-85 in the register. Whole
+        percent would have the pump reporting up to 480 %.
+        """
+        assert MODBUS_INPUT_REGISTER_MAP["gp2_speed"] == (29, "uint16", 0.1)
+        field = QvantumInputs.declared_fields["gp2_speed"]
+        assert field.scale == 0.1
+        assert field.signed is False
+
     def test_relay_bits_use_bitmask_register(self):
         bitmask_address = MODBUS_INPUT_REGISTER_MAP["relays_bitmask"][0]
         for name, index in RELAY_BIT_MAP.items():
@@ -170,10 +182,14 @@ class TestComponentDecode:
         unit.input[93] = 420  # compressor_power
         unit.input[95] = 4
         unit.input[96] = 8010  # compressor_kwh scale 0.1
+        unit.input[28] = 700  # gp1 70.0 %
+        unit.input[29] = 480  # gp2 48.0 %, tenths despite the datasheet
 
         await device.async_update_inputs()
         values = component_values(device.inputs)
 
+        assert values["gp1_speed"] == 70.0
+        assert values["gp2_speed"] == 48.0
         assert values["bt1"] == 21.5
         assert values["bt2"] == -4.0
         assert values["picpin_relay_heat_l1"] == 1

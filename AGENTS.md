@@ -88,6 +88,15 @@ cloud-only / Modbus-only ones through coordinator helpers
   the datasheet MIN/MAX (`MODBUS_HOLDING_RANGE`, `client/modbus/model.py`)
   before encoding. Never invent registers or ranges — `client/modbus/maps.py` is
   the datasheet.
+- The datasheet is followed **until a measurement contradicts it**, and then the
+  measurement wins with its numbers in the map. Input 29 (`gp2_speed`, the DHW
+  pump, which on this FLVP product line pumps tank water through the through-flow
+  DHW exchanger **only while hot water is drawn** — the tank is charged directly
+  by the compressor) is listed at scale 1, whole percent. A QE-6 on fw 1.11.10
+  read 29-85 in the register while the Qvantum app showed 5-8 % mid-draw
+  (2026-10-25) and 0-480 across a week, which no percentage can, so the map
+  scales it 0.1 like GP1 (input 28, whose 700 matches its 70 % setting). A
+  sensor that reports >100 % is the signal that a scale row is wrong.
 - Exceptions: `AuthError`, `TransportError`, `RateLimitError` (aliases
   `APIAuthError`, `APIConnectionError`, `APIRateLimitError`). Never name a class
   `ConnectionError`.
