@@ -215,6 +215,11 @@ The `docs` job in `test.yml` fails a pull request that touches
 moved, because "does this need a sentence?" is the author's judgement — and a
 PR that genuinely needs none opts out with the **`docs-not-needed`** label,
 which the job re-reads on `labeled`/`unlabeled` so no empty commit is needed.
+A **docs-only** pull request (`docs/**`, a root `*.md`, `LICENSE`) also skips the
+Python test matrix: the `changes` job diffs the PR and the `test` job runs only
+when a non-prose file moved, so a typo fix does not wait two minutes for an
+install and a suite. A skipped job is not a failure — the ruleset requires no
+specific check.
 Translations, tests, `docs/releases/**` and the workflows do not count as
 behaviour, so a test-only or tooling PR passes on its own.
 
