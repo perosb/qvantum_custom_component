@@ -18,6 +18,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .open_meteo import hour_ts as weather_hour_ts
+from .plant_analytics import HeatingPowerWindow
 
 # Keys that must never leave the instance. ``async_redact_data`` applies these
 # recursively, so they cover config-entry data as well as nested client state.
@@ -445,7 +446,16 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
     baseline = getattr(coordinator, "_baseline", None)
     baseline_stats = getattr(coordinator, "_baseline_stats", None)
     margins = getattr(coordinator, "_indoor_margins", None)
-    powers = getattr(coordinator, "_powers", None)
+    # The load term's input: the poll-resolution mean the main coordinator
+    # keeps, plus how much of its window is actually observed. Without the
+    # coverage a dump cannot tell a listed zero from a window still filling.
+    main = getattr(coordinator, "_main", None)
+    power_window = getattr(main, "_heating_power_mean", None)
+    coverage_hours = None
+    if isinstance(power_window, HeatingPowerWindow):
+        coverage_hours = round(
+            power_window.coverage_seconds(dt_util.utcnow().timestamp()) / 3600.0, 2
+        )
 
     return {
         "active": bool(getattr(coordinator, "active", False)),
@@ -565,9 +575,8 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
             for ts, margin in (margins or [])
             if isinstance(ts, (int, float)) and isinstance(margin, (int, float))
         ],
-        "power_samples": [
-            power for power in (powers or []) if isinstance(power, (int, float))
-        ],
+        "load_power_mean_w": live.get("heating_power_mean_w"),
+        "load_power_coverage_hours": coverage_hours,
     }
 
 

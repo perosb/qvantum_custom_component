@@ -9,7 +9,9 @@ import pytest
 from custom_components.qvantum.plant_analytics import (
     DEFAULT_HEALTH_WEIGHTS,
     DHW_METER_WINDOW_SECONDS,
+    HEATING_POWER_WINDOW_SECONDS,
     DhwMeterWindow,
+    HeatingPowerWindow,
     HealthGrade,
     dhw_heat_meter_power_w,
     duty_cycle,
@@ -277,3 +279,70 @@ class TestDhwMeterWindow:
         self._polls(window, 1_000_200.0, 2, flow=1.0, hot=20.0, cold=10.0,
                     meter_step=0.0)
         assert window.signature() != first
+
+
+class TestHeatingPowerWindow:
+    """The cycle-length mean behind the adaptive curve's load term."""
+
+    @staticmethod
+    def _polls(window, start, count, *, power, counted=True, step=60):
+        for index in range(count):
+            window.add(
+                now_ts=start + index * step,
+                power_w=power,
+                counted=counted,
+            )
+        return start + count * step
+
+    def test_idle_intervals_count_as_zero(self):
+        # 30 min at 4000 W then 30 min idle: the mean over the hour is 2000 W,
+        # which is the "coasting" the load term is supposed to see.
+        window = HeatingPowerWindow()
+        start = 1_000_000.0
+        end = self._polls(window, start, 31, power=4000.0)
+        self._polls(window, end, 31, power=0.0)
+        assert window.mean_w(end + 1800.0) == pytest.approx(2000.0, rel=0.02)
+
+    def test_uncounted_intervals_are_not_evidence(self):
+        window = HeatingPowerWindow()
+        start = 1_000_000.0
+        self._polls(window, start, 31, power=4000.0)
+        end = start + 1800.0
+        # DHW for an hour: neither numerator nor denominator moves.
+        self._polls(window, end, 61, power=0.0, counted=False)
+        assert window.mean_w(end + 3600.0) == pytest.approx(4000.0, rel=0.02)
+        assert window.coverage_seconds(end + 3600.0) == pytest.approx(1800.0, abs=1.0)
+
+    def test_publishes_nothing_below_the_coverage_gate(self):
+        window = HeatingPowerWindow()
+        start = 1_000_000.0
+        self._polls(window, start, 10, power=4000.0)  # 9 counting intervals
+        assert window.mean_w(start + 540.0) is None
+
+    def test_a_poll_gap_is_not_credited(self):
+        window = HeatingPowerWindow()
+        window.add(now_ts=1_000_000.0, power_w=4000.0)
+        window.add(now_ts=1_003_600.0, power_w=4000.0)  # 1 h gap
+        assert window.coverage_seconds(1_003_600.0) == 0.0
+        assert window.mean_w(1_003_600.0) is None
+
+    def test_buckets_are_pruned_to_the_window(self):
+        window = HeatingPowerWindow()
+        start = 1_000_000.0
+        self._polls(window, start, 181, power=1000.0)  # 3 h
+        assert len(window.buckets) <= 3
+        # Pruned on the bucket's end, so the retained coverage can exceed the
+        # window by at most one bucket.
+        assert window.coverage_seconds(start + 180 * 60) <= (
+            HEATING_POWER_WINDOW_SECONDS + 3600.0
+        )
+
+    def test_invalid_inputs_are_ignored(self):
+        window = HeatingPowerWindow()
+        window.add(now_ts=None, power_w=1000.0)
+        window.add(now_ts="x", power_w=1000.0)
+        assert window.buckets == {}
+        window.add(now_ts=1_000_000.0, power_w=1000.0)
+        window.add(now_ts=1_000_060.0, power_w="x")
+        window.add(now_ts=1_000_120.0, power_w=-5.0)
+        assert window.coverage_seconds(1_000_120.0) == 0.0

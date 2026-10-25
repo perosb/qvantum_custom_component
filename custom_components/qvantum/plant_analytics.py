@@ -43,6 +43,20 @@ DHW_METER_BUCKET_SECONDS = 3600
 DHW_METER_MAX_INTERVAL_SECONDS = 900.0
 #: A larger counter jump is a reset or a teleport, not a draw.
 DHW_METER_MAX_STEP_KWH = 5.0
+#: Window for the adaptive curve's rolling space-heating power mean. It must
+#: span whole compressor cycles: measured on a live QE-6 the compressor ran
+#: 34-96 min and stood still 25-34 min, so anything shorter oscillates with the
+#: cycle instead of describing the house.
+HEATING_POWER_WINDOW_SECONDS = 2 * 3600.0
+#: Bucket width for that window (one small bucket per hour).
+HEATING_POWER_BUCKET_SECONDS = 3600
+#: A longer poll gap is not credited: the sample in hand describes the moment
+#: it was read, not the minutes the poll was missing.
+HEATING_POWER_MAX_INTERVAL_SECONDS = 900.0
+#: Evidence needed before the mean is published. Below it the figure is one
+#: sample standing in for a cycle, which is the aliasing this window replaces,
+#: and no reading beats a plausible wrong one.
+HEATING_POWER_MIN_COVERAGE_SECONDS = 1800.0
 
 
 def _finite(value: object) -> float | None:
@@ -241,6 +255,90 @@ class DhwMeterWindow:
         """Drop buckets that left the window."""
         cutoff = now_ts - DHW_METER_WINDOW_SECONDS
         for bucket in [b for b in self.buckets if b < cutoff]:
+            del self.buckets[bucket]
+
+
+@dataclass
+class HeatingPowerWindow:
+    """Time-weighted mean space-heating output over whole compressor cycles.
+
+    The adaptive curve's load term asks whether the pump delivers less than the
+    model's demand for the house, which is a property of a cycle, not of a
+    poll. Sampling ``heatingpower`` once per 15-minute curve cycle aliased the
+    compressor's on/off cycling — a single sample is either an "on" value or an
+    "off" one — and clearing the samples whenever ``hp_status`` left Heating
+    turned that aliasing into a jump between "no data" (term 0) and a full
+    shortfall. Measured on a live installation, the shared adjustment then
+    dithered between 0 and -0.5 °C several times an hour and every swing
+    rewrote the whole curve table.
+
+    ``counted`` says whether an interval is evidence at all: a poll while the
+    pump heats or stands idle counts (idle as 0 W, because coasting *is* the
+    shortfall being measured), while DHW, defrost and cooling polls do not —
+    the compressor was working on something else, so the interval says nothing
+    about the house either way.
+
+    State is bounded (one small bucket per hour, pruned to the window) and
+    deliberately not persisted: after a restart the coverage gate has to be
+    waited out rather than booking hours nobody observed.
+    """
+
+    buckets: dict[int, list[float]] = field(default_factory=dict)
+    last_ts: float | None = None
+
+    def add(
+        self,
+        *,
+        now_ts: object,
+        power_w: object,
+        counted: bool = True,
+    ) -> None:
+        """Book one poll: its power weighted by the elapsed interval."""
+        now = _finite(now_ts)
+        if now is None:
+            return
+        previous = self.last_ts
+        self.last_ts = now
+        if previous is not None and counted:
+            elapsed = now - previous
+            power = _finite(power_w)
+            if 0.0 < elapsed <= HEATING_POWER_MAX_INTERVAL_SECONDS and power is not None:
+                if power >= 0.0:
+                    bucket = (
+                        int(now // HEATING_POWER_BUCKET_SECONDS)
+                        * HEATING_POWER_BUCKET_SECONDS
+                    )
+                    slot = self.buckets.setdefault(bucket, [0.0, 0.0])
+                    slot[0] += power * elapsed
+                    slot[1] += elapsed
+        self._prune(now)
+
+    def coverage_seconds(self, now_ts: object) -> float:
+        """Seconds of usable evidence inside the window."""
+        now = _finite(now_ts)
+        if now is not None:
+            self._prune(now)
+        return sum(slot[1] for slot in self.buckets.values())
+
+    def mean_w(self, now_ts: object) -> float | None:
+        """Mean output over the observed intervals, or ``None`` below the gate."""
+        seconds = self.coverage_seconds(now_ts)
+        if seconds < HEATING_POWER_MIN_COVERAGE_SECONDS:
+            return None
+        return sum(slot[0] for slot in self.buckets.values()) / seconds
+
+    def _prune(self, now_ts: float) -> None:
+        """Drop buckets that left the window.
+
+        The comparison uses the bucket's *end*: a bucket is stamped with its
+        start, so dropping on the start would discard up to an hour of evidence
+        that is still inside the window. What this retains is at most one
+        bucket of extra coverage.
+        """
+        cutoff = now_ts - HEATING_POWER_WINDOW_SECONDS
+        for bucket in [
+            b for b in self.buckets if b + HEATING_POWER_BUCKET_SECONDS <= cutoff
+        ]:
             del self.buckets[bucket]
 
 

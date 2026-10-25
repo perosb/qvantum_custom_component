@@ -2215,6 +2215,118 @@ class TestDhwMeterCalculation:
         assert values["dhw_meter_metered_kwh"] == 0.0
 
 
+class TestHeatingPowerMean:
+    """The poll-resolution rolling mean behind the adaptive curve's load term."""
+
+    @staticmethod
+    def _make_coordinator():
+        return TestCopPersistence()._make_coordinator()
+
+    @staticmethod
+    def _poll(coordinator, values, when):
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=when,
+        ):
+            coordinator._calculate_heating_power_mean(values)
+        return values
+
+    def test_below_the_coverage_gate_nothing_is_published(self):
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        values = self._poll(
+            coordinator,
+            {"hp_status": 3, "heatingpower": 4000.0},
+            start,
+        )
+        values = self._poll(
+            coordinator,
+            {"hp_status": 3, "heatingpower": 4000.0},
+            start + timedelta(seconds=900),
+        )
+
+        assert "heating_power_mean_w" not in values
+
+    def test_heating_and_idle_average_to_the_cycle_mean(self):
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        self._poll(coordinator, {"hp_status": 3, "heatingpower": 4000.0}, start)
+        # 30 min heating...
+        for step in range(1, 31):
+            self._poll(
+                coordinator,
+                {"hp_status": 3, "heatingpower": 4000.0},
+                start + timedelta(seconds=60 * step),
+            )
+        # ...then 30 min idle at 0 W. The mean is the house's load, not the
+        # compressor's on-power: 2000 W.
+        for step in range(31, 62):
+            values = self._poll(
+                coordinator,
+                {"hp_status": 0, "heatingpower": 0.0},
+                start + timedelta(seconds=60 * step),
+            )
+
+        assert values["heating_power_mean_w"] == pytest.approx(2000.0, rel=0.02)
+
+    def test_defrost_and_dhw_polls_are_not_evidence(self):
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        for step in range(0, 31):
+            self._poll(
+                coordinator,
+                {"hp_status": 3, "heatingpower": 4000.0},
+                start + timedelta(seconds=60 * step),
+            )
+        # An hour of hot-water production in the middle must neither raise nor
+        # lower the space-heating mean.
+        values = None
+        for step in range(31, 91):
+            values = self._poll(
+                coordinator,
+                {"hp_status": 2, "heatingpower": 0.0},
+                start + timedelta(seconds=60 * step),
+            )
+
+        assert values["heating_power_mean_w"] == pytest.approx(4000.0, rel=0.02)
+
+    def test_element_demanded_intervals_are_not_evidence(self):
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        self._poll(
+            coordinator,
+            {"hp_status": 3, "heatingpower": 4000.0, "additiondemand": 0},
+            start,
+        )
+        values = self._poll(
+            coordinator,
+            {"hp_status": 3, "heatingpower": 4000.0, "additiondemand": 1},
+            start + timedelta(seconds=900),
+        )
+
+        # The element's output is not in `heatingpower`, so the interval cannot
+        # say whether the house was short of heat.
+        assert "heating_power_mean_w" not in values
+        assert coordinator._heating_power_mean.coverage_seconds(
+            start.timestamp() + 900
+        ) == 0.0
+
+    def test_a_poll_gap_is_not_credited(self):
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        self._poll(coordinator, {"hp_status": 3, "heatingpower": 4000.0}, start)
+        values = self._poll(
+            coordinator,
+            {"hp_status": 3, "heatingpower": 4000.0},
+            start + timedelta(hours=1),
+        )
+
+        assert "heating_power_mean_w" not in values
+        assert coordinator._heating_power_mean.coverage_seconds(
+            start.timestamp() + 3600
+        ) == 0.0
+
+
 class TestCopPersistence:
     """Tests for the COP restart snapshot."""
 

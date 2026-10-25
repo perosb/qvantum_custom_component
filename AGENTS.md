@@ -694,6 +694,24 @@ further changes once it ships; before that, edit it in place as usual).
   directly, bypassing the throttle — and answers with the model state, because a
   sensor change or a fixed data gap makes waiting a day pointless. It writes
   nothing to the pump.
+- The **load term** is fed by a poll-resolution rolling mean of `heatingpower`
+  (`HeatingPowerWindow`, 2 h, published as `heating_power_mean_w`), never by one
+  sample per 15-minute curve cycle. A single sample aliases the compressor's
+  on/off cycling, and the old average reset whenever `hp_status` left Heating,
+  so the term jumped between "no data" (0) and a full shortfall: measured on a
+  live QE-6 the compressor ran 34–96 min and stood still 25–34 min, and the
+  shared adjustment dithered between 0 and −0.5 °C several times an hour — each
+  swing rewrote every curve point, including knots the weather never reaches.
+  Idle polls count as 0 W (coasting *is* the shortfall being measured);
+  DHW/defrost/cooling polls count as neither, because the compressor was working
+  on something else, and so does any interval with `additiondemand` set — the
+  element's heat is not in `heatingpower`, so such an interval would read as a
+  shortfall the house never had; a poll gap is not credited and nothing is
+  published below
+  the 30-minute coverage gate (no reading beats one sample standing in for a
+  cycle). The window is deliberately **not** persisted — after a restart the
+  gate is waited out instead of booking hours no poll observed. Diagnostics
+  report `load_power_mean_w` and `load_power_coverage_hours`.
 - Wind is **identified but not applied** (#427). `open_meteo` requests
   `wind_speed_10m` with `wind_speed_unit=ms` (the API default is km/h, and a
   silent unit mismatch would read as a calibration result), `HourlyWeather.wind_ms`

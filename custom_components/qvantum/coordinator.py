@@ -40,7 +40,7 @@ from .client.protocol import (
 )
 from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
 from .calculations import DhwCharge, QvantumCalculationsMixin
-from .plant_analytics import DhwMeterWindow
+from .plant_analytics import DhwMeterWindow, HeatingPowerWindow
 from .client.constants import alias_heating_curve_settings
 from .const import (
     DEFAULT_DISABLED_HTTP_METRICS,
@@ -267,6 +267,10 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # rather than from hourly means (see DhwMeterWindow). Persisted with
         # the COP snapshot so a restart does not blank a week-long window.
         self._dhw_meter = DhwMeterWindow()
+        # Rolling space-heating output for the adaptive curve's load term. Not
+        # persisted: the coverage gate then waits out a restart instead of
+        # booking hours no poll observed.
+        self._heating_power_mean = HeatingPowerWindow()
         # Effective tank volume identified from element-only charges; None until
         # one has been measured, and persisted with the COP snapshot.
         self._dhw_tank_liters: float | None = None
@@ -1486,6 +1490,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
             if self.modbus_enabled:
                 self._calculate_heating_power(values)
+                self._calculate_heating_power_mean(values)
                 self._calculate_dhw_power(values)
                 self._calculate_tap_water_cap(values)
                 self._persist_dhw_state()

@@ -38,6 +38,7 @@ from .const import (
     DHW_TANK_VOLUME_L,
     HP_STATUS_HEATING,
     HP_STATUS_HOT_WATER,
+    HP_STATUS_IDLE,
     SensorMode,
 )
 from .dhw_loss import (
@@ -217,6 +218,37 @@ class QvantumCalculationsMixin:
             last_time_attr="_last_heatingenergy_time",
             mode_label="heating",
         )
+
+    def _calculate_heating_power_mean(self, values: dict) -> None:
+        """Feed the poll into the load term's rolling heating-power mean.
+
+        The load term compares the pump's output with the model's demand for
+        the house, which is a property of a whole compressor cycle. Reading
+        ``heatingpower`` once per curve cycle aliased the cycling, so the mean
+        is accumulated here at poll resolution instead: heating polls
+        contribute their output, idle polls contribute 0 W (coasting is the
+        shortfall being measured) and DHW/defrost/cooling polls contribute
+        nothing at all, because the compressor was working on something else.
+
+        The running mean travels in ``values`` so it also shows up in the
+        diagnostics dump; the curve coordinator reads it instead of the
+        instantaneous figure.
+        """
+        now_ts = dt_util.utcnow().timestamp()
+        status = values.get("hp_status")
+        # An interval with the element demanded is not evidence either way:
+        # ``heatingpower`` is the compressor's output, so the element's share is
+        # invisible and the interval would read as a shortfall the house did
+        # not have.
+        self._heating_power_mean.add(
+            now_ts=now_ts,
+            power_w=values.get("heatingpower"),
+            counted=status in (HP_STATUS_HEATING, HP_STATUS_IDLE)
+            and not _flag(values.get("additiondemand")),
+        )
+        mean = self._heating_power_mean.mean_w(now_ts)
+        if mean is not None:
+            values["heating_power_mean_w"] = round(mean, 1)
 
     def _calculate_dhw_power(self, values: dict) -> None:
         """Derive dhwpower (W) from the dhwenergy (kWh) delta between polls."""
