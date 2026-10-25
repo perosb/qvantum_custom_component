@@ -3233,7 +3233,7 @@ async def test_revert_pending_retries_until_reachable() -> None:
     )
 
 
-async def test_apply_active_writes_only_changed_points() -> None:
+async def test_apply_active_writes_only_changed_reachable_points() -> None:
     target = {key: value + 1.0 for key, value in BASELINE.items()}
     current = {**BASELINE, "curve_30": 26.0}
     coordinator, client = make_writable_coordinator(
@@ -3245,8 +3245,105 @@ async def test_apply_active_writes_only_changed_points() -> None:
         await coordinator._async_apply_active(make_result(target))
 
     written = [call.args[1] for call in client.set_heating_curve_point.call_args_list]
-    assert written == list(BASELINE)[1:]
-    assert coordinator._main.data["values"]["curve_minus_30"] == 61
+    # 10 °C outdoor and no forecast: the two coldest knots cannot be reached
+    # before the next forecast arrives, so they keep what the pump holds.
+    assert written == ["curve_20", "curve_10", "curve_0", "curve_minus_10"]
+    assert coordinator._main.data["values"]["curve_minus_10"] == 49
+    assert coordinator._main.data["values"]["curve_minus_20"] == 54
+    assert coordinator._main.data["values"]["curve_minus_30"] == 60
+    assert coordinator._write_scope == (
+        "curve_20",
+        "curve_10",
+        "curve_0",
+        "curve_minus_10",
+    )
+
+
+async def test_apply_active_scope_follows_the_forecast() -> None:
+    target = {key: value + 1.0 for key, value in BASELINE.items()}
+    coordinator, client = make_writable_coordinator(
+        points=target, settings={"curve_type_heating": 1, **BASELINE}
+    )
+    coordinator._mode = "active"
+    coordinator._forecast = make_forecast(temperature=-18.0)
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator._async_apply_active(make_result(target))
+
+    written = [call.args[1] for call in client.set_heating_curve_point.call_args_list]
+    # A cold forecast reaches down to −20 with one knot of margin.
+    assert written == [key for key in BASELINE if key != "curve_30"]
+
+
+async def test_apply_active_keeps_a_knot_inside_the_dead_band() -> None:
+    target = {**BASELINE, "curve_0": 42.6}
+    coordinator, client = make_writable_coordinator(
+        points=target, settings={"curve_type_heating": 1, **BASELINE}
+    )
+    coordinator._mode = "active"
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator._async_apply_active(make_result(target))
+
+    # 0.6 K from 42 rounds to 43, but the dead band keeps 42: plain rounding
+    # flipped a knot sitting on its boundary on every cycle.
+    assert client.set_heating_curve_point.await_args_list == []
+
+
+async def test_apply_active_writes_a_knot_past_the_dead_band() -> None:
+    target = {**BASELINE, "curve_0": 43.0}
+    coordinator, client = make_writable_coordinator(
+        points=target, settings={"curve_type_heating": 1, **BASELINE}
+    )
+    coordinator._mode = "active"
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator._async_apply_active(make_result(target))
+
+    written = [call.args[1] for call in client.set_heating_curve_point.call_args_list]
+    assert written == ["curve_0"]
+    assert client.set_heating_curve_point.await_args_list[0].args[2] == 43
+
+
+async def test_apply_active_projects_a_stale_warm_knot_onto_the_shape() -> None:
+    # The pump holds +30 = 21 from an earlier cycle while +20 sits in its dead
+    # band; writing 20 would put an inverted table on the pump.
+    current = {**BASELINE, "curve_30": 21, "curve_20": 20}
+    target = {**BASELINE, "curve_30": 20.0, "curve_20": 20.4}
+    coordinator, client = make_writable_coordinator(
+        points=target, settings={"curve_type_heating": 1, **current}
+    )
+    coordinator._mode = "active"
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator._async_apply_active(make_result(target))
+
+    written = [call.args[1] for call in client.set_heating_curve_point.call_args_list]
+    assert written == ["curve_20"]
+    assert client.set_heating_curve_point.await_args_list[0].args[2] == 21
+
+
+async def test_apply_active_brings_an_unreachable_knot_inside_new_limits() -> None:
+    # A dropped max supply must not leave a knot the weather cannot reach above
+    # it: that would revert the curve for a limit the user changed.
+    target = {**BASELINE, "curve_minus_20": 50.0, "curve_minus_30": 50.0}
+    coordinator, client = make_writable_coordinator(
+        points=target,
+        settings={
+            "curve_type_heating": 1,
+            **BASELINE,
+            "max_heating_supply": 50,
+        },
+    )
+    coordinator._mode = "active"
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator._async_apply_active(make_result(target))
+
+    written = [call.args[1] for call in client.set_heating_curve_point.call_args_list]
+    assert "curve_minus_20" in written
+    assert "curve_minus_30" in written
+    assert coordinator.active is True
 
 
 async def test_apply_active_without_user_defined_goes_shadow() -> None:

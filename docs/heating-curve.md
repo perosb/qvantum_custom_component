@@ -469,6 +469,38 @@ reload, and Home Assistant shutting down, deliberately leave the written table
 in place so the pump keeps heating with the last curve while nothing is
 running.
 
+### Write policy
+
+The coordinator does not write "whatever changed". Three rules keep the pump's
+table stable, because the shared adjustment moves all seven knots together and
+the registers hold whole degrees:
+
+- **Only knots the forecast can reach.** The pump interpolates the table, so
+  only the knot pair bracketing the outdoor temperature affects the supply it
+  asks for. Knots below the coldest hour of the forecast cannot be used before
+  the next forecast arrives (the payload is refetched hourly), so they keep the
+  value already on the pump. One knot of margin is kept below the coldest
+  forecast hour — a forecast 10 K too warm still leaves every reachable segment
+  with both endpoints written. There is no margin on the warm side: a warm
+  overshoot only moves the pump onto a flatter, lower part of the curve that the
+  supply floor already covers. A missing forecast means every knot is in scope.
+  A sensor can therefore show the ideal value for a knot the pump holds older —
+  `write_scope` in the diagnostics lists the knots of the last active cycle.
+- **A dead band per knot.** A knot is rewritten only when the computed value is
+  0.75 °C away from the integer on the pump. Plain rounding rewrites at 0.5 °C,
+  and a knot whose baseline plus trim ends near .5 — or a shared adjustment
+  hovering around zero — then flips every cycle. Measured on a live
+  installation, the +10 knot changed 32 times in two days that way, and each
+  rewrite of the cold end moved a number no weather could read.
+- **The table the pump will end up with is the one validated.** Holding a stale
+  knot can invert the written table (+30 = 21 beside +20 = 20), so the result is
+  projected onto the non-decreasing shape; a knot the projection has to raise is
+  written even when it is out of reach. A knot left outside the pump's own
+  supply limits — a lowered `max_heating_supply` — is brought inside them rather
+  than triggering the safety reversion, and an unreadable knot is always
+  written. If the resulting table still breaks the limits or the shape, the
+  curve reverts to Auto.
+
 ### Optional terms
 
 Control-loop terms beyond the four forecast terms are **off by default** and

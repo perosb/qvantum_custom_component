@@ -577,6 +577,14 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         ],
         "load_power_mean_w": live.get("heating_power_mean_w"),
         "load_power_coverage_hours": coverage_hours,
+        # Knots of the last active write cycle: a dump must distinguish a knot
+        # the forecast cannot reach (the pump keeps an older value) from one the
+        # write path failed to move.
+        "write_scope": [
+            key
+            for key in (getattr(coordinator, "_write_scope", ()) or ())
+            if isinstance(key, str)
+        ],
     }
 
 

@@ -61,6 +61,15 @@ OUTDOOR_DAMP = 0.5
 #: Anticipation clamp.
 OUTDOOR_MAX_C = 1.0
 
+#: Knots of margin kept beyond the coldest temperature the forecast can bring.
+#: The pump interpolates the table, so the pair bracketing the outdoor
+#: temperature decides the supply; a knot is only skipped while no weather can
+#: reach its segment. One knot means a forecast that is 10 K too warm still
+#: leaves every reachable segment with freshly written endpoints. There is no
+#: margin on the warm side: overshooting upwards only moves the pump onto a
+#: flatter, lower part of the curve that the supply floor already covers.
+REACH_MARGIN_KNOTS = 1
+
 #: Daylight rhythm amplitude as a fraction of the forecast diurnal supply
 #: swing (|local curve slope| × forecast outdoor range). A flat day has no
 #: rhythm offset; a volatile day gets a larger (bounded) one.
@@ -292,6 +301,63 @@ def lift_baseline_floor(
         key: max(supply, low)
         for key, (_, supply) in zip(CURVE_KEYS, points)
     }
+
+
+def points_in_reach(
+    forecast_temperature: Mapping[int, float],
+    *,
+    outdoor_c: float | None = None,
+    margin_knots: int = REACH_MARGIN_KNOTS,
+) -> tuple[str, ...]:
+    """Curve knots the pump can interpolate before the weather changes.
+
+    The table is interpolated, so only the knot pair bracketing an outdoor
+    temperature can affect the supply the pump asks for. A knot below the
+    coldest hour in the forecast cannot be reached before the next forecast
+    arrives (the coordinator refetches hourly), so rewriting it only moves a
+    number nothing reads. That matters because the shared adjustment moves all
+    knots together: on a mild day the cold end used to be rewritten several
+    times a day for weather that was not coming.
+
+    ``margin_knots`` keeps that many knots beyond the coldest forecast hour, so
+    a forecast that is too warm still leaves the reachable segments covered.
+    Without a forecast — or without a single usable hour and no measured
+    outdoor temperature — every knot is returned: nothing is known, so nothing
+    may be skipped.
+    """
+    reachable: list[float] = []
+    candidates: list[object] = [outdoor_c, *forecast_temperature.values()]
+    for candidate in candidates:
+        if isinstance(candidate, bool) or not isinstance(candidate, (int, float)):
+            continue
+        numeric = float(candidate)
+        if math.isfinite(numeric):
+            reachable.append(numeric)
+    if not reachable:
+        return CURVE_KEYS
+
+    temps = [HEATING_CURVE_OUTDOOR_TEMPS[key] for key in CURVE_KEYS]
+
+    def _bracket(value: float, *, strict: bool) -> tuple[int, int]:
+        # Knots are ordered warm → cold, so the run of entries above ``value``
+        # ends at the warmer half of the bracketing pair. Outside the table the
+        # nearest end covers it. The warm end is compared strictly: a
+        # temperature sitting exactly on a knot also uses the segment above it.
+        upper = 0
+        for index, temp in enumerate(temps):
+            if temp > value or (not strict and temp == value):
+                upper = index
+            else:
+                break
+        return upper, min(upper + 1, len(temps) - 1)
+
+    positions: set[int] = set()
+    positions.update(_bracket(min(reachable), strict=False))
+    positions.update(_bracket(max(reachable), strict=True))
+
+    start = min(positions)
+    end = min(len(CURVE_KEYS) - 1, max(positions) + max(0, margin_knots))
+    return CURVE_KEYS[start : end + 1]
 
 
 def curve_slope(points: Sequence[tuple[float, float]], outdoor_c: float) -> float:

@@ -39,6 +39,7 @@ from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
 from .const import DOMAIN, HP_STATUS_HEATING, HeatingCurveType, SensorMode
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .heating_curve import (
+    CURVE_KEYS,
     MAX_SUPPLY_C,
     MIN_SUPPLY_C,
     ROOM_GAIN_MAX_C,
@@ -52,6 +53,7 @@ from .heating_curve import (
     interpolate_supply,
     lift_baseline_floor,
     normalize_baseline,
+    points_in_reach,
     precharge_adjustment_c,
     ActiveRoomGain,
     PumpRoomReading,
@@ -144,8 +146,14 @@ COP_REFERENCE_MIN_SAMPLES = 12
 
 #: Pause between single-point Modbus writes so one cycle is not a burst.
 WRITE_PAUSE_SECONDS = 1.0
-#: Minimum change in °C before a point is rewritten.
-MIN_WRITE_DELTA_C = 1.0
+#: Distance in °C the continuous point must be from the value the pump holds
+#: before that knot is rewritten. The registers are whole degrees, so plain
+#: rounding already rewrites a knot as soon as it is 0.5 K away — which turns a
+#: value hovering on a rounding boundary (a knot whose baseline+trim ends in
+#: .5, or a shared adjustment near zero) into a rewrite every cycle. The extra
+#: quarter degree is the dead band: a knot is rewritten at 0.75 K and the error
+#: against the ideal stays below that, on top of the register's own 1 °C grid.
+MIN_WRITE_DELTA_C = 0.75
 #: Days kept per counter; the pool needs a rate, not a log.
 COUNTER_MAX_DAYS = 90
 CONTROL_MODES = ("shadow", "active")
@@ -732,6 +740,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._indoor_margins: deque[tuple[float, float]] = deque(
             maxlen=INDOOR_MARGIN_CYCLES
         )
+        #: Knots of the last active write cycle, for the diagnostics dump: it
+        #: explains why a knot the dump shows can be older than the computed one.
+        self._write_scope: tuple[str, ...] = ()
         self._mode = "shadow"
         self._revert_pending = False
         self._control_lock = asyncio.Lock()
@@ -1366,15 +1377,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             )
             return
 
+        writes, targets = self._plan_point_writes(result, values, low, high)
+        if writes is None:
+            await self._async_revert(
+                "computed table violates the pump's supply limits or shape"
+            )
+            return
+
         client = self._main.client
-        for key, value in result.integer_points():
-            current = values.get(key)
-            if (
-                isinstance(current, (int, float))
-                and not isinstance(current, bool)
-                and abs(float(value) - float(current)) < MIN_WRITE_DELTA_C
-            ):
-                continue
+        for key, value in writes:
             response = await self._async_write_or_revert(
                 client.set_heating_curve_point(device_id, key, value),
                 label=f"{key}={value}",
@@ -1385,6 +1396,108 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 response, self._main, "values", key, value
             )
             await asyncio.sleep(WRITE_PAUSE_SECONDS)
+
+    def _plan_point_writes(
+        self,
+        result: Any,
+        values: Mapping[str, Any],
+        low: float,
+        high: float,
+    ) -> tuple[list[tuple[str, int]] | None, dict[str, int]]:
+        """Decide which knots to write and what the table will hold afterwards.
+
+        Three rules, in order:
+
+        1. A knot the forecast cannot reach before its next refetch keeps the
+           value the pump already holds. The pump interpolates, so only the
+           bracketing pair of the reachable outdoor range affects the supply.
+        2. Within reach, a knot is only rewritten once the continuous point is
+           ``MIN_WRITE_DELTA_C`` away from the value on the pump — plain
+           rounding would flip a knot sitting on its rounding boundary every
+           cycle.
+        3. The result is projected onto the non-decreasing shape, because
+           holding a stale knot can invert the written table even when the
+           computed one is valid. A knot the projection has to raise is written
+           even when it is outside the reachable range: leaving it would put a
+           table on the pump that its own curve guard may refuse.
+
+        Returns ``(writes, targets)``; ``writes`` is ``None`` when the table the
+        pump would end up with breaks the supply limits or the shape, which is
+        the safety reversion.
+        """
+        ideal = dict(result.points)
+        reach = frozenset(
+            points_in_reach(
+                self._forecast.temperature_by_hour()
+                if self._forecast is not None
+                else {},
+                outdoor_c=self._numeric(values.get("bt1")),
+            )
+        )
+        self._write_scope = tuple(
+            key for key in CURVE_KEYS if key in reach
+        )
+
+        targets: dict[str, int] = {}
+        forced: set[str] = set()
+        for key, rounded in result.integer_points():
+            current = self._pump_point(values, key)
+            supply = self._numeric(ideal.get(key))
+            if supply is None:
+                supply = float(rounded)
+            if current is None:
+                # No readable value: the knot has to be written to exist at all.
+                targets[key] = int(rounded)
+                forced.add(key)
+            elif key in reach:
+                targets[key] = (
+                    int(rounded)
+                    if abs(supply - current) >= MIN_WRITE_DELTA_C
+                    else current
+                )
+            elif low - 1e-9 <= current <= high + 1e-9:
+                # Out of reach and still legal under the pump's own limits:
+                # leave it exactly as the pump holds it.
+                targets[key] = current
+            else:
+                # The pump's limits moved under a knot the weather cannot
+                # reach; it still has to be brought inside them.
+                targets[key] = int(rounded)
+                forced.add(key)
+
+        projected: set[str] = set()
+        previous: int | None = None
+        for key in CURVE_KEYS:
+            value = targets[key]
+            if previous is not None and value < previous:
+                targets[key] = previous
+                projected.add(key)
+            previous = targets[key]
+
+        if not points_within_limits(targets, min_supply_c=low, max_supply_c=high):
+            return None, targets
+
+        writes = [
+            (key, targets[key])
+            for key in CURVE_KEYS
+            if (key in reach or key in projected or key in forced)
+            and targets[key] != self._pump_point(values, key)
+        ]
+        return writes, targets
+
+    @staticmethod
+    def _numeric(value: Any) -> float | None:
+        """Coerce an optional numeric value, rejecting bools and NaN."""
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        numeric = float(value)
+        return numeric if math.isfinite(numeric) else None
+
+    @classmethod
+    def _pump_point(cls, values: Mapping[str, Any], key: str) -> int | None:
+        """The whole-degree value the pump currently holds for one knot."""
+        value = cls._numeric(values.get(key))
+        return None if value is None else int(math.floor(value + 0.5))
 
     async def _async_update_data(self) -> CurveSnapshot:
         """Never fail the coordinator: degrade to the last good snapshot."""
