@@ -1011,11 +1011,11 @@
     },
     "tap_water_capacity_unmapped": {
       "title": "Warmwatercapaciteit is onbekend",
-      "description": "De warmtepomp houdt {start} / {stop} °C aan als start/stop voor warm water. Dat paar staat niet in de capaciteitstabel van deze integratie: de tabel stamt van vóór een firmwarewijziging waarbij de niveaus ongeveer 1 °C uit elkaar liggen, dus het niveau kan niet benoemd worden en de capaciteit toont \"onbekend\" in plaats van een schatting. De start- en stoptemperatuur zijn de waarheid en blijven bewerkbaar."
+      "description": "De pomp gebruikt {start} / {stop} °C als start-/stoptemperatuur voor warm water; deze voorinstelling is onbekend voor deze integratie. De waarden zijn waarschijnlijk handmatig of via de Qvantum-app ingesteld."
     },
     "tap_water_capacity_level_conflict": {
       "title": "De app meldt een niveau dat niet bij de temperaturen past",
-      "description": "De warmtepomp houdt {start} / {stop} °C aan als start/stop voor warm water, wat in de tabel van deze integratie niveau {pair_level} is — maar de app/cloud meldt niveau {reported}. De temperaturen verwarmen de tank en daar volgt de capaciteit ze; het niveaulabel is het verouderde deel."
+      "description": "De pomp gebruikt {start} / {stop} °C als start-/stoptemperatuur voor warm water; deze voorinstelling is onbekend voor deze integratie. De waarden zijn waarschijnlijk handmatig of via de Qvantum-app ingesteld."
     }
   }
 }

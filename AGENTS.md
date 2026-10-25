@@ -381,18 +381,30 @@ entity stays available (its own key may be `None` — that is the one exemption 
 the number platform's availability check) with
 `start_stop_pair`/`pair_mapped`/`nearest_capacity`/`reported_capacity`
 attributes, and `_async_sync_tap_water_capacity_issue` keeps the repair issues in
-step with the mismatch. Two **separate** issues, because their texts differ and
-one of them has no level to name: `tap_water_capacity_unmapped` (`unmapped`: the
-pair is not in the table — no level in the text, since `reported` is `None` on
-Modbus and printing "none" was a bug) and `tap_water_capacity_level_conflict`
-(`level_conflict`: the table maps the pair to one level and the transport
-reports another, so both numbers are named). Each has its own issue id suffix and
+step with the mismatch. Two **separate** issues, because the situations differ:
+`tap_water_capacity_unmapped` (`unmapped`: the pair is not in the table — no
+level exists at all, since `reported` is `None` on Modbus and printing "none"
+was a bug) and `tap_water_capacity_level_conflict` (`level_conflict`: the table
+maps the pair to one level and the transport reports another). Both carry the
+**same** text on purpose — it names the pair, says the preset is unknown to this
+integration and that it was probably set by hand or in the app; naming a level
+told the user to fix the side that is stale, and the conflict is still
+identifiable by issue id and by the entity's `pair_mapped`/`reported_capacity`
+attributes. Each has its own issue id suffix and
 every other id is deleted on every sync — **including the legacy unsuffixed
 `tap_water_capacity_mismatch_<entry>`**, which releases up to 2026.10.18 raised
 and which lives in HA's issue store across restarts; without that delete an
 upgrading installation keeps the old issue next to the new one forever.
 `nearest_tap_water_capacity_level` is only the entity's *attribute* hint, never
 the state and never in either issue text.
+
+**Neither issue is raised on a read-only Modbus link** (`modbus_enabled` and
+`client.writable is False`): the pair was then moved by the app or the cloud, the
+integration has no write path back, and a current-firmware pump holds a pair
+outside the table anyway — so the issue would ask for something nobody can do
+from Home Assistant and would nag forever. Turning writes off clears an issue
+that was already raised; the entity keeps reporting `unknown` with its
+`start_stop_pair`/`pair_mapped`/`reported_capacity` attributes.
 
 **The table is firmware-specific and must not be "fixed" by guessing.** It has
 been unchanged since #270 and predates Qvantum's change, which is the firmware in
@@ -409,9 +421,10 @@ waits for evidence — a per-firmware mapping accumulated from cloud rows (level
 and pair arrive together there; Modbus has no level) or a published table. Note
 that the level is **not** a capacity figure: 175 L ≈ 0.20 kWh/K while a 6-minute
 shower needs ≈ 1.76 kWh, i.e. ≈ 8.6 K per shower, so a 1 °C step cannot mean one
-shower and no mapping follows from physics. The repair text therefore says the
-pair cannot be named, that start/stop remain the editable truth, and what level
-the app/cloud reports — it does **not** tell the user to set a level. The open
+shower and no mapping follows from physics. The repair text therefore names only
+the pair and says the preset is unknown to this integration (probably set by
+hand or in the app): it does **not** name a level and does **not** tell the user
+to set one. The open
 work is a per-firmware mapping learned from cloud rows (level and pair arrive
 together there; Modbus has no level) or a table published by Qvantum.
 

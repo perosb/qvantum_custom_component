@@ -1011,11 +1011,11 @@
     },
     "tap_water_capacity_unmapped": {
       "title": "Ismeretlen használivíz-kapacitás",
-      "description": "A szivattyú {start} / {stop} °C-ot tart a használivíz indítás/leállítás értékeként. Ez a pár nincs benne az integráció kapacitástáblázatában: a táblázat egy firmware-változás előtti állapotot tükrözi, amely körülbelül 1 °C-ra vitte a szinteket egymástól, így a szint nem nevezhető meg, és a kapacitásszám „ismeretlen” értéket mutat tipp helyett. Az indítási és leállítási hőmérséklet a mérvadó, és továbbra is szerkeszthető."
+      "description": "A szivattyú {start} / {stop} °C-ot használ a használivíz indítási/leállítási hőmérsékleteként, ami egy ismeretlen előbeállítás ehhez az integrációhoz. Ezeket az értékeket valószínűleg kézzel vagy a Qvantum alkalmazásban állították be."
     },
     "tap_water_capacity_level_conflict": {
       "title": "Az alkalmazás a hőmérsékletekkel nem egyező szintet jelez",
-      "description": "A szivattyú {start} / {stop} °C-ot tart a használivíz indítás/leállítás értékeként, ami ennek az integrációnak a táblázatában a(z) {pair_level}. kapacitásszint — az alkalmazás/felhő azonban a(z) {reported}. szintet jelzi. A tartályt a hőmérsékletek melegítik, és a kapacitásszám ezeket követi; a szint címkéje az elavult."
+      "description": "A szivattyú {start} / {stop} °C-ot használ a használivíz indítási/leállítási hőmérsékleteként, ami egy ismeretlen előbeállítás ehhez az integrációhoz. Ezeket az értékeket valószínűleg kézzel vagy a Qvantum alkalmazásban állították be."
     }
   }
 }

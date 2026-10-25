@@ -1011,11 +1011,11 @@
     },
     "tap_water_capacity_unmapped": {
       "title": "Capacidad de agua caliente desconocida",
-      "description": "La bomba mantiene {start} / {stop} °C como arranque/parada de agua caliente. Esa pareja no está en la tabla de capacidad de esta integración: la tabla es anterior a un cambio de firmware que dejó los niveles a unos 1 °C de distancia, así que el nivel no se puede nombrar y la capacidad muestra «desconocido» en lugar de una estimación. Las temperaturas de arranque y parada son la verdad y siguen siendo editables."
+      "description": "La bomba utiliza {start} / {stop} °C como temperatura de arranque/parada del agua caliente, un ajuste predefinido que esta integración no conoce. Es probable que estos valores se hayan fijado manualmente o desde la aplicación Qvantum."
     },
     "tap_water_capacity_level_conflict": {
       "title": "La aplicación informa un nivel que no coincide con las temperaturas",
-      "description": "La bomba mantiene {start} / {stop} °C como arranque/parada de agua caliente, que es el nivel de capacidad {pair_level} en la tabla de esta integración, pero la aplicación/la nube informa el nivel {reported}. Son las temperaturas las que calientan el depósito y las que sigue la capacidad; la etiqueta del nivel es la obsoleta."
+      "description": "La bomba utiliza {start} / {stop} °C como temperatura de arranque/parada del agua caliente, un ajuste predefinido que esta integración no conoce. Es probable que estos valores se hayan fijado manualmente o desde la aplicación Qvantum."
     }
   }
 }

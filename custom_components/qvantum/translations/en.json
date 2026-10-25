@@ -1011,11 +1011,11 @@
     },
     "tap_water_capacity_unmapped": {
       "title": "Hot-water capacity is unknown",
-      "description": "The pump holds {start} / {stop} °C as hot-water start/stop. That pair is not in the capacity table this integration knows: the table predates a firmware change that put the levels about 1 °C apart, so the level cannot be named and the capacity number shows \"unknown\" rather than a guess. The start and stop temperatures are the truth and stay editable."
+      "description": "The pump holds {start} / {stop} °C as hot-water start/stop which is an unknown preset to this integration. These values have probably been set manually or via the Qvantum App."
     },
     "tap_water_capacity_level_conflict": {
       "title": "The app reports a level that does not match the temperatures",
-      "description": "The pump holds {start} / {stop} °C as hot-water start/stop, which is capacity level {pair_level} in this integration's table — but the app/cloud reports level {reported}. The temperatures are what heat the tank and what the capacity number follows; the level label is the stale one."
+      "description": "The pump holds {start} / {stop} °C as hot-water start/stop which is an unknown preset to this integration. These values have probably been set manually or via the Qvantum App."
     }
   }
 }
