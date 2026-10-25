@@ -191,7 +191,7 @@ def _curve_coordinator() -> SimpleNamespace:
         _last_active_ts=None,
         _last_trim_ts=1758794400.0,
         _indoor_margins=[(1758794400.0, 0.5)],
-        _powers=[1200.0, 1300.0],
+        _main_values=lambda: {"heating_power_mean_w": 1450.0},
     )
 
 
@@ -689,7 +689,10 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     # hours the pump followed our table from hours it followed its own.
     assert curve["timestamps"]["active_since_ts"] == 1758790800.0
     assert curve["indoor_margins"] == [[1758794400.0, 0.5]]
-    assert curve["power_samples"] == [1200.0, 1300.0]
+    # The load term's input and how much of its window is observed: the square
+    # of a single sample would be the aliasing this replaced.
+    assert curve["load_power_mean_w"] == 1450.0
+    assert curve["load_power_coverage_hours"] is None
     json.dumps(result)
 
 
@@ -721,5 +724,6 @@ async def test_curve_diagnostics_tolerates_malformed_state(hass):
     assert curve_result["room_error"] is None
     assert curve_result["adjustment_c"] is None
     assert curve_result["indoor_margins"] == []
-    assert curve_result["power_samples"] == []
+    assert curve_result["load_power_mean_w"] is None
+    assert curve_result["load_power_coverage_hours"] is None
     json.dumps(result)

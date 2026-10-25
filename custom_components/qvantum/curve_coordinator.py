@@ -117,7 +117,6 @@ TRIM_FIRST_REFRESH_HOURS = 3.0
 #: Fraction of the indicated residual applied per update (damped loop).
 TRIM_UPDATE_GAIN = 0.3
 INDOOR_MARGIN_CYCLES = 96  # 24 h at 15 min
-POWER_CYCLES = 4  # 1 h at 15 min
 READY_WINDOW_DAYS = 3
 READY_MIN_COVERAGE = 0.9
 #: Heating-hour samples needed before the readiness statistics mean anything.
@@ -733,7 +732,6 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._indoor_margins: deque[tuple[float, float]] = deque(
             maxlen=INDOOR_MARGIN_CYCLES
         )
-        self._powers: deque[float] = deque(maxlen=POWER_CYCLES)
         self._mode = "shadow"
         self._revert_pending = False
         self._control_lock = asyncio.Lock()
@@ -2455,15 +2453,18 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return sum(recent) / len(recent)
 
     def _push_power(self, values: Mapping[str, Any]) -> float | None:
-        if values.get("hp_status") != HP_STATUS_HEATING:
-            self._powers.clear()
-            return None
-        power = values.get("heatingpower")
-        if isinstance(power, (int, float)) and not isinstance(power, bool):
-            self._powers.append(float(power))
-        if not self._powers:
-            return None
-        return sum(self._powers) / len(self._powers)
+        """Mean space-heating output over the load term's cycle window.
+
+        The main coordinator accumulates this at poll resolution; a single
+        sample per curve cycle aliases the compressor's on/off cycling, and the
+        mean has to include idle intervals as 0 W for "coasting below demand"
+        to be measurable at all. ``None`` until the window holds enough
+        evidence: no reading is better than one sample standing in for a cycle.
+        """
+        mean = values.get("heating_power_mean_w")
+        if isinstance(mean, (int, float)) and not isinstance(mean, bool):
+            return float(mean)
+        return None
 
     def _cop_feedback_c(
         self,

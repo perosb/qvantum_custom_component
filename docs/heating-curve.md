@@ -159,12 +159,27 @@ pump's current seven-point table (holding 24–30) as the baseline and computes
 | outdoor | Open-Meteo hourly temperature trend over the next hours (never instantaneous BT1), damped |
 | night/day | local sunrise/sunset (Home Assistant location); amplitude is a fraction of the forecast's diurnal supply swing (curve slope × outdoor range), bounded |
 | solar | self-calibrating `a`/`b`/`trust` model from recorder statistics (`heatingpower`, indoor, outdoor) plus Open-Meteo GHI history, identified on **day blocks** (see [Solar model](#solar-model)); gain in W → °C through the local baseline slope |
-| load | one-sided reduction when measured heating power is below the model demand at the target indoor temperature |
+| load | one-sided reduction when the measured heating power (a 2 h mean over whole compressor cycles, idle time included) is below the model demand at the target indoor temperature |
 | optional | COP feedback, cold-snap pre-charge and/or wind, **off by default**; the solar term can be switched off — see [Optional terms](#optional-terms) |
 
 Indoor deviation from the target is a **cap** only (a warm house blocks upward
 adjustment, a cold house blocks downward), it never drives a term. Points are
 clamped to 10–80 °C and fall toward warmer outdoors.
+
+The load term's input is a rolling mean of `heatingpower` accumulated at poll
+resolution over two hours, not the instantaneous figure. It has to span whole
+compressor cycles: a single sample per curve cycle is either an "on" or an "off"
+value, and a heat pump that cycles then looks like a pump that coasts — or, right
+after a cycle ends, like no data at all. Idle polls contribute 0 W (coasting is
+exactly what the term measures) while hot-water, defrost and cooling polls
+contribute nothing, because the compressor was working on something else — and
+so does any interval with the immersion heater demanded, since the element's heat
+is not part of `heatingpower` and would read as a shortfall the house never had. The
+mean is published as `heating_power_mean_w` and appears in the diagnostics
+together with `load_power_coverage_hours`; below 30 minutes of observed
+intervals nothing is published and the term stays inert, so a fresh start (or a
+restart) cannot act on one sample. The window is not persisted across restarts:
+the gate is waited out instead of booking hours no poll observed.
 
 The frozen baseline is the app's seven-point table, but that table is only a
 side dump: on Auto the firmware follows holding 23, so it can diverge from what

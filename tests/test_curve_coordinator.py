@@ -28,7 +28,6 @@ from custom_components.qvantum.heating_curve import (
 )
 from custom_components.qvantum.curve_coordinator import (
     INDOOR_MARGIN_CYCLES,
-    POWER_CYCLES,
     READY_MIN_HOURS,
     CurveSnapshot,
     QvantumCurveCoordinator,
@@ -149,7 +148,6 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._forecast_ts = None
     coordinator._forecast_reused = False
     coordinator._indoor_margins = deque(maxlen=INDOOR_MARGIN_CYCLES)
-    coordinator._powers = deque(maxlen=POWER_CYCLES)
     coordinator._mode = "shadow"
     coordinator._revert_pending = False
     coordinator._control_lock = asyncio.Lock()
@@ -1869,13 +1867,27 @@ async def test_async_persist_swallows_store_errors() -> None:
     await coordinator._async_persist()
 
 
-async def test_push_power_only_while_heating() -> None:
+async def test_push_power_reads_the_cycle_window_mean() -> None:
     coordinator = make_coordinator()
 
-    assert coordinator._push_power({"hp_status": HP_STATUS_HEATING, "heatingpower": 1000.0}) == 1000.0
-    assert coordinator._push_power({"hp_status": HP_STATUS_HEATING, "heatingpower": 2000.0}) == 1500.0
-    assert coordinator._push_power({"hp_status": 0, "heatingpower": 2000.0}) is None
-    assert coordinator._push_power({"hp_status": 0}) is None
+    # The main coordinator keeps the poll-resolution mean; the curve must not
+    # average a single sample per cycle, which would alias the cycling.
+    assert coordinator._push_power({"heating_power_mean_w": 1850.0}) == 1850.0
+    assert (
+        coordinator._push_power(
+            {"heating_power_mean_w": 1850.0, "hp_status": 0, "heatingpower": 4000.0}
+        )
+        == 1850.0
+    )
+
+
+async def test_push_power_is_none_without_window_evidence() -> None:
+    coordinator = make_coordinator()
+
+    # No mean yet: the load term stays inert instead of acting on one sample.
+    assert coordinator._push_power({"hp_status": HP_STATUS_HEATING, "heatingpower": 4000.0}) is None
+    assert coordinator._push_power({}) is None
+    assert coordinator._push_power({"heating_power_mean_w": None}) is None
 
 
 async def test_push_indoor_margin_averages_window() -> None:
@@ -2472,10 +2484,7 @@ def test_push_helpers_return_none_for_empty_inputs() -> None:
     coordinator = make_coordinator()
 
     assert coordinator._push_indoor_margin({}, time.time()) is None
-    assert (
-        coordinator._push_power({"hp_status": HP_STATUS_HEATING, "heatingpower": None})
-        is None
-    )
+    assert coordinator._push_power({"heatingpower": 1000.0}) is None
 
 
 async def test_snapshot_forecast_failure_blocks_and_falls_back() -> None:
