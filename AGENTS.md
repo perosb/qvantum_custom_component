@@ -403,8 +403,9 @@ that the level is **not** a capacity figure: 175 L ≈ 0.20 kWh/K while a 6-minu
 shower needs ≈ 1.76 kWh, i.e. ≈ 8.6 K per shower, so a 1 °C step cannot mean one
 shower and no mapping follows from physics. The repair text therefore says the
 pair cannot be named, that start/stop remain the editable truth, and what level
-the app/cloud reports — it does **not** tell the user to set a level. Plan:
-`~/.pi/agent/plans/qvantum-dhw-capacity-table.md`.
+the app/cloud reports — it does **not** tell the user to set a level. The open
+work is a per-firmware mapping learned from cloud rows (level and pair arrive
+together there; Modbus has no level) or a table published by Qvantum.
 
 ## Telemetry
 
@@ -709,8 +710,7 @@ further changes once it ships; before that, edit it in place as usual).
   (measured 1.6–2.2 on real windows: collinearity is not what breaks it).
   With evidence the estimator is unbiased: on a synthetic winter at this
   install's noise level (≈4 kWh/day) it returns 0.11 ± 0.25 with no term and
-  3.11 ± 0.25 for a true 3.0 W/K per m/s. See
-  `~/.pi/agent/plans/qvantum-wind-term.md`.
+  3.11 ± 0.25 for a true 3.0 W/K per m/s.
 - Wind is a **site proxy**: Open-Meteo returns 10 m wind on a grid cell, and
   shelter from trees, neighbours and terrain is invisible in the payload. The
   coefficient is therefore identified per installation and is biased low where
