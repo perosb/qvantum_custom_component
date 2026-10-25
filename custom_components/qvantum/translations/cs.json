@@ -1011,7 +1011,7 @@
     },
     "tap_water_capacity_mismatch": {
       "title": "Neznámá kapacita teplé vody",
-      "description": "Čerpadlo drží {start} / {stop} °C jako start/stop teplé vody – dvojici, která neodpovídá žádné úrovni kapacity v aplikaci. Číslo kapacity ukazuje „neznámá“ místo zaokrouhlení na úroveň: nejbližší úroveň podle teploty stop je {nearest} a úroveň hlášená aplikací/cloudem je {reported}. Zvolte úroveň kapacity a zapište odpovídající dvojici."
+      "description": "Čerpadlo drží {start} / {stop} °C jako start/stop teplé vody. Tato dvojice není v tabulce kapacity této integrace: tabulka pochází z doby před změnou firmwaru, která úrovně vzdálila přibližně o 1 °C, takže úroveň nelze pojmenovat a číslo kapacity ukazuje „neznámá“ místo odhadu. Teploty start a stop jsou směrodatné a zůstávají upravitelné. Úroveň hlášená aplikací/cloudem je {reported}."
     }
   }
 }

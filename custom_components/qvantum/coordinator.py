@@ -1240,7 +1240,6 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             ir.async_delete_issue(self.hass, DOMAIN, issue_id)
             return
         reported = mismatch["reported"]
-        nearest = mismatch["nearest"]
         ir.async_create_issue(
             self.hass,
             DOMAIN,
@@ -1248,11 +1247,13 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             is_fixable=False,
             severity=ir.IssueSeverity.WARNING,
             translation_key="tap_water_capacity_mismatch",
+            # No ``nearest`` placeholder: it is computed from a table that
+            # predates Qvantum's firmware change, so naming a level would point
+            # at one the user's pump does not have.
             translation_placeholders={
                 "start": str(mismatch["start"]),
                 "stop": str(mismatch["stop"]),
                 "reported": "none" if reported is None else str(reported),
-                "nearest": str(nearest),
             },
         )
 

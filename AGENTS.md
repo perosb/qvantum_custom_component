@@ -378,7 +378,23 @@ the number platform's availability check) with
 attributes, and `_async_sync_tap_water_capacity_issue` keeps a
 `tap_water_capacity_mismatch` repair issue (WARNING, not fixable) in step with
 the mismatch — including a cloud level that disagrees with a mapped pair.
-`nearest_tap_water_capacity_level` is only the issue's hint, never the state.
+`nearest_tap_water_capacity_level` is only the entity's *attribute* hint, never
+the state and never in the issue text.
+
+**The table is firmware-specific and must not be "fixed" by guessing.** It has
+been unchanged since #270 and predates Qvantum's change, which is the firmware in
+the field — not only newer pumps: the levels now sit about 1 °C apart (a
+reporting QE4 shows **55/65 = level 5**, and its app no longer writes 55/71), so
+no current pump is expected to match the table. Keep the pair as the truth and the level `unknown`;
+re-pointing the table silently retargets every level write for every user, so it
+waits for evidence — a per-firmware mapping accumulated from cloud rows (level
+and pair arrive together there; Modbus has no level) or a published table. Note
+that the level is **not** a capacity figure: 175 L ≈ 0.20 kWh/K while a 6-minute
+shower needs ≈ 1.76 kWh, i.e. ≈ 8.6 K per shower, so a 1 °C step cannot mean one
+shower and no mapping follows from physics. The repair text therefore says the
+pair cannot be named, that start/stop remain the editable truth, and what level
+the app/cloud reports — it does **not** tell the user to set a level. Plan:
+`~/.pi/agent/plans/qvantum-dhw-capacity-table.md`.
 
 ## Telemetry
 

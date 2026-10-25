@@ -1792,11 +1792,12 @@ class TestDeriveTapWaterCapacity:
         delete_issue.assert_not_called()
         kwargs = create_issue.call_args.kwargs
         assert kwargs["translation_key"] == "tap_water_capacity_mismatch"
+        # No ``nearest``: the table predates Qvantum's firmware change, so a
+        # level number would point at one the pump no longer uses.
         assert kwargs["translation_placeholders"] == {
             "start": "55",
             "stop": "65",
             "reported": "5",
-            "nearest": "2",
         }
         assert create_issue.call_args.args[2].startswith(
             "tap_water_capacity_mismatch_"
