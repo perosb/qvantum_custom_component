@@ -1011,7 +1011,7 @@
     },
     "tap_water_capacity_mismatch": {
       "title": "Capacidad de agua caliente desconocida",
-      "description": "La bomba mantiene {start} / {stop} °C como arranque/parada de agua caliente, una pareja que no corresponde a ninguno de los niveles de capacidad de la aplicación. El número de capacidad muestra «desconocido» en lugar de redondear a un nivel: el nivel más cercano según la temperatura de parada sería {nearest} y el nivel informado por la aplicación/la nube es {reported}. Elige un nivel de capacidad para volver a escribir una pareja coincidente."
+      "description": "La bomba mantiene {start} / {stop} °C como arranque/parada de agua caliente. Esa pareja no está en la tabla de capacidad de esta integración: la tabla es anterior a un cambio de firmware que dejó los niveles a unos 1 °C de distancia, así que el nivel no se puede nombrar y la capacidad muestra «desconocido» en lugar de una estimación. Las temperaturas de arranque y parada son la verdad y siguen siendo editables. El nivel que informan la aplicación/la nube es {reported}."
     }
   }
 }

@@ -1011,7 +1011,7 @@
     },
     "tap_water_capacity_mismatch": {
       "title": "Warmwatercapaciteit is onbekend",
-      "description": "De warmtepomp houdt {start} / {stop} °C aan als start/stop voor warm water, een paar dat niet overeenkomt met een van de capaciteitsniveaus in de app. Het capaciteitsnummer toont \"onbekend\" in plaats van naar een niveau af te ronden: het dichtstbijzijnde niveau op basis van de stoptemperatuur is {nearest} en het niveau dat de app/cloud meldt is {reported}. Kies een capaciteitsniveau om weer een passend paar te schrijven."
+      "description": "De warmtepomp houdt {start} / {stop} °C aan als start/stop voor warm water. Dat paar staat niet in de capaciteitstabel van deze integratie: de tabel stamt van vóór een firmwarewijziging waarbij de niveaus ongeveer 1 °C uit elkaar liggen, dus het niveau kan niet benoemd worden en de capaciteit toont \"onbekend\" in plaats van een schatting. De start- en stoptemperatuur zijn de waarheid en blijven bewerkbaar. Het niveau dat de app/cloud meldt is {reported}."
     }
   }
 }
