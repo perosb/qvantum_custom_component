@@ -387,7 +387,10 @@ pair is not in the table — no level in the text, since `reported` is `None` on
 Modbus and printing "none" was a bug) and `tap_water_capacity_level_conflict`
 (`level_conflict`: the table maps the pair to one level and the transport
 reports another, so both numbers are named). Each has its own issue id suffix and
-the other kind is deleted on every sync.
+every other id is deleted on every sync — **including the legacy unsuffixed
+`tap_water_capacity_mismatch_<entry>`**, which releases up to 2026.10.18 raised
+and which lives in HA's issue store across restarts; without that delete an
+upgrading installation keeps the old issue next to the new one forever.
 `nearest_tap_water_capacity_level` is only the entity's *attribute* hint, never
 the state and never in either issue text.
 

@@ -1791,9 +1791,14 @@ class TestDeriveTapWaterCapacity:
         ) as delete_issue:
             coordinator._async_sync_tap_water_capacity_issue()
         # The other kind's issue is cleared, this one raised.
-        delete_issue.assert_called_once()
-        assert delete_issue.call_args.args[2].startswith(
-            "tap_water_capacity_mismatch_level_conflict_"
+        cleared = [call.args[2] for call in delete_issue.call_args_list]
+        assert any(c.startswith("tap_water_capacity_mismatch_level_conflict_") for c in cleared)
+        # The legacy unsuffixed id from releases before the split goes too.
+        assert any(
+            c.startswith("tap_water_capacity_mismatch_")
+            and "_unmapped_" not in c
+            and "_level_conflict_" not in c
+            for c in cleared
         )
         kwargs = create_issue.call_args.kwargs
         # Its own key and placeholders: the unmapped case has no level to name,
@@ -1844,8 +1849,8 @@ class TestDeriveTapWaterCapacity:
         ) as delete_issue:
             coordinator._async_sync_tap_water_capacity_issue()
         create_issue.assert_not_called()
-        # Both kinds are cleared, whichever one was open.
-        assert delete_issue.call_count == 2
+        # Both kinds and the legacy id are cleared, whichever one was open.
+        assert delete_issue.call_count == 3
 
     def test_issue_cleared_before_the_first_poll(self):
         """No mismatch recorded yet (restart, no poll) means no issue."""
@@ -1854,7 +1859,7 @@ class TestDeriveTapWaterCapacity:
             coordinator_module.ir, "async_delete_issue"
         ) as delete_issue:
             coordinator._async_sync_tap_water_capacity_issue()
-        assert delete_issue.call_count == 2  # both kinds
+        assert delete_issue.call_count == 3  # both kinds + the legacy id
 
 
 class TestCalculateHeatingPower:

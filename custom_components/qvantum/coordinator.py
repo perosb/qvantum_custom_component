@@ -1241,11 +1241,16 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         """Raise the issue for the current mismatch and clear the other kind."""
         mismatch = getattr(self, "_tap_water_capacity_mismatch", None)
         kind = None if mismatch is None else str(mismatch["kind"])
-        for candidate in ("unmapped", "level_conflict"):
-            if candidate != kind:
-                ir.async_delete_issue(
-                    self.hass, DOMAIN, self._tap_water_capacity_issue_id(candidate)
-                )
+        # The legacy unsuffixed id was raised by releases up to 2026.10.18; it
+        # lives in HA's issue store across restarts, so an upgrading installation
+        # would keep it next to the new one forever unless it is cleared here
+        # (a no-op once it is gone).
+        for candidate in (None, "unmapped", "level_conflict"):
+            if kind is not None and candidate == kind:
+                continue  # the current kind is created below
+            ir.async_delete_issue(
+                self.hass, DOMAIN, self._tap_water_capacity_issue_id(candidate)
+            )
         if mismatch is None:
             return
         if kind == "unmapped":
