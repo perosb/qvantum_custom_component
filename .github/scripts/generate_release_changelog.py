@@ -29,6 +29,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_DARTER = REPO_ROOT / ".github" / "release-drafter.yml"
 DEFAULT_INDEX = REPO_ROOT / "docs" / "releases" / "README.md"
 
+#: Release-note file names: a ``YYYY.M.D`` tag, nothing else.
+_TAG_FILE_RE = re.compile(r"^\d{4}\.\d+\.\d+$")
+
 ALL_RELEASES_URL = "https://github.com/{repo}/tree/main/docs/releases"
 COMPARE_URL = "https://github.com/{repo}/compare/{base}...{head}"
 BLOB_URL = "https://github.com/{repo}/blob/main/docs/releases/{tag}.md"
@@ -363,10 +366,20 @@ def prune_superseded_prereleases(repo: str, releases_dir: Path, index_path: Path
 
     removed = []
     for path in sorted(Path(releases_dir).glob("*.md")):
-        if path.name == "README.md":
+        if path.name == "README.md" or not _TAG_FILE_RE.match(path.stem):
+            # Only ``YYYY.M.D`` files are release notes; anything else in the
+            # directory belongs to the caller (``--out`` uses arbitrary names).
             continue
         release = by_tag.get(path.stem)
-        if not release or not release.get("isPrerelease") or path.stem == latest_tag:
+        if release is None:
+            # The file outlived its release (deleted pre-release, or a run that
+            # wrote the notes and never published). Nothing links to it any
+            # more, so it is an orphan: drop it with its index row.
+            path.unlink()
+            prune_index_row(index_path, path.stem)
+            removed.append(path.stem)
+            continue
+        if not release.get("isPrerelease") or path.stem == latest_tag:
             continue
         path.unlink()
         prune_index_row(index_path, path.stem)
@@ -801,8 +814,26 @@ def _read_index_rows(index_path: Path) -> list[tuple[str, str, str]]:
     return rows
 
 
+def _version_key(tag: str) -> tuple[int, ...]:
+    """Numeric key for a ``YYYY.M.D`` tag.
+
+    String order puts 2026.10.9 *above* 2026.10.10, and a date-only sort leaves
+    two releases from the same day in insertion order — which is how the index
+    ended up with 10.10 above 10.11.
+    """
+    key: list[int] = []
+    for piece in str(tag).split("."):
+        try:
+            key.append(int(piece))
+        except ValueError:
+            key.append(0)
+    return tuple(key)
+
+
 def _write_index_rows(index_path: Path, rows: list[tuple[str, str, str]]) -> None:
-    rows = sorted(rows, key=lambda row: row[1], reverse=True)
+    rows = sorted(
+        rows, key=lambda row: (row[1], _version_key(row[0])), reverse=True
+    )
     lines = [INDEX_HEADER.rstrip("\n")]
     lines.extend(f"| [{row[0]}]({row[0]}.md) | {row[1]} | {row[2]} |" for row in rows)
     index_path = Path(index_path)

@@ -256,6 +256,22 @@ def test_update_index_is_idempotent_and_sorted(changelog, tmp_path):
     assert "Changed" in index.read_text()
 
 
+def test_index_sorts_same_day_releases_by_version_number(changelog, tmp_path):
+    """Same-day releases must fall newest-first, and 10.9 is older than 10.10.
+
+    The index was sorted by the date column only, so two releases published the
+    same day kept insertion order (10.10 above 10.11), and a tag-string sort
+    would put 2026.10.9 above 2026.10.10.
+    """
+    index = tmp_path / "README.md"
+    for tag in ("2026.10.10", "2026.10.11", "2026.10.9", "2026.10.13"):
+        changelog.update_index(index, tag, "2026-10-19T00:00:00Z", "x")
+
+    rows = [line for line in index.read_text().splitlines() if line.startswith("| [")]
+    order = [line.split("]")[0].lstrip("| [") for line in rows]
+    assert order == ["2026.10.13", "2026.10.11", "2026.10.10", "2026.10.9"]
+
+
 def test_existing_overview_preserved(changelog, tmp_path):
     path = tmp_path / "2026.9.16.md"
     path.write_text(
@@ -582,6 +598,34 @@ def test_prune_superseded_prereleases_keeps_latest(changelog, monkeypatch, tmp_p
     assert "[2026.9.15]" not in index.read_text()
     assert "[2026.10.1]" in index.read_text()
     assert fake.edited is not None and "Full release notes" not in fake.edited
+
+
+def test_prune_removes_notes_for_releases_that_no_longer_exist(
+    changelog, monkeypatch, tmp_path
+):
+    """A deleted pre-release leaves an orphan file and a dead index row.
+
+    Found on the repository itself: 2026.10.14/.15/.16 (and .4–.7, .9) had note
+    files while their releases were gone, so the index linked to nothing.
+    """
+    releases = [
+        {"tagName": "2026.10.13", "publishedAt": "2026-10-24T00:00:00Z", "isPrerelease": False, "isDraft": False},
+    ]
+    fake = FakeGh(releases=releases, info=INFO, body="", prs=PRS)
+    monkeypatch.setattr(changelog, "_gh", fake)
+    releases_dir = tmp_path / "releases"
+    releases_dir.mkdir()
+    index = releases_dir / "README.md"
+    for tag in ("2026.10.13", "2026.10.16"):
+        (releases_dir / f"{tag}.md").write_text(f"# {tag}\n")
+        changelog.update_index(index, tag, "2026-10-24T00:00:00Z", "x")
+
+    removed = changelog.prune_superseded_prereleases("o/r", releases_dir, index)
+
+    assert removed == ["2026.10.16"]
+    assert not (releases_dir / "2026.10.16.md").exists()
+    assert (releases_dir / "2026.10.13.md").exists()
+    assert "[2026.10.16]" not in index.read_text()
 
 
 def test_parse_themes_valid_and_invalid(changelog):
