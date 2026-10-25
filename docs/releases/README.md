@@ -6,7 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
-| [2026.10.17](2026.10.17.md) | 2026-10-25 | Wind data improves calibration |
+| [2026.10.18](2026.10.18.md) | 2026-10-25 | Wind data and reliable estimates |
 | [2026.10.13](2026.10.13.md) | 2026-10-24 | Missing room sensors no longer distort heat-pump readings |
 | [2026.10.12](2026.10.12.md) | 2026-10-23 | More reliable and protected summaries |
 | [2026.10.11](2026.10.11.md) | 2026-10-19 | Choose whether to share an anonymous summary |
