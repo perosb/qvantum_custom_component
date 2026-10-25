@@ -688,6 +688,9 @@
       },
       "solar_gain_now_w": {
         "name": "Solární zisk (nyní)"
+      },
+      "adaptive_curve_wind_model": {
+        "name": "Adaptivní topná křivka: model větru"
       }
     },
     "number": {

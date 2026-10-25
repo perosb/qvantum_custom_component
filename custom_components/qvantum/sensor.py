@@ -26,6 +26,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
+from .solar_gain import DAILY_MIN_COLD_WIND_HOURS as _MIN_COLD_WIND_HOURS
 from .const import (
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
@@ -153,6 +154,7 @@ _CURVE_SENSOR_KEYS = frozenset(
         "adaptive_curve_deviation",
         "adaptive_curve_room_error",
         "adaptive_curve_solar_model",
+        "adaptive_curve_wind_model",
         "adaptive_curve_coverage",
     }
 )
@@ -445,6 +447,15 @@ async def async_setup_entry(
             sensors.append(
                 QvantumCurveSolarModelSensor(
                     curve_coordinator, "adaptive_curve_solar_model", device
+                )
+            )
+            # The wind column is part of the same day-block fit but answers a
+            # different question ("does my house have an identifiable wind
+            # term?"), and without its own entity that answer hides inside
+            # another sensor's attributes.
+            sensors.append(
+                QvantumCurveWindModelSensor(
+                    curve_coordinator, "adaptive_curve_wind_model", device
                 )
             )
             # Opt-in diagnostic: how much of the seven-point curve the learned
@@ -968,6 +979,14 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
             "wind_valid": (
                 None if snapshot.daily_model is None else snapshot.daily_model.wind_valid
             ),
+            # Enough cold, windy hours is what an identifiable wind term needs;
+            # showing the count turns "nothing happens" into "37 of 200 hours".
+            "wind_cold_hours": (
+                None
+                if snapshot.daily_model is None
+                else snapshot.daily_model.wind_cold_hours
+            ),
+            "wind_required_cold_hours": _MIN_COLD_WIND_HOURS,
             "capped_by_indoor": snapshot.capped_by_indoor,
             "trims": dict(snapshot.trims),
             "clamped": snapshot.clamped,
@@ -1236,6 +1255,56 @@ class QvantumCurveSolarModelSensor(QvantumCurveSensorEntity):
             ),
         }
         return attributes
+
+
+class QvantumCurveWindModelSensor(QvantumCurveSensorEntity):
+    """Diagnostic wind column of the day-block model."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:weather-windy"
+    _attr_native_unit_of_measurement = "W/K/(m/s)"
+
+    @property
+    def native_value(self):
+        """The identified sensitivity, or ``None`` while it is not identifiable.
+
+        ``unknown`` is the answer, not 0: a coefficient that failed its gates is
+        not "no wind effect", and reporting 0 would read like one.
+        """
+        snapshot = self.coordinator.data
+        if snapshot is None or snapshot.daily_model is None:
+            return None
+        daily = snapshot.daily_model
+        if not daily.wind_valid or daily.w_per_ms is None:
+            return None
+        return round(daily.w_per_ms, 2)
+
+    @property
+    def available(self) -> bool:
+        """Available once a day-block model exists, even if wind is not."""
+        snapshot = self.coordinator.data
+        return super().available and snapshot is not None and snapshot.daily_model is not None
+
+    @property
+    def extra_state_attributes(self):
+        """Why the term is or is not acting, in one place."""
+        snapshot = self.coordinator.data
+        if snapshot is None or snapshot.daily_model is None:
+            return None
+        daily = snapshot.daily_model
+        terms = getattr(self.coordinator, "terms", {}) or {}
+        return {
+            "valid": daily.wind_valid,
+            "term_enabled": bool(terms.get("wind", False)),
+            "applied_c": round(snapshot.wind_c, 2),
+            "cold_hours": daily.wind_cold_hours,
+            "required_cold_hours": _MIN_COLD_WIND_HOURS,
+            "wind_hours": daily.wind_hours,
+            "t_stat": None if daily.w_t_stat is None else round(daily.w_t_stat, 2),
+            "std_err": None if daily.w_std_err is None else round(daily.w_std_err, 3),
+            "vif": None if daily.wind_vif is None else round(daily.wind_vif, 2),
+            "notes": daily.wind_notes,
+        }
 
 
 class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):

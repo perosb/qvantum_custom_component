@@ -688,6 +688,9 @@
       },
       "solar_gain_now_w": {
         "name": "Solare Wärmegewinne (jetzt)"
+      },
+      "adaptive_curve_wind_model": {
+        "name": "Adaptive Heizkurve: Windmodell"
       }
     },
     "number": {

@@ -484,7 +484,9 @@ class QvantumCurveCard extends HTMLElement {
         // Which terms are switched on, and whether the wind column could be
         // identified at all: "on but idle" must not look like "off".
         terms: attr(adj, "terms") || {},
-        windValid: attr(adj, "wind_valid") !== false,
+        windValid: attr(adj, "wind_valid") === true,
+        windCold: num(attr(adj, "wind_cold_hours")),
+        windRequired: num(attr(adj, "wind_required_cold_hours")),
         load: num(attr(adj, "load_c")),
         trims: attr(adj, "trims"),
         clamped: attr(adj, "clamped") === true,
@@ -797,12 +799,10 @@ class QvantumCurveCard extends HTMLElement {
       a.trims && typeof a.trims === "object"
         ? Object.values(a.trims).reduce((acc, v) => acc + (num(v) ?? 0), 0)
         : 0;
-    const term = (label, value, cls = "") =>
+    const term = (label, value, cls = "", note = "") =>
       `<span class="term ${cls}"><span class="label">${esc(
         label,
-      )}</span><span class="value">${esc(
-        value === null ? "–" : `${signed(value)} K`,
-      )}</span></span>`;
+      )}</span><span class="value">${esc(note || (value === null ? "–" : `${signed(value)} K`))}</span></span>`;
     // Solar is on by default; the other three are opt-in. An enabled term is
     // shown even while idle (+0.0 K), so "switched on but no effect" is
     // distinguishable from "switched off" — and the wind chip reads "–" when
@@ -813,8 +813,16 @@ class QvantumCurveCard extends HTMLElement {
     // coefficient is identifiable is a property of the house and its weather,
     // and knowing that is exactly what decides whether to switch it on. "Off
     // and not identifiable" stays quiet — there is nothing to see or act on.
+    // Enabled but unidentifiable: say *how far off* the evidence is, rather
+    // than a bare "–". The counts come from the adjustment sensor.
+    const windEvidence =
+      a.windCold !== null && a.windRequired !== null
+        ? `${fmt(a.windCold, 0)}/${fmt(a.windRequired, 0)} ${t.hours}`
+        : null;
     const windChip = a.terms.wind
-      ? term(t.tWind, a.windValid ? a.wind : null, a.windValid ? "" : "idle")
+      ? a.windValid
+        ? term(t.tWind, a.wind)
+        : term(t.tWind, null, "idle", windEvidence)
       : a.windValid
         ? term(`${t.tWind} (${t.off})`, null, "idle")
         : "";
