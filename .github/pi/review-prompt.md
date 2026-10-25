@@ -87,6 +87,10 @@ After any tool calls, your final message must still be only that JSON object:
 }
 ```
 
+Reply with the JSON object and **nothing else** — no prose before or after, no
+fences needed. A prose answer (even a correct review) cannot be parsed, so it is
+posted as a plain comment and the inline anchors are lost.
+
 ## Hard rules for comments
 
 1. Only `critical` and `high` severity comments are posted; anything lower is

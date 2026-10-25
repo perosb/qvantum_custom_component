@@ -278,19 +278,53 @@ def test_main_success_posts_review(review_module, monkeypatch, tmp_path):
     assert captured["head_sha"] == "abc"
 
 
-def test_main_parse_failure_posts_fallback(review_module, monkeypatch, tmp_path):
+def test_main_prose_review_posts_fallback_and_passes(review_module, monkeypatch, tmp_path, capsys):
+    """Unformatted output must not fail the check when the review is posted.
+
+    Two merges (#430, #434) were blocked by this: the reviewer answered in prose
+    with no findings, the fallback comment went up, and the job still exited 1.
+    """
     events = tmp_path / "events.jsonl"
     events.write_text('{"type":"agent_start"}\n')
     captured: dict[str, Any] = {}
     monkeypatch.setattr(review_module, "extract_assistant_text", lambda path: "not json")
-    monkeypatch.setattr(
-        review_module, "post_fallback_comment", lambda number, raw: captured.update(number=number, raw=raw)
-    )
+
+    def fake_fallback(number, raw):
+        captured.update(number=number, raw=raw)
+        return True
+
+    monkeypatch.setattr(review_module, "post_fallback_comment", fake_fallback)
     monkeypatch.setattr(sys, "argv", ["post_review.py", str(events), "5"])
+
+    review_module.main()  # no SystemExit
+
+    assert captured == {"number": 5, "raw": "not json"}
+    assert "::warning title=Unparsed review::" in capsys.readouterr().out
+
+
+def test_main_fails_when_the_fallback_cannot_be_posted(review_module, monkeypatch, tmp_path):
+    events = tmp_path / "events.jsonl"
+    events.write_text('{"type":"agent_start"}\n')
+    monkeypatch.setattr(review_module, "extract_assistant_text", lambda path: "not json")
+    monkeypatch.setattr(review_module, "post_fallback_comment", lambda number, raw: False)
+    monkeypatch.setattr(sys, "argv", ["post_review.py", str(events), "5"])
+
     with pytest.raises(SystemExit):
         review_module.main()
-    assert captured["number"] == 5
-    assert captured["raw"] == "not json"
+
+
+def test_main_fails_when_the_reviewer_said_nothing(review_module, monkeypatch, tmp_path):
+    """An empty answer has no review to keep: that stays a failure."""
+    events = tmp_path / "events.jsonl"
+    events.write_text('{"type":"agent_start"}\n')
+    monkeypatch.setattr(review_module, "extract_assistant_text", lambda path: "")
+    monkeypatch.setattr(
+        review_module, "post_fallback_comment", lambda number, raw: pytest.fail("nothing to post")
+    )
+    monkeypatch.setattr(sys, "argv", ["post_review.py", str(events), "5"])
+
+    with pytest.raises(SystemExit):
+        review_module.main()
 
 
 def test_below_threshold_comments_are_omitted(review_module, monkeypatch):

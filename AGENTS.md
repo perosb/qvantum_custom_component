@@ -230,6 +230,12 @@ now wrong* is the one that changed. What has to move, when:
 | A measured constant or protocol behaviour (a probe, a verified register) | the place that documents the measurement, with its numbers |
 | Workflow, tooling, release automation | `AGENTS.md` |
 
+The reviewer's output contract is JSON; when the model answers in prose instead,
+`post_review.py` posts that text as a fallback comment and **passes with a
+`::warning::`** — failing the check there blocked two merges (#430, #434) on a
+formatting slip with no findings behind it. A run that produces no text at all,
+or whose fallback cannot be posted, still fails.
+
 ### Release automation
 
 `release.yml` is the only writer of `manifest.json` / `const.py` (both hold the

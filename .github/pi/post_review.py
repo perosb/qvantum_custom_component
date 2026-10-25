@@ -292,8 +292,12 @@ def post_review(number: int, head_sha: str, review: dict) -> None:
         sys.exit(1)
 
 
-def post_fallback_comment(number: int, raw: str) -> None:
-    """Keep the review visible even when the JSON could not be parsed."""
+def post_fallback_comment(number: int, raw: str) -> bool:
+    """Keep the review visible even when the JSON could not be parsed.
+
+    Returns whether the comment landed: a review nobody can read is a failure,
+    while a review that is merely unformatted is not.
+    """
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     body = (
         "⚠️ The model's output could not be parsed as review JSON. Raw text:\n\n"
@@ -302,6 +306,9 @@ def post_fallback_comment(number: int, raw: str) -> None:
     code, _ = gh_api(f"repos/{repo}/issues/{number}/comments", {"body": body})
     if code == 0:
         print("Posted unparsed review as fallback comment.")
+        return True
+    print("Failed to post the fallback comment.", file=sys.stderr)
+    return False
 
 
 def main() -> None:
@@ -317,9 +324,22 @@ def main() -> None:
         review = parse_review_json(raw)
     except (RuntimeError, json.JSONDecodeError) as error:
         print(f"Review parsing failed: {error}", file=sys.stderr)
-        if raw:
-            post_fallback_comment(args.number, raw)
-        sys.exit(1)
+        if not raw:
+            # Nothing at all came back: that is a real failure, and the PR must
+            # not merge past it.
+            sys.exit(1)
+        if not post_fallback_comment(args.number, raw):
+            sys.exit(1)
+        # The review *is* posted, just without inline anchors. Failing the
+        # check here blocked two merges (#430, #434) on a formatting slip with
+        # no findings behind it; annotate instead and let the check pass.
+        print(
+            "::warning title=Unparsed review::"
+            "The reviewer answered in prose instead of review JSON. "
+            "It was posted as a fallback comment, so nothing is lost — "
+            "but this run could not anchor comments to the diff."
+        )
+        return
 
     post_review(args.number, args.head_sha, review)
 
