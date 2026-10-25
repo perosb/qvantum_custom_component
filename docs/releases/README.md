@@ -7,6 +7,7 @@ link added to the GitHub release body.
 | Version | Released | Highlights |
 | --- | --- | --- |
 | [2026.10.16](2026.10.16.md) | 2026-10-25 | Hourly wind data joins solar weather data |
+| [2026.10.17](2026.10.17.md) | 2026-10-25 | Wind data improves calibration |
 | [2026.10.13](2026.10.13.md) | 2026-10-24 | Missing room sensors no longer distort heat-pump readings |
 | [2026.10.14](2026.10.14.md) | 2026-10-24 | Wind readings added to weather data |
 | [2026.10.15](2026.10.15.md) | 2026-10-24 | Wind readings are collected for future adaptation |
