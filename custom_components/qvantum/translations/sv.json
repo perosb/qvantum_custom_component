@@ -444,10 +444,10 @@
         "name": "Varmvattentemperatur stopp"
       },
       "tap_water_cap": {
-        "name": "Varmvattenkapacitet"
+        "name": "Duschar kvar"
       },
       "tap_water_minutes": {
-        "name": "Återstående varmvatten"
+        "name": "Återstående duschminuter"
       },
       "additionalenergy": {
         "name": "Tillsatsenergi"

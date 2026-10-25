@@ -436,10 +436,10 @@
         "name": "Melegvíz tartály felső határ"
       },
       "tap_water_cap": {
-        "name": "Melegvíz kapacitás"
+        "name": "Hátralévő zuhanyzások"
       },
       "tap_water_minutes": {
-        "name": "Melegvíz hátralévő"
+        "name": "Hátralévő zuhanyzási percek"
       },
       "additionalenergy": {
         "name": "Rásegítési energia"

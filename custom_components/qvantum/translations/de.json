@@ -436,10 +436,10 @@
         "name": "Brauchwasserbehälter Obergrenze"
       },
       "tap_water_cap": {
-        "name": "Brauchwasserkapazität"
+        "name": "Verbleibende Duschen"
       },
       "tap_water_minutes": {
-        "name": "Verbleibende Brauchwasserzeit"
+        "name": "Verbleibende Duschminuten"
       },
       "additionalenergy": {
         "name": "Zusätzliche Energie"

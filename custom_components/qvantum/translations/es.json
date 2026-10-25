@@ -436,10 +436,10 @@
         "name": "Límite superior depósito ACS"
       },
       "tap_water_cap": {
-        "name": "Capacidad agua caliente"
+        "name": "Duchas restantes"
       },
       "tap_water_minutes": {
-        "name": "Agua caliente restante"
+        "name": "Minutos de ducha restantes"
       },
       "additionalenergy": {
         "name": "Energía adicional"

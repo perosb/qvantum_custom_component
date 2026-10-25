@@ -436,10 +436,10 @@
         "name": "Horní hranice nádrže teplé vody"
       },
       "tap_water_cap": {
-        "name": "Kapacita teplé vody"
+        "name": "Zbývající sprchy"
       },
       "tap_water_minutes": {
-        "name": "Zbývající teplá voda"
+        "name": "Zbývající minuty sprchování"
       },
       "additionalenergy": {
         "name": "Dodatečná energie"

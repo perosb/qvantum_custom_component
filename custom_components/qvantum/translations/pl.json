@@ -436,10 +436,10 @@
         "name": "Górna granica zbiornika ciepłej wody"
       },
       "tap_water_cap": {
-        "name": "Pojemność ciepłej wody"
+        "name": "Pozostałe prysznice"
       },
       "tap_water_minutes": {
-        "name": "Pozostała ciepła woda"
+        "name": "Pozostałe minuty prysznica"
       },
       "additionalenergy": {
         "name": "Energia dogrzewania"

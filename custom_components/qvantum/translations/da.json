@@ -436,10 +436,10 @@
         "name": "Øvre grænse for varmtvandsbeholder"
       },
       "tap_water_cap": {
-        "name": "Varmtvandskapacitet"
+        "name": "Brusebade tilbage"
       },
       "tap_water_minutes": {
-        "name": "Varmt vand tilbage"
+        "name": "Resterende bruseminutter"
       },
       "additionalenergy": {
         "name": "Ekstra energi"
