@@ -3568,6 +3568,7 @@ async def test_recalibrate_bypasses_the_daily_throttle() -> None:
     coordinator._last_calibration_ok = True
     assert coordinator._calibration_due(time.time()) is False
     coordinator._async_calibrate = AsyncMock()
+    coordinator.async_refresh = AsyncMock()
     coordinator._daily_model = make_daily_model(
         wind_hours=264, wind_cold_hours=37, wind_valid=False, wind_notes="too few"
     )
@@ -3575,6 +3576,8 @@ async def test_recalibrate_bypasses_the_daily_throttle() -> None:
     result = await coordinator.async_recalibrate()
 
     coordinator._async_calibrate.assert_awaited_once()
+    # The entities must show the new column now, not at the next 15-min cycle.
+    coordinator.async_refresh.assert_awaited_once()
     assert result["calibration_ok"] is True
     assert result["wind_hours"] == 264
     assert result["wind_valid"] is False

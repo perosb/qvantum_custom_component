@@ -1095,6 +1095,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         (the service) can answer without opening a dump.
         """
         await self._async_calibrate(dt_util.utcnow().timestamp())
+        # Publish the new model now: the snapshot is only rebuilt by the regular
+        # cycle (15 min), so without this the service answers with the fresh
+        # column while every entity still shows the old one.
+        await self.async_refresh()
         daily = self._daily_model
         return {
             "calibration_ok": self._last_calibration_ok,

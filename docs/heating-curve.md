@@ -538,7 +538,9 @@ indoor sensor, filled a data gap, or are checking whether the wind column is
 identifiable at all), **Actions → Qvantum: Recalibrate**
 (`qvantum.recalibrate`) runs the attempt immediately and answers with the model
 state: day count, whether the daily model passed, and the wind column's hours,
-validity and notes. It writes nothing to the pump.
+validity and notes. It also recomputes the curve snapshot, so the sensors show
+the new column immediately instead of at the next 15-minute cycle. It writes
+nothing to the pump.
 `a` (W/K), `b` (m²) and a continuous trust in [0, 1] from `b`'s t-statistic
 are computed from your house's data — nothing is hand-tuned. Weak evidence
 keeps the solar term tiny automatically, and GHI is smoothed with an
