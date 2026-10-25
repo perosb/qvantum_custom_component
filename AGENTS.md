@@ -680,8 +680,14 @@ further changes once it ships; before that, edit it in place as usual).
   coefficient is therefore identified per installation and is biased low where
   the grid over-reports; "no term" is the expected answer for a sheltered site.
 - `SolarDailyModel` reports `w_per_ms`/`w_std_err`/`w_t_stat`/`wind_hours`
-  /`wind_valid`/`wind_notes` and the four-column `a_w_per_k_4col`/`b_m2_4col`,
-  all in `diagnostics.curve.model_daily`. `SUMMARY_SCHEMA_VERSION` is **8**: the
+  /`wind_cold_hours`/`wind_vif`/`wind_valid`/`wind_notes`, the half-split `w` and
+  the four-column `a_w_per_k_4col`/`b_m2_4col`, all in
+  `diagnostics.curve.model_daily`. They are **persisted with the model**
+  (`_daily_to_state`/`_daily_from_state`): the calibration runs at most once a
+  day, so a column left out of the store would silently switch the term off
+  after every restart until the next attempt — and the dump would report zeros
+  instead of "not measured". An older payload without the keys restores as "no
+  wind column", which is the correct reading. `SUMMARY_SCHEMA_VERSION` is **8**: the
   four wind fields plus the applied `wind_c` are new, and a schema without them
   cannot express "this installation has no identifiable wind term".
 - The **wind term** is optional and off by default: `"wind"` in the curve

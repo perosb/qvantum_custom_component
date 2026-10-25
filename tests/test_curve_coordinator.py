@@ -3557,6 +3557,81 @@ async def test_calibrate_fits_and_persists_the_daily_model() -> None:
     assert coordinator._store.saved["daily_model"]["n_days"] == daily.n_days
 
 
+async def test_the_wind_column_round_trips_with_the_daily_model() -> None:
+    """A restart must not blank the wind column until the next calibration.
+
+    The gates are 24 h apart, so a lost column meant the optional wind term
+    could not act again for a day — and the dump reported zeros rather than
+    "not measured", which reads like a fit result.
+    """
+    model = make_daily_model(
+        w_per_ms=2.4,
+        w_std_err=0.5,
+        w_t_stat=4.8,
+        wind_hours=1438,
+        wind_cold_hours=612,
+        wind_vif=1.6,
+        wind_valid=True,
+        wind_notes="cold_hours=612 w=2.40",
+        a_w_per_k_4col=150.0,
+        b_m2_4col=1.85,
+        w_first_half_ms=2.1,
+        w_second_half_ms=2.7,
+    )
+    coordinator = make_coordinator(store=FakeStore())
+    coordinator._daily_model = model
+    payload = coordinator._state_payload()
+
+    restored = make_coordinator(store=FakeStore(data=payload))
+    await restored.async_restore()
+
+    wind = restored.daily_model
+    assert wind is not None
+    assert wind.wind_valid is True
+    assert wind.w_per_ms == pytest.approx(2.4)
+    assert wind.w_std_err == pytest.approx(0.5)
+    assert wind.w_t_stat == pytest.approx(4.8)
+    assert wind.wind_hours == 1438
+    assert wind.wind_cold_hours == 612
+    assert wind.wind_vif == pytest.approx(1.6)
+    assert wind.wind_notes == "cold_hours=612 w=2.40"
+    assert wind.a_w_per_k_4col == pytest.approx(150.0)
+    assert wind.b_m2_4col == pytest.approx(1.85)
+    assert wind.w_first_half_ms == pytest.approx(2.1)
+    assert wind.w_second_half_ms == pytest.approx(2.7)
+
+
+async def test_a_store_without_the_wind_column_still_restores() -> None:
+    """An older payload has no wind keys: that is "no term", not a crash."""
+    coordinator = make_coordinator(store=FakeStore())
+    coordinator._daily_model = make_daily_model()
+    payload = coordinator._state_payload()
+    for key in (
+        "w",
+        "w_std_err",
+        "w_t_stat",
+        "wind_hours",
+        "wind_cold_hours",
+        "wind_vif",
+        "wind_valid",
+        "wind_notes",
+        "a_4col",
+        "b_4col",
+        "w_first_half",
+        "w_second_half",
+    ):
+        payload["daily_model"].pop(key, None)
+
+    restored = make_coordinator(store=FakeStore(data=payload))
+    await restored.async_restore()
+
+    wind = restored.daily_model
+    assert wind is not None and wind.valid
+    assert wind.wind_valid is False
+    assert wind.w_per_ms is None
+    assert wind.wind_hours == 0
+
+
 async def test_daily_model_round_trips_through_the_store() -> None:
     now_ts = time.time()
     coordinator = make_coordinator(store=FakeStore())
