@@ -1009,9 +1009,13 @@
         }
       }
     },
-    "tap_water_capacity_mismatch": {
+    "tap_water_capacity_unmapped": {
       "title": "Nieznana pojemność ciepłej wody",
-      "description": "Pompa utrzymuje {start} / {stop} °C jako start/stop ciepłej wody. Tej pary nie ma w tabeli pojemności tej integracji: tabela pochodzi sprzed zmiany firmware'u, która rozsunęła poziomy o około 1 °C, więc poziomu nie da się nazwać, a liczba pojemności pokazuje „nieznana” zamiast zgadywania. Temperatury start i stop są prawdą i nadal można je edytować. Poziom zgłaszany przez aplikację/chmurę to {reported}."
+      "description": "Pompa utrzymuje {start} / {stop} °C jako start/stop ciepłej wody. Tej pary nie ma w tabeli pojemności tej integracji: tabela pochodzi sprzed zmiany firmware'u, która rozsunęła poziomy o około 1 °C, więc poziomu nie da się nazwać, a liczba pojemności pokazuje „nieznana” zamiast zgadywania. Temperatury start i stop są prawdą i nadal można je edytować."
+    },
+    "tap_water_capacity_level_conflict": {
+      "title": "Aplikacja zgłasza poziom niezgodny z temperaturami",
+      "description": "Pompa utrzymuje {start} / {stop} °C jako start/stop ciepłej wody, co w tabeli tej integracji odpowiada poziomowi {pair_level} — ale aplikacja/chmura zgłasza poziom {reported}. To temperatury grzeją zbiornik i za nimi podąża liczba pojemności; to etykieta poziomu jest nieaktualna."
     }
   }
 }

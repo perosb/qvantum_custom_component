@@ -1009,9 +1009,13 @@
         }
       }
     },
-    "tap_water_capacity_mismatch": {
+    "tap_water_capacity_unmapped": {
       "title": "Neznámá kapacita teplé vody",
-      "description": "Čerpadlo drží {start} / {stop} °C jako start/stop teplé vody. Tato dvojice není v tabulce kapacity této integrace: tabulka pochází z doby před změnou firmwaru, která úrovně vzdálila přibližně o 1 °C, takže úroveň nelze pojmenovat a číslo kapacity ukazuje „neznámá“ místo odhadu. Teploty start a stop jsou směrodatné a zůstávají upravitelné. Úroveň hlášená aplikací/cloudem je {reported}."
+      "description": "Čerpadlo drží {start} / {stop} °C jako start/stop teplé vody. Tato dvojice není v tabulce kapacity této integrace: tabulka pochází z doby před změnou firmwaru, která úrovně vzdálila přibližně o 1 °C, takže úroveň nelze pojmenovat a číslo kapacity ukazuje „neznámá“ místo odhadu. Teploty start a stop jsou směrodatné a zůstávají upravitelné."
+    },
+    "tap_water_capacity_level_conflict": {
+      "title": "Aplikace hlásí úroveň, která neodpovídá teplotám",
+      "description": "Čerpadlo drží {start} / {stop} °C jako start/stop teplé vody, což je v tabulce této integrace úroveň {pair_level} — aplikace/cloud však hlásí úroveň {reported}. Vodu v zásobníku ohřívají teploty a podle nich se řídí i číslo kapacity; zastaralé je označení úrovně."
     }
   }
 }

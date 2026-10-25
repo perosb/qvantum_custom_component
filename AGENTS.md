@@ -380,11 +380,16 @@ with no user action) while the app keeps showing level 5. A pair outside
 entity stays available (its own key may be `None` — that is the one exemption in
 the number platform's availability check) with
 `start_stop_pair`/`pair_mapped`/`nearest_capacity`/`reported_capacity`
-attributes, and `_async_sync_tap_water_capacity_issue` keeps a
-`tap_water_capacity_mismatch` repair issue (WARNING, not fixable) in step with
-the mismatch — including a cloud level that disagrees with a mapped pair.
+attributes, and `_async_sync_tap_water_capacity_issue` keeps the repair issues in
+step with the mismatch. Two **separate** issues, because their texts differ and
+one of them has no level to name: `tap_water_capacity_unmapped` (`unmapped`: the
+pair is not in the table — no level in the text, since `reported` is `None` on
+Modbus and printing "none" was a bug) and `tap_water_capacity_level_conflict`
+(`level_conflict`: the table maps the pair to one level and the transport
+reports another, so both numbers are named). Each has its own issue id suffix and
+the other kind is deleted on every sync.
 `nearest_tap_water_capacity_level` is only the entity's *attribute* hint, never
-the state and never in the issue text.
+the state and never in either issue text.
 
 **The table is firmware-specific and must not be "fixed" by guessing.** It has
 been unchanged since #270 and predates Qvantum's change, which is the firmware in

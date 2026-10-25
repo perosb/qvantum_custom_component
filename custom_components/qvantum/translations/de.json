@@ -1009,9 +1009,13 @@
         }
       }
     },
-    "tap_water_capacity_mismatch": {
+    "tap_water_capacity_unmapped": {
       "title": "Warmwasserkapazität ist unbekannt",
-      "description": "Die Wärmepumpe hält {start} / {stop} °C als Start/Stopp für Warmwasser. Dieses Paar steht nicht in der Kapazitätstabelle dieser Integration: Die Tabelle stammt aus der Zeit vor einer Firmware-Änderung, bei der die Stufen etwa 1 °C auseinanderliegen, sodass sich die Stufe nicht benennen lässt und die Kapazitätsnummer „unbekannt“ statt einer Schätzung zeigt. Start- und Stopptemperatur sind maßgeblich und bleiben editierbar. Die von App/Cloud gemeldete Stufe ist {reported}."
+      "description": "Die Wärmepumpe hält {start} / {stop} °C als Start/Stopp für Warmwasser. Dieses Paar steht nicht in der Kapazitätstabelle dieser Integration: Die Tabelle stammt aus der Zeit vor einer Firmware-Änderung, bei der die Stufen etwa 1 °C auseinanderliegen, sodass sich die Stufe nicht benennen lässt und die Kapazitätsnummer „unbekannt“ statt einer Schätzung zeigt. Start- und Stopptemperatur sind maßgeblich und bleiben editierbar."
+    },
+    "tap_water_capacity_level_conflict": {
+      "title": "Die App meldet eine Stufe, die nicht zu den Temperaturen passt",
+      "description": "Die Wärmepumpe hält {start} / {stop} °C als Start/Stopp für Warmwasser, was in der Tabelle dieser Integration Stufe {pair_level} entspricht — die App/Cloud meldet jedoch Stufe {reported}. Maßgeblich sind die Temperaturen, und ihnen folgt die Kapazitätsnummer; die Stufenbezeichnung ist veraltet."
     }
   }
 }

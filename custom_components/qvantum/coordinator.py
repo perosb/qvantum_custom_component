@@ -1211,51 +1211,69 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # one the pump no longer uses.
         pair_is_numeric = nearest_tap_water_capacity_level(tap_stop) is not None
 
+        # Two different situations, two different texts: the pair is simply not
+        # in our (pre-firmware-change) table, or the table maps the pair to a
+        # level the transport disagrees with. Only the second one has a level to
+        # report, and mixing them put the literal word "none" into the first.
         mismatch = None
         pair_known = tap_start is not None and tap_stop is not None
         if capacity is None and pair_known and pair_is_numeric:
             # A pair that is not a number is not a level either, but nothing can
             # be said about which one it is close to — no issue for that.
-            mismatch = {
-                "start": tap_start,
-                "stop": tap_stop,
-                "reported": reported,
-            }
+            mismatch = {"kind": "unmapped", "start": tap_start, "stop": tap_stop}
         elif capacity is not None and reported is not None and reported != capacity:
             mismatch = {
+                "kind": "level_conflict",
                 "start": tap_start,
                 "stop": tap_stop,
+                "pair_level": capacity,
                 "reported": reported,
             }
         self._tap_water_capacity_mismatch = mismatch
 
-    def _tap_water_capacity_issue_id(self) -> str:
-        """Repair issue for a capacity level that is not the pair's level."""
+    def _tap_water_capacity_issue_id(self, kind: str | None = None) -> str:
+        """Repair issue id per kind: the two situations must not share one."""
         entry_id = getattr(getattr(self, "config_entry", None), "entry_id", None)
-        return f"tap_water_capacity_mismatch_{entry_id or 'entry'}"
+        suffix = f"_{kind}" if kind else ""
+        return f"tap_water_capacity_mismatch{suffix}_{entry_id or 'entry'}"
 
     def _async_sync_tap_water_capacity_issue(self) -> None:
-        """Raise or clear the repair issue for an unrepresentable capacity level."""
+        """Raise the issue for the current mismatch and clear the other kind."""
         mismatch = getattr(self, "_tap_water_capacity_mismatch", None)
-        issue_id = self._tap_water_capacity_issue_id()
+        kind = None if mismatch is None else str(mismatch["kind"])
+        for candidate in ("unmapped", "level_conflict"):
+            if candidate != kind:
+                ir.async_delete_issue(
+                    self.hass, DOMAIN, self._tap_water_capacity_issue_id(candidate)
+                )
         if mismatch is None:
-            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
             return
-        reported = mismatch["reported"]
+        if kind == "unmapped":
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                self._tap_water_capacity_issue_id("unmapped"),
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="tap_water_capacity_unmapped",
+                translation_placeholders={
+                    "start": str(mismatch["start"]),
+                    "stop": str(mismatch["stop"]),
+                },
+            )
+            return
         ir.async_create_issue(
             self.hass,
             DOMAIN,
-            issue_id,
+            self._tap_water_capacity_issue_id("level_conflict"),
             is_fixable=False,
             severity=ir.IssueSeverity.WARNING,
-            translation_key="tap_water_capacity_mismatch",
-            # No ``nearest`` placeholder: it is computed from a table that
-            # predates Qvantum's firmware change, so naming a level would point
-            # at one the user's pump does not have.
+            translation_key="tap_water_capacity_level_conflict",
             translation_placeholders={
                 "start": str(mismatch["start"]),
                 "stop": str(mismatch["stop"]),
-                "reported": "none" if reported is None else str(reported),
+                "pair_level": str(mismatch["pair_level"]),
+                "reported": str(mismatch["reported"]),
             },
         )
 

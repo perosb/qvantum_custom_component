@@ -1698,9 +1698,9 @@ class TestDeriveTapWaterCapacity:
         coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] is None
         assert coordinator._tap_water_capacity_mismatch == {
+            "kind": "unmapped",
             "start": 55,
             "stop": 65,
-            "reported": None,
         }
 
     def test_unknown_pair_keeps_reported_cloud_level(self):
@@ -1713,10 +1713,12 @@ class TestDeriveTapWaterCapacity:
         }
         coordinator._derive_tap_water_capacity(values)
         assert values["tap_water_capacity_target"] == 5
+        # The cloud's own label does not change the verdict: the pair is what
+        # it is, and the table cannot name it.
         assert coordinator._tap_water_capacity_mismatch == {
+            "kind": "unmapped",
             "start": 55,
             "stop": 65,
-            "reported": 5,
         }
 
     def test_reported_level_that_disagrees_with_the_pair_is_a_mismatch(self):
@@ -1729,8 +1731,10 @@ class TestDeriveTapWaterCapacity:
         }
         coordinator._derive_tap_water_capacity(values)
         assert coordinator._tap_water_capacity_mismatch == {
+            "kind": "level_conflict",
             "start": 55,
             "stop": 70,
+            "pair_level": 4,
             "reported": 5,
         }
 
@@ -1786,19 +1790,43 @@ class TestDeriveTapWaterCapacity:
             coordinator_module.ir, "async_delete_issue"
         ) as delete_issue:
             coordinator._async_sync_tap_water_capacity_issue()
-        delete_issue.assert_not_called()
+        # The other kind's issue is cleared, this one raised.
+        delete_issue.assert_called_once()
+        assert delete_issue.call_args.args[2].startswith(
+            "tap_water_capacity_mismatch_level_conflict_"
+        )
         kwargs = create_issue.call_args.kwargs
-        assert kwargs["translation_key"] == "tap_water_capacity_mismatch"
-        # No ``nearest``: the table predates Qvantum's firmware change, so a
-        # level number would point at one the pump no longer uses.
+        # Its own key and placeholders: the unmapped case has no level to name,
+        # which is what used to put the literal "none" in the text.
+        assert kwargs["translation_key"] == "tap_water_capacity_unmapped"
+        assert kwargs["translation_placeholders"] == {"start": "55", "stop": "65"}
+        assert create_issue.call_args.args[2].startswith(
+            "tap_water_capacity_mismatch_unmapped_"
+        )
+
+    def test_issue_raised_for_a_level_conflict(self):
+        """A mapped pair whose cloud level disagrees names both levels."""
+        coordinator = self._make_coordinator()
+        values = {
+            "tap_water_capacity_target": 5,
+            "tap_water_start": 55,
+            "tap_water_stop": 70,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        with patch.object(
+            coordinator_module.ir, "async_create_issue"
+        ) as create_issue, patch.object(
+            coordinator_module.ir, "async_delete_issue"
+        ):
+            coordinator._async_sync_tap_water_capacity_issue()
+        kwargs = create_issue.call_args.kwargs
+        assert kwargs["translation_key"] == "tap_water_capacity_level_conflict"
         assert kwargs["translation_placeholders"] == {
             "start": "55",
-            "stop": "65",
+            "stop": "70",
+            "pair_level": "4",
             "reported": "5",
         }
-        assert create_issue.call_args.args[2].startswith(
-            "tap_water_capacity_mismatch_"
-        )
 
     def test_issue_cleared_when_the_pair_maps_again(self):
         """A capacity write or the pump moving back clears the issue."""
@@ -1816,7 +1844,8 @@ class TestDeriveTapWaterCapacity:
         ) as delete_issue:
             coordinator._async_sync_tap_water_capacity_issue()
         create_issue.assert_not_called()
-        delete_issue.assert_called_once()
+        # Both kinds are cleared, whichever one was open.
+        assert delete_issue.call_count == 2
 
     def test_issue_cleared_before_the_first_poll(self):
         """No mismatch recorded yet (restart, no poll) means no issue."""
@@ -1825,7 +1854,7 @@ class TestDeriveTapWaterCapacity:
             coordinator_module.ir, "async_delete_issue"
         ) as delete_issue:
             coordinator._async_sync_tap_water_capacity_issue()
-        delete_issue.assert_called_once()
+        assert delete_issue.call_count == 2  # both kinds
 
 
 class TestCalculateHeatingPower:
