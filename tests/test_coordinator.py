@@ -1809,6 +1809,57 @@ class TestDeriveTapWaterCapacity:
             "tap_water_capacity_mismatch_unmapped_"
         )
 
+    def test_no_issue_on_a_read_only_modbus_link(self):
+        """Nothing can be corrected from HA, so nothing is asked of the user."""
+        coordinator = self._make_coordinator()
+        coordinator.modbus_enabled = True
+        coordinator.client.writable = False
+        values = {
+            "tap_water_capacity_target": 5,
+            "tap_water_start": 55,
+            "tap_water_stop": 65,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        with patch.object(
+            coordinator_module.ir, "async_create_issue"
+        ) as create_issue, patch.object(
+            coordinator_module.ir, "async_delete_issue"
+        ) as delete_issue:
+            coordinator._async_sync_tap_water_capacity_issue()
+
+        assert create_issue.call_args_list == []
+        # And an issue raised while writes were still on is cleared, not left
+        # standing after the option is turned off.
+        cleared = [call.args[2] for call in delete_issue.call_args_list]
+        assert any(
+            c.startswith("tap_water_capacity_mismatch_unmapped_") for c in cleared
+        )
+        assert any(
+            c.startswith("tap_water_capacity_mismatch_level_conflict_")
+            for c in cleared
+        )
+
+    def test_the_issue_returns_when_modbus_writes_come_back(self):
+        coordinator = self._make_coordinator()
+        coordinator.modbus_enabled = True
+        coordinator.client.writable = True
+        values = {
+            "tap_water_capacity_target": 5,
+            "tap_water_start": 55,
+            "tap_water_stop": 65,
+        }
+        coordinator._derive_tap_water_capacity(values)
+        with patch.object(
+            coordinator_module.ir, "async_create_issue"
+        ) as create_issue, patch.object(
+            coordinator_module.ir, "async_delete_issue"
+        ):
+            coordinator._async_sync_tap_water_capacity_issue()
+
+        assert create_issue.call_args.kwargs["translation_key"] == (
+            "tap_water_capacity_unmapped"
+        )
+
     def test_issue_raised_for_a_level_conflict(self):
         """A mapped pair whose cloud level disagrees names both levels."""
         coordinator = self._make_coordinator()
@@ -1826,12 +1877,9 @@ class TestDeriveTapWaterCapacity:
             coordinator._async_sync_tap_water_capacity_issue()
         kwargs = create_issue.call_args.kwargs
         assert kwargs["translation_key"] == "tap_water_capacity_level_conflict"
-        assert kwargs["translation_placeholders"] == {
-            "start": "55",
-            "stop": "70",
-            "pair_level": "4",
-            "reported": "5",
-        }
+        # Both texts name only the pair: a level in the text pointed the user at
+        # the wrong thing to fix.
+        assert kwargs["translation_placeholders"] == {"start": "55", "stop": "70"}
 
     def test_issue_cleared_when_the_pair_maps_again(self):
         """A capacity write or the pump moving back clears the issue."""

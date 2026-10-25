@@ -1241,9 +1241,26 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         suffix = f"_{kind}" if kind else ""
         return f"tap_water_capacity_mismatch{suffix}_{entry_id or 'entry'}"
 
+    def _tap_water_capacity_issue_allowed(self) -> bool:
+        """False when this transport cannot change the pair at all.
+
+        On a read-only Modbus link the temperatures were moved by the app or the
+        cloud and the integration has no write path back, so the issue would ask
+        for something that cannot be done from Home Assistant. Current firmware
+        almost always holds a pair outside the table, so it would nag forever
+        about a setting nobody can correct here.
+        """
+        client = getattr(self, "client", None)
+        read_only = self.modbus_enabled and getattr(client, "writable", None) is False
+        return not read_only
+
     def _async_sync_tap_water_capacity_issue(self) -> None:
         """Raise the issue for the current mismatch and clear the other kind."""
         mismatch = getattr(self, "_tap_water_capacity_mismatch", None)
+        if mismatch is not None and not self._tap_water_capacity_issue_allowed():
+            # Cleared rather than left standing: turning writes off must not
+            # leave yesterday's notification behind.
+            mismatch = None
         kind = None if mismatch is None else str(mismatch["kind"])
         # The legacy unsuffixed id was raised by releases up to 2026.10.18; it
         # lives in HA's issue store across restarts, so an upgrading installation
@@ -1278,11 +1295,13 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             is_fixable=False,
             severity=ir.IssueSeverity.WARNING,
             translation_key="tap_water_capacity_level_conflict",
+            # Both issues carry the same text: it names the pair and says the
+            # preset is unknown here, because start/stop are the truth and the
+            # level label is the stale side. The conflict stays distinguishable
+            # by issue id and by the entity's pair/reported attributes.
             translation_placeholders={
                 "start": str(mismatch["start"]),
                 "stop": str(mismatch["stop"]),
-                "pair_level": str(mismatch["pair_level"]),
-                "reported": str(mismatch["reported"]),
             },
         )
 

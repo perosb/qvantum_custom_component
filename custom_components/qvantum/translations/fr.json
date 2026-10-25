@@ -1011,11 +1011,11 @@
     },
     "tap_water_capacity_unmapped": {
       "title": "Capacité d'eau chaude inconnue",
-      "description": "La pompe maintient {start} / {stop} °C comme départ/arrêt d'eau chaude. Cette paire n'existe pas dans la table de capacité de cette intégration : elle date d'avant un changement de firmware qui a espacé les niveaux d'environ 1 °C, si bien que le niveau ne peut pas être nommé et que la capacité affiche « inconnu » plutôt qu'une estimation. Les températures de départ et d'arrêt font foi et restent modifiables."
+      "description": "La pompe utilise {start} / {stop} °C comme température de départ/arrêt de l'eau chaude, un préréglage que cette intégration ne connaît pas. Ces valeurs ont probablement été définies manuellement ou via l'application Qvantum."
     },
     "tap_water_capacity_level_conflict": {
       "title": "L'application signale un niveau qui ne correspond pas aux températures",
-      "description": "La pompe maintient {start} / {stop} °C comme départ/arrêt d'eau chaude, soit le niveau de capacité {pair_level} dans la table de cette intégration — mais l'application/le cloud signale le niveau {reported}. Ce sont les températures qui chauffent le ballon et que suit la capacité ; c'est le libellé du niveau qui est périmé."
+      "description": "La pompe utilise {start} / {stop} °C comme température de départ/arrêt de l'eau chaude, un préréglage que cette intégration ne connaît pas. Ces valeurs ont probablement été définies manuellement ou via l'application Qvantum."
     }
   }
 }
