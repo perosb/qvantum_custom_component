@@ -29,7 +29,13 @@ MODBUS_INPUT_REGISTER_MAP = {
     "bf1_l_min": (26, "uint16", 0.01),
     "bf1_rpm": (27, "uint16", 0.1),
     "gp1_speed": (28, "uint16", 0.1),
-    "gp2_speed": (29, "uint16", 1.0),
+    # The datasheet lists GP2 (input 29) at scale 1, whole percent, but the
+    # firmware reports tenths like GP1: read mid-draw on a QE-6 (fw 1.11.10,
+    # 2026-10-25) while the Qvantum app showed 5-8 %, the register held 29-85.
+    # The same pump reads 0-480 across a week, which no percentage can. GP1's
+    # 700 on the same datasheet matches its 70 % setting, so the error is in
+    # the map and not in the pump.
+    "gp2_speed": (29, "uint16", 0.1),
     "fanrpm": (30, "uint16", 1.0),
     "compressormeasuredspeed": (31, "uint16", 1.0),
     "relays_bitmask": (33, "uint16", 1.0),
