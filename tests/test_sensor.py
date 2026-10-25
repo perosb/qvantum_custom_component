@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -60,6 +61,7 @@ with patch(
                 QvantumCurvePointSensor,
                 QvantumCurveRoomErrorSensor,
                 QvantumCurveSolarModelSensor,
+                QvantumCurveWindModelSensor,
                 QvantumCurrentEntity,
                 QvantumDhwHeatMeterSensor,
                 QvantumEfficiencyHealthSensor,
@@ -581,10 +583,29 @@ def _curve_snapshot(**overrides) -> CurveSnapshot:
     return CurveSnapshot(**values)
 
 
-def _curve_coordinator(snapshot: CurveSnapshot) -> QvantumCurveCoordinator:
+def _curve_coordinator(snapshot: CurveSnapshot, *, daily=None) -> QvantumCurveCoordinator:
     coordinator = QvantumCurveCoordinator.__new__(QvantumCurveCoordinator)
-    coordinator.data = snapshot
+    coordinator.data = snapshot if daily is None else replace(snapshot, daily_model=daily)
     return coordinator
+
+
+def make_daily_model_stub(**overrides):
+    """A real ``SolarDailyModel`` with the wind column filled in."""
+    from custom_components.qvantum.solar_gain import SolarDailyModel
+
+    values = dict(
+        a_w_per_k=152.0,
+        b_m2=1.9,
+        c_w=-600.0,
+        trust=0.7,
+        r2=0.92,
+        n_days=25,
+        valid=True,
+    )
+    if "w" in overrides:
+        overrides["w_per_ms"] = overrides.pop("w")
+    values.update(overrides)
+    return SolarDailyModel(**values)
 
 
 class TestQvantumCurveSensors:
@@ -636,6 +657,46 @@ class TestQvantumCurveSensors:
         }
         assert attributes["wind_valid"] is None  # no daily model in the fixture
 
+    def test_wind_model_sensor_reports_unknown_while_unidentifiable(self, mock_device):
+        """"Unknown" is the answer, not 0 W/K per m/s: the gate refused."""
+        daily = make_daily_model_stub(
+            wind_valid=False, wind_cold_hours=37, wind_hours=670, wind_notes="cold+windy hours 37 < 200"
+        )
+        coordinator = _curve_coordinator(_curve_snapshot(), daily=daily)
+        entity = QvantumCurveWindModelSensor(
+            coordinator, "adaptive_curve_wind_model", mock_device
+        )
+
+        assert entity.native_value is None
+        attributes = entity.extra_state_attributes
+        assert attributes["valid"] is False
+        assert attributes["cold_hours"] == 37
+        assert attributes["required_cold_hours"] == 200
+        assert attributes["term_enabled"] is False
+        assert "37 < 200" in attributes["notes"]
+
+    def test_wind_model_sensor_reports_the_identified_sensitivity(self, mock_device):
+        daily = make_daily_model_stub(
+            wind_valid=True,
+            w=2.4,
+            w_t_stat=4.8,
+            wind_cold_hours=612,
+            wind_hours=1438,
+            wind_notes="cold_hours=612 w=2.40",
+        )
+        coordinator = _curve_coordinator(_curve_snapshot(), daily=daily)
+        coordinator._terms = {"solar": True, "wind": True}
+        entity = QvantumCurveWindModelSensor(
+            coordinator, "adaptive_curve_wind_model", mock_device
+        )
+
+        assert entity.native_value == 2.4
+        attributes = entity.extra_state_attributes
+        assert attributes["valid"] is True
+        assert attributes["term_enabled"] is True
+        assert attributes["t_stat"] == 4.8
+        assert attributes["applied_c"] == 0.0
+
     def test_point_sensor_unavailable_without_point(self, mock_device):
         coordinator = _curve_coordinator(_curve_snapshot(points={}))
         entity = QvantumCurvePointSensor(coordinator, "adaptive_curve_minus_30", mock_device)
@@ -661,6 +722,8 @@ class TestQvantumCurveSensors:
             "wind_c": 0.0,
             "terms": {},
             "wind_valid": None,
+            "wind_cold_hours": None,
+            "wind_required_cold_hours": 200,
             "capped_by_indoor": False,
             "trims": {},
             "clamped": False,
@@ -1847,6 +1910,11 @@ class TestSensorSetup:
             for entity in entities
             if isinstance(entity, QvantumCurveSolarModelSensor)
         ]
+        wind_models = [
+            entity
+            for entity in entities
+            if isinstance(entity, QvantumCurveWindModelSensor)
+        ]
         coverage = [
             entity
             for entity in entities
@@ -1866,13 +1934,22 @@ class TestSensorSetup:
             )
             for key in ("30", "20", "10", "0", "minus_10", "minus_20", "minus_30")
         }
-        assert len(adjustments) == len(deviations) == len(room_errors) == len(models) == 1
+        assert (
+            len(adjustments)
+            == len(deviations)
+            == len(room_errors)
+            == len(models)
+            == len(wind_models)
+            == 1
+        )
         assert adjustments[0]._attr_unique_id == (
             "qvantum_adaptive_curve_adjustment_test_device_123"
         )
         assert deviations[0]._attr_translation_key == "adaptive_curve_deviation"
         assert room_errors[0]._attr_translation_key == "adaptive_curve_room_error"
         assert models[0]._attr_translation_key == "adaptive_curve_solar_model"
+        assert wind_models[0]._attr_translation_key == "adaptive_curve_wind_model"
+        assert wind_models[0]._attr_entity_registry_enabled_default is True
         # Enabled by default: compressor_power_avg reads its statistics.
         assert len(compressor_power) == 1
         assert compressor_power[0]._attr_entity_registry_enabled_default is True

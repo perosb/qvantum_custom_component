@@ -711,7 +711,15 @@ further changes once it ships; before that, edit it in place as usual).
   the indoor cap and the total clamp. It needs `wind_valid`, a wind reading for
   the current hour (missing is *not* calm) and `indoor_target > outdoor`,
   otherwise 0. `CurveSnapshot.wind_c` travels to `diagnostics.curve`, the
-  adjustment sensor's attributes and the summary.
+  adjustment sensor's attributes and the summary. Those attributes also carry
+  `terms` (the four switches), `wind_valid` and the evidence counts
+  (`wind_cold_hours`/`wind_required_cold_hours`), because a wind term is 0 most
+  of the time and the card must tell "on but idle" from "off" — and show the chip
+  while it is off when the coefficient *is* identifiable, which is what decides
+  whether switching it on is worth anything. The wind column also has its own
+  diagnostic entity (`sensor.*_adaptive_curve_wind_model`: state = identified `w`
+  or `unknown`, attributes = the gates and why they refused); without it that
+  answer hides inside another sensor's `model_daily` block.
 - A failed **forecast** refetch keeps the previous payload while it still covers
   the current hour and is under `FORECAST_REUSE_HOURS` old (both coordinators,
   `WeatherForecast.covers`): Open-Meteo 503s sporadically well inside its quota,

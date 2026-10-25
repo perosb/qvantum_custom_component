@@ -688,6 +688,9 @@
       },
       "solar_gain_now_w": {
         "name": "Ganancia solar (ahora)"
+      },
+      "adaptive_curve_wind_model": {
+        "name": "Curva de calefacción adaptativa: modelo de viento"
       }
     },
     "number": {

@@ -688,6 +688,9 @@
       },
       "solar_gain_now_w": {
         "name": "Aurinkohyöty (nyt)"
+      },
+      "adaptive_curve_wind_model": {
+        "name": "Mukautuva lämmityskäyrä: tuulimalli"
       }
     },
     "number": {

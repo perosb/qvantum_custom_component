@@ -374,6 +374,15 @@ Entities:
   `r2_solar`) and a `model_daily` block carrying the day-block `a`, `b`, `t`,
   `r2`, `n_days`, the two window halves, the jackknife range and the gate
   `notes` that explain why a term is missing. Diagnostic entity.
+- `sensor.qvantum_adaptive_curve_wind_model` — the wind column of the same
+  day-block fit: state is the identified sensitivity in W/K per m/s, or
+  `unknown` while it does not pass its gates (that is the answer, not 0 — an
+  unidentifiable coefficient is not "no wind effect"). Attributes: `valid`,
+  `term_enabled`, `applied_c`, `cold_hours` / `required_cold_hours` (the
+  evidence the gate wants), `wind_hours`, `t_stat`, `std_err`, `vif` and the
+  gate `notes` that say why it refused. This is the one entity that answers
+  "does my house have an identifiable wind term?" without a support dump.
+  Diagnostic entity, enabled by default.
 - `switch.qvantum_adaptive_curve_control` — off = shadow, on = active writing.
   `qvantum.set_curve_control` with `mode: shadow|active` does the same from an
   automation.

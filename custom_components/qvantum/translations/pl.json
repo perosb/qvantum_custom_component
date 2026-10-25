@@ -688,6 +688,9 @@
       },
       "solar_gain_now_w": {
         "name": "Zysk słoneczny (teraz)"
+      },
+      "adaptive_curve_wind_model": {
+        "name": "Adaptacyjna krzywa grzewcza: model wiatru"
       }
     },
     "number": {
