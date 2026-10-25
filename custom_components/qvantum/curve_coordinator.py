@@ -529,6 +529,22 @@ def _daily_to_state(model: SolarDailyModel | None) -> dict[str, Any] | None:
         "b_jackknife_max": model.b_jackknife_max_m2,
         "valid": model.valid,
         "notes": model.notes,
+        # The wind column is part of the same identification, so it round-trips
+        # with it: without this a restart blanked it and the optional wind term
+        # could not act again until the next daily calibration (up to 24 h),
+        # while the dump showed zeros instead of "not measured".
+        "w": model.w_per_ms,
+        "w_std_err": model.w_std_err,
+        "w_t_stat": model.w_t_stat,
+        "wind_hours": model.wind_hours,
+        "wind_cold_hours": model.wind_cold_hours,
+        "wind_vif": model.wind_vif,
+        "wind_valid": model.wind_valid,
+        "wind_notes": model.wind_notes,
+        "a_4col": model.a_w_per_k_4col,
+        "b_4col": model.b_m2_4col,
+        "w_first_half": model.w_first_half_ms,
+        "w_second_half": model.w_second_half_ms,
     }
 
 
@@ -561,6 +577,18 @@ def _daily_from_state(state: Any) -> SolarDailyModel | None:
             b_jackknife_max_m2=optional(state.get("b_jackknife_max")),
             valid=bool(state.get("valid", False)),
             notes=str(state.get("notes", "")),
+            w_per_ms=optional(state.get("w")),
+            w_std_err=optional(state.get("w_std_err")),
+            w_t_stat=optional(state.get("w_t_stat")),
+            wind_hours=int(state.get("wind_hours") or 0),
+            wind_cold_hours=int(state.get("wind_cold_hours") or 0),
+            wind_vif=optional(state.get("wind_vif")),
+            wind_valid=bool(state.get("wind_valid", False)),
+            wind_notes=str(state.get("wind_notes", "")),
+            a_w_per_k_4col=optional(state.get("a_4col")),
+            b_m2_4col=optional(state.get("b_4col")),
+            w_first_half_ms=optional(state.get("w_first_half")),
+            w_second_half_ms=optional(state.get("w_second_half")),
         )
     except (KeyError, TypeError, ValueError):
         return None
