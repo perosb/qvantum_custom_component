@@ -501,8 +501,9 @@ the registers hold whole degrees:
   written even when it is out of reach. A knot left outside the pump's own
   supply limits — a lowered `max_heating_supply` — is brought inside them rather
   than triggering the safety reversion, and an unreadable knot is always
-  written. If the resulting table still breaks the limits or the shape, the
-  curve reverts to Auto.
+  written. The computed table is validated against the pump's limits and the
+  shape *before* any of this; a write the firmware still rejects reverts the
+  curve to Auto through the ordinary transport failure path.
 
 ### Optional terms
 

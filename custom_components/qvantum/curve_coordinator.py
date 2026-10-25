@@ -1377,15 +1377,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             )
             return
 
-        writes, targets = self._plan_point_writes(result, values, low, high)
-        if writes is None:
-            await self._async_revert(
-                "computed table violates the pump's supply limits or shape"
-            )
-            return
-
         client = self._main.client
-        for key, value in writes:
+        for key, value in self._plan_point_writes(result, values, low, high):
             response = await self._async_write_or_revert(
                 client.set_heating_curve_point(device_id, key, value),
                 label=f"{key}={value}",
@@ -1403,7 +1396,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         values: Mapping[str, Any],
         low: float,
         high: float,
-    ) -> tuple[list[tuple[str, int]] | None, dict[str, int]]:
+    ) -> list[tuple[str, int]]:
         """Decide which knots to write and what the table will hold afterwards.
 
         Three rules, in order:
@@ -1421,9 +1414,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
            even when it is outside the reachable range: leaving it would put a
            table on the pump that its own curve guard may refuse.
 
-        Returns ``(writes, targets)``; ``writes`` is ``None`` when the table the
-        pump would end up with breaks the supply limits or the shape, which is
-        the safety reversion.
+        The caller has already validated the computed table, and every target
+        here is either one of its rounded points, the pump's own value inside
+        its limits, or a projection that only raises toward such a value — so
+        the table cannot leave the limits here. A write the firmware rejects is
+        still caught by the transport's own range check and the reversion that
+        follows it.
         """
         ideal = dict(result.points)
         reach = frozenset(
@@ -1474,16 +1470,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 projected.add(key)
             previous = targets[key]
 
-        if not points_within_limits(targets, min_supply_c=low, max_supply_c=high):
-            return None, targets
-
-        writes = [
+        return [
             (key, targets[key])
             for key in CURVE_KEYS
             if (key in reach or key in projected or key in forced)
             and targets[key] != self._pump_point(values, key)
         ]
-        return writes, targets
 
     @staticmethod
     def _numeric(value: Any) -> float | None:

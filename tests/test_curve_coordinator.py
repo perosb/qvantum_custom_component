@@ -3323,6 +3323,24 @@ async def test_apply_active_projects_a_stale_warm_knot_onto_the_shape() -> None:
     assert client.set_heating_curve_point.await_args_list[0].args[2] == 21
 
 
+async def test_apply_active_always_writes_an_unreadable_knot() -> None:
+    # The pump did not report the knot at all (a failed register read): it has
+    # to be written even though the weather cannot reach it, otherwise the
+    # table stays incomplete.
+    coordinator, client = make_writable_coordinator(
+        points=BASELINE,
+        settings={"curve_type_heating": 1, "curve_minus_30": None},
+    )
+    coordinator._mode = "active"
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator._async_apply_active(make_result())
+
+    written = [call.args[1] for call in client.set_heating_curve_point.call_args_list]
+    assert written == ["curve_minus_30"]
+    assert client.set_heating_curve_point.await_args_list[0].args[2] == 60
+
+
 async def test_apply_active_brings_an_unreachable_knot_inside_new_limits() -> None:
     # A dropped max supply must not leave a knot the weather cannot reach above
     # it: that would revert the curve for a limit the user changed.
