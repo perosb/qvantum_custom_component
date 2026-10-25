@@ -972,6 +972,10 @@
     "telemetry_delete": {
       "name": "Slet uploadede resuméer",
       "description": "Sletter alle uploadede rækker for dette anlæg via dets lokale token. Delingen stopper først, når den også slås fra i indstillingerne."
+    },
+    "recalibrate": {
+      "name": "Kalibrér igen",
+      "description": "Kør dagskalibreringen igen nu i stedet for at vente på næste daglige forsøg. Finder soludbyttet og vindkolonnen ud fra historikken; skriver intet til varmepumpen."
     }
   },
   "issues": {

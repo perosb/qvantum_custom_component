@@ -239,6 +239,31 @@ async def async_setup_services(hass: HomeAssistant):
         supports_response=SupportsResponse.OPTIONAL,
     )
 
+    async def recalibrate(service_call: ServiceCall) -> Any:
+        """Force a solar/wind calibration attempt instead of waiting a day."""
+        curve_coordinator = _find_curve_coordinator(service_call.hass)
+        if curve_coordinator is None:
+            return {
+                "qvantum": {
+                    "exception": "unknown_error",
+                    "details": "Calibration is only available in Modbus mode",
+                }
+            }
+        try:
+            result = await curve_coordinator.async_recalibrate()
+        except Exception as err:
+            _LOGGER.error("Calibration failed: %s", err)
+            return {"qvantum": {"exception": "unknown_error", "details": str(err)}}
+        return {"qvantum": result}
+
+    hass.services.async_register(
+        domain=DOMAIN,
+        service="recalibrate",
+        service_func=recalibrate,
+        schema=vol.Schema({}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
     async def telemetry_upload(service_call: ServiceCall) -> Any:
         """Post the anonymous summary now instead of waiting for the week."""
         hass = service_call.hass

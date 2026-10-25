@@ -972,6 +972,10 @@
     "telemetry_delete": {
       "name": "Supprimer les résumés envoyés",
       "description": "Supprime toutes les lignes envoyées de cette installation via son jeton local. Le partage ne cesse qu'une fois également désactivé dans les réglages."
+    },
+    "recalibrate": {
+      "name": "Recalibrer",
+      "description": "Relancer la calibration journalière maintenant au lieu d'attendre la prochaine tentative quotidienne. Identifie le gain solaire et la colonne vent à partir de l'historique ; n'écrit rien sur la pompe."
     }
   },
   "issues": {

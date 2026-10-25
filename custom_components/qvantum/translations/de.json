@@ -972,6 +972,10 @@
     "telemetry_delete": {
       "name": "Hochgeladene Zusammenfassungen löschen",
       "description": "Löscht alle hochgeladenen Zeilen dieser Anlage über ihr lokales Token. Die Weitergabe endet erst, wenn sie auch in den Einstellungen abgeschaltet wird."
+    },
+    "recalibrate": {
+      "name": "Neu kalibrieren",
+      "description": "Die Tageskalibrierung jetzt erneut ausführen, statt auf den nächsten Tagesversuch zu warten. Ermittelt Solarertrag und Windspalte aus der Historie; schreibt nichts an die Wärmepumpe."
     }
   },
   "issues": {

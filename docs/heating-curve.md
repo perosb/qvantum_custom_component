@@ -524,7 +524,12 @@ term" is a normal, correct outcome for a sheltered location.
 An attempt that cannot fetch its inputs retries within the hour instead of
 waiting the full day, so one network hiccup does not freeze the model; a
 completed attempt — fit accepted or rejected — waits the full interval, because
-the inputs cannot change in an hour.
+the inputs cannot change in an hour. If you do not want to wait (you changed the
+indoor sensor, filled a data gap, or are checking whether the wind column is
+identifiable at all), **Actions → Qvantum: Recalibrate**
+(`qvantum.recalibrate`) runs the attempt immediately and answers with the model
+state: day count, whether the daily model passed, and the wind column's hours,
+validity and notes. It writes nothing to the pump.
 `a` (W/K), `b` (m²) and a continuous trust in [0, 1] from `b`'s t-statistic
 are computed from your house's data — nothing is hand-tuned. Weak evidence
 keeps the solar term tiny automatically, and GHI is smoothed with an

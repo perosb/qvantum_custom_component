@@ -168,6 +168,7 @@ class TestSetupDeviceRequirements:
             call("qvantum", "extra_hot_water"),
             call("qvantum", "set_curve_control"),
             call("qvantum", "set_curve_terms"),
+            call("qvantum", "recalibrate"),
         ]
 
     @pytest.mark.asyncio

@@ -972,6 +972,10 @@
     "telemetry_delete": {
       "name": "Feltöltött összefoglalók törlése",
       "description": "Törli ennek a rendszernek az összes feltöltött sorát a helyi tokenjével. A megosztás csak akkor szűnik meg, ha a beállításokban is kikapcsolja."
+    },
+    "recalibrate": {
+      "name": "Újrakalibrálás",
+      "description": "A napi kalibráció újbóli futtatása most, a következő napi kísérlet helyett. A napnyereséget és a széloszlopot az előzményekből azonosítja; a hőszivattyúba nem ír."
     }
   },
   "issues": {

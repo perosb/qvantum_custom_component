@@ -640,7 +640,11 @@ further changes once it ships; before that, edit it in place as usual).
   demand estimate, which must subtract the same applied gain. Calibration retries
   within the hour when it cannot fetch its inputs (`CALIBRATION_RETRY_HOURS`) and
   waits `CALIBRATION_REFRESH_HOURS` after a completed attempt; the flag is
-  persisted and exposed as `calibration_ok`.
+  persisted and exposed as `calibration_ok`. `qvantum.recalibrate`
+  (`async_recalibrate`) runs an attempt immediately — it calls `_async_calibrate`
+  directly, bypassing the throttle — and answers with the model state, because a
+  sensor change or a fixed data gap makes waiting a day pointless. It writes
+  nothing to the pump.
 - Wind is **identified but not applied** (#427). `open_meteo` requests
   `wind_speed_10m` with `wind_speed_unit=ms` (the API default is km/h, and a
   silent unit mismatch would read as a calibration result), `HourlyWeather.wind_ms`

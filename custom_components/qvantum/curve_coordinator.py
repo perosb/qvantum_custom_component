@@ -1085,6 +1085,26 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         await self._async_persist()
         self.async_update_listeners()
 
+    async def async_recalibrate(self) -> dict[str, Any]:
+        """Run a calibration attempt now, bypassing the daily throttle.
+
+        The throttle bounds archive fetches, not because the inputs change
+        within the hour: after a sensor change, a fixed data gap or a support
+        question the figures are stale *now*, and waiting for the next cycle
+        costs up to a day. Returns what the attempt produced so the caller
+        (the service) can answer without opening a dump.
+        """
+        await self._async_calibrate(dt_util.utcnow().timestamp())
+        daily = self._daily_model
+        return {
+            "calibration_ok": self._last_calibration_ok,
+            "daily_model_valid": None if daily is None else daily.valid,
+            "daily_model_days": None if daily is None else daily.n_days,
+            "wind_valid": None if daily is None else daily.wind_valid,
+            "wind_hours": None if daily is None else daily.wind_hours,
+            "wind_notes": None if daily is None else daily.wind_notes,
+        }
+
     async def async_set_control_mode(self, mode: str) -> None:
         """Switch between shadow (no writes) and active curve control."""
         if mode not in CONTROL_MODES:

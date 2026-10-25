@@ -972,6 +972,10 @@
     "telemetry_delete": {
       "name": "Verstuurde samenvattingen verwijderen",
       "description": "Verwijdert alle verstuurde rijen van deze installatie met zijn lokale token. Delen stopt pas als het ook in de instellingen wordt uitgezet."
+    },
+    "recalibrate": {
+      "name": "Herkalibreren",
+      "description": "Voer de dagkalibratie nu opnieuw uit in plaats van te wachten op de volgende dagelijkse poging. Bepaalt de zonnewinst en de windkolom uit de historie; schrijft niets naar de warmtepomp."
     }
   },
   "issues": {
