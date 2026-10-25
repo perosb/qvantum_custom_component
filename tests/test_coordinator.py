@@ -1701,7 +1701,6 @@ class TestDeriveTapWaterCapacity:
             "start": 55,
             "stop": 65,
             "reported": None,
-            "nearest": 2,  # stop 65 -> 62
         }
 
     def test_unknown_pair_keeps_reported_cloud_level(self):
@@ -1718,7 +1717,6 @@ class TestDeriveTapWaterCapacity:
             "start": 55,
             "stop": 65,
             "reported": 5,
-            "nearest": 2,
         }
 
     def test_reported_level_that_disagrees_with_the_pair_is_a_mismatch(self):
@@ -1734,7 +1732,6 @@ class TestDeriveTapWaterCapacity:
             "start": 55,
             "stop": 70,
             "reported": 5,
-            "nearest": 4,
         }
 
     def test_agreement_is_not_a_mismatch(self):
