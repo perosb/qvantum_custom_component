@@ -285,3 +285,34 @@ def test_reconfigure_and_reauth_have_data_descriptions():
         assert data["options"]["step"]["init"]["data_description"]["scan_interval"], (
             path.name
         )
+
+
+def test_adaptive_curve_entity_names_share_one_prefix_per_locale():
+    """Every curve entity must be named after the same feature.
+
+    A single sensor named "Anpassad värmekurva" while its siblings say "Adaptiv
+    värmekurva" reads like a different integration's entity in the UI. The prefix
+    is locale-specific prose, so it cannot be checked structurally — compare the
+    text before the separator instead, in every locale.
+    """
+    separator = re.compile(r"\s*:\s*")
+    failures: list[str] = []
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        sensors = data.get("entity", {}).get("sensor", {})
+        prefixes: dict[str, set[str]] = {}
+        for key, value in sensors.items():
+            # The seven point sensors carry an index in their prefix
+            # ("… curve 1"), so only the feature-level ones are comparable.
+            if not key.startswith("adaptive_curve_"):
+                continue
+            if re.search(r"adaptive_curve_(minus_)?\d+", key):
+                continue
+            name = value.get("name") if isinstance(value, dict) else None
+            if not isinstance(name, str):
+                continue
+            prefix = separator.split(name, maxsplit=1)[0]
+            prefixes.setdefault(prefix, set()).add(key)
+        if len(prefixes) > 1:
+            failures.append(f"{path.name}: {dict(prefixes)}")
+    assert not failures, "inconsistent adaptive-curve prefixes: " + "; ".join(failures)

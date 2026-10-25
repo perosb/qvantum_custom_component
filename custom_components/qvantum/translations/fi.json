@@ -690,7 +690,7 @@
         "name": "Aurinkohyöty (nyt)"
       },
       "adaptive_curve_wind_model": {
-        "name": "Mukautuva lämmityskäyrä: tuulimalli"
+        "name": "Adaptiivinen lämmityskäyrä: tuulimalli"
       }
     },
     "number": {

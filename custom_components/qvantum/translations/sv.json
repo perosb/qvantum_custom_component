@@ -690,7 +690,7 @@
         "name": "Soltillskott (nu)"
       },
       "adaptive_curve_wind_model": {
-        "name": "Anpassad värmekurva: vindmodell"
+        "name": "Adaptiv värmekurva: vindmodell"
       }
     },
     "number": {

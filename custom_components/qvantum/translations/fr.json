@@ -690,7 +690,7 @@
         "name": "Gains solaires (maintenant)"
       },
       "adaptive_curve_wind_model": {
-        "name": "Courbe de chauffe adaptative : modèle de vent"
+        "name": "Courbe de chauffage adaptative: modèle de vent"
       }
     },
     "number": {
