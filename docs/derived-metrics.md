@@ -14,13 +14,35 @@ list the key in `special_sensor_keys`, so registry cleanup keeps it.
 ## Power
 
 `dhwpower` is the instantaneous draw power `4.186/60 · BF1 · (BT34 − BT33)` in
-Modbus mode; `heatingpower` is derived from the `heatingenergy` counter delta and
-holds its last value between steps. Both are documented with their measurements
-in [QE architecture §7.5 and §7.7](qe-architecture.md#75-dhwpower-in-home-assistant)
-— including why `dhwpower` must never be integrated for energy.
-
-`powertotal` is an estimate (base load + active relay stages +
+Modbus mode. `powertotal` is an estimate (base load + active relay stages +
 `compressor_power`), not a calibrated measurement.
+
+`heatingpower` **cannot** be measured that way, and the difference matters
+before reaching for the same fix. The only flow register is `bf1_l_min` (the DHW
+draw); the heating circuit carries temperatures (BT10/BT11/BT12) but no water
+flow, so there is no `flow × ΔT` for space heating and `heatingenergy`
+(input 99/100) is the only thermal measurement the hardware offers.
+
+That counter advances in 0.1 kWh steps, so `heatingpower` is the **average since
+the previous step, held until the next one**: measured on a live installation
+over 36 h it changed every ~225 s at a median 1.6 kW. Read it as a **~3–4 minute
+average, not instantaneous power**, and note that its granularity follows the
+poll interval — the same 0.1 kWh step is 6 kW at a 60 s poll and 24 kW at 15 s,
+and the jitter of the step observation grows with the interval too. It still
+tracks the load a counter-derived draw figure could not: only 2 % of the polls
+inside a heating phase read 0 W and 1.5 % exceed twice the median, where the
+old counter-derived `dhwpower` sat at 0 W on 24 % of its draw polls.
+
+Do not "fix" it the way `dhwpower` was fixed — there is nothing to switch to. A
+rolling counter window smooths the staircase but lags, and it loses energy at
+every stop (a 600 s window gave up 7 % over the same measurement window); the
+curve's load term already consumes `heatingpower` through its own two-hour
+rolling mean, so a second average would only stack. For an instantaneous figure
+use `compressor_power` (input 93), which is a real electrical measurement.
+
+Both are documented with their measurements in
+[QE architecture §7.5 and §7.7](qe-architecture.md#75-dhwpower-in-home-assistant)
+— including why `dhwpower` must never be integrated for energy.
 
 ## The electrical split
 

@@ -498,7 +498,9 @@ review has to catch:
   energy is divided by a rise it did not cause. The counter is the signal, not
   the derived `heatingpower`, which is zero in exactly the state being guarded.
 - `dhwpower` is instantaneous and must **not** be integrated for energy;
-  `heatingpower` is a counter delta that holds between steps.
+  `heatingpower` is a counter rate that holds between steps (a ~3–4 min average —
+  no heating-water flow exists to replace it, so it must not be "fixed" into a
+  rolling window either).
 - A new COP-store field belongs in the diagnostics `cop` block in the same PR.
 - The two tap-water comfort sensors are **estimates** from a tank model
   (`tap_water_minutes`, `tap_water_cap`), never a volume, an energy or the

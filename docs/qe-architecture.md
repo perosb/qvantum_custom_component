@@ -516,7 +516,7 @@ This explains why a 12–20 kW draw can last only minutes before the tank cools,
 
 ### 7.7 `heatingpower`, `dhwpower` and `powertotal`
 
-- `heatingpower` is **derived** from the `heatingenergy` counter: it holds the last value between counter steps and resets to 0 outside heating. `dhwpower` is different — it is the instantaneous flow × ΔT measurement of §7.5, not a counter rate. `[I]`
+- `heatingpower` is **derived** from the `heatingenergy` counter: the value held between steps is the average since the previous one — ~3–4 min at a median 1.6 kW — and it resets to 0 outside heating, so read it as a short average rather than an instantaneous figure. There is no heating-water flow register to replace it with (only the DHW `bf1_l_min`). `dhwpower` is different — it is the instantaneous flow × ΔT measurement of §7.5, not a counter rate. `[I]`
 - `compressor_power` (input 93) is the only direct electrical power measurement. `[R]`
 - `powertotal` in the integration is an **estimate**: 160 W base load + active relay stages (2+2+1 kW) + `compressor_power`. It is not a calibrated measurement. `[I]`
 
