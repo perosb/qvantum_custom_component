@@ -2085,7 +2085,7 @@ class TestCalculateHeatingPower:
 
 
 class TestCalculateDhwPower:
-    """Tests for _calculate_dhw_power."""
+    """Tests for _calculate_dhw_power: the instantaneous secondary-side draw."""
 
     def _make_coordinator(self):
         with patch(
@@ -2104,87 +2104,63 @@ class TestCalculateDhwPower:
             coordinator.data = None  # simulate no prior poll
         return coordinator
 
-    def test_no_previous_sample_writes_zero_power(self):
-        """First call (DHW active) records baseline and writes 0 W."""
+    def test_power_is_flow_times_delta_t(self):
+        """dhwpower = BF1/60 · 4186 · (BT34 − BT33), in W."""
         coordinator = self._make_coordinator()
-        values = {"dhwenergy": 100.0, "bf1_l_min": 5.0}
+        values = {"bf1_l_min": 5.0, "bt33": 10.0, "bt34": 40.0}
 
-        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
-            mock_now.return_value = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-            coordinator._calculate_dhw_power(values)
+        coordinator._calculate_dhw_power(values)
 
-        assert values["dhwpower"] == 0
-        assert coordinator._last_dhwenergy == 100.0
+        # 5/60 · 4186 · 30 = 10 465 W
+        assert values["dhwpower"] == 10465.0
 
-    def test_calculates_power_from_delta(self):
-        """After two calls, dhwpower = delta_kWh / delta_s * 3_600_000."""
+    def test_repeated_polls_report_the_same_power(self):
+        """No counter and no held staircase: the same draw reads the same W."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        first = {"bf1_l_min": 10.7, "bt33": 13.1, "bt34": 39.5}
+        second = {"bf1_l_min": 10.7, "bt33": 13.1, "bt34": 39.5}
 
-        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
-            mock_now.return_value = t0
-            coordinator._calculate_dhw_power({"dhwenergy": 100.0, "bf1_l_min": 5.0})
+        coordinator._calculate_dhw_power(first)
+        coordinator._calculate_dhw_power(second)
 
-            mock_now.return_value = t1
-            values = {"dhwenergy": 100.001, "bf1_l_min": 5.0}
-            coordinator._calculate_dhw_power(values)
+        assert first["dhwpower"] == second["dhwpower"] == 19707.7
 
-        assert values["dhwpower"] == 240.0
-
-    def test_not_dhw_resets_power_to_zero(self):
-        """When bf1_l_min == 0, dhwpower is always 0 regardless of energy."""
+    def test_no_flow_is_zero(self):
+        """A closed tap is 0 W even when the pipe is still warm."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
-        t1_same = t1  # intentionally same timestamp: this assertion is mode-switch, not time-delta based
+        values = {"bf1_l_min": 0.0, "bt33": 12.0, "bt34": 45.0}
 
-        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
-            mock_now.return_value = t0
-            coordinator._calculate_dhw_power({"dhwenergy": 100.0, "bf1_l_min": 5.0})
-            mock_now.return_value = t1
-            v1 = {"dhwenergy": 100.001, "bf1_l_min": 5.0}
-            coordinator._calculate_dhw_power(v1)
-            assert v1["dhwpower"] == 240.0
-            coordinator.data = {"values": v1}
-
-            mock_now.return_value = t1_same
-            values = {"dhwenergy": 100.001, "bf1_l_min": 0}
-            coordinator._calculate_dhw_power(values)
+        coordinator._calculate_dhw_power(values)
 
         assert values["dhwpower"] == 0.0
 
-    def test_missing_dhwenergy_skipped(self):
-        """If dhwenergy is absent, the method does nothing."""
+    def test_non_positive_delta_t_is_zero(self):
+        """Water moving but not heated (ΔT ≤ 0) is 0 W, never negative."""
         coordinator = self._make_coordinator()
-        values = {}
-        coordinator._calculate_dhw_power(values)
-        assert "dhwpower" not in values
-        assert coordinator._last_dhwenergy is None
-
-    def test_zero_delta_holds_last_power_while_dhw(self):
-        """When bf1_l_min > 0 and counter has not ticked, last computed power is held."""
-        coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
-        t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
-
-        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
-            mock_now.return_value = t0
-            coordinator._calculate_dhw_power({"dhwenergy": 100.0, "bf1_l_min": 5.0})
-
-            mock_now.return_value = t1
-            v1 = {"dhwenergy": 100.001, "bf1_l_min": 5.0}
-            coordinator._calculate_dhw_power(v1)
-            assert v1["dhwpower"] == 240.0
-
-            coordinator.data = {"values": v1}
-
-            mock_now.return_value = t2
-            values = {"dhwenergy": 100.001, "bf1_l_min": 5.0}
+        for hot in (12.0, 9.5):
+            values = {"bf1_l_min": 4.0, "bt33": 12.0, "bt34": hot}
             coordinator._calculate_dhw_power(values)
+            assert values["dhwpower"] == 0.0
 
-        assert values["dhwpower"] == 240.0
+    def test_missing_temperature_leaves_key_unset(self):
+        """Without a measurement the key stays absent so the entity is unavailable."""
+        coordinator = self._make_coordinator()
+        for values in (
+            {"bf1_l_min": 5.0, "bt33": 10.0},
+            {"bf1_l_min": 5.0, "bt34": 40.0},
+            {"bt33": 10.0, "bt34": 40.0},
+        ):
+            coordinator._calculate_dhw_power(values)
+            assert "dhwpower" not in values
+
+    def test_non_numeric_input_is_zero(self):
+        """A payload that carries an unparseable state is 0 W, not a crash."""
+        coordinator = self._make_coordinator()
+        values = {"bf1_l_min": 5.0, "bt33": 10.0, "bt34": "unknown"}
+
+        coordinator._calculate_dhw_power(values)
+
+        assert values["dhwpower"] == 0.0
 
 
 class TestDhwMeterCalculation:

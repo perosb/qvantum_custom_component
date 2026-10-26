@@ -260,7 +260,7 @@
         "name": "Verwarmingsvermogen"
       },
       "dhwpower": {
-        "name": "Warmwatervermogen"
+        "name": "Vermogen bij warmwatertappen"
       },
       "compressor_power": {
         "name": "Compressorvermogen"

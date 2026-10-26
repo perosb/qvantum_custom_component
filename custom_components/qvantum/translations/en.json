@@ -260,7 +260,7 @@
         "name": "Heating Power"
       },
       "dhwpower": {
-        "name": "DHW Power"
+        "name": "Hot-water draw power"
       },
       "compressor_power": {
         "name": "Compressor Power"

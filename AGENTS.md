@@ -92,10 +92,23 @@ metrics present in the payload, so absent registers degrade to no entity.
 - `dhwenergy` (input 103/104) is the **draw meter** on the secondary side
   (BT33→BT34 × BF1), not the compressor's DHW output. It stays flat while the
   compressor charges the tank without a draw.
-- `dhwpower` is derived from the 0.1 kWh `dhwenergy` counter and is quantised
-  (0.1 kWh over 15 s reads 24 kW); instantaneous draw power is
-  `4.186/60 · BF1 · (BT34 − BT33)`. The DHW heat-meter comparison integrates the
-  same formula at poll resolution.
+- `dhwpower` is the **instantaneous** secondary-side draw power,
+  `4.186/60 · BF1 · (BT34 − BT33)` in W, computed on every poll in Modbus mode —
+  not a rate derived from the 0.1 kWh `dhwenergy` counter. That derivation could
+  not carry a power figure: its step is a staircase whose granularity follows
+  the poll interval (0.1 kWh over 15 s reads 24 kW, over 60 s 6 kW), it drops
+  the trailing partial step of every draw and it cannot resolve a draw shorter
+  than a step (~36 s at 10 kW). Measured on a live QE-6, 2026-10-26 — 36 h,
+  41 draws, 55 min of draw, 9.60 kWh metered: the counter-derived series read
+  0 W on 24 % of the polls inside a draw, peaked at 24.2 kW, had a 4.9 kW RMSE
+  against the formula and missed 31 of the 41 draws, while the formula stayed
+  within 2 % of the meter on the long draws. The key is left **unset** (entity
+  unavailable) when `bf1_l_min`/`bt33`/`bt34` are missing and never falls back
+  to the counter; a zero flow or a non-positive ΔT is 0 W. Cloud mode passes the
+  API's own `dhwpower` through unchanged. Do **not** integrate it for energy —
+  it reads ~5 % above `dhwenergy` because the meter cannot resolve sub-0.1 kWh
+  draws, so `dhwenergy` is the energy figure. The DHW heat-meter comparison
+  integrates the same formula at poll resolution.
 - BT30 is **one point in the stratified buffer tank**, not a tank mean and not
   the tank top. BT31 is the DHW primary inlet at EP31: it reads low while GP2 is
   stopped (the primary loop is stagnant) and can read hotter than BT30 during a

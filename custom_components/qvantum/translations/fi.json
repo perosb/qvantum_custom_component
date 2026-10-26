@@ -260,7 +260,7 @@
         "name": "Lämmitysteho"
       },
       "dhwpower": {
-        "name": "Käyttöveden teho"
+        "name": "Käyttöveden ottoteho"
       },
       "compressor_power": {
         "name": "Kompressorin teho"

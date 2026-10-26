@@ -260,7 +260,7 @@
         "name": "Výkon topení"
       },
       "dhwpower": {
-        "name": "Výkon teplé vody"
+        "name": "Výkon odběru teplé vody"
       },
       "compressor_power": {
         "name": "Výkon kompresoru"

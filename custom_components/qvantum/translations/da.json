@@ -260,7 +260,7 @@
         "name": "Varmeeffekt"
       },
       "dhwpower": {
-        "name": "Varmt vand effekt"
+        "name": "Effekt ved varmtvandsudtag"
       },
       "compressor_power": {
         "name": "Kompressoreffekt"

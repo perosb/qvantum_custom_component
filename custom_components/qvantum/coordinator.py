@@ -233,8 +233,6 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._sw_version_refreshed_at: float | None = None
         self._last_heatingenergy: float | None = None
         self._last_heatingenergy_time: datetime | None = None
-        self._last_dhwenergy: float | None = None
-        self._last_dhwenergy_time: datetime | None = None
         # Cumulative energy counters from the previous poll, for instantaneous COP.
         self._last_cop_energies: dict[str, float] | None = None
         # Rolling window of (timestamp, counters, hp_status, bt30, dhwdemand,
