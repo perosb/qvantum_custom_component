@@ -2,7 +2,9 @@
 
 ## Qvantum Heat Pump Integration for Home Assistant
 
-Connect a Qvantum heat pump to Home Assistant using either the Qvantum cloud API or a direct local Modbus TCP connection:
+Connect a Qvantum heat pump to Home Assistant using either the Qvantum cloud API or a direct local Modbus TCP connection.
+
+The integration is not limited to the QE. It uses Qvantum's shared cloud API and Modbus register map, so the **QA+QH** (air source) and **QG** (ground source) families are expected to work where they expose the same metrics and settings. The QE-specific architecture in [docs/qe-architecture.md](docs/qe-architecture.md) does not necessarily apply to those products.
 
 - **Cloud mode (HTTP):** Uses your Qvantum account for live metrics, firmware details, SmartControl, and cloud settings.
 - **Local Modbus mode:** Connects directly on your LAN without an account or cloud session, with faster local polling.
@@ -281,6 +283,13 @@ actions:
 | Qvantum: Climate | Qvantum: Power |
 |:-------------:|:------:|
 | ![Inomhusklimat](https://github.com/user-attachments/assets/15e56f43-4d3c-41d7-aebc-899d6486586b) | ![Effekt](https://github.com/user-attachments/assets/d150f56f-cabe-44e0-b1b3-8647c1b079c2) |
+
+## Documentation
+
+- [QE architecture and measurement model](docs/qe-architecture.md) — the 175 L buffer tank vs through-flow DHW, the immersion heater, draw power and the sensor map.
+- [QE quick reference](docs/qe-architecture-quick-reference.md) — the compact version for an AI context window.
+- [Heating curve](docs/heating-curve.md) — Auto vs User defined, registers and the adaptive curve.
+- [Telemetry](docs/telemetry.md) — what the opt-in summary export contains and how it is stored.
 
 ## Changelog
 

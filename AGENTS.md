@@ -2,7 +2,13 @@
 
 HA integration for Qvantum heat pumps. One config entry, two exclusive transports:
 **cloud HTTP** XOR **local Modbus TCP**. Requires HA **2026.9+**. HACS zip:
-`custom_components/qvantum/`.
+`custom_components/qvantum/`. The integration is not QE-specific: the **QA+QH**
+air-source and **QG** ground-source families use the same cloud/Modbus interface,
+but the *Pump hardware model (QE)* section describes the QE only.
+
+The pump hardware model — 175 L buffer tank vs through-flow DHW, the draw meter
+and the BT30/BT31 split — is in `docs/qe-architecture.md`. Read
+*Pump hardware model (QE)* before changing a DHW metric.
 
 ## Layout
 
@@ -39,6 +45,9 @@ custom_components/qvantum/
   test_data/
 tests/
 docs/heating-curve.md
+docs/telemetry.md
+docs/qe-architecture.md
+docs/qe-architecture-quick-reference.md
 docs/releases/<tag>.md       # generated per-release notes + README.md index
 ```
 
@@ -52,6 +61,54 @@ Writes: shared ones go through `QvantumClient` on `coordinator.client`;
 cloud-only / Modbus-only ones through coordinator helpers
 (`async_set_extra_tap_water`, `async_write_metric`, `async_set_smartcontrol`,
 `async_elevate_access`). No `isinstance` on transport.
+
+## Pump hardware model (QE)
+
+The QE is an **exhaust-air heat pump** with an integrated **175 L buffer tank**
+and **through-flow DHW**. Every DHW metric below depends on this model; the full
+reference is `docs/qe-architecture.md` (short version:
+`docs/qe-architecture-quick-reference.md`).
+
+This section is QE-specific. QA+QH (air source) and QG (ground source) share
+the transport and many registers, but their hydraulic/refrigerant models differ:
+do not transfer the QE tank, through-flow DHW or draw-power claims to them
+without checking their manuals. The integration creates entities only for
+metrics present in the payload, so absent registers degrade to no entity.
+
+- The 175 L tank is **heating water, not potable DHW**. DHW is heated
+  instantaneously in plate heat exchanger EP31 (<0.8 L): tank water on the
+  primary side (BT31 → GP2 → EP31) and cold tap water on the secondary side
+  (BT33 → EP31 → BT34). There is no DHW tank and no legionella store.
+- The compressor charges the tank (QM10 in DHW mode); the tank discharges into
+  the tap through GP2/EP31. A draw can therefore be 10–20 kW while the
+  compressor is 1–6 kW; the tank supplies the peak and is recharged afterwards.
+- The immersion heater (EB1) is **5 kW split as 1+2+2 kW**, switched in 1–5 kW
+  steps. It heats the tank/heating water, not the tap water; it can run in
+  parallel with the compressor and can be the only source when the compressor is
+  off/defrosting (`hp_status` then reads `Idle`). `additiondhwdemand` is its DHW
+  flag, `additionalenergy` its meter, and element-only DHW is capped at COP 1.0.
+  Maximum tank temperature with the element is 90 °C; the safety limiter trips at
+  95 °C.
+- `dhwenergy` (input 103/104) is the **draw meter** on the secondary side
+  (BT33→BT34 × BF1), not the compressor's DHW output. It stays flat while the
+  compressor charges the tank without a draw.
+- `dhwpower` is derived from the 0.1 kWh `dhwenergy` counter and is quantised
+  (0.1 kWh over 15 s reads 24 kW); instantaneous draw power is
+  `4.186/60 · BF1 · (BT34 − BT33)`. The DHW heat-meter comparison integrates the
+  same formula at poll resolution.
+- BT30 is **one point in the stratified buffer tank**, not a tank mean and not
+  the tank top. BT31 is the DHW primary inlet at EP31: it reads low while GP2 is
+  stopped (the primary loop is stagnant) and can read hotter than BT30 during a
+  draw. BT33/BT34 are the cold/hot tap temperatures.
+- GP2 is the **internal primary pump between tank and EP31**, not an external
+  DHW circulation pump. BT14/BT15 are **air in/out of the evaporator**; the
+  manual's "BT14 heating medium return" label conflicts with the live values —
+  do not use BT14 as a water return without verifying on the unit.
+- `hp_status` follows the compressor, not the immersion heater: element-only DHW
+  can report `Idle`. Use `compressor_state`, `additiondhwdemand` and the counters.
+- `cop_dhw` is a **charge-segment COP** (draw + tank change over compressor +
+  element input), not draw power over compressor power; one tank sensor cannot
+  capture stratification, so treat it as an estimate.
 
 ## Client vs Home Assistant
 
@@ -245,6 +302,7 @@ now wrong* is the one that changed. What has to move, when:
 | New snapshot / diagnostics field | the field lists in `AGENTS.md` and `docs/` |
 | New entity, option, service, user-visible behaviour | `docs/` (and `README.md` for the summary export's field list) |
 | A measured constant or protocol behaviour (a probe, a verified register) | the place that documents the measurement, with its numbers |
+| Pump hardware model, DHW path, draw-power semantics | `docs/qe-architecture.md` and this file |
 | Workflow, tooling, release automation | `AGENTS.md` |
 
 The reviewer's output contract is JSON; when the model answers in prose instead,
@@ -490,8 +548,8 @@ two meanings out of one pool key, so a version that no release has carried has
 no rows to protect: further schema-shaped changes on `main` before the next
 release edit the current number in place and append to its comment instead of
 bumping again. Check the released `manifest.json` (or the latest tag) before
-deciding — 2026.10.13 is the newest stable release, it carries **v7**, so v8 is
-the first number that needs a row of its own (and v8 therefore may not fold
+deciding — 2026.10.20 is the newest stable release, it carries **v8**, so v9 is
+the first number that needs a row of its own (and v9 therefore may not fold
 further changes once it ships; before that, edit it in place as usual).
 
 ## Derived metrics — power, COP, DHW
@@ -587,7 +645,7 @@ further changes once it ships; before that, edit it in place as usual).
   under `dhw_meter` in the COP store. The efficiency coordinator only applies the
   gates (draw time and metered energy) and the ±20 % warning, so the figure also
   works without a recorder. Diagnostics dump it as `cop.dhw_meter`.
-- The tank volume in that balance is **identified, not assumed**: with the
+- The buffer-tank volume in that balance is **identified, not assumed**: with the
   compressor idle and nothing drawn, the element is the only heat source, so
   `V = Σelement_kWh / (ΣΔbt30 · c)` (gates: ≥ 1.5 kWh, ≥ 3 K, 50–500 L). An
   interval only counts when **nothing else** can take heat out of the tank
@@ -604,12 +662,11 @@ further changes once it ships; before that, edit it in place as usual).
   identifying as before (absence is not heat flow), and neither reading may enter
   the COP window's counter-reset check: they are not energy counters. The
   datasheet 175 L (QE/QG/QG-C/QH-175; the QGM wall unit QH100 is smaller and
-  unpublished) is only the fallback. It is a fair fallback: `bt30` reads the top
-  of a stratified store, so how much energy one kelvin represents depends on how
-  the charge mixes it, and measured on a QE-6 (2026-10-21) an element-only charge
-  gave 1.60 kWh over 7.7 K → **179 L**, i.e. the nameplate holds there. An earlier
-  note here claimed the top reading over-counts by a wide margin (123 L); that was
-  never measured and is not what the data shows. It is EMA-smoothed, persisted as
+  unpublished) is only the fallback. It is a fair fallback: `bt30` is one point
+  in the stratified tank (not the top; `bt31` can read hotter during a draw), so
+  how much energy one kelvin represents depends on how the charge mixes it, and
+  measured on a QE-6 (2026-10-21) an element-only charge gave 1.60 kWh over
+  7.7 K → **179 L**, i.e. the nameplate holds there. It is EMA-smoothed, persisted as
   `dhw_tank_liters` with the COP snapshot, used for the live ratio of its own
   charge, exposed on `cop_dhw`
   (`charge_open`, `tank_liters`) and in the diagnostics `cop` block — a new
@@ -914,6 +971,10 @@ further changes once it ships; before that, edit it in place as usual).
 - Interval-only option changes apply in place; host/port/unit/enablement reloads.
 - Do not invent endpoints or registers. Maps: `client/modbus/maps.py`.
   HTTP paths: `client/cloud/endpoints.py`.
+- The 175 L tank is a buffer tank for heating water, not a DHW tank. DHW is
+  through-flow in EP31; see *Pump hardware model (QE)*.
+- The integration is product-agnostic across QE, QA+QH and QG; QE-specific
+  hardware claims live in *Pump hardware model (QE)* and `docs/qe-architecture.md`.
 
 ---
 
