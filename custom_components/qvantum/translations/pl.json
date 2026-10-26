@@ -260,7 +260,7 @@
         "name": "Moc ogrzewania"
       },
       "dhwpower": {
-        "name": "Moc DHW"
+        "name": "Moc poboru ciepłej wody"
       },
       "compressor_power": {
         "name": "Moc sprężarki"

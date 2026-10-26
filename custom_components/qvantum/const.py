@@ -191,7 +191,7 @@ DEFAULT_ENABLED_METRICS = [
 # Additional metrics only available via Modbus input registers (not the HTTP API)
 DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "heatingpower",  # Derived from heatingenergy delta; only meaningful with fast Modbus polling
-    "dhwpower",  # Derived from dhwenergy delta; only meaningful with fast Modbus polling
+    "dhwpower",  # Derived from bf1_l_min/bt33/bt34; only computed in Modbus mode
     "tap_water_cap",  # Derived from bt30/bt33/bf1_l_min; only computed in Modbus mode
     "tap_water_minutes",  # Minutes of hot water remaining; companion to tap_water_cap
     "smart_dhw_control_status",
@@ -378,6 +378,10 @@ REQUIRED_MODBUS_METRICS = [
     "bt30",  # Tank temperature
     "bt33",  # Cold water inlet temperature
     "bf1_l_min",  # DHW flow rate
+    # Required by dhwpower (instantaneous draw power = bf1 · (bt34 − bt33)) and
+    # by the DHW heat-meter window. bf1/bt33 are above; a user who disables the
+    # bt34 entity would otherwise silently take both figures with it.
+    "bt34",  # Hot water outlet temperature
     # Required by the custom heating curve coordinator in Modbus mode.
     # bt2 is already in REQUIRED_METRICS, and indoor_temperature_target comes
     # from the holding-register settings that are always read.

@@ -22,12 +22,12 @@
 
 ## Short version (30 seconds)
 
-The QE is an **exhaust-air heat pump** with a **175 L buffer tank of heating water**. The tank is **not** a domestic-hot-water tank: DHW is heated **instantaneously** in a plate heat exchanger, with the tank as the heat source. The compressor (1–6 kW depending on model) charges the tank; a draw can take **10–20 kW** for a few minutes because the tank discharges. `dhwenergy` meters the **draw** on the secondary side, not the compressor's DHW output. `dhwpower` in Home Assistant is derived from a 0.1 kWh counter and is therefore quantised; instantaneous draw power is `4.186/60 · BF1 · (BT34 − BT33)`. **BT30** = buffer tank, **BT31** = DHW primary inlet, **BT33/BT34** = cold/hot tap water. Read §11 before answering DHW questions.
+The QE is an **exhaust-air heat pump** with a **175 L buffer tank of heating water**. The tank is **not** a domestic-hot-water tank: DHW is heated **instantaneously** in a plate heat exchanger, with the tank as the heat source. The compressor (1–6 kW depending on model) charges the tank; a draw can take **10–20 kW** for a few minutes because the tank discharges. `dhwenergy` meters the **draw** on the secondary side, not the compressor's DHW output. `dhwpower` in Home Assistant is the **instantaneous** draw power `4.186/60 · BF1 · (BT34 − BT33)`; it is a power, not an energy, and does not integrate to `dhwenergy`. **BT30** = buffer tank, **BT31** = DHW primary inlet, **BT33/BT34** = cold/hot tap water. Read §11 before answering DHW questions.
 
 ### How to read this document
 
 1. Read the short version, §0 and §11 first. That is enough to avoid the common errors.
-2. Always distinguish `dhwenergy` (draw), `dhwpower` (derived, quantised) and `P_draw` (instantaneous, from BF1 and ΔT).
+2. Always distinguish `dhwenergy` (draw **energy**, the meter) from `dhwpower`/`P_draw` (draw **power**, `BF1 × ΔT`). They do not integrate to the same figure: the 0.1 kWh meter cannot resolve short draws.
 3. Distinguish BT30 (tank), BT31 (primary inlet), BT33/BT34 (tap water) and BT14/BT15 (air in/out).
 4. `hp_status` follows the compressor, not the immersion heater. Use `compressor_state`, `additiondhwdemand` and the energy counters to decide what is happening.
 5. Mark `[?]` as uncertain in an answer. Do not invent a mechanism the sources do not describe.
@@ -63,7 +63,7 @@ The QE is an **exhaust-air heat pump** with a **175 L buffer tank of heating wat
 5. **The compressor charges the tank; the tank delivers the draw.** The compressor's DHW mode heats the buffer tank, not the tap water directly. During a draw, tank water is pushed through the plate heat exchanger by pump GP2. `[M]`
 6. **Draw power can be 10–20 kW even though the compressor is 1–6 kW depending on model.** The peak comes from the tank's stored energy; the compressor recharges afterwards. `[L]`
 7. **`dhwenergy` meters the draw on the secondary side** (BT33 → BT34 × BF1), not the compressor's DHW output. The counter stays flat during a tank charge with no draw. `[I][L]`
-8. **`dhwpower` in Home Assistant is derived from the `dhwenergy` counter's 0.1 kWh steps** and is therefore quantised. Instantaneous draw power is `4.186/60 · BF1 · (BT34 − BT33)`. `[I]`
+8. **`dhwpower` in Home Assistant is the instantaneous draw power** `4.186/60 · BF1 · (BT34 − BT33)`, computed at poll resolution in Modbus mode. `[I]`
 9. **Three independent flows:** ventilation air (l/s), tap water (l/min) and heating water (l/s). Never mix them or convert one into another. `[M][R]`
 10. **`hp_status` follows the compressor, not the whole unit.** When only the immersion heater charges the tank, the pump can report `Idle` (0) even though DHW is being produced. `[I]`
 11. **BT30 is the buffer tank. BT31 is the DHW primary inlet. BT33/BT34 are cold/hot tap water.** BT31 is low when GP2 is stopped and high during a draw. `[M][L]`
@@ -500,10 +500,11 @@ This explains why a 12–20 kW draw can last only minutes before the tank cools,
 
 ### 7.5 `dhwpower` in Home Assistant
 
-- `dhwpower` is **derived** from the `dhwenergy` counter delta between polls. `[I]`
-- It is active only while `BF1 > 0`; otherwise it is written as 0. `[I]`
-- The counter resolution is 0.1 kWh. A step of 0.1 kWh over 15 s gives `0.1 × 3,600 / 15 = 24 kW`. That is **quantisation**, not a real 24 kW peak. `[I]`
-- Therefore: use `dhwpower` as a rough indicator, not as instantaneous draw power. Use the formula in §7.2 when accuracy matters.
+- `dhwpower` is the **instantaneous draw power** of §7.2, `4.186/60 · BF1 · (BT34 − BT33)`, evaluated on every poll in Modbus mode and published in W. `[I]`
+- It reads 0 W when `BF1 = 0` or when `BT34 − BT33 ≤ 0` (water moving but not being heated), and the entity is unavailable when `bf1_l_min`/`bt33`/`bt34` are missing. `[I]`
+- In cloud mode the entity carries the API's own `dhwpower` value, disabled by default; the integration only computes it over Modbus. `[I]`
+- It is **not** derived from the 0.1 kWh `dhwenergy` counter any more. That derivation could not carry a power figure: one step is a staircase whose granularity follows the poll interval (0.1 kWh over 15 s reads 24 kW, over 60 s 6 kW), it drops the trailing partial step of every draw and it cannot resolve a draw shorter than a step (~36 s at 10 kW). Measured on a live QE-6, 2026-10-26 — 36 h, 41 draws, 55 min of draw, 9.60 kWh metered: the counter-derived series read 0 W on 24 % of the polls inside a draw, peaked at 24.2 kW, had a 4.9 kW RMSE against the formula and missed 31 of the 41 draws, while the formula stayed within 2 % of the meter on the long draws. `[L][I]`
+- Do **not** integrate `dhwpower` for energy. Over that window the formula read 10.11 kWh against the meter's 9.60 kWh (+5 %), because the meter cannot resolve the sub-0.1 kWh draws the formula sees; `dhwenergy` is the energy figure and the only one to reconcile against. `[L]`
 
 ### 7.6 `cop_dhw` — the charge-segment COP
 
@@ -515,7 +516,7 @@ This explains why a 12–20 kW draw can last only minutes before the tank cools,
 
 ### 7.7 `heatingpower`, `dhwpower` and `powertotal`
 
-- `heatingpower` and `dhwpower` are **derived** from energy counters, not direct power sensors. They hold the last value between counter steps and reset to 0 outside the respective mode. `[I]`
+- `heatingpower` is **derived** from the `heatingenergy` counter: it holds the last value between counter steps and resets to 0 outside heating. `dhwpower` is different — it is the instantaneous flow × ΔT measurement of §7.5, not a counter rate. `[I]`
 - `compressor_power` (input 93) is the only direct electrical power measurement. `[R]`
 - `powertotal` in the integration is an **estimate**: 160 W base load + active relay stages (2+2+1 kW) + `compressor_power`. It is not a calibrated measurement. `[I]`
 
@@ -577,7 +578,7 @@ This explains why a 12–20 kW draw can last only minutes before the tank cools,
 | Metric | What it is | Important limitation |
 |---|---|---|
 | `heatingpower` | `heatingenergy` delta / time | Held between counter steps; 0 outside heating. |
-| `dhwpower` | `dhwenergy` delta / time | Quantised; 0 without flow. |
+| `dhwpower` | `BF1 × (BT34 − BT33)` in W | Instantaneous draw power; 0 without flow; not an energy. |
 | `cop_heating` | Rolling 1 h heating COP | Heating mode only; shares the electrical counters. |
 | `cop_dhw` | Charge-segment COP | Tank balance, one sensor; not draw efficiency. |
 | `scop_total` | 30-day system COP | Includes DHW, additional heat and real operation. |
@@ -639,7 +640,7 @@ Each step can lose information:
 | "The 175 L tank is a hot-water tank." | It is a buffer tank for heating water; DHW is through-flow. | Otherwise one assumes the tank can be drained like a DHW tank and that legionella is relevant. |
 | "The compressor heats the tap water directly." | The compressor charges the buffer tank; the plate heat exchanger transfers heat to the tap water. | Explains why draw power can exceed compressor power. |
 | "`dhwenergy` is the compressor's DHW production." | It is the draw meter on the secondary side. | Gives wrong COP and wrong energy balance if used as production. |
-| "`dhwpower` is instantaneous draw power." | It is derived from a 0.1 kWh counter and is quantised. | Produces false 24 kW peaks. |
+| "`dhwpower` × time is the draw energy." | `dhwpower` is instantaneous power from `BF1 × ΔT`; it reads ~5 % above the meter because the meter cannot resolve short draws. | Use `dhwenergy` for energy, `dhwpower` for power. |
 | "A 6 kW heat pump cannot deliver 15 kW DHW." | It can deliver 10–20 kW briefly from the tank; the compressor recharges afterwards. | Explains why a small pump can serve a shower. |
 | "BT30 is the tap-water temperature." | BT30 is one point in the buffer tank. | Stratification means the top can be much hotter. |
 | "BT31 is the tank temperature." | BT31 is the primary inlet at the plate heat exchanger. | A low BT31 at standstill is normal. |
@@ -679,7 +680,7 @@ Each step can lose information:
 
 ### "What is dhwpower?"
 
-> `dhwpower` in Home Assistant is derived from the `dhwenergy` counter's 0.1 kWh steps and is therefore quantised; it is not instantaneous draw power. Instantaneous draw power is `4.186/60 · BF1 · (BT34 − BT33)` kW. `dhwenergy` meters tap water on the secondary side and stays flat during a tank charge with no draw.
+> `dhwpower` in Home Assistant is the instantaneous draw power, `4.186/60 · BF1 · (BT34 − BT33)`, published in W on every Modbus poll; it reads 0 W when no water flows. `dhwenergy` is the separate **energy** meter on the same secondary side: it counts 0.1 kWh steps and stays flat during a tank charge with no draw. The two do not integrate to the same figure, because the meter cannot resolve short draws — reconcile energy against `dhwenergy`, never by integrating `dhwpower`.
 
 ### "Why does BT31 read only 42 °C when the tank is 55 °C?"
 
@@ -752,7 +753,7 @@ Each step can lose information:
 | Where is DHW heated? | In EP31, with tank water on the primary side and potable water on the secondary side. |
 | What drives the primary side? | GP2, an internal pump between tank and plate heat exchanger. |
 | What does `dhwenergy` meter? | Tap-water energy on the secondary side, not the compressor's DHW output. |
-| What does `dhwpower` meter? | A derived, quantised power from `dhwenergy`; not instantaneous draw power. |
+| What does `dhwpower` meter? | Instantaneous draw power to the tap water, `BF1 × ΔT`; not an energy. |
 | How do you calculate draw power? | `4.186/60 · BF1 · (BT34 − BT33)` kW. |
 | Why can draw power be 20 kW? | The tank discharges; the compressor is 1–6 kW and recharges afterwards. |
 | What is BT30? | One point in the buffer tank, not the whole tank. |

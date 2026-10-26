@@ -260,7 +260,7 @@
         "name": "Fűtési teljesítmény"
       },
       "dhwpower": {
-        "name": "HMV teljesítmény"
+        "name": "HMV-vétel teljesítménye"
       },
       "compressor_power": {
         "name": "Kompresszor teljesítmény"

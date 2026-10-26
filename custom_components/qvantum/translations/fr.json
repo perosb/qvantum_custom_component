@@ -260,7 +260,7 @@
         "name": "Puissance de chauffage"
       },
       "dhwpower": {
-        "name": "Puissance ECS"
+        "name": "Puissance de soutirage ECS"
       },
       "compressor_power": {
         "name": "Puissance compresseur"

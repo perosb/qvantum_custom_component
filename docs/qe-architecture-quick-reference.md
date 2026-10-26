@@ -23,7 +23,7 @@ different tank balance and COP model.
 4. **The compressor charges the tank**; the tank is the heat source for the DHW draw. `[M]`
 5. **Draw power can be 10–20 kW**; the compressor is 1–6 kW depending on model and recharges afterwards. `[L]`
 6. **`dhwenergy` meters the draw on the secondary side** (BT33 → BT34 × BF1), not the compressor's DHW output. It stays flat during a tank charge with no draw. `[I][L]`
-7. **`dhwpower` in Home Assistant is derived from the `dhwenergy` counter's 0.1 kWh steps** and is quantised; it is not instantaneous draw power. `[I]`
+7. **`dhwpower` in Home Assistant is the instantaneous draw power** `4.186/60 · BF1 · (BT34 − BT33)` (Modbus, in W); `dhwenergy` is the separate draw **energy** meter. `[I]`
 8. **Instantaneous draw power** = `4.186/60 · BF1 [l/min] · (BT34 − BT33) [K]` kW. `[L]`
 9. **`hp_status` follows the compressor**, not the immersion heater. Element-only DHW can report `Idle` (0). `[I]`
 10. **Three independent flows:** ventilation air (l/s), tap water (l/min), heating water (l/s). Do not mix them. `[M][R]`
@@ -83,7 +83,7 @@ This is why a 12–20 kW draw can last only minutes before the tank cools.
 | "The 175 L tank is a hot-water tank." | It is a buffer tank for heating water; DHW is through-flow. |
 | "The compressor heats the tap water directly." | The compressor charges the tank; the plate heat exchanger transfers the heat to the tap water. |
 | "`dhwenergy` is the compressor's DHW production." | It is the draw meter on the secondary side. |
-| "`dhwpower` is instantaneous draw power." | It is derived from a 0.1 kWh counter and is quantised. |
+| "`dhwpower` × time is the draw energy." | `dhwpower` is instantaneous power from `BF1 × ΔT`; the meter is `dhwenergy`. |
 | "A 6 kW pump cannot deliver 15 kW DHW." | It can deliver 10–20 kW briefly from the tank. |
 | "BT30 is the tap-water temperature." | BT30 is one point in the buffer tank. |
 | "BT31 is the tank temperature." | BT31 is the primary inlet at the plate heat exchanger. |
@@ -113,7 +113,7 @@ This is why a 12–20 kW draw can last only minutes before the tank cools.
 
 1. **The tank is not DHW.** It is heating water; DHW is through-flow.
 2. **The compressor charges the tank; the tank delivers the draw.** This is why draw power can exceed compressor power.
-3. **`dhwenergy` = draw, `dhwpower` = quantised derivation, `P_draw` = BF1 × ΔT.**
+3. **`dhwenergy` = draw energy (meter), `dhwpower` = `P_draw` = BF1 × ΔT (power).**
 4. **BT30 = tank, BT31 = primary inlet, BT33/34 = tap water, BT14/15 = air in/out.**
 5. **`hp_status` follows the compressor**, not the immersion heater.
 

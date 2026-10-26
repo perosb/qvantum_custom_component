@@ -260,7 +260,7 @@
         "name": "Heizleistung"
       },
       "dhwpower": {
-        "name": "Warmwasser-Leistung"
+        "name": "Warmwasser-Zapfleistung"
       },
       "compressor_power": {
         "name": "Kompressorleistung"
