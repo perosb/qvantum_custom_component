@@ -37,7 +37,7 @@ The QE is an **exhaust-air heat pump** with a **175 L buffer tank of heating wat
 | Section | Area |
 |---|---|
 | [0](#0-mental-model) | Mental model and why the design looks like this |
-| [1](#1-product-line-and-physical-layout) | Product line, two units, the tank |
+| [1](#1-product-line-and-physical-layout) | Product line, two units, the tank, other Qvantum products |
 | [2](#2-the-four-circuits) | Air, refrigerant, heating water, DHW — energy flow |
 | [3](#3-air-side-and-ventilation) | Ventilation, flows, BT14/BT15, frost |
 | [4](#4-refrigerant-circuit-and-compressor) | Refrigerant, compressor, capacity, states |
@@ -123,6 +123,29 @@ The hydronic unit and the compressor unit are connected by heating-water and ref
 - The tank is **not** a potable-water storage tank. Potable water only passes through the secondary side of the plate heat exchanger. `[M]`
 - The tank is **stratified**. One sensor (BT30) does not represent the whole tank. During a draw, the top can be significantly hotter than BT30. `[L]`
 - The tank can be charged by the compressor, by the immersion heater, or both. It can also deliver heat to the heating system through QN8 when the compressor cannot meet demand. `[M]`
+
+### 1.4 Other Qvantum products (QA+QH, QG)
+
+The integration is **not QE-specific**. It speaks Qvantum's shared cloud API and
+Modbus register map, so the **QA+QH** (air-source) and **QG** (ground-source)
+families are expected to work where they expose the same metrics and settings.
+The integration creates entities only for metrics present in the payload, so an
+absent register degrades to no entity instead of failing the poll. `[R][I]`
+
+Do **not** transfer the QE hardware model to those products without checking
+their own manuals and hydraulic schematics:
+
+- QA+QH is air-to-water and QG is brine-to-water; their source-side sensors,
+  defrost behaviour and refrigerant circuits differ from the QE's exhaust-air
+  evaporator.
+- DHW may be an external cylinder or a different integrated arrangement. The
+  QE's **175 L buffer tank + through-flow plate heat exchanger** is a QE design,
+  not a universal Qvantum design.
+- The QE-specific draw-power formula and `dhwenergy`/`dhwpower` semantics still
+  describe the tap-water side where the same BF1/BT33/BT34 sensors exist, but a
+  product with a DHW tank will have a different tank balance and COP model.
+- Check the product's manual before applying any QE-specific claim about the
+  tank, the immersion heater or the DHW path.
 
 ---
 
@@ -642,6 +665,7 @@ Each step can lose information:
 | "`dhw_tank_liters` is a setting." | It is an identified volume from an element-only balance. | Live 177.9 L vs 175 L nameplate. |
 | "175 L is the amount of hot water you can draw." | 175 L is the tank volume; the draw volume at 40 °C is 235 L (max 350 L with extra DHW). | Wrong capacity expectation. |
 | "QE-4 and QE-6 have different tanks." | Both have a 175 L tank; they differ in compressor, air flow, minimum flow and refrigerant charge. | Wrong spare-part/installation assumption. |
+| "These QE tank/DHW rules apply to every Qvantum model." | The integration is shared, but the 175 L buffer tank and through-flow DHW model is QE-specific; QA+QH and QG differ. | Applying the QE model to another product gives wrong DHW and COP conclusions. |
 
 ---
 
@@ -720,6 +744,7 @@ Each step can lose information:
 
 | Question | Safe answer |
 |---|---|
+| Does the integration only support the QE? | No; it targets Qvantum heat pumps and is expected to work with QA+QH and QG where the shared registers exist. The QE hardware model is QE-specific. |
 | What is the QE? | An exhaust-air heat pump with a 175 L buffer tank and through-flow DHW. |
 | Is the tank DHW? | No. It is heating water; DHW is a plate heat exchanger. |
 | Where is DHW heated? | In EP31, with tank water on the primary side and potable water on the secondary side. |

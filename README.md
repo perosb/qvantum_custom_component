@@ -2,7 +2,9 @@
 
 ## Qvantum Heat Pump Integration for Home Assistant
 
-Connect a Qvantum heat pump to Home Assistant using either the Qvantum cloud API or a direct local Modbus TCP connection:
+Connect a Qvantum heat pump to Home Assistant using either the Qvantum cloud API or a direct local Modbus TCP connection.
+
+The integration is not limited to the QE. It uses Qvantum's shared cloud API and Modbus register map, so the **QA+QH** (air source) and **QG** (ground source) families are expected to work where they expose the same metrics and settings. The QE-specific architecture in [docs/qe-architecture.md](docs/qe-architecture.md) does not necessarily apply to those products.
 
 - **Cloud mode (HTTP):** Uses your Qvantum account for live metrics, firmware details, SmartControl, and cloud settings.
 - **Local Modbus mode:** Connects directly on your LAN without an account or cloud session, with faster local polling.

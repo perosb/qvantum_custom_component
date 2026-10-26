@@ -6,6 +6,15 @@
 
 The Qvantum QE is an **exhaust-air heat pump**. It takes energy from the house's outgoing ventilation air and delivers heat to a heating system and to domestic hot water. The heat is stored in a **175 L buffer tank of heating water** — not in a domestic-hot-water tank. Domestic hot water (DHW) is produced in **through-flow** in a plate heat exchanger: tank water on the primary side heats cold potable water on the secondary side at the moment it is drawn. The compressor charges the tank; during a draw the tank discharges and can deliver 10–20 kW for a few minutes, even though the compressor is only 1–6 kW.
 
+## Product scope
+
+This quick reference describes the **QE**. The integration itself is shared
+across Qvantum heat pumps and is expected to work with **QA+QH** (air source)
+and **QG** (ground source) where the same cloud/Modbus fields exist. Do not
+apply the QE-specific 175 L buffer tank and through-flow DHW model to those
+products without checking their manuals; a product with a DHW tank has a
+different tank balance and COP model.
+
 ## Ten facts that must be right
 
 1. **The QE is an exhaust-air heat pump** — not an air-to-water heat pump with an outdoor unit. `[M]`
@@ -98,6 +107,7 @@ This is why a 12–20 kW draw can last only minutes before the tank cools.
 | "`compressor_power` is heating output." | It is electrical input. |
 | "`heatingpower` is a direct power sensor." | It is derived from a 0.1 kWh counter. |
 | "175 L is the amount of hot water you can draw." | 175 L is the tank volume; the draw volume at 40 °C is 235 L (max 350 L with extra DHW). |
+| "These QE tank/DHW rules apply to every Qvantum model." | The integration is shared, but the QE buffer tank and through-flow DHW model is QE-specific; QA+QH and QG differ. |
 
 ## If you remember only five things
 

@@ -2,7 +2,9 @@
 
 HA integration for Qvantum heat pumps. One config entry, two exclusive transports:
 **cloud HTTP** XOR **local Modbus TCP**. Requires HA **2026.9+**. HACS zip:
-`custom_components/qvantum/`.
+`custom_components/qvantum/`. The integration is not QE-specific: the **QA+QH**
+air-source and **QG** ground-source families use the same cloud/Modbus interface,
+but the *Pump hardware model (QE)* section describes the QE only.
 
 The pump hardware model — 175 L buffer tank vs through-flow DHW, the draw meter
 and the BT30/BT31 split — is in `docs/qe-architecture.md`. Read
@@ -66,6 +68,12 @@ The QE is an **exhaust-air heat pump** with an integrated **175 L buffer tank**
 and **through-flow DHW**. Every DHW metric below depends on this model; the full
 reference is `docs/qe-architecture.md` (short version:
 `docs/qe-architecture-quick-reference.md`).
+
+This section is QE-specific. QA+QH (air source) and QG (ground source) share
+the transport and many registers, but their hydraulic/refrigerant models differ:
+do not transfer the QE tank, through-flow DHW or draw-power claims to them
+without checking their manuals. The integration creates entities only for
+metrics present in the payload, so absent registers degrade to no entity.
 
 - The 175 L tank is **heating water, not potable DHW**. DHW is heated
   instantaneously in plate heat exchanger EP31 (<0.8 L): tank water on the
@@ -965,6 +973,8 @@ further changes once it ships; before that, edit it in place as usual).
   HTTP paths: `client/cloud/endpoints.py`.
 - The 175 L tank is a buffer tank for heating water, not a DHW tank. DHW is
   through-flow in EP31; see *Pump hardware model (QE)*.
+- The integration is product-agnostic across QE, QA+QH and QG; QE-specific
+  hardware claims live in *Pump hardware model (QE)* and `docs/qe-architecture.md`.
 
 ---
 
