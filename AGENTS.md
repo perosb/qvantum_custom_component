@@ -6,9 +6,23 @@ HA integration for Qvantum heat pumps. One config entry, two exclusive transport
 air-source and **QG** ground-source families use the same cloud/Modbus interface,
 but the *Pump hardware model (QE)* section describes the QE only.
 
-The pump hardware model — 175 L buffer tank vs through-flow DHW, the draw meter
-and the BT30/BT31 split — is in `docs/qe-architecture.md`. Read
-*Pump hardware model (QE)* before changing a DHW metric.
+**Where the detail lives.** This file is the working agreement: workflow, hard
+invariants and the map of the code. Measurements, derivations and field lists
+live in `docs/` and are read on demand, before touching that area:
+
+| Area | Document |
+|---|---|
+| QE hardware model: 175 L buffer tank, through-flow DHW, BT30/BT31, draw power | `docs/qe-architecture.md` (compact: `docs/qe-architecture-quick-reference.md`) |
+| Derived metrics: power, COP, DHW, tank volume, standing loss | `docs/derived-metrics.md` |
+| Adaptive curve: readiness, room gain, trims, solar/wind model, write policy | `docs/heating-curve.md` |
+| Tap-water capacity 1–7 and its two repair issues | `docs/tap-water-capacity.md` |
+| Telemetry consent, uploader, `SUMMARY_SCHEMA_VERSION` | `docs/telemetry.md` |
+| Summary export field list | `README.md#qvantumexport_summary` |
+
+Do not paste a measurement back into this file. A number that lives in two
+places goes stale in one of them: one `dhwpower` change had to correct the same
+claim in two docs and here. This file states the rule; the doc states the
+measurement and the numbers behind it.
 
 ## Layout
 
@@ -45,6 +59,8 @@ custom_components/qvantum/
   test_data/
 tests/
 docs/heating-curve.md
+docs/derived-metrics.md
+docs/tap-water-capacity.md
 docs/telemetry.md
 docs/qe-architecture.md
 docs/qe-architecture-quick-reference.md
@@ -64,64 +80,31 @@ cloud-only / Modbus-only ones through coordinator helpers
 
 ## Pump hardware model (QE)
 
-The QE is an **exhaust-air heat pump** with an integrated **175 L buffer tank**
-and **through-flow DHW**. Every DHW metric below depends on this model; the full
-reference is `docs/qe-architecture.md` (short version:
-`docs/qe-architecture-quick-reference.md`).
+The QE is an **exhaust-air heat pump** with an integrated **175 L buffer tank of
+heating water** and **through-flow DHW** in plate heat exchanger EP31 (< 0.8 L;
+no DHW tank, no legionella store). The compressor charges the tank; a draw takes
+10–20 kW from it while the compressor is 1–6 kW and recharges afterwards.
 
-This section is QE-specific. QA+QH (air source) and QG (ground source) share
-the transport and many registers, but their hydraulic/refrigerant models differ:
-do not transfer the QE tank, through-flow DHW or draw-power claims to them
-without checking their manuals. The integration creates entities only for
-metrics present in the payload, so absent registers degrade to no entity.
+Four things every DHW metric depends on:
 
-- The 175 L tank is **heating water, not potable DHW**. DHW is heated
-  instantaneously in plate heat exchanger EP31 (<0.8 L): tank water on the
-  primary side (BT31 → GP2 → EP31) and cold tap water on the secondary side
-  (BT33 → EP31 → BT34). There is no DHW tank and no legionella store.
-- The compressor charges the tank (QM10 in DHW mode); the tank discharges into
-  the tap through GP2/EP31. A draw can therefore be 10–20 kW while the
-  compressor is 1–6 kW; the tank supplies the peak and is recharged afterwards.
-- The immersion heater (EB1) is **5 kW split as 1+2+2 kW**, switched in 1–5 kW
-  steps. It heats the tank/heating water, not the tap water; it can run in
-  parallel with the compressor and can be the only source when the compressor is
-  off/defrosting (`hp_status` then reads `Idle`). `additiondhwdemand` is its DHW
-  flag, `additionalenergy` its meter, and element-only DHW is capped at COP 1.0.
-  Maximum tank temperature with the element is 90 °C; the safety limiter trips at
-  95 °C.
 - `dhwenergy` (input 103/104) is the **draw meter** on the secondary side
-  (BT33→BT34 × BF1), not the compressor's DHW output. It stays flat while the
-  compressor charges the tank without a draw.
-- `dhwpower` is the **instantaneous** secondary-side draw power,
-  `4.186/60 · BF1 · (BT34 − BT33)` in W, computed on every poll in Modbus mode —
-  not a rate derived from the 0.1 kWh `dhwenergy` counter. That derivation could
-  not carry a power figure: its step is a staircase whose granularity follows
-  the poll interval (0.1 kWh over 15 s reads 24 kW, over 60 s 6 kW), it drops
-  the trailing partial step of every draw and it cannot resolve a draw shorter
-  than a step (~36 s at 10 kW). Measured on a live QE-6, 2026-10-26 — 36 h,
-  41 draws, 55 min of draw, 9.60 kWh metered: the counter-derived series read
-  0 W on 24 % of the polls inside a draw, peaked at 24.2 kW, had a 4.9 kW RMSE
-  against the formula and missed 31 of the 41 draws, while the formula stayed
-  within 2 % of the meter on the long draws. The key is left **unset** (entity
-  unavailable) when `bf1_l_min`/`bt33`/`bt34` are missing and never falls back
-  to the counter; a zero flow or a non-positive ΔT is 0 W. Cloud mode passes the
-  API's own `dhwpower` through unchanged. Do **not** integrate it for energy —
-  it reads ~5 % above `dhwenergy` because the meter cannot resolve sub-0.1 kWh
-  draws, so `dhwenergy` is the energy figure. The DHW heat-meter comparison
-  integrates the same formula at poll resolution.
-- BT30 is **one point in the stratified buffer tank**, not a tank mean and not
-  the tank top. BT31 is the DHW primary inlet at EP31: it reads low while GP2 is
-  stopped (the primary loop is stagnant) and can read hotter than BT30 during a
-  draw. BT33/BT34 are the cold/hot tap temperatures.
-- GP2 is the **internal primary pump between tank and EP31**, not an external
-  DHW circulation pump. BT14/BT15 are **air in/out of the evaporator**; the
-  manual's "BT14 heating medium return" label conflicts with the live values —
-  do not use BT14 as a water return without verifying on the unit.
-- `hp_status` follows the compressor, not the immersion heater: element-only DHW
-  can report `Idle`. Use `compressor_state`, `additiondhwdemand` and the counters.
-- `cop_dhw` is a **charge-segment COP** (draw + tank change over compressor +
-  element input), not draw power over compressor power; one tank sensor cannot
-  capture stratification, so treat it as an estimate.
+  (BT33 → BT34 × BF1), not the compressor's DHW output.
+- `dhwpower` is the **instantaneous** draw power `4.186/60 · BF1 · (BT34 − BT33)`
+  in Modbus mode. Never integrate it for energy — `dhwenergy` is the energy.
+- The immersion heater (EB1, 5 kW as 1+2+2) heats tank water, not the tap; its
+  DHW energy is attributed by `additiondhwdemand`, and `hp_status` follows the
+  compressor, so element-only DHW can read `Idle`.
+- BT30 is **one point in the stratified tank**, BT31 is the DHW primary inlet at
+  EP31, BT33/BT34 are cold/hot tap water, and BT14/BT15 are **air** in/out of the
+  evaporator (the manual's "BT14 heating-medium return" label contradicts the
+  live values).
+
+Full reference, sensor map, formulas and the measurement behind each claim:
+`docs/qe-architecture.md`. This section is QE-specific: QA+QH (air source) and QG
+(ground source) share the transport and many registers, but not the tank, the
+through-flow DHW or the draw-power model — do not transfer these claims to them
+without checking their manuals. The integration creates entities only for metrics
+present in the payload, so absent registers degrade to no entity.
 
 ## Client vs Home Assistant
 
@@ -206,10 +189,12 @@ its own branch from the latest `main`, never an append to that PR's branch.
 Before pushing to a branch, check `gh pr view <n> --json state`: a merged PR's
 branch is gone, so branch from `main` again.
 
-**This file is part of the change.** A PR that alters architecture,
-derived-metric semantics, persistence or this workflow updates `AGENTS.md` in
-the same PR — it is injected as the authoritative note for the next session, so
-a version describing the old behaviour is worse than no note at all.
+**The owning document is part of the change.** A PR that alters architecture,
+derived-metric semantics, persistence or this workflow updates the doc that owns
+it (see *Where the detail lives*) in the same PR — and this file when the change
+also moves a rule a review has to enforce. It is injected as the authoritative
+note for the next session, so a version describing the old behaviour is worse
+than no note at all.
 
 `/root/.gitconfig` does not survive a container restart, so set identity and the
 credential helper **per repo**:
@@ -311,11 +296,12 @@ now wrong* is the one that changed. What has to move, when:
 
 | Change | Documentation |
 |---|---|
-| Derived metric, gate, threshold, persisted field, `SUMMARY_SCHEMA_VERSION` meaning | `AGENTS.md` and the metric's section in `docs/` |
-| New snapshot / diagnostics field | the field lists in `AGENTS.md` and `docs/` |
+| Derived metric, gate, threshold, persisted field, `SUMMARY_SCHEMA_VERSION` meaning | the metric's section in `docs/` — `derived-metrics.md`, `heating-curve.md`, `qe-architecture.md` or `telemetry.md` — plus the one-line invariant in `AGENTS.md` if a review rule moves |
+| New snapshot / diagnostics field | the documented field lists in `docs/` (`AGENTS.md` only when the field is also a new invariant) |
 | New entity, option, service, user-visible behaviour | `docs/` (and `README.md` for the summary export's field list) |
 | A measured constant or protocol behaviour (a probe, a verified register) | the place that documents the measurement, with its numbers |
-| Pump hardware model, DHW path, draw-power semantics | `docs/qe-architecture.md` and this file |
+| Pump hardware model, DHW path, draw-power semantics | `docs/qe-architecture.md` |
+| Tap-water capacity level, its table or its repair issues | `docs/tap-water-capacity.md` |
 | Workflow, tooling, release automation | `AGENTS.md` |
 
 The reviewer's output contract is JSON; when the model answers in prose instead,
@@ -418,6 +404,12 @@ migration test when the entry schema changes.
 Icons on `QvantumEntity`. Cloud-only entities (SmartControl, firmware boards,
 access expiry, elevate-access) must not be created in Modbus mode.
 
+The `DEFAULT_ENABLED_*` / `DEFAULT_DISABLED_*` lists are the source of truth in
+both directions: `disable_entities_by_default` clears a stale
+`disabled_by=INTEGRATION`, but never a `disabled_by=USER`. A disabled entity
+records no statistics, so a metric some fit reads must not be moved into a
+disabled list.
+
 Entity category: machine-internal telemetry and settings read-backs
 (refrigerant/air-side BT sensors, refrigerant pressures, compressor/pump/fan
 speeds, lifetime counters, valve position, derived diagnostics such as the
@@ -439,543 +431,143 @@ control is offered when a write would fail.
 
 Optimistic writes (`handle_setting_update_response` / `async_apply_setting`) land
 in `values` before the next poll, so a setting whose *state* is derived from
-another key must move that key too via `extra_updates`. DHW capacity is the
-example: the write lands as the start/stop pair and `native_value` derives the
-level from that pair, so updating only `tap_water_capacity_target` showed the
-previous level until the next poll even though the pump already held the new
-temperatures. `TAP_WATER_CAPACITY_START_STOP` in `client/constants.py` is the
-inverse of `TAP_WATER_CAPACITY_MAPPINGS`; both transports and the entity use it
-instead of rebuilding the inverse. Cloud writes levels 2-5 as the level setting
-and only 1/6/7 as a start/stop pair, but that PATCH answers
-`{"success": true}`, which is not APPLIED, so a cloud capacity write stays
-poll-driven (up to 120 s) and only the Modbus pair write applies optimistically;
-the same is true of every other settings-PATCH write, and
-`client.models.result_applied` is why.
+another key must move that key too via `extra_updates` — otherwise the UI shows
+the old state until the next poll. Cloud settings PATCHes answer
+`{"success": true}`, which is not APPLIED (`client.models.result_applied`), so
+every cloud settings write stays poll-driven (up to 120 s) while Modbus applies
+optimistically.
 
-The pair is also the **truth about the level**, not a key to look one up with:
-no holding register carries the capacity target, so Modbus derives it, and the
-pump can move the pair on its own (measured on a QE-4, 2026-10-22: 55/71 → 55/65
-with no user action) while the app keeps showing level 5. A pair outside
-`TAP_WATER_CAPACITY_MAPPINGS` is therefore **not** rounded to a nearest level
-(that reported 55/65 as 2): `_derive_tap_water_capacity` leaves
-`tap_water_capacity_target` at the transport's own label (cloud) or `None`
-(Modbus), `native_value` answers only from the pair and reports `unknown`, the
-entity stays available (its own key may be `None` — that is the one exemption in
-the number platform's availability check) with
-`start_stop_pair`/`pair_mapped`/`nearest_capacity`/`reported_capacity`
-attributes, and `_async_sync_tap_water_capacity_issue` keeps the repair issues in
-step with the mismatch. Two **separate** issues, because the situations differ:
-`tap_water_capacity_unmapped` (`unmapped`: the pair is not in the table — no
-level exists at all, since `reported` is `None` on Modbus and printing "none"
-was a bug) and `tap_water_capacity_level_conflict` (`level_conflict`: the table
-maps the pair to one level and the transport reports another). Both carry the
-**same** text on purpose — it names the pair, says the preset is unknown to this
-integration and that it was probably set by hand or in the app; naming a level
-told the user to fix the side that is stale, and the conflict is still
-identifiable by issue id and by the entity's `pair_mapped`/`reported_capacity`
-attributes. Each has its own issue id suffix and
-every other id is deleted on every sync — **including the legacy unsuffixed
-`tap_water_capacity_mismatch_<entry>`**, which releases up to 2026.10.18 raised
-and which lives in HA's issue store across restarts; without that delete an
-upgrading installation keeps the old issue next to the new one forever.
-`nearest_tap_water_capacity_level` is only the entity's *attribute* hint, never
-the state and never in either issue text.
-
-**Neither issue is raised on a read-only Modbus link** (`modbus_enabled` and
-`client.writable is False`): the pair was then moved by the app or the cloud, the
-integration has no write path back, and a current-firmware pump holds a pair
-outside the table anyway — so the issue would ask for something nobody can do
-from Home Assistant and would nag forever. Turning writes off clears an issue
-that was already raised; the entity keeps reporting `unknown` with its
-`start_stop_pair`/`pair_mapped`/`reported_capacity` attributes.
-
-**The table is firmware-specific and must not be "fixed" by guessing.** It has
-been unchanged since #270 and predates Qvantum's change, which is the firmware in
-the field — not only newer pumps, and Qvantum installs that firmware
-**automatically and mandatorily**, so no pump stays behind: the levels now sit
-about 1 °C apart (a reporting QE4 shows **55/65 = level 5**, and its app no
-longer writes 55/71), so no current pump is expected to match the table. The old
-table is therefore on a countdown, and the pair is the only stable control
-surface: one current-firmware pump's seven `(level, start, stop)` readings map the
-fleet, so the mapping is learnable — it is the *level write path* (a level
-resolved through the stale table) that is the remaining hazard, not the label. Keep the pair as the truth and the level `unknown`;
-re-pointing the table silently retargets every level write for every user, so it
-waits for evidence — a per-firmware mapping accumulated from cloud rows (level
-and pair arrive together there; Modbus has no level) or a published table. Note
-that the level is **not** a capacity figure: 175 L ≈ 0.20 kWh/K while a 6-minute
-shower needs ≈ 1.76 kWh, i.e. ≈ 8.6 K per shower, so a 1 °C step cannot mean one
-shower and no mapping follows from physics. The repair text therefore names only
-the pair and says the preset is unknown to this integration (probably set by
-hand or in the app): it does **not** name a level and does **not** tell the user
-to set one. The open
-work is a per-firmware mapping learned from cloud rows (level and pair arrive
-together there; Modbus has no level) or a table published by Qvantum.
+**Tap-water capacity** is the case where this matters most: the level is derived
+from the start/stop pair, the pair is the truth, and a pair outside
+`TAP_WATER_CAPACITY_MAPPINGS` must not be rounded to a nearest level (the entity
+reports `unknown` with its attributes, and two separate repair issues track the
+two situations — none of them on a read-only Modbus link). `TAP_WATER_CAPACITY_START_STOP`
+in `client/constants.py` is the shared inverse. The saga, the measured
+firmware change and why the table must not be re-pointed by guessing:
+`docs/tap-water-capacity.md`.
 
 ## Telemetry
 
 **Opt-in and never implied.** `telemetry.py` stores only the decision and a
 locally generated random token; it never sends anything. The question is a
-fixable **repair issue** (`telemetry_consent`, raised once after
-`PROMPT_AFTER_DAYS` of use — existing installs are covered because the clock
-starts on the first start with this version) with a two-choice fix flow in
-`repairs.py`. Consent must never be a condition for a feature: enabling the
-adaptive curve does not imply it, and a README notice is not consent. A grant can
-be revoked and the state removed; removing the entry calls `async_forget`.
+fixable **repair issue** raised once after a week of use, with a two-choice fix
+flow in `repairs.py`. Consent must never be a condition for a feature: enabling
+the adaptive curve does not imply it, and a README notice is not consent.
 
-The intake lives in `telemetry-worker/` (Cloudflare Worker + KV), deployed by
-`.github/workflows/telemetry-worker.yml` and deliberately not by `release.yml`: a
-Cloudflare outage must never block a HACS release, and the zip only takes
-`custom_components/qvantum/`. The deploy skips itself when the Cloudflare secrets
-or the KV namespace id are missing.
+The summary export is **whitelist-built and identifier-free** — fields are picked
+explicitly, coerced to numbers/booleans/short enums, and the `counters` block is
+counts, never a log of when. `tests/test_summary.py` asserts it carries no entity
+ids or names.
 
-`telemetry.py` also owns the uploader: a six-hour check that posts the summary at
-most once a week, only while consent is granted. Counters reset **after** the
-worker accepted the row, so a failed week retries instead of losing its evidence;
-the installation token travels in the request only, never in the exported file.
-`qvantum.telemetry_upload` forces a send and `qvantum.telemetry_delete` erases
-every row for the installation with that token. The endpoint is a constant, not
-an option — an URL setting would invite sending this data elsewhere without the
-prompt.
-
-The summary export (`qvantum.export_summary`, `summary.py`) is
-**whitelist-built** and must stay identifier-free, including the `counters` block
-(curve reverts, trim updates, days a clamped or extrapolated knot was lived with,
-and the date they were reset at — counts, never a log of when): fields are picked
-explicitly and coerced to numbers, booleans or short enumerated strings, never
-free text from the values payload. `tests/test_summary.py` asserts the payload
-carries no entity ids or names. It writes a file and returns it — it never sends
-anything and never opens an issue.
-
-`SUMMARY_SCHEMA_VERSION` is the pool's grouping key, so it moves for **a new
-field, a removed field, and a field whose meaning changed** — the third is the
-one that gets forgotten. Re-normalizing an existing figure is exactly that: v6
-marks `dhw_standing_loss` as a coefficient quoted at a fixed tank-to-ambient
-difference (identified volume) instead of the raw daily figure at whatever tank
-temperature its window saw, because two such readings pool side by side and
-neither is comparable to the other. When a derived metric changes semantics,
-bump the version **in the same PR** and say in the constant's comment what
-changed and why; a test pins the floor so a silent revert cannot pass.
-
-**Only a version that has shipped needs superseding.** The number exists to keep
-two meanings out of one pool key, so a version that no release has carried has
-no rows to protect: further schema-shaped changes on `main` before the next
-release edit the current number in place and append to its comment instead of
-bumping again. Check the released `manifest.json` (or the latest tag) before
-deciding — 2026.10.20 is the newest stable release, it carries **v8**, so v9 is
-the first number that needs a row of its own (and v9 therefore may not fold
-further changes once it ships; before that, edit it in place as usual).
+`SUMMARY_SCHEMA_VERSION` moves for a new field, a removed field **and a field
+whose meaning changed** — bump it in the same PR as the semantic change, and
+check the released `manifest.json` first: a version no release has carried is
+edited in place instead of bumped. Details, the v6/v8 history and why:
+`docs/telemetry.md`.
 
 ## Derived metrics — power, COP, DHW
 
-- The two DHW-comfort sensors are **estimates from a tank model**, and their
-  names say what they are: `tap_water_minutes` → "Remaining shower minutes" is
-  `(V/flow)·ln((tank − cold)/(38 − cold))`, the time until the tap falls to the
-  38 °C shower temperature at the EMA of the observed shower flow, and
-  `tap_water_cap` → "Showers remaining" is those minutes divided by the EMA
-  shower duration. Neither is a volume, an energy or the capacity *level*
-  (`tap_water_capacity_target`, which is the app's 1–7). The flow and duration
-  only update while water runs, so the figures hold their last shower's values.
-- `heatingenergy` is space-heating output, but `dhwenergy` meters the DHW
-  **draw** (secondary side), not the compressor's DHW output. There is no
-  short-window system COP.
-- The electrical counters (`compressorenergy` + `additionalenergy`) are shared
-  between modes and split per poll by `_split_electrical_input`: hot water → DHW;
-  space heating → compressor heating with the element DHW when its own flag is
-  set (parallel top-up); compressor idle/defrosting → element DHW (the pump
-  reports `Idle` when only the element runs, because `hp_status` follows the
-  compressor). The **element is attributed by `additiondhwdemand`**, its own
-  DHW flag: measured 2026-10-21, the counters step late (compressor every ~9 min,
-  the element a handful of times a day) and in all 1 087 step intervals of a
-  10-day window both `dhwdemand` and `additiondemand` had already cleared, so a
-  demand-gated split booked the element's DHW energy nowhere — 3.7 kWh of 4.2 kWh
-  in that window, 8 % of the DHW electrical, and it also left `charge.element_kwh`
-  at zero so the volume identification could never fire. All three flags are
-  disabled-by-default binary sensors and therefore sit in `REQUIRED_METRICS` — a
-  disabled entity is not fetched. Energy that still cannot be attributed (an
-  element step with no flag, or a compressor step that landed in an idle
-  interval) is **never dropped silently**: it is returned separately and counted
-  in `cop.unattributed_kwh`, because a vanishing kWh is how a COP drifts.
-- `cop_heating`: rolling one-hour window of counter deltas over heating-mode
-  electrical only. `cop_dhw`: **one charge segment** (`_update_dhw_charge`) —
-  opens on DHW demand **or on the element's DHW flag** with the previous poll's
-  tank level (an element top-up after the demand cleared is still DHW
-  production, and without it the segment never carried the element energy the
-  volume identification reads), publishes live, finalises on the first poll
-  without either; production = draw since the charge started + tank change
-  against that baseline, and a segment with no compressor work is element-only,
-  capped at COP 1.0. Two review invariants: the interval
-  that clears the demand is **not** booked (closing publish uses
-  `charge.last_tank`), and element-only evidence checks the **compressor counter**
-  delta (`interval_dhw_compressor` is zero for every status but hot water, so a
-  defrost would read as element heat). A counter reset drops the window and the
-  open charge; a charge older than `DHW_CHARGE_MAX_SECONDS` restarts its baseline.
-- `dhw_standing_loss` is an EMA persisted in `qvantum.efficiency.<entry_id>` and
-  restored before the first refresh, so a restart no longer blanks it. The **open
-  free-cooling window is deliberately not persisted**: the tank went unsampled
-  across the restart, and resuming would book an unobserved draw as standing
-  loss. A fresh window starts on the next idle poll.
-- What that EMA holds is a **coefficient, not a daily figure**: windows are
-  normalized by the tank-to-ambient difference (`bt2` first, the configured room
-  sensor as fallback) and the published kWh/d is the coefficient quoted at
-  `REFERENCE_DELTA_K` (40 K). Without it the number tracked the tank temperature
-  rather than the insulation — one window after a 69 °C extra-hot-water run
-  moved a live install from 2.5 to 5.1 kWh/d. The volume is the identified one
-  when present, and the store key is `dhw_standing_loss_per_k`; a snapshot
-  written under the old key is ignored, never reinterpreted. The newest window's
-  evidence (hours, drop, tank mean, ambient and its source, ΔT, volume) travels
-  as sensor attributes.
-- The ambient is only a BT2 that is a **temperature** — and BT2 is a wired
-  room-air sensor whose room the installer picks (ours hangs in a hallway, not
-  beside the unit), so it proxies the tank's surroundings rather than measuring
-  them; an install whose tank stands colder than BT2's room gets a biased
-  figure that no payload can flag. Without a probe the sensor holds the
-  firmware's placeholder (a QE4 owner reported a fixed −30 °C, 2026-10-23), and
-  the pump's room value then comes from the configured sensor.
-  `bt2` is skipped when `BT2 Detected` (input 86) says it is not fitted, or when
-  it reads at or below `BT2_PLACEHOLDER_MAX_C` (−25 °C — the cloud carries no
-  bit, so the value has to say it). The bound is deliberately lower than the
-  curve's room band: a tank in an unheated garage at −5 °C is a valid window,
-  while averaging a placeholder in would divide by 85 K instead of ~34 K and
-  publish ~40 % of the true coefficient. The window then falls through to
-  `room_temp_external`/`room_temp_ext`, or is discarded when neither exists.
-  The statistics picker applies the same rule: `pick_indoor_metric_key` skips a
-  candidate whose series median is not a room temperature
-  (`INDOOR_SERIES_MIN_C`/`INDOOR_SERIES_MAX_C`, −10…45 °C — a placeholder
-  records −30 °C as an ordinary series), and skips BT2 outright when the pump
-  reports no probe. That matters because the picker's fallback exists for a
-  newly configured sensor with no history: without the guard it selected the
-  placeholder, and a −50 K room error puts the trims on their clamp and inflates
-  the heat-loss coefficient, the time constant and the solar aperture. No series
-  beats a plausible wrong one.
-- The DHW heat-meter comparison (`dhw_heat_meter_deviation`) is a
-  **poll-resolution integral**, not a statistics product: `mean(flow) · mean(ΔT)`
-  is not the integral of `flow · ΔT`, and on a live install it read 0.7 kWh
-  against a 17.3 kWh meter over three days where the poll integral landed within
-  2.8 %. `plant_analytics.DhwMeterWindow` accumulates it (hourly buckets, a week
-  long, gap and counter-reset guarded) where the interval is known — the main
-  coordinator's poll — publishes `dhw_meter_estimated_kwh` /
-  `dhw_meter_metered_kwh` / `dhw_meter_draw_hours` in `values`, and is persisted
-  under `dhw_meter` in the COP store. The efficiency coordinator only applies the
-  gates (draw time and metered energy) and the ±20 % warning, so the figure also
-  works without a recorder. Diagnostics dump it as `cop.dhw_meter`.
-- The buffer-tank volume in that balance is **identified, not assumed**: with the
-  compressor idle and nothing drawn, the element is the only heat source, so
-  `V = Σelement_kWh / (ΣΔbt30 · c)` (gates: ≥ 1.5 kWh, ≥ 3 K, 50–500 L). An
-  interval only counts when **nothing else** can take heat out of the tank
-  either: `element_only_tank_balance` also requires the addition shunt closed
-  (`qn8position` = 0) and **no step of the `heatingenergy` counter** in the
-  interval. The counter is the signal, not the derived `heatingpower`: that one
-  is computed after the COP pass and reads zero whenever the compressor is not
-  heating, which is exactly the state being guarded, so it could never fire.
-  Both guards were missing, and measured on a QE-6 (2026-10-21) an extra-hot-water
-  run sat *idle with the element demanded* while `qn8position` had been 7 and the
-  heating circuit was taking 2.3 kW — tank water was heating the house, so the element's
-  energy would have been divided by a rise it did not fully cause, inflating the
-  volume and, linearly, the DHW COP. A payload that carries neither metric keeps
-  identifying as before (absence is not heat flow), and neither reading may enter
-  the COP window's counter-reset check: they are not energy counters. The
-  datasheet 175 L (QE/QG/QG-C/QH-175; the QGM wall unit QH100 is smaller and
-  unpublished) is only the fallback. It is a fair fallback: `bt30` is one point
-  in the stratified tank (not the top; `bt31` can read hotter during a draw), so
-  how much energy one kelvin represents depends on how the charge mixes it, and
-  measured on a QE-6 (2026-10-21) an element-only charge gave 1.60 kWh over
-  7.7 K → **179 L**, i.e. the nameplate holds there. It is EMA-smoothed, persisted as
-  `dhw_tank_liters` with the COP snapshot, used for the live ratio of its own
-  charge, exposed on `cop_dhw`
-  (`charge_open`, `tank_liters`) and in the diagnostics `cop` block — a new
-  COP-store field belongs there in the same PR.
-- Derived metrics (`cop_*`, `scop_total`, `aux_heat_share`, …) are computed in HA
-  after the poll. Never add them to `DEFAULT_ENABLED_*` / `DEFAULT_DISABLED_*`:
-  those lists are also the fetch universe, so the client would request a metric
-  the API does not return. Create the entity explicitly in its platform and list
-  the key in `special_sensor_keys` so registry cleanup keeps it.
+Computed in HA after the poll; the derivations and their measurements are in
+`docs/derived-metrics.md` and `docs/qe-architecture.md` §7. The invariants a
+review has to catch:
+
+- Never add a derived key (`cop_*`, `scop_total`, `aux_heat_share`,
+  `efficiency_health`, `tap_water_cap`/`tap_water_minutes`, `dhw_meter_*`,
+  `heating_power_mean_w`) to `DEFAULT_ENABLED_*` /
+  `DEFAULT_DISABLED_*`: those lists are also the fetch universe, so the client
+  would request a metric the API does not return. Create the entity explicitly
+  in its platform and list the key in `special_sensor_keys`, so registry cleanup
+  keeps it.
+- **The element is attributed by `additiondhwdemand`**, its own DHW flag — not by
+  the demand flags, which have almost always cleared by the time a coarse counter
+  steps. Energy that still cannot be attributed is counted in
+  `cop.unattributed_kwh`, never dropped.
+- `cop_dhw` is **one charge segment**, and two invariants break easily: the
+  interval that clears the demand is not booked (closing publish uses
+  `charge.last_tank`), and element-only evidence checks the **compressor**
+  counter delta, or a defrost reads as element heat.
+- `dhw_standing_loss` is a **coefficient quoted at 40 K** tank-to-ambient, not a
+  raw daily figure; the store key is `dhw_standing_loss_per_k` and an older
+  snapshot is ignored, never reinterpreted. The open free-cooling window is
+  deliberately not persisted.
+- The DHW heat-meter comparison is a **poll-resolution integral**; `mean(flow) ·
+  mean(ΔT)` is not the integral of `flow · ΔT` and lands far below it.
+- The buffer-tank volume is **identified** (element-only balance), and
+  `element_only_tank_balance` must keep both guards — shunt closed
+  (`qn8position` = 0) and no `heatingenergy` counter step — or the element's
+  energy is divided by a rise it did not cause. The counter is the signal, not
+  the derived `heatingpower`, which is zero in exactly the state being guarded.
+- `dhwpower` is instantaneous and must **not** be integrated for energy;
+  `heatingpower` is a counter delta that holds between steps.
+- A new COP-store field belongs in the diagnostics `cop` block in the same PR.
+- The two tap-water comfort sensors are **estimates** from a tank model
+  (`tap_water_minutes`, `tap_water_cap`), never a volume, an energy or the
+  capacity level.
+- The indoor sensor is resolved through `statistics.pick_indoor_metric_key`:
+  never hard-code BT2 or the external sensor, and degrade to "no series" rather
+  than to a plausible wrong one (a placeholder series records −30 °C).
 
 ## Adaptive curve
 
-- Optional terms (COP feedback, cold-snap pre-charge) are off by default,
-  persisted in the curve Store and enabled via `qvantum.set_curve_terms`; they
-  apply only while the curve is active and never override the indoor cap or the
-  total clamp. That cap needs a **fresh indoor reading**: `_push_indoor_margin`
-  feeds it from the room error and keeps 24 h of samples, so with `sensor_mode`
-  DISABLED / BT3 / AUX (or a sensor unavailable for a day) it is inert and
-  nothing brakes a warm house. Diagnostics and the deviation sensor report
-  `indoor_cap_armed` / `indoor_margin_c` so that state is visible — do not lean
-  on the cap as a guarantee without checking it.
-- `ready` compares the *learned baseline* (not the adjusted shadow) to
-  `cal_heat_temp` on heating hours, with the pump's room term removed. Gates:
-  median ≤ 1.5 °C and p95 ≤ 3.0 °C over ≥ 3 days and ≥ 24 heating hours —
-  calibrated to what a 10° seven-point table can represent; a tighter median
-  gate is unreachable.
-- The room term is removed **only on hours the pump followed our table**: the
-  gain is the pump's own `room_comp_factor` (never fitted over it), applied
-  inside the last active segment, `active_since_ts` → `last_active_ts` (a store
-  without a start stamps the current load, so older hours stay uncorrected rather
-  than guessed). On Auto hours the pump already holds the term and the baseline
-  was fitted to it, so correcting there double-counts — measured, it moved the
-  readiness median 1.17 °C → 2.67 °C (gate failure) against 1.08 °C on active
-  hours alone; the Auto-hour fit survives as the fallback for a missing factor.
-  That fit is **not** how the applied gain is refreshed: the gain is the factor
-  as last seen, re-read every poll by `_async_sync_room_gain`, so a user changing
-  `room_comp_factor` (5 → 3) has the new gain within one cycle and needs no
-  re-identification. The `ROOM_GAIN_MIN_SAMPLES`/Auto-only window gates the
-  fallback and the diagnostics-only `fitted` slope, nothing else — and because
-  the current gain is applied retroactively to the whole readiness window, a
-  factor change legitimately moves `median_abs_c` (it is a better correction,
-  not a new measurement).
-  The *fitted* slope (`room_gain_from_active_hours`, fixed effects per 2 °C
-  outdoor bucket) is measured on active hours only, because our written table is
-  exogenous there; it is diagnostics-only, travels with its gates
-  (`valid`/`notes`, hours, buckets, R², leave-one-out) and never becomes the
-  applied gain while the pump reports a factor. It lags a factor change until
-  the next Auto segment — the pooled `configured` vs `fitted` comparison is the
-  only thing that notices, which is why it is a cross-check and not a control
-  input.
-- The room **value** in that removal is the pump's own input, not our configured
-  sensor's: in the external mode (`sensor_mode` 4) the firmware blends the
-  external value with BT2. Measured on a QE-6, 2026-10-21: `cal_heat_temp`
-  follows `curve(bt1) + 5.0 · (desired − room)` with `room` the **mean** of the
-  two (median |deviation| 0.10 °C, against 0.32 °C for the external sensor alone
-  and 0.30 °C for BT2), the 5.0 gain confirmed by a +1.1 K target step that moved
-  `cal_heat_temp` by 5.5 K, and a +2 K step on `curve_10` that moved it by 1.9 K
-  (the table is followed 1:1). Removing a term built from one sensor while the
-  pump built it from the mean leaves a constant `gain · (bt2 − configured) / 2`
-  bias — 1.7 °C on that install, i.e. more than the readiness median gate, which
-  is why the median sat at 2.17 °C with a raw 1.43 °C underneath. Hence
-  `pump_room_reading` (mean blend, guarded to the
-  external mode — the only regime it was measured in) feeds the readiness window
-  and the live `deviation`, while the trims, the indoor cap and `room_error`
-  stay on the configured sensor because those describe the house. That
-  measurement was taken with a **fitted** BT2: without a probe the sensor holds
-  the firmware's placeholder (a QE4 owner reported a fixed −30 °C, 2026-10-23),
-  and the pump's room value then comes from the external sensor alone. Blending
-  the placeholder puts `room` ~26 K off, i.e. `gain · 26 K` on the deviation
-  (13 K at gain 0.5, 130 K at 5) — the readiness gate cannot pass at any gain.
-  The blend is therefore gated three times: the datasheet's `BT2 Detected`
-  input register 86 (0=No, 1=Yes, 2=Detecting — Modbus only; the cloud reports
-  no such bit) must say 1; the value must be a room temperature
-  (`BT2_MIN_PLAUSIBLE_C`/`BT2_MAX_PLAUSIBLE_C`, −10…45 °C) and within
-  `BT2_MAX_DIVERGENCE_C` (10 K — |bt2 − external| on a live QE-6 was median
-  0.54 °C, p95 0.77 °C, max 0.85 °C over 30 days) of the configured reading;
-  and the **resulting** value is gated again, because in `DISABLED`/`BT3`/`AUX`
-  modes `_indoor_live_key` falls back to `bt2`, so "configured" *is* the
-  placeholder there. Degrading to the configured sensor costs the ~0.3 °C
-  single-sensor bias; no reading is better than a 26 K error. `bt2_detected` is
-  in `REQUIRED_MODBUS_METRICS` because the payload is filtered by enabled
-  metrics and no entity exposes it, and it sits inside the 0–104 input block the
-  client already reads (no extra I/O). `pump_room_c` and `pump_room_source`
-  (`blended`/`configured`/`bt2`/`none`) travel in the snapshot, the deviation
-  sensor and the diagnostics, next to `bt2_detected`. The DHW standing-loss
-  ambient applies the same rule separately (see below).
-- While the curve is active readiness turns self-referential;
-  `sensor.qvantum_adaptive_curve_room_error` (median `|indoor − target|` over the
-  same window) is the outcome signal instead. Readiness also only covers the
-  outdoor range the baseline was observed at (`baseline_outdoor_min_c`/`max_c`);
-  points outside it are extrapolated from the cached table, listed in
-  `extrapolated_points`, and only the trims correct them once the weather gets
-  there.
-- The solar aperture is identified from the **day-block energy balance**
-  (`Q_day ≈ a·ΣΔT + 24c − b·ΣGHI`, idle hours contributing `q = 0`), not from
-  heating hours: the sunny hours are exactly the ones the pump's room term has
-  switched off, so such a fit is censored — and at hour resolution the
-  control response flips its sign. `fit_daily_solar_model` gates on day count,
-  `t`, R² and a leave-one-day-out band; an ungated window means **no** term,
-  never a preserved older aperture. When valid, `effective_solar_model` uses its `b`
-  *and* its `a`; the hourly fit stays the fallback and owns the load term's
-  demand estimate, which must subtract the same applied gain. Calibration retries
-  within the hour when it cannot fetch its inputs (`CALIBRATION_RETRY_HOURS`) and
-  waits `CALIBRATION_REFRESH_HOURS` after a completed attempt; the flag is
-  persisted and exposed as `calibration_ok`. `qvantum.recalibrate`
-  (`async_recalibrate`) runs an attempt immediately — it calls `_async_calibrate`
-  directly, bypassing the throttle — and answers with the model state, because a
-  sensor change or a fixed data gap makes waiting a day pointless. It writes
-  nothing to the pump.
-- The **load term** is fed by a poll-resolution rolling mean of `heatingpower`
-  (`HeatingPowerWindow`, 2 h, published as `heating_power_mean_w`), never by one
-  sample per 15-minute curve cycle. A single sample aliases the compressor's
-  on/off cycling, and the old average reset whenever `hp_status` left Heating,
-  so the term jumped between "no data" (0) and a full shortfall: measured on a
-  live QE-6 the compressor ran 34–96 min and stood still 25–34 min, and the
-  shared adjustment dithered between 0 and −0.5 °C several times an hour — each
-  swing rewrote every curve point, including knots the weather never reaches.
-  Idle polls count as 0 W (coasting *is* the shortfall being measured);
-  DHW/defrost/cooling polls count as neither, because the compressor was working
-  on something else, and so does any interval with `additiondemand` set — the
-  element's heat is not in `heatingpower`, so such an interval would read as a
-  shortfall the house never had; a poll gap is not credited and nothing is
-  published below
-  the 30-minute coverage gate (no reading beats one sample standing in for a
-  cycle). The window is deliberately **not** persisted — after a restart the
-  gate is waited out instead of booking hours no poll observed. Diagnostics
-  report `load_power_mean_w` and `load_power_coverage_hours`.
-- Wind is **identified but not applied** (#427). `open_meteo` requests
-  `wind_speed_10m` with `wind_speed_unit=ms` (the API default is km/h, and a
-  silent unit mismatch would read as a calibration result), `HourlyWeather.wind_ms`
-  is `None` for an hour without a reading (never 0.0 — "not measured" is not
-  "calm"), and `SolarDay` carries `sum_wind_delta_t_k_m_s`/`sum_wind_ms_h`
-  /`wind_hours`. `aggregate_days(wind_by_hour=None)` keeps its old behaviour, so
-  any caller that does not pass wind is unaffected. `diagnostics.curve` reports
-  `forecast_wind_ms`/`forecast_wind_available` (the site proxy) and, in
-  `model_daily`, the wind column's state.
-- The coefficient comes from a **fourth column** of the same day balance:
-  `Q = a·ΣΔT + w·Σ(v·ΔT) + 24c − b·ΣGHI`. Wind multiplies the envelope loss, so
-  the interaction form is the physical one; a plain `+ w·Σv` offset is not
-  fitted. `_fit_wind_coefficient` runs **only where the three-column balance is
-  already valid**, and `wind_valid` is False whenever a gate fails — the term is
-  then not applied at all, exactly like an invalid aperture. Gates, in order:
-  at least `DAILY_MIN_COLD_WIND_HOURS` (200) hours that are **cold and windy**
-  (`ΔT ≥ WIND_EVIDENCE_MIN_DELTA_T_K` 15 K, `v ≥ WIND_EVIDENCE_MIN_MS` 4 m/s) —
-  a windy mild hour is a reading, not evidence, and the probe measured a mild
-  September–October window holding 156 h at ΔT ≥ 10 K but only 37 at the shipped
-  threshold; `w ≥ 0`; `w ≤ a / DAILY_WIND_REFERENCE_MS` at
-  `DAILY_MAX_WIND_FRACTION` (wind may at most double the loss at 5 m/s);
-  `t_w ≥ 2.5`; the four-column aperture inside the three-column jackknife band
-  (otherwise the column is absorbing the solar signal); **both halves of the
-  window agreeing on `w`** within `DAILY_WIND_HALF_BAND` (±50 %) and both
-  positive; and a wind jackknife inside its own band. The half-split is the gate
-  that rejects a *drift*: the same probe found a mild 30-day window fitting
-  4.50 W/K per m/s with halves of 8.66/4.44 and a 60-day window fitting
-  −1.06/5.93 — opposite signs — while every older gate passed. The VIF of the
-  interaction column against `{ΣΔT, ΣGHI, const}` is **reported, not gated**
-  (measured 1.6–2.2 on real windows: collinearity is not what breaks it).
-  With evidence the estimator is unbiased: on a synthetic winter at this
-  install's noise level (≈4 kWh/day) it returns 0.11 ± 0.25 with no term and
-  3.11 ± 0.25 for a true 3.0 W/K per m/s.
-- Wind is a **site proxy**: Open-Meteo returns 10 m wind on a grid cell, and
-  shelter from trees, neighbours and terrain is invisible in the payload. The
-  coefficient is therefore identified per installation and is biased low where
-  the grid over-reports; "no term" is the expected answer for a sheltered site.
-- `SolarDailyModel` reports `w_per_ms`/`w_std_err`/`w_t_stat`/`wind_hours`
-  /`wind_cold_hours`/`wind_vif`/`wind_valid`/`wind_notes`, the half-split `w` and
-  the four-column `a_w_per_k_4col`/`b_m2_4col`, all in
-  `diagnostics.curve.model_daily`. They are **persisted with the model**
-  (`_daily_to_state`/`_daily_from_state`): the calibration runs at most once a
-  day, so a column left out of the store would silently switch the term off
-  after every restart until the next attempt — and the dump would report zeros
-  instead of "not measured". An older payload without the keys restores as "no
-  wind column", which is the correct reading. `SUMMARY_SCHEMA_VERSION` is **8**: the
-  four wind fields plus the applied `wind_c` are new, and a schema without them
-  cannot express "this installation has no identifiable wind term".
-- The **wind term** is optional and off by default: `"wind"` in the curve
-  store's `terms` dict. All four terms (`solar`, `cop_feedback`, `precharge`,
-  `wind`) now have a switch in the **Configure** dialog as well as in
-  `qvantum.set_curve_terms`; the dialog reads the flags from the coordinator and
-  writes them back through `async_set_terms`, so the options payload never holds
-  a second copy. Only `solar` defaults to on: it is identified and measured
-  (t ≈ 3, R² 0.92, jackknife gate) while the other three are heuristic or
-  unproven, and the rule to keep is **identified/measured terms on, heuristic
-  ones off**. A switch can only silence a valid model, never force an invalid
-  one to act. `compute_curve(wind_by_hour=…, wind_enabled=…)` adds
-  `wind_adjustment_c` — `−slope · (w · v̄ · ΔT) / a`, one-sided, `0…WIND_MAX_C`
-  (2 °C), with `v̄` the mean of the *available* hours in the next
-  `WIND_SMOOTH_HOURS` (3) — a missing hour is skipped, never counted as calm
-  and `a` from the same day-block model — to the shared adjustment, still under
-  the indoor cap and the total clamp. It needs `wind_valid`, a wind reading for
-  the current hour (missing is *not* calm) and `indoor_target > outdoor`,
-  otherwise 0. `CurveSnapshot.wind_c` travels to `diagnostics.curve`, the
-  adjustment sensor's attributes and the summary. Those attributes also carry
-  `terms` (the four switches), `wind_valid` and the evidence counts
-  (`wind_cold_hours`/`wind_required_cold_hours`), because a wind term is 0 most
-  of the time and the card must tell "on but idle" from "off" — and show the chip
-  while it is off when the coefficient *is* identifiable, which is what decides
-  whether switching it on is worth anything. The wind column also has its own
-  diagnostic entity (`sensor.*_adaptive_curve_wind_model`: state = identified `w`
-  or `unknown`, attributes = the gates and why they refused); without it that
-  answer hides inside another sensor's `model_daily` block.
-- A failed **forecast** refetch keeps the previous payload while it still covers
-  the current hour and is under `FORECAST_REUSE_HOURS` old (both coordinators,
-  `WeatherForecast.covers`): Open-Meteo 503s sporadically well inside its quota,
-  and dropping a usable payload on one error flapped `forecast_ok` and took the
-  readiness window down with it. `forecast_reused` in the diagnostics
-  distinguishes a served-cached cycle from a fresh fetch.
-- Statistics-based curve features (trims, room gain, solar calibration) and the
-  efficiency building metrics resolve the indoor sensor through
-  `statistics.pick_indoor_metric_key`: the configured sensor wins once it has
-  enough hourly rows, otherwise the next candidate (BT2 last). Never hard-code
-  BT2 or the external sensor; degrade to "no series" rather than a wrong one.
-  Both external-room metrics must stay enabled, for different reasons:
-  `room_temp_ext` (HTTP) sits in `DEFAULT_ENABLED_HTTP_ONLY_METRICS`, while
-  `room_temp_external` is created explicitly enabled in `sensor.py` and listed in
-  `special_sensor_keys` — it is in **no** `DEFAULT_ENABLED_*` list, and adding it
-  to one would create it twice under the same unique id. A disabled entity
-  records no statistics, so moving either into a `DEFAULT_DISABLED_*` list
-  silently sends those features back to BT2. Those lists are the source of truth
-  both ways: `disable_entities_by_default` clears a stale
-  `disabled_by=INTEGRATION`, but never a `disabled_by=USER`.
-- Point sensors are the per-point surface: each carries `baseline`, `trim`,
-  `evidence_hours`, `extrapolated`, `clamped` and `floor_pinned`, because which
-  knot the pump's limits bit (or which one the baseline never observed) decides
-  whether the baseline point has to move. `clamped` on `CurveResult` and the
-  snapshot stays a bool for the card; `clamped_points` names the actionable ones
-  and `floor_pinned_points` the warm end the floor holds down.
-  `adaptive_curve_coverage` is the aggregate (state = number of extrapolated
-  points, attributes = observed span, `clamped_points`, `floor_pinned_points`,
-  `trim_evidence`) and is deliberately **disabled by default**: the repairs
-  issue, when it exists, is the notification and this is the detail.
-- Baseline floor: the frozen baseline is lifted to the pump's **minimum** heating
-  supply every cycle (`lift_baseline_floor` / `_lift_baseline_to_floor`) — a knot
-  under the floor is clamped on every computation, so it never shows its trim
-  feedback and the clamp is structural rather than weather-driven. Such a point
-  is reported in `floor_pinned_points`, **not** in `clamped_points`: there is
-  nothing to act on (the floor is the answer), whereas `clamped`/`clamped_points`
-  must keep meaning "adjust the baseline point" — that is what the
-  `days_clamped` counter pools, and a floor pin would otherwise fire at every
-  installation on every mild day. Only the pump's floor is applied; a point
-  above the pump's own maximum is left alone (a real limit the user should see)
-  and stays `clamped`, while the register range and the non-decreasing shape
-  normalize as for any baseline. A lift clears the trims (the
-  shape changed, same rule as a learned correction) and makes the two warmest
-  knots **equal**, so the independently fitted trims can invert them by a tenth
-  of a degree while a positive shared adjustment holds both above the floor.
-  `compute_curve` therefore projects the final table onto the non-decreasing shape
-  (raising the warmer knot) instead of letting the write guard revert the whole
-  curve; the guard's message says "limits or shape" because it cannot tell which.
-- **Writes are masked and hysteretic**, not "whatever changed":
-  `points_in_reach` (in `heating_curve.py`) keeps only the knots the forecast
-  can reach — the pair bracketing the coldest and warmest usable hour, plus
-  `REACH_MARGIN_KNOTS` (1) **below the coldest hour only**, so a forecast 10 K
-  too warm still finds every reachable segment with both endpoints written; a
-  warm overshoot only moves the pump onto a flatter, floored part of the curve.
-  The scope needs a reading, not a forecast: without one it follows the measured
-  `bt1` alone (a bracket, not all seven), and only when neither is usable are
-  all seven written — a missing forecast must not silently widen the scope.
-  A knot outside the scope keeps the value the pump already holds, so a point
-  sensor may show the ideal while the pump holds an older integer — that is why
-  `diagnostics.curve.write_scope` lists the knots of the last active cycle.
-  Inside the scope a knot is rewritten only when the continuous point is
-  `MIN_WRITE_DELTA_C` (0.75 K) from the pump's value: plain rounding already
-  rewrites at 0.5 K, so a knot whose baseline+trim ends near .5 (or a shared
-  adjustment near zero) flipped every cycle — measured on a live install, the
-  +10 knot changed 32 times in two days. The extra quarter degree is the dead
-  band; the error against the ideal stays under it on top of the register's own
-  1 °C grid. The table is then projected onto the non-decreasing shape and
-  validated as what the pump will **end up** with (holding a stale knot can
-  invert it: +30 = 21 beside +20 = 20), not as the computed one. A knot the
-  projection raises is written even outside the scope, and so is one left
-  outside the pump's own limits when they move (a lowered
-  `max_heating_supply` must not revert the curve) or one that is unreadable.
+Modbus-only. The module freezes the pump's seven-point table as a baseline and
+writes it back adjusted; `docs/heating-curve.md` is the full description
+(readiness, room gain, trims, solar and wind identification, write policy, card).
+The rules that must not drift:
+
+- Optional terms are **off by default** (COP feedback, pre-charge, wind); solar
+  is on because it is identified and measured on the owner's history. The rule is
+  *identified/measured terms on, heuristic ones off*: a switch can only silence a
+  valid model, never force an invalid one to act.
+- `ready` compares the **learned baseline** to `cal_heat_temp` on heating hours,
+  with the pump's room term removed: median ≤ 1.5 °C, p95 ≤ 3.0 °C, ≥ 3 days and
+  ≥ 24 heating hours. A tighter median gate is unreachable by a ten-degree
+  seven-point table — do not "improve" it.
+- The room term is removed **only on hours the pump followed our table**
+  (`active_since_ts` → `last_active_ts`); on Auto hours the pump already holds it
+  and the baseline was fitted to it, so correcting there double-counts. The gain
+  is the pump's own `room_comp_factor`, re-read every poll — never fitted over.
+  The Auto-hour fit is the fallback for a missing factor and is diagnostics-only.
+- The room **value** is the pump's own input: in the external mode the firmware
+  averages it with BT2 (`pump_room_reading`), and that blend is gated three times
+  (`bt2_detected` = 1, a plausible room temperature, within 10 K of the configured
+  reading — and the result checked again, because in the no-sensor modes the
+  configured reading *is* BT2). Without the gates a placeholder BT2 puts the
+  deviation tens of kelvin off. Trims, the indoor cap and `room_error` stay on
+  the configured sensor: those describe the house.
+- The solar aperture comes from the **day-block energy balance**, never from
+  heating hours (the sunny hours are exactly the ones the pump's room term has
+  switched off). An ungated window means **no** term, never a preserved older
+  aperture. Wind is identified but off by default and is a **site proxy**: "no
+  identifiable term" is the correct answer for a sheltered site.
+- The load term is fed by a **poll-resolution rolling mean** of `heatingpower`
+  with a 30-minute coverage gate — never by one sample per curve cycle, which
+  aliases the compressor's cycling. Below the gate nothing is published.
+- Writes are **masked and hysteretic**, never "whatever changed": only knots the
+  forecast (or the measured outdoor reading) can reach, plus a 0.75 K dead band
+  per knot, and the table is validated as what the pump will **end up** with.
+  A missing forecast must not widen the scope to all seven knots.
+- The baseline is lifted to the pump's **minimum supply** every cycle; such a
+  knot is `floor_pinned` (nothing to act on), **not** `clamped` — `days_clamped`
+  pools actionable points only, and a floor pin would otherwise fire at every
+  installation on every mild day.
 - When the pump stops following our table (the app or a cloud profile moved the
-  curve type), the coordinator drops to shadow, clears the trims, logs a warning
-  and opens **`curve_left_user_defined`**, deleted again as soon as we are
-  active and the pump follows us. That path does **not** write Auto;
-  `_async_revert(reason)` does, and it logs the reason at WARNING (INFO when the
-  user switched control off), because a reversion we caused is otherwise
-  indistinguishable from an external one in the log. It deliberately does **not**
-  reassert the curve type: that would fight a user who chose the pump's own
-  curve in the app. Detection lands on the 15-minute cycle boundary, which is
-  why two events an hour apart look like a schedule.
-- `diagnostics.py` is the support-dump surface and must stay in step with the
-  state it mirrors: a new `CurveSnapshot` or persisted curve field (readiness
-  gate, room gain and its source, trims and their evidence, room error,
-  extrapolated points, clamped points, …) goes into `_curve_diagnostics` in the
-  same PR. A field missing from the dump cannot be read from a user's report, and
-  a missing readiness gate hides why activation is blocked.
-- Removing the config entry reverts holding 22 to Auto (`async_remove_entry`),
-  because nothing would be left to supervise the User-defined table we wrote.
-  Reload and HA shutdown deliberately keep it: a reload re-activates from the
-  curve Store, and while HA is down the pump should still heat on the last curve.
-  A removal-time write must borrow a *temporary* Modbus unit
-  (`_async_temporary_modbus_unit`): `_async_modbus_unit` ties its release to
-  `entry.async_on_unload`, which cannot run once the entry is unloaded.
+  curve type) the coordinator drops to shadow, clears the trims and opens
+  `curve_left_user_defined` — and deliberately does **not** write Auto back: that
+  would fight a user who chose the pump's own curve. `_async_revert(reason)` is
+  the path that writes Auto, and it logs the reason at WARNING (INFO when the user
+  switched control off) so a reversion we caused is distinguishable in the log.
+- Removing the config entry reverts holding 22 to Auto via a **temporary** Modbus
+  unit (`_async_temporary_modbus_unit`; `_async_modbus_unit` ties its release to
+  `entry.async_on_unload`, which cannot run then). Reload and HA shutdown keep the
+  table on purpose.
+- `diagnostics.py` mirrors the curve state: a new `CurveSnapshot` or persisted
+  curve field goes into `_curve_diagnostics` in the same PR. A field missing from
+  the dump cannot be read from a user's report.
+- Both external-room metrics must stay enabled: `room_temp_ext` sits in
+  `DEFAULT_ENABLED_HTTP_ONLY_METRICS`, `room_temp_external` is created explicitly
+  and listed in `special_sensor_keys` (it is in **no** `DEFAULT_ENABLED_*` list —
+  adding it would create it twice). A disabled entity records no statistics, so
+  moving either sends the curve features back to BT2.
 
 ## Product constraints
 

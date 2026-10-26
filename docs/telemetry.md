@@ -26,7 +26,11 @@ raised once, after a week of use, with two one-click answers.
 * The adaptive curve never depends on it: refusing changes nothing about how the
   integration works.
 * The consent lives in `qvantum.telemetry.<entry_id>` in `.storage`, together
-  with the installation token. Removing the config entry removes both.
+  with the installation token. Removing the config entry removes both
+  (`async_forget`).
+* The question is the fixable issue `telemetry_consent`, raised once after
+  `PROMPT_AFTER_DAYS` (7) of use — existing installs are covered because the
+  clock starts on the first start with this version.
 
 ## What is sent
 
@@ -48,6 +52,31 @@ schedules, sensor identities, raw series, or a timestamp finer than a date. The
 payload is built by whitelist in `summary.py`, and `tests/test_summary.py`
 asserts the result carries no identifiers.
 
+The `counters` block is counts, never a log of when: curve reverts, trim updates
+and the days a clamped or extrapolated knot was lived with, plus the date the
+counters were reset at.
+
+## `SUMMARY_SCHEMA_VERSION`
+
+This number is the pool's grouping key, so it moves for **a new field, a removed
+field, and a field whose meaning changed** — the third is the one that gets
+forgotten. Re-normalizing an existing figure is exactly that: v6 marks
+`dhw_standing_loss` as a coefficient quoted at a fixed tank-to-ambient difference
+(identified volume) instead of the raw daily figure at whatever tank temperature
+its window saw, because two such readings pool side by side and neither is
+comparable to the other. When a derived metric changes semantics, bump the
+version **in the same PR** and say in the constant's comment what changed and
+why; a test pins the floor so a silent revert cannot pass.
+
+**Only a version that has shipped needs superseding.** The number exists to keep
+two meanings out of one pool key, so a version that no release has carried has no
+rows to protect: further schema-shaped changes on `main` before the next release
+edit the current number in place and append to its comment instead of bumping
+again. Check the released `manifest.json` (or the latest tag) before deciding —
+2026.10.20 is the newest stable release and carries **v8**, so v9 is the first
+number that needs a row of its own (and v9 therefore may not fold further changes
+once it ships; before that, edit it in place as usual).
+
 ### The installation token
 
 A 128-bit random value generated locally when sharing is granted — never derived
@@ -59,7 +88,14 @@ request.
 ## Where it goes
 
 A Cloudflare Worker (`telemetry-worker/` in this repository) stores the body in
-KV under `v<schema_version>/<install_token>/<date>`.
+KV under `v<schema_version>/<install_token>/<date>`. It is deployed by
+`.github/workflows/telemetry-worker.yml` and deliberately **not** by
+`release.yml`: a Cloudflare outage must never block a HACS release, and the
+release zip only takes `custom_components/qvantum/`. The deploy skips itself when
+the Cloudflare secrets or the KV namespace id are missing.
+
+The uploader is a six-hour check that posts the summary at most once a week, and
+only while consent is granted.
 
 * **Retention:** two years per row, then it expires on its own.
 * **No logs:** the Worker stores no IP address and does no request logging.
