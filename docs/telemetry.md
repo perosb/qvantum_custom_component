@@ -44,7 +44,7 @@ The field list is in the [README](../README.md#qvantumexport_summary); in short:
 | plant | sensor mode, room-compensation factor, curve type, offsets, tap-water start/stop, the pump's supply limits |
 | climate | the outdoor span observed, heating hours |
 | curve | room gain (configured / applied / fitted, with validity, evidence hours, standard error, leave-one-out swing), readiness median and p95, the solar model |
-| fitted | heat loss (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (kWh/day), cycling, SCOP, auxiliary-heat share, health grade |
+| fitted | heat loss (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (kWh/day at a 40 K tank-to-ambient difference), cycling, SCOP, auxiliary-heat share, health grade |
 | counters | curve reverts, trim updates, days with an actionable clamped or an extrapolated knot, and the date the counters were reset at |
 
 It **never** contains: entity ids or names, coordinates, energy totals,

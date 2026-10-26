@@ -38,7 +38,7 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 ### Features
 
 - **Monitoring:** Temperatures, pressure, energy, power, system status, defrost, connectivity, filter time, and other heat-pump metrics. Machine-internal values (refrigerant circuit, speeds, lifetime counters, settings read-backs) live under the **Diagnostics** entity category.
-- **Efficiency analytics:** COP and rolling SCOP (the DHW COP includes tank charges made with the electric element alone — parallel with, or after, the compressor — and is capped at 1.0 when no compressor work was involved), auxiliary-heat share, building heat-loss coefficient, heating degree hours and weather-normalized consumption, DHW standing loss, a DHW heat-meter plausibility check, compressor cycling/duty/speed and average power, plus an A–F efficiency health grade. All derived from data the integration already polls — no extra hardware.
+- **Efficiency analytics:** COP and rolling SCOP (the DHW COP includes tank charges made with the electric element alone — parallel with, or after, the compressor — and is capped at 1.0 when no compressor work was involved), auxiliary-heat share, building heat-loss coefficient, heating degree hours and weather-normalized consumption, DHW standing loss (quoted at a 40 K tank-to-ambient difference), a DHW heat-meter plausibility check, compressor cycling/duty/speed and average power, plus an A–F efficiency health grade. All derived from data the integration already polls — no extra hardware.
 - **Thermal mass:** the envelope time constant and heat capacity (`UA × τ`) are identified from how fast the rooms cool while the pump is not heating — hot water, defrost, idle. They say how quickly a house reacts to a pause; both are diagnostics, and both stay unavailable until the window holds enough decays across a spread of outdoor temperatures.
 - **Solar:** Current solar irradiance and a self-calibrated solar-gain estimate from Open-Meteo, in both cloud and Modbus mode. No PV system is required.
 - **Control:** Operation modes, target temperatures, vacation mode, ventilation, and supported settings.
@@ -195,7 +195,7 @@ What it contains:
 | plant | `sensor_mode`, `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
 | climate | the outdoor span the installation has been observed in, heating hours |
 | curve | room gain grouped as `configured` / `applied` / `fitted`, the readiness median/p95, the solar model (`a`, `b`, trust, days) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours behind it and whether its gates let it act) |
-| fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day**), cycling, SCOP, aux share, health grade |
+| fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure), cycling, SCOP, aux share, health grade |
 | counters | curve reverts, trim updates and the number of days an actionable clamped knot or an extrapolated knot was lived with, plus the date they were reset at (*Modbus only*) |
 | verdicts | reserved for the derived analysis results (currently empty) |
 
@@ -216,6 +216,18 @@ hours. The measurement carries `valid`, `notes`, the hour count, its standard
 error (with `t`) and its leave-one-out swing, because on this data one hour can
 move the number by more than the effect being measured. It never changes what is
 applied: the factor does.
+
+The standing loss is the other figure that needs a word, because its unit looks
+more absolute than it is. A window measures how fast the tank cools, and that
+rate depends on **how warm the tank was** — so windows are normalised to a
+coefficient per kelvin of tank-to-ambient difference and only then quoted, at a
+fixed **40 K**. The published kWh/day is therefore "what this tank would lose in
+a day at 40 K", comparable between installations and between seasons, not the
+loss at whatever temperature the tank happened to hold. Without the
+normalisation one window after a 69 °C extra-hot-water run moved a live
+installation from 2.5 to 5.1 kWh/d without the insulation changing at all. The
+sensor carries `reference_delta_k`, `loss_w_per_k` and the newest window's
+evidence (hours, drop, tank mean, ambient and its source, ΔT, volume).
 
 What it **never** contains: entity ids or names, coordinates, energy totals,
 schedules, sensor identities, or any raw hourly series. The payload is built by
