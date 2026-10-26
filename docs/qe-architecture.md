@@ -276,9 +276,11 @@ Source: `[M]`. These are declared part-load values, not hardware limits. The com
 | DHW | 8 | 2 | The condenser heats the buffer tank (DHW charge). |
 | Defrost DHW passive | 9 | 1 | Defrost in DHW mode. |
 | Defrost heating passive | 10 | 1 | Defrost in heating mode. |
-| Pool | 11–13 | — | Pool control; not part of normal QE residential operation. |
+| Prepare pool | 11 | — | Pool preparation; not part of normal QE residential operation. |
+| Pool | 12 | — | Pool control; not part of normal QE residential operation. |
+| Defrost pool passive | 13 | 1 | Defrost in pool mode; the integration maps it to Defrosting (§3.5 counts 9/10/13 as the defrost states). |
 
-Source: `[R]`, with the `hp_status` mapping from `[R]`. The pool states exist in the shared firmware map and should not be assumed active on a QE.
+Source: `[R]`, with the `hp_status` mapping from `[R]`. The pool states exist in the shared firmware map and should not be assumed active on a QE; when input 41 reports 0, the integration's fallback maps 11/12 to DHW and 13 to Defrosting.
 
 > **Important:** `hp_status` follows the **compressor**. When only the immersion heater charges the tank, the status can be `Idle` (0) even though DHW is being produced. Use `additiondhwdemand`, `compressor_state` and the energy counters to decide what is actually happening. `[I]`
 
