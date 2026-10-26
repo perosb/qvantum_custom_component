@@ -54,13 +54,22 @@ correctness. Do not invent nits. Specifically watch for:
   affected prose describing the old one, or adds a field/state a support dump
   must show without documenting it:
   - a new or changed derived metric, gate, threshold, persisted field or
-    `SUMMARY_SCHEMA_VERSION` meaning → `AGENTS.md` (and the metric's own section);
+    `SUMMARY_SCHEMA_VERSION` meaning → the metric's own section in `docs/`
+    (`derived-metrics.md`, `heating-curve.md`, `qe-architecture.md`,
+    `telemetry.md`), plus the one-line invariant in `AGENTS.md` when a review
+    rule moves;
   - a new `CurveSnapshot` / efficiency-snapshot / diagnostics field → the
-    documented field list in `AGENTS.md` and `docs/`;
+    documented field list in `docs/`;
   - user-visible behaviour, new entities, options or services → `docs/` (and
     `README.md` when the summary export's field list changes);
   - a changed measurement constant or protocol (a probe, a verified register
-    behaviour) → the place that documents the measurement.
+    behaviour) → the place that documents the measurement;
+  - tap-water capacity level, its table or its repair issues →
+    `docs/tap-water-capacity.md`;
+  - workflow, tooling or release automation → `AGENTS.md`.
+
+  Measurements do **not** belong in `AGENTS.md`: it carries the rule and the
+  doc carries the number, so flag a PR that pastes a measurement back into it.
   The `docs` CI job only proves *some* documentation moved; check that the
   sentence which is now wrong is the one that changed.
 

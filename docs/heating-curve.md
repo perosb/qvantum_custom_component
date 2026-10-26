@@ -167,7 +167,7 @@ adjustment, a cold house blocks downward), it never drives a term. Points are
 clamped to 10–80 °C and fall toward warmer outdoors.
 
 The load term's input is a rolling mean of `heatingpower` accumulated at poll
-resolution over two hours, not the instantaneous figure. It has to span whole
+resolution over two hours (`HeatingPowerWindow`), not the instantaneous figure. It has to span whole
 compressor cycles: a single sample per curve cycle is either an "on" or an "off"
 value, and a heat pump that cycles then looks like a pump that coasts — or, right
 after a cycle ends, like no data at all. Idle polls contribute 0 W (coasting is
@@ -176,7 +176,8 @@ contribute nothing, because the compressor was working on something else — and
 so does any interval with the immersion heater demanded, since the element's heat
 is not part of `heatingpower` and would read as a shortfall the house never had. The
 mean is published as `heating_power_mean_w` and appears in the diagnostics
-together with `load_power_coverage_hours`; below 30 minutes of observed
+as `load_power_mean_w` together with `load_power_coverage_hours`; below 30
+minutes of observed
 intervals nothing is published and the term stays inert, so a fresh start (or a
 restart) cannot act on one sample. The window is not persisted across restarts:
 the gate is waited out instead of booking hours no poll observed.
@@ -204,9 +205,10 @@ a compensating pump closely enough to become `ready`.
 firmware does not use the external value on its own: it averages it with its own
 BT2. Measured on a QE-6, 2026-10-21, the implicit room value behind
 `cal_heat_temp` matched that mean with a median deviation of 0.10 °C, against
-0.32 °C for the external sensor alone and 0.30 °C for BT2. `pump_room_temperature`
-reproduces it (mean in the external mode, the configured sensor everywhere else —
-the regime it was measured in), and `pump_room_c` publishes the value used.
+0.32 °C for the external sensor alone and 0.30 °C for BT2. `pump_room_reading()`
+(`heating_curve.py`) reproduces it (mean in the external mode, the configured
+sensor everywhere else — the regime it was measured in), and `pump_room_c`
+publishes the value used.
 Removing a term built from one sensor while the pump built it from the mean
 leaves a constant `gain · (BT2 − configured) / 2` bias: 1.7 °C on that install,
 more than the readiness median gate, which is why the median sat at 2.17 °C with
@@ -220,8 +222,11 @@ from the external sensor alone. Averaging that placeholder in would put the
 removed term about 26 K off (`gain · 26 K` on the deviation, which is 13 K even
 at the minimum gain), so readiness could never pass. Three gates apply: the
 datasheet's `BT2 Detected` register (input 86: `0=No`, `1=Yes`,
-`2=Detecting` — read over Modbus only) must report `1`; the value must be a room
-temperature and within 10 K of the configured reading (measured on a live QE-6
+`2=Detecting` — read over Modbus only, and listed in `REQUIRED_MODBUS_METRICS`
+because no entity exposes it and the payload is filtered by enabled metrics)
+must report `1`; the value must be a room
+temperature (`BT2_MIN_PLAUSIBLE_C`/`BT2_MAX_PLAUSIBLE_C`, −10…45 °C) and within
+`BT2_MAX_DIVERGENCE_C` (10 K) of the configured reading (measured on a live QE-6
 over 30 days, the two sensors were 0.54 K apart at the median and 0.85 K at
 most, so the bound only catches a placeholder or a stuck probe); and the
 resulting value is checked again, because in the modes without an indoor sensor
@@ -244,10 +249,10 @@ outdoor and the room error), which is what an installation without a usable
 factor still gets. That fallback is **not** a re-learning step you have to
 schedule: the applied gain is the setting as last seen, compared on every poll,
 so changing `room_comp_factor` from 5 to 3 takes effect within one cycle and
-needs no re-identification. The fit's window (the curve off, holding 22 on Auto,
-24 heating hours since active control ended, room error moved ≥ 0.3 °C) gates the
-fallback and the diagnostics-only `fitted` slope — nothing that is applied while
-a factor exists. Because the *current* gain is applied retroactively to every
+needs no re-identification. The fit's window (`ROOM_GAIN_MIN_SAMPLES` = 24 heating hours, the curve off,
+holding 22 on Auto, since active control ended, room error moved ≥ 0.3 °C) gates
+the fallback and the diagnostics-only `fitted` slope — nothing that is applied
+while a factor exists. Because the *current* gain is applied retroactively to every
 hour of the readiness window, a factor change moves the reported `deviation` and
 `median_abs_c`; that is the correction following the pump, not a reset.
 Whether configured or fitted, the gain **travels with the indoor sensor it
@@ -338,13 +343,16 @@ Entities:
 - `sensor.qvantum_adaptive_curve_01_30` … `sensor.qvantum_adaptive_curve_07_minus_30` —
   the computed shadow points, numbered 1–7 (+30 … −30) like the pump's own
   curve numbers so they sort together, with `baseline`, `adjustment`, `trim`
-  and `evidence_hours` attributes. `evidence_hours` is how many hours the trim
-  window holds near that outdoor temperature: **0 means the trim is 0 on
-  purpose** — no evidence, no correction — rather than because the curve is
-  already right.
+  `evidence_hours`, `extrapolated`, `clamped` and `floor_pinned` attributes.
+  `evidence_hours` is how many hours the trim window holds near that outdoor
+  temperature: **0 means the trim is 0 on purpose** — no evidence, no
+  correction — rather than because the curve is already right. `clamped` is a
+  bool for the card; `clamped_points` names the actionable knots and
+  `floor_pinned_points` the warm end the supply floor holds down.
 - `sensor.qvantum_adaptive_curve_adjustment` — the shared adjustment, with
   `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `cop_c`, `precharge_c`,
-  `wind_c`, `terms` (which of the four are switched on), `wind_valid`, `trims`,
+  `wind_c`, `terms` (which of the four are switched on), `wind_valid`, the
+  evidence counts `wind_cold_hours` / `wind_required_cold_hours`, `trims`,
   `clamped`, `clamped_points` and `floor_pinned_points` attributes. The card
   uses `terms`/`wind_valid` to tell "switched on but idle" from "switched off",
   and to show the wind chip while it is off when the coefficient is
@@ -398,6 +406,11 @@ Entities:
   gate `notes` that say why it refused. This is the one entity that answers
   "does my house have an identifiable wind term?" without a support dump.
   Diagnostic entity, enabled by default.
+- `sensor.qvantum_adaptive_curve_coverage` — the per-point surface in one
+  place: state is the number of extrapolated points, attributes carry the
+  observed outdoor span, `clamped_points`, `floor_pinned_points` and
+  `trim_evidence`. Deliberately **disabled by default**: the repair issue is the
+  notification and this is the detail.
 - `switch.qvantum_adaptive_curve_control` — off = shadow, on = active writing.
   `qvantum.set_curve_control` with `mode: shadow|active` does the same from an
   automation.
@@ -446,7 +459,11 @@ Active cycles write only points that changed by ≥ 1 °C, one at a time with a
 pause. Any failed write, an out-of-range or non-monotone table, or a lost
 connection writes holding 22 back to Auto and turns the switch off. If the
 pump is instead moved off User defined, the coordinator returns to shadow
-without touching holding 22. A revert that cannot be written is latched and
+without touching holding 22 and opens the `curve_left_user_defined` repair
+issue, which is deleted again as soon as we are active and the pump follows us.
+A reversion the module caused itself logs its reason at WARNING (INFO when the
+user switched control off), so it is not mistaken for an external change in the
+log. A revert that cannot be written is latched and
 retried, so a lost connection cannot leave the integration claiming control.
 Optional terms are persisted with the rest of the curve state and have a switch
 in the integration's **Configure** dialog as well as in
@@ -475,12 +492,13 @@ The coordinator does not write "whatever changed". Three rules keep the pump's
 table stable, because the shared adjustment moves all seven knots together and
 the registers hold whole degrees:
 
-- **Only knots the forecast can reach.** The pump interpolates the table, so
+- **Only knots the forecast can reach** (`points_in_reach()` in
+  `heating_curve.py`). The pump interpolates the table, so
   only the knot pair bracketing the outdoor temperature affects the supply it
   asks for. Knots below the coldest hour of the forecast cannot be used before
   the next forecast arrives (the payload is refetched hourly), so they keep the
-  value already on the pump. One knot of margin is kept below the coldest
-  forecast hour — a forecast 10 K too warm still leaves every reachable segment
+  value already on the pump. One knot of margin (`REACH_MARGIN_KNOTS`) is kept
+  below the coldest forecast hour — a forecast 10 K too warm still leaves every reachable segment
   with both endpoints written. There is no margin on the warm side: a warm
   overshoot only moves the pump onto a flatter, lower part of the curve that the
   supply floor already covers. The scope needs a reading, not a forecast: with
@@ -489,8 +507,8 @@ the registers hold whole degrees:
   scope. A sensor can therefore show the ideal value for a knot the pump holds
   older — `write_scope` in the diagnostics lists the knots of the last active
   cycle.
-- **A dead band per knot.** A knot is rewritten only when the computed value is
-  0.75 °C away from the integer on the pump. Plain rounding rewrites at 0.5 °C,
+- **A dead band per knot** (`MIN_WRITE_DELTA_C` = 0.75 K). A knot is rewritten
+  only when the computed value is that far from the integer on the pump. Plain rounding rewrites at 0.5 °C,
   and a knot whose baseline plus trim ends near .5 — or a shared adjustment
   hovering around zero — then flips every cycle. Measured on a live
   installation, the +10 knot changed 32 times in two days that way, and each
@@ -536,35 +554,50 @@ only act while the curve is active. Enable them with
 
 The fit uses recorder long-term statistics (`heatingpower`, outdoor and indoor
 temperature, 60 days hourly) plus Open-Meteo GHI history, refreshed daily. The
-same requests also carry 10 m wind (`wind_speed_10m`, in m/s rather than the
-API's default km/h), and the day blocks hold it as `Σ(v·ΔT)` — the form wind
+same requests also carry 10 m wind (`wind_speed_10m`, requested with
+`wind_speed_unit=ms` — the API default is km/h and a silent unit mismatch would
+read as a calibration result), and the day blocks hold it as `Σ(v·ΔT)` — the form wind
 takes physically, since it multiplies the envelope loss instead of shifting it.
-The column is fitted as a **fourth regressor** of the same daily balance —
+The column is fitted as a **fourth regressor** of the same daily balance
+(`SolarDailyModel` carries `w_per_ms`, `w_std_err`, `w_t_stat`, `wind_hours`,
+`wind_cold_hours`, `wind_vif`, `wind_valid`, `wind_notes` and the half-split
+`w`) —
 `Q = a·ΣΔT + w·Σ(v·ΔT) + 24c − b·ΣGHI`, because wind multiplies the envelope
 loss rather than shifting it — and only where the three-column balance is
 already valid. A payload without wind produces the same days with
 `wind_hours = 0`, because "not measured" is not "calm".
 
+The column is **persisted with the model** (`_daily_to_state` /
+`_daily_from_state`): the calibration runs at most once a day, so a field left
+out of the store would silently switch the term off after every restart until
+the next attempt, and the dump would report zeros instead of "not measured". An
+older payload without the keys restores as "no wind column", which is the
+correct reading.
+
 `w` is reported with `wind_valid`, which is false whenever a gate fails: fewer
-than 200 hours that are both cold and windy (ΔT ≥ 15 K and wind ≥ 4 m/s — a
-windy mild hour is a reading, not evidence), `t < 2.5`, a negative coefficient,
-a coefficient that would more than double the loss at 5 m/s, an aperture that
-moved outside the three-column jackknife band (the wind column absorbing the
-solar signal), two window halves that disagree on `w` (a drift rather than a
-sensitivity), or a solution resting on a single day. The collinearity of the
-interaction column is published with the coefficient but not gated: measured
-1.6–2.2 on real windows, so it is not what breaks such a fit.
+than `DAILY_MIN_COLD_WIND_HOURS` (200) hours that are both cold
+(`WIND_EVIDENCE_MIN_DELTA_T_K` = 15 K) and windy (`WIND_EVIDENCE_MIN_MS` =
+4 m/s — a windy mild hour is a reading, not evidence), `t < 2.5`, a negative
+coefficient, a coefficient that would more than double the loss at
+`DAILY_WIND_REFERENCE_MS` (5 m/s) — the bound is
+`DAILY_MAX_WIND_FRACTION` × `a` — an aperture that moved outside the
+three-column jackknife band (the wind column absorbing the solar signal), two
+window halves that disagree on `w` beyond `DAILY_WIND_HALF_BAND` (±50 %; a
+drift rather than a sensitivity), or a solution resting on a single day. The
+collinearity of the interaction column (`wind_vif`) is published with the
+coefficient but not gated: measured 1.6–2.2 on real windows, so it is not what
+breaks such a fit.
 
 The **wind term** is optional and off by default
 (`qvantum.set_curve_terms: wind: true`), like the other optional terms. When
 enabled *and* `wind_valid`, it adds
 
 ```
-wind_c = −slope · (w · v̄ · (indoor_target − outdoor)) / a     0 ≤ wind_c ≤ 2 °C
+wind_c = −slope · (w · v̄ · (indoor_target − outdoor)) / a     0 ≤ wind_c ≤ WIND_MAX_C (2 °C)
 ```
 
-with `v̄` the mean of the available hours in the next three (a missing hour is
-skipped, never counted as calm), `a` the loss coefficient
+with `v̄` the mean of the available hours in the next `WIND_SMOOTH_HOURS` (3) (a
+missing hour is skipped, never counted as calm), `a` the loss coefficient
 from the *same* day-block model (so the W → °C conversion is self-consistent,
 exactly as for solar) and `−slope` because extra loss raises the supply. It is
 one-sided and bounded, folded into the shared adjustment, and still subject to
@@ -581,10 +614,12 @@ house. Shelter is a site property no payload carries, so the coefficient is
 per-installation and biased low where the grid over-reports — "no identifiable
 term" is a normal, correct outcome for a sheltered location.
 
-An attempt that cannot fetch its inputs retries within the hour instead of
-waiting the full day, so one network hiccup does not freeze the model; a
-completed attempt — fit accepted or rejected — waits the full interval, because
-the inputs cannot change in an hour. If you do not want to wait (you changed the
+An attempt that cannot fetch its inputs retries within the hour
+(`CALIBRATION_RETRY_HOURS`) instead of waiting the full day, so one network
+hiccup does not freeze the model; a completed attempt — fit accepted or
+rejected — waits the full interval (`CALIBRATION_REFRESH_HOURS`), because the
+inputs cannot change in an hour. The outcome is persisted and exposed as
+`calibration_ok`. If you do not want to wait (you changed the
 indoor sensor, filled a data gap, or are checking whether the wind column is
 identifiable at all), **Actions → Qvantum: Recalibrate**
 (`qvantum.recalibrate`) runs the attempt immediately and answers with the model
@@ -623,6 +658,18 @@ When the day-block model is valid it is the one the term uses (its `b` and its
 `a` are converted with each other); the hourly fit remains as the fallback and
 still feeds the load term's demand estimate. Both are visible in diagnostics
 (`curve.model` and `curve.model_daily`) and on the solar-model sensor.
+
+### Diagnostics and the snapshot
+
+`diagnostics.curve` mirrors the `CurveSnapshot`/`CurveResult` state, so a new
+snapshot or persisted field has to be added there in the same PR — a field
+missing from the dump cannot be read from a user's report. It carries
+`write_scope` (the knots of the last active cycle), `forecast_ok` and
+`forecast_reused`, `forecast_wind_ms`/`forecast_wind_available`, the load term's
+`load_power_mean_w`/`load_power_coverage_hours`, `indoor_cap_armed` /
+`indoor_margin_c`, `bt2_detected`, `pump_room_c`/`pump_room_source`, the readiness
+gates and the whole model, where `model_daily` holds both the three-column fit
+and the four-column one (`a_w_per_k_4col`, `b_m2_4col`) beside the wind column.
 
 ## Seasonality
 

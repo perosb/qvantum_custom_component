@@ -289,6 +289,8 @@ actions:
 - [QE architecture and measurement model](docs/qe-architecture.md) — the 175 L buffer tank vs through-flow DHW, the immersion heater, draw power and the sensor map.
 - [QE quick reference](docs/qe-architecture-quick-reference.md) — the compact version for an AI context window.
 - [Heating curve](docs/heating-curve.md) — Auto vs User defined, registers and the adaptive curve.
+- [Derived metrics](docs/derived-metrics.md) — power, COP and DHW: how each figure is computed and where it can mislead.
+- [Tap-water capacity](docs/tap-water-capacity.md) — the 1–7 preset, why the start/stop pair is the truth and what the two repair issues mean.
 - [Telemetry](docs/telemetry.md) — what the opt-in summary export contains and how it is stored.
 
 ## Changelog
