@@ -282,6 +282,13 @@ actions:
 |:-------------:|:------:|
 | ![Inomhusklimat](https://github.com/user-attachments/assets/15e56f43-4d3c-41d7-aebc-899d6486586b) | ![Effekt](https://github.com/user-attachments/assets/d150f56f-cabe-44e0-b1b3-8647c1b079c2) |
 
+## Documentation
+
+- [QE architecture and measurement model](docs/qe-architecture.md) — the 175 L buffer tank vs through-flow DHW, the immersion heater, draw power and the sensor map.
+- [QE quick reference](docs/qe-architecture-quick-reference.md) — the compact version for an AI context window.
+- [Heating curve](docs/heating-curve.md) — Auto vs User defined, registers and the adaptive curve.
+- [Telemetry](docs/telemetry.md) — what the opt-in summary export contains and how it is stored.
+
 ## Changelog
 
 Per-release notes live in [`docs/releases/`](docs/releases/). Each file expands
