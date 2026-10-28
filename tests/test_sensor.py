@@ -335,6 +335,42 @@ class TestQvantumBaseSensorEntity:
         assert getattr(entity, "_attr_state_class", None) is None
         assert getattr(entity, "_attr_device_class", None) is None
 
+    @pytest.mark.parametrize(
+        ("code", "description"),
+        [
+            (33, "High Pressure Alarm"),
+            (252, "Source water low temperature protection"),
+            (391, "QGM2 fault of water flow switch on the ground source side"),
+        ],
+    )
+    def test_alarm_code_names_the_alarm(
+        self, mock_coordinator, mock_device, code, description
+    ):
+        """A known code carries Qvantum's friendly name as an attribute."""
+        mock_coordinator.data["values"]["alarm_1_code"] = code
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "alarm_1_code", mock_device, True
+        )
+        assert entity.extra_state_attributes == {"description": description}
+
+    def test_unknown_alarm_code_has_no_description(
+        self, mock_coordinator, mock_device
+    ):
+        """An unlisted code stays the bare number instead of a guessed name."""
+        mock_coordinator.data["values"]["alarm_1_code"] = 999
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "alarm_1_code", mock_device, True
+        )
+        assert entity.extra_state_attributes is None
+
+    def test_non_alarm_sensor_has_no_alarm_attribute(
+        self, mock_coordinator, mock_device
+    ):
+        """The attribute belongs to the five code slots, not every sensor."""
+        mock_coordinator.data["values"]["bt1"] = 21.5
+        entity = QvantumBaseSensorEntity(mock_coordinator, "bt1", mock_device, True)
+        assert entity.extra_state_attributes is None
+
     def test_compressor_starts_unit_assignment(self, mock_coordinator, mock_device):
         """Compressor start count is a diagnostic total-increasing counter."""
         entity = QvantumBaseSensorEntity(

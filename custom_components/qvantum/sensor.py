@@ -40,6 +40,7 @@ from .const import (
     CURRENT_METRICS,
     PRESSURE_METRICS,
 )
+from .alarm_codes import alarm_description
 from .dhw_loss import REFERENCE_DELTA_K
 from .efficiency import COP_WINDOW_SECONDS
 from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
@@ -656,6 +657,18 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             super().available
             and self._values.get(self._metric_key) is not None
         )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        """Name an alarm code; unknown codes keep the bare number only.
+
+        The names are Qvantum's English alarm-list terms (alarm_codes.py),
+        not translated UI strings, so they stay out of the translation files.
+        """
+        if self._metric_key not in _ALARM_CODE_SENSORS:
+            return None
+        description = alarm_description(self._values.get(self._metric_key))
+        return {"description": description} if description else None
 
 class QvantumCopSensor(QvantumBaseSensorEntity):
     """Coefficient of performance from the energy counters.
