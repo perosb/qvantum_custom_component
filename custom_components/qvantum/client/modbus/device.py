@@ -6,6 +6,7 @@ HTTP path uses, so coordinators and entities do not need to change.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, TYPE_CHECKING
 
 from ..constants import (
@@ -16,13 +17,22 @@ from ..constants import (
     RELAY_STAGE_POWER_MAP,
 )
 from .maps import MODBUS_HOLDING_RANGE, MODBUS_HOLDING_TO_SETTINGS_MAP
-from .model import QvantumIdentity, QvantumInputs, QvantumSettings
+from .model import (
+    QvantumCompressorUnits,
+    QvantumIdentity,
+    QvantumInputs,
+    QvantumSettings,
+)
 
 if TYPE_CHECKING:
     from modbus_connection import ModbusUnit
 
+_LOGGER = logging.getLogger(__name__)
+
 _ENERGY_PREFIXES = ("compressor", "additional", "heating", "cooling", "dhw")
 _HIDDEN_SETTINGS = frozenset({"dhw_start_normal", "dhw_stop_normal"})
+# Stop asking for the per-compressor-unit block after this many refusals in a row.
+_COMPRESSOR_UNITS_MAX_FAILURES = 3
 _SETTINGS_NAME_TO_HOLDING = {
     settings_name: holding_key
     for holding_key, settings_name in MODBUS_HOLDING_TO_SETTINGS_MAP.items()
@@ -215,10 +225,41 @@ class QvantumModbusDevice:
         self.inputs = QvantumInputs(unit)
         self.settings = QvantumSettings(unit)
         self.identity = QvantumIdentity(unit)
+        self.compressor_units = QvantumCompressorUnits(unit)
+        self._compressor_units_failures = 0
+        self._compressor_units_ok = False
 
     async def async_update_inputs(self) -> None:
         """Refresh input-register metrics."""
         await self.inputs.async_update()
+        await self._async_update_compressor_units()
+
+    async def _async_update_compressor_units(self) -> None:
+        """Refresh the per-compressor-unit block where the pump has one.
+
+        Only some QG pumps answer 119-148. The block is optional, so a refusal
+        must never fail the main poll; after a few refusals it is left alone.
+        """
+        if self._compressor_units_failures >= _COMPRESSOR_UNITS_MAX_FAILURES:
+            return
+        try:
+            await self.compressor_units.async_update()
+        except Exception:  # noqa: BLE001 - optional block, any failure skips it
+            self._compressor_units_failures += 1
+            self._compressor_units_ok = False
+            _LOGGER.debug(
+                "Per-compressor-unit registers unavailable (refusal %d of %d)",
+                self._compressor_units_failures,
+                _COMPRESSOR_UNITS_MAX_FAILURES,
+            )
+            if self._compressor_units_failures == _COMPRESSOR_UNITS_MAX_FAILURES:
+                _LOGGER.info(
+                    "Heat pump does not answer the per-compressor-unit registers "
+                    "(input 119-148); not polling them again until restart"
+                )
+            return
+        self._compressor_units_failures = 0
+        self._compressor_units_ok = True
 
     async def async_update_settings(self) -> None:
         """Refresh holding-register settings."""
@@ -242,9 +283,10 @@ class QvantumModbusDevice:
         self, device_id: str, enabled_metrics: list[str] | None = None
     ) -> dict[str, Any]:
         """Build the metrics dict from the last input-register update."""
-        return build_metrics_payload(
-            device_id, component_values(self.inputs), enabled_metrics
-        )
+        values = component_values(self.inputs)
+        if self._compressor_units_ok:
+            values.update(component_values(self.compressor_units))
+        return build_metrics_payload(device_id, values, enabled_metrics)
 
     def settings_payload(
         self, enabled_settings: list[str] | None = None

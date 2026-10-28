@@ -16,6 +16,7 @@ live in `docs/` and are read on demand, before touching that area:
 | Derived metrics: power, COP, DHW, tank volume, standing loss | `docs/derived-metrics.md` |
 | Adaptive curve: readiness, room gain, trims, solar/wind model, write policy | `docs/heating-curve.md` |
 | Tap-water capacity 1–7 and its two repair issues | `docs/tap-water-capacity.md` |
+| Per-compressor-unit registers on QG (EP10/EP11), why the legacy values are means | `docs/compressor-units.md` |
 | Telemetry consent, uploader, `SUMMARY_SCHEMA_VERSION` | `docs/telemetry.md` |
 | Summary export field list | `README.md#qvantumexport_summary` |
 

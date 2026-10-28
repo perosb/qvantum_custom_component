@@ -10,6 +10,8 @@ from __future__ import annotations
 from modbus_connection.model import Component, bit, gauge, integer
 
 from .maps import (
+    MODBUS_COMPRESSOR_UNIT_REGISTER_MAP,
+    MODBUS_COMPRESSOR_UNIT_REGISTER_RANGE,
     MODBUS_HOLDING_RANGE,
     MODBUS_HOLDING_REGISTER_MAP,
     MODBUS_IDENTITY_REGISTER_MAP,
@@ -124,6 +126,16 @@ QvantumInputs = _component_from_map(
     # 150-170 answers (alarms 150-155, smart/wifi/cloud/vacation 161-170).
     # Price registers 165-166 are unread.
     register_ranges=((0, 104), (150, 170)),
+)
+
+QvantumCompressorUnits = _component_from_map(
+    "QvantumCompressorUnits",
+    "input",
+    MODBUS_COMPRESSOR_UNIT_REGISTER_MAP,
+    # QG only: the documented QGM1/QGM2 block, which pumps without two units
+    # refuse. Kept apart from QvantumInputs so a refusal cannot fail the main
+    # poll.
+    register_ranges=(MODBUS_COMPRESSOR_UNIT_REGISTER_RANGE,),
 )
 
 QvantumSettings = _component_from_map(

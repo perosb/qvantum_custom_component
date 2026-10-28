@@ -36,6 +36,8 @@ _EFFICIENCY_BINARY_FIELDS = {
 
 _CONNECTIVITY_BINARY_SENSORS = frozenset({"wifi_connected", "cloud_connected"})
 _PROBLEM_BINARY_SENSORS = frozenset({"alarm_active"})
+# Per-compressor-unit GP4 brine pumps (QG input 119-148, offset +12).
+_RUNNING_BINARY_SENSORS = frozenset({"ep10_brine_pump", "ep11_brine_pump"})
 
 # Status / release / protection flags — Diagnostics section, not main UI.
 _DIAGNOSTIC_BINARY_SENSORS = frozenset(
@@ -55,6 +57,9 @@ _DIAGNOSTIC_BINARY_SENSORS = frozenset(
         "unit_state",
         "cooling_enabled",
         "time_to_defrost",
+        # Per-compressor-unit pump status (QG only)
+        "ep10_brine_pump",
+        "ep11_brine_pump",
         # All picpin relay status bits (HTTP + Modbus-only pump)
         "picpin_relay_heat_l1",
         "picpin_relay_heat_l2",
@@ -180,6 +185,8 @@ class QvantumBaseBinaryEntity(QvantumEntity, BinarySensorEntity):
         enabled_by_default: bool = True,
     ) -> None:
         super().__init__(coordinator, metric_key, device, enabled_by_default)
+        if metric_key in _RUNNING_BINARY_SENSORS:
+            self._attr_device_class = BinarySensorDeviceClass.RUNNING
         if metric_key in _CONNECTIVITY_BINARY_SENSORS:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY

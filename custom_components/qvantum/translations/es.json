@@ -220,6 +220,12 @@
       },
       "heat_meter_deviation_warning": {
         "name": "Aviso: desviación del contador de calor de ACS"
+      },
+      "ep10_brine_pump": {
+        "name": "EP10 bomba de salmuera (GP4)"
+      },
+      "ep11_brine_pump": {
+        "name": "EP11 bomba de salmuera (GP4)"
       }
     },
     "sensor": {
@@ -691,6 +697,60 @@
       },
       "adaptive_curve_wind_model": {
         "name": "Curva de calefacción adaptativa: modelo de viento"
+      },
+      "ep10_bt10": {
+        "name": "EP10 salida condensador (BT10)"
+      },
+      "ep10_bt13": {
+        "name": "EP10 entrada condensador (BT13)"
+      },
+      "ep10_bt14": {
+        "name": "EP10 entrada salmuera (BT14)"
+      },
+      "ep10_bt15": {
+        "name": "EP10 salida salmuera (BT15)"
+      },
+      "ep10_bt20": {
+        "name": "EP10 gas de descarga (BT20)"
+      },
+      "ep10_bt23": {
+        "name": "EP10 gas de aspiración (BT23)"
+      },
+      "ep10_bp1_pressure": {
+        "name": "EP10 presión de aspiración (BP1)"
+      },
+      "ep10_bp2_pressure": {
+        "name": "EP10 presión de descarga (BP2)"
+      },
+      "ep10_compressor_rpm": {
+        "name": "EP10 velocidad del compresor"
+      },
+      "ep11_bt10": {
+        "name": "EP11 salida condensador (BT10)"
+      },
+      "ep11_bt13": {
+        "name": "EP11 entrada condensador (BT13)"
+      },
+      "ep11_bt14": {
+        "name": "EP11 entrada salmuera (BT14)"
+      },
+      "ep11_bt15": {
+        "name": "EP11 salida salmuera (BT15)"
+      },
+      "ep11_bt20": {
+        "name": "EP11 gas de descarga (BT20)"
+      },
+      "ep11_bt23": {
+        "name": "EP11 gas de aspiración (BT23)"
+      },
+      "ep11_bp1_pressure": {
+        "name": "EP11 presión de aspiración (BP1)"
+      },
+      "ep11_bp2_pressure": {
+        "name": "EP11 presión de descarga (BP2)"
+      },
+      "ep11_compressor_rpm": {
+        "name": "EP11 velocidad del compresor"
       }
     },
     "number": {

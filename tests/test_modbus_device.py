@@ -1,6 +1,7 @@
 """Tests for the typed Modbus model and dict adapter."""
 
 import pytest
+from modbus_connection.exceptions import IllegalDataAddressError
 from modbus_connection.mock import MockModbusConnection
 
 from custom_components.qvantum.const import (
@@ -10,6 +11,8 @@ from custom_components.qvantum.const import (
 )
 from custom_components.qvantum.client.modbus.maps import (
     HEATING_CURVE_OUTDOOR_TEMPS,
+    MODBUS_COMPRESSOR_UNIT_REGISTER_MAP,
+    MODBUS_COMPRESSOR_UNIT_REGISTER_RANGE,
     MODBUS_HOLDING_RANGE,
     MODBUS_HOLDING_REGISTER_MAP,
     MODBUS_IDENTITY_REGISTER_MAP,
@@ -28,6 +31,7 @@ from custom_components.qvantum.client.modbus.device import (
     metric_range,
 )
 from custom_components.qvantum.client.modbus.model import (
+    QvantumCompressorUnits,
     QvantumIdentity,
     QvantumInputs,
     QvantumSettings,
@@ -96,6 +100,42 @@ class TestRegisterMapAlignment:
             field = QvantumInputs.declared_fields[name]
             assert field.address == address
             assert field.signed is False
+
+    def test_compressor_unit_fields_match_register_map(self):
+        """The QGM1/QGM2 blocks, EP10 at 119 and EP11 at 134 (QSG EN 2613-A)."""
+        assert MODBUS_COMPRESSOR_UNIT_REGISTER_MAP["ep10_bt10"] == (119, "int16", 0.1)
+        assert MODBUS_COMPRESSOR_UNIT_REGISTER_MAP["ep11_bt10"] == (134, "int16", 0.1)
+        # Documented in rps at scale 10; x60 gives rpm (46.0 rps = 2760 rpm).
+        assert MODBUS_COMPRESSOR_UNIT_REGISTER_MAP["ep10_compressor_rpm"] == (
+            128,
+            "int16",
+            6.0,
+        )
+        # Pressure registers are S16 in the datasheet, not U16.
+        assert MODBUS_COMPRESSOR_UNIT_REGISTER_MAP["ep10_bp1_pressure"] == (
+            125,
+            "int16",
+            0.01,
+        )
+        assert MODBUS_COMPRESSOR_UNIT_REGISTER_MAP["ep11_brine_pump"] == (
+            146,
+            "int16",
+            1.0,
+        )
+        assert MODBUS_COMPRESSOR_UNIT_REGISTER_RANGE == (119, 146)
+        low, high = MODBUS_COMPRESSOR_UNIT_REGISTER_RANGE
+        for name, (address, data_type, scale) in MODBUS_COMPRESSOR_UNIT_REGISTER_MAP.items():
+            field = QvantumCompressorUnits.declared_fields[name]
+            assert field.address == address
+            assert field.signed is (data_type == "int16")
+            assert (field.scale or 1.0) == scale
+            assert low <= address <= high
+
+    def test_brine_pumps_are_modbus_only_binary_sensors(self):
+        assert {"ep10_brine_pump", "ep11_brine_pump"} <= set(
+            MODBUS_ONLY_BINARY_SENSORS
+        )
+        assert not {"ep10_brine_pump", "ep11_brine_pump"} & set(BINARY_SENSOR_NAMES)
 
     def test_all_relay_bits_are_binary_sensors(self):
         exposed = set(BINARY_SENSOR_NAMES) | set(MODBUS_ONLY_BINARY_SENSORS)
@@ -170,6 +210,76 @@ class TestRegisterMapAlignment:
             assert field.address == address
             assert field.signed is (data_type == "int16")
             assert (field.scale or 1.0) == scale
+
+
+
+class TestCompressorUnitBlock:
+    """The QG-only block is optional: a refusal must not fail the main poll."""
+
+    @pytest.mark.asyncio
+    async def test_publishes_per_unit_values_when_the_block_answers(self):
+        _, unit, device = _device()
+        unit.input[0] = 215  # bt1 21.5 (mean over the units)
+        unit.input[119] = 351  # EP10 bt10 35.1
+        unit.input[121] = 0xFFF6  # EP10 bt14 -1.0 as int16
+        unit.input[125] = 0xFF6A  # EP10 bp1 -1.50 bar as int16
+        unit.input[128] = 460  # EP10 46.0 Hz -> 2760 rpm
+        unit.input[131] = 1  # EP10 GP4 running
+        unit.input[134] = 470  # EP11 bt10 47.0
+        unit.input[146] = 0  # EP11 GP4 stopped
+
+        await device.async_update_inputs()
+
+        values = component_values(device.compressor_units)
+        assert values["ep10_bt10"] == 35.1
+        assert values["ep10_bt14"] == -1.0
+        assert values["ep10_bp1_pressure"] == -1.5
+        assert values["ep10_compressor_rpm"] == 2760
+        assert values["ep10_brine_pump"] == 1
+        assert values["ep11_bt10"] == 47.0
+        assert values["ep11_brine_pump"] == 0
+
+        payload = device.metrics_payload(
+            "dev",
+            ["ep10_bt10", "ep10_compressor_rpm", "ep11_brine_pump", "bt1"],
+        )
+        assert payload["metrics"]["ep10_bt10"] == 35.1
+        assert payload["metrics"]["ep10_compressor_rpm"] == 2760
+        assert payload["metrics"]["ep11_brine_pump"] == 0
+        assert payload["metrics"]["bt1"] == 21.5
+
+    @pytest.mark.asyncio
+    async def test_refusals_never_fail_the_main_poll_and_stop_after_three(self):
+        _, unit, device = _device()
+        unit.input[0] = 215
+        unit.fail_read(119, IllegalDataAddressError(), register_type="input")
+
+        for _ in range(5):
+            await device.async_update_inputs()
+
+        payload = device.metrics_payload("dev")
+        assert payload["metrics"]["bt1"] == 21.5
+        assert not any(key.startswith(("ep10_", "ep11_")) for key in payload["metrics"])
+
+        attempts = [
+            event
+            for event in unit.read_events
+            if event.register_type == "input" and 119 <= event.address <= 148
+        ]
+        assert len(attempts) == 3
+
+    @pytest.mark.asyncio
+    async def test_recovers_after_a_transient_refusal(self):
+        _, unit, device = _device()
+        unit.input[119] = 351
+        unit.fail_read(119, IllegalDataAddressError(), register_type="input")
+
+        await device.async_update_inputs()
+        assert "ep10_bt10" not in device.metrics_payload("dev")["metrics"]
+
+        unit.fail_read(119, None, register_type="input")
+        await device.async_update_inputs()
+        assert device.metrics_payload("dev")["metrics"]["ep10_bt10"] == 35.1
 
 
 class TestComponentDecode:
@@ -271,20 +381,26 @@ class TestComponentDecode:
     @pytest.mark.asyncio
     async def test_input_poll_uses_few_block_reads(self):
         _, unit, device = _device()
+        # A pump without the per-compressor-unit block (every QE) refuses it.
+        unit.fail_read(119, IllegalDataAddressError(), register_type="input")
         await device.async_update_inputs()
         input_reads = [
             event for event in unit.read_events if event.register_type == "input"
         ]
-        assert len(input_reads) <= 3
         assert all(event.count <= 125 for event in input_reads)
+        compressor_reads = [
+            event for event in input_reads if 119 <= event.address <= 148
+        ]
+        main_reads = [event for event in input_reads if event not in compressor_reads]
+        assert len(compressor_reads) == 1
+        assert len(main_reads) == 2
         covered = {
             addr
-            for event in input_reads
+            for event in main_reads
             for addr in range(event.address, event.address + event.count)
         }
         assert not set(range(105, 119)) & covered
-        assert not set(range(119, 147)) & covered
-        assert not set(range(147, 150)) & covered
+        assert not set(range(119, 150)) & covered
         assert not set(range(180, 194)) & covered
         assert set(range(150, 156)) <= covered
         assert set(range(161, 171)) <= covered

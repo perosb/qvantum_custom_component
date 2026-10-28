@@ -220,6 +220,12 @@
       },
       "heat_meter_deviation_warning": {
         "name": "Varning: avvikelse för varmvattenmätare"
+      },
+      "ep10_brine_pump": {
+        "name": "EP10 köldbärarpump (GP4)"
+      },
+      "ep11_brine_pump": {
+        "name": "EP11 köldbärarpump (GP4)"
       }
     },
     "sensor": {
@@ -691,6 +697,60 @@
       },
       "adaptive_curve_wind_model": {
         "name": "Adaptiv värmekurva: vindmodell"
+      },
+      "ep10_bt10": {
+        "name": "EP10 kondensor ut (BT10)"
+      },
+      "ep10_bt13": {
+        "name": "EP10 kondensor in (BT13)"
+      },
+      "ep10_bt14": {
+        "name": "EP10 köldbärare in (BT14)"
+      },
+      "ep10_bt15": {
+        "name": "EP10 köldbärare ut (BT15)"
+      },
+      "ep10_bt20": {
+        "name": "EP10 hetgas (BT20)"
+      },
+      "ep10_bt23": {
+        "name": "EP10 suggas (BT23)"
+      },
+      "ep10_bp1_pressure": {
+        "name": "EP10 sugtryck (BP1)"
+      },
+      "ep10_bp2_pressure": {
+        "name": "EP10 hetgastryck (BP2)"
+      },
+      "ep10_compressor_rpm": {
+        "name": "EP10 kompressorhastighet"
+      },
+      "ep11_bt10": {
+        "name": "EP11 kondensor ut (BT10)"
+      },
+      "ep11_bt13": {
+        "name": "EP11 kondensor in (BT13)"
+      },
+      "ep11_bt14": {
+        "name": "EP11 köldbärare in (BT14)"
+      },
+      "ep11_bt15": {
+        "name": "EP11 köldbärare ut (BT15)"
+      },
+      "ep11_bt20": {
+        "name": "EP11 hetgas (BT20)"
+      },
+      "ep11_bt23": {
+        "name": "EP11 suggas (BT23)"
+      },
+      "ep11_bp1_pressure": {
+        "name": "EP11 sugtryck (BP1)"
+      },
+      "ep11_bp2_pressure": {
+        "name": "EP11 hetgastryck (BP2)"
+      },
+      "ep11_compressor_rpm": {
+        "name": "EP11 kompressorhastighet"
       }
     },
     "number": {

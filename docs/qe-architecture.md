@@ -146,6 +146,9 @@ their own manuals and hydraulic schematics:
   product with a DHW tank will have a different tank balance and COP model.
 - Check the product's manual before applying any QE-specific claim about the
   tank, the immersion heater or the DHW path.
+- A QG with two compressor units publishes a per-unit block at input 119-148
+  that the shared legacy registers average away. Registers, evidence and the
+  optional-read policy: [compressor-units.md](compressor-units.md).
 
 ---
 

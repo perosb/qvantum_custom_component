@@ -69,6 +69,24 @@ _DIAGNOSTIC_SENSORS = frozenset(
         "ventilation_fan_run_time",
         "active_alarms",
         *_ALARM_CODE_SENSORS,
+        # Per-compressor-unit QG block (input 119-148): one refrigerant circuit
+        # per unit, so these are machine-internal even though the legacy
+        # averaged bt10/bt13/... are listed below for the same reason.
+        *(
+            f"ep{unit}_{name}"
+            for unit in ("10", "11")
+            for name in (
+                "bt10",
+                "bt13",
+                "bt14",
+                "bt15",
+                "bt20",
+                "bt23",
+                "bp1_pressure",
+                "bp2_pressure",
+                "compressor_rpm",
+            )
+        ),
         # Refrigerant circuit, air side and pressures
         "bt4",
         "bt10",
