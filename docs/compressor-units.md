@@ -12,6 +12,7 @@ optional component.
 | Tag | Meaning |
 |---|---|
 | `[R]` | Qvantum Modbus Quick-start guide, QSG EN 2613-A (`docs/modbus-1.pdf`), "QGM1/QGM2" input rows. |
+| `[M]` | Qvantum QG Installation and user handbook (1014923-A, qvantum.com/documentation): component designations and the compressor-unit sensor view. |
 | `[L]` | Live measurement on a QG-14, firmware 1.11.9 and 1.11.10, read-only scan 2026-10-11. |
 | `[I]` | Home Assistant integration code and semantics (`perosb/qvantum_custom_component`). |
 | `[?]` | Not documented in these sources. Do not infer. |
@@ -20,12 +21,20 @@ optional component.
 
 ## 1. Why a second block exists
 
-A QG-14 has **two compressor units**, each with its own compressor, evaporator,
-condenser, brine pump (GP4) and its own temperature and pressure sensors.
-The display labels them **EP10** and **EP11**; those labels are the QG
-compressor-unit designations and have nothing to do with the QE's EP11
-evaporator or EP21 condenser. `[L]` The Modbus guide calls the same two units
-**QGM1** and **QGM2**. `[R]`
+A QG-14 has **two compressor units**; QG-7 has one. `[M]` Each unit has its own
+compressor, evaporator, condenser, brine pump (GP4) and its own temperature and
+pressure sensors. The handbook labels them **EP10** (compressor unit 1) and
+**EP11** (compressor unit 2); those labels are the QG compressor-unit
+designations and have nothing to do with the QE's EP11 evaporator or EP21
+condenser. `[M][L]` The Modbus guide calls the same two units **QGM1** and
+**QGM2**. `[R]`
+
+The Modbus register map itself is **not** published on
+qvantum.com/documentation: Qvantum support provides it on request. `[R]` The
+copy this repository maps against is QSG EN 2613-A in
+[`modbus-1.pdf`](modbus-1.pdf). The QG handbook on the public site confirms the
+component designations and that the compressor-unit view shows exactly BT10,
+BT13, BT14, BT15, BT20, BT23, BP1, BP2 and GP4, but not the register numbers. `[M]`
 
 The legacy metrics (`bt10`, `bt13`, `bt14`, `bt15`, `bt20`, `bt23`, inputs
 5/8/9/10/11/14) report the **mean of the two units** on this pump. `[L][I]`
@@ -89,6 +98,10 @@ component, `QvantumCompressorUnits`, and never as part of the main input poll:
   failed block degrades to no entity/unknown rather than to stale values.
 - A success resets the refusal counter, so a transient error during startup
   recovers on the next poll.
+
+A **QG-7** has one compressor unit, so its legacy registers are not averages
+and there is no second unit whose fault could hide. If such a pump refuses the
+two-unit span, nothing is lost: the sensors simply do not appear. `[M][I]`
 
 ## 4. Entities
 
