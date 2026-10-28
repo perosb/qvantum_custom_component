@@ -212,6 +212,28 @@ DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "alarm_3_code",
     "alarm_4_code",
     "alarm_5_code",
+    # Per-compressor-unit values (QG models, input registers 119-148).
+    # Only a pump that answers the optional block publishes them.
+    "ep10_bt10",
+    "ep10_bt13",
+    "ep10_bt14",
+    "ep10_bt15",
+    "ep10_bt20",
+    "ep10_bt23",
+    "ep10_bp1_pressure",
+    "ep10_bp2_pressure",
+    "ep10_compressor_rpm",
+    "ep11_bt10",
+    "ep11_bt13",
+    "ep11_bt14",
+    "ep11_bt15",
+    "ep11_bt20",
+    "ep11_bt23",
+    "ep11_bp1_pressure",
+    "ep11_bp2_pressure",
+    "ep11_compressor_rpm",
+    "ep10_brine_pump",
+    "ep11_brine_pump",
 ]
 
 # Holding register keys that should be exposed as sensor entities in Modbus mode
@@ -548,6 +570,8 @@ MODBUS_ONLY_BINARY_SENSORS = [
     "vacation_mode",
     "picpin_relay_pump",
     "alarm_active",
+    "ep10_brine_pump",
+    "ep11_brine_pump",
 ]
 
 # Sensor filtering: substring patterns vs exact binary-sensor metric names.

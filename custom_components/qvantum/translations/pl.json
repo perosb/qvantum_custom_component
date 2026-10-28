@@ -220,6 +220,12 @@
       },
       "heat_meter_deviation_warning": {
         "name": "Ostrzeżenie: odchylenie ciepłomierza CWU"
+      },
+      "ep10_brine_pump": {
+        "name": "EP10 pompa solanki (GP4)"
+      },
+      "ep11_brine_pump": {
+        "name": "EP11 pompa solanki (GP4)"
       }
     },
     "sensor": {
@@ -691,6 +697,60 @@
       },
       "adaptive_curve_wind_model": {
         "name": "Adaptacyjna krzywa grzewcza: model wiatru"
+      },
+      "ep10_bt10": {
+        "name": "EP10 wyjście skraplacza (BT10)"
+      },
+      "ep10_bt13": {
+        "name": "EP10 wejście skraplacza (BT13)"
+      },
+      "ep10_bt14": {
+        "name": "EP10 solanka wejście (BT14)"
+      },
+      "ep10_bt15": {
+        "name": "EP10 solanka wyjście (BT15)"
+      },
+      "ep10_bt20": {
+        "name": "EP10 gorący gaz (BT20)"
+      },
+      "ep10_bt23": {
+        "name": "EP10 gaz zasysany (BT23)"
+      },
+      "ep10_bp1_pressure": {
+        "name": "EP10 ciśnienie ssania (BP1)"
+      },
+      "ep10_bp2_pressure": {
+        "name": "EP10 ciśnienie tłoczenia (BP2)"
+      },
+      "ep10_compressor_rpm": {
+        "name": "EP10 prędkość sprężarki"
+      },
+      "ep11_bt10": {
+        "name": "EP11 wyjście skraplacza (BT10)"
+      },
+      "ep11_bt13": {
+        "name": "EP11 wejście skraplacza (BT13)"
+      },
+      "ep11_bt14": {
+        "name": "EP11 solanka wejście (BT14)"
+      },
+      "ep11_bt15": {
+        "name": "EP11 solanka wyjście (BT15)"
+      },
+      "ep11_bt20": {
+        "name": "EP11 gorący gaz (BT20)"
+      },
+      "ep11_bt23": {
+        "name": "EP11 gaz zasysany (BT23)"
+      },
+      "ep11_bp1_pressure": {
+        "name": "EP11 ciśnienie ssania (BP1)"
+      },
+      "ep11_bp2_pressure": {
+        "name": "EP11 ciśnienie tłoczenia (BP2)"
+      },
+      "ep11_compressor_rpm": {
+        "name": "EP11 prędkość sprężarki"
       }
     },
     "number": {

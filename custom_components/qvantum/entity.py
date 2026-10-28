@@ -205,6 +205,8 @@ _ENTITY_ICONS: dict[str, str] = {
     "picpin_relay_gp3": "mdi:pump",
     "picpin_relay_pump": "mdi:pump",
     "picpin_relay_ha12": "mdi:pump",
+    "ep10_brine_pump": "mdi:pump",
+    "ep11_brine_pump": "mdi:pump",
     # Sensors
     "tap_water_cap": "mdi:account-group",
     "cop_heating": "mdi:heat-pump",
@@ -214,6 +216,7 @@ _ENTITY_ICONS: dict[str, str] = {
     "fanrpm": "mdi:fan",
     "compressormeasuredspeed": "mdi:turbine",
     "degree_minute": "mdi:metronome",
+    **{f"ep{unit}_compressor_rpm": "mdi:turbine" for unit in ("10", "11")},
     # Switches
     "op_mode": "mdi:auto-mode",
     "man_mode": "mdi:radiator",

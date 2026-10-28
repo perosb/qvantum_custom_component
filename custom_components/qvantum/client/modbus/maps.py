@@ -113,6 +113,43 @@ MODBUS_IDENTITY_REGISTER_MAP = {
     "version_patch": (193, "uint16", 1.0),
 }
 
+# Per-compressor-unit input registers, documented in QSG EN 2613-A
+# (docs/modbus-1.pdf) as the QGM1/QGM2 block: 119-131 and 134-146, all S16.
+# The pump's display labels the two units EP10/EP11. The block is not part of
+# the legacy input map because most pumps do not have it; on a QG-14 the
+# legacy 5/8/9/10/11/14 (bt10/bt13/bt14/bt15/bt20/bt23) report the mean of the
+# two units, so one locked-out unit is invisible there.
+#
+# Compressor actual speed is documented in rps at scale 10; the map scales it
+# by 6.0 so the sensor reads rpm, the unit of input 31 and of the HA entities
+# (46.0 rps = 2760 rpm).
+_COMPRESSOR_UNIT_BLOCKS = {"ep10": 119, "ep11": 134}
+_COMPRESSOR_UNIT_FIELDS = (
+    ("bt10", 0, "int16", 0.1),
+    ("bt13", 1, "int16", 0.1),
+    ("bt14", 2, "int16", 0.1),
+    ("bt15", 3, "int16", 0.1),
+    ("bt20", 4, "int16", 0.1),
+    ("bt23", 5, "int16", 0.1),
+    # S16: suction pressure is signed, the high pressure is not negative in
+    # practice but shares the datasheet type.
+    ("bp1_pressure", 6, "int16", 0.01),
+    ("bp2_pressure", 7, "int16", 0.01),
+    ("compressor_rpm", 9, "int16", 6.0),
+    # GP4, the unit's ground-source-side pump. 1 rises ~90 s before the
+    # compressor starts and stayed 1 with the compressor at 0 rps during a
+    # lockout (alarm 252).
+    ("brine_pump", 12, "int16", 1.0),
+)
+MODBUS_COMPRESSOR_UNIT_REGISTER_MAP = {
+    f"{unit}_{name}": (base + offset, data_type, scale)
+    for unit, base in _COMPRESSOR_UNIT_BLOCKS.items()
+    for name, offset, data_type, scale in _COMPRESSOR_UNIT_FIELDS
+}
+# Datasheet span; 117 (BBR Locked) sits before it and 129/130, 144/145
+# (4-way valve, flow switch) are documented neighbours not decoded here.
+MODBUS_COMPRESSOR_UNIT_REGISTER_RANGE = (119, 146)
+
 MODBUS_HOLDING_REGISTER_MAP = {
     "unit_on_off": (0, "uint16", 1.0),
     "operation_mode": (1, "uint16", 1.0),

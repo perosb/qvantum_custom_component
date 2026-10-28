@@ -220,6 +220,12 @@
       },
       "heat_meter_deviation_warning": {
         "name": "Warnung: Abweichung des Warmwasser-Wärmemessers"
+      },
+      "ep10_brine_pump": {
+        "name": "EP10 Solepumpe (GP4)"
+      },
+      "ep11_brine_pump": {
+        "name": "EP11 Solepumpe (GP4)"
       }
     },
     "sensor": {
@@ -691,6 +697,60 @@
       },
       "adaptive_curve_wind_model": {
         "name": "Adaptive Heizkurve: Windmodell"
+      },
+      "ep10_bt10": {
+        "name": "EP10 Kondensator aus (BT10)"
+      },
+      "ep10_bt13": {
+        "name": "EP10 Kondensator ein (BT13)"
+      },
+      "ep10_bt14": {
+        "name": "EP10 Sole ein (BT14)"
+      },
+      "ep10_bt15": {
+        "name": "EP10 Sole aus (BT15)"
+      },
+      "ep10_bt20": {
+        "name": "EP10 Heißgas (BT20)"
+      },
+      "ep10_bt23": {
+        "name": "EP10 Sauggas (BT23)"
+      },
+      "ep10_bp1_pressure": {
+        "name": "EP10 Saugdruck (BP1)"
+      },
+      "ep10_bp2_pressure": {
+        "name": "EP10 Hochdruck (BP2)"
+      },
+      "ep10_compressor_rpm": {
+        "name": "EP10 Kompressordrehzahl"
+      },
+      "ep11_bt10": {
+        "name": "EP11 Kondensator aus (BT10)"
+      },
+      "ep11_bt13": {
+        "name": "EP11 Kondensator ein (BT13)"
+      },
+      "ep11_bt14": {
+        "name": "EP11 Sole ein (BT14)"
+      },
+      "ep11_bt15": {
+        "name": "EP11 Sole aus (BT15)"
+      },
+      "ep11_bt20": {
+        "name": "EP11 Heißgas (BT20)"
+      },
+      "ep11_bt23": {
+        "name": "EP11 Sauggas (BT23)"
+      },
+      "ep11_bp1_pressure": {
+        "name": "EP11 Saugdruck (BP1)"
+      },
+      "ep11_bp2_pressure": {
+        "name": "EP11 Hochdruck (BP2)"
+      },
+      "ep11_compressor_rpm": {
+        "name": "EP11 Kompressordrehzahl"
       }
     },
     "number": {
