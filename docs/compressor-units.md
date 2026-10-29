@@ -1,6 +1,6 @@
 # Per-compressor-unit registers (QG ground source)
 
-**Version:** 2026-10-28  
+**Version:** 2026-10-29  
 **Scope:** QG ground-source models with two compressor units (QG-14 and
 family), firmware 1.11.9/1.11.10, Modbus input registers 119-146.  
 **Purpose:** Record the documented per-compressor-unit register block, what the
@@ -13,7 +13,7 @@ optional component.
 |---|---|
 | `[R]` | Qvantum Modbus Quick-start guide, QSG EN 2613-A (`docs/modbus-1.pdf`), "QGM1/QGM2" input rows. |
 | `[M]` | Qvantum QG Installation and user handbook (1014923-A, qvantum.com/documentation): component designations and the compressor-unit sensor view. |
-| `[L]` | Live measurement on a QG-14, firmware 1.11.9 and 1.11.10, read-only scan 2026-10-11. |
+| `[L]` | Live measurement on a QG-14, firmware 1.11.9/1.11.10: read-only scan 2026-10-11 and field test 2026-10-21/29. |
 | `[I]` | Home Assistant integration code and semantics (`perosb/qvantum_custom_component`). |
 | `[?]` | Not documented in these sources. Do not infer. |
 
@@ -75,8 +75,35 @@ The guide's `[L]`-verified correspondence: `[L]`
   stayed 1 with the compressor at 0 rps during a lockout (alarm 252).
 
 The integration exposes the documented speed as **rpm**, not rps: the map
-scales the 0.1-rps register by 6.0, so 46.0 rps reads 2760 rpm, the same unit
+scales the 0.1-rps register by 6.0, so 25.0 rps reads 1500 rpm, the same unit
 as input 31 and the existing `compressormeasuredspeed` entity. `[I]`
+
+### Pressures are gauge pressure, not the display's saturation temperature
+
+BP1 and BP2 are **pressure transmitters**, and the registers carry **gauge
+pressure in bar** (scale 100, S16) — that is what the `ep*_bp1_pressure` and
+`ep*_bp2_pressure` sensors show. The pump's display shows the same BP1/BP2
+circles as the **saturation temperature** of the refrigerant (R290/propane),
+so the two numbers must not be compared directly. `[L]`
+
+| Unit state | HA BP1 / BP2 (bar gauge) | Display BP1 / BP2 (°C saturation, R290) |
+|---|---|---|
+| EP11, stopped | 7.25 / 7.25 | 19.6 / 19.6 |
+| EP10, running | 3.55 / 9.57 | −2 / 29 |
+
+Check with the R290 saturation curve and the ambient pressure (absolute =
+gauge + ~1.01 bar): 3.55 bar gauge ≈ 4.56 bar absolute ≈ −2 °C, 9.57 ≈ 10.58
+bar ≈ 29 °C, 7.25 ≈ 8.26 bar ≈ 19.6 °C. The values are consistent; the
+difference is the unit, not a mapping error. `[L]`
+
+Field test 2026-10-21 on a QG-14, firmware 1.11.10, with the 2026.10.21
+pre-release and without the reporter's local patch: `[L]`
+
+- All EP10/EP11 entities came up with their previous entity ids, so history
+  was kept.
+- Temperatures, speed and GP4 matched the display (EP10 at 1500 rpm while
+  EP11 stood still).
+- The pressure readings matched R290 saturation temperatures as above.
 
 The guide also documents **117 BBR Locked** and, inside each block,
 **129/144 4-way valve** and **130/145 flow switch state**. Those are outside
