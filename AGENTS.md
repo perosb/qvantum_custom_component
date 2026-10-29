@@ -19,7 +19,7 @@ live in `docs/` and are read on demand, before touching that area:
 | Per-compressor-unit registers on QG (EP10/EP11), why the legacy values are means | `docs/compressor-units.md` |
 | Alarm codes and their friendly names (source, English-only policy) | `docs/alarm-codes.md` |
 | Telemetry consent, uploader, `SUMMARY_SCHEMA_VERSION` | `docs/telemetry.md` |
-| Summary export field list | `README.md#qvantumexport_summary` |
+| Summary export field list | `docs/telemetry.md` |
 
 Do not paste a measurement back into this file. A number that lives in two
 places goes stale in one of them: one `dhwpower` change had to correct the same

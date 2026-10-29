@@ -36,16 +36,17 @@ raised once, after a week of use, with two one-click answers.
 
 One POST per week (at most), containing the same payload as
 `qvantum.export_summary` plus the installation token in the request body only.
-The field list is in the [README](../README.md#qvantumexport_summary); in short:
+The complete field list:
 
-| block | example content |
+| section | fields |
 |---|---|
-| device | manufacturer, model, firmware versions — `model` is empty on local Modbus, which reports serial and firmware only |
-| plant | sensor mode, room-compensation factor, curve type, offsets, tap-water start/stop, the pump's supply limits |
-| climate | the outdoor span observed, heating hours |
-| curve | room gain (configured / applied / fitted, with validity, evidence hours, standard error, leave-one-out swing), readiness median and p95, the solar model |
-| fitted | heat loss (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (kWh/day at a 40 K tank-to-ambient difference), cycling, SCOP, auxiliary-heat share, health grade |
-| counters | curve reverts, trim updates, days with an actionable clamped or an extrapolated knot, and the date the counters were reset at |
+| device | manufacturer, model, firmware version (device metadata, never user data). `model` is empty on local Modbus: the pump reports serial and firmware only |
+| plant | `sensor_mode`, `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
+| climate | the outdoor span the installation has been observed in, heating hours |
+| curve | room gain grouped as `configured` / `applied` / `fitted`, with `window`, `valid`, `notes`, evidence hours, standard error (with `t`) and leave-one-out swing; readiness median and p95; the solar model (`a`, `b`, trust, days) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours behind it and whether its gates let it act) |
+| fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure, with `reference_delta_k`, `loss_w_per_k` and the newest window's evidence), cycling, SCOP, auxiliary-heat share, health grade |
+| counters | curve reverts, trim updates, days with an actionable clamped or an extrapolated knot, and the date the counters were reset at (*Modbus only*) |
+| verdicts | reserved for derived analysis results (currently empty) |
 
 It **never** contains: entity ids or names, coordinates, energy totals,
 schedules, sensor identities, raw series, or a timestamp finer than a date. The

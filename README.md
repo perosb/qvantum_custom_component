@@ -4,7 +4,7 @@
 
 Connect a Qvantum heat pump to Home Assistant using either the Qvantum cloud API or a direct local Modbus TCP connection.
 
-The integration is not limited to the QE. It uses Qvantum's shared cloud API and Modbus register map, so the **QA+QH** (air source) and **QG** (ground source) families are expected to work where they expose the same metrics and settings. The QE-specific architecture in [docs/qe-architecture.md](docs/qe-architecture.md) does not necessarily apply to those products.
+It has been tested on the **QE** (exhaust air) and **QG** (ground source) families. It uses Qvantum's shared cloud API and Modbus register map and is expected to work with **QA+QH** (air source) where the same metrics and settings exist; the QE-specific architecture in [docs/qe-architecture.md](docs/qe-architecture.md) does not necessarily apply to other products.
 
 - **Cloud mode (HTTP):** Uses your Qvantum account for live metrics, firmware details, SmartControl, and cloud settings.
 - **Local Modbus mode:** Connects directly on your LAN without an account or cloud session, with faster local polling.
@@ -53,7 +53,6 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **Adaptive heating curve (Modbus) — the headline feature:** Learns the house from the forecast, sun and delivered heat and writes its own curve back; shadow mode first, readiness gate, hand-back on failure. [Details](docs/heating-curve.md).
 - **Curve card:** A bundled Lovelace card (`qvantum-curve-card`) that graphs the baseline, shadow curve, written pump table and adjustment terms.
 - **Monitoring:** Temperatures, pressure, energy, power, system status, defrost, connectivity, filter time, and other heat-pump metrics. Machine-internal values (refrigerant circuit, speeds, lifetime counters, settings read-backs) live under the **Diagnostics** entity category. Alarm codes carry Qvantum's friendly name in a `description` attribute.
-- **QG-14 per-compressor-unit readings (Modbus):** On QG pumps with two compressor units, each unit's refrigerant temperatures, pressures, compressor speed and GP4 brine-pump state are exposed separately; the shared legacy registers report the mean of the two units, which hides a unit that is locked out or standing still. Entities are created only when the pump answers the optional block, so single-unit pumps are unaffected. See [docs/compressor-units.md](docs/compressor-units.md).
 - **Efficiency analytics:** COP and rolling SCOP (the DHW COP includes tank charges made with the electric element alone — parallel with, or after, the compressor — and is capped at 1.0 when no compressor work was involved), auxiliary-heat share, building heat-loss coefficient, heating degree hours and weather-normalized consumption, DHW standing loss (quoted at a 40 K tank-to-ambient difference), a DHW heat-meter plausibility check, compressor cycling/duty/speed and average power, plus an A–F efficiency health grade. All derived from data the integration already polls — no extra hardware.
 - **Thermal mass:** the envelope time constant and heat capacity (`UA × τ`) are identified from how fast the rooms cool while the pump is not heating — hot water, defrost, idle. They say how quickly a house reacts to a pause; both are diagnostics, and both stay unavailable until the window holds enough decays across a spread of outdoor temperatures.
 - **Solar:** Current solar irradiance and a self-calibrated solar-gain estimate from Open-Meteo, in both cloud and Modbus mode. No PV system is required.
@@ -179,108 +178,22 @@ data:
   precharge: true
 ```
 
-#### `qvantum.export_summary`
+#### Summary export and anonymous sharing (opt-in)
 
-Writes `config/qvantum_summary.json` and returns the same payload. It exists so a
-rule can be checked across installations — "does the pump's own
-`room_comp_factor` equal the room-gain slope fitted on this house?" cannot be
-answered from one pump. **Nothing is sent anywhere and no issue is opened for
-you**: the file is yours to attach where you choose — the
-[Rule check issue template](.github/ISSUE_TEMPLATE/summary_submission.yml) is
-just a form for pasting it.
+`qvantum.export_summary` writes and returns a compact, whitelist-built summary
+of the installation: pump model and firmware, plant settings, the identified
+envelope and curve figures, and counters. It contains no entity ids or names,
+coordinates, energy totals, schedules or series, and the service sends nothing
+by itself. Download it from `/api/qvantum/summary` while logged in, or find
+`config/qvantum_summary.json`.
 
-```yaml
-service: qvantum.export_summary
-```
+Sharing is **opt-in and never implied**: after a week of use a repair issue asks
+once. If you accept, the same summary is posted once a week to a small
+Cloudflare Worker; declining changes nothing else, including the adaptive curve.
+`qvantum.telemetry_upload` sends now and `qvantum.telemetry_delete` erases every
+row this installation sent.
 
-How to get the file:
-
-1. **Download it** — open `/api/qvantum/summary` in your browser while logged in
-   (`http://<your-ha>/api/qvantum/summary`). It returns the file
-   `qvantum_summary.json`; your session cookie carries the auth, so no token is
-   in the URL.
-2. The service also writes `config/qvantum_summary.json`, reachable over Samba,
-   the File editor or SSH.
-3. **Developer tools → Actions** shows the same payload in the service response,
-   which can be copied directly.
-
-What it contains:
-
-| section | fields |
-|---|---|
-| device | manufacturer, model, firmware version (device metadata, never user data). **`model` is empty on local Modbus**: the pump reports serial and firmware only, and the model exists only for an entry that was created through the cloud |
-| plant | `sensor_mode`, `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
-| climate | the outdoor span the installation has been observed in, heating hours |
-| curve | room gain grouped as `configured` / `applied` / `fitted`, the readiness median/p95, the solar model (`a`, `b`, trust, days) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours behind it and whether its gates let it act) |
-| fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure), cycling, SCOP, aux share, health grade |
-| counters | curve reverts, trim updates and the number of days an actionable clamped knot or an extrapolated knot was lived with, plus the date they were reset at (*Modbus only*) |
-| verdicts | reserved for the derived analysis results (currently empty) |
-
-Run it **while the curve is active** when the room gain is the point: active hours
-are the only regime where that number measures the pump rather than the pump's own
-control loop. Everything else — the plant settings, the observed climate span, the
-identified envelope figures, the cycling and DHW numbers — is mode-independent, and
-a shadow-mode dump still carries the last active-hour measurement if the curve ran
-recently. The payload says which case it is: `curve.active`, and inside
-`room_gain.fitted` the `window`, `valid` and `notes`.
-
-The room gain is the part worth explaining, because three numbers that look
-alike are not: **configured** is the pump's own `room_comp_factor`, **applied**
-is what the curve's deviation correction uses (the factor when the pump reports
-a usable one, else the fitted slope) and **fitted** is a *measurement* — taken on
-hours the pump followed our own table when such hours exist, otherwise from Auto
-hours. The measurement carries `valid`, `notes`, the hour count, its standard
-error (with `t`) and its leave-one-out swing, because on this data one hour can
-move the number by more than the effect being measured. It never changes what is
-applied: the factor does.
-
-The standing loss is the other figure that needs a word, because its unit looks
-more absolute than it is. A window measures how fast the tank cools, and that
-rate depends on **how warm the tank was** — so windows are normalised to a
-coefficient per kelvin of tank-to-ambient difference and only then quoted, at a
-fixed **40 K**. The published kWh/day is therefore "what this tank would lose in
-a day at 40 K", comparable between installations and between seasons, not the
-loss at whatever temperature the tank happened to hold. Without the
-normalisation one window after a 69 °C extra-hot-water run moved a live
-installation from 2.5 to 5.1 kWh/d without the insulation changing at all. The
-sensor carries `reference_delta_k`, `loss_w_per_k` and the newest window's
-evidence (hours, drop, tank mean, ambient and its source, ΔT, volume).
-
-What it **never** contains: entity ids or names, coordinates, energy totals,
-schedules, sensor identities, or any raw hourly series. The payload is built by
-whitelist in `summary.py` — every field is picked explicitly and coerced to a
-number, a boolean or a short enumerated string — and a test asserts the result is
-free of identifiers.
-
-#### Anonymous summary sharing (opt-in)
-
-More installations are needed to answer the curve questions, but **nothing is
-sent unless you say yes**. After a week of use a repair issue asks once:
-
-> **Share anonymous operating data?** — *Bidra* / *Nej tack*
-
-One click. Declining is remembered and the question is not asked again, and it
-never affects the adaptive curve. The answer can be changed at any time in
-**Settings → Devices & services → Qvantum → Configure → "Share anonymous
-operating data"**.
-
-If you accept, the same summary as `qvantum.export_summary` is posted **once a
-week** to a small Cloudflare Worker that stores it with a two-year expiry. The
-installation token travels in the request only, never in the exported file.
-
-```yaml
-# send now instead of waiting for the week
-service: qvantum.telemetry_upload
-
-# erase every row this installation ever sent
-service: qvantum.telemetry_delete
-```
-
-What travels is the [field list above](#qvantumexport_summary) — pump model and
-firmware, plant settings, the identified figures and the counters. It contains
-no names, entity ids, coordinates, energy totals, schedules or series, and the
-intake rejects anything identifier-shaped. The full description, including
-retention and erasure, is in [docs/telemetry.md](docs/telemetry.md).
+Details, field list, retention and erasure: [docs/telemetry.md](docs/telemetry.md).
 
 #### Elevate Access
 
