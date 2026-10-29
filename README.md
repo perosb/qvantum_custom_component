@@ -37,7 +37,8 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 
 ### Features
 
-- **Monitoring:** Temperatures, pressure, energy, power, system status, defrost, connectivity, filter time, and other heat-pump metrics. Machine-internal values (refrigerant circuit, speeds, lifetime counters, settings read-backs) live under the **Diagnostics** entity category.
+- **Monitoring:** Temperatures, pressure, energy, power, system status, defrost, connectivity, filter time, and other heat-pump metrics. Machine-internal values (refrigerant circuit, speeds, lifetime counters, settings read-backs) live under the **Diagnostics** entity category. Alarm codes carry Qvantum's friendly name in a `description` attribute.
+- **QG-14 per-compressor-unit readings (Modbus):** On QG pumps with two compressor units, each unit's refrigerant temperatures, pressures, compressor speed and GP4 brine-pump state are exposed separately; the shared legacy registers report the mean of the two units, which hides a unit that is locked out or standing still. Entities are created only when the pump answers the optional block, so single-unit pumps are unaffected. See [docs/compressor-units.md](docs/compressor-units.md).
 - **Efficiency analytics:** COP and rolling SCOP (the DHW COP includes tank charges made with the electric element alone — parallel with, or after, the compressor — and is capped at 1.0 when no compressor work was involved), auxiliary-heat share, building heat-loss coefficient, heating degree hours and weather-normalized consumption, DHW standing loss (quoted at a 40 K tank-to-ambient difference), a DHW heat-meter plausibility check, compressor cycling/duty/speed and average power, plus an A–F efficiency health grade. All derived from data the integration already polls — no extra hardware.
 - **Thermal mass:** the envelope time constant and heat capacity (`UA × τ`) are identified from how fast the rooms cool while the pump is not heating — hot water, defrost, idle. They say how quickly a house reacts to a pause; both are diagnostics, and both stay unavailable until the window holds enough decays across a spread of outdoor temperatures.
 - **Solar:** Current solar irradiance and a self-calibrated solar-gain estimate from Open-Meteo, in both cloud and Modbus mode. No PV system is required.
@@ -300,6 +301,8 @@ actions:
 
 - [QE architecture and measurement model](docs/qe-architecture.md) — the 175 L buffer tank vs through-flow DHW, the immersion heater, draw power and the sensor map.
 - [QE quick reference](docs/qe-architecture-quick-reference.md) — the compact version for an AI context window.
+- [QG per-compressor-unit registers](docs/compressor-units.md) — the two-unit block, why the legacy values are means, and gauge pressure vs the display's saturation temperature.
+- [Alarm codes](docs/alarm-codes.md) — where the friendly names come from, the app-only codes 252/391 and the English-only policy.
 - [Heating curve](docs/heating-curve.md) — Auto vs User defined, registers and the adaptive curve.
 - [Derived metrics](docs/derived-metrics.md) — power, COP and DHW: how each figure is computed and where it can mislead.
 - [Tap-water capacity](docs/tap-water-capacity.md) — the 1–7 preset, why the start/stop pair is the truth and what the two repair issues mean.
