@@ -9,6 +9,19 @@ The integration is not limited to the QE. It uses Qvantum's shared cloud API and
 - **Cloud mode (HTTP):** Uses your Qvantum account for live metrics, firmware details, SmartControl, and cloud settings.
 - **Local Modbus mode:** Connects directly on your LAN without an account or cloud session, with faster local polling.
 
+### Highlights
+
+- **Self-learning heating curve (Modbus).** Instead of the pump's fixed Auto
+  curve, the integration learns how your house responds to the forecast, the
+  sun and the heat it delivers, then writes its own curve back. It starts in
+  shadow mode, takes over only when the comparison is ready, and hands control
+  back to the pump on any failure. [How it works →](docs/heating-curve.md)
+- **Local, fast and offline.** Modbus TCP on your LAN with 15 s default
+  polling and optional writes; a cloud account is only needed for cloud mode.
+- **Analytics from data the pump already has.** COP/SCOP, auxiliary-heat
+  share, envelope heat loss and time constant, DHW standing loss, solar gain
+  and readable alarm names — no extra hardware.
+
 ### Installation
 
 Requires Home Assistant **2026.9** or newer (shared Modbus connection).
@@ -37,6 +50,8 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 
 ### Features
 
+- **Adaptive heating curve (Modbus) — the headline feature:** Learns the house from the forecast, sun and delivered heat and writes its own curve back; shadow mode first, readiness gate, hand-back on failure. [Details](docs/heating-curve.md).
+- **Curve card:** A bundled Lovelace card (`qvantum-curve-card`) that graphs the baseline, shadow curve, written pump table and adjustment terms.
 - **Monitoring:** Temperatures, pressure, energy, power, system status, defrost, connectivity, filter time, and other heat-pump metrics. Machine-internal values (refrigerant circuit, speeds, lifetime counters, settings read-backs) live under the **Diagnostics** entity category. Alarm codes carry Qvantum's friendly name in a `description` attribute.
 - **QG-14 per-compressor-unit readings (Modbus):** On QG pumps with two compressor units, each unit's refrigerant temperatures, pressures, compressor speed and GP4 brine-pump state are exposed separately; the shared legacy registers report the mean of the two units, which hides a unit that is locked out or standing still. Entities are created only when the pump answers the optional block, so single-unit pumps are unaffected. See [docs/compressor-units.md](docs/compressor-units.md).
 - **Efficiency analytics:** COP and rolling SCOP (the DHW COP includes tank charges made with the electric element alone — parallel with, or after, the compressor — and is capped at 1.0 when no compressor work was involved), auxiliary-heat share, building heat-loss coefficient, heating degree hours and weather-normalized consumption, DHW standing loss (quoted at a 40 K tank-to-ambient difference), a DHW heat-meter plausibility check, compressor cycling/duty/speed and average power, plus an A–F efficiency health grade. All derived from data the integration already polls — no extra hardware.
@@ -48,8 +63,6 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **Device automations:** Triggers and conditions for defrost, compressor blocking, freeze protection, Wi-Fi/cloud connectivity, and a ventilation filter due in under 48 hours.
 - **External room sensor:** The integration can feed a Home Assistant temperature sensor to the pump as the external room temperature, refreshed continuously (never slower than every 4 minutes) so the app's external room sensor mode stays fed.
 - **Modbus writes:** Optional local writes for supported targets, DHW, fan, operation, room compensation, and sensor settings.
-- **Adaptive heating curve (Modbus):** A self-learning curve based on the weather forecast and the pump's own data. It starts in shadow mode and replaces the pump's Auto curve once you switch it on; see [docs/heating-curve.md](docs/heating-curve.md).
-- **Curve card:** A bundled Lovelace card (`qvantum-curve-card`) that graphs the baseline, shadow curve, written pump table and adjustment terms.
 
 #### Device automation details
 
@@ -84,43 +97,48 @@ the adaptive curve. When the pump has no such sensor the metric is absent and
 no entity is created.
 
 
-#### Adaptive heating curve
+### Adaptive heating curve
 
-Modbus-only, and **Enable writing via Modbus** must be enabled. Instead of
-using the pump's fixed Auto curve, the integration learns how your house
-responds — from the outdoor forecast, the local daylight rhythm, the sun and
-the heat the pump delivers — and calculates its own version of the curve.
+**The pump's Auto curve is a fixed table. This one learns your house.**
 
-It always starts in **shadow mode**: nothing is written, and the calculated
-curve is only compared with the pump's own curve. When the comparison has
-looked good for a few days, the deviation sensor reports `ready` and you can
-turn on `switch.qvantum_adaptive_curve_control`. The integration then takes over
-the curve; turning the switch off — or a failed write, or a lost connection —
-hands control straight back to the pump's Auto curve, and removing the
-integration does the same. Restarting Home Assistant does **not**: the pump
-keeps running the last table written, so it still heats while nothing is
-supervising it.
+Modbus-only, and **Enable writing via Modbus** must be enabled. It always
+starts in **shadow mode**: nothing is written, the calculated curve is only
+compared with the pump's own. Once the deviation has stayed within the
+readiness gate — median ≤ 1.5 °C, p95 ≤ 3.0 °C over at least three days and 24
+heating hours — `sensor.qvantum_adaptive_curve_deviation` reports `ready`, and
+you can turn on `switch.qvantum_adaptive_curve_control` yourself. The
+integration never does.
 
-`ready` only describes that pre-activation comparison. While the curve is
-active the pump follows the integration's own table, so watch
-`sensor.qvantum_adaptive_curve_room_error` instead — it reports how far the
-rooms actually sit from the target over the last three days.
+| | Pump's Auto curve | Adaptive curve |
+|---|---|---|
+| Input | outdoor temperature + the pump's room term | outdoor forecast, sun, delivered heat, room term |
+| Writes | — | only knots the forecast can reach, 0.75 K dead band per knot |
+| Safety | — | shadow first, readiness gate, indoor cap, pump supply limits |
+| Hand-back | — | switch off, failed write, lost connection or removing the integration |
 
-While active you can optionally enable extra control terms with
-`qvantum.set_curve_terms`: **COP feedback** (reduce supply while the measured
-COP is below its learned reference) and **cold-snap pre-charge** (raise supply
-ahead of a forecast temperature drop). Both are off by default and never
-override the indoor cap or the pump's supply limits.
+While active, `sensor.qvantum_adaptive_curve_room_error` reports how far the
+rooms actually sit from the target over the last three days. Restarting Home
+Assistant does **not** hand back: the pump keeps running the last table written,
+so it still heats while nothing is supervising it.
 
-**What is expected of you:**
+Optional terms via `qvantum.set_curve_terms` — **COP feedback** (reduce supply
+while the measured COP is below its learned reference) and **cold-snap
+pre-charge** (raise supply ahead of a forecast temperature drop) — are off by
+default and never override the indoor cap or the pump's supply limits. If the
+pump leaves the curve (the app or a cloud profile changed the curve type), the
+integration drops to shadow and opens a repair issue instead of fighting the
+choice.
 
-- Enable Modbus writing.
-- Wait until the deviation sensor reports `ready` (a few days of shadow data).
-- Flip the switch yourself; the integration never does.
+**Get started**
 
-A bundled Lovelace card visualizes the curve. Add
-`/qvantum/qvantum-curve-card.js` as a **JavaScript module** dashboard
-resource, then add the card:
+1. Enable **Modbus TCP** and **Enable writing via Modbus**.
+2. Let it run in shadow mode until the deviation sensor reports `ready`.
+3. Turn on the adaptive-curve switch, and add the card below if you want the graph.
+
+Details: [docs/heating-curve.md](docs/heating-curve.md).
+
+**Curve card.** Add `/qvantum/qvantum-curve-card.js` as a **JavaScript module**
+dashboard resource, then add the card:
 
 ```yaml
 type: custom:qvantum-curve-card
@@ -130,9 +148,7 @@ It draws the frozen baseline, the computed shadow curve, the seven points
 written to the pump, the ±1 °C write band, the optional operating point and
 the adjustment term breakdown (outdoor, night/day, solar, load, trims).
 
-Details: [docs/heating-curve.md](docs/heating-curve.md).  
-
-<img width="250" alt="Adaptive Curve" src="https://github.com/user-attachments/assets/03bed4aa-1816-4597-9c3c-fe3faf06ecd6" />
+<img width="600" alt="Adaptive heating curve" src="https://github.com/user-attachments/assets/03bed4aa-1816-4597-9c3c-fe3faf06ecd6" />
 
 
 ### Services and Elevate Access
