@@ -96,14 +96,8 @@ gauge + ~1.01 bar): 3.55 bar gauge ≈ 4.56 bar absolute ≈ −2 °C, 9.57 ≈ 
 bar ≈ 29 °C, 7.25 ≈ 8.26 bar ≈ 19.6 °C. The values are consistent; the
 difference is the unit, not a mapping error. `[L]`
 
-Field test 2026-10-21 on a QG-14, firmware 1.11.10, with the 2026.10.21
-pre-release and without the reporter's local patch: `[L]`
-
-- All EP10/EP11 entities came up with their previous entity ids, so history
-  was kept.
-- Temperatures, speed and GP4 matched the display (EP10 at 1500 rpm while
-  EP11 stood still).
-- The pressure readings matched R290 saturation temperatures as above.
+A field test 2026-10-21 on a QG-14, firmware 1.11.10, measured EP10 at
+1500 rpm while EP11 stood still, and the pressure pairs above. `[L]`
 
 The guide also documents **117 BBR Locked** and, inside each block,
 **129/144 4-way valve** and **130/145 flow switch state**. Those are outside
