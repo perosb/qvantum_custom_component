@@ -6,7 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
-| [2026.10.21](2026.10.21.md) | 2026-10-28 | More accurate pump speed readings |
+| [2026.10.22](2026.10.22.md) | 2026-10-31 | More accurate pump readings |
 | [2026.10.20](2026.10.20.md) | 2026-10-25 | Hot-water capacity messages reflect the temperatures the pump uses |
 | [2026.10.18](2026.10.18.md) | 2026-10-25 | Wind data and reliable estimates |
 | [2026.10.13](2026.10.13.md) | 2026-10-24 | Missing room sensors no longer distort heat-pump readings |
