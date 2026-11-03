@@ -665,10 +665,14 @@ returns the day-block pair `(b·trust, a)` when the day block is valid, otherwis
 the hourly pair, and the two are never mixed — an aperture is only meaningful
 with the loss coefficient it was identified with. It is also much weaker
 evidence: the hourly `b` is a one-sided residual fit on the solar hours alone,
-accepted from `MIN_FIT_ROWS` rows (3) with no t-statistic, R² or jackknife gate,
-and shrunk only by its own `trust = t²/(t² + 4)`. On a censored window it is
-usually 0 — no term — but a positive value *is* applied. Measured 2026-11-03 on
-the owner's QE-6: the day block was invalid (`days 19 < 20`, zero coefficients)
+accepted from `MIN_FIT_ROWS` rows (3) and then required to clear the day
+block's own t ≥ 2.5 bar (`SOLAR_MIN_T_STAT`) before any of it acts; above the bar
+it is shrunk by `trust = t²/(t² + 4)`, below it `trust` is 0 — term off, while
+`b` and its standard error stay readable in the diagnostics. On a censored
+window it is usually 0 in the first place. Measured in the pool (2026-11-02): of
+the four installations with a live hourly aperture, two sat at t = 0.75 and 1.39
+(now refused) and two at 2.88 and 5.27 (still applied). On the owner's QE-6
+(2026-11-03) the day block was invalid (`days 19 < 20`, zero coefficients)
 while the hourly fit carried `b = 1.454 m²` at `t = 5.50`, `trust = 0.883`,
 `r2_solar = 0.125`, and published `solar_c = −1.35 °C`. The indoor floor capped
 the shared adjustment in the same cycle, so the seven supply points moved by

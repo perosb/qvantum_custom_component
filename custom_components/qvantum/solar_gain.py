@@ -56,6 +56,15 @@ OPAQUE_GHI_MAX_WM2: float = 30.0
 T_STAT_REFERENCE: float = 2.0
 #: Minimum rows for an identified stage (needed for a t-stat / residual scale).
 MIN_FIT_ROWS: int = 3
+#: Evidence bar for the hourly column before any of it is applied, matching
+#: ``DAILY_MIN_T_STAT``. ``MIN_FIT_ROWS`` alone is 3 rows, so a through-origin
+#: slope can read ``b > 0`` with a standard error as large as the estimate.
+#: Measured in the summary pool (2026-11-02, schema 8): of 4 installations with
+#: a live hourly aperture, 2 sat at t = 0.75 and 1.39, the other 2 at 2.88 and
+#: 5.27 — the bar removes exactly the two that carry no evidence. Below it the
+#: coefficient stays in the diagnostics (``b_m2``, ``b_std_err``) with
+#: ``trust = 0``, so the term is off without hiding what was fitted.
+SOLAR_MIN_T_STAT: float = 2.5
 #: Huber-style cutoff for studentised residuals (one robust pass per stage).
 ROBUST_CUTOFF: float = 4.0
 #: Median absolute deviation → Gaussian-consistent scale.
@@ -390,6 +399,12 @@ def fit_solar_model(
     than :data:`MIN_FIT_ROWS` opaque rows exist, when the design is
     singular, or when the fitted ``a`` is non-positive. Callers then apply
     no solar correction at all.
+
+    A fitted ``b`` is only applied when it clears :data:`SOLAR_MIN_T_STAT`:
+    below the bar ``trust`` is 0, so the term is off while ``b`` and its
+    standard error stay readable in the diagnostics. The opaque ``a``/``c``
+    pair is untouched — the load term uses it whether or not the aperture is
+    applied.
     """
     # One corrupt (NaN/inf) sensor hour must never poison the fit: a non-finite
     # row would make the LS sums non-finite and slip past the a <= 0 gate (or
@@ -471,7 +486,11 @@ def fit_solar_model(
         if b_std_err is None or b_std_err < 1e-12:
             trust = 1.0
         else:
-            trust = max(0.0, min(1.0, _trust_from_t_stat(b / b_std_err)))
+            b_t_stat = b / b_std_err
+            if b_t_stat >= SOLAR_MIN_T_STAT:
+                trust = max(0.0, min(1.0, _trust_from_t_stat(b_t_stat)))
+            else:
+                solar_note += f"; t {b_t_stat:.2f} < {SOLAR_MIN_T_STAT:.1f}, term off"
 
     return SolarModel(
         a_w_per_k=a,
@@ -1099,8 +1118,10 @@ def effective_solar_model(
     average in — the two pairs are not comparable, because an aperture is only
     meaningful with the loss coefficient it was identified with. The hourly
     ``b`` is a one-sided residual fit on the solar hours alone, accepted from
-    ``MIN_FIT_ROWS`` rows with no t-stat/R²/jackknife gate and shrunk by its own
-    ``trust``: usually 0 on a censored window, but a positive value is applied.
+    ``MIN_FIT_ROWS`` rows and then required to clear ``SOLAR_MIN_T_STAT`` (2.5,
+    the day block's bar) before ``trust`` — its own ``t²/(t² + 4)`` shrinkage —
+    lets any of it act. Usually 0 on a censored window; a positive value is
+    applied only when its standard error is small enough to say so.
     """
     if daily is not None and daily.valid and daily.a_w_per_k > 0.0:
         aperture = daily.effective_b_m2
