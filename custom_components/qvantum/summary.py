@@ -83,7 +83,11 @@ _ENTITY_PREFIXES = (
 #: term (`wind_c`). The fields are new, so v7 rows stay valid for their own
 #: fields — but the pool key must not mix a schema where "no wind term" was not
 #: expressible with one where it is.
-SUMMARY_SCHEMA_VERSION = 8
+#: 9: adds `daily_wind_evidence_days`, the number of days the cold+windy hours
+#: are spread over. The hours gate alone could not be read from a row, so a
+#: window refused for having 200 h on four days looked identical to one with no
+#: evidence at all.
+SUMMARY_SCHEMA_VERSION = 9
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -268,6 +272,11 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "daily_wind_t_stat": _number(getattr(daily, "w_t_stat", None)),
         "daily_wind_hours": _number(getattr(daily, "wind_hours", None)),
         "daily_wind_cold_hours": _number(getattr(daily, "wind_cold_hours", None)),
+        # Days the cold+windy hours are spread over — the gate's other half,
+        # because the four-column fit runs on day blocks.
+        "daily_wind_evidence_days": _number(
+            getattr(daily, "wind_evidence_days", None)
+        ),
         "daily_wind_vif": _number(getattr(daily, "wind_vif", None)),
         "daily_wind_valid": bool(getattr(daily, "wind_valid", False)),
         "wind_c": _number(getattr(snapshot, "wind_c", None)),

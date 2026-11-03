@@ -352,7 +352,8 @@ Entities:
 - `sensor.qvantum_adaptive_curve_adjustment` — the shared adjustment, with
   `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `cop_c`, `precharge_c`,
   `wind_c`, `terms` (which of the four are switched on), `wind_valid`, the
-  evidence counts `wind_cold_hours` / `wind_required_cold_hours`, `trims`,
+  evidence counts `wind_cold_hours` / `wind_required_cold_hours` and
+  `wind_evidence_days` / `wind_required_days`, `trims`,
   `clamped`, `clamped_points` and `floor_pinned_points` attributes. The card
   uses `terms`/`wind_valid` to tell "switched on but idle" from "switched off",
   and to show the wind chip while it is off when the coefficient is
@@ -560,8 +561,8 @@ read as a calibration result), and the day blocks hold it as `Σ(v·ΔT)` — th
 takes physically, since it multiplies the envelope loss instead of shifting it.
 The column is fitted as a **fourth regressor** of the same daily balance
 (`SolarDailyModel` carries `w_per_ms`, `w_std_err`, `w_t_stat`, `wind_hours`,
-`wind_cold_hours`, `wind_vif`, `wind_valid`, `wind_notes` and the half-split
-`w`) —
+`wind_cold_hours`, `wind_evidence_days`, `wind_vif`, `wind_valid`, `wind_notes`
+and the half-split `w`) —
 `Q = a·ΣΔT + w·Σ(v·ΔT) + 24c − b·ΣGHI`, because wind multiplies the envelope
 loss rather than shifting it — and only where the three-column balance is
 already valid. A payload without wind produces the same days with
@@ -577,7 +578,9 @@ correct reading.
 `w` is reported with `wind_valid`, which is false whenever a gate fails: fewer
 than `DAILY_MIN_COLD_WIND_HOURS` (200) hours that are both cold
 (`WIND_EVIDENCE_MIN_DELTA_T_K` = 15 K) and windy (`WIND_EVIDENCE_MIN_MS` =
-4 m/s — a windy mild hour is a reading, not evidence), `t < 2.5`, a negative
+4 m/s — a windy mild hour is a reading, not evidence), fewer than
+`DAILY_MIN_COLD_WIND_DAYS` (10) **days** carrying at least
+`DAILY_MIN_COLD_WIND_HOURS_PER_DAY` (3) such hours, `t < 2.5`, a negative
 coefficient, a coefficient that would more than double the loss at
 `DAILY_WIND_REFERENCE_MS` (5 m/s) — the bound is
 `DAILY_MAX_WIND_FRACTION` × `a` — an aperture that moved outside the
@@ -587,6 +590,16 @@ drift rather than a sensitivity), or a solution resting on a single day. The
 collinearity of the interaction column (`wind_vif`) is published with the
 coefficient but not gated: measured 1.6–2.2 on real windows, so it is not what
 breaks such a fit.
+
+The two evidence counts answer different questions, which is why both exist.
+Hours are the **volume** bar. Days are the **degrees-of-freedom** bar: the fit
+regresses one point per day block, so 200 h can be 15 days × 13 h (identifiable)
+or 4 days × 50 h (one weather episode, with no cross-day variation to identify
+`w` from) — and the hour count cannot tell them apart. Measured 2026-11-03: the
+owner's QE-6 held 3 cold+windy hours on a **single** day over 60 days, and the
+summary pool's median is 4.5 h against the 200 h bar. So the hours gate is a
+statement about the climate, not about identifiability; the day gate is the one
+that would notice.
 
 The **wind term** is optional and off by default
 (`qvantum.set_curve_terms: wind: true`), like the other optional terms. When

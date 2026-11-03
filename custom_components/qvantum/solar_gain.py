@@ -120,6 +120,16 @@ DAILY_MIN_COLD_WIND_HOURS: int = 200
 #: variance, and enough wind for the term to matter at all.
 WIND_EVIDENCE_MIN_DELTA_T_K: float = 15.0
 WIND_EVIDENCE_MIN_MS: float = 4.0
+#: Hours are the *volume* bar; the fit itself runs on **day blocks**, so its
+#: degrees of freedom are days. 200 h can be 15 days × 13 h (identifiable) or
+#: 4 days × 50 h (one weather episode, no cross-day variance), and the count
+#: alone cannot tell them apart. A day therefore counts as evidence only with
+#: this many cold+windy hours — one or two hours of weather does not make a day.
+DAILY_MIN_COLD_WIND_HOURS_PER_DAY: int = 3
+#: Days the gate wants. Four parameters (``a``, ``b``, ``c``, ``w``) need more
+#: than four points; 10 leaves six residual degrees of freedom, the same shape
+#: as the half-split gate, which needs ``DAILY_MIN_WIND_HALF_DAYS`` per half.
+DAILY_MIN_COLD_WIND_DAYS: int = 10
 #: Both halves of the window must agree on `w` within this factor, and both must
 #: be positive. This is the gate that rejects a window whose coefficient is a
 #: drift rather than a sensitivity: measured 2026-10-24, a 30-day mild window
@@ -571,10 +581,13 @@ class SolarDailyModel:
     w_per_ms: float | None = None
     w_std_err: float | None = None
     w_t_stat: float | None = None
-    #: Hours with a wind reading behind the fit, and how many of them were cold
-    #: and windy — the evidence count the gate reads.
+    #: Hours with a wind reading behind the fit, how many of them were cold
+    #: and windy, and over how many days those hours are spread — the two
+    #: evidence counts the gate reads (hours for volume, days for degrees of
+    #: freedom).
     wind_hours: int = 0
     wind_cold_hours: int = 0
+    wind_evidence_days: int = 0
     #: VIF of the interaction column against {ΣΔT, ΣGHI, const}, reported (not
     #: gated: measured 1.6–2.2 on real windows, i.e. collinearity is not what
     #: breaks the fit there).
@@ -849,16 +862,21 @@ def _fit_wind_coefficient(
     whether it may act. Every gate that fails produces ``wind_valid=False`` and
     a note — never a smaller, "probably fine" coefficient.
 
-    The gates, in order: enough **cold and windy** hours (the interaction's
-    variance, not just a reading), a positive ``w`` that is plausible against
-    ``a``, a significant ``t``, an aperture the fourth column did not move, both
-    window halves agreeing on ``w``, and a jackknife that stays inside the band.
+    The gates, in order: enough **cold and windy** hours *and* enough days
+    carrying them (the interaction's variance, not just a reading), a positive
+    ``w`` that is plausible against ``a``, a significant ``t``, an aperture the
+    fourth column did not move, both window halves agreeing on ``w``, and a
+    jackknife that stays inside the band.
     """
     wind_hours = sum(day.wind_hours for day in days)
     cold_hours = sum(day.cold_wind_hours for day in days)
+    evidence_days = sum(
+        1 for day in days if day.cold_wind_hours >= DAILY_MIN_COLD_WIND_HOURS_PER_DAY
+    )
     wind: dict[str, Any] = {
         "wind_hours": wind_hours,
         "wind_cold_hours": cold_hours,
+        "wind_evidence_days": evidence_days,
         "wind_valid": False,
         "wind_notes": "",
         "w_per_ms": None,
@@ -866,10 +884,17 @@ def _fit_wind_coefficient(
         "w_t_stat": None,
     }
     solar: dict[str, Any] = {}
-    if cold_hours < DAILY_MIN_COLD_WIND_HOURS:
+    if (
+        cold_hours < DAILY_MIN_COLD_WIND_HOURS
+        or evidence_days < DAILY_MIN_COLD_WIND_DAYS
+    ):
+        missing: list[str] = []
+        if cold_hours < DAILY_MIN_COLD_WIND_HOURS:
+            missing.append(f"hours {cold_hours} < {DAILY_MIN_COLD_WIND_HOURS}")
+        if evidence_days < DAILY_MIN_COLD_WIND_DAYS:
+            missing.append(f"days {evidence_days} < {DAILY_MIN_COLD_WIND_DAYS}")
         wind["wind_notes"] = (
-            f"cold+windy hours {cold_hours} < {DAILY_MIN_COLD_WIND_HOURS}"
-            f" (of {wind_hours} wind hours)"
+            f"cold+windy evidence: {', '.join(missing)} (of {wind_hours} wind hours)"
             if wind_hours
             else "no wind data in the window"
         )
@@ -991,6 +1016,11 @@ def fit_daily_solar_model(days: Sequence[SolarDay]) -> SolarDailyModel:
     n_days = len(usable)
     wind_hours = sum(day.wind_hours for day in usable)
     cold_wind_hours = sum(day.cold_wind_hours for day in usable)
+    wind_evidence_days = sum(
+        1
+        for day in usable
+        if day.cold_wind_hours >= DAILY_MIN_COLD_WIND_HOURS_PER_DAY
+    )
     empty: dict[str, Any] = {
         "a_w_per_k": 0.0,
         "b_m2": 0.0,
@@ -1002,6 +1032,7 @@ def fit_daily_solar_model(days: Sequence[SolarDay]) -> SolarDailyModel:
         # and how much wind evidence the window held.
         "wind_hours": wind_hours,
         "wind_cold_hours": cold_wind_hours,
+        "wind_evidence_days": wind_evidence_days,
         "wind_notes": "no wind term: the solar balance was not valid in this window",
         "valid": False,
     }
