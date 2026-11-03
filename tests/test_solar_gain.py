@@ -21,7 +21,9 @@ from custom_components.qvantum.solar_gain import (
     SolarDay,
     SolarModel,
     SolarSample,
+    DAILY_MIN_COLD_WIND_DAYS,
     DAILY_MIN_COLD_WIND_HOURS,
+    DAILY_MIN_COLD_WIND_HOURS_PER_DAY,
     DAILY_MIN_WIND_T_STAT,
     _median,
     _ols_three,
@@ -1028,9 +1030,55 @@ def test_wind_needs_cold_windy_hours_not_just_wind_hours() -> None:
     assert model.w_per_ms is None
     assert model.wind_hours == 30 * 24
     assert model.wind_cold_hours == 30 * 4 < DAILY_MIN_COLD_WIND_HOURS
-    assert (
-        f"cold+windy hours {30 * 4} < {DAILY_MIN_COLD_WIND_HOURS}" in model.wind_notes
-    )
+    assert f"hours {30 * 4} < {DAILY_MIN_COLD_WIND_HOURS}" in model.wind_notes
+
+
+def _cold_hours_per_day(days, hours_per_day):
+    """Spread ``hours_per_day`` cold+windy hours evenly over each day."""
+    return [replace(day, cold_wind_hours=hours_per_day) for day in days]
+
+
+def test_wind_gate_refuses_hours_spread_over_too_few_days() -> None:
+    """200 hours is not evidence when they sit on four days.
+
+    The four-column fit has day-level degrees of freedom: 4 days × 50 h is one
+    weather episode with no cross-day variance to identify ``w`` from.
+    """
+    days = _cold_hours_per_day(_wind_days(w=2.5, n_days=30), 0)
+    for index in range(4):
+        days[index] = replace(days[index], cold_wind_hours=50)
+    model = fit_daily_solar_model(days)
+
+    assert model.valid
+    assert model.wind_cold_hours == 200  # the hours bar alone would let it through
+    assert model.wind_evidence_days == 4
+    assert model.wind_valid is False
+    assert model.w_per_ms is None
+    assert f"days 4 < {DAILY_MIN_COLD_WIND_DAYS}" in model.wind_notes
+
+
+def test_wind_gate_accepts_the_same_hours_spread_over_enough_days() -> None:
+    days = _cold_hours_per_day(_wind_days(w=2.5, n_days=20), 10)
+    model = fit_daily_solar_model(days)
+
+    assert model.valid
+    assert model.wind_cold_hours == 200
+    assert model.wind_evidence_days == 20
+    # The fit is attempted, so the coefficient and its t-stat exist even if a
+    # later gate (halves, jackknife, plausibility) refuses the term itself.
+    assert model.w_per_ms is not None
+    assert "cold+windy evidence" not in model.wind_notes
+
+
+def test_wind_evidence_day_needs_three_cold_hours() -> None:
+    """One or two cold+windy hours in a day is weather, not a day of evidence."""
+    few = DAILY_MIN_COLD_WIND_HOURS_PER_DAY - 1
+    days = _cold_hours_per_day(_wind_days(w=2.5, n_days=30), few)
+    model = fit_daily_solar_model(days)
+
+    assert model.wind_cold_hours == 30 * few
+    assert model.wind_evidence_days == 0
+    assert model.wind_valid is False
 
 
 def test_wind_fit_is_attempted_only_where_the_balance_is_valid() -> None:

@@ -389,6 +389,7 @@ def _curve_daily_model_diagnostics(model: Any) -> dict[str, Any] | None:
         "w_t_stat": getattr(model, "w_t_stat", None),
         "wind_hours": getattr(model, "wind_hours", None),
         "wind_cold_hours": getattr(model, "wind_cold_hours", None),
+        "wind_evidence_days": getattr(model, "wind_evidence_days", None),
         "wind_vif": getattr(model, "wind_vif", None),
         "w_first_half_ms": getattr(model, "w_first_half_ms", None),
         "w_second_half_ms": getattr(model, "w_second_half_ms", None),

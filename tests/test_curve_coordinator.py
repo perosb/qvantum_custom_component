@@ -3721,6 +3721,7 @@ async def test_the_wind_column_round_trips_with_the_daily_model() -> None:
         w_t_stat=4.8,
         wind_hours=1438,
         wind_cold_hours=612,
+        wind_evidence_days=17,
         wind_vif=1.6,
         wind_valid=True,
         wind_notes="cold_hours=612 w=2.40",
@@ -3744,6 +3745,9 @@ async def test_the_wind_column_round_trips_with_the_daily_model() -> None:
     assert wind.w_t_stat == pytest.approx(4.8)
     assert wind.wind_hours == 1438
     assert wind.wind_cold_hours == 612
+    # Days are the gate's other half: a dropped key would restore 0 and read as
+    # "no evidence" while the hours still said 612.
+    assert wind.wind_evidence_days == 17
     assert wind.wind_vif == pytest.approx(1.6)
     assert wind.wind_notes == "cold_hours=612 w=2.40"
     assert wind.a_w_per_k_4col == pytest.approx(150.0)
@@ -3763,6 +3767,7 @@ async def test_a_store_without_the_wind_column_still_restores() -> None:
         "w_t_stat",
         "wind_hours",
         "wind_cold_hours",
+        "wind_evidence_days",
         "wind_vif",
         "wind_valid",
         "wind_notes",

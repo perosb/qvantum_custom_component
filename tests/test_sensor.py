@@ -760,6 +760,8 @@ class TestQvantumCurveSensors:
             "wind_valid": None,
             "wind_cold_hours": None,
             "wind_required_cold_hours": 200,
+            "wind_evidence_days": None,
+            "wind_required_days": 10,
             "capped_by_indoor": False,
             "trims": {},
             "clamped": False,

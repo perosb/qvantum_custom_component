@@ -26,6 +26,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
+from .solar_gain import DAILY_MIN_COLD_WIND_DAYS as _MIN_COLD_WIND_DAYS
 from .solar_gain import DAILY_MIN_COLD_WIND_HOURS as _MIN_COLD_WIND_HOURS
 from .const import (
     DEFAULT_ENABLED_HTTP_METRICS,
@@ -1018,6 +1019,13 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
                 else snapshot.daily_model.wind_cold_hours
             ),
             "wind_required_cold_hours": _MIN_COLD_WIND_HOURS,
+            # Hours are the volume bar; days are the fit's degrees of freedom.
+            "wind_evidence_days": (
+                None
+                if snapshot.daily_model is None
+                else snapshot.daily_model.wind_evidence_days
+            ),
+            "wind_required_days": _MIN_COLD_WIND_DAYS,
             "capped_by_indoor": snapshot.capped_by_indoor,
             "trims": dict(snapshot.trims),
             "clamped": snapshot.clamped,
@@ -1281,6 +1289,7 @@ class QvantumCurveSolarModelSensor(QvantumCurveSensorEntity):
                     ),
                     "wind_hours": daily.wind_hours,
                     "wind_cold_hours": daily.wind_cold_hours,
+                    "wind_evidence_days": daily.wind_evidence_days,
                     "wind_notes": daily.wind_notes,
                 }
             ),
@@ -1330,6 +1339,8 @@ class QvantumCurveWindModelSensor(QvantumCurveSensorEntity):
             "applied_c": round(snapshot.wind_c, 2),
             "cold_hours": daily.wind_cold_hours,
             "required_cold_hours": _MIN_COLD_WIND_HOURS,
+            "evidence_days": daily.wind_evidence_days,
+            "required_days": _MIN_COLD_WIND_DAYS,
             "wind_hours": daily.wind_hours,
             "t_stat": None if daily.w_t_stat is None else round(daily.w_t_stat, 2),
             "std_err": None if daily.w_std_err is None else round(daily.w_std_err, 3),

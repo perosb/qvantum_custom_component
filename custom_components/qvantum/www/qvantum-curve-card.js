@@ -97,6 +97,7 @@ const STRINGS = {
     notFound:
       "Qvantum adaptive curve entities not found. This card is Modbus-only.",
     hours: "h",
+    days: "d",
   },
   sv: {
     baseline: "Baslinje (fryst)",
@@ -131,6 +132,7 @@ const STRINGS = {
     notFound:
       "Qvantum adaptiva kurventiteter hittades inte. Kortet är endast för Modbus.",
     hours: "h",
+    days: "d",
   },
 };
 
@@ -487,6 +489,8 @@ class QvantumCurveCard extends HTMLElement {
         windValid: attr(adj, "wind_valid") === true,
         windCold: num(attr(adj, "wind_cold_hours")),
         windRequired: num(attr(adj, "wind_required_cold_hours")),
+        windDays: num(attr(adj, "wind_evidence_days")),
+        windDaysRequired: num(attr(adj, "wind_required_days")),
         load: num(attr(adj, "load_c")),
         trims: attr(adj, "trims"),
         clamped: attr(adj, "clamped") === true,
@@ -815,9 +819,15 @@ class QvantumCurveCard extends HTMLElement {
     // and not identifiable" stays quiet — there is nothing to see or act on.
     // Enabled but unidentifiable: say *how far off* the evidence is, rather
     // than a bare "–". The counts come from the adjustment sensor.
+    // Two bars: hours are the volume the fit needs, days are its degrees of
+    // freedom. A window with 250 h on three days is still not identifiable, so
+    // showing only the hours would read as "why is this idle?".
     const windEvidence =
       a.windCold !== null && a.windRequired !== null
-        ? `${fmt(a.windCold, 0)}/${fmt(a.windRequired, 0)} ${t.hours}`
+        ? `${fmt(a.windCold, 0)}/${fmt(a.windRequired, 0)} ${t.hours}` +
+          (a.windDays !== null && a.windDaysRequired !== null
+            ? ` · ${fmt(a.windDays, 0)}/${fmt(a.windDaysRequired, 0)} ${t.days}`
+            : "")
         : null;
     const windChip = a.terms.wind
       ? a.windValid
