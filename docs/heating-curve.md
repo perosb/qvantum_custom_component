@@ -648,16 +648,32 @@ low-sun hours), which is why the day block is the smallest window used.
 The day-block model is **gated**: at least 20 usable days (≥ 20 h of data and
 ≥ 5 heating hours each), a positive loss coefficient and aperture, `b`'s
 t-statistic ≥ 2.5, R² ≥ 0.85, and a leave-one-day-out check that no single day
-moves `b` by more than ±50 %. When a gate fails the model is *invalid* and the
-solar term is simply 0 — the curve never guesses, and an unidentifiable window
-switches the term off rather than preserving an older aperture. Because the
+moves `b` by more than ±50 %. When a gate fails the model is *invalid*: it
+returns zero coefficients, contributes nothing, and never preserves an older
+aperture. The solar term does not then go to zero — it **falls back to the
+hourly fit** (below), and is 0 only when that fit is unusable too. Because the
 evidence is measured in heating days, a fresh install needs a few weeks of
-heating season before the term appears.
+heating season before the day-block term appears.
 
 When the day-block model is valid it is the one the term uses (its `b` and its
 `a` are converted with each other); the hourly fit remains as the fallback and
 still feeds the load term's demand estimate. Both are visible in diagnostics
 (`curve.model` and `curve.model_daily`) and on the solar-model sensor.
+
+The fallback is a **whole model, not a second opinion**: `effective_solar_model`
+returns the day-block pair `(b·trust, a)` when the day block is valid, otherwise
+the hourly pair, and the two are never mixed — an aperture is only meaningful
+with the loss coefficient it was identified with. It is also much weaker
+evidence: the hourly `b` is a one-sided residual fit on the solar hours alone,
+accepted from `MIN_FIT_ROWS` rows (3) with no t-statistic, R² or jackknife gate,
+and shrunk only by its own `trust = t²/(t² + 4)`. On a censored window it is
+usually 0 — no term — but a positive value *is* applied. Measured 2026-11-03 on
+the owner's QE-6: the day block was invalid (`days 19 < 20`, zero coefficients)
+while the hourly fit carried `b = 1.454 m²` at `t = 5.50`, `trust = 0.883`,
+`r2_solar = 0.125`, and published `solar_c = −1.35 °C`. The indoor floor capped
+the shared adjustment in the same cycle, so the seven supply points moved by
+≈ 0.21 K, not by the published 1.35 K — the published term is the term *before*
+the cap, and `capped_by_indoor` says whether that gap is live.
 
 ### Diagnostics and the snapshot
 

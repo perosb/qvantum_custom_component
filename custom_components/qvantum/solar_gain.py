@@ -36,8 +36,10 @@ bought contribute ``q = 0`` rather than being dropped::
 
     Q_day ≈ a · ΣΔT + 24c − b · ΣGHI     (Σ over all hours of the day)
 
-It is gated on evidence (day count, t-stat, R², half-window agreement) and
-returns an invalid model — no solar term at all — whenever a gate fails.
+It is gated on evidence (day count, t-stat, R², leave-one-day-out) and returns
+an invalid zero model whenever a gate fails. The term then falls back to the
+hourly fit in :func:`effective_solar_model` — never to a preserved aperture,
+and never to zero unless that fit is unusable too.
 """
 
 from __future__ import annotations
@@ -523,8 +525,9 @@ class SolarDay:
 class SolarDailyModel:
     """Day-block energy balance ``Q = a·ΣΔT + 24c − b·ΣGHI``.
 
-    ``valid`` is ``False`` whenever an evidence gate fails; callers then
-    apply no solar term at all rather than a guess.
+    ``valid`` is ``False`` whenever an evidence gate fails; the coefficients
+    are then zero and the solar term falls back to the hourly model (see
+    :func:`effective_solar_model`) rather than reusing an older aperture.
     """
 
     a_w_per_k: float
@@ -956,9 +959,9 @@ def fit_daily_solar_model(days: Sequence[SolarDay]) -> SolarDailyModel:
 
     Returns an invalid zero model whenever a gate fails — too few usable
     days, a non-positive loss or aperture, an absurd aperture, a weak t-stat,
-    a poor R², or two window halves that disagree. The caller then applies no
-    solar term at all: an unidentifiable aperture must degrade to "off", not
-    to a guess.
+    a poor R², or a leave-one-day-out band that is too wide. The caller then
+    applies no *day-block* term: an unidentifiable aperture must degrade to
+    "off" rather than to a guess, and the term falls back to the hourly fit.
     """
     usable = [
         day
@@ -1092,8 +1095,12 @@ def effective_solar_model(
     The day-block pair wins whenever it passed its gates with a positive
     aperture: it is the same balance identified without the heating-hour
     censoring, so its ``b`` and ``a`` belong together and are converted with
-    each other. The hourly model is the fallback (its own ``b`` is 0 on a
-    censored window, i.e. no term), never a second opinion to average in.
+    each other. The hourly model is the fallback, never a second opinion to
+    average in — the two pairs are not comparable, because an aperture is only
+    meaningful with the loss coefficient it was identified with. The hourly
+    ``b`` is a one-sided residual fit on the solar hours alone, accepted from
+    ``MIN_FIT_ROWS`` rows with no t-stat/R²/jackknife gate and shrunk by its own
+    ``trust``: usually 0 on a censored window, but a positive value is applied.
     """
     if daily is not None and daily.valid and daily.a_w_per_k > 0.0:
         aperture = daily.effective_b_m2

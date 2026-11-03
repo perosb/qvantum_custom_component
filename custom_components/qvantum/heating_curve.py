@@ -467,8 +467,10 @@ def solar_gain_w_now(
     """Effective solar gain in W at the smoothed irradiance.
 
     The day-block model wins whenever it passed its evidence gates; the
-    hourly model is the fallback, and on a censored window its ``b`` is 0 —
-    i.e. no term at all, never a second opinion averaged in.
+    hourly model is the fallback (see ``effective_solar_model``), never a
+    second opinion averaged in. A censored window often gives it ``b = 0``,
+    which is no term, but a positive hourly aperture is applied at its own
+    trust rather than discarded.
     """
     aperture, _ = effective_solar_model(model, daily)
     if aperture <= 0.0:
