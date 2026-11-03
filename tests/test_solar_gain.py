@@ -17,6 +17,7 @@ from custom_components.qvantum.solar_gain import (
     MIN_FIT_ROWS,
     MIN_SAMPLE_Q_W,
     OPAQUE_GHI_MAX_WM2,
+    SOLAR_MIN_T_STAT,
     SolarDay,
     SolarModel,
     SolarSample,
@@ -96,17 +97,40 @@ def test_two_histories_yield_different_models_without_config() -> None:
     assert model_high.b_m2 > model_low.b_m2 * 2.0
 
 
-def test_pers_like_weak_b_gives_small_trust_and_solar_term() -> None:
-    """a ≈ 161 W/K, b ≈ 0.10 m² and little evidence → tiny solar offset."""
+def test_hourly_aperture_below_the_t_gate_is_not_applied() -> None:
+    """A weak hourly b keeps its diagnostics but gets no term at all.
+
+    Measured in the summary pool (2026-11-02): of the four installations with a
+    live hourly aperture, two sat at t = 0.75 and 1.39 — a positive b whose
+    standard error rivaled the estimate. They are the case this gate refuses.
+    """
     model = fit_solar_model(
         make_samples(b=0.10, n_solar=24, noise=60.0, seed=3), now_ts=NOW
     )
 
+    assert model.valid
+    assert model.b_m2 == pytest.approx(0.10, abs=0.03)  # still reported
+    assert model.b_m2 / model.b_std_err < SOLAR_MIN_T_STAT
+    assert model.trust == 0.0
+    assert model.effective_b_m2 == 0.0
+    assert model.solar_gain_w(500.0) == 0.0
+    assert "term off" in model.notes
+    # The opaque pair feeds the load term and must survive the aperture's gate.
     assert model.a_w_per_k == pytest.approx(161.0, abs=4.0)
-    assert model.b_m2 == pytest.approx(0.10, abs=0.03)
-    assert model.trust < 0.6
-    # Equivalent temperature drop: < 1 °C for any curve slope up to 2 °C/°C.
-    assert model.solar_gain_w(500.0) / model.a_w_per_k < 0.5
+    aperture, loss = effective_solar_model(model, None)
+    assert aperture == 0.0
+    assert loss == pytest.approx(model.a_w_per_k)
+
+
+def test_hourly_aperture_above_the_t_gate_is_applied_at_its_trust() -> None:
+    model = fit_solar_model(make_samples(b=0.10, n_solar=100, seed=7), now_ts=NOW)
+
+    t_stat = model.b_m2 / model.b_std_err
+    assert t_stat >= SOLAR_MIN_T_STAT
+    assert model.trust == pytest.approx(_trust_from_t_stat(t_stat))
+    assert model.trust > 0.5
+    assert "term off" not in model.notes
+    assert model.solar_gain_w(500.0) > 0.0
 
 
 def test_trust_grows_with_more_solar_data() -> None:
