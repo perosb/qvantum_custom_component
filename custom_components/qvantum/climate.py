@@ -28,6 +28,15 @@ from . import MyConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
+#: Home Assistant 2026.11 renames the temperature surface: ``current_temperature``,
+#: ``target_temperature`` and ``_attr_temperature_unit`` become deprecated aliases
+#: of ``native_current_temperature`` / ``native_target_temperature`` /
+#: ``_attr_native_temperature_unit`` (removed in 2027.11). The native names do not
+#: exist before that release, so the choice is made once from the base class
+#: instead of from a version string — a dev build reports 2026.11.0.dev0 but
+#: behaves like whichever checkout it was built from.
+NATIVE_TEMPERATURE_API = hasattr(ClimateEntity, "native_current_temperature")
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -56,7 +65,10 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         super().__init__(coordinator)
         self._hpid = (self.coordinator.data or {}).get("values", {}).get("hpid")
         self._attr_unique_id = f"qvantum_indoor_climate_{self._hpid}"
-        self._attr_temperature_unit = UnitOfTemperature.CELSIUS
+        if NATIVE_TEMPERATURE_API:
+            self._attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+        else:
+            self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_target_temperature_step = PRECISION_TENTHS
         self._attr_device_info = device
         self._attr_translation_key = "indoor_climate"
@@ -121,10 +133,13 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         enforced in ``async_set_temperature`` so a read-only account can still
         see the indoor temperature.
         """
-        return self._coordinator_available and self.current_temperature is not None
+        return (
+            self._coordinator_available
+            and self.native_current_temperature is not None
+        )
 
     @property
-    def current_temperature(self):
+    def native_current_temperature(self):
         """Return the indoor temperature from the selected sensor."""
         values = (self.coordinator.data or {}).get("values", {})
         for key in SensorMode.current_temperature_keys(self._sensor_mode()):
@@ -134,9 +149,13 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         return None
 
     @property
-    def target_temperature(self):
+    def native_target_temperature(self):
         """Return the temperature we try to reach."""
         return (self.coordinator.data or {}).get("values", {}).get("indoor_temperature_target")
+
+    if not NATIVE_TEMPERATURE_API:  # HA < 2026.11: the old names are the surface.
+        current_temperature = native_current_temperature
+        target_temperature = native_target_temperature
 
     @property
     def hvac_action(self) -> HVACAction:
