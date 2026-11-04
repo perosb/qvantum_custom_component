@@ -6,7 +6,7 @@
   },
   "device_automation": {
     "trigger_type": {
-      "defrosting": "{entity_name} zahájil odmrazování",
+      "defrosting": "{entity_name} se zapnul",
       "compressor_blocked": "{entity_name} se zablokoval",
       "freeze_protection_active": "{entity_name} aktivoval ochranu proti zamrznutí",
       "wifi_disconnected": "{entity_name} se odpojil od Wi-Fi",
@@ -18,7 +18,7 @@
       "alarm_active": "{entity_name} začal alarmovat"
     },
     "condition_type": {
-      "is_defrosting": "{entity_name} odmrazuje",
+      "is_defrosting": "{entity_name} je zapnutý",
       "is_compressor_blocked": "{entity_name} je zablokovaný",
       "is_freeze_protection_active": "{entity_name} má aktivní ochranu proti zamrznutí",
       "is_wifi_disconnected": "{entity_name} je odpojený od Wi-Fi",
@@ -180,7 +180,7 @@
         "name": "Požadavek přídavného ohřevu TUV"
       },
       "time_to_defrost": {
-        "name": "Doba odmrazování"
+        "name": "Je třeba odmrazit"
       },
       "heatingreleased": {
         "name": "Topení povoleno"

@@ -6,7 +6,7 @@
   },
   "device_automation": {
     "trigger_type": {
-      "defrosting": "{entity_name} begon met ontdooien",
+      "defrosting": "{entity_name} ging aan",
       "compressor_blocked": "{entity_name} werd geblokkeerd",
       "freeze_protection_active": "{entity_name} activeerde de vorstbeveiliging",
       "wifi_disconnected": "{entity_name} verloor de wifi-verbinding",
@@ -18,7 +18,7 @@
       "alarm_active": "{entity_name} ging in alarm"
     },
     "condition_type": {
-      "is_defrosting": "{entity_name} is aan het ontdooien",
+      "is_defrosting": "{entity_name} staat aan",
       "is_compressor_blocked": "{entity_name} is geblokkeerd",
       "is_freeze_protection_active": "{entity_name} vorstbeveiliging is actief",
       "is_wifi_disconnected": "{entity_name} wifi is verbroken",
@@ -180,7 +180,7 @@
         "name": "Extra DHW vraag"
       },
       "time_to_defrost": {
-        "name": "Tijd om te ontdooien"
+        "name": "Ontdooien nodig"
       },
       "heatingreleased": {
         "name": "Verwarming vrijgegeven"

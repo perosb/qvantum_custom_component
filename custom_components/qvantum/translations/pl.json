@@ -6,7 +6,7 @@
   },
   "device_automation": {
     "trigger_type": {
-      "defrosting": "{entity_name} rozpoczęło odszranianie",
+      "defrosting": "{entity_name} włączono",
       "compressor_blocked": "{entity_name} zostało zablokowane",
       "freeze_protection_active": "{entity_name} aktywowano ochronę przed zamarzaniem",
       "wifi_disconnected": "{entity_name} utraciło połączenie z Wi-Fi",
@@ -18,7 +18,7 @@
       "alarm_active": "{entity_name} zgłosił alarm"
     },
     "condition_type": {
-      "is_defrosting": "{entity_name} odszrania się",
+      "is_defrosting": "{entity_name} jest włączony",
       "is_compressor_blocked": "{entity_name} jest zablokowane",
       "is_freeze_protection_active": "{entity_name} ochrona przed zamarzaniem jest aktywna",
       "is_wifi_disconnected": "{entity_name} jest odłączone od Wi-Fi",
@@ -180,7 +180,7 @@
         "name": "Zapotrzebowanie na dogrzewanie ciepłej wody"
       },
       "time_to_defrost": {
-        "name": "Czas rozmrażania"
+        "name": "Wymagane odszranianie"
       },
       "heatingreleased": {
         "name": "Ogrzewanie dozwolone"

@@ -6,7 +6,7 @@
   },
   "device_automation": {
     "trigger_type": {
-      "defrosting": "{entity_name} begyndte afrimning",
+      "defrosting": "{entity_name} blev tændt",
       "compressor_blocked": "{entity_name} blev blokeret",
       "freeze_protection_active": "{entity_name} aktiverede frostbeskyttelse",
       "wifi_disconnected": "{entity_name} mistede Wi-Fi-forbindelsen",
@@ -18,7 +18,7 @@
       "alarm_active": "{entity_name} gik i alarm"
     },
     "condition_type": {
-      "is_defrosting": "{entity_name} afrimer",
+      "is_defrosting": "{entity_name} er tændt",
       "is_compressor_blocked": "{entity_name} er blokeret",
       "is_freeze_protection_active": "{entity_name} har aktiv frostbeskyttelse",
       "is_wifi_disconnected": "{entity_name} er afbrudt fra Wi-Fi",
@@ -180,7 +180,7 @@
         "name": "Tillægsbehov for varmt vand"
       },
       "time_to_defrost": {
-        "name": "Tid til afrimning"
+        "name": "Afrimning nødvendig"
       },
       "heatingreleased": {
         "name": "Varme tilladt"

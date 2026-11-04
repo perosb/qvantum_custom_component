@@ -6,7 +6,7 @@
   },
   "device_automation": {
     "trigger_type": {
-      "defrosting": "{entity_name} started defrosting",
+      "defrosting": "{entity_name} turned on",
       "compressor_blocked": "{entity_name} became blocked",
       "freeze_protection_active": "{entity_name} freeze protection activated",
       "wifi_disconnected": "{entity_name} Wi-Fi disconnected",
@@ -18,7 +18,7 @@
       "alarm_active": "{entity_name} alarm became active"
     },
     "condition_type": {
-      "is_defrosting": "{entity_name} is defrosting",
+      "is_defrosting": "{entity_name} is on",
       "is_compressor_blocked": "{entity_name} is blocked",
       "is_freeze_protection_active": "{entity_name} freeze protection is active",
       "is_wifi_disconnected": "{entity_name} Wi-Fi is disconnected",
@@ -180,7 +180,7 @@
         "name": "Addition hot water demand"
       },
       "time_to_defrost": {
-        "name": "Time to defrost"
+        "name": "Defrost needed"
       },
       "heatingreleased": {
         "name": "Heating permitted"
