@@ -225,7 +225,7 @@ Rooms → extract air devices → duct → filter HQ1 (G3) → evaporator EP11 �
 - The evaporator can frost at low air temperatures. The firmware has separate defrost states: "Defrost DHW passive", "Defrost heating passive" and "Defrost pool passive". `[R]`
 - `hp_status = 1` means Defrost; compressor states 9/10/13 are the defrost states. `[R]`
 - Normal heating/DHW production pauses during defrost. The exact mechanism (passive use of tank heat, hot gas, reverse cycle) is not documented in the public register guide. `[?]`
-- `Time To Defrost` (input 67) is a flag, not a temperature. `[R]` It is a **request**, not the defrost itself: on 2026-11-03 it pulsed `1` for exactly one 5-minute poll, 13 times, and `hp_status` was `2`/`3` at every one of those polls — never `1` (Defrost). The entity is therefore named "Defrost needed", not "Time to defrost". `[L]`
+- `Time To Defrost` (input 67) is a flag, not a temperature. `[R]` It is a **request**, not the defrost itself. Measured over 2026-10-01 → 11-04 (15 s poll): 24 pulses, each exactly **5 minutes** long (a request window, not one poll), all at outdoor 0.3–5.6 °C. `hp_status` was `2`/`3` at every one of them and `compressor_state` `6`/`8` — **never** `hp_status = 1` and never a defrost compressor state (9/10/13) anywhere in the window. So the flag announces a defrost the pump then performs without reporting it in either status register, or it performs it passively inside a normal cycle. The entity is therefore named "Defrost needed", not "Time to defrost". `[L]`
 
 ### 3.6 Filter
 
