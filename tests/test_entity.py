@@ -7,9 +7,11 @@ import pytest
 from custom_components.qvantum.entity import (
     QvantumAccessMixin,
     QvantumEntity,
+    apply_temperature_unit,
     async_get_qvantum_device_entry,
     cleanup_disabled_entities,
     finalize_platform_setup,
+    has_native_temperature_api,
     resolve_device_id,
 )
 from custom_components.qvantum.const import DOMAIN
@@ -641,3 +643,32 @@ def test_finalize_platform_setup_skips_disable_by_default():
         )
 
     disable.assert_not_called()
+
+
+class _LegacyTemperatureBase:
+    """Stand-in for a HA release without the ``native_*`` surface (< 2026.11)."""
+
+
+class _NativeTemperatureBase:
+    """Stand-in for HA 2026.11, which carries the ``native_*`` surface."""
+
+    native_current_temperature = property(lambda self: None)
+    native_target_temperature = property(lambda self: None)
+
+
+def test_has_native_temperature_api_probes_the_base_class():
+    assert has_native_temperature_api(_NativeTemperatureBase) is True
+    assert has_native_temperature_api(_LegacyTemperatureBase) is False
+
+
+def test_apply_temperature_unit_writes_only_the_surface_ha_reads():
+    """Exactly one attribute: writing both keeps the deprecated one logging."""
+    native = _NativeTemperatureBase()
+    apply_temperature_unit(native, _NativeTemperatureBase, "°C")
+    assert native._attr_native_temperature_unit == "°C"
+    assert not hasattr(native, "_attr_temperature_unit")
+
+    legacy = _LegacyTemperatureBase()
+    apply_temperature_unit(legacy, _LegacyTemperatureBase, "°C")
+    assert legacy._attr_temperature_unit == "°C"
+    assert not hasattr(legacy, "_attr_native_temperature_unit")

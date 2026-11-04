@@ -30,9 +30,16 @@ from .const import (
     ensure_tap_water_start_below_stop,
 )
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
-from .entity import QvantumAccessMixin
+from .entity import (
+    QvantumAccessMixin,
+    apply_temperature_unit,
+    has_native_temperature_api,
+)
 
 _LOGGER = logging.getLogger(__name__)
+
+#: See ``climate.py`` / ``entity.has_native_temperature_api``.
+NATIVE_TEMPERATURE_API = has_native_temperature_api(WaterHeaterEntity)
 
 # Operation modes shown in HA. eco/off use HA standard state strings.
 OPERATION_ECO = STATE_ECO
@@ -84,7 +91,7 @@ class QvantumWaterHeaterEntity(
         super().__init__(coordinator)
         self._hpid = (self.coordinator.data or {}).get("values", {}).get("hpid")
         self._attr_unique_id = f"qvantum_water_heater_{self._hpid}"
-        self._attr_temperature_unit = UnitOfTemperature.CELSIUS
+        apply_temperature_unit(self, WaterHeaterEntity, UnitOfTemperature.CELSIUS)
         self._attr_precision = PRECISION_WHOLE
         self._attr_target_temperature_step = float(TAP_WATER_TEMP_STEP)
         self._attr_min_temp = float(TAP_WATER_TEMP_MIN)
@@ -124,11 +131,12 @@ class QvantumWaterHeaterEntity(
         access themselves so a read-only account can still see temperatures.
         """
         return self._coordinator_available and (
-            self.current_temperature is not None or self.target_temperature is not None
+            self.native_current_temperature is not None
+            or self.native_target_temperature is not None
         )
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Tank temperature — prefer bt30, else best available VV tank temp."""
         values = self._values
         for key in CURRENT_TEMPERATURE_KEYS:
@@ -156,12 +164,16 @@ class QvantumWaterHeaterEntity(
         return float(TAP_WATER_TEMP_MAX)
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """DHW stop temperature (tap_water_stop)."""
         stop = self._values.get("tap_water_stop")
         if stop is None:
             return None
         return float(stop)
+
+    if not NATIVE_TEMPERATURE_API:  # HA < 2026.11: the old names are the surface.
+        current_temperature = native_current_temperature
+        target_temperature = native_target_temperature
 
     @property
     def current_operation(self) -> str | None:

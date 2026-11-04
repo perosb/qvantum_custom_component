@@ -176,6 +176,23 @@ class TestQvantumWaterHeaterEntity:
         entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
         assert entity.target_temperature == 62.0
 
+    def test_temperature_surface_follows_the_installed_ha(
+        self, mock_coordinator, mock_device
+    ):
+        """Same split as the climate entity: ``native_*`` where HA has it."""
+        from custom_components.qvantum.water_heater import NATIVE_TEMPERATURE_API
+
+        entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)
+
+        assert entity.native_current_temperature == 54.5
+        assert entity.native_target_temperature == 62.0
+        if NATIVE_TEMPERATURE_API:
+            assert "current_temperature" not in type(entity).__dict__
+            assert entity._attr_native_temperature_unit == "°C"
+        else:
+            assert entity.current_temperature == entity.native_current_temperature
+            assert entity.target_temperature == entity.native_target_temperature
+
     def test_min_temp_follows_start(self, mock_coordinator, mock_device):
         mock_coordinator.data["values"]["tap_water_start"] = 55
         entity = QvantumWaterHeaterEntity(mock_coordinator, mock_device)

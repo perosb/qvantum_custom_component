@@ -421,6 +421,17 @@ tap-water comfort, solar exposure and the headline efficiency figures
 (COP/SCOP/aux share/health) stay in the main UI. Controls are never diagnostics;
 `alarm_active` is a PROBLEM.
 
+Temperature entities must publish the **`native_*` surface** where the installed
+Home Assistant has it. HA 2026.11 deprecates `current_temperature`,
+`target_temperature` and `_attr_temperature_unit` in favour of
+`native_current_temperature`, `native_target_temperature` and
+`_attr_native_temperature_unit` (removed in 2027.11), and logs a warning per
+entity that still defines the old ones. `climate.py` and `water_heater.py` probe
+the base class once (`NATIVE_TEMPERATURE_API = hasattr(..., "native_current_temperature")`)
+and alias the old names to the native properties **only** on releases that lack
+them, so one code path serves 2026.9–2026.10 and warns on nothing later. Do not
+set both attribute names — the deprecated one is what logs.
+
 Availability: `available` ANDs its data check with `_coordinator_available` (the
 coordinator's `last_update_success`), because HA keeps stale data after a failed
 poll. Availability is not a write guard — write methods call

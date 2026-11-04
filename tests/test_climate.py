@@ -66,6 +66,7 @@ with patch(
                             from homeassistant.helpers.device_registry import DeviceInfo
 
                             from custom_components.qvantum.climate import (
+                                NATIVE_TEMPERATURE_API,
                                 QvantumIndoorClimateEntity,
                             )
                             from custom_components.qvantum.const import (
@@ -179,7 +180,10 @@ class TestQvantumIndoorClimateEntity:
 
         assert entity._hpid == "test_device_123"
         assert entity._attr_unique_id == "qvantum_indoor_climate_test_device_123"
-        assert entity._attr_temperature_unit == "°C"
+        if NATIVE_TEMPERATURE_API:
+            assert entity._attr_native_temperature_unit == "°C"
+        else:
+            assert entity._attr_temperature_unit == "°C"
         assert entity._attr_target_temperature_step == PRECISION_TENTHS
         assert entity._attr_device_info == mock_device
         assert entity._attr_translation_key == "indoor_climate"
@@ -189,6 +193,68 @@ class TestQvantumIndoorClimateEntity:
         """Test getting current temperature."""
         entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
         assert entity.current_temperature == 22.5
+
+    def test_temperature_surface_follows_the_installed_ha(
+        self, mock_coordinator, mock_device
+    ):
+        """HA 2026.11 deprecates the unprefixed names; pick one surface, once.
+
+        On a release that has the ``native_*`` API the entity must not define
+        ``current_temperature``/``target_temperature`` (that is what HA logs the
+        deprecation for); on an older one the ``native_*`` properties are ours
+        alone and the unprefixed names have to be aliased to them.
+        """
+        from custom_components.qvantum.climate import NATIVE_TEMPERATURE_API
+
+        entity = QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+
+        assert entity.native_current_temperature == 22.5
+        assert entity.native_target_temperature == 21.0
+        if NATIVE_TEMPERATURE_API:
+            assert "current_temperature" not in type(entity).__dict__
+            assert "target_temperature" not in type(entity).__dict__
+            assert entity._attr_native_temperature_unit == "°C"
+        else:
+            assert entity.current_temperature == entity.native_current_temperature
+            assert entity.target_temperature == entity.native_target_temperature
+            assert entity._attr_temperature_unit == "°C"
+
+    def test_the_native_surface_is_used_when_ha_provides_it(
+        self, monkeypatch, mock_coordinator, mock_device
+    ):
+        """Simulate HA 2026.11, where the deprecated names are gone.
+
+        The release is not installable here, so the base class is given the
+        ``native_*`` properties and the module re-imported — the choice is made
+        once at import, which is exactly what has to be reproduced.
+        """
+        import importlib
+
+        from homeassistant.components.climate import ClimateEntity
+
+        import custom_components.qvantum.climate as climate_module
+
+        for name in ("native_current_temperature", "native_target_temperature"):
+            monkeypatch.setattr(
+                ClimateEntity, name, property(lambda self: None), raising=False
+            )
+        monkeypatch.setattr(
+            ClimateEntity,
+            "native_temperature_unit",
+            property(lambda self: "°C"),
+            raising=False,
+        )
+        try:
+            reloaded = importlib.reload(climate_module)
+
+            assert reloaded.NATIVE_TEMPERATURE_API is True
+            entity = reloaded.QvantumIndoorClimateEntity(mock_coordinator, mock_device)
+            assert "current_temperature" not in type(entity).__dict__
+            assert entity._attr_native_temperature_unit == "°C"
+            assert entity.native_current_temperature == 22.5
+        finally:
+            monkeypatch.undo()
+            importlib.reload(climate_module)
 
     def test_current_temperature_uses_bt2_for_bt2_mode(
         self, mock_coordinator, mock_device
