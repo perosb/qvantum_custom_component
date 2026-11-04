@@ -22,6 +22,33 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+def has_native_temperature_api(base: type) -> bool:
+    """Whether ``base`` carries Home Assistant's ``native_*`` temperature surface.
+
+    HA 2026.11 renames the temperature surface: ``current_temperature``,
+    ``target_temperature`` and ``_attr_temperature_unit`` become deprecated
+    aliases of ``native_current_temperature`` / ``native_target_temperature`` /
+    ``_attr_native_temperature_unit`` (removed in 2027.11), and every entity that
+    still defines the old ones logs a warning. The native names do not exist on
+    the releases this integration supports, so the choice is made from the base
+    class instead of a version string — a dev build reports ``2026.11.0.dev0``
+    but behaves like whichever checkout it was built from.
+    """
+    return hasattr(base, "native_current_temperature")
+
+
+def apply_temperature_unit(entity: object, base: type, unit: str) -> None:
+    """Set the temperature-unit attribute the installed HA reads.
+
+    Exactly one of the two is written: writing both keeps the deprecated name
+    logging the very warning this exists to avoid.
+    """
+    if has_native_temperature_api(base):
+        entity._attr_native_temperature_unit = unit  # type: ignore[attr-defined]
+    else:
+        entity._attr_temperature_unit = unit  # type: ignore[attr-defined]
+
+
 def _device_value(device: DeviceInfo | dict[str, object], key: str) -> object:
     """Read one device info field, whether it is a mapping or an object.
 

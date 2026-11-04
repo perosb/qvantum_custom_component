@@ -15,7 +15,11 @@ from homeassistant.components.climate.const import HVACMode
 from homeassistant.components.climate.const import HVACAction
 from homeassistant.components.climate.const import ClimateEntityFeature
 
-from .entity import QvantumAccessMixin
+from .entity import (
+    QvantumAccessMixin,
+    apply_temperature_unit,
+    has_native_temperature_api,
+)
 from .coordinator import QvantumDataUpdateCoordinator
 from .coordinator import handle_setting_update_response
 from .const import (
@@ -28,14 +32,9 @@ from . import MyConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
-#: Home Assistant 2026.11 renames the temperature surface: ``current_temperature``,
-#: ``target_temperature`` and ``_attr_temperature_unit`` become deprecated aliases
-#: of ``native_current_temperature`` / ``native_target_temperature`` /
-#: ``_attr_native_temperature_unit`` (removed in 2027.11). The native names do not
-#: exist before that release, so the choice is made once from the base class
-#: instead of from a version string — a dev build reports 2026.11.0.dev0 but
-#: behaves like whichever checkout it was built from.
-NATIVE_TEMPERATURE_API = hasattr(ClimateEntity, "native_current_temperature")
+#: Whether this HA release carries the ``native_*`` temperature surface (2026.11+);
+#: see ``entity.has_native_temperature_api`` for why it is probed, not versioned.
+NATIVE_TEMPERATURE_API = has_native_temperature_api(ClimateEntity)
 
 
 async def async_setup_entry(
@@ -65,10 +64,7 @@ class QvantumIndoorClimateEntity(QvantumAccessMixin, CoordinatorEntity, ClimateE
         super().__init__(coordinator)
         self._hpid = (self.coordinator.data or {}).get("values", {}).get("hpid")
         self._attr_unique_id = f"qvantum_indoor_climate_{self._hpid}"
-        if NATIVE_TEMPERATURE_API:
-            self._attr_native_temperature_unit = UnitOfTemperature.CELSIUS
-        else:
-            self._attr_temperature_unit = UnitOfTemperature.CELSIUS
+        apply_temperature_unit(self, ClimateEntity, UnitOfTemperature.CELSIUS)
         self._attr_target_temperature_step = PRECISION_TENTHS
         self._attr_device_info = device
         self._attr_translation_key = "indoor_climate"
