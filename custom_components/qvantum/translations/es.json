@@ -6,7 +6,7 @@
   },
   "device_automation": {
     "trigger_type": {
-      "defrosting": "{entity_name} comenzó a descongelar",
+      "defrosting": "{entity_name} se activó",
       "compressor_blocked": "{entity_name} quedó bloqueada",
       "freeze_protection_active": "{entity_name} activó la protección antihielo",
       "wifi_disconnected": "{entity_name} se desconectó de la Wi-Fi",
@@ -18,7 +18,7 @@
       "alarm_active": "{entity_name} pasó a alarma"
     },
     "condition_type": {
-      "is_defrosting": "{entity_name} está descongelando",
+      "is_defrosting": "{entity_name} está activado",
       "is_compressor_blocked": "{entity_name} está bloqueada",
       "is_freeze_protection_active": "{entity_name} tiene activa la protección antihielo",
       "is_wifi_disconnected": "{entity_name} está desconectada de la Wi-Fi",
@@ -180,7 +180,7 @@
         "name": "Demanda adicional ACS"
       },
       "time_to_defrost": {
-        "name": "Tiempo de descongelación"
+        "name": "Descongelación necesaria"
       },
       "heatingreleased": {
         "name": "Calefacción permitida"

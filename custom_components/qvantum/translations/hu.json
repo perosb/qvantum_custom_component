@@ -6,7 +6,7 @@
   },
   "device_automation": {
     "trigger_type": {
-      "defrosting": "{entity_name} elkezdte a leolvasztást",
+      "defrosting": "{entity_name} bekapcsolt",
       "compressor_blocked": "{entity_name} blokkolttá vált",
       "freeze_protection_active": "{entity_name} fagyvédelme aktiválódott",
       "wifi_disconnected": "{entity_name} Wi-Fi-kapcsolata megszakadt",
@@ -18,7 +18,7 @@
       "alarm_active": "{entity_name} riasztást adott"
     },
     "condition_type": {
-      "is_defrosting": "{entity_name} leolvasztást végez",
+      "is_defrosting": "{entity_name} be van kapcsolva",
       "is_compressor_blocked": "{entity_name} blokkolva van",
       "is_freeze_protection_active": "{entity_name} fagyvédelme aktív",
       "is_wifi_disconnected": "{entity_name} Wi-Fi-kapcsolata megszakadt",
@@ -180,7 +180,7 @@
         "name": "Rásegítési használati melegvíz igény"
       },
       "time_to_defrost": {
-        "name": "Leolvasztás ideje"
+        "name": "Leolvasztás szükséges"
       },
       "heatingreleased": {
         "name": "Fűtés engedélyezve"

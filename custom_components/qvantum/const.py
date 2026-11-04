@@ -324,7 +324,7 @@ DEFAULT_DISABLED_MODBUS_METRICS = [
     "heating_prioritytimeleft",
     "cooling_prioritytimeleft",
     "degree_minute",
-    "time_to_defrost",  # should be interpreted as binary (defrosting vs not) rather than a continuous time value
+    "time_to_defrost",  # binary flag: the pump requests a defrost (not a countdown, not "defrosting now")
     "heatingreleased",
     "coolingreleased",
     "compressorreleased",
@@ -552,7 +552,7 @@ BINARY_SENSOR_NAMES = [
     "coolingdemand",
     "additiondemand",
     "additiondhwdemand",
-    "time_to_defrost",  # should be interpreted as binary (defrosting vs not) rather than a continuous time value
+    "time_to_defrost",  # binary flag: the pump requests a defrost (not a countdown, not "defrosting now")
     "heatingreleased",
     "coolingreleased",
     "compressorreleased",
