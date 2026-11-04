@@ -6,6 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
+| [2026.11.1](2026.11.1.md) | 2026-11-04 | More reliable solar estimates |
 | [2026.10.22](2026.10.22.md) | 2026-10-31 | More accurate pump readings |
 | [2026.10.20](2026.10.20.md) | 2026-10-25 | Hot-water capacity messages reflect the temperatures the pump uses |
 | [2026.10.18](2026.10.18.md) | 2026-10-25 | Wind data and reliable estimates |
