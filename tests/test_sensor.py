@@ -50,6 +50,9 @@ with patch(
             from homeassistant.helpers.device_registry import DeviceInfo
             from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
+            from custom_components.qvantum.client.modbus.maps import (
+                MODBUS_INPUT_REGISTER_MAP,
+            )
             from custom_components.qvantum.sensor import (
                 QvantumAccessExpireEntity,
                 QvantumBaseSensorEntity,
@@ -220,6 +223,28 @@ class TestQvantumBaseSensorEntity:
         )
         assert entity._attr_native_unit_of_measurement == "l/m"
 
+    def test_curve_offsets_are_kelvin_not_temperatures(
+        self, mock_coordinator, mock_device
+    ):
+        """Input 37/38 are supply-target differences, so kelvin and no device class.
+
+        A negative offset is not a temperature; giving them the TEMPERATURE
+        device class would offer a unit conversion that has no meaning.
+        """
+        for key in ("curve_offset_total", "cooling_offset_total"):
+            entity = QvantumBaseSensorEntity(mock_coordinator, key, mock_device, True)
+            assert entity._attr_native_unit_of_measurement == UnitOfTemperature.KELVIN
+            assert entity._attr_state_class == SensorStateClass.MEASUREMENT
+            assert entity._attr_suggested_display_precision == 1
+            assert getattr(entity, "_attr_device_class", None) is None
+
+    @pytest.mark.parametrize(
+        ("key", "address"), (("curve_offset_total", 37), ("cooling_offset_total", 38))
+    )
+    def test_curve_offset_registers_decode_signed(self, key, address):
+        """A negative offset arrives as two's complement, not as 65511 C."""
+        assert MODBUS_INPUT_REGISTER_MAP[key] == (address, "int16", 0.1)
+
     def test_degree_minute_unit_assignment(self, mock_coordinator, mock_device):
         """Test degree minute unit assignment."""
         entity = QvantumBaseSensorEntity(
@@ -291,6 +316,10 @@ class TestQvantumBaseSensorEntity:
             "degree_minute",
             "price_region",
             "start_cooling_temp",
+            "room_temp_filtered",
+            "cooling_supply_temp_calc",
+            "curve_offset_total",
+            "cooling_offset_total",
         ),
     )
     def test_machine_internal_sensors_are_diagnostic(

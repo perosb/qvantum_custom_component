@@ -751,6 +751,18 @@
       },
       "ep11_compressor_rpm": {
         "name": "EP11 compressorsnelheid"
+      },
+      "room_temp_filtered": {
+        "name": "Gefilterde ruimtetemperatuur"
+      },
+      "cooling_supply_temp_calc": {
+        "name": "Berekende aanvoertemperatuur koeling"
+      },
+      "curve_offset_total": {
+        "name": "Totale offset stooklijn"
+      },
+      "cooling_offset_total": {
+        "name": "Totale offset koelcurve"
       }
     },
     "number": {

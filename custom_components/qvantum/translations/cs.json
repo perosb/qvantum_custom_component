@@ -751,6 +751,18 @@
       },
       "ep11_compressor_rpm": {
         "name": "EP11 rychlost kompresoru"
+      },
+      "room_temp_filtered": {
+        "name": "Filtrovaná teplota místnosti"
+      },
+      "cooling_supply_temp_calc": {
+        "name": "Vypočtená teplota přívodu chlazení"
+      },
+      "curve_offset_total": {
+        "name": "Celkový posun topné křivky"
+      },
+      "cooling_offset_total": {
+        "name": "Celkový posun chladicí křivky"
       }
     },
     "number": {

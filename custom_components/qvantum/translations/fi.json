@@ -751,6 +751,18 @@
       },
       "ep11_compressor_rpm": {
         "name": "EP11 kompressorin nopeus"
+      },
+      "room_temp_filtered": {
+        "name": "Suodatettu huonelämpötila"
+      },
+      "cooling_supply_temp_calc": {
+        "name": "Laskettu jäähdytyksen menolämpötila"
+      },
+      "curve_offset_total": {
+        "name": "Lämmityskäyrän kokonaispoikkeama"
+      },
+      "cooling_offset_total": {
+        "name": "Jäähdytyskäyrän kokonaispoikkeama"
       }
     },
     "number": {

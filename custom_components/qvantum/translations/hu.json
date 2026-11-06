@@ -751,6 +751,18 @@
       },
       "ep11_compressor_rpm": {
         "name": "EP11 kompresszor fordulatszám"
+      },
+      "room_temp_filtered": {
+        "name": "Szűrt szobahőmérséklet"
+      },
+      "cooling_supply_temp_calc": {
+        "name": "Számított hűtési előremenő hőmérséklet"
+      },
+      "curve_offset_total": {
+        "name": "Fűtési görbe teljes eltolása"
+      },
+      "cooling_offset_total": {
+        "name": "Hűtési görbe teljes eltolása"
       }
     },
     "number": {

@@ -10,6 +10,11 @@ the stack already consumes.
 MODBUS_INPUT_REGISTER_MAP = {
     "bt1": (0, "int16", 0.1),
     "bt2": (2, "int16", 0.1),
+    # BT2 after the firmware's room-temperature filter (input 3). Read on a
+    # QE-6 2026-11-06: bt2 21.4 vs 20.7 here, i.e. the same signal with the
+    # filter's lag. Kept apart from bt2 so the curve's indoor series does not
+    # change meaning.
+    "room_temp_filtered": (3, "int16", 0.1),
     "bt4": (4, "int16", 0.1),
     "bt10": (5, "int16", 0.1),
     "bt11": (6, "int16", 0.1),
@@ -41,6 +46,14 @@ MODBUS_INPUT_REGISTER_MAP = {
     "relays_bitmask": (33, "uint16", 1.0),
     "degree_minute": (34, "int16", 0.1),
     "cal_heat_temp": (35, "int16", 0.1),
+    "cooling_supply_temp_calc": (36, "int16", 0.1),
+    # The pump's own sum of the curve terms, i.e. how far it has moved the
+    # supply target away from the seven-point table. Read on a QE-6 2026-11-06:
+    # 37 = -2.5 while cal_heat_temp 33.6 and the table gave 36.2 at BT1 0.9 C,
+    # a difference of -2.6. That makes it a direct cross-check for the adaptive
+    # curve, which otherwise infers the same offset from cal_heat_temp.
+    "curve_offset_total": (37, "int16", 0.1),
+    "cooling_offset_total": (38, "int16", 0.1),
     "unit_state": (40, "uint16", 1.0),
     "hp_status": (41, "uint16", 1.0),
     "heatingreleased": (42, "uint16", 1.0),

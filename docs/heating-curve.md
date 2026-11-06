@@ -23,9 +23,25 @@ Related, but not the Auto curve itself:
 - Holdings 19 / 20 — max / min heating supply (°C)
 - Holding 18 — outdoor temperature stop heating (°C)
 - Input 35 — calculated supply temp heating (`cal_heat_temp`)
+- Input 37 — total heating curve offset (`curve_offset_total`), input 38 —
+  total cooling curve offset (`cooling_offset_total`). **The pump's own sum of
+  the curve terms**: `cal_heat_temp − table(BT1)`. Read on a QE-6 2026-11-06:
+  BT1 0.9 °C gives 36.2 from the seven-point table, `cal_heat_temp` was 33.6 and
+  input 37 read −2.5 — the same offset, straight from the pump. That makes it a
+  cross-check for the adaptive curve, which otherwise infers the offset from
+  `cal_heat_temp` alone. Both are diagnostic sensors, in kelvin, enabled by
+  default (they sit inside the 0–104 block the client already reads, so they
+  cost no extra Modbus traffic).
+- Input 36 — calculated supply temp cooling (`cooling_supply_temp_calc`)
+- Input 3 — BT2 after the firmware's room filter (`room_temp_filtered`), which
+  lags `bt2` (20.7 against 21.4 on the same poll). Kept as its own key so the
+  curve's indoor series does not change meaning.
 
 Holdings **16, 17, 21** (gaps next to the curve block) always read **0**.
-They are not DUT or supply-at-DUT.
+They are not DUT or supply-at-DUT. Holding 67 reads the live pump speed (70 on
+the same dump, equal to holding 63) and holding 54/55 hold an **undocumented**
+DHW start/stop pair (51/57) one kelvin below the Normal pair (56/57 = 52/58);
+neither is mapped.
 
 ## Two UIs, two runtimes
 
