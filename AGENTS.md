@@ -95,7 +95,9 @@ Four things every DHW metric depends on:
   in Modbus mode. Never integrate it for energy — `dhwenergy` is the energy.
 - The immersion heater (EB1, 5 kW as 1+2+2) heats tank water, not the tap; its
   DHW energy is attributed by `additiondhwdemand`, and `hp_status` follows the
-  compressor, so element-only DHW can read `Idle`.
+  compressor, so element-only DHW can read `Idle`. The one exception is a
+  defrost, where the compressor stops but `hp_status` keeps the previous mode:
+  the input-67 flag is the only defrost signal (`docs/qe-architecture.md` §3.5).
 - BT30 is **one point in the stratified tank**, BT31 is the DHW primary inlet at
   EP31, BT33/BT34 are cold/hot tap water, and BT14/BT15 are **air** in/out of the
   evaporator (the manual's "BT14 heating-medium return" label contradicts the

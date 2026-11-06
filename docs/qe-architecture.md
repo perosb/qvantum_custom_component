@@ -223,9 +223,10 @@ Rooms → extract air devices → duct → filter HQ1 (G3) → evaporator EP11 �
 ### 3.5 Frost and defrost
 
 - The evaporator can frost at low air temperatures. The firmware has separate defrost states: "Defrost DHW passive", "Defrost heating passive" and "Defrost pool passive". `[R]`
-- `hp_status = 1` means Defrost; compressor states 9/10/13 are the defrost states. `[R]`
-- Normal heating/DHW production pauses during defrost. The exact mechanism (passive use of tank heat, hot gas, reverse cycle) is not documented in the public register guide. `[?]`
-- `Time To Defrost` (input 67) is a flag, not a temperature. `[R]` It is a **request**, not the defrost itself. Measured over 2026-10-01 → 11-04 (15 s poll): 24 pulses, each exactly **5 minutes** long (a request window, not one poll), all at outdoor 0.3–5.6 °C. `hp_status` was `2`/`3` at every one of them and `compressor_state` `6`/`8` — **never** `hp_status = 1` and never a defrost compressor state (9/10/13) anywhere in the window. So the flag announces a defrost the pump then performs without reporting it in either status register, or it performs it passively inside a normal cycle. The entity is therefore named "Defrost needed", not "Time to defrost". `[L]`
+- **The mechanism is passive off-cycle defrost, not a reverse cycle.** Measured on 2026-11-06 06:40:29 → 06:45:29, outdoor −2.4 °C, heating mode: `Time To Defrost` (input 67) came on and the compressor wound down 2600 → 2355 → 1653 → **0 rpm** in 30 s, stood still for 4.5 min, then restarted (1098 → 1848 → 2548 rpm). During the stop the evaporator warmed while the heating water cooled: BT22 −1.6 → +7.7 °C, BT15 (air out) −5.5 → +8.7 °C, BT11 (flow line) 39.0 → 32.2 °C, BT30 (tank point) only 57.1 → 56.4 °C, BT14 (exhaust air from the house) 20.4 → 21.0 °C. No extra energy is added: the heat comes from heating water circulated through the evaporator. `[L]`
+- `Time To Defrost` (input 67) is a flag, not a temperature. `[R]` It is a **request** and it *is* the defrost window: measured over 2026-10-01 → 11-04 (15 s poll) it pulsed 24 times, each exactly **5 minutes** long, all at outdoor 0.3–5.6 °C, and the live 2026-11-06 event fell inside its window to the second. The entity is therefore named "Defrost needed", not "Time to defrost". `[L]`
+- **`hp_status = 1` and compressor states 9/10/13 are never reported on the QE-6.** `[R]` describes them, but 274 samples over 2026-10-01 → 11-04 and the live defrost both stayed at `hp_status` `3` / `compressor_state` `6` — unchanged for over two hours before the defrost started, and unchanged through it, while the compressor stood still. The flag is the **only** observable defrost signal, so a `hp_status = 1` automation will never fire on this product line. `[L]`
+- The valve positions during the stop are still not documented. `[?]`
 
 ### 3.6 Filter
 
@@ -331,9 +332,11 @@ the heating circuit through QN8, or the tap through GP2/EP31. `[M]`
   L1/L2/L3 as 2+2+1 kW. `[M][I]`
 - **Parallel operation:** it can run alongside the compressor, e.g. charge the
   tank while the compressor heats the house, or top up DHW after a draw. `[I]`
-- **Only source:** with the compressor off or defrosting, the immersion heater
-  can be the only heat source. `hp_status` then follows the compressor and can
-  read `Idle` (0), so use `additiondemand`/`additiondhwdemand` instead. `[I]`
+- **Only source:** with the compressor off, the immersion heater can be the
+  only heat source. `hp_status` then follows the compressor and can read `Idle`
+  (0), so use `additiondemand`/`additiondhwdemand` instead. During a **defrost**
+  the compressor is also stopped, but `hp_status` keeps the previous mode rather
+  than reading `Idle` — there the input-67 flag is the signal (§3.5). `[I]`
 - **DHW:** `additiondhwdemand` (input 53, scale 0.1) is its own DHW flag;
   `additiondemand` (input 52) is the general flag. Extra DHW can activate it. `[R][M]`
 - **Energy:** `additionalenergy` (input 97/98) meters its electrical energy.
@@ -663,7 +666,7 @@ Each step can lose information:
 | "`cop_dhw` is the instantaneous COP of the draw." | It is a charge-segment COP with a tank balance. | Misused as a shower performance figure. |
 | "Lifetime counters give a lifetime COP." | They mix seasons, commissioning and additional heat; use the 30-day SCOP. | Wrong conclusion about pump performance. |
 | "Cooling uses the DHW plate heat exchanger." | Cooling uses the heating system and the four-way valve. | Wrong hydraulic circuit. |
-| "Defrost is always a reversed refrigerant circuit." | The firmware has passive defrost states; the mechanism is not publicly documented. | Do not infer valve positions. |
+| "Defrost is always a reversed refrigerant circuit." | On the QE-6 it is a passive off-cycle defrost: the compressor stops and the evaporator is melted by circulated heating water (BT11 −6.8 K while BT22 +9.3 K). Valve positions are still not documented. | Do not infer valve positions, and do not look for `hp_status = 1`. |
 | "The QE is an air-to-water heat pump with an outdoor unit." | It is an exhaust-air heat pump with indoor units. | Wrong product category and installation. |
 | "The tank can be used for a legionella cycle." | There is no stored potable-water volume; DHW is through-flow. | A legionella cycle does not apply to the DHW side. |
 | "`compressor_power` is heating output." | It is electrical input. | COP is wrong if the two are mixed. |
@@ -700,7 +703,7 @@ Each step can lose information:
 - **BT14/BT15:** The manual and the Modbus guide label them differently. The live values and the integration names support air in/out, but verify on the specific unit before using BT14 as a heating-water return. `[?]`
 - **BT30's exact height in the tank:** It affects how representative it is of the tank mean and how `cop_dhw`/`dhw_tank_liters` should be read. `[?]`
 - **GP2 scale:** The datasheet says scale 1, but the firmware reports tenths of a percent; the integration scales by 0.1. Check which version is active before reading GP2 as a percentage. `[R][I]`
-- **Defrost mechanism:** Passive states exist, but the exact valve positions/heat source are not documented. `[?]`
+- **Defrost mechanism:** The heat source is measured (circulated heating water, compressor stopped — §3.5), but the valve positions during the stop are not documented. `[?]`
 - **Cooling capacity and limits:** The product leaflet mentions cooling, but detailed cooling curves and capacity are missing from the register guide. `[?]`
 - **"Temperatur ut" (Normal/+ /++):** It affects the tap-water temperature but is not a Modbus register; the control path is outside the public map. `[I]`
 - **Smart DHW:** A cloud function; local Modbus registers show status, but the full decision logic is not documented. `[R]`
@@ -768,5 +771,5 @@ Each step can lose information:
 | Is capacity level 1–7 litres? | No; it is a start/stop pair. |
 | Does the immersion heater heat tap water? | No; it heats the tank/heating water, and EP31 transfers heat to the tap. |
 | Is `cop_dhw` the draw COP? | No; it is a charge-segment COP with a tank balance. |
-| Is defrost reversed cooling? | Not documented; passive defrost states exist. |
+| Is defrost reversed cooling? | No. The compressor stops and circulated heating water melts the evaporator (passive off-cycle defrost). |
 | Can the QE cool? | Yes, through the heating system with dew-point protection; not through the DHW heat exchanger. |
