@@ -332,9 +332,11 @@ the heating circuit through QN8, or the tap through GP2/EP31. `[M]`
   L1/L2/L3 as 2+2+1 kW. `[M][I]`
 - **Parallel operation:** it can run alongside the compressor, e.g. charge the
   tank while the compressor heats the house, or top up DHW after a draw. `[I]`
-- **Only source:** with the compressor off or defrosting, the immersion heater
-  can be the only heat source. `hp_status` then follows the compressor and can
-  read `Idle` (0), so use `additiondemand`/`additiondhwdemand` instead. `[I]`
+- **Only source:** with the compressor off, the immersion heater can be the
+  only heat source. `hp_status` then follows the compressor and can read `Idle`
+  (0), so use `additiondemand`/`additiondhwdemand` instead. During a **defrost**
+  the compressor is also stopped, but `hp_status` keeps the previous mode rather
+  than reading `Idle` — there the input-67 flag is the signal (§3.5). `[I]`
 - **DHW:** `additiondhwdemand` (input 53, scale 0.1) is its own DHW flag;
   `additiondemand` (input 52) is the general flag. Extra DHW can activate it. `[R][M]`
 - **Energy:** `additionalenergy` (input 97/98) meters its electrical energy.

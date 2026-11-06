@@ -72,7 +72,7 @@ This is why a 12–20 kW draw can last only minutes before the tank cools.
 
 - **5 kW total**, split as **1+2+2 kW**, switched in 1–5 kW steps.
 - It heats the **buffer tank/heating water**, not the tap water directly.
-- It can run **in parallel with the compressor** and can be the **only heat source** when the compressor is off or defrosting. `hp_status` then reports `Idle`.
+- It can run **in parallel with the compressor** and can be the **only heat source** when the compressor is off. `hp_status` then reports `Idle`. A **defrost** also stops the compressor, but `hp_status` keeps the previous mode — the input-67 flag is the signal.
 - `additiondhwdemand` is its DHW flag; `additionalenergy` meters its electrical energy. Element-only DHW is capped at COP 1.0.
 - Maximum tank temperature **90 °C** with the immersion heater; the safety temperature limiter trips at **95 °C**.
 
