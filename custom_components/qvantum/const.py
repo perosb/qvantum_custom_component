@@ -204,6 +204,11 @@ DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "cooling_supply_temp_calc",
     "curve_offset_total",
     "cooling_offset_total",
+    # Input 173/174 as a char[4]: the bidding zone the pump price-optimises
+    # against ("se3"). The only local source — the cloud key of the same name
+    # is HTTP-only. Input 165, which the register guide labels "Electricity
+    # price region", read 0 with both SE3 and SE4.
+    "price_region",
     "picpin_relay_pump",
     "freeze_protection_active",
     "compressor_blocked",

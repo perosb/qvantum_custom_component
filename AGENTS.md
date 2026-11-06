@@ -147,7 +147,9 @@ present in the payload, so absent registers degrade to no entity.
   failures to `TransportError`; holding writes are validated for signedness and
   the datasheet MIN/MAX (`MODBUS_HOLDING_RANGE`, `client/modbus/model.py`)
   before encoding. Never invent registers or ranges — `client/modbus/maps.py` is
-  the datasheet.
+  the datasheet. A register-map tuple is `(address, data_type, scale)`; the
+  `"string"` data type carries the **register count** in the scale slot
+  (`price_region`: `(173, "string", 2)` for the char[4] bidding zone).
 - The datasheet is followed **until a measurement contradicts it**, and then the
   measurement wins with its numbers in the map. Input 29 (`gp2_speed`, the DHW
   pump, which on this FLVP product line pumps tank water through the through-flow
