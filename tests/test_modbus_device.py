@@ -6,6 +6,7 @@ from modbus_connection.mock import MockModbusConnection
 
 from custom_components.qvantum.const import (
     BINARY_SENSOR_NAMES,
+    DEFAULT_ENABLED_MODBUS_METRICS,
     MODBUS_ONLY_BINARY_SENSORS,
     REQUIRED_MODBUS_METRICS,
 )
@@ -51,6 +52,10 @@ class TestRegisterMapAlignment:
                 continue
             field = QvantumInputs.declared_fields[name]
             assert field.address == address
+            if data_type == "string":
+                # The scale slot carries the register count for a string field.
+                assert field.count == scale
+                continue
             assert field.signed is (data_type == "int16")
             assert (field.scale or 1.0) == scale
 
@@ -108,6 +113,36 @@ class TestRegisterMapAlignment:
         assert field.address == address
         assert field.signed is True
         assert field.scale == 0.1
+
+    def test_price_region_is_the_bidding_zone_string(self):
+        """Input 173/174 is a char[4] holding the bidding zone.
+
+        Read on a QE-6 2026-11-06: 29541/13056 = b"se3\\0". Switching the pump
+        to SE4 changed only the second word, 13056 -> 13312 = b"4\\0", so the
+        field is the region and nothing else. Input 165, which QSG EN 2613-A
+        labels "Electricity price region", read 0 with both regions.
+        """
+        assert MODBUS_INPUT_REGISTER_MAP["price_region"] == (173, "string", 2)
+        field = QvantumInputs.declared_fields["price_region"]
+        assert field.address == 173
+        assert field.count == 2
+        assert "price_region" in DEFAULT_ENABLED_MODBUS_METRICS
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("second_word", "expected"),
+        ((13056, "se3"), (13312, "se4")),
+    )
+    async def test_price_region_decodes_the_zone(self, second_word, expected):
+        """The two register words decode to the zone the pump optimises against."""
+        _, unit, device = _device()
+        unit.input[173] = 29541  # b"se"
+        unit.input[174] = second_word  # b"3\\0" or b"4\\0"
+
+        await device.async_update_inputs()
+
+        assert device.inputs.price_region == expected
+        assert component_values(device.inputs)["price_region"] == expected
 
     def test_alarm_register_addresses(self):
         expected = {

@@ -558,6 +558,9 @@ This explains why a 12–20 kW draw can last only minutes before the tank cools,
 ### 8.4 Other functions
 
 - **Smart DHW:** cloud-based control that can raise/lower the tank temperature according to electricity price; statuses are Unavailable/Standby/Raising/Lowering/Lowering long term/Paused. `[R]`
+- **Bidding zone:** inputs **173–174** hold the electricity price region as a **char[4]**, big-endian, NUL-padded — a string, not a number. Read on a QE-6 2026-11-06: `29541/13056` = `b"se3\0"`. Switching the pump's region to SE4 changed **only** the second word, `13056 → 13312` = `b"4\0"`, so the field is the bidding zone and nothing else. `[L]`
+- **Input 165 is not the bidding zone**, despite QSG EN 2613-A labelling it "Electricity price region": it read `0` with both SE3 and SE4. The guide points at the wrong register; the integration reads 173/174 (`price_region`) and leaves 165 unmapped. `[L]`
+- Inputs 171, 172 and 175–179 read `0` on the same dump; nothing there is mapped. `[L]`
 - **SG Ready:** external tariff signals can block/encourage heating and DHW (inputs 157–159, holding 88). `[R]`
 - **Vacation mode:** lowers indoor temperature and DHW production. `[R]`
 - **Manual mode:** operation_mode 0 Auto, 1 Manual, 2 Addition only; manual permissions for heating/cooling/addition/DHW. `[R]`
@@ -707,7 +710,7 @@ Each step can lose information:
 - **Defrost mechanism:** The heat source is measured (circulated heating water, compressor stopped — §3.5), but the valve positions during the stop are not documented. `[?]`
 - **Cooling capacity and limits:** The product leaflet mentions cooling, but detailed cooling curves and capacity are missing from the register guide. `[?]`
 - **"Temperatur ut" (Normal/+ /++):** It affects the tap-water temperature but is not a Modbus register; the control path is outside the public map. `[I]`
-- **Smart DHW:** A cloud function; local Modbus registers show status, but the full decision logic is not documented. `[R]`
+- **Smart DHW:** A cloud function; local Modbus registers show status, but the full decision logic is not documented. `[R]` The bidding zone is local (input 173/174), so which region the pump optimises against *is* readable. `[L]`
 - **Pool states:** They exist in the shared firmware map but are not part of normal QE residential operation. `[R]`
 
 ---

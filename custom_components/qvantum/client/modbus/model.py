@@ -7,7 +7,7 @@ Relay bits replace the ``relays_bitmask`` word rather than duplicating it.
 
 from __future__ import annotations
 
-from modbus_connection.model import Component, bit, gauge, integer
+from modbus_connection.model import Component, bit, gauge, integer, string
 
 from .maps import (
     MODBUS_COMPRESSOR_UNIT_REGISTER_MAP,
@@ -64,6 +64,11 @@ def _write_validator(
     return _validate
 
 
+#: Data types a register-map tuple may carry. ``string`` reuses the scale slot
+#: as the register count: a char[4] field is ``(address, "string", 2)``.
+STRING_DATA_TYPE = "string"
+
+
 def _register_field(
     data_type: str,
     address: int,
@@ -72,7 +77,12 @@ def _register_field(
     writable: bool = False,
     value_range: tuple[float, float] | None = None,
 ):
-    """Return a gauge or integer field matching a register-map tuple."""
+    """Return a field matching a register-map tuple."""
+    if data_type == STRING_DATA_TYPE:
+        # Fixed-length null-padded ASCII over ``scale`` registers. The pump
+        # puts the bidding zone at input 173/174: 29541/13056 = b"se3\0",
+        # confirmed by switching the region to SE4 (13312 = b"4\0").
+        return string(address, int(scale), writable=writable)
     signed = data_type == "int16"
     write_arg = (
         _write_validator(signed, scale, value_range) if writable else False
@@ -123,9 +133,9 @@ QvantumInputs = _component_from_map(
         for name, index in RELAY_BIT_MAP.items()
     },
     # Live probe: 0-104 answers; QGM1/QGM2 inputs 119-146 raise 0x04;
-    # 150-170 answers (alarms 150-155, smart/wifi/cloud/vacation 161-170).
-    # Price registers 165-166 are unread.
-    register_ranges=((0, 104), (150, 170)),
+    # 150-174 answers (alarms 150-155, smart/wifi/cloud/vacation 161-170,
+    # bidding zone 173-174). Price registers 165-166 are still unread.
+    register_ranges=((0, 104), (150, 175)),
 )
 
 QvantumCompressorUnits = _component_from_map(

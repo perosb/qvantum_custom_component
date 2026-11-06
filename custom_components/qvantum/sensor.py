@@ -136,6 +136,7 @@ _DIAGNOSTIC_SENSORS = frozenset(
         "curve_offset_total",
         "cooling_offset_total",
         "room_temp_filtered",
+        "price_region",
         "calc_suppy_cpr",
         "guide_des_temp",
         "guide_he",

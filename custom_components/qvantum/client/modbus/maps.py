@@ -107,6 +107,14 @@ MODBUS_INPUT_REGISTER_MAP = {
     "wifi_connected": (168, "uint16", 1.0),
     "cloud_connected": (169, "uint16", 1.0),
     "vacation_mode": (170, "uint16", 1.0),
+    # Electricity price region as a char[4]; for a string field the scale slot
+    # carries the register count. Read on a QE-6 2026-11-06: 173/174 =
+    # 29541/13056 = b"se3\0". Switching the pump's region to SE4 changed only
+    # the second word, 13056 -> 13312 = b"4\0", so the field is the bidding
+    # zone and nothing else. Input 165 is labelled "Electricity price region"
+    # in QSG EN 2613-A but read 0 with both SE3 and SE4: the guide points at
+    # the wrong register, so 165 stays unmapped.
+    "price_region": (173, "string", 2),
 }
 
 # Device identity (QSG EN 2613-A input 180-193). Kept off the metrics map so

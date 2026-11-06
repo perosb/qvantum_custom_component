@@ -56,6 +56,11 @@ def component_values(component) -> dict[str, Any]:
         if isinstance(value, bool):
             data[name] = int(value)
             continue
+        if isinstance(value, str):
+            # String fields (the bidding zone, input 173/174) are already the
+            # value; coercing them with int() raises on "se3".
+            data[name] = value
+            continue
         scale = getattr(field, "scale", 1.0) or 1.0
         if scale == 1.0:
             data[name] = int(value)
