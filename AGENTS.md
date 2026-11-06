@@ -94,10 +94,13 @@ Four things every DHW metric depends on:
 - `dhwpower` is the **instantaneous** draw power `4.186/60 · BF1 · (BT34 − BT33)`
   in Modbus mode. Never integrate it for energy — `dhwenergy` is the energy.
 - The immersion heater (EB1, 5 kW as 1+2+2) heats tank water, not the tap; its
-  DHW energy is attributed by `additiondhwdemand`, and `hp_status` follows the
-  compressor, so element-only DHW can read `Idle`. The one exception is a
-  defrost, where the compressor stops but `hp_status` keeps the previous mode:
-  the input-67 flag is the only defrost signal (`docs/qe-architecture.md` §3.5).
+  DHW energy is attributed by `additiondhwdemand`, and element-only DHW can read
+  `Idle` because the coordinator rewrites a `hp_status` of `0` from
+  `compressor_state`. That rewrite means the `hp_status` **entity is derived, not
+  the register** — the pump reports input 41 as `0` while it heats. Never cite
+  the entity state as a register reading, and never treat `hp_status = 1` as a
+  defrost signal: the input-67 flag is the only one
+  (`docs/qe-architecture.md` §3.5).
 - BT30 is **one point in the stratified tank**, BT31 is the DHW primary inlet at
   EP31, BT33/BT34 are cold/hot tap water, and BT14/BT15 are **air** in/out of the
   evaporator (the manual's "BT14 heating-medium return" label contradicts the
