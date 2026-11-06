@@ -86,6 +86,29 @@ class TestRegisterMapAlignment:
             assert field.address == bitmask_address
             assert field.start == index
 
+    @pytest.mark.parametrize(
+        ("name", "address"),
+        (
+            ("room_temp_filtered", 3),
+            ("cooling_supply_temp_calc", 36),
+            ("curve_offset_total", 37),
+            ("cooling_offset_total", 38),
+        ),
+    )
+    def test_curve_and_filtered_room_registers(self, name, address):
+        """Input 3, 36, 37 and 38 are S16 tenths inside the block already read.
+
+        They cost no extra traffic (max_gap 16 keeps them in the 0-104 block),
+        and 37/38 are the pump's own sum of the curve terms: read on a QE-6
+        2026-11-06, 37 = -2.5 while cal_heat_temp 33.6 and the seven-point table
+        gave 36.2 at BT1 0.9 C.
+        """
+        assert MODBUS_INPUT_REGISTER_MAP[name] == (address, "int16", 0.1)
+        field = QvantumInputs.declared_fields[name]
+        assert field.address == address
+        assert field.signed is True
+        assert field.scale == 0.1
+
     def test_alarm_register_addresses(self):
         expected = {
             "active_alarms": 150,

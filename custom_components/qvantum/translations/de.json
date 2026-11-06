@@ -751,6 +751,18 @@
       },
       "ep11_compressor_rpm": {
         "name": "EP11 Kompressordrehzahl"
+      },
+      "room_temp_filtered": {
+        "name": "Gefilterte Raumtemperatur"
+      },
+      "cooling_supply_temp_calc": {
+        "name": "Berechnete Vorlauftemperatur Kühlung"
+      },
+      "curve_offset_total": {
+        "name": "Gesamtversatz Heizkurve"
+      },
+      "cooling_offset_total": {
+        "name": "Gesamtversatz Kühlkurve"
       }
     },
     "number": {

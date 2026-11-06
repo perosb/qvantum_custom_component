@@ -196,6 +196,14 @@ DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     "tap_water_minutes",  # Minutes of hot water remaining; companion to tap_water_cap
     "smart_dhw_control_status",
     "compressor_state",
+    # Input 3, 36, 37 and 38 sit inside the 0-104 block the client already
+    # reads (max_gap 16), so they cost no extra Modbus traffic. curve_offset_total
+    # is the pump's own sum of the curve terms and cross-checks what the
+    # adaptive curve infers from cal_heat_temp.
+    "room_temp_filtered",
+    "cooling_supply_temp_calc",
+    "curve_offset_total",
+    "cooling_offset_total",
     "picpin_relay_pump",
     "freeze_protection_active",
     "compressor_blocked",

@@ -57,6 +57,11 @@ _LOGGER = logging.getLogger(__name__)
 _ALARM_CODE_SENSORS = frozenset(
     {f"alarm_{index}_code" for index in range(1, 6)}
 )
+# Supply-target offsets from the pump's own curve arithmetic (input 37/38).
+# They are temperature *differences*, so the entity carries kelvin and no
+# temperature device class.
+_OFFSET_KELVIN_SENSORS = frozenset({"curve_offset_total", "cooling_offset_total"})
+
 #: Machine-internal telemetry and settings read-backs belong under
 #: Diagnostics. Primary temperatures (outdoor/indoor/tank/flow), the energy
 #: counters, the tap-water comfort figures and the derived COP/efficiency
@@ -125,6 +130,12 @@ _DIAGNOSTIC_SENSORS = frozenset(
         "heating_prioritytimeleft",
         "cooling_prioritytimeleft",
         "degree_minute",
+        # Input 36-38 and 3: the pump's own curve arithmetic and its filtered
+        # room reading. Machine-internal, so diagnostics.
+        "cooling_supply_temp_calc",
+        "curve_offset_total",
+        "cooling_offset_total",
+        "room_temp_filtered",
         "calc_suppy_cpr",
         "guide_des_temp",
         "guide_he",
@@ -643,6 +654,12 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
         elif "degree_minute" == metric_key:
             self._attr_native_unit_of_measurement = "°min"
             self._attr_state_class = SensorStateClass.MEASUREMENT
+        elif metric_key in _OFFSET_KELVIN_SENSORS:
+            # A difference between two supply targets, so kelvin and no
+            # temperature device class: a negative offset is not a temperature.
+            self._attr_native_unit_of_measurement = UnitOfTemperature.KELVIN
+            self._attr_state_class = SensorStateClass.MEASUREMENT
+            self._attr_suggested_display_precision = 1
         if metric_key in _TOTAL_INCREASING_SENSORS:
             self._attr_state_class = SensorStateClass.TOTAL_INCREASING
 

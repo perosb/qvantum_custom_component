@@ -751,6 +751,18 @@
       },
       "ep11_compressor_rpm": {
         "name": "EP11 vitesse du compresseur"
+      },
+      "room_temp_filtered": {
+        "name": "Température ambiante filtrée"
+      },
+      "cooling_supply_temp_calc": {
+        "name": "Température de départ froid calculée"
+      },
+      "curve_offset_total": {
+        "name": "Décalage total de la courbe de chauffage"
+      },
+      "cooling_offset_total": {
+        "name": "Décalage total de la courbe de refroidissement"
       }
     },
     "number": {

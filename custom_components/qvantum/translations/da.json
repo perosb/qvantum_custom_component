@@ -751,6 +751,18 @@
       },
       "ep11_compressor_rpm": {
         "name": "EP11 kompressorhastighed"
+      },
+      "room_temp_filtered": {
+        "name": "Filtreret rumtemperatur"
+      },
+      "cooling_supply_temp_calc": {
+        "name": "Beregnet fremløbstemperatur køling"
+      },
+      "curve_offset_total": {
+        "name": "Samlet varmekurveoffset"
+      },
+      "cooling_offset_total": {
+        "name": "Samlet kølekurveoffset"
       }
     },
     "number": {

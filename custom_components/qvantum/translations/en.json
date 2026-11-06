@@ -751,6 +751,18 @@
       },
       "ep11_compressor_rpm": {
         "name": "EP11 compressor speed"
+      },
+      "room_temp_filtered": {
+        "name": "Filtered room temperature"
+      },
+      "cooling_supply_temp_calc": {
+        "name": "Calculated cooling supply temperature"
+      },
+      "curve_offset_total": {
+        "name": "Total heating curve offset"
+      },
+      "cooling_offset_total": {
+        "name": "Total cooling curve offset"
       }
     },
     "number": {

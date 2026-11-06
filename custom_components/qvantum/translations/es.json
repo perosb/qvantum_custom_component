@@ -751,6 +751,18 @@
       },
       "ep11_compressor_rpm": {
         "name": "EP11 velocidad del compresor"
+      },
+      "room_temp_filtered": {
+        "name": "Temperatura ambiente filtrada"
+      },
+      "cooling_supply_temp_calc": {
+        "name": "Temperatura de impulsión de refrigeración calculada"
+      },
+      "curve_offset_total": {
+        "name": "Desplazamiento total de la curva de calefacción"
+      },
+      "cooling_offset_total": {
+        "name": "Desplazamiento total de la curva de refrigeración"
       }
     },
     "number": {

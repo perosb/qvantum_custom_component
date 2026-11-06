@@ -751,6 +751,18 @@
       },
       "ep11_compressor_rpm": {
         "name": "EP11 prędkość sprężarki"
+      },
+      "room_temp_filtered": {
+        "name": "Filtrowana temperatura pomieszczenia"
+      },
+      "cooling_supply_temp_calc": {
+        "name": "Obliczona temperatura zasilania chłodzenia"
+      },
+      "curve_offset_total": {
+        "name": "Całkowite przesunięcie krzywej grzewczej"
+      },
+      "cooling_offset_total": {
+        "name": "Całkowite przesunięcie krzywej chłodzenia"
       }
     },
     "number": {
