@@ -101,7 +101,7 @@ This is why a 12–20 kW draw can last only minutes before the tank cools.
 | "Ventilation flow and tap flow are related." | Independent: l/s air vs l/min water. |
 | "`cop_dhw` is the instantaneous COP of the draw." | It is a charge-segment COP with a tank balance. |
 | "Cooling uses the DHW plate heat exchanger." | Cooling uses the heating system and the four-way valve. |
-| "Defrost is always a reversed refrigerant circuit." | Passive defrost states exist; the mechanism is not publicly documented. |
+| "Defrost is always a reversed refrigerant circuit." | On the QE-6 it is a passive off-cycle defrost: the compressor stops and circulated heating water melts the evaporator. `hp_status` stays `3`, so the only defrost signal is the input-67 flag. |
 | "The QE is an air-to-water heat pump with an outdoor unit." | It is an exhaust-air heat pump with indoor units. |
 | "The tank can be used for a legionella cycle." | There is no stored potable-water volume; DHW is through-flow. |
 | "`compressor_power` is heating output." | It is electrical input. |
