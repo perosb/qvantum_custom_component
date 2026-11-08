@@ -32,7 +32,15 @@ Related, but not the Auto curve itself:
   `cal_heat_temp` alone. Both are diagnostic sensors, in kelvin, enabled by
   default (they sit inside the 0–104 block the client already reads, so they
   cost no extra Modbus traffic).
-- Input 36 — calculated supply temp cooling (`cooling_supply_temp_calc`)
+- Input 36 — calculated supply temp cooling (`cooling_supply_temp_calc`).
+  **It holds the supply ceiling while cooling is idle, not a target.** Read on a
+  QE-6 2026-11-08: 60.0 °C, exactly `max_heating_supply` (60), with
+  `coolingdemand` 0, `coolingenergy` 0.0, `qn8position` 0 (shunt closed for
+  heating) and `start_cooling_temp` 23. A cooling supply sits at 7–18 °C, so the
+  reading is the ceiling. The sensor therefore reports `unknown` when it lands on
+  or above `max_heating_supply`, which keeps the ceiling out of long-term
+  statistics; whether the register is a sentinel or carries a different meaning
+  cannot be told before a cooling season is observed.
 - Input 3 — BT2 after the firmware's room filter (`room_temp_filtered`), which
   lags `bt2` (20.7 against 21.4 on the same poll). Kept as its own key so the
   curve's indoor series does not change meaning.

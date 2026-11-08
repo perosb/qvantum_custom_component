@@ -238,6 +238,51 @@ class TestQvantumBaseSensorEntity:
             assert entity._attr_suggested_display_precision == 1
             assert getattr(entity, "_attr_device_class", None) is None
 
+    def test_cooling_supply_hides_the_pump_ceiling(
+        self, mock_coordinator, mock_device
+    ):
+        """Input 36 sits on max supply when cooling is idle; report unknown.
+
+        Read on a QE-6 2026-11-08: 60.0 °C, exactly ``max_heating_supply`` (60),
+        with ``coolingdemand`` 0 and the shunt closed for heating. A cooling
+        supply runs at 7-18 °C, so the ceiling is not a target and must not
+        reach long-term statistics.
+        """
+        values = mock_coordinator.data["values"]
+        values["max_heating_supply"] = 60
+        values["cooling_supply_temp_calc"] = 60.0
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "cooling_supply_temp_calc", mock_device, True
+        )
+        assert entity.native_value is None
+        # Still readable: the register answered, the number is just not a target.
+        assert entity.available
+
+        values["cooling_supply_temp_calc"] = 12.4
+        assert entity.native_value == 12.4
+
+    def test_cooling_supply_without_a_ceiling_is_not_suppressed(
+        self, mock_coordinator, mock_device
+    ):
+        """No ``max_heating_supply`` in the payload means no basis for the gate."""
+        values = mock_coordinator.data["values"]
+        values.pop("max_heating_supply", None)
+        values["cooling_supply_temp_calc"] = 60.0
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "cooling_supply_temp_calc", mock_device, True
+        )
+        assert entity.native_value == 60.0
+
+    def test_other_sensors_are_never_ceiling_gated(
+        self, mock_coordinator, mock_device
+    ):
+        """The gate is opt-in per key: a real temperature may equal the ceiling."""
+        values = mock_coordinator.data["values"]
+        values["max_heating_supply"] = 60
+        values["bt11"] = 60.0
+        entity = QvantumBaseSensorEntity(mock_coordinator, "bt11", mock_device, True)
+        assert entity.native_value == 60.0
+
     @pytest.mark.parametrize(
         ("key", "address"), (("curve_offset_total", 37), ("cooling_offset_total", 38))
     )
