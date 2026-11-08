@@ -394,31 +394,7 @@
         "name": "Driftstilstandssensor"
       },
       "price_region": {
-        "name": "Prisregion",
-        "state": {
-          "se1": "SE1",
-          "se2": "SE2",
-          "se3": "SE3",
-          "se4": "SE4",
-          "no1": "NO1",
-          "no2": "NO2",
-          "no3": "NO3",
-          "no4": "NO4",
-          "no5": "NO5",
-          "dk1": "DK1",
-          "dk2": "DK2",
-          "fi": "FI",
-          "ee": "EE",
-          "lv": "LV",
-          "lt": "LT",
-          "pl": "PL",
-          "nl": "NL",
-          "be": "BE",
-          "fr": "FR",
-          "at": "AT",
-          "de": "DE",
-          "se": "SE"
-        }
+        "name": "Prisregion"
       },
       "room_temp_ext": {
         "name": "Ekstern rumtemperatur"
