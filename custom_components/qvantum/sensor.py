@@ -62,6 +62,16 @@ _ALARM_CODE_SENSORS = frozenset(
 # temperature device class.
 _OFFSET_KELVIN_SENSORS = frozenset({"curve_offset_total", "cooling_offset_total"})
 
+#: Metrics whose register holds the pump's supply ceiling while the feature is
+#: idle, rather than a computed target. Input 36 read exactly
+#: ``max_heating_supply`` (60.0 °C) with ``coolingdemand = 0``, ``coolingenergy``
+#: 0 and the shunt closed, so a 60 °C "cooling supply" is the ceiling and not a
+#: number. The gate is the ceiling, not the demand flag: a demand-keyed gate
+#: would blank the value between compressor cycles all through the cooling
+#: season, while the ceiling test only hides a reading that is provably not a
+#: cooling target (they sit at 7-18 °C).
+_COOLING_CEILING_SENSORS = frozenset({"cooling_supply_temp_calc"})
+
 #: Machine-internal telemetry and settings read-backs belong under
 #: Diagnostics. Primary temperatures (outdoor/indoor/tank/flow), the energy
 #: counters, the tap-water comfort figures and the derived COP/efficiency
@@ -666,8 +676,13 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
 
     @property
     def native_value(self):
-        """Get metric from API data."""
-        return self._values.get(self._metric_key)
+        """Get metric from API data, or None where the register is a ceiling."""
+        value = self._values.get(self._metric_key)
+        if self._metric_key in _COOLING_CEILING_SENSORS:
+            ceiling = self._values.get("max_heating_supply")
+            if value is not None and ceiling is not None and value >= ceiling:
+                return None
+        return value
 
     @property
     def available(self):
