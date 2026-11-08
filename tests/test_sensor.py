@@ -273,6 +273,36 @@ class TestQvantumBaseSensorEntity:
         )
         assert entity.native_value == 60.0
 
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        (("se3", "SE3"), ("se4", "SE4"), ("no1", "NO1"), ("xx9", "XX9")),
+    )
+    def test_price_region_is_displayed_uppercase(
+        self, mock_coordinator, mock_device, raw, expected
+    ):
+        """The register stays lowercase; only the entity state is upper-cased.
+
+        Both transports return ``se3`` and the app shows ``SE3``, so the casing
+        belongs in the entity. ``xx9`` is deliberately a zone nobody has
+        measured: the mapping is a casing rule, not a whitelist, so it cannot go
+        stale when a new market appears.
+        """
+        mock_coordinator.data["values"]["price_region"] = raw
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "price_region", mock_device, True
+        )
+        assert entity.native_value == expected
+        # The client payload keeps the register's own spelling for the dump.
+        assert mock_coordinator.data["values"]["price_region"] == raw
+
+    def test_uppercase_is_opt_in_per_key(self, mock_coordinator, mock_device):
+        """A textual metric nobody listed is passed through untouched."""
+        mock_coordinator.data["values"]["room_temp_filtered"] = 20.9
+        entity = QvantumBaseSensorEntity(
+            mock_coordinator, "room_temp_filtered", mock_device, True
+        )
+        assert entity.native_value == 20.9
+
     def test_other_sensors_are_never_ceiling_gated(
         self, mock_coordinator, mock_device
     ):

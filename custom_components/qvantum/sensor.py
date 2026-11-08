@@ -72,6 +72,16 @@ _OFFSET_KELVIN_SENSORS = frozenset({"curve_offset_total", "cooling_offset_total"
 #: cooling target (they sit at 7-18 °C).
 _COOLING_CEILING_SENSORS = frozenset({"cooling_supply_temp_calc"})
 
+#: Metrics the pump stores in a casing the UI should not show. The bidding zone
+#: is a read-only input register (173/174) that both transports return lowercase
+#: ("se3", measured on Modbus and on the cloud /values payload) while the app and
+#: the Nord Pool convention show "SE3". Nothing writes it back, so there is no
+#: round-trip to keep in sync — and the uppercase happens here rather than in the
+#: client, so coordinator.values and the support dump keep the register's own
+#: spelling. A casing table in the translations would be a whitelist that quietly
+#: falls back to lowercase for a zone nobody has measured yet.
+_UPPERCASE_SENSORS = frozenset({"price_region"})
+
 #: Machine-internal telemetry and settings read-backs belong under
 #: Diagnostics. Primary temperatures (outdoor/indoor/tank/flow), the energy
 #: counters, the tap-water comfort figures and the derived COP/efficiency
@@ -676,12 +686,14 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
 
     @property
     def native_value(self):
-        """Get metric from API data, or None where the register is a ceiling."""
+        """Get metric from API data, upper-cased or suppressed where needed."""
         value = self._values.get(self._metric_key)
         if self._metric_key in _COOLING_CEILING_SENSORS:
             ceiling = self._values.get("max_heating_supply")
             if value is not None and ceiling is not None and value >= ceiling:
                 return None
+        if self._metric_key in _UPPERCASE_SENSORS and isinstance(value, str):
+            return value.upper()
         return value
 
     @property
