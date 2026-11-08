@@ -103,6 +103,24 @@ def test_runtime_sensor_translations_exist_in_all_locales():
             assert sensors[key]["name"], f"{path.name} missing {key}"
 
 
+def test_price_region_states_are_displayed_uppercase():
+    """The bidding zone renders as SE3 while the register keeps ``se3``.
+
+    Both transports return lowercase (`se3`, measured on Modbus inputs 173/174
+    and on the cloud /values payload) and the app shows uppercase, so the case
+    difference is display-only and belongs in a state translation: the state
+    machine keeps the register's own spelling.
+    """
+    expected = {f"se{index}": f"SE{index}" for index in range(1, 5)}
+    for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        states = data["entity"]["sensor"]["price_region"]["state"]
+        for key, value in expected.items():
+            assert states[key] == value, f"{path.name}: {key} -> {states.get(key)}"
+        # A casing map never invents a zone: every value is its key uppercased.
+        assert all(value == key.upper() for key, value in states.items()), path.name
+
+
 def test_filter_calendar_translation_exists_in_all_locales():
     """The Modbus-only filter calendar has a name in every locale."""
     for path in sorted(TRANSLATIONS_DIR.glob("*.json")):
