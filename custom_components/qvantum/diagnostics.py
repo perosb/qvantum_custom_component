@@ -352,6 +352,12 @@ def _curve_active_gain_diagnostics(estimate: Any) -> dict[str, Any] | None:
         "r2": getattr(estimate, "r2", None),
         "residual_std_c": getattr(estimate, "residual_std_c", None),
         "leave_one_out_c_per_c": getattr(estimate, "leave_one_out_c_per_c", None),
+        # The absorbed within-bucket outdoor slope: it should land on the
+        # curve's own slope. A 0 here means the window held no outdoor
+        # variation inside the buckets, so the room slope carries the shape.
+        "outdoor_slope_c_per_c": getattr(
+            estimate, "outdoor_slope_c_per_c", None
+        ),
         "valid": getattr(estimate, "valid", None),
         "notes": getattr(estimate, "notes", None),
     }
