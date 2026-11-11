@@ -630,6 +630,7 @@ def _active_gain_to_state(estimate: ActiveRoomGain | None) -> dict[str, Any] | N
         "r2": estimate.r2,
         "residual": estimate.residual_std_c,
         "loo": estimate.leave_one_out_c_per_c,
+        "outdoor_slope": estimate.outdoor_slope_c_per_c,
         "valid": estimate.valid,
         "notes": estimate.notes,
     }
@@ -659,6 +660,7 @@ def _active_gain_from_state(state: Any) -> ActiveRoomGain | None:
             r2=optional(state.get("r2")),
             residual_std_c=optional(state.get("residual")),
             leave_one_out_c_per_c=optional(state.get("loo")),
+            outdoor_slope_c_per_c=optional(state.get("outdoor_slope")),
             valid=bool(state.get("valid", False)),
             notes=str(state.get("notes", "")),
         )

@@ -1164,6 +1164,48 @@ def test_active_room_gain_recovers_a_known_slope() -> None:
     assert estimate.notes == ""
 
 
+def test_active_room_gain_absorbs_the_shape_inside_a_bucket() -> None:
+    """A 2 K bucket still holds the curve's slope, and it is not the room term.
+
+    Centring removes the table's level, not its shape: when the room error
+    drifts alongside the outdoor *inside* a bucket, a fit on the room error
+    alone attributes part of the curve to it. Measured on the live install
+    2026-11-11 (160 h, 7 buckets): 4.32 ± 0.32 °C/°C against a configured 5.0,
+    and 4.75 ± 0.20 once the within-bucket outdoor was fitted as a nuisance
+    column at −0.85 °C/°C — the curve's own slope.
+    """
+    rows = []
+    for bucket in (6.0, 8.0, 10.0, 12.0):
+        for index, offset in enumerate((-0.8, -0.4, 0.0, 0.4, 0.8)):
+            outdoor = bucket + offset
+            # Partly collinear with the outdoor, as a real room error is, but
+            # not so collinear that the two columns cannot separate.
+            error = 0.3 * offset + (0.2 if index % 2 else -0.2)
+            rows.append((outdoor, 40.0 - outdoor - 5.0 * error, error))
+
+    estimate = room_gain_from_active_hours(rows)
+
+    assert estimate.valid
+    assert estimate.gain_c_per_c == pytest.approx(5.0, abs=0.1)
+    assert estimate.outdoor_slope_c_per_c == pytest.approx(-1.0, abs=0.1)
+
+    # The confound is real: the same hours fitted on the room error alone are
+    # biased, which is what the nuisance column exists to remove.
+    centred = []
+    for bucket in (6.0, 8.0, 10.0, 12.0):
+        group = [row for row in rows if round(row[0] / 2.0) == round(bucket / 2.0)]
+        mean_error = sum(row[2] for row in group) / len(group)
+        mean_supply = sum(row[1] for row in group) / len(group)
+        centred.extend(
+            (error - mean_error, supply - mean_supply)
+            for _, supply, error in group
+        )
+    xs = [x for x, _ in centred]
+    ys = [y for _, y in centred]
+    biased = -sum(x * y for x, y in zip(xs, ys)) / sum(x * x for x in xs)
+    assert abs(biased - 5.0) > 0.3
+
+
 def test_active_room_gain_drops_a_lone_outdoor_bucket() -> None:
     """The leverage immunity: an hour alone in its bucket cannot decide it."""
     rows = active_hours(5.0)

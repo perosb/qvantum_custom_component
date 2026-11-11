@@ -307,6 +307,19 @@ When fitting anything against `cal_heat_temp`, **include only hours after
 different control laws into one regression and flattened the room gain to 3.2
 instead of 5.0.
 
+**Centring inside a bucket is not enough.** The bucket mean removes the table's
+level, not its shape: the outdoor still moves ~2 K inside a bucket while the
+supply follows the curve, so a fit on the room error alone attributes part of
+the curve's own slope to the room term. Measured 2026-11-11 on the live install
+(160 heating hours, 7 buckets, a 0.85 K room-error span): the centred-only fit
+read 4.32 ± 0.32 °C/°C against the configured factor of 5.0, and adding the
+within-bucket outdoor as a nuisance column moved it to **4.75 ± 0.20** with the
+nuisance at **−0.85 °C/°C** — the curve's own slope. R² moved 0.55 → 0.82, so
+the R² gate's rejections were partly this bias rather than a weak room term.
+The nuisance column is reported (`outdoor_slope_c_per_c`, diagnostics only) and
+never applied; a bucket with no outdoor variation contributes nothing to it and
+the fit degrades to the single-slope form.
+
 **It only applies to hours the pump followed our table.** The correction is
 valid where `cal_heat_temp` came from the table we wrote — from the start of the
 last active period (`active_since_ts`) until it ended (`last_active_ts`). On
