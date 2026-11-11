@@ -192,6 +192,12 @@ class CurveReadiness:
     max_abs_c: float | None
     window_hours: float
     p95_abs_c: float | None = None
+    #: Signed median of the same deviations. ``median_abs_c`` says how far the
+    #: curve is off; the sign says whether it is a *level* (a constant offset,
+    #: which points at the room term or a baseline shift) or noise around zero
+    #: (which points at the window). The two need different answers, and a
+    #: pooled row that carries only the absolute value cannot tell them apart.
+    median_c: float | None = None
 
 
 @dataclass(frozen=True)
@@ -246,6 +252,10 @@ class CurveSnapshot:
     room_gain_c: float | None = None
     #: 95th percentile of the readiness window (the gated upper bound).
     p95_abs_c: float | None = None
+    #: Signed median of the same window. A constant offset and noise around
+    #: zero can produce the same ``median_abs_c`` and need opposite answers, so
+    #: the sign travels with it.
+    median_c: float | None = None
     #: Hours behind each point's trim; 0 means the trim is deliberately 0
     #: because the window holds no evidence near that outdoor temperature.
     trim_evidence: Mapping[str, int] = field(default_factory=dict)
@@ -470,6 +480,7 @@ def assess_readiness(
 
     absolute = sorted(abs(value) for value in values)
     median_abs = _median_sorted(absolute)
+    median_c = _median_sorted(sorted(values))
     p95_abs = absolute[min(len(absolute) - 1, round(0.95 * (len(absolute) - 1)))]
     max_abs = absolute[-1]
     if median_abs > READY_MEDIAN_MAX_C:
@@ -480,6 +491,7 @@ def assess_readiness(
             round(max_abs, 2),
             round(window_hours, 1),
             round(p95_abs, 2),
+            round(median_c, 2),
         )
     if p95_abs > READY_P95_MAX_C:
         return CurveReadiness(
@@ -489,6 +501,7 @@ def assess_readiness(
             round(max_abs, 2),
             round(window_hours, 1),
             round(p95_abs, 2),
+            round(median_c, 2),
         )
     return CurveReadiness(
         True,
@@ -497,6 +510,7 @@ def assess_readiness(
         round(max_abs, 2),
         round(window_hours, 1),
         round(p95_abs, 2),
+        round(median_c, 2),
     )
 
 
@@ -2866,6 +2880,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             median_abs_c=readiness.median_abs_c,
             max_abs_c=readiness.max_abs_c,
             p95_abs_c=readiness.p95_abs_c,
+            median_c=readiness.median_c,
             window_hours=readiness.window_hours,
             room_error_median_abs_c=None if room is None else room.median_abs_c,
             room_error_median_c=None if room is None else room.median_c,

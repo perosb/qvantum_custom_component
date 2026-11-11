@@ -87,7 +87,13 @@ _ENTITY_PREFIXES = (
 #: are spread over. The hours gate alone could not be read from a row, so a
 #: window refused for having 200 h on four days looked identical to one with no
 #: evidence at all.
-SUMMARY_SCHEMA_VERSION = 9
+#: 10: carries the *evidence* behind the two readiness questions instead of only
+#: their outcome — the day-block model's `t`/R²/`valid`/`notes` (which gate bit),
+#: the readiness `blocker` and window, the signed median (an offset and noise
+#: around zero share a median absolute value), and the room error over the same
+#: window. v9 could report that a model was invalid but not why, so "is the gate
+#: too strict or is it the season?" was unanswerable from the pool.
+SUMMARY_SCHEMA_VERSION = 10
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -237,13 +243,20 @@ def climate_summary(curve: Any) -> dict[str, Any]:
 
 
 def curve_summary(coordinator: Any) -> dict[str, Any] | None:
-    """The identified pump room gain, configured against fitted.
+    """The identified pump room gain, configured against fitted, plus evidence.
 
     Three numbers, not one: **configured** is the pump's own setting,
     **applied** is what the correction actually uses (the factor when it is
     usable, else the fit) and **fitted** is the measured slope. This is the first
     pooled question — does the configured factor equal the measured slope? — and
     one installation only fixes the linear map at one factor value.
+
+    Every field here is the *evidence* for a pooled question, not just its
+    outcome: which gate refused the model (``notes``/``blocker``), the `t` and
+    R² behind the aperture, and the signed median beside the absolute one. A row
+    that carries only the outcome cannot distinguish "the gate is too strict"
+    from "there is nothing to identify yet", which is the question the pool
+    exists to answer.
     """
     if coordinator is None:
         return None
@@ -255,8 +268,27 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "active": bool(getattr(coordinator, "active", False)),
         "room_gain": room_gain_summary(coordinator),
         "median_abs_c": _number(getattr(snapshot, "median_abs_c", None)),
+        # The signed median beside the absolute one: a constant offset (the room
+        # term left in, a baseline shift) and noise around zero look the same in
+        # `median_abs_c` and need opposite answers.
+        "median_c": _number(getattr(snapshot, "median_c", None)),
         "p95_abs_c": _number(getattr(snapshot, "p95_abs_c", None)),
         "ready": bool(getattr(snapshot, "ready", False)),
+        # Why the gate is not met (`window`, `median`, `max` or the missing
+        # signal) and the window it was judged over. Without the blocker a row
+        # that failed the median gate is indistinguishable from one that never
+        # had the coverage to be judged at all.
+        "blocker": _short_string(getattr(snapshot, "blocker", None)),
+        "window_hours": _number(getattr(snapshot, "window_hours", None)),
+        # The house's own room error over the same window. Readiness compares
+        # the baseline against the pump's target, which carries the room term,
+        # so a deviation cannot be weighed without it.
+        "room_error_median_abs_c": _number(
+            getattr(snapshot, "room_error_median_abs_c", None)
+        ),
+        "room_error_p90_abs_c": _number(
+            getattr(snapshot, "room_error_p90_abs_c", None)
+        ),
         "baseline_points": len(baseline) if isinstance(baseline, Mapping) else None,
         "solar_a_w_per_k": _number(getattr(model, "a_w_per_k", None)),
         "solar_b_m2": _number(getattr(model, "b_m2", None)),
@@ -264,6 +296,15 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "daily_solar_b_m2": _number(getattr(daily, "b_m2", None)),
         "daily_solar_trust": _number(getattr(daily, "trust", None)),
         "daily_solar_days": _number(getattr(daily, "n_days", None)),
+        # The evidence behind the day-block model, not just its outcome. An
+        # invalid model zeroes `b` and `trust`, so v9 rows could say "no model"
+        # but not whether the day count, the t-stat, R² or a non-positive
+        # aperture refused it — the difference between "the gate is too strict"
+        # and "there is nothing to identify yet".
+        "daily_solar_t_stat": _number(getattr(daily, "t_stat", None)),
+        "daily_solar_r2": _number(getattr(daily, "r2", None)),
+        "daily_solar_valid": bool(getattr(daily, "valid", False)),
+        "daily_solar_notes": _note(getattr(daily, "notes", None)),
         # Wind column of the same day balance: the identified sensitivity (W/K
         # per m/s), whether it passed its gates, and the evidence behind it.
         # The pool question is "how often is a wind term identifiable at all",

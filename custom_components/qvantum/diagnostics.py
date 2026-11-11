@@ -516,6 +516,9 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "ready": getattr(snapshot, "ready", None),
         "blocker": getattr(snapshot, "blocker", None),
         "median_abs_c": getattr(snapshot, "median_abs_c", None),
+        # Signed median: a constant offset and noise around zero share an
+        # absolute median and need opposite answers.
+        "median_c": getattr(snapshot, "median_c", None),
         "max_abs_c": getattr(snapshot, "max_abs_c", None),
         "p95_abs_c": getattr(snapshot, "p95_abs_c", None),
         "window_hours": getattr(snapshot, "window_hours", None),

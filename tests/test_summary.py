@@ -64,8 +64,13 @@ def curve_coordinator(**overrides):
     """
     snapshot = SimpleNamespace(
         median_abs_c=1.26,
+        median_c=-1.11,
         p95_abs_c=3.87,
         ready=False,
+        blocker="median",
+        window_hours=91.4,
+        room_error_median_abs_c=0.2,
+        room_error_p90_abs_c=0.3,
         baseline_outdoor_min_c=3.4,
         baseline_outdoor_max_c=14.1,
         baseline_learned_hours=148,
@@ -83,6 +88,10 @@ def curve_coordinator(**overrides):
             b_m2=1.875,
             trust=0.69,
             n_days=26,
+            t_stat=3.1,
+            r2=0.91,
+            valid=True,
+            notes="days=26 t=3.10 r2=0.910 jackknife=1.49-2.22",
             w_per_ms=2.4,
             w_t_stat=4.8,
             wind_hours=612,
@@ -247,6 +256,22 @@ def test_the_gain_pair_travels_because_the_pool_needs_it() -> None:
     assert gain["fitted"]["window"] == "auto"
     assert curve["daily_solar_b_m2"] == 1.875
     assert curve["daily_solar_days"] == 26
+    # The evidence behind the day-block model: an invalid model zeroes `b` and
+    # `trust`, so without the t, the R² and the note a row cannot say *which*
+    # gate refused it — the difference between a strict gate and no evidence.
+    assert curve["daily_solar_t_stat"] == 3.1
+    assert curve["daily_solar_r2"] == 0.91
+    assert curve["daily_solar_valid"] is True
+    assert "t=3.10" in curve["daily_solar_notes"]
+    # Readiness: the blocker says *why* the gate is not met, the signed median
+    # separates a level from noise, and the room error is what the pump's target
+    # carries on top of its curve.
+    assert curve["blocker"] == "median"
+    assert curve["window_hours"] == 91.4
+    assert curve["median_abs_c"] == 1.26
+    assert curve["median_c"] == -1.11
+    assert curve["room_error_median_abs_c"] == 0.2
+    assert curve["room_error_p90_abs_c"] == 0.3
     # The wind column of the same balance: the pool's "how often is a wind
     # term identifiable" question needs the coefficient, its t and the
     # evidence count, plus whether the gates let it act.
@@ -507,6 +532,19 @@ def test_schema_version_bumped_for_the_normalized_standing_loss():
     from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
 
     assert SUMMARY_SCHEMA_VERSION >= 7
+
+
+def test_schema_version_bumped_for_the_curve_evidence():
+    """v9 rows cannot say *why* a model was refused; v10 rows can.
+
+    The day-block model's `t`/R²/`valid`/`notes`, the readiness blocker and
+    window, the signed median and the room error are additive, but pooling them
+    with v9 would read "field missing" as "no evidence" — the exact question
+    the fields exist to answer.
+    """
+    from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
+
+    assert SUMMARY_SCHEMA_VERSION >= 10
 
 
 def test_schema_version_bumped_for_the_wind_column():
