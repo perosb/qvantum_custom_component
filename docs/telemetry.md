@@ -43,7 +43,7 @@ The complete field list:
 | device | manufacturer, model, firmware version (device metadata, never user data). `model` is empty on local Modbus: the pump reports serial and firmware only |
 | plant | `sensor_mode`, `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
 | climate | the outdoor span the installation has been observed in, heating hours |
-| curve | room gain grouped as `configured` / `applied` / `fitted`, with `window`, `valid`, `notes`, evidence hours, standard error (with `t`) and leave-one-out swing; readiness median and p95; the solar model (`a`, `b`, trust, days — the hourly `b` keeps its value while `trust` is 0 when it misses the t ≥ 2.5 gate, so the pair is not a bug) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours *and days* behind it and whether its gates let it act) |
+| curve | room gain grouped as `configured` / `applied` / `fitted`, with `window`, `valid`, `notes`, evidence hours, standard error (with `t`) and leave-one-out swing; readiness `median_abs_c` **and** the signed `median_c`, `p95_abs_c`, `blocker`, `window_hours` and the room error over the same window (`room_error_median_abs_c`, `room_error_p90_abs_c`); the solar model (`a`, `b`, trust, days — the hourly `b` keeps its value while `trust` is 0 when it misses the t ≥ 2.5 gate, so the pair is not a bug), the day-block model's evidence (`daily_solar_t_stat`, `daily_solar_r2`, `daily_solar_valid`, `daily_solar_notes`: which gate refused it) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours *and days* behind it and whether its gates let it act) |
 | fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure, with `reference_delta_k`, `loss_w_per_k` and the newest window's evidence), cycling, SCOP, auxiliary-heat share, health grade |
 | counters | curve reverts, trim updates, days with an actionable clamped or an extrapolated knot, and the date the counters were reset at (*Modbus only*) |
 | verdicts | reserved for derived analysis results (currently empty) |
@@ -74,13 +74,24 @@ two meanings out of one pool key, so a version that no release has carried has n
 rows to protect: further schema-shaped changes on `main` before the next release
 edit the current number in place and append to its comment instead of bumping
 again. Check the released `manifest.json` (or the latest tag) before deciding —
-2026.10.22 is the newest stable release and carries **v8**, so **v9** is the first
-number that needs a row of its own (and v9 therefore may not fold further changes
-once it ships; before that, edit it in place as usual). v9 adds
+2026.11.1 is the newest stable release and carries **v9**, so **v10** is the first
+number that needs a row of its own (and v10 therefore may not fold further changes
+once it ships; before that, edit it in place as usual). v9 added
 `daily_wind_evidence_days` beside `daily_wind_cold_hours`: the wind gate wants
 cold+windy hours **and** the days carrying them, and a row reporting only the
 hours cannot separate "200 h on four days" (refused) from a window with no
 evidence at all.
+
+v10 adds the **evidence** behind the two readiness questions, because v9 could
+report that a model was invalid but not why: the day-block model's `t_stat`,
+R², `valid` and `notes` (an invalid model zeroes `b` and `trust`, so "the gate
+is too strict" and "there is nothing to identify yet" looked identical); the
+readiness `blocker` and `window_hours` (a median failure and a window that never
+had the coverage to be judged are different answers); the signed `median_c`
+beside the absolute one (a constant offset and noise around zero share a median
+absolute value and need opposite answers); and the room error over the same
+window (readiness compares against the pump's target, which carries the room
+term, so a deviation cannot be weighed without it).
 
 ### The installation token
 

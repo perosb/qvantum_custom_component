@@ -1307,8 +1307,18 @@ def test_assess_readiness_ready_and_value_blockers() -> None:
     assert result.ready
     assert result.blocker is None
     assert result.median_abs_c == pytest.approx(0.5)
+    assert result.median_c == pytest.approx(0.5)
     assert result.max_abs_c == pytest.approx(0.5)
     assert result.p95_abs_c == pytest.approx(0.5)
+
+    # The sign is what separates a level from noise around zero: both of these
+    # fail the median gate with the same absolute value and need opposite
+    # answers, so the signed median has to travel.
+    negative = {ts: -1.6 for ts in window}
+    result = assess_readiness(negative, int(now), ZoneInfo("UTC"))
+    assert result.blocker == "median"
+    assert result.median_abs_c == pytest.approx(1.6)
+    assert result.median_c == pytest.approx(-1.6)
 
     median_fail = {ts: 1.6 for ts in window}
     result = assess_readiness(median_fail, int(now), ZoneInfo("UTC"))
