@@ -125,11 +125,15 @@ jobs:
           diff-cover coverage.xml --compare-branch "$BASE_SHA" \
             --fail-under "$PATCH_FLOOR" \
             --format json:"$RUNNER_TEMP/patch.json" || patch_status=$?
-          python .github/scripts/coverage_summary.py \
+          # The renderer's own exit code counts too: a crash must not leave the
+          # job green with no summary (`patch_status` is already 0 here).
+          if ! python .github/scripts/coverage_summary.py \
             --json "$RUNNER_TEMP/patch.json" \
             --floor "$PATCH_FLOOR" \
             --project-report "$RUNNER_TEMP/project.txt" \
-            >> "$GITHUB_STEP_SUMMARY" || patch_status=${patch_status:-1}
+            >> "$GITHUB_STEP_SUMMARY"; then
+            patch_status=1
+          fi
           exit "$patch_status"
 
   validate:
