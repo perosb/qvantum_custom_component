@@ -118,6 +118,18 @@ ROOM_GAIN_ACTIVE_WINDOW_DAYS = 7
 TRIM_FIRST_REFRESH_HOURS = 3.0
 #: Fraction of the indicated residual applied per update (damped loop).
 TRIM_UPDATE_GAIN = 0.3
+#: An active period's trims belong to it -- they are learned against the
+#: baseline that was current then -- so a reversion clears them. But they carry
+#: the house's offset from the pitched curve, which the integrator rebuilds at
+#: `TRIM_UPDATE_GAIN x (slope x room error)`: measured on a live install, a 5 K
+#: offset is 0.125 K/day at a 0.5 K room error and 0.03 K/day at 0.1 K, i.e.
+#: two to five weeks of under-supply after every reversion. They are therefore
+#: kept as a **seed** and re-applied when the same baseline comes back.
+TRIM_SEED_MAX_AGE_DAYS = 90.0
+#: A seed only fits the baseline it was learned against. Baselines round-trip
+#: exactly through the store, so this is float hygiene, not a tolerance: a
+#: baseline the learning has *moved* must reject the seed.
+TRIM_SEED_BASELINE_TOLERANCE_C = 0.05
 INDOOR_MARGIN_CYCLES = 96  # 24 h at 15 min
 READY_WINDOW_DAYS = 3
 READY_MIN_COVERAGE = 0.9
@@ -745,6 +757,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._trims: dict[str, float] = {}
         self._trim_evidence: dict[str, int] = {}
         self._last_trim_ts: float | None = None
+        #: The trims of the last active period, kept across a reversion so the
+        #: integrator does not have to rebuild the house's offset from zero.
+        #: Beside them: the baseline they were learned against and when.
+        self._trim_seed: dict[str, float] | None = None
+        self._trim_seed_baseline: dict[str, float] | None = None
+        self._trim_seed_ts: float | None = None
         self._baseline_stats: dict[str, Any] | None = None
         self._room_gain: float | None = None
         self._room_gain_source: str | None = None
@@ -914,6 +932,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "active_since_ts": self._active_since_ts,
             "trims": dict(self._trims),
             "trim_evidence": dict(self._trim_evidence),
+            "trim_seed": (
+                {
+                    "trims": dict(self._trim_seed),
+                    "baseline": dict(self._trim_seed_baseline or {}),
+                    "at": self._trim_seed_ts,
+                }
+                if self._trim_seed and self._trim_seed_baseline
+                else None
+            ),
             "baseline_stats": self._baseline_stats,
             "room_gain": self._room_gain,
             "room_gain_source": self._room_gain_source,
@@ -956,6 +983,59 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         learning must not read across the boundary.
         """
         self._last_active_ts = dt_util.utcnow().timestamp()
+
+    def _remember_trim_seed(self) -> None:
+        """Keep this period's trims and the baseline they were learned against.
+
+        A reversion drops the trims because they belong to its active period.
+        Without a seed the next activation starts from zero and the damping
+        loop (``TRIM_UPDATE_GAIN`` per day against the local curve slope) has to
+        rebuild the whole offset — measured on the live install: 0.5 K of room
+        error gives 0.125 K/day, and the 5 K offset it built took weeks.
+        """
+        if not self._trims or self._baseline is None:
+            return
+        self._trim_seed = dict(self._trims)
+        self._trim_seed_baseline = dict(self._baseline)
+        self._trim_seed_ts = dt_util.utcnow().timestamp()
+
+    def _seed_trims(self) -> bool:
+        """Re-apply a remembered trim set when the same baseline is current.
+
+        Three gates, all of which a dump can re-derive: the seed must be
+        **fresh** (``TRIM_SEED_MAX_AGE_DAYS``: the house's need changes with a
+        season, and a stale seed is worse than zero because the loop has to
+        undo it), it must have been learned against **this** baseline (a knot
+        the learning or the app moved would get a correction that belongs to
+        the old shape), and it must not overwrite trims that already exist (a
+        reload while active restores those, and they are newer).
+        """
+        if self._trim_seed is None or self._trim_seed_baseline is None:
+            return False
+        if self._trims:
+            return False
+        if self._baseline is None:
+            return False
+        if self._trim_seed_ts is not None and (
+            dt_util.utcnow().timestamp() - self._trim_seed_ts
+            > TRIM_SEED_MAX_AGE_DAYS * 86400.0
+        ):
+            return False
+        for key in CURVE_KEYS:
+            seeded = self._trim_seed_baseline.get(key)
+            current = self._baseline.get(key)
+            if seeded is None or current is None:
+                return False
+            if abs(float(seeded) - float(current)) > TRIM_SEED_BASELINE_TOLERANCE_C:
+                return False
+        self._trims = dict(self._trim_seed)
+        self._last_trim_ts = None
+        _LOGGER.info(
+            "Adaptive-curve trims seeded from the last active period "
+            "(%s points, baseline unchanged)",
+            len(self._trims),
+        )
+        return True
 
     async def _async_persist(self) -> None:
         store = self._store
@@ -1022,6 +1102,31 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             for key, hours in evidence.items():
                 if key in CURVE_KEYS and isinstance(hours, int) and not isinstance(hours, bool):
                     self._trim_evidence[key] = hours
+        seed = data.get("trim_seed")
+        if isinstance(seed, dict):
+            # The trims are a *partial* map (only the knots with evidence), so
+            # they are filtered per key like ``trims`` above; the baseline they
+            # belong to is a full seven-point table and goes through
+            # ``freeze_baseline``.
+            seed_trims = seed.get("trims")
+            restored_trims: dict[str, float] = {}
+            if isinstance(seed_trims, dict):
+                for key, value in seed_trims.items():
+                    if (
+                        key in CURVE_KEYS
+                        and isinstance(value, (int, float))
+                        and not isinstance(value, bool)
+                    ):
+                        restored_trims[key] = float(value)
+            seed_baseline = freeze_baseline(
+                seed.get("baseline") if isinstance(seed.get("baseline"), dict) else {}
+            )
+            if restored_trims and seed_baseline is not None:
+                self._trim_seed = restored_trims
+                self._trim_seed_baseline = seed_baseline
+                seed_at = seed.get("at")
+                if isinstance(seed_at, (int, float)) and not isinstance(seed_at, bool):
+                    self._trim_seed_ts = float(seed_at)
         counters = data.get("counters")
         if isinstance(counters, dict):
             self._counters = {
@@ -1300,6 +1405,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         )
         self._mode = "active"
         self._mark_active_started()
+        # Re-apply the offset the last active period learned, if the baseline
+        # it was learned against is still the current one. Without it the
+        # integrator rebuilds the same correction over weeks.
+        self._seed_trims()
         # A latch from an earlier failed revert is obsolete once the pump
         # follows our table again; keeping it would write 22 back to Auto on
         # the next cycle and silently undo this activation.
@@ -1325,7 +1434,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if was_active:
             self._mark_active_ended()
             # Active trims belong to the active period; the next activation
-            # relearns them against whatever baseline is current then.
+            # relearns them against whatever baseline is current then. They are
+            # kept as a *seed* first: they carry the house's offset from the
+            # pitched curve, and the integrator rebuilds that at 0.03-0.13 K/day
+            # -- two to five weeks of under-supply, measured on a live install
+            # that reverted. The seed is only applied when the same baseline
+            # comes back, so a moved curve cannot inherit a stale correction.
+            self._remember_trim_seed()
             self._trims = {}
             self._last_trim_ts = None
         device_id = getattr(self._main, "device_id", None)
@@ -1396,6 +1511,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             self._async_raise_left_user_defined()
             self._mode = "shadow"
             self._mark_active_ended()
+            self._remember_trim_seed()
             self._trims = {}
             self._last_trim_ts = None
             await self._async_persist()

@@ -320,6 +320,21 @@ The nuisance column is reported (`outdoor_slope_c_per_c`, diagnostics only) and
 never applied; a bucket with no outdoor variation contributes nothing to it and
 the fit degrades to the single-slope form.
 
+**A period's trims are kept when it ends.** A reversion clears them — they
+were learned against the baseline that was current then — but they carry the
+house's difference from the pitched curve, and the damping loop rebuilds that at
+`TRIM_UPDATE_GAIN × (curve slope × room error)` per day: measured on a live
+install, 0.5 K of room error is 0.125 K/day and 0.1 K is 0.03, i.e. two to five
+weeks of under-supply after every reversion. The set is therefore stored as a
+**seed** with the baseline it was learned against, and re-applied on the next
+activation under three gates: it must be younger than
+`TRIM_SEED_MAX_AGE_DAYS` (90: the house's need moves with a season, and a stale
+seed is worse than zero because the loop must undo it), its baseline must still
+be the current one (`TRIM_SEED_BASELINE_TOLERANCE_C`), and it must not overwrite
+trims restored from a reload while active. A baseline the learning or the app
+has moved rejects the seed, so a re-pitched curve cannot inherit a correction
+that belongs to the old shape.
+
 **It only applies to hours the pump followed our table.** The correction is
 valid where `cal_heat_temp` came from the table we wrote — from the start of the
 last active period (`active_since_ts`) until it ended (`last_active_ts`). On

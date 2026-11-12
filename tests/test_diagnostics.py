@@ -156,6 +156,17 @@ def _curve_coordinator() -> SimpleNamespace:
         },
         _trims={"curve_30": 0.1},
         _trim_evidence={"curve_30": 12, "curve_minus_30": 0},
+        _trim_seed={"curve_30": 1.4, "curve_0": 0.9},
+        _trim_seed_baseline={
+            "curve_30": 28.0,
+            "curve_20": 30.0,
+            "curve_10": 34.0,
+            "curve_0": 38.0,
+            "curve_minus_10": 44.0,
+            "curve_minus_20": 50.0,
+            "curve_minus_30": 52.0,
+        },
+        _trim_seed_ts=1758790400.0,
         counters={
             "since": "2026-10-01",
             "reverts": 2,
@@ -649,6 +660,12 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
         "days_extrapolated": 4,
     }
     assert curve["trim_evidence"] == {"curve_30": 12, "curve_minus_30": 0}
+    # The set the last active period ended with: a re-activation re-applies it
+    # only while the baseline is unchanged, so the dump has to show both sides
+    # and whether they still agree.
+    assert curve["trim_seed"]["trims"] == {"curve_30": 1.4, "curve_0": 0.9}
+    assert curve["trim_seed"]["at"] == 1758790400.0
+    assert curve["trim_seed"]["baseline_matches"] is False
     assert curve["room_error"] == {
         "median_abs_c": 0.6,
         "median_c": -0.2,
