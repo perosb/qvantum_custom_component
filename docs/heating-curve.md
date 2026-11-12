@@ -840,6 +840,14 @@ language: auto        # auto | sv | en
 curve entities (and the pump's written table via `curve_type_heating`) from
 the entity registry. Omitting `entity` auto-discovers the adjustment sensor.
 
+**If the card keeps showing old text after an update**, the browser is still
+running the cached module: the resource URL is fixed, so the module is fetched
+once and the custom element stays defined for the life of the page. Hard-reload
+the dashboard (Ctrl/Cmd+Shift+R), or put a version on the resource once and bump
+it per release — `/qvantum/qvantum-curve-card.js?v=2026.11.1` — so the URL
+changes and the cache cannot answer. The server side carries an ETag, so a
+normal reload is enough *if* the element was not already defined.
+
 Fallback if static serving is unavailable: copy
 `custom_components/qvantum/www/qvantum-curve-card.js` to `config/www/` and
 use `/local/qvantum-curve-card.js` as the resource URL.
