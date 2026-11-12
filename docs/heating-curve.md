@@ -468,45 +468,46 @@ hours the pump followed our table, using the pump's own `room_comp_factor`.
 The gates are calibrated to what a ten-degree seven-point table can
 represent: even a converged baseline leaves roughly 1 °C of scatter across the
 observed outdoor range, so a tighter median gate is unreachable by
-construction. Readiness says nothing about the house once the curve is active,
-where the pump follows our own table; `sensor.qvantum_adaptive_curve_room_error`
-is the outcome signal to watch instead.
+construction.
 
-**What `median_abs_c` measures depends on the regime**, and the two are not
-comparable (measured 2026-11-11 on the live install, 160 heating hours, gain
-5.0):
+**Readiness is a pre-activation question, so it is assessed in shadow only.**
+While the curve writes, `ready` is not evaluated: `blocker` is `active` and no
+median/p95 is published. The reason is arithmetic, not caution —
+`cal_heat_temp` then follows our own table, so `baseline − cal` **is**
+`−(trims + adjustment)`: a large trim (the module doing its job) reads as a
+failing gate. Measured 2026-11-12 on the live install: median 1.84 °C against
+trims of 1.44–1.50 °C at the two knots in use and a −0.15 °C shared
+adjustment, signed median −1.84, p95 2.2 — a level, not a tail. The trims never
+feed back into the baseline (`_async_learn_baseline` only runs on Auto), so the
+figure could not have improved on its own: one installation had run active for
+a month and would never have shown `ready` again.
+`sensor.qvantum_adaptive_curve_room_error` is the outcome signal to watch
+instead.
 
-- **Active.** `cal_heat_temp` follows the table we wrote, so `baseline − cal`
-is our own `−(trims + adjustment)` plus the room term the correction removes.
-The figure the gate sees is therefore the size of our corrections: 1.70 °C
-median against trims of 1.35–1.39 °C at the two knots in use and a −0.24 °C
-shared adjustment, reproduced from the recorder to 0.01 °C. A large trim fails
-the gate because the baseline no longer matches, which is what the trim is for —
-but it is not a measurement of the pump.
-- **Shadow.** The room term is deliberately left in (see below), and the
-learned baseline has itself absorbed its *linear* profile whenever
-`corrected_baseline` has run — the correction is fitted to `cal_heat_temp`,
-which carries the term. What the deviation then holds is the part a
-`slope · outdoor + intercept` correction could not absorb, because the pump's
-room term is not linear in the outdoor temperature (and is clamped at large
-factors).
-
-The room term is large enough to matter: the uncorrected deviation follows the
-room error with a measured slope of **4.98 °C/°C** against a configured gain of
-5.0, so a 0.5 K room error is 2.5 K of supply. A shadow failure is therefore not
-evidence that the baseline is wrong, and a median of 0.61 °C (the uncorrected
-deviation on the live install, p95 1.36) says the seven-point table reproduced
-that pump to well inside the gate. Settling the shadow case needs a shadow
-installation's hourly series: the sign of the correction depends on whether the
-baseline was corrected, which no exported field carried before schema 10 added
-`room_error_median_abs_c`, the signed `median_c` and `blocker`. It also only covers the outdoor range
+**In shadow the deviation still carries the pump's room term.** The term is
+deliberately left in (see below), and the learned baseline has itself absorbed
+its *linear* profile whenever `corrected_baseline` has run — the correction is
+fitted to `cal_heat_temp`, which carries the term. What the deviation then holds
+is the part a `slope · outdoor + intercept` correction could not absorb, because
+the pump's room term is not linear in the outdoor temperature (and is clamped at
+large factors). The term is large enough to matter: the uncorrected deviation
+follows the room error with a measured slope of **4.98 °C/°C** against a
+configured gain of 5.0, so a 0.5 K room error is 2.5 K of supply. A shadow
+failure is therefore not evidence that the baseline is wrong, and a median of
+0.61 °C (the uncorrected deviation on the live install, p95 1.36) says the
+seven-point table reproduced that pump to well inside the gate. Settling the
+shadow case needs a shadow installation's hourly series: the sign of a
+correction depends on whether the baseline was corrected, which no exported
+field carried before schema 10 added `room_error_median_abs_c`, the signed
+`median_c` and `blocker`. It also only covers the outdoor range
 the baseline was observed at — on a mild autumn that can be a handful of points
 around 0–15 °C, while the cold end is extrapolated from the cached table. The
 trims correct those points once the weather gets there, which is why a winter
 curve should be watched rather than assumed. The 95th percentile replaces an absolute maximum because single
 mode-switch hours are transients, not a curve error. The
 `blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
-`window`, `median`, `max`). A transient forecast failure counts as missing only
+`window`, `median`, `max`) or `active` — the gate was not assessed because the
+curve is writing. A transient forecast failure counts as missing only
 when no payload covering the current hour is still cached, so a sporadic
 Open-Meteo 503 does not collapse the window. `ready` is a signal, not an
 activation. `ready` needs the recorder running with ≥ 90 % window coverage and
