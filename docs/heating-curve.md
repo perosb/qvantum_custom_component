@@ -863,6 +863,10 @@ use `/local/qvantum-curve-card.js` as the resource URL.
 - **Operating point** — ring, only when `operating_point` is configured.
 - **Status chips** — Active/Shadow (switch), Ready/blocker, Pump
   User-defined/Auto, clamped to supply limits, indoor cap, solar-model trust.
+  The Ready/blocker chip is **omitted while the curve is active**: the gate is
+  a pre-activation question and is not assessed there (`blocker: active`), so
+  the chip would read "not assessed" every day without ever carrying
+  information.
 - **Term chips** — outdoor, night/day, solar, load, trims and total, all in K
   (they are temperature *differences*, not absolute temperatures).
 
