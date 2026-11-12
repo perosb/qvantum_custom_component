@@ -333,7 +333,8 @@ seed is worse than zero because the loop must undo it), its baseline must still
 be the current one (`TRIM_SEED_BASELINE_TOLERANCE_C`), and it must not overwrite
 trims restored from a reload while active. A baseline the learning or the app
 has moved rejects the seed, so a re-pitched curve cannot inherit a correction
-that belongs to the old shape.
+that belongs to the old shape. The dump carries the seed itself (`trim_seed`:
+trims, baseline and `at`, plus `baseline_matches` against the current one).
 
 **It only applies to hours the pump followed our table.** The correction is
 valid where `cal_heat_temp` came from the table we wrote — from the start of the
@@ -785,6 +786,10 @@ missing from the dump cannot be read from a user's report. It carries
 `indoor_margin_c`, `bt2_detected`, `pump_room_c`/`pump_room_source`, the readiness
 gates and the whole model, where `model_daily` holds both the three-column fit
 and the four-column one (`a_w_per_k_4col`, `b_m2_4col`) beside the wind column.
+The trim layer travels too: `trim_evidence` (hours behind each point's trim) and
+`trim_seed` — the set the last active period ended with, the baseline it was
+learned against, when it was taken and `baseline_matches` against the current
+one, which is what decides whether a re-activation may re-apply it.
 
 ## Seasonality
 
