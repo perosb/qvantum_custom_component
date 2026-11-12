@@ -73,6 +73,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          # The patch-coverage gate diffs the changed lines against the pull
+          # request's base commit, so the history has to be there.
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
@@ -89,6 +93,44 @@ jobs:
       - name: Run tests
         run: |
           ./run-tests.sh
+
+      - name: Coverage
+        # Replaces the external Codecov app. The project floor is already
+        # enforced by `pytest` (--cov-fail-under=92 in pytest.ini); what was
+        # missing is the per-pull-request figure, which `diff-cover` reads from
+        # the same `coverage.xml` by diffing against the PR's base commit. The
+        # numbers go to the run summary (no app, no token, nothing to hang) and
+        # the patch floor fails the job. A push to `main` has no base to diff
+        # against, so it is report-only there.
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PATCH_FLOOR: "80"
+        run: |
+          python -m coverage report > "$RUNNER_TEMP/project.txt"
+          if [ -z "$BASE_SHA" ]; then
+            {
+              echo "### Changed lines (patch)"
+              echo
+              echo "No pull-request base: the patch floor runs only on a pull request."
+              echo
+              echo "### Project"
+              echo
+              echo '```'
+              cat "$RUNNER_TEMP/project.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          patch_status=0
+          diff-cover coverage.xml --compare-branch "$BASE_SHA" \
+            --fail-under "$PATCH_FLOOR" \
+            --format json:"$RUNNER_TEMP/patch.json" || patch_status=$?
+          python .github/scripts/coverage_summary.py \
+            --json "$RUNNER_TEMP/patch.json" \
+            --floor "$PATCH_FLOOR" \
+            --project-report "$RUNNER_TEMP/project.txt" \
+            >> "$GITHUB_STEP_SUMMARY" || patch_status=${patch_status:-1}
+          exit "$patch_status"
 
   validate:
     runs-on: "ubuntu-latest"

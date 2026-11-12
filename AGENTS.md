@@ -398,7 +398,13 @@ enough. Verify in a `/tmp` worktree (see *Git*).
 python -m pytest        # repo root; pytest.ini sets coverage + timeout
 ```
 
-- Coverage floor **92%**. Timeout **30s** per test.
+- Coverage floor **92%** (`--cov-fail-under` in `pytest.ini`, so the suite
+  itself fails below it). Timeout **30s** per test.
+- The **per-pull-request** figure is measured in CI with `diff-cover` against
+  the PR's base commit (`--fail-under 80` on the changed lines) and written to
+  the run summary; the text report goes to the job log. `.github/scripts/coverage_summary.py`
+  renders it. The external Codecov app is gone on purpose (its checks hung in
+  `in_progress` for whole PRs) — do not re-add an upload.
 - Modbus tests inject `modbus_connection.mock.MockModbusConnection` — no TCP.
 - `tests/test_api.py` `QvantumAPI` is test-only. Do not add a production facade.
 - Cancel leftover asyncio tasks in `finally`.
