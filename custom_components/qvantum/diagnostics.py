@@ -337,6 +337,27 @@ def _curve_model_diagnostics(model: Any) -> dict[str, Any] | None:
     }
 
 
+def _curve_trim_seed_diagnostics(coordinator: Any) -> dict[str, Any] | None:
+    """The remembered trim set: its values, the baseline it belongs to, its age."""
+    trims = getattr(coordinator, "_trim_seed", None)
+    baseline = getattr(coordinator, "_trim_seed_baseline", None)
+    if not isinstance(trims, dict) or not isinstance(baseline, dict):
+        return None
+    current = getattr(coordinator, "_baseline", None)
+    matches: bool | None = None
+    if isinstance(current, dict):
+        matches = all(
+            abs(float(value) - float(current.get(key, float("nan")))) <= 0.05
+            for key, value in baseline.items()
+        )
+    return {
+        "trims": {key: float(value) for key, value in trims.items()},
+        "baseline": {key: float(value) for key, value in baseline.items()},
+        "at": getattr(coordinator, "_trim_seed_ts", None),
+        "baseline_matches": matches,
+    }
+
+
 def _curve_active_gain_diagnostics(estimate: Any) -> dict[str, Any] | None:
     """The room gain measured on active hours, with the evidence for it."""
     if estimate is None:
@@ -559,6 +580,10 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         ),
         # Hours behind each point's trim; 0 means the trim is deliberately 0.
         "trim_evidence": dict(getattr(coordinator, "_trim_evidence", None) or {}),
+        # The trims the last active period ended with, and the baseline they
+        # were learned against: a re-activation applies them only when that
+        # baseline is still current, so a dump has to show both sides.
+        "trim_seed": _curve_trim_seed_diagnostics(coordinator),
         # Persisted curve counters (reverts, trim updates, days with a clamped
         # or extrapolated knot); they also travel in the summary export.
         "counters": (

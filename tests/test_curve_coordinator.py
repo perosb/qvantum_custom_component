@@ -133,6 +133,9 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._trims = {}
     coordinator._trim_evidence = {}
     coordinator._last_trim_ts = None
+    coordinator._trim_seed = None
+    coordinator._trim_seed_baseline = None
+    coordinator._trim_seed_ts = None
     coordinator._baseline_stats = None
     coordinator._room_gain = None
     coordinator._room_gain_source = None
@@ -3239,6 +3242,123 @@ async def test_revert_records_last_active() -> None:
     assert coordinator._last_active_ts >= before
     assert coordinator._trims == {}
     assert coordinator._last_trim_ts is None
+
+
+async def test_revert_keeps_the_trim_set_as_a_seed() -> None:
+    """The offset the integrator built must not vanish with the period.
+
+    A reversion clears the trims because they belong to its active period, but
+    they carry the house's difference from the pitched curve: the damping loop
+    rebuilds it at `TRIM_UPDATE_GAIN x (slope x room error)`, i.e. 0.03-0.13 K
+    per day -- two to five weeks on the install that reverted. So the set is
+    kept with the baseline it was learned against.
+    """
+    coordinator, _client = make_writable_coordinator()
+    coordinator._mode = "active"
+    coordinator._trims = {"curve_0": 1.5, "curve_10": 1.4}
+
+    before = time.time()
+    await coordinator.async_set_control_mode("shadow")
+
+    assert coordinator._trims == {}
+    assert coordinator._trim_seed == {"curve_0": 1.5, "curve_10": 1.4}
+    assert coordinator._trim_seed_baseline == coordinator._baseline
+    assert coordinator._trim_seed_ts >= before
+
+
+async def test_activation_seeds_the_trims_when_the_baseline_is_unchanged() -> None:
+    coordinator, _client = make_writable_coordinator()
+    coordinator._trim_seed = {"curve_0": 1.5, "curve_10": 1.4}
+    coordinator._trim_seed_baseline = dict(BASELINE)
+    coordinator._trim_seed_ts = time.time() - 3600.0
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    assert coordinator._trims == {"curve_0": 1.5, "curve_10": 1.4}
+    # A fresh seed resets the throttle: the integrator may measure at once.
+    assert coordinator._last_trim_ts is None
+
+
+async def test_activation_ignores_a_seed_learned_against_another_baseline() -> None:
+    """A moved curve must not inherit a correction that belongs to the old one."""
+    coordinator, _client = make_writable_coordinator()
+    coordinator._trim_seed = {"curve_0": 1.5}
+    coordinator._trim_seed_baseline = {**BASELINE, "curve_0": BASELINE["curve_0"] - 1.0}
+    coordinator._trim_seed_ts = time.time() - 3600.0
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    assert coordinator._trims == {}
+
+
+async def test_activation_ignores_an_expired_seed() -> None:
+    """The house's need moves with the season; a stale seed is worse than zero."""
+    coordinator, _client = make_writable_coordinator()
+    coordinator._trim_seed = {"curve_0": 1.5}
+    coordinator._trim_seed_baseline = dict(BASELINE)
+    coordinator._trim_seed_ts = time.time() - (cc.TRIM_SEED_MAX_AGE_DAYS + 1) * 86400.0
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    assert coordinator._trims == {}
+
+
+async def test_activation_does_not_overwrite_trims_that_already_exist() -> None:
+    """A reload while active restores newer trims; the seed is older."""
+    coordinator, _client = make_writable_coordinator()
+    coordinator._trim_seed = {"curve_0": 1.5}
+    coordinator._trim_seed_baseline = dict(BASELINE)
+    coordinator._trim_seed_ts = time.time() - 3600.0
+    coordinator._trims = {"curve_0": 0.2}
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        await coordinator.async_set_control_mode("active")
+
+    assert coordinator._trims == {"curve_0": 0.2}
+
+
+async def test_the_trim_seed_round_trips_through_the_store() -> None:
+    """A reload must not lose the offset a reversion kept.
+
+    The seed only helps if it survives the restart that usually follows a
+    reversion, and it is only applicable while its baseline is unchanged — so
+    both halves travel together.
+    """
+    store = FakeStore(
+        {
+            "baseline": dict(BASELINE),
+            "trim_seed": {
+                "trims": {"curve_0": 1.48, "curve_10": 1.63},
+                "baseline": dict(BASELINE),
+                "at": 1_760_100_000.0,
+            },
+        }
+    )
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator._trim_seed == {"curve_0": 1.48, "curve_10": 1.63}
+    assert coordinator._trim_seed_baseline == BASELINE
+    assert coordinator._trim_seed_ts == pytest.approx(1_760_100_000.0)
+
+
+async def test_an_incomplete_trim_seed_is_dropped() -> None:
+    store = FakeStore(
+        {
+            "baseline": dict(BASELINE),
+            "trim_seed": {"trims": {"curve_0": 1.5}, "baseline": {}, "at": 1.0},
+        }
+    )
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator._trim_seed is None
+    assert coordinator._trim_seed_baseline is None
 
 
 async def test_revert_from_shadow_does_not_record_last_active() -> None:
