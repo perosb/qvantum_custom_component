@@ -1340,6 +1340,34 @@ def test_assess_readiness_ready_and_value_blockers() -> None:
     assert result.p95_abs_c == pytest.approx(5.0)
 
 
+def test_assess_readiness_is_not_assessed_while_active() -> None:
+    """The gate is a pre-activation question, and active makes it self-referential.
+
+    ``cal_heat_temp`` then follows the table we wrote, so ``baseline − cal`` is
+    ``−(trims + adjustment)``: a large trim (the module doing its job) reads as
+    a failing gate, and a converged installation can never pass again. Measured
+    on a live install 2026-11-12: median 1.84 °C against trims of 1.44–1.50 and
+    a −0.15 °C adjustment. The gate therefore reports no verdict and no numbers.
+    """
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc).timestamp()
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc).timestamp()
+    window = {ts: 1.8 for ts in range(int(midnight), int(now), 3600)}
+
+    result = assess_readiness(window, int(now), ZoneInfo("UTC"), active=True)
+
+    assert not result.ready
+    assert result.blocker == "active"
+    assert result.median_abs_c is None
+    assert result.p95_abs_c is None
+    assert result.median_c is None
+    assert result.window_hours == pytest.approx(84.0)
+
+    # The same window in shadow is judged, so this is the regime and not the data.
+    shadow = assess_readiness(window, int(now), ZoneInfo("UTC"))
+    assert shadow.blocker == "median"
+    assert shadow.median_abs_c == pytest.approx(1.8)
+
+
 def test_assess_readiness_coverage_uses_covered_hours() -> None:
     now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc).timestamp()
     midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc).timestamp()

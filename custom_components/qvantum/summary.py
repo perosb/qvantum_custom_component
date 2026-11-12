@@ -93,6 +93,11 @@ _ENTITY_PREFIXES = (
 #: around zero share a median absolute value), and the room error over the same
 #: window. v9 could report that a model was invalid but not why, so "is the gate
 #: too strict or is it the season?" was unanswerable from the pool.
+#: The readiness figures are also **null while the curve is active**
+#: (`blocker: active`): the gate compares the baseline against a target that is
+#: then our own table, so the value was the trims and never meant what the field
+#: name said. A v10 row taken before this line existed carries a number there,
+#: which is why the meaning change belongs in the version comment.
 SUMMARY_SCHEMA_VERSION = 10
 
 #: Plant settings that describe the control loops. Everything else in the
@@ -274,10 +279,11 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "median_c": _number(getattr(snapshot, "median_c", None)),
         "p95_abs_c": _number(getattr(snapshot, "p95_abs_c", None)),
         "ready": bool(getattr(snapshot, "ready", False)),
-        # Why the gate is not met (`window`, `median`, `max` or the missing
-        # signal) and the window it was judged over. Without the blocker a row
-        # that failed the median gate is indistinguishable from one that never
-        # had the coverage to be judged at all.
+        # Why the gate is not met (`window`, `median`, `max`, the missing
+        # signal, or `active` = not assessed because the curve is writing) and
+        # the window it was judged over. Without the blocker a row that failed
+        # the median gate is indistinguishable from one that never had the
+        # coverage to be judged at all — or from one that was never judged.
         "blocker": _short_string(getattr(snapshot, "blocker", None)),
         "window_hours": _number(getattr(snapshot, "window_hours", None)),
         # The house's own room error over the same window. Readiness compares

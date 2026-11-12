@@ -74,6 +74,7 @@ const STRINGS = {
     shadowMode: "Shadow",
     ready: "Ready",
     notReady: "Not ready",
+    notAssessed: "Not assessed while active",
     noData: "No data",
     blocker: "blocker",
     pumpUser: "Pump: User defined",
@@ -109,6 +110,7 @@ const STRINGS = {
     shadowMode: "Skugga",
     ready: "Redo",
     notReady: "Inte redo",
+    notAssessed: "Bedöms inte medan kurvan är aktiv",
     noData: "Ingen data",
     blocker: "blockerare",
     pumpUser: "Pump: User defined",
@@ -775,10 +777,20 @@ class QvantumCurveCard extends HTMLElement {
         : `<span class="chip">${esc(t.noData)}</span>`,
     );
     if (model.known.deviation) {
+      // The gate is a pre-activation question: while the curve writes,
+      // cal_heat_temp follows our own table and the deviation is the trims,
+      // so the module reports "not assessed" rather than a failing verdict.
+      const notAssessed = model.blocker === "active";
       chips.push(
-        `<span class="chip ${model.ready ? "ok" : "warn"}">${esc(
-          model.ready ? t.ready : t.notReady,
-        )}${model.blocker ? `: ${esc(t.blocker)} ${esc(model.blocker)}` : ""}</span>`,
+        `<span class="chip ${
+          model.ready ? "ok" : notAssessed ? "" : "warn"
+        }">${esc(
+          model.ready ? t.ready : notAssessed ? t.notAssessed : t.notReady,
+        )}${
+          model.blocker && !notAssessed
+            ? `: ${esc(t.blocker)} ${esc(model.blocker)}`
+            : ""
+        }</span>`,
       );
       chips.push(
         `<span class="chip ${model.shadow ? "" : "ok"}">${esc(

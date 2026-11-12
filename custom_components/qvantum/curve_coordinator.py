@@ -449,6 +449,7 @@ def assess_readiness(
     *,
     signal: str | None = None,
     covered_hours: Iterable[int] | None = None,
+    active: bool = False,
 ) -> CurveReadiness:
     """Assess the readiness window over at least three full local days.
 
@@ -458,9 +459,24 @@ def assess_readiness(
     window, so a sample that is deliberately filtered (heating hours only) is
     not judged against every hour of the window; it defaults to the sample
     count for callers that pass an unfiltered series.
+
+    ``active`` means the curve is writing, and the gate is then **not
+    assessed** (``blocker="active"``, no numbers): ``cal_heat_temp`` follows
+    our own table, so ``baseline − cal`` is ``−(trims + adjustment)`` — a large
+    trim fails the gate because the module is doing its job. Measured
+    2026-11-12 on a live install: median 1.84 °C against trims of 1.44–1.50 and
+    a −0.15 °C adjustment, with a signed median of −1.84 and p95 2.2 (a level,
+    not a tail). The gate is a pre-activation question, so the trims never feed
+    back into the baseline (`_async_learn_baseline` only runs on Auto) and it
+    could not recover on its own.
     """
     if signal is not None:
         return CurveReadiness(False, signal, None, None, 0.0)
+    if active:
+        _, window_hours = readiness_window(now_ts, tz)
+        return CurveReadiness(
+            False, "active", None, None, round(window_hours, 1)
+        )
 
     start, window_hours = readiness_window(now_ts, tz)
     expected = max(1, int((now_ts - start) // 3600))
@@ -2844,6 +2860,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             time_zone,
             signal=signal,
             covered_hours=covered_hours,
+            active=self.active,
         )
         room_errors, room_source = await self._async_room_error_hours()
         room = room_error_summary(room_errors, int(now_ts), time_zone)
