@@ -49,8 +49,10 @@ COP_MIN_ELECTRICAL_KWH = 0.2
 #:
 #: This deliberately does *not* suppress an hour that delivered 0.7 kWh of heat
 #: from 1.5 kWh of electricity (a measured 0.47). That is a real figure for a
-#: real regime — 70 K lift into the buffer with the evaporator below zero and a
-#: defrost every 50 minutes — and hiding it would be the wrong correction.
+#: real regime — a 70 K lift into a 61.7 °C buffer with the evaporator at
+#: −7.5 °C — and hiding it would be the wrong correction. Defrost is *not* part
+#: of it: the same window ran 15 defrosts at 8 % duty spread evenly across the
+#: hours that scored 3.1–4.1 as well.
 COP_MIN_THERMAL_KWH = 0.2
 
 
