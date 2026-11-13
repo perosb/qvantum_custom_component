@@ -131,6 +131,24 @@ CONF_CURVE_SOLAR = "curve_solar_term"
 CONF_CURVE_COP = "curve_cop_feedback_term"
 CONF_CURVE_PRECHARGE = "curve_precharge_term"
 CONF_CURVE_WIND = "curve_wind_term"
+
+#: Stable codes for the curve's revert counter. The log keeps the human sentence
+#: (which write failed, which knot did not stick); the pool needs a fixed set it
+#: can count, because "why does this installation keep reverting" has a different
+#: answer per code: a transport failure, a pump that rejects the write, a table we
+#: computed wrong and a user switching control off lead to different fixes. A code
+#: is only ever added here, never renamed: the pool groups by it.
+REVERT_REASONS: tuple[str, ...] = (
+    "switched_off",
+    "write_failed",
+    "write_not_applied",
+    "points_unverified",
+    "point_not_stuck",
+    "writes_disabled",
+    "no_device_id",
+    "table_invalid",
+    "other",
+)
 # EMA time constant (seconds) for the fed value: smooths sensor noise while
 # still following the room temperature within minutes.
 EXTERNAL_ROOM_TEMP_EMA_TAU = 300.0

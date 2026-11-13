@@ -36,7 +36,13 @@ from homeassistant.util import dt as dt_util
 
 from .client.models import result_applied
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
-from .const import DOMAIN, HP_STATUS_HEATING, HeatingCurveType, SensorMode
+from .const import (
+    DOMAIN,
+    HP_STATUS_HEATING,
+    REVERT_REASONS,
+    HeatingCurveType,
+    SensorMode,
+)
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .heating_curve import (
     CURVE_KEYS,
@@ -409,6 +415,25 @@ def _counter_days(value: Any) -> list[str]:
         if item not in days:
             days.append(item)
     return days[-COUNTER_MAX_DAYS:]
+
+
+def _counter_reasons(value: Any) -> dict[str, int]:
+    """Sanitize a persisted ``code -> count`` map against the known codes.
+
+    An unknown code is dropped rather than carried: the pool groups by code, and
+    a renamed one would split a count in two. A code that is absent is simply
+    zero, so the export always carries the full set.
+    """
+    if not isinstance(value, dict):
+        return {}
+    reasons: dict[str, int] = {}
+    for code in REVERT_REASONS:
+        count = value.get(code)
+        if isinstance(count, bool) or not isinstance(count, (int, float)):
+            continue
+        if count > 0:
+            reasons[code] = int(count)
+    return reasons
 
 
 def readiness_window(now_ts: int, tz: ZoneInfo) -> tuple[float, float]:
@@ -807,6 +832,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "trim_updates": 0,
             "clamped_days": [],
             "extrapolated_days": [],
+            # Why the curve was reverted, by stable code. ``reverts`` says how
+            # often; this says whether it was a transport failure, a pump that
+            # rejected the write, a table we computed wrong or a user switching
+            # control off — four different answers to the same count.
+            "revert_reasons": {},
         }
         # Optional control-loop terms (off unless explicitly enabled) and the
         # learned COP reference used by the feedback term.
@@ -868,6 +898,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "trim_updates": 0,
             "clamped_days": [],
             "extrapolated_days": [],
+            "revert_reasons": {},
         }
         await self._async_persist()
 
@@ -881,6 +912,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "trim_updates": int(counters.get("trim_updates") or 0),
             "days_clamped": len(counters.get("clamped_days") or ()),
             "days_extrapolated": len(counters.get("extrapolated_days") or ()),
+            "revert_reasons": {
+                code: int((counters.get("revert_reasons") or {}).get(code) or 0)
+                for code in REVERT_REASONS
+            },
         }
 
     @property
@@ -1137,6 +1172,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 "extrapolated_days": _counter_days(
                     counters.get("extrapolated_days")
                 ),
+                "revert_reasons": _counter_reasons(
+                    counters.get("revert_reasons")
+                ),
             }
         stats = data.get("baseline_stats")
         if isinstance(stats, dict):
@@ -1265,7 +1303,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             if mode == "active":
                 await self._async_activate()
             elif self.active:
-                await self._async_revert("switched off")
+                await self._async_revert("switched off", code="switched_off")
             else:
                 # Already shadow: never touch a table this module does not
                 # own; only retry a latched safety reversion.
@@ -1299,11 +1337,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             raise
         except Exception as err:  # noqa: BLE001 — transport failures revert
             _LOGGER.warning("Curve write %s failed: %s", label, err)
-            await self._async_revert(f"write failed ({label})")
+            await self._async_revert(
+                f"write failed ({label})", code="write_failed"
+            )
             return None
         if not result_applied(response):
             _LOGGER.warning("Curve write %s was not applied: %s", label, response)
-            await self._async_revert(f"write not applied ({label})")
+            await self._async_revert(
+                f"write not applied ({label})", code="write_not_applied"
+            )
             return None
         return response
 
@@ -1376,7 +1418,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         except asyncio.CancelledError:
             raise
         except Exception as err:  # noqa: BLE001 — verification is mandatory
-            await self._async_revert("curve points could not be verified")
+            await self._async_revert(
+                "curve points could not be verified", code="points_unverified"
+            )
             raise HomeAssistantError(f"Could not verify curve points: {err}") from err
         for key, value in points.items():
             reported = readback.get(key)
@@ -1385,7 +1429,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 or isinstance(reported, bool)
                 or int(math.floor(float(reported) + 0.5)) != value
             ):
-                await self._async_revert(f"{key} did not stick")
+                await self._async_revert(
+                    f"{key} did not stick", code="point_not_stuck"
+                )
                 raise HomeAssistantError(f"Curve point {key} did not stick")
 
         response = await self._async_write_or_revert(
@@ -1416,16 +1462,23 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         await self._async_persist()
         _LOGGER.info("Adaptive heating curve active (holding 22 = User defined)")
 
-    async def _async_revert(self, reason: str = "unspecified") -> None:
+    async def _async_revert(
+        self, reason: str = "unspecified", *, code: str = "other"
+    ) -> None:
         """Safety fallback: write holding 22 back to Auto, stop writing.
 
         ``reason`` is logged: a reversion that writes Auto is otherwise
         indistinguishable from the pump leaving User defined on its own, and
-        the two need different answers.
+        the two need different answers. ``code`` is the stable half: the log
+        sentence names the write or the knot, the code is what the pooled
+        summary counts, so "why does this installation keep reverting" can be
+        answered without the installation's log.
         """
         was_active = self._mode == "active"
         if was_active:
             self._counters["reverts"] = int(self._counters.get("reverts") or 0) + 1
+            reasons = self._counters.setdefault("revert_reasons", {})
+            reasons[code] = int(reasons.get(code) or 0) + 1
         if reason == "switched off":
             _LOGGER.info("Adaptive curve control switched off (holding 22 = Auto)")
         else:
@@ -1492,11 +1545,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
     async def _async_apply_active(self, result: Any) -> None:
         """Write changed points while active; a failure reverts to Auto."""
         if not self.writable:
-            await self._async_revert("Modbus writes are disabled")
+            await self._async_revert(
+                "Modbus writes are disabled", code="writes_disabled"
+            )
             return
         device_id = getattr(self._main, "device_id", None)
         if not device_id:
-            await self._async_revert("no pump device id")
+            await self._async_revert("no pump device id", code="no_device_id")
             return
         values = self._main_values()
         if values.get("curve_type_heating") != HeatingCurveType.USER_DEFINED:
@@ -1523,7 +1578,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             dict(result.points), min_supply_c=low, max_supply_c=high
         ):
             await self._async_revert(
-                "computed table violates the pump's supply limits or shape"
+                "computed table violates the pump's supply limits or shape",
+                code="table_invalid",
             )
             return
 

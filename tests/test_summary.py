@@ -16,6 +16,7 @@ from custom_components.qvantum.heating_curve import ActiveRoomGain
 from custom_components.qvantum.client.modbus.maps import MODBUS_HOLDING_TO_SETTINGS_MAP
 from custom_components.qvantum.summary import (
     FITTED_EFFICIENCY_KEYS,
+    REVERT_REASONS,
     MODBUS_ONLY_PLANT_KEYS,
     PLANT_KEYS,
     QvantumSummaryView,
@@ -509,6 +510,7 @@ def test_counters_block_is_exported_and_absent_on_cloud():
             "trim_updates": 6,
             "days_clamped": 3,
             "days_extrapolated": 4,
+            "revert_reasons": {"write_failed": 2},
         }
     )
 
@@ -520,10 +522,46 @@ def test_counters_block_is_exported_and_absent_on_cloud():
         "trim_updates": 6,
         "days_clamped": 3,
         "days_extrapolated": 4,
+        "revert_reasons": {
+            "switched_off": 0,
+            "write_failed": 2,
+            "write_not_applied": 0,
+            "points_unverified": 0,
+            "point_not_stuck": 0,
+            "writes_disabled": 0,
+            "no_device_id": 0,
+            "table_invalid": 0,
+            "other": 0,
+        },
     }
     # No curve coordinator (cloud mode) means no counters at all.
     assert summary_counters_summary(None) is None
     assert summary_counters_summary(SimpleNamespace()) is None
+
+
+def test_revert_reasons_are_a_fixed_set_and_never_a_log():
+    """An unknown code is dropped, and every known one is present.
+
+    The pool groups by code, so a renamed or invented one would split a count in
+    two; a missing one would read as "never happened" instead of zero.
+    """
+    coordinator = SimpleNamespace(
+        counters={
+            "since": "2026-10-01",
+            "reverts": 3,
+            "trim_updates": 0,
+            "days_clamped": 0,
+            "days_extrapolated": 0,
+            "revert_reasons": {"table_invalid": 3, "invented_code": 9},
+        }
+    )
+
+    reasons = summary_counters_summary(coordinator)["revert_reasons"]
+
+    assert set(reasons) == set(REVERT_REASONS)
+    assert reasons["table_invalid"] == 3
+    assert "invented_code" not in reasons
+    assert sum(reasons.values()) == 3
 
 
 def test_schema_version_covers_the_counters_block():
