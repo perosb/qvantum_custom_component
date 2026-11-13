@@ -592,7 +592,7 @@ This explains why a 12–20 kW draw can last only minutes before the tank cools,
 | `dhwpower` | `BF1 × (BT34 − BT33)` in W | Instantaneous draw power; 0 without flow; not an energy. |
 | `cop_heating` | Rolling 1 h heating COP | Heating mode only; shares the electrical counters. |
 | `cop_dhw` | Charge-segment COP | Tank balance, one sensor; not draw efficiency. |
-| `scop_total` | 30-day system COP | Includes DHW, additional heat and real operation. |
+| `scop_total` | 30-day system COP | Includes DHW, additional heat and real operation. Summed from the recorder's `sum` column in positive segments, so a restored or merged database (which restarts that column at zero) does not blank it. |
 | `dhw_standing_loss` | Tank standing loss | Normalised to 40 K tank-to-ambient. |
 | `dhw_tank_liters` | Identified tank volume | Element-only balance; live 177.9 L vs 175 L nameplate. |
 | `dhw_meter_estimated_kwh` | Poll integral of BF1 × ΔT | Compared with `dhwenergy`; live −0.2 %. |

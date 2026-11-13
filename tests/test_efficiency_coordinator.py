@@ -100,6 +100,23 @@ class TestWindowDelta:
         assert _window_delta([], 1000, 30) == (None, 0.0)
         assert _window_delta([(0, 1.0)], 1000, 30)[0] is None
 
+    def test_a_restored_recorder_does_not_blank_the_window(self):
+        """A merge restarts the sum column; the segments still add up.
+
+        Measured 2026-11-13 after a database recovery: 17397.8 kWh became
+        1.2 kWh at the merge point. The restore consumes nothing, so the
+        energy across it is the sum of the positive segments — refusing the
+        window instead blanked SCOP, the aux share, the duty cycle and the
+        health grade for the whole 30 days.
+        """
+        now_ts = 10 * 3600
+        rows = [(0, 100.0), (3600, 110.0), (2 * 3600, 1.0), (3 * 3600, 4.0)]
+
+        delta, coverage = _window_delta(rows, now_ts, 30)
+
+        assert delta == pytest.approx(13.0)  # 10 before the merge + 3 after
+        assert coverage == pytest.approx(4 / 24)
+
     def test_negative_delta_is_none(self):
         now_ts = 10 * 3600
         rows = [(0, 5.0), (now_ts, 1.0)]
