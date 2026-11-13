@@ -74,8 +74,8 @@ two meanings out of one pool key, so a version that no release has carried has n
 rows to protect: further schema-shaped changes on `main` before the next release
 edit the current number in place and append to its comment instead of bumping
 again. Check the released `manifest.json` (or the latest tag) before deciding —
-2026.11.1 is the newest stable release and carries **v9**, so **v10** is the first
-number that needs a row of its own (and v10 therefore may not fold further changes
+2026.11.2 is the newest stable release and carries **v10**, so **v11** is the first
+number that needs a row of its own (and v11 therefore may not fold further changes
 once it ships; before that, edit it in place as usual). v9 added
 `daily_wind_evidence_days` beside `daily_wind_cold_hours`: the wind gate wants
 cold+windy hours **and** the days carrying them, and a row reporting only the
