@@ -10,7 +10,11 @@
  * `/local/qvantum-curve-card.js`. No build step, no dependencies.
  */
 
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.0.1";
+
+/** Outdoor temperature → the ``curve_*`` key the trim layer is keyed by. */
+const trimKey = (outdoor) =>
+  outdoor < 0 ? `curve_minus_${Math.abs(outdoor)}` : `curve_${outdoor}`;
 
 /** Metric keys (unique_id suffix) → outdoor temperature for the seven points. */
 const POINT_METRICS = [
@@ -82,6 +86,10 @@ const STRINGS = {
     capped: "Indoor cap",
     trust: "Solar trust",
     learned: "Baseline learned",
+    extrapolated: "extrapolated",
+    trimEvidence: "Trim evidence",
+    capBand: "Indoor cap",
+    roomError: "room error 24 h",
     tOutdoor: "Outdoor",
     tNight: "Night/day",
     tSolar: "Solar",
@@ -117,6 +125,10 @@ const STRINGS = {
     capped: "Inomhustak",
     trust: "Sol-tilltro",
     learned: "Baslinje inlärd",
+    extrapolated: "extrapolerade",
+    trimEvidence: "Trim-eviden",
+    capBand: "Inomhustak",
+    roomError: "rumfel 24 h",
     tOutdoor: "Ute",
     tNight: "Natt/dag",
     tSolar: "Sol",
@@ -438,6 +450,12 @@ class QvantumCurveCard extends HTMLElement {
         value: num(s?.state),
         baseline: num(attr(s, "baseline")),
         trim: num(attr(s, "trim")) ?? 0,
+        // Hours behind this knot's trim: 0 means the trim is 0 on purpose.
+        evidence: num(attr(s, "evidence_hours")),
+        // A knot outside the learned baseline span is the line fit's shape,
+        // not a measurement — the distinction the chart cannot show by itself.
+        extrapolated: attr(s, "extrapolated") === true,
+        floorPinned: attr(s, "floor_pinned") === true,
       };
     }).sort((a, b) => a.outdoor - b.outdoor);
 
@@ -495,7 +513,15 @@ class QvantumCurveCard extends HTMLElement {
         trims: attr(adj, "trims"),
         clamped: attr(adj, "clamped") === true,
         capped: attr(adj, "capped_by_indoor") === true,
+        loadMean: num(attr(adj, "load_power_mean_w")),
+        loadCoverage: num(attr(adj, "load_power_coverage_hours")),
       },
+      extrapolated: points
+        .filter((p) => p.extrapolated)
+        .map((p) => p.outdoor),
+      trimEvidence: attr(dev, "trim_evidence"),
+      capArmed: attr(dev, "indoor_cap_armed") === true,
+      capMargin: num(attr(dev, "indoor_margin_c")),
       ready: attr(dev, "ready") === true,
       shadow: attr(dev, "shadow") === true,
       blocker: attr(dev, "blocker"),
@@ -794,6 +820,16 @@ class QvantumCurveCard extends HTMLElement {
     }
     if (model.known.adjustment && model.adjustment.clamped)
       chips.push(`<span class="chip warn">${esc(t.clamped)}</span>`);
+    // Shown above the clamped chip in importance: a clamped knot is refused by
+    // the pump's limits, an extrapolated one has no measurement behind it at
+    // all. Six of seven knots is the common case while the baseline span is
+    // narrower than the weather.
+    if (model.extrapolated.length)
+      chips.push(
+        `<span class="chip warn">${fmt(model.extrapolated.length, 0)}/7 ${esc(
+          t.extrapolated,
+        )}</span>`,
+      );
     if (model.known.adjustment && model.adjustment.capped)
       chips.push(`<span class="chip warn">${esc(t.capped)}</span>`);
     if (model.known.solar && model.trust !== null)
@@ -849,7 +885,17 @@ class QvantumCurveCard extends HTMLElement {
       ...optional(a.terms.cop_feedback, t.tCop, a.cop),
       ...optional(a.terms.precharge, t.tPrecharge, a.precharge),
       ...(windChip ? [windChip] : []),
-      term(t.tLoad, a.load),
+      // The load term is gated on 30 minutes of observed evidence, so a bare
+      // "+0.0 K" hides whether it balances or is still filling after a restart.
+      // The coverage says which, and the mean says what it is balancing.
+      term(
+        t.tLoad,
+        a.load,
+        "",
+        a.loadCoverage !== null && Math.abs(a.load ?? 0) < 0.05
+          ? `${fmt(a.loadCoverage, 1)} ${t.hours}`
+          : "",
+      ),
       term(t.tTrims, trimSum),
       term(t.tTotal, a.total, "total"),
     ];
@@ -864,7 +910,35 @@ class QvantumCurveCard extends HTMLElement {
           0,
         )} °C)`;
       }
-      footer.push(learned);
+      // Its own flex item: the footer lays items out with a gap, and a bare
+      // string would run into the next one.
+      footer.push(`<span>${learned}</span>`);
+    }
+    // Hours behind the trims, worst-evidenced first: "+3.8 K" sums knots that
+    // rest on 151 measured hours and knots the line fit produced with none.
+    const evidence = model.trimEvidence;
+    if (evidence && typeof evidence === "object") {
+      const parts = model.allPoints
+        .filter((p) => (num(evidence[trimKey(p.outdoor)]) ?? 0) > 0 || p.trim)
+        .sort((a, b) => (num(evidence[trimKey(b.outdoor)]) ?? 0) - (num(evidence[trimKey(a.outdoor)]) ?? 0))
+        .map(
+          (p) =>
+            `${fmt(p.outdoor, 0)} °C ${fmt(num(evidence[trimKey(p.outdoor)]) ?? 0, 0)} ${t.hours}`,
+        );
+      if (parts.length)
+        footer.push(
+          `<span>${esc(t.trimEvidence)}: ${parts.join(" · ")}</span>`,
+        );
+    }
+    // The indoor cap is a band whose edges follow the 24 h room error; showing
+    // it while the cap is only *armed* answers "how close is it?" before the
+    // warn chip ever appears.
+    if (model.capArmed && model.capMargin !== null && !model.adjustment?.capped) {
+      footer.push(
+        `<span>${esc(t.capBand)}: ${esc(t.roomError)} ${signed(
+          model.capMargin,
+        )} K</span>`,
+      );
     }
     return `<div class="terms">${terms.join("")}</div>${
       footer.length ? `<div class="footer">${footer.join("")}</div>` : ""
