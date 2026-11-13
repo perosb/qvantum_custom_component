@@ -342,9 +342,10 @@ class TestCalculateCop:
         """A genuinely poor hour is a measurement and must not be hidden.
 
         The same night gave 0.7 kWh of delivered heat from 1.5 kWh of
-        electricity: a 70 K lift into the buffer, the evaporator below zero and
-        a defrost every 50 minutes. Suppressing that would hide the one figure
-        the sensor exists to show.
+        electricity: a 70 K lift into a 61.7 °C buffer with the evaporator at
+        -7.5 °C. Suppressing that would hide the one figure the sensor exists to
+        show. Defrost does not explain it - the same 8 % duty ran through the
+        hours that scored 3.1-4.1.
         """
         calculator = _Calculator()
         calculator._calculate_cop(_values())
