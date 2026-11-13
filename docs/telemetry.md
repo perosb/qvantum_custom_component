@@ -44,7 +44,7 @@ The complete field list:
 | plant | `sensor_mode`, `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
 | climate | the outdoor span the installation has been observed in, heating hours |
 | curve | room gain grouped as `configured` / `applied` / `fitted`, with `window`, `valid`, `notes`, evidence hours, standard error (with `t`) and leave-one-out swing; readiness `median_abs_c` **and** the signed `median_c`, `p95_abs_c`, `window_hours` and the room error over the same window (`room_error_median_abs_c`, `room_error_p90_abs_c`) — plus the `blocker` that says whether the gate failed or was never assessed (while the curve writes the readiness figures are `null` and `blocker` is `active`, because the deviation is then our own trims); the solar model (`a`, `b`, trust, days — the hourly `b` keeps its value while `trust` is 0 when it misses the t ≥ 2.5 gate, so the pair is not a bug), the day-block model's evidence (`daily_solar_t_stat`, `daily_solar_r2`, `daily_solar_valid`, `daily_solar_notes`: which gate refused it) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours *and days* behind it and whether its gates let it act) |
-| fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure, with `reference_delta_k`, `loss_w_per_k` and the newest window's evidence), cycling, SCOP, auxiliary-heat share, health grade |
+| fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure, with `reference_delta_k`, `loss_w_per_k` and the newest window's evidence), cycling, SCOP over the 30-day window **and** over the 90-day one (`scop_total_90d` — the health grade reads the 30-day figure, so the longer window is what separates a shoulder-season row from a poor installation), auxiliary-heat share, health grade |
 | counters | curve reverts, trim updates, days with an actionable clamped or an extrapolated knot, and the date the counters were reset at (*Modbus only*) |
 | verdicts | reserved for derived analysis results (currently empty) |
 
@@ -93,6 +93,13 @@ beside the absolute one (a constant offset and noise around zero share a median
 absolute value and need opposite answers); and the room error over the same
 window (readiness compares against the pump's target, which carries the room
 term, so a deviation cannot be weighed without it).
+
+v11 adds `scop_total_90d` beside `scop_total`. The health grade is built from
+the 30-day figure while `SCOP_WORST`/`SCOP_BEST` in `plant_analytics.py` are
+documented as a *seasonal* range, so a shoulder-season row and a genuinely poor
+installation produce the same letter. The pool could not tell them apart without
+the longer window in the same row; the number already existed as an attribute on
+the SCOP sensor, and the export is what makes it poolable.
 
 ### The installation token
 
