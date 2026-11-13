@@ -23,6 +23,15 @@ draw); the heating circuit carries temperatures (BT10/BT11/BT12) but no water
 flow, so there is no `flow × ΔT` for space heating and `heatingenergy`
 (input 99/100) is the only thermal measurement the hardware offers.
 
+**And it meters the circuit, not the heat pump.** The 175 L buffer is charged by
+the same compressor, so an hour spent lifting the buffer towards its DHW setpoint
+spends electrical energy that never appears in `heatingenergy`. A ratio below 1
+is therefore possible **by construction** and is not evidence of a measurement
+error: measured on a live QE-6, the hours the buffer sat at 61.7 °C with the
+circuit at 38.3 °C gave 0.5–1.7, while the hours at circuit temperature gave
+3.1–4.1. Read `cop_heating` as *delivered to the circuit per kWh drawn*, never as
+the heat pump's COP.
+
 That counter advances in 0.1 kWh steps, so `heatingpower` is the **average since
 the previous step, held until the next one**: measured on a live installation
 over 36 h it changed every ~225 s at a median 1.6 kW. Read it as a **~3–4 minute
@@ -65,9 +74,18 @@ while the delivered-heat counter stood still: 0.3 kWh of electricity against
 
 The floor is deliberately at two counter steps, not at a "plausible" level. The
 same night produced an hour of 0.7 kWh of heat from 1.5 kWh of electricity —
-COP 0.47 — which is a **real** figure for a real regime: a 70 K lift into the
-buffer, the evaporator at −7.5 °C and a defrost every 50 minutes. Suppressing
-that would hide the one thing the sensor exists to show.
+COP 0.47 — which is a **real** figure for the regime described above: a 70 K lift
+into a 61.7 °C buffer with the evaporator at −7.5 °C. Suppressing that would hide
+the one thing the sensor exists to show.
+
+Defrost is **not** part of that explanation, although it looks like it. The same
+window ran 15 defrosts of exactly 5 minutes each — every 50 minutes, 8 % duty —
+and they were distributed evenly across both regimes: the hours that scored 3.1–4.1
+carried the same 8 %. A constant duty cannot explain a fivefold difference, so the
+electrical side was checked instead: the integral of `powertotal` matched
+`compressorenergy + additionalenergy` within 0.1–0.2 kWh every hour (04:00:
+1.63 kWh measured against 1.50 kWh counted), which puts the quantisation of three
+0.1 kWh counters and an assumed tank volume on the same order as what is left.
 
 ## The electrical split
 
