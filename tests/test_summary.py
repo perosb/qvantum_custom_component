@@ -112,6 +112,8 @@ def efficiency_snapshot():
         thermal_mass_kwh_per_k=1.7,
         dhw_standing_loss=0.04,
         compressor_starts_per_hour=1.2,
+        scop_total=2.66,
+        scop_total_90d=2.81,
         efficiency_health_grade="B",
         efficiency_health_score=0.72,
         efficiency_health_coverage=0.8,
@@ -228,6 +230,20 @@ def test_summary_degrades_without_a_curve_or_efficiency() -> None:
     assert set(payload["fitted"]) == set(FITTED_EFFICIENCY_KEYS)
     assert all(value is None for value in payload["fitted"].values())
     assert payload["verdicts"] == {}
+
+
+def test_fitted_carries_both_scop_windows() -> None:
+    """The 30-day SCOP and the 90-day one travel side by side.
+
+    The health grade reads the 30-day figure while its scorer's range is a
+    seasonal one, so a shoulder-season row and a poor installation produce the
+    same letter. The pool can only separate them if both windows are in the row.
+    """
+    fitted = build()["fitted"]
+
+    assert fitted["scop_total"] == 2.66
+    assert fitted["scop_total_90d"] == 2.81
+    assert fitted["scop_total_90d"] != fitted["scop_total"]
 
 
 def test_climate_comes_from_the_curve_snapshot() -> None:
@@ -545,6 +561,20 @@ def test_schema_version_bumped_for_the_curve_evidence():
     from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
 
     assert SUMMARY_SCHEMA_VERSION >= 10
+
+
+def test_schema_version_bumped_for_the_second_scop_window():
+    """v10 rows carry one SCOP window; the health grade needs two to be read.
+
+    The grade is built from the 30-day figure while its scorer's range is a
+    seasonal one, so a shoulder-season row and a poor installation produce the
+    same letter. `scop_total_90d` is additive, but pooling it with v10 would
+    read "field missing" as "no longer window" — the question the field exists
+    to answer.
+    """
+    from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
+
+    assert SUMMARY_SCHEMA_VERSION >= 11
 
 
 def test_schema_version_bumped_for_the_wind_column():

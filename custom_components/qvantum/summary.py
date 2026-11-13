@@ -98,7 +98,13 @@ _ENTITY_PREFIXES = (
 #: then our own table, so the value was the trims and never meant what the field
 #: name said. A v10 row taken before this line existed carries a number there,
 #: which is why the meaning change belongs in the version comment.
-SUMMARY_SCHEMA_VERSION = 10
+#: 11: adds `scop_total_90d`, the same SCOP over the 90-day window. The health
+#: grade is built from the 30-day figure while its scorer's range is documented
+#: as a *seasonal* one, so the pool needs both windows side by side to tell a
+#: shoulder-season 30-day figure from a genuinely poor installation. The number
+#: already existed as an attribute on the SCOP sensor; the export is what makes
+#: it poolable.
+SUMMARY_SCHEMA_VERSION = 11
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -136,6 +142,10 @@ FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (
     "compressor_run_hours_24h",
     "compressor_duty_cycle",
     "scop_total",
+    # The same figure over the 90-day window. The health grade reads the 30-day
+    # one, so a shoulder-season row and a poor installation look alike without
+    # the longer window beside it.
+    "scop_total_90d",
     "aux_heat_share",
     "efficiency_health_grade",
     "efficiency_health_score",
