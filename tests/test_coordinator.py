@@ -1996,6 +1996,78 @@ class TestCalculateHeatingPower:
 
         assert values["heatingpower"] == 0.0
 
+    def test_stopped_compressor_zeroes_the_held_rate(self):
+        """A held rate must not survive a compressor that stopped.
+
+        ``hp_status`` is derived from ``compressor_state`` and reports heating
+        for the *mode*, so a night-time off period kept the last running figure
+        (measured on a live QE-6: 1846 W held at 0 rpm and 0 W electrical).
+        """
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power(
+                {"heatingenergy": 100.0, "hp_status": 3, "compressormeasuredspeed": 1900}
+            )
+            mock_now.return_value = t1
+            v1 = {
+                "heatingenergy": 100.001,
+                "hp_status": 3,
+                "compressormeasuredspeed": 1900,
+            }
+            coordinator._calculate_heating_power(v1)
+            assert v1["heatingpower"] == 240.0
+            coordinator.data = {"values": v1}
+
+            # Compressor stopped; the counter cannot step, so nothing may be held.
+            values = {
+                "heatingenergy": 100.001,
+                "hp_status": 3,
+                "compressormeasuredspeed": 0,
+            }
+            coordinator._calculate_heating_power(values)
+
+        assert values["heatingpower"] == 0.0
+
+    def test_electrical_input_gates_when_speed_is_absent(self):
+        """Input 93 answers where speed does not; either zero stops the hold."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power(
+                {"heatingenergy": 100.0, "hp_status": 3, "compressor_power": 663}
+            )
+            mock_now.return_value = t1
+            holding = {"heatingenergy": 100.001, "hp_status": 3, "compressor_power": 663}
+            coordinator._calculate_heating_power(holding)
+            assert holding["heatingpower"] == 240.0
+
+            stopped = {"heatingenergy": 100.001, "hp_status": 3, "compressor_power": 0}
+            coordinator._calculate_heating_power(stopped)
+
+        assert stopped["heatingpower"] == 0.0
+
+    def test_no_compressor_metric_keeps_the_previous_behaviour(self):
+        """Without either signal the mode alone decides, as before."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
+            mock_now.return_value = t1
+            values = {"heatingenergy": 100.001, "hp_status": 3}
+            coordinator._calculate_heating_power(values)
+
+        assert values["heatingpower"] == 240.0
+
     def test_missing_heatingenergy_skipped(self):
         """If heatingenergy is absent, the method does nothing."""
         coordinator = self._make_coordinator()

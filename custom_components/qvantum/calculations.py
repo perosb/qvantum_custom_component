@@ -7,6 +7,7 @@ import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from itertools import pairwise
+from collections.abc import Mapping
 from typing import Any, Callable
 
 from homeassistant.util import dt as dt_util
@@ -70,6 +71,26 @@ def _flag(value: object) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "on", "yes"}
     return False
+
+
+def _compressor_running(values: Mapping[str, Any]) -> bool:
+    """True when the compressor itself is turning.
+
+    A counter rate is held between steps because one 0.1 kWh step over a poll
+    is a quantisation artefact, not a power. That hold is only meaningful while
+    the compressor is actually working: gating it on ``hp_status`` alone holds
+    the last running figure through a whole off period, because ``hp_status`` is
+    derived from ``compressor_state`` and reports "heating" for the mode. Speed
+    (input 31) is the direct signal; electrical input (input 93) answers as well
+    and catches a compressor still ramping down. Neither metric present leaves
+    the previous behaviour, so a transport without them is not changed.
+    """
+    for key in ("compressormeasuredspeed", "compressor_power"):
+        value = values.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        return value > 0
+    return True
 
 
 def _split_electrical_input(
@@ -214,7 +235,14 @@ class QvantumCalculationsMixin:
             values,
             energy_key="heatingenergy",
             power_key="heatingpower",
-            is_active=lambda v: v.get("hp_status") == HP_STATUS_HEATING,
+            # The counter rate may only be held while the compressor is turning.
+            # ``hp_status`` describes the pump's *mode*, not whether a compressor
+            # runs: it is derived from ``compressor_state``, which reports 6
+            # (heating) with the compressor at 0 rpm and 0 W, so a night-time off
+            # period held the last running figure until the counter stepped again.
+            is_active=lambda v: (
+                v.get("hp_status") == HP_STATUS_HEATING and _compressor_running(v)
+            ),
             last_energy_attr="_last_heatingenergy",
             last_time_attr="_last_heatingenergy_time",
             mode_label="heating",

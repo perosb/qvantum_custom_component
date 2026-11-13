@@ -33,6 +33,15 @@ tracks the load a counter-derived draw figure could not: only 2 % of the polls
 inside a heating phase read 0 W and 1.5 % exceed twice the median, where the
 old counter-derived `dhwpower` sat at 0 W on 24 % of its draw polls.
 
+The hold is only allowed **while the compressor is turning** (`compressormeasuredspeed`
+input 31, falling back to `compressor_power` input 93). `hp_status` is the pump's
+*mode*, not a running signal: it is derived from `compressor_state`, which reports
+6 (heating) with the compressor at 0 rpm and 0 W electrical, so a night-time off
+period held the last running figure for the whole stop — measured 1846 W held at
+0 rpm while `powertotal` read 160 W. The same hold fed `heating_power_mean_w`, the
+load term's input, so the bias was not cosmetic. Without either metric the mode
+alone still decides, which keeps a transport that reports neither unchanged.
+
 Do not "fix" it the way `dhwpower` was fixed — there is nothing to switch to. A
 rolling counter window smooths the staircase but lags, and it loses energy at
 every stop (a 600 s window gave up 7 % over the same measurement window); the
