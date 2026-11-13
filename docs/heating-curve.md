@@ -887,13 +887,27 @@ use `/local/qvantum-curve-card.js` as the resource URL.
   ≥1 °C write-threshold visualized.
 - **Operating point** — ring, only when `operating_point` is configured.
 - **Status chips** — Active/Shadow (switch), Ready/blocker, Pump
-  User-defined/Auto, clamped to supply limits, indoor cap, solar-model trust.
+  User-defined/Auto, clamped to supply limits, **extrapolated knots**, indoor
+  cap, solar-model trust. The extrapolation chip counts the knots the chart
+  draws as the line fit's shape rather than as a measurement — six of seven is
+  the normal state while the learned baseline span is narrower than the weather,
+  and without the chip that shape reads like any other point.
   The Ready/blocker chip is **omitted while the curve is active**: the gate is
   a pre-activation question and is not assessed there (`blocker: active`), so
   the chip would read "not assessed" every day without ever carrying
   information.
 - **Term chips** — outdoor, night/day, solar, load, trims and total, all in K
   (they are temperature *differences*, not absolute temperatures).
+- **Footer** — three facts the term chips cannot carry. *Baseline learned*: the
+  hours and outdoor span the baseline rests on. *Trim evidence*: the hours
+  behind each knot's trim, so "+3.8 K" is readable as 151 measured hours at
+  0 °C beside a +0.5 K that the line fit produced with none — a knot with
+  0 hours keeps its trim at 0 on purpose rather than because the house is right.
+  *Indoor cap*: the 24-hour mean room error, shown while the cap is only
+  **armed**; once it bites, the warn chip says so instead. The load chip shows
+  its coverage in hours when the term is 0, because the mean is gated on 30
+  minutes of evidence and a bare `+0.0 K` cannot say whether the house balances
+  or the window is still filling after a restart.
 
 In cloud mode, with the Modbus write option off, or before the first curve
 snapshot the card degrades to a message instead of failing.
