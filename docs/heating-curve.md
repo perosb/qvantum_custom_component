@@ -407,7 +407,12 @@ Entities:
   `wind_c`, `terms` (which of the four are switched on), `wind_valid`, the
   evidence counts `wind_cold_hours` / `wind_required_cold_hours` and
   `wind_evidence_days` / `wind_required_days`, `trims`,
-  `clamped`, `clamped_points` and `floor_pinned_points` attributes. The card
+  `clamped`, `clamped_points` and `floor_pinned_points` attributes, plus the
+  load term's own inputs `load_power_mean_w` and `load_power_coverage_hours`.
+  Those two are the only part of `load_c` a reader cannot infer from the term:
+  the mean refuses to publish below 30 minutes of observed evidence, so a
+  `load_c` of `0.0` is either an observed balance or a window still filling
+  after a restart, and the coverage is what tells them apart. The card
   uses `terms`/`wind_valid` to tell "switched on but idle" from "switched off",
   and to show the wind chip while it is off when the coefficient is
   identifiable — that is the state that decides whether switching it on is

@@ -723,6 +723,16 @@ def _curve_snapshot(**overrides) -> CurveSnapshot:
     return CurveSnapshot(**values)
 
 
+class _WindowStub:
+    """Minimal stand-in for ``HeatingPowerWindow``'s coverage accessor."""
+
+    def __init__(self, hours: float) -> None:
+        self._hours = hours
+
+    def coverage_seconds(self, now_ts: object) -> float:
+        return self._hours * 3600.0
+
+
 def _curve_coordinator(snapshot: CurveSnapshot, *, daily=None) -> QvantumCurveCoordinator:
     coordinator = QvantumCurveCoordinator.__new__(QvantumCurveCoordinator)
     coordinator.data = snapshot if daily is None else replace(snapshot, daily_model=daily)
@@ -867,6 +877,8 @@ class TestQvantumCurveSensors:
             "wind_evidence_days": None,
             "wind_required_days": 10,
             "capped_by_indoor": False,
+            "load_power_mean_w": None,
+            "load_power_coverage_hours": None,
             "trims": {},
             "clamped": False,
             "clamped_points": [],
@@ -879,6 +891,40 @@ class TestQvantumCurveSensors:
             mock_device,
         )
         assert empty.available is False
+
+    def test_adjustment_sensor_exposes_the_load_term_inputs(self, mock_device):
+        """A load term of 0.0 needs its inputs to be readable.
+
+        The mean is gated on 30 minutes of observed evidence, so the same
+        ``load_c`` means either an observed balance or a window still filling
+        after a restart. The coverage is the only distinction, and neither
+        figure can be inferred from the term itself.
+        """
+        coordinator = _curve_coordinator(_curve_snapshot())
+        coordinator._main = SimpleNamespace(
+            data={"values": {"heating_power_mean_w": 2328.8}}
+        )
+        coordinator._main._heating_power_mean = _WindowStub(1.29)
+        entity = QvantumCurveAdjustmentSensor(
+            coordinator, "adaptive_curve_adjustment", mock_device
+        )
+
+        attributes = entity.extra_state_attributes
+        assert attributes["load_power_mean_w"] == 2328.8
+        assert attributes["load_power_coverage_hours"] == 1.29
+
+    def test_load_term_inputs_degrade_to_none(self, mock_device):
+        """A poll without the mean, or a window that is gone, is None."""
+        coordinator = _curve_coordinator(_curve_snapshot())
+        coordinator._main = SimpleNamespace(data={"values": {}})
+
+        entity = QvantumCurveAdjustmentSensor(
+            coordinator, "adaptive_curve_adjustment", mock_device
+        )
+
+        attributes = entity.extra_state_attributes
+        assert attributes["load_power_mean_w"] is None
+        assert attributes["load_power_coverage_hours"] is None
 
     def test_point_sensor_exposes_active_trim(self, mock_device):
         coordinator = _curve_coordinator(

@@ -1072,6 +1072,13 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
             ),
             "wind_required_days": _MIN_COLD_WIND_DAYS,
             "capped_by_indoor": snapshot.capped_by_indoor,
+            # The load term's only input the output does not reveal: what the
+            # pump delivers on average, and how much of that window was
+            # observed. A term of 0.0 is either a balance or a window still
+            # filling after a restart, and without the coverage they look the
+            # same (the mean is gated on 30 minutes of evidence).
+            "load_power_mean_w": self.coordinator.load_power_mean_w,
+            "load_power_coverage_hours": self.coordinator.load_power_coverage_hours,
             "trims": dict(snapshot.trims),
             "clamped": snapshot.clamped,
             "clamped_points": list(snapshot.clamped_points),

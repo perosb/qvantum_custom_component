@@ -1684,9 +1684,35 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         same ``values`` section as the metrics (``{"device", "values"}``), so
         curve type, targets and the seven points all live there.
         """
-        data = self._main.data if isinstance(self._main.data, dict) else {}
+        main = getattr(self, "_main", None)
+        data = main.data if main is not None and isinstance(main.data, dict) else {}
         values = data.get("values")
         return values if isinstance(values, dict) else {}
+
+    @property
+    def load_power_mean_w(self) -> float | None:
+        """The rolling mean that feeds the load term, from the main poll."""
+        value = self._main_values().get("heating_power_mean_w")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return float(value)
+
+    @property
+    def load_power_coverage_hours(self) -> float | None:
+        """How much of the load mean's window is actually observed.
+
+        The mean refuses to publish below ``HEATING_POWER_MIN_COVERAGE_SECONDS``
+        (30 minutes), so a load term of ``0.0`` means two different things: an
+        observed balance, or a window still filling after a restart. The
+        coverage is what tells them apart, and it is the only input of the term
+        a reader cannot infer from the output.
+        """
+        window = getattr(getattr(self, "_main", None), "_heating_power_mean", None)
+        coverage = getattr(window, "coverage_seconds", None)
+        if not callable(coverage):
+            return None
+        seconds = coverage(dt_util.utcnow().timestamp())
+        return round(float(seconds) / 3600.0, 2)
 
     def _supply_bounds(self, values: Mapping[str, Any]) -> tuple[float, float]:
         """Effective pump supply limits, falling back to the register range."""
