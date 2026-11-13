@@ -239,6 +239,18 @@ more than the readiness median gate, which is why the median sat at 2.17 °C wit
 a raw 1.43 °C underneath. The trims, the indoor cap and `room_error` stay on the
 configured sensor — those describe the house, this describes the pump's input.
 
+**Modes without an indoor sensor.** In `sensor_mode` DISABLED / BT3 / AUX there
+is no mode-specific indoor metric, so the configured reading falls back to BT2 —
+it is a probe the pump can read, and the correction is skipped only when BT2 is
+missing or implausible too. Whether the firmware applies its room term at all in
+those modes is **not measured**: the pool's four such installations all report an
+applied gain from `bt2` (1.0–8.0 °C/°C), and one of them fits 0.43 °C/°C on its
+own Auto hours against a configured 8.0 — which is what a pump applying no term
+would look like, but the Auto-hour fit is ungated and reads 0.0 on two
+installations that do compensate. An **active-hour** fit on an installation in
+one of those modes is what would settle it, because there the table is ours and
+the room term is the only thing moving the supply inside an outdoor bucket.
+
 The blend is only used while BT2 is a probe the pump can read. An installation
 without an interior sensor keeps the firmware's placeholder there — a QE4 owner
 reported a fixed −30 °C (2026-10-23) — and the pump's own room value then comes

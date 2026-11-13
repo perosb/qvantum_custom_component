@@ -2228,9 +2228,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         """The pump's configured room-compensation gain and the sensor it uses.
 
         ``None`` — today's no-correction behaviour — when the factor is
-        missing, zero, non-finite or above ``ROOM_GAIN_MAX_C``, and when
-        ``sensor_mode`` supplies no indoor reading at all: with no reading
-        there is no room term to remove, so a factor must not invent one.
+        missing, zero, non-finite or above ``ROOM_GAIN_MAX_C``, and when there
+        is no indoor reading at all: with no reading there is no room term to
+        remove, so a factor must not invent one. "No reading" means no usable
+        BT2 either — in the DISABLED/BT3/AUX modes the configured value falls
+        back to BT2 (``_indoor_live_key``), because BT2 is a probe the pump can
+        read. Whether the firmware applies its room term in those modes is not
+        measured; see ``docs/heating-curve.md``.
         """
         factor = values.get("room_comp_factor")
         self._room_gain_factor = (
