@@ -732,8 +732,27 @@ async def test_an_unusable_factor_never_invents_a_correction(factor) -> None:
     assert coordinator._room_gain_source is None
 
 
-async def test_a_mode_without_an_indoor_reading_has_no_gain() -> None:
-    """No reading means no room term, whatever the factor says."""
+async def test_a_mode_without_a_mode_sensor_still_uses_bt2() -> None:
+    """DISABLED/BT3/AUX have no mode sensor, so the reading falls back to BT2.
+
+    BT2 is a probe the pump can read, and it is always in the payload, so this
+    is the branch the pool's four ``sensor_mode`` 0 installations actually take
+    (0f3bb8, 3f63b6, 94ccf5, e98afa all report an applied gain from ``bt2``).
+    """
+    coordinator = make_coordinator(
+        values=configured_values(sensor_mode=0), settings=SETTINGS
+    )
+    coordinator._async_persist = AsyncMock()
+
+    await coordinator._async_sync_room_gain(coordinator._main_values())
+
+    assert coordinator._room_gain == pytest.approx(5.0)
+    assert coordinator._room_gain_source == "bt2"
+    assert coordinator._room_gain_from_factor is True
+
+
+async def test_a_mode_without_any_indoor_reading_has_no_gain() -> None:
+    """No reading at all means no room term, whatever the factor says."""
     coordinator = make_coordinator(
         values=configured_values(sensor_mode=0, bt2=None), settings=SETTINGS
     )
