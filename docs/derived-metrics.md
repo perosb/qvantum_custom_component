@@ -53,6 +53,22 @@ Both are documented with their measurements in
 [QE architecture §7.5 and §7.7](qe-architecture.md#75-dhwpower-in-home-assistant)
 — including why `dhwpower` must never be integrated for energy.
 
+## The heating COP window
+
+`cop_heating` is one rolling hour (`COP_WINDOW_SECONDS`) of counter deltas, and it
+publishes only when the window holds **both** measurable electricity
+(`COP_MIN_ELECTRICAL_KWH` 0.2 kWh, two 0.1 kWh steps) and measurable delivered
+heat (`COP_MIN_THERMAL_KWH`, the same two steps). The thermal half was added
+after a night hour on a live QE-6 spent the compressor's work on a 61.7 °C buffer
+while the delivered-heat counter stood still: 0.3 kWh of electricity against
+0.0 kWh of heat published as a ratio of 0.
+
+The floor is deliberately at two counter steps, not at a "plausible" level. The
+same night produced an hour of 0.7 kWh of heat from 1.5 kWh of electricity —
+COP 0.47 — which is a **real** figure for a real regime: a 70 K lift into the
+buffer, the evaporator at −7.5 °C and a defrost every 50 minutes. Suppressing
+that would hide the one thing the sensor exists to show.
+
 ## The electrical split
 
 The counters (`compressorenergy` + `additionalenergy`) are **shared between

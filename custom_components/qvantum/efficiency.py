@@ -40,6 +40,19 @@ COP_WINDOW_SECONDS = 3600.0
 #: window keeps growing until the full COP_WINDOW_SECONDS is reached.
 COP_MIN_ELECTRICAL_KWH = 0.2
 
+#: Minimum *delivered* heat in the window, the symmetric half of the gate
+#: above. Without it a window whose electrical input is real but whose
+#: ``heatingenergy`` counter never stepped publishes a ratio of 0 — measured as
+#: a night hour at a 61.7 °C buffer, where the compressor's work went into the
+#: tank and the delivered-heat counter stood still. Two steps, like the
+#: electrical floor: a smaller figure is quantisation, not a level.
+#:
+#: This deliberately does *not* suppress an hour that delivered 0.7 kWh of heat
+#: from 1.5 kWh of electricity (a measured 0.47). That is a real figure for a
+#: real regime — 70 K lift into the buffer with the evaporator below zero and a
+#: defrost every 50 minutes — and hiding it would be the wrong correction.
+COP_MIN_THERMAL_KWH = 0.2
+
 
 def _finite(value: object) -> float | None:
     """Coerce to a finite float, rejecting bools and non-numeric input."""
