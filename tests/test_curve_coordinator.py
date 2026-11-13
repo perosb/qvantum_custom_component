@@ -15,7 +15,7 @@ import pytest
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.qvantum import curve_coordinator as cc
-from custom_components.qvantum.const import HP_STATUS_HEATING
+from custom_components.qvantum.const import HP_STATUS_HEATING, REVERT_REASONS
 from custom_components.qvantum.heating_curve import (
     WIND_MAX_C,
     ActiveRoomGain,
@@ -4315,6 +4315,7 @@ class TestCurveCounters:
             "trim_updates": 5,
             "days_clamped": 2,
             "days_extrapolated": 1,
+            "revert_reasons": dict.fromkeys(REVERT_REASONS, 0),
         }
 
     async def test_revert_and_trim_updates_are_counted(self):
@@ -4326,6 +4327,56 @@ class TestCurveCounters:
 
         assert coordinator.counters["reverts"] == 1
         assert coordinator.counters["trim_updates"] == 0
+
+    async def test_revert_reasons_are_counted_by_code(self):
+        """``reverts`` says how often; the codes say why."""
+        coordinator, _client = make_writable_coordinator()
+
+        # A revert drops the coordinator to shadow, so a second one needs the
+        # user to have re-activated it — which is what the counter measures.
+        for reason, code in (
+            ("write failed (curve_10=42)", "write_failed"),
+            ("write failed (curve_0=30)", "write_failed"),
+            ("switched off", "switched_off"),
+        ):
+            coordinator._mode = "active"
+            await coordinator._async_revert(reason, code=code)
+
+        counters = coordinator.counters
+        assert counters["reverts"] == 3
+        assert counters["revert_reasons"]["write_failed"] == 2
+        assert counters["revert_reasons"]["switched_off"] == 1
+        assert counters["revert_reasons"]["table_invalid"] == 0
+
+    async def test_a_shadow_revert_counts_no_reason(self):
+        """Only an active curve can be reverted, so only then is there a why."""
+        coordinator, _client = make_writable_coordinator()
+
+        await coordinator._async_revert("Modbus writes are disabled", code="writes_disabled")
+
+        counters = coordinator.counters
+        assert counters["reverts"] == 0
+        assert counters["revert_reasons"]["writes_disabled"] == 0
+
+    async def test_revert_reasons_survive_a_restart(self):
+        store = FakeStore(
+            {
+                "counters": {
+                    "since": "2026-10-01",
+                    "reverts": 4,
+                    "revert_reasons": {"write_failed": 3, "invented": 7, "other": -1},
+                }
+            }
+        )
+        coordinator = make_coordinator(store=store)
+
+        await coordinator.async_restore()
+
+        reasons = coordinator.counters["revert_reasons"]
+        assert reasons["write_failed"] == 3
+        # An unknown code is dropped and a non-positive count is not a count.
+        assert "invented" not in reasons
+        assert reasons["other"] == 0
 
     async def test_a_day_is_marked_once_in_each_category(self):
         coordinator, _client = make_writable_coordinator()

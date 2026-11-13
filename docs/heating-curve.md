@@ -554,6 +554,14 @@ A reversion the module caused itself logs its reason at WARNING (INFO when the
 user switched control off), so it is not mistaken for an external change in the
 log. A revert that cannot be written is latched and
 retried, so a lost connection cannot leave the integration claiming control.
+Each reversion is also counted under a stable code — `switched_off`,
+`write_failed`, `write_not_applied`, `points_unverified`, `point_not_stuck`,
+`writes_disabled`, `no_device_id`, `table_invalid` — beside the total, and the
+counts travel in the summary export. The total says how often an installation
+was kicked out; the code says whether it was the transport, the pump rejecting
+a write, a table we computed wrong or the user switching control off, which are
+four different fixes. Only an active curve can be reverted, so a shadow
+coordinator counts neither.
 Optional terms are persisted with the rest of the curve state and have a switch
 in the integration's **Configure** dialog as well as in
 `qvantum.set_curve_terms`. COP feedback, pre-charge and wind default to off; the

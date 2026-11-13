@@ -37,7 +37,7 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, VERSION
+from .const import DOMAIN, REVERT_REASONS, VERSION
 from .statistics import INDOOR_METRIC_KEYS
 
 #: Where the summary can be downloaded while logged in. The browser session
@@ -103,7 +103,10 @@ _ENTITY_PREFIXES = (
 #: as a *seasonal* one, so the pool needs both windows side by side to tell a
 #: shoulder-season 30-day figure from a genuinely poor installation. The number
 #: already existed as an attribute on the SCOP sensor; the export is what makes
-#: it poolable.
+#: it poolable. Also adds `counters.revert_reasons`: `reverts` says how often the
+#: curve was kicked out, the per-code counts say whether it was a transport
+#: failure, a pump that rejected the write, a table we computed wrong or a user
+#: switching control off — four different answers to the same number.
 SUMMARY_SCHEMA_VERSION = 11
 
 #: Plant settings that describe the control loops. Everything else in the
@@ -359,7 +362,7 @@ def counters_summary(coordinator: Any) -> dict[str, Any] | None:
     counters = getattr(coordinator, "counters", None)
     if not isinstance(counters, Mapping):
         return None
-    return {
+    payload = {
         key: (
             _short_string(counters.get(key))
             if key == "since"
@@ -367,6 +370,16 @@ def counters_summary(coordinator: Any) -> dict[str, Any] | None:
         )
         for key in COUNTER_KEYS
     }
+    # Why, not just how often. The codes are a fixed set, so the block stays
+    # counts and never a log; an absent code is zero, which is what makes
+    # "this installation never reverted on a write" expressible at all.
+    reasons = counters.get("revert_reasons")
+    if not isinstance(reasons, Mapping):
+        reasons = {}
+    payload["revert_reasons"] = {
+        code: int(_number(reasons.get(code)) or 0) for code in REVERT_REASONS
+    }
+    return payload
 
 
 def room_gain_summary(coordinator: Any) -> dict[str, Any]:
