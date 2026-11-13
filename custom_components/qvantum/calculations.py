@@ -48,6 +48,7 @@ from .dhw_loss import (
 )
 from .efficiency import (
     COP_MIN_ELECTRICAL_KWH,
+    COP_MIN_THERMAL_KWH,
     COP_WINDOW_SECONDS,
     cap_dhw_ratio,
     cop_ratio,
@@ -471,7 +472,10 @@ class QvantumCalculationsMixin:
         heating_thermal = round(heating_thermal, 6)
         heating_electrical = round(heating_electrical, 6)
 
-        if heating_electrical >= COP_MIN_ELECTRICAL_KWH:
+        if (
+            heating_electrical >= COP_MIN_ELECTRICAL_KWH
+            and heating_thermal >= COP_MIN_THERMAL_KWH
+        ):
             heating_ratio = cop_ratio(heating_thermal, heating_electrical)
             if heating_ratio is not None:
                 self._cop_last["cop_heating"] = heating_ratio

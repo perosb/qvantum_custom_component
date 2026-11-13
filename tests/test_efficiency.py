@@ -321,6 +321,39 @@ class TestCalculateCop:
         # Two compressor steps (0.2 kWh) against 0.6 kWh of heating energy.
         assert values["cop_heating"] == pytest.approx(3.0)
 
+    def test_no_delivered_heat_holds_the_last_ratio(self):
+        """Electrical input without a heat step must not publish a 0.
+
+        Measured on a live QE-6: an hour at a 61.7 °C buffer spent the
+        compressor's work on the tank while the delivered-heat counter stood
+        still, so the window held 0.3 kWh of electricity and 0.0 kWh of heat.
+        The ratio is not a measurement there — the last good figure holds.
+        """
+        calculator = _Calculator()
+        calculator._cop_last = {"cop_heating": 3.2}
+        calculator._calculate_cop(_values())
+        values = _values(heatingenergy=100.0, compressorenergy=40.3)
+
+        calculator._calculate_cop(values)
+
+        assert values["cop_heating"] == 3.2
+
+    def test_low_but_real_heat_still_publishes(self):
+        """A genuinely poor hour is a measurement and must not be hidden.
+
+        The same night gave 0.7 kWh of delivered heat from 1.5 kWh of
+        electricity: a 70 K lift into the buffer, the evaporator below zero and
+        a defrost every 50 minutes. Suppressing that would hide the one figure
+        the sensor exists to show.
+        """
+        calculator = _Calculator()
+        calculator._calculate_cop(_values())
+        values = _values(heatingenergy=100.7, compressorenergy=41.5)
+
+        calculator._calculate_cop(values)
+
+        assert values["cop_heating"] == pytest.approx(0.4667, abs=1e-3)
+
     def test_heating_window_publishes_heating_cop(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
