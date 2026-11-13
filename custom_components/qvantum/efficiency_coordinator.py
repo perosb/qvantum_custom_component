@@ -232,20 +232,32 @@ def _cumulative_series(rows: list[Any]) -> list[tuple[int, float]]:
 def _window_delta(
     points: list[tuple[int, float]], now_ts: float, days: int
 ) -> tuple[float | None, float]:
-    """First-to-last cumulative delta inside the window, plus coverage in days.
+    """Summed cumulative delta inside the window, plus coverage in days.
 
-    The recorder's ``sum`` is monotonic across meter resets, so first-to-last
-    is a safe delta. ``None`` when fewer than two hours fall in the window.
+    The recorder's ``sum`` is monotonic across **meter** resets — it adds the
+    new total on top — so a first-to-last difference is safe there. It is not
+    monotonic across a **restored or merged recorder**, which restarts the
+    column at zero: measured 2026-11-13 after a database recovery, 17397.8 kWh
+    became 1.2 kWh at the merge point. Requiring monotonicity blanked
+    ``scop_total``, the aux share, the duty cycle and the health grade for the
+    whole 30-day window, so the segments are summed instead: the restore itself
+    consumes nothing, and a negative step is a discontinuity rather than
+    consumption. ``None`` when fewer than two hours fall in the window or no
+    segment is positive.
     """
     cutoff = now_ts - days * 86400.0
     window = [(ts, total) for ts, total in points if ts >= cutoff]
     coverage_days = len(window) / 24.0
     if len(window) < 2:
         return None, coverage_days
-    delta = window[-1][1] - window[0][1]
-    if delta < 0.0:
+    total = 0.0
+    for (_, before), (_, after) in zip(window, window[1:]):
+        step = after - before
+        if step > 0.0:
+            total += step
+    if total <= 0.0:
         return None, coverage_days
-    return delta, coverage_days
+    return total, coverage_days
 
 
 def _aligned_window(
