@@ -83,6 +83,12 @@ MODBUS_INPUT_REGISTER_MAP = {
     "compressor_starts": (89, "uint16", 1.0),
     "ventilation_fan_run_time": (90, "uint16", 1.0),
     "ventilation_filter_time_left": (91, "uint16", 1.0),
+    # 1.12 reports the unit's own total power here; 1.11.10 answers the address
+    # with 0. Measured on a QE-6 (1.12.8) against the integration's derivation:
+    # element off 546 = 160 base + 0 + 386 compressor, element on (L1+L3)
+    # 3889 = 160 + 3000 + 729. Internal: build_metrics_payload consumes it and
+    # never publishes the key.
+    "powertotal_register": (92, "uint16", 1.0),
     "compressor_power": (93, "uint16", 1.0),
     "compressor_mwh": (95, "uint16", 1.0),
     "compressor_kwh": (96, "uint16", 0.1),

@@ -610,6 +610,40 @@ class TestPayloadAdapter:
         assert payload["metrics"]["compressor_power"] == 100
         assert payload["metrics"]["hpid"] == "dev"
 
+    def test_powertotal_prefers_the_pumps_own_reading(self):
+        """1.12 reports the unit's total; it beats the estimate.
+
+        Measured on a QE-6 (1.12.8): element off 546 = 160 base + 0 + 386
+        compressor, element on (L1+L3) 3889 = 160 + 3000 + 729. The register
+        carries the real fan and pump draw, the estimate a fixed base.
+        """
+        payload = build_metrics_payload(
+            "dev",
+            {
+                "powertotal_register": 3889,
+                "picpin_relay_heat_l1": 1,
+                "picpin_relay_heat_l3": 1,
+                "compressor_power": 729,
+            },
+        )
+
+        assert payload["metrics"]["powertotal"] == 3889.0
+        # Internal: the key itself is never published.
+        assert "powertotal_register" not in payload["metrics"]
+
+    def test_powertotal_falls_back_when_the_register_reads_zero(self):
+        """1.11.10 answers the address with 0, and 0 is also a unit that is off."""
+        payload = build_metrics_payload(
+            "dev",
+            {
+                "powertotal_register": 0,
+                "picpin_relay_heat_l1": 1,
+                "compressor_power": 100,
+            },
+        )
+
+        assert payload["metrics"]["powertotal"] == 2260.0
+
     def test_bt2_detected_survives_the_enabled_metric_filter(self):
         """No entity exposes the bit, so only REQUIRED_MODBUS_METRICS keeps it.
 

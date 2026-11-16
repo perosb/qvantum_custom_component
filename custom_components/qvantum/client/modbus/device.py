@@ -102,9 +102,25 @@ def build_metrics_payload(
     except (TypeError, ValueError):
         compressor_power = 0.0
 
-    metrics["powertotal"] = round(
-        BASE_SYSTEM_POWER_W + relay_sum + compressor_power, 2
-    )
+    # The pump's own total (input 92, firmware 1.12+) beats the estimate: it
+    # carries the real fan and pump draw instead of a fixed base. 1.11.10
+    # answers the address with 0, and 0 is also a legitimate reading for a unit
+    # that is off, so the estimate stays for 0 — a 1.11 pump is unchanged, at
+    # the cost of reporting the 160 W base while a 1.12 unit is idle.
+    reported_total = values.get("powertotal_register")
+    # Internal either way: with no enabled-metric filter the key would otherwise
+    # reach the payload and create an entity nobody asked for.
+    metrics.pop("powertotal_register", None)
+    if (
+        isinstance(reported_total, (int, float))
+        and not isinstance(reported_total, bool)
+        and reported_total > 0
+    ):
+        metrics["powertotal"] = float(reported_total)
+    else:
+        metrics["powertotal"] = round(
+            BASE_SYSTEM_POWER_W + relay_sum + compressor_power, 2
+        )
 
     for prefix in _ENERGY_PREFIXES:
         mwh = metrics.get(f"{prefix}_mwh")
