@@ -120,7 +120,16 @@ _ENTITY_PREFIXES = (
 #: so the name was dropped and the field read null on all 31 cloud rows in the
 #: pool while the other seven arrived as numbers. The export maps the two names
 #: to `SensorMode`'s integers; an unrecognised name still exports null.
-SUMMARY_SCHEMA_VERSION = 12
+#: 13: two changes to what a row can be weighed with. `device.firmware` becomes
+#: the **display** component only: the device registry holds `display/cc/inv`
+#: when the cloud wrote it and the display version alone when the Modbus probe
+#: did, because cc/inv exist only in the cloud metadata — the same build was
+#: therefore listed twice in the pool. And `fitted` gains `scop_coverage_days`
+#: and `building_coverage_days`, the observed days behind the SCOP and the
+#: heat-loss fit: without them a SCOP over seven scattered days reads exactly
+#: like one over thirty, which is what an installation that only runs while its
+#: owner tests produces.
+SUMMARY_SCHEMA_VERSION = 13
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -166,6 +175,12 @@ FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (
     "efficiency_health_grade",
     "efficiency_health_score",
     "efficiency_health_coverage",
+    # How much of each window was actually observed. A SCOP over 30 days and a
+    # SCOP over seven scattered days read the same in a row without them, and
+    # an installation that only runs while its owner tests produces the second
+    # while looking like the first.
+    "scop_coverage_days",
+    "building_coverage_days",
 )
 
 
@@ -263,6 +278,22 @@ def device_metadata(hass: Any, device_id: str, entry_id: str) -> Any:
     )
 
 
+def _display_firmware(sw_version: object) -> str | None:
+    """The display component of ``sw_version``, or ``None``.
+
+    The device registry carries ``display/cc/inv`` when the cloud wrote it and
+    the display version alone when the Modbus probe did, because the two extra
+    component versions are only in the cloud's metadata. The export keeps the
+    display part so one build cannot appear in the pool under two spellings —
+    measured: ``1.12.8/436/239`` and ``1.12.8`` are the same pump, and the
+    firmware column already lists both.
+    """
+    text = _short_string(sw_version)
+    if text is None:
+        return None
+    return text.split("/", 1)[0] or None
+
+
 def device_summary(device: Any) -> dict[str, Any]:
     """Manufacturer/model/firmware — device metadata, never user data."""
     if device is None:
@@ -270,7 +301,7 @@ def device_summary(device: Any) -> dict[str, Any]:
     return {
         "manufacturer": _short_string(getattr(device, "manufacturer", None)),
         "model": _short_string(getattr(device, "model", None)),
-        "firmware": _short_string(getattr(device, "sw_version", None)),
+        "firmware": _display_firmware(getattr(device, "sw_version", None)),
         "hardware": _short_string(getattr(device, "hw_version", None)),
     }
 
@@ -472,11 +503,14 @@ def fitted_summary(snapshot: Any) -> dict[str, Any]:
     """Identified envelope figures from the efficiency snapshot."""
     if snapshot is None:
         return {key: None for key in FITTED_EFFICIENCY_KEYS}
+    # ``scop_coverage_days`` is the snapshot's ``coverage_days``: the weakest
+    # counter's observed days in the 30-day SCOP window.
+    attribute = {"scop_coverage_days": "coverage_days"}
     return {
         key: (
-            _short_string(getattr(snapshot, key, None))
+            _short_string(getattr(snapshot, attribute.get(key, key), None))
             if key == "efficiency_health_grade"
-            else _number(getattr(snapshot, key, None))
+            else _number(getattr(snapshot, attribute.get(key, key), None))
         )
         for key in FITTED_EFFICIENCY_KEYS
     }

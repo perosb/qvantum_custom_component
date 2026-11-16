@@ -109,6 +109,19 @@ fixes, and the reason only ever existed in the installation's own log. The codes
 are a fixed set (`REVERT_REASONS` in `const.py`), so the block stays counts and
 never a log, and an absent code is exported as zero rather than omitted.
 
+v13 does two things to what a row can be weighed with. `device.firmware` becomes
+the **display** component only: the device registry holds `display/cc/inv` when
+the cloud wrote it and the display version alone when the Modbus probe did,
+because cc/inv exist only in the cloud metadata — so the same pump could appear
+in the pool twice, and the firmware column already listed both spellings. And
+`fitted` gains `scop_coverage_days` and `building_coverage_days`, the observed
+days behind the SCOP window and the heat-loss fit. Without them a SCOP over seven
+scattered days reads exactly like one over thirty, which is what an installation
+that only runs while its owner tests produces: measured on such an instance,
+`heat_loss_w_per_k`, `thermal_time_constant`, `thermal_mass` and
+`dhw_standing_loss` were all null while `heating_degree_hours` still came out,
+because the fits need continuous windows and the aligned one skips gaps.
+
 v12 fills `plant.sensor_mode` on cloud installations. Cloud/HTTP reports the
 indoor sensor source as a **name** (`bt2`, `ext_room_sensor`) while Modbus
 reports holding 9 as an integer, and the export coerces every plant setting
