@@ -117,6 +117,45 @@ class TestWindowDelta:
         assert delta == pytest.approx(13.0)  # 10 before the merge + 3 after
         assert coverage == pytest.approx(4 / 24)
 
+    def test_counters_share_one_interval(self):
+        """A counter that starts later must not leave the others unmoved.
+
+        The recorder keeps a separate history per entity, so a counter added or
+        enabled later begins inside the window. Measured on the pool: one row
+        reported SCOP 5.46 at a 52.5 % auxiliary share, which asks the
+        compressor for a COP of 10.4 — unequal spans are how that shape
+        appears.
+        """
+        now_ts = 10 * 3600
+        counts = {
+            # Starts a full day before the others and keeps going.
+            "heatingenergy": [(index * 3600, 100.0 + index) for index in range(10)],
+            "dhwenergy": [(5 * 3600, 50.0), (6 * 3600, 51.0), (7 * 3600, 52.0)],
+            "compressorenergy": [(5 * 3600, 40.0), (6 * 3600, 40.5), (7 * 3600, 41.0)],
+            "additionalenergy": [(5 * 3600, 10.0), (6 * 3600, 10.0), (7 * 3600, 10.0)],
+        }
+
+        deltas, coverage = ec.QvantumEfficiencyCoordinator._window(counts, now_ts, 30)
+
+        # The common span is 05:00-07:00, so heating contributes 2 kWh there,
+        # not the 9 kWh its own longer window would have given.
+        assert deltas["heatingenergy"] == pytest.approx(2.0)
+        assert deltas["dhwenergy"] == pytest.approx(2.0)
+        assert deltas["compressorenergy"] == pytest.approx(1.0)
+        assert coverage == pytest.approx(3 / 24)
+
+    def test_a_counter_with_no_window_fails_the_whole_window(self):
+        """No span to share means no ratio; a partial window is not one."""
+        now_ts = 10 * 3600
+        counts = {
+            "heatingenergy": [(index * 3600, 100.0 + index) for index in range(10)],
+        }
+
+        deltas, coverage = ec.QvantumEfficiencyCoordinator._window(counts, now_ts, 30)
+
+        assert deltas["heatingenergy"] is None
+        assert coverage == 0.0
+
     def test_negative_delta_is_none(self):
         now_ts = 10 * 3600
         rows = [(0, 5.0), (now_ts, 1.0)]
