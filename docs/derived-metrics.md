@@ -14,8 +14,13 @@ list the key in `special_sensor_keys`, so registry cleanup keeps it.
 ## Power
 
 `dhwpower` is the instantaneous draw power `4.186/60 · BF1 · (BT34 − BT33)` in
-Modbus mode. `powertotal` is an estimate (base load + active relay stages +
-`compressor_power`), not a calibrated measurement.
+Modbus mode. `powertotal` is the pump's **own** total from input 92 on firmware
+1.12+, and an estimate (base load + active relay stages + `compressor_power`)
+when that address reads 0 — which is what 1.11.10 answers, and also what a unit
+that is off reports. The estimate is not a calibrated measurement, but the
+register validated it to the watt in two element states (element off
+`546 = 160 + 0 + 386`, element on `3889 = 160 + 3000 + 729`), and the register is
+preferred because it carries the real fan and pump draw instead of a fixed base.
 
 `heatingpower` **cannot** be measured that way, and the difference matters
 before reaching for the same fix. The only flow register is `bf1_l_min` (the DHW
