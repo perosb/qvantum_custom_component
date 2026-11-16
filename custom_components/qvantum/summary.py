@@ -114,6 +114,12 @@ _ENTITY_PREFIXES = (
 #: curve was kicked out, the per-code counts say whether it was a transport
 #: failure, a pump that rejected the write, a table we computed wrong or a user
 #: switching control off — four different answers to the same number.
+#: 12: fills `plant.sensor_mode` on cloud installations. Cloud/HTTP reports the
+#: indoor source as a name ("bt2", "ext_room_sensor") while Modbus reports holding
+#: 9 as an integer, and every plant setting is coerced through a numeric check —
+#: so the name was dropped and the field read null on all 31 cloud rows in the
+#: pool while the other seven arrived as numbers. The export maps the two names
+#: to `SensorMode`'s integers; an unrecognised name still exports null.
 SUMMARY_SCHEMA_VERSION = 12
 
 #: Plant settings that describe the control loops. Everything else in the
