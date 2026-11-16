@@ -249,7 +249,8 @@ cost more than one.
 
 ## Commits and PRs
 
-Title: `type: Imperative subject`. Body = *why* when the subject is not enough.
+Title: `type(scope): Imperative subject`. Body = *why* when the subject is not
+enough.
 
 | Prefix | Use |
 |---|---|
@@ -259,6 +260,24 @@ Title: `type: Imperative subject`. Body = *why* when the subject is not enough.
 | `test:` | Tests only |
 | `docs:` | Docs only |
 | `chore:` | Tooling, CI, deps |
+
+**Add a scope when the change is confined to one area** — it is what makes a
+log readable a year later, and the squash merge takes the PR title, so the same
+rule applies there. Omit it when the change genuinely spans the integration.
+
+| Scope | Area |
+|---|---|
+| `modbus` | `client/modbus/`, register maps, the Modbus transport |
+| `cloud` | `client/cloud/`, endpoints, the HTTP transport |
+| `curve` | the adaptive curve: `heating_curve`, `curve_coordinator`, `solar_gain` |
+| `efficiency` | `efficiency_coordinator`, `building`, `dhw_loss`, the COP/SCOP figures |
+| `card` | `www/qvantum-curve-card.js` |
+| `telemetry` | consent, uploader, `summary.py`, `SUMMARY_SCHEMA_VERSION` |
+| `ci` | workflows, release automation, scripts under `.github/` |
+
+`feat(modbus): read the unit's own total power from input 92` is the shape:
+the scope names the area, the subject says what changed, and the body carries
+the measurement that justifies it.
 
 Release automation owns `Update for new version <tag>` — leave it to CI.
 
