@@ -260,6 +260,28 @@ def _window_delta(
     return total, coverage_days
 
 
+def _span_delta(
+    points: list[tuple[int, float]], start_ts: float, end_ts: float
+) -> tuple[float | None, int]:
+    """Summed cumulative delta inside ``[start_ts, end_ts]``, and its row count.
+
+    The same segment rule as :func:`_window_delta`, but over an explicit span so
+    several counters can be measured over the *same* interval. ``None`` when the
+    span holds fewer than two rows or no positive segment.
+    """
+    window = [(ts, total) for ts, total in points if start_ts <= ts <= end_ts]
+    if len(window) < 2:
+        return None, len(window)
+    total = 0.0
+    for (_, before), (_, after) in zip(window, window[1:]):
+        step = after - before
+        if step > 0.0:
+            total += step
+    if total <= 0.0:
+        return None, len(window)
+    return total, len(window)
+
+
 def _aligned_window(
     heating_points: list[tuple[int, float]],
     outdoor: Mapping[int, float],
@@ -832,13 +854,46 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
     def _window(
         series: Mapping[str, list[tuple[int, float]]], now_ts: float, days: int
     ) -> tuple[dict[str, float | None], float]:
-        """Deltas for every counter in the window, with the weakest coverage."""
+        """Deltas for every counter over the **same** interval, and its coverage.
+
+        Each counter must not be measured over its own window. The recorder
+        keeps a separate history per entity, so a counter whose entity was added,
+        enabled or renamed later starts inside the window while the others start
+        before it — and the ratio then divides a heating delta over N days by an
+        electrical delta over M days. Measured on the pool: one row reported
+        SCOP 5.46 with an auxiliary share of 52.5 %, which asks the compressor
+        for a COP of 10.4; the components cannot both be right, and unequal
+        spans are how that shape appears.
+
+        ``_aligned_window`` already aligns the numerator and denominator for the
+        heat-loss fit, and the DHW meter window insists on the same rule ("both
+        sides cover exactly the same intervals"). The ratio needs it too, so the
+        common span is used and the coverage is the weakest count inside it.
+        """
+        cutoff = now_ts - days * 86400.0
+        windows = {
+            key: [
+                (ts, total)
+                for ts, total in series.get(key, [])
+                if ts >= cutoff
+            ]
+            for key in COUNTER_KEYS
+        }
+        starts = [window[0][0] for window in windows.values() if window]
+        ends = [window[-1][0] for window in windows.values() if window]
+        if len(starts) < len(COUNTER_KEYS):
+            # A counter with nothing in the window has no span to share.
+            return {key: None for key in COUNTER_KEYS}, 0.0
+        start, end = max(starts), min(ends)
+        if end <= start:
+            return {key: None for key in COUNTER_KEYS}, 0.0
+
         deltas: dict[str, float | None] = {}
         coverages: list[float] = []
-        for key in COUNTER_KEYS:
-            delta, coverage_days = _window_delta(series.get(key, []), now_ts, days)
+        for key, window in windows.items():
+            delta, hours = _span_delta(window, start, end)
             deltas[key] = delta
-            coverages.append(coverage_days)
+            coverages.append(hours / 24.0)
         return deltas, min(coverages) if coverages else 0.0
 
     def _dhw_heat_meter_metrics(
