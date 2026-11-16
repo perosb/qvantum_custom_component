@@ -28,6 +28,7 @@ from custom_components.qvantum.summary import (
     device_metadata,
     device_summary,
     SensorMode,
+    fitted_summary,
     plant_summary,
 )
 
@@ -207,6 +208,51 @@ def test_a_cloud_payload_leaves_the_supply_limits_null() -> None:
 
     assert plant["indoor_temperature_offset"] == 0
     assert plant["max_heating_supply"] is None
+
+
+def test_the_firmware_keeps_only_the_display_component() -> None:
+    """One build must not appear in the pool under two spellings.
+
+    The device registry holds ``display/cc/inv`` when the cloud wrote it and the
+    display version alone when the Modbus probe did, because cc/inv exist only
+    in the cloud metadata. Measured: ``1.12.8/436/239`` and ``1.12.8`` are the
+    same pump.
+    """
+    device = SimpleNamespace(
+        manufacturer="Qvantum",
+        model="QE-6",
+        sw_version="1.12.8/436/239",
+        hw_version=None,
+    )
+
+    assert device_summary(device)["firmware"] == "1.12.8"
+
+    device.sw_version = "1.12.8"
+    assert device_summary(device)["firmware"] == "1.12.8"
+
+    device.sw_version = None
+    assert device_summary(device)["firmware"] is None
+
+
+def test_the_fitted_block_carries_the_coverage_behind_its_windows() -> None:
+    """A SCOP over seven scattered days must not read like one over thirty.
+
+    ``scop_coverage_days`` is the snapshot's ``coverage_days``: the weakest
+    counter's observed days in the 30-day window.
+    """
+    snapshot = SimpleNamespace(
+        scop_total=3.08,
+        efficiency_health_grade="D",
+        coverage_days=6.98,
+        building_coverage_days=11.4,
+    )
+
+    fitted = fitted_summary(snapshot)
+
+    assert fitted["scop_coverage_days"] == 6.98
+    assert fitted["building_coverage_days"] == 11.4
+    # A snapshot without them still exports the keys, as null.
+    assert fitted_summary(None)["scop_coverage_days"] is None
 
 
 def test_a_cloud_sensor_mode_name_is_exported_as_the_register_value() -> None:
