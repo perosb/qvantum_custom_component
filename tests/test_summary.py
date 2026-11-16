@@ -27,6 +27,7 @@ from custom_components.qvantum.summary import (
     counters_summary as summary_counters_summary,
     device_metadata,
     device_summary,
+    SensorMode,
     plant_summary,
 )
 
@@ -206,6 +207,29 @@ def test_a_cloud_payload_leaves_the_supply_limits_null() -> None:
 
     assert plant["indoor_temperature_offset"] == 0
     assert plant["max_heating_supply"] is None
+
+
+def test_a_cloud_sensor_mode_name_is_exported_as_the_register_value() -> None:
+    """Cloud reports the indoor source as a name, Modbus as the integer.
+
+    Measured on the pool: among 31 cloud rows every other plant field arrived as
+    a number, and ``sensor_mode`` alone was null on all 31 — the name was being
+    dropped by the numeric coercion rather than missing from the transport.
+    """
+    assert (
+        plant_summary({"sensor_mode": "ext_room_sensor"})["sensor_mode"]
+        == int(SensorMode.EXTERNAL)
+    )
+    assert plant_summary({"sensor_mode": "bt2"})["sensor_mode"] == int(SensorMode.BT2)
+    # Case and surrounding space come from the payload, not from us.
+    assert (
+        plant_summary({"sensor_mode": " Ext_Room_Sensor "})["sensor_mode"]
+        == int(SensorMode.EXTERNAL)
+    )
+    # An integer from Modbus passes straight through.
+    assert plant_summary({"sensor_mode": 0})["sensor_mode"] == 0
+    # An unknown name stays unknown rather than becoming a number.
+    assert plant_summary({"sensor_mode": "bt3_pending"})["sensor_mode"] is None
 
 
 def test_plant_carries_only_the_whitelisted_settings() -> None:

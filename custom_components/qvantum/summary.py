@@ -37,7 +37,14 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, REVERT_REASONS, VERSION
+from .const import (
+    DOMAIN,
+    REVERT_REASONS,
+    SENSOR_MODE_HTTP_BT2,
+    SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
+    SensorMode,
+    VERSION,
+)
 from .statistics import INDOOR_METRIC_KEYS
 
 #: Where the summary can be downloaded while logged in. The browser session
@@ -107,7 +114,7 @@ _ENTITY_PREFIXES = (
 #: curve was kicked out, the per-code counts say whether it was a transport
 #: failure, a pump that rejected the write, a table we computed wrong or a user
 #: switching control off — four different answers to the same number.
-SUMMARY_SCHEMA_VERSION = 11
+SUMMARY_SCHEMA_VERSION = 12
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -206,9 +213,27 @@ def _metric_key(value: Any) -> str | None:
     return value if value in INDOOR_METRIC_KEYS else None
 
 
+#: Cloud/HTTP reports the indoor sensor source as a **name** while Modbus reports
+#: the register integer (``SensorMode``). The export carries the integer on both
+#: transports so a cloud row and a Modbus row can be compared — which is why
+#: ``sensor_mode`` is the one plant field that was null on every cloud row while
+#: the other seven arrived as numbers.
+_SENSOR_MODE_NAMES = {
+    SENSOR_MODE_HTTP_BT2: int(SensorMode.BT2),
+    SENSOR_MODE_HTTP_EXT_ROOM_SENSOR: int(SensorMode.EXTERNAL),
+}
+
+
+def _plant_value(key: str, value: Any) -> Any:
+    """Coerce one plant setting, normalising the cloud's sensor-mode names."""
+    if key == "sensor_mode" and isinstance(value, str):
+        return _SENSOR_MODE_NAMES.get(value.strip().lower())
+    return _number(value)
+
+
 def plant_summary(values: Mapping[str, Any]) -> dict[str, Any]:
     """Whitelisted control-loop settings, coerced to numbers or ``None``."""
-    return {key: _number(values.get(key)) for key in PLANT_KEYS}
+    return {key: _plant_value(key, values.get(key)) for key in PLANT_KEYS}
 
 
 def device_metadata(hass: Any, device_id: str, entry_id: str) -> Any:
