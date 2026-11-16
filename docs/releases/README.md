@@ -6,7 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
-| [2026.11.4](2026.11.4.md) | 2026-11-16 | More reliable long-term performance calculations |
+| [2026.11.5](2026.11.5.md) | 2026-11-16 | More reliable long-term performance statistics |
 | [2026.11.3](2026.11.3.md) | 2026-11-13 | More insight into adaptive heating adjustments |
 | [2026.11.2](2026.11.2.md) | 2026-11-13 | More insight into room temperature and cooling |
 | [2026.11.1](2026.11.1.md) | 2026-11-04 | More reliable solar estimates |
