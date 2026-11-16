@@ -94,6 +94,35 @@ def _compressor_running(values: Mapping[str, Any]) -> bool:
     return True
 
 
+#: A heat pump's thermal output cannot exceed its electrical input by more than
+#: this. An exhaust-air unit at 4 °C outdoor and 40 °C supply has a Carnot limit
+#: near 8 and a real COP of 3–5, so 6 is a physical bound with headroom rather
+#: than a tuning knob. It exists to reject a *counter* artefact, not to model the
+#: machine: the 0.1 kWh counter can step several increments in consecutive polls
+#: when the pump flushes a lagging register, and one step per 15 s poll reads
+#: 24 kW. Measured on a QE-4 (issue #499): 0.1–0.4 kWh per poll for six minutes,
+#: 24–96 kW, which pushed the load term's mean from 3.5 to 9.8 kW and silenced it
+#: for hours. Measured on a QE-6: single 11–12 kW polls, the same mechanism at a
+#: smaller flush.
+HEATING_POWER_COP_CEILING = 6.0
+
+
+def _heating_power_ceiling(values: Mapping[str, Any]) -> float | None:
+    """Highest plausible ``heatingpower`` for this poll, or ``None``.
+
+    Scaled by the compressor's own electrical input, so it needs no model: the
+    pump reports serial and firmware only on Modbus, and ``device.model`` is
+    null there. Without a compressor reading there is no basis for a ceiling and
+    the previous behaviour stands.
+    """
+    power = values.get("compressor_power")
+    if isinstance(power, bool) or not isinstance(power, (int, float)):
+        return None
+    if power <= 0:
+        return None
+    return float(power) * HEATING_POWER_COP_CEILING
+
+
 def _split_electrical_input(
     *,
     hp_status: object,
@@ -178,6 +207,7 @@ class QvantumCalculationsMixin:
         last_energy_attr: str,
         last_time_attr: str,
         mode_label: str,
+        power_ceiling: Callable[[dict[str, Any]], float | None] | None = None,
     ) -> None:
         """Derive a mode-specific power metric from an energy counter delta.
 
@@ -185,6 +215,15 @@ class QvantumCalculationsMixin:
         While active mode is on and the counter is unchanged, holds the previously
         emitted power value. Outside active mode, writes 0 W and resets baseline.
         Negative deltas (counter resets) are clamped to 0 W.
+
+        ``power_ceiling`` rejects a step that implies a physically impossible
+        rate. The counter can flush several 0.1 kWh increments in consecutive
+        polls, and because the anchor moves on every step each one is divided by
+        a single poll interval — one step per 15 s poll reads 24 kW. Such a step
+        is a counter artefact, not a burst of heat, so the previous value is held
+        and the anchors advance: the next step then measures a normal interval
+        instead of inheriting the flush. The counter itself is untouched, so the
+        energy totals and the COP windows keep whatever the pump reported.
         """
         now = dt_util.utcnow()
         current_energy = values.get(energy_key)
@@ -215,14 +254,27 @@ class QvantumCalculationsMixin:
             if delta_kwh != 0 and delta_seconds > 0:
                 # kWh / s -> W: (kWh * 3_600_000 J/kWh) / s = J/s = W
                 power_w = (delta_kwh * 3_600_000) / delta_seconds
-                prev_power = max(0.0, round(power_w, 1))
-                _LOGGER.debug(
-                    "Calculated %s: %.1f W (delta=%.6f kWh over %.1f s)",
-                    power_key,
-                    prev_power,
-                    delta_kwh,
-                    delta_seconds,
-                )
+                ceiling = power_ceiling(values) if power_ceiling else None
+                if ceiling is not None and power_w > ceiling:
+                    _LOGGER.debug(
+                        "Ignoring implausible %s step: %.1f W (delta=%.6f kWh "
+                        "over %.1f s) exceeds the %.0f W ceiling; holding %.1f W",
+                        power_key,
+                        power_w,
+                        delta_kwh,
+                        delta_seconds,
+                        ceiling,
+                        prev_power,
+                    )
+                else:
+                    prev_power = max(0.0, round(power_w, 1))
+                    _LOGGER.debug(
+                        "Calculated %s: %.1f W (delta=%.6f kWh over %.1f s)",
+                        power_key,
+                        prev_power,
+                        delta_kwh,
+                        delta_seconds,
+                    )
 
         values[power_key] = prev_power
 
@@ -247,6 +299,7 @@ class QvantumCalculationsMixin:
             last_energy_attr="_last_heatingenergy",
             last_time_attr="_last_heatingenergy_time",
             mode_label="heating",
+            power_ceiling=_heating_power_ceiling,
         )
 
     def _calculate_heating_power_mean(self, values: dict) -> None:

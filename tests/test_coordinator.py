@@ -2068,6 +2068,101 @@ class TestCalculateHeatingPower:
 
         assert values["heatingpower"] == 240.0
 
+    def test_implausible_counter_step_holds_the_last_value(self):
+        """A flushed counter must not read as a burst of heat.
+
+        The anchor moves on every step, so a step per poll is divided by one
+        poll interval: 0.1 kWh over 15 s is 24 kW. Measured on a QE-4
+        (issue #499) as 0.1-0.4 kWh per poll for six minutes, 24-96 kW, which
+        pushed the load term's mean from 3.5 to 9.8 kW and silenced it.
+        """
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power(
+                {"heatingenergy": 100.0, "hp_status": 3, "compressor_power": 900}
+            )
+            mock_now.return_value = t1
+            plausible = {
+                "heatingenergy": 100.001,
+                "hp_status": 3,
+                "compressor_power": 900,
+            }
+            coordinator._calculate_heating_power(plausible)
+            assert plausible["heatingpower"] == 240.0
+            coordinator.data = {"values": plausible}
+
+            # 0.4 kWh in 15 s = 96 kW, against a 5.4 kW ceiling.
+            burst = {
+                "heatingenergy": 100.401,
+                "hp_status": 3,
+                "compressor_power": 900,
+            }
+            coordinator._calculate_heating_power(burst)
+
+        assert burst["heatingpower"] == 240.0
+
+    def test_the_next_step_after_a_burst_measures_normally(self):
+        """The anchors advance, so the flush is not inherited by the next step."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power(
+                {"heatingenergy": 100.0, "hp_status": 3, "compressor_power": 900}
+            )
+            mock_now.return_value = t1
+            plausible = {
+                "heatingenergy": 100.001,
+                "hp_status": 3,
+                "compressor_power": 900,
+            }
+            coordinator._calculate_heating_power(plausible)
+            coordinator.data = {"values": plausible}
+            mock_now.return_value = t2
+            burst = {
+                "heatingenergy": 100.401,
+                "hp_status": 3,
+                "compressor_power": 900,
+            }
+            coordinator._calculate_heating_power(burst)
+            assert burst["heatingpower"] == 240.0
+
+            mock_now.return_value = datetime(
+                2026, 4, 6, 12, 0, 45, tzinfo=timezone.utc
+            )
+            after = {
+                "heatingenergy": 100.402,
+                "hp_status": 3,
+                "compressor_power": 900,
+            }
+            coordinator._calculate_heating_power(after)
+
+        # 0.001 kWh over 15 s from the post-burst anchor, not over 30 s.
+        assert after["heatingpower"] == 240.0
+
+    def test_no_compressor_power_means_no_ceiling(self):
+        """Without an electrical reading there is no basis for a ceiling."""
+        coordinator = self._make_coordinator()
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+
+        with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
+            mock_now.return_value = t0
+            coordinator._calculate_heating_power({"heatingenergy": 100.0, "hp_status": 3})
+            mock_now.return_value = t1
+            values = {"heatingenergy": 100.4, "hp_status": 3}
+            coordinator._calculate_heating_power(values)
+
+        assert values["heatingpower"] == 96000.0
+
     def test_missing_heatingenergy_skipped(self):
         """If heatingenergy is absent, the method does nothing."""
         coordinator = self._make_coordinator()

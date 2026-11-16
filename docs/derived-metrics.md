@@ -42,6 +42,22 @@ tracks the load a counter-derived draw figure could not: only 2 % of the polls
 inside a heating phase read 0 W and 1.5 % exceed twice the median, where the
 old counter-derived `dhwpower` sat at 0 W on 24 % of its draw polls.
 
+A step that implies a physically impossible rate is **rejected**: the previous
+value is held and the anchors advance, so the next step measures a normal
+interval instead of inheriting the flush. The counter can step several 0.1 kWh
+increments in consecutive polls when the pump flushes a lagging register, and
+because the anchor moves on every step each increment is divided by a single
+poll interval — one step per 15 s poll reads 24 kW. Measured on a QE-4
+(issue #499): 0.1–0.4 kWh per poll for six minutes, 24–96 kW, which pushed the
+load term's mean from 3.5 to 9.8 kW and silenced it for hours; measured on a
+QE-6: single 11–12 kW polls, the same mechanism at a smaller flush. The ceiling
+is `compressor_power × 6` — a physical bound (Carnot near 8 at these
+temperatures, real COP 3–5), scaled by the pump's own electrical input because
+`device.model` is null on Modbus and there is no model to key a fixed ceiling
+on. Without a compressor reading there is no ceiling and the previous behaviour
+stands. The counter itself is untouched, so the energy totals and the COP
+windows keep whatever the pump reported.
+
 The hold is only allowed **while the compressor is turning** (`compressormeasuredspeed`
 input 31, falling back to `compressor_power` input 93). `hp_status` is the pump's
 *mode*, not a running signal: it is derived from `compressor_state`, which reports
