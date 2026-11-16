@@ -1718,6 +1718,33 @@ class TestSensorSetup:
         assert unique_ids.count("qvantum_tap_stop_test_device_123") == 1
 
     @pytest.mark.asyncio
+    async def test_cloud_mode_creates_an_enabled_heating_power_sensor(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """A disabled entity records no statistics, and the envelope fits need it.
+
+        Measured on a cloud installation: heat loss, time constant, mass and
+        standing loss were all null with ``building_fit_rows: 0``, because
+        ``heatingpower`` was the one series missing — disabled in the cloud
+        metric list while the value was not even computed.
+        """
+        mock_coordinator.data["values"]["heatingpower"] = 1846.5
+
+        def mock_async_add_entities(entities):
+            for sensor in entities:
+                sensor.entity_id = f"sensor.qvantum_{sensor._metric_key}_{sensor._hpid}"
+
+        async_add_entities = MagicMock(side_effect=mock_async_add_entities)
+
+        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        entities = async_add_entities.call_args[0][0]
+        power = [e for e in entities if e._metric_key == "heatingpower"]
+
+        assert len(power) == 1
+        assert power[0]._attr_entity_registry_enabled_default is True
+
+    @pytest.mark.asyncio
     async def test_async_setup_entry_disables_default_disabled_entities(
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):

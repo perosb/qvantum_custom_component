@@ -47,6 +47,18 @@ tracks the load a counter-derived draw figure could not: only 2 % of the polls
 inside a heating phase read 0 W and 1.5 % exceed twice the median, where the
 old counter-derived `dhwpower` sat at 0 W on 24 % of its draw polls.
 
+It is derived on **both** transports. The load term needs the instantaneous
+figure, which only a fast poll gives, so the load term stays Modbus-only — but
+the efficiency coordinator's heat-loss and thermal fits read this series' hourly
+means and they are transport-agnostic. At the cloud's 120 s poll the series is a
+coarse staircase (one 0.1 kWh step reads 3 kW) while the hourly mean is still the
+energy over that hour, which is exactly what the fits consume. Measured on a
+cloud installation before this: `heat_loss_w_per_k`, `thermal_time_constant`,
+`thermal_mass_kwh_per_k` and `dhw_standing_loss` were all null with
+`building_fit_rows: 0`, because `heatingpower` was the one series the fit needs
+and cloud mode never produced it — the entity existed but was disabled by
+default, and a disabled entity records no statistics.
+
 A step that implies a physically impossible rate is **rejected**: the previous
 value is held and the anchors advance, so the next step measures a normal
 interval instead of inheriting the flush. The counter can step several 0.1 kWh

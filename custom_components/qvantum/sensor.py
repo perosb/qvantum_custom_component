@@ -218,6 +218,10 @@ _CURVE_SENSOR_KEYS = frozenset(
 # short-window system figure — drawn DHW energy only balances production over
 # the 30-day scop_total window.
 _COP_SENSOR_KEYS = frozenset({"cop_heating", "cop_dhw"})
+#: Derived from the heatingenergy counter in both transports; created explicitly
+#: so the cloud side gets an entity (and therefore statistics) without putting a
+#: derived key into the fetch lists.
+_HEATING_POWER_KEY = "heatingpower"
 _COP_ICONS: dict[str, str] = {
     "cop_heating": "mdi:heat-pump",
     "cop_dhw": "mdi:water-boiler",
@@ -403,8 +407,13 @@ async def async_setup_entry(
             DEFAULT_ENABLED_HTTP_METRICS + DEFAULT_DISABLED_HTTP_METRICS
         )
 
-    # Special metrics that have dedicated sensor classes (created explicitly below)
-    special_metrics = {"latency", "hpid", "tap_stop"}
+    # Special metrics that have dedicated sensor classes (created explicitly
+    # below). ``heatingpower`` belongs here because it is derived on **both**
+    # transports — the efficiency coordinator's envelope fits read its hourly
+    # means — while a derived key must not sit in the fetch lists. It is still
+    # in ``DEFAULT_ENABLED_MODBUS_ONLY_METRICS`` because the cloud API does not
+    # return it, and that list is what the Modbus payload filters on.
+    special_metrics = {"latency", "hpid", "tap_stop", _HEATING_POWER_KEY}
 
     # Create entities using a hybrid approach:
     # - Disabled-by-default metrics: always create so they appear in the entity registry
@@ -445,6 +454,15 @@ async def async_setup_entry(
     # four energy counters).
     for cop_key in sorted(_COP_SENSOR_KEYS):
         sensors.append(QvantumCopSensor(coordinator, cop_key, device, True))
+    # Derived from the heatingenergy counter in both transports. On cloud the
+    # series is a coarse staircase (one 0.1 kWh step over a 120 s poll reads
+    # 3 kW), but its hourly mean is the energy over the hour, which is what the
+    # heat-loss and thermal fits consume.
+    sensors.append(
+        _get_sensor_type(_HEATING_POWER_KEY)(
+            coordinator, _HEATING_POWER_KEY, device, True
+        )
+    )
     if coordinator.modbus_enabled:
         # Local Modbus: display firmware from input registers 191-193 and the
         # custom heating-curve shadow sensors (no cloud equivalent).
@@ -552,6 +570,7 @@ async def async_setup_entry(
         "latency",
         "hpid",
         "tap_stop",
+        _HEATING_POWER_KEY,
         *_COP_SENSOR_KEYS,
     }
 

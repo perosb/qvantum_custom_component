@@ -1505,8 +1505,15 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             self._calculate_dhw_meter(values)
             await self._persist_cop_state()
 
+            # Derived on both transports: the efficiency coordinator's heat-loss
+            # and thermal fits read this sensor's hourly means, and they are
+            # transport-agnostic. At the cloud's 120 s poll the series is a coarse
+            # staircase — one 0.1 kWh step reads 3 kW — but the hourly mean is the
+            # energy over that hour, which is what the fits consume. The load term
+            # stays Modbus-only because it needs the instantaneous figure.
+            self._calculate_heating_power(values)
+
             if self.modbus_enabled:
-                self._calculate_heating_power(values)
                 self._calculate_heating_power_mean(values)
                 self._calculate_dhw_power(values)
                 self._calculate_tap_water_cap(values)
