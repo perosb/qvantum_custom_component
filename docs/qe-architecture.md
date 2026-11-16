@@ -361,7 +361,8 @@ the heating circuit through QN8, or the tap through GP2/EP31. `[M]`
 | `additionalenergy` | Input 97/98 | Immersion-heater electrical energy, lifetime. |
 | Relay bitmask | Input 33, bits 0–2 | L1/L2/L3 element stages. |
 | `qn8position` | Input 76 | Tank-to-heating shunt position; 0 = closed. |
-| `powertotal` | HA derived | Base 160 W + relay stages + `compressor_power`; an estimate. |
+| `powertotal` | Input 92 (1.12+) | The unit's own total power. On 1.11.10 the address answers 0, so the estimate below is kept. |
+| `powertotal` (estimate) | HA derived | Base 160 W + relay stages + `compressor_power`; used when input 92 reads 0. |
 
 ---
 
@@ -525,7 +526,7 @@ This explains why a 12–20 kW draw can last only minutes before the tank cools,
 
 - `heatingpower` is **derived** from the `heatingenergy` counter: the value held between steps is the average since the previous one — ~3–4 min at a median 1.6 kW — and it resets to 0 outside heating, so read it as a short average rather than an instantaneous figure. There is no heating-water flow register to replace it with (only the DHW `bf1_l_min`). `dhwpower` is different — it is the instantaneous flow × ΔT measurement of §7.5, not a counter rate. `[I]`
 - `compressor_power` (input 93) is the only direct electrical power measurement. `[R]`
-- `powertotal` in the integration is an **estimate**: 160 W base load + active relay stages (2+2+1 kW) + `compressor_power`. It is not a calibrated measurement. `[I]`
+- `powertotal` is the pump's **own** total from input 92 on firmware 1.12+, and an **estimate** (160 W base load + active relay stages 2+2+1 kW + `compressor_power`) when that address reads 0 — which is what 1.11.10 answers, and also what a unit that is off reports. The estimate is not a calibrated measurement, but the register validated it: measured on a QE-6 (1.12.8) the two agree to the watt in two different element states — element off `546 = 160 + 0 + 386`, element on (L1+L3) `3889 = 160 + 3000 + 729`. The register is preferred because it carries the real fan and pump draw instead of a fixed base; the cost of the `> 0` rule is that a 1.12 unit that is idle reports the 160 W base rather than 0. `[R]`
 
 ---
 
