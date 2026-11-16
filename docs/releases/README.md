@@ -6,6 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
+| [2026.11.7](2026.11.7.md) | 2026-11-16 | Clearer firmware and fit coverage |
 | [2026.11.6](2026.11.6.md) | 2026-11-16 | More reliable SCOP measurements |
 | [2026.11.5](2026.11.5.md) | 2026-11-16 | More reliable long-term performance statistics |
 | [2026.11.3](2026.11.3.md) | 2026-11-13 | More insight into adaptive heating adjustments |
