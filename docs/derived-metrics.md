@@ -260,6 +260,21 @@ there in the same PR.
 
 ## The two tap-water comfort sensors
 
+## Diagnostics
+
+The dump carries an `efficiency` block beside `curve`, mirroring the efficiency
+snapshot field for field plus two inputs of its own: `building_fit_rows` and
+`building_indoor_key`. A null `heat_loss_w_per_k` has two very different causes —
+too few hours where indoor, outdoor and power coincide, or a slope that is not
+positive — and the published figure cannot say which. Measured on an installation
+whose dump showed `building_coverage_days` 24.79 with the coefficient null and
+`building_fit_rows` 3: the window was ample and the fit starved, which is the
+opposite conclusion to the one the null alone suggests. A field that is missing
+from the dump cannot be read from a user's report, which is why the curve
+snapshot already works this way.
+
+## The two tap-water comfort sensors
+
 Both are **estimates from a tank model**, and their names say what they are:
 
 - `tap_water_minutes` → *Remaining shower minutes*:

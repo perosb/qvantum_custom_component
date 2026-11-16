@@ -75,6 +75,7 @@ def _runtime(
     maintenance: SimpleNamespace | None = None,
     extra_dhw: SimpleNamespace | None = None,
     curve: SimpleNamespace | None = None,
+    efficiency: SimpleNamespace | None = None,
     client: object | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
@@ -83,6 +84,7 @@ def _runtime(
         maintenance_coordinator=maintenance,
         extra_dhw=extra_dhw,
         curve_coordinator=curve,
+        efficiency_coordinator=efficiency,
         modbus_host="Qvantum-HP",
         modbus_port=502,
         modbus_unit_id=1,
@@ -713,6 +715,50 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["load_power_coverage_hours"] is None
     assert curve["write_scope"] == ["curve_10", "curve_0"]
     json.dumps(result)
+
+
+@pytest.mark.asyncio
+async def test_efficiency_diagnostics_carry_the_fits_own_inputs(hass):
+    """A null heat loss must be readable from the dump, not guessed at.
+
+    The coefficient is null either because too few hours had indoor, outdoor
+    and power together, or because the slope was not positive — the published
+    figure cannot tell them apart.
+    """
+    efficiency = SimpleNamespace(
+        data=SimpleNamespace(
+            scop_total=3.08,
+            scop_total_90d=1.597,
+            heat_loss_w_per_k=None,
+            building_coverage_days=24.79,
+            building_fit_rows=3,
+            building_indoor_key=None,
+            efficiency_health_grade="D",
+            efficiency_health_components={"scop": 0.36},
+            updated_at="2026-11-16T16:00:00+00:00",
+        )
+    )
+    runtime = _runtime(_coordinator(), efficiency=efficiency)
+
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    block = result["efficiency"]
+    assert block["scop_total"] == 3.08
+    assert block["heat_loss_w_per_k"] is None
+    # The two inputs that explain the null.
+    assert block["building_coverage_days"] == 24.79
+    assert block["building_fit_rows"] == 3
+    assert block["building_indoor_key"] is None
+    assert block["efficiency_health_components"] == {"scop": 0.36}
+    json.dumps(result)
+
+
+@pytest.mark.asyncio
+async def test_efficiency_diagnostics_absent_without_a_snapshot(hass):
+    runtime = _runtime(_coordinator(), efficiency=SimpleNamespace(data=None))
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    assert result["efficiency"] is None
 
 
 @pytest.mark.asyncio
