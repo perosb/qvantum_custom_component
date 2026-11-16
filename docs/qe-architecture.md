@@ -585,6 +585,20 @@ This explains why a 12–20 kW draw can last only minutes before the tank cools,
 | Input 88/89 | `compressor_run_time` / `starts` | Run time / starts | Lifetime; never reset. |
 | Input 91 | `ventilation_filter_time_left` | Filter hours remaining | Counts down. |
 
+**Identity and firmware.** Inputs 191–193 are the display firmware triple, and
+they are the only firmware the pump reports: the cloud adds two component
+builds (`display/cc/inv`), Modbus has no register for them. The device
+registry's `sw_version` is therefore written by two paths — the Modbus identity
+probe, and the cloud maintenance check that runs at setup in cloud mode — and
+the **cache** wins if it is not overruled: the `DeviceInfo` the entities register
+with is built from the cached device store *before* the maintenance check runs,
+while entities are added *after* it, so a cached pre-update firmware overwrote
+the fresh value on every restart. Measured after a 1.11.10 → 1.12.8 update: the
+log recorded `Updated device registry firmware version … to 1.12.8/436/239`
+while the device page and the summary export kept showing `1.11.10/344/239`
+across several restarts. The setup now applies the version the check just
+fetched to the identity the entities will use. `[R]`
+
 ### 9.2 Derived metrics in the integration
 
 | Metric | What it is | Important limitation |
