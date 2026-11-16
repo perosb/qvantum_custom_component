@@ -208,7 +208,11 @@ DEFAULT_ENABLED_METRICS = [
 
 # Additional metrics only available via Modbus input registers (not the HTTP API)
 DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
-    "heatingpower",  # Derived from heatingenergy delta; only meaningful with fast Modbus polling
+    # Derived from the heatingenergy delta on both transports; listed here
+    # because the cloud API does not return it, not because it is uncomputed.
+    # The load term still needs the instantaneous figure, which only a fast
+    # poll gives, and the load term is Modbus-only.
+    "heatingpower",
     "dhwpower",  # Derived from bf1_l_min/bt33/bt34; only computed in Modbus mode
     "tap_water_cap",  # Derived from bt30/bt33/bf1_l_min; only computed in Modbus mode
     "tap_water_minutes",  # Minutes of hot water remaining; companion to tap_water_cap
@@ -321,7 +325,13 @@ DEFAULT_DISABLED_HTTP_METRICS = [
     "dhwdemand",
     "heatingdemand",
     "coolingdemand",
-    "heatingpower",
+    # ``heatingpower`` is deliberately absent: it is derived on both transports
+    # now, because the efficiency coordinator's heat-loss and thermal fits read
+    # its hourly means and they are transport-agnostic. A disabled entity
+    # records no statistics, so leaving it here silenced every envelope figure
+    # on a cloud installation — measured: heat loss, time constant, mass and
+    # standing loss all null with ``building_fit_rows: 0`` while the power
+    # series was the only one missing.
     "dhwpower",
     "heatingreleased",
     "coolingreleased",

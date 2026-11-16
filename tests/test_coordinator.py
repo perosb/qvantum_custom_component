@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import pytest
+from pathlib import Path
 import time
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -2162,6 +2163,32 @@ class TestCalculateHeatingPower:
             coordinator._calculate_heating_power(values)
 
         assert values["heatingpower"] == 96000.0
+
+    def test_the_probe_runs_on_cloud_too(self):
+        """The efficiency fits are transport-agnostic, so the series must exist.
+
+        Measured on a cloud installation: heat loss, time constant, mass and
+        standing loss were all null with ``building_fit_rows: 0`` because
+        ``heatingpower`` was the one series the heat-loss fit needs and cloud
+        mode never computed it.
+        """
+        source = Path("custom_components/qvantum/coordinator.py")
+        lines = source.read_text(encoding="utf-8").splitlines()
+        call = next(
+            line
+            for line in lines
+            if "self._calculate_heating_power(values)" in line
+        )
+        load_term = next(
+            line
+            for line in lines
+            if "self._calculate_heating_power_mean(values)" in line
+        )
+
+        # Both live in the poll body (12 spaces). The mean one is nested inside
+        # the Modbus-only gate (16), the value one is not.
+        assert len(call) - len(call.lstrip()) == 12
+        assert len(load_term) - len(load_term.lstrip()) == 16
 
     def test_missing_heatingenergy_skipped(self):
         """If heatingenergy is absent, the method does nothing."""
