@@ -228,6 +228,56 @@ def _dhw_meter_diagnostics(window: Any) -> dict[str, Any]:
     }
 
 
+#: The efficiency figures a row carries, in the order they appear in the summary
+#: export. The dump mirrors them so a null can be read from a report instead of
+#: guessed at — the curve established this rule and the envelope fits are the
+#: same kind of evidence.
+_EFFICIENCY_FIELDS = (
+    "scop_total",
+    "scop_total_90d",
+    "aux_heat_share",
+    "heat_loss_w_per_k",
+    "heating_degree_hours",
+    "weather_normalized_heating",
+    "thermal_time_constant",
+    "thermal_gain_k_per_h",
+    "thermal_mass_kwh_per_k",
+    "thermal_episodes",
+    "dhw_standing_loss",
+    "compressor_starts_per_hour",
+    "compressor_run_hours_24h",
+    "compressor_duty_cycle",
+    "efficiency_health_grade",
+    "efficiency_health_score",
+    "efficiency_health_coverage",
+    "coverage_days",
+    "building_coverage_days",
+    "building_fit_rows",
+    "building_indoor_key",
+)
+
+
+def _efficiency_diagnostics(coordinator: Any) -> dict[str, Any] | None:
+    """Mirror the efficiency snapshot, with the fit's own inputs.
+
+    A null heat-loss coefficient has two very different causes — too few hours
+    where indoor, outdoor and power coincide, or a slope that is not positive —
+    and neither is visible from the published figure. ``building_fit_rows`` and
+    ``building_indoor_key`` are the inputs :func:`building.fit_heat_loss` saw.
+    """
+    snapshot = getattr(coordinator, "data", None)
+    if snapshot is None:
+        return None
+    block: dict[str, Any] = {
+        field: getattr(snapshot, field, None) for field in _EFFICIENCY_FIELDS
+    }
+    block["updated_at"] = getattr(snapshot, "updated_at", None)
+    components = getattr(snapshot, "efficiency_health_components", None)
+    if isinstance(components, dict):
+        block["efficiency_health_components"] = dict(components)
+    return block
+
+
 def _coordinator_diagnostics(coordinator: Any) -> dict[str, Any]:
     """Return poll state, last values and local derived state."""
     data = getattr(coordinator, "data", None)
@@ -652,6 +702,9 @@ async def async_get_config_entry_diagnostics(
     )
     diagnostics["curve"] = _curve_diagnostics(
         getattr(runtime, "curve_coordinator", None)
+    )
+    diagnostics["efficiency"] = _efficiency_diagnostics(
+        getattr(runtime, "efficiency_coordinator", None)
     )
     diagnostics["modbus_link"] = (
         {

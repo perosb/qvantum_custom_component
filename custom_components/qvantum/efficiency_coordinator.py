@@ -193,6 +193,12 @@ class EfficiencySnapshot:
     efficiency_health_components: dict[str, float] = field(default_factory=dict)
     coverage_days: float = 0.0
     building_coverage_days: float = 0.0
+    #: Hours that entered the heat-loss fit, and the indoor series it picked.
+    #: The coefficient is null for two very different reasons — too few hours
+    #: where indoor, outdoor and power coincide, or a slope that is not
+    #: positive — and a bare null in a report cannot tell them apart.
+    building_fit_rows: int = 0
+    building_indoor_key: str | None = None
     updated_at: str | None = None
 
 
@@ -747,6 +753,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             efficiency_health_components=health.components,
             coverage_days=short_coverage,
             building_coverage_days=building_coverage,
+            building_fit_rows=getattr(self, "_building_fit_rows", 0),
+            building_indoor_key=getattr(self, "_building_indoor_key", None),
             updated_at=now.isoformat(),
         )
 
@@ -815,6 +823,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         ):
             rising = normalized >= previous * TREND_RISING_RATIO
 
+        self._building_fit_rows = len(fit_hours)
+        self._building_indoor_key = indoor_key
         return heat_loss, hdh, normalized, rising, building_coverage
 
     def _thermal_metrics(
