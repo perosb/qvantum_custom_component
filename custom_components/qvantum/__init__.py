@@ -255,6 +255,18 @@ def _coordinator_device(coordinator: QvantumDataUpdateCoordinator) -> dict:
     return device if isinstance(device, dict) else {}
 
 
+def _firmware_triple(firmware_versions: object) -> str | None:
+    """``display/cc/inv`` from a maintenance result, or ``None``."""
+    if not isinstance(firmware_versions, dict):
+        return None
+    display = firmware_versions.get("display_fw_version")
+    cc = firmware_versions.get("cc_fw_version")
+    inv = firmware_versions.get("inv_fw_version")
+    if not (display and cc and inv):
+        return None
+    return f"{display}/{cc}/{inv}"
+
+
 def _has_required_device(device: dict, *, require_metadata: bool) -> bool:
     """Return True when setup has enough device identity to continue."""
     if not device.get("id"):
@@ -417,6 +429,22 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
                     "Firmware/access check timed out"
                 ) from err
             raise
+
+        # The identity the entities register with was built from the **cached**
+        # device store before this check ran, and an entity's ``device_info``
+        # creates or updates the device entry when it is added — which happens
+        # below, after this point. A cached pre-update firmware therefore
+        # overwrote the fresh one this check had just written, on every restart:
+        # measured after a 1.11.10 -> 1.12.8 update, the log recorded the update
+        # to ``1.12.8/436/239`` while the device page and the summary export both
+        # kept showing ``1.11.10/344/239`` across several restarts.
+        fresh_firmware = _firmware_triple(
+            (maintenance_coordinator.data or {}).get("firmware_versions")
+            if isinstance(maintenance_coordinator.data, dict)
+            else None
+        )
+        if fresh_firmware:
+            device["sw_version"] = fresh_firmware
 
     # Rolling efficiency analytics (SCOP / auxiliary-heat share) are derived
     # from recorder statistics and are transport-agnostic. Like the curve

@@ -22,6 +22,7 @@ from custom_components.qvantum import (
     _coordinator_device,
     _has_required_device,
     _device_sw_version,
+    _firmware_triple,
     _modbus_link_settings,
     _async_sync_extra_hot_water_service,
     _CARD_URL_PATH,
@@ -244,6 +245,18 @@ class TestSetupDeviceRequirements:
     def test_device_sw_version_omits_empty(self):
         assert _device_sw_version({}) is None
         assert _device_sw_version({"display_fw_version": "1.0"}) == "1.0//"
+
+    def test_firmware_triple_needs_all_three_components(self):
+        assert _firmware_triple(
+            {
+                "display_fw_version": "1.12.8",
+                "cc_fw_version": "436",
+                "inv_fw_version": "239",
+            }
+        ) == "1.12.8/436/239"
+        # A partial answer would write a version that means nothing.
+        assert _firmware_triple({"display_fw_version": "1.12.8"}) is None
+        assert _firmware_triple(None) is None
 
     def test_coordinator_device_handles_missing_or_invalid_payload(self):
         coordinator = MagicMock()
