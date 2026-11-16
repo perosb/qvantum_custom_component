@@ -258,13 +258,12 @@ live ratio of its own charge, exposed on `cop_dhw` (`charge_open`,
 `tank_liters`) and in the diagnostics `cop` block — a new COP-store field belongs
 there in the same PR.
 
-## The two tap-water comfort sensors
-
 ## Diagnostics
 
-The dump carries an `efficiency` block beside `curve`, mirroring the efficiency
-snapshot field for field plus two inputs of its own: `building_fit_rows` and
-`building_indoor_key`. A null `heat_loss_w_per_k` has two very different causes —
+The dump carries an `efficiency` block beside `curve`: a **fixed list** of the
+snapshot's headline figures — not every attribute, so a field absent from this
+list is absent rather than null — plus two inputs of its own:
+`building_fit_rows` and `building_indoor_key`. A null `heat_loss_w_per_k` has two very different causes —
 too few hours where indoor, outdoor and power coincide, or a slope that is not
 positive — and the published figure cannot say which. Measured on an installation
 whose dump showed `building_coverage_days` 24.79 with the coefficient null and
