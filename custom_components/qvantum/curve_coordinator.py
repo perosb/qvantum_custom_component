@@ -780,6 +780,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._last_active_ts: float | None = None
         self._active_since_ts: float | None = None
         self._trims: dict[str, float] = {}
+        #: When each trim last reached ``TRIM_MAX_C``, cleared when it leaves it.
+        #: The trims live as attributes on the point sensors, which the recorder
+        #: does not keep, so "how long has the cap been binding?" could only be
+        #: reconstructed from indirect series — two days apart, measured once.
+        self._trim_cap_since: dict[str, float] = {}
         self._trim_evidence: dict[str, int] = {}
         self._last_trim_ts: float | None = None
         #: The trims of the last active period, kept across a reversion so the
@@ -966,6 +971,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "last_active_ts": self._last_active_ts,
             "active_since_ts": self._active_since_ts,
             "trims": dict(self._trims),
+            "trim_cap_since": dict(getattr(self, "_trim_cap_since", None) or {}),
             "trim_evidence": dict(self._trim_evidence),
             "trim_seed": (
                 {
@@ -1132,6 +1138,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     and not isinstance(value, bool)
                 ):
                     self._trims[key] = float(value)
+        cap_since = data.get("trim_cap_since")
+        if isinstance(cap_since, dict):
+            for key, stamp in cap_since.items():
+                if (
+                    key in CURVE_KEYS
+                    and isinstance(stamp, (int, float))
+                    and not isinstance(stamp, bool)
+                ):
+                    self._trim_cap_since[key] = float(stamp)
         evidence = data.get("trim_evidence")
         if isinstance(evidence, dict):
             for key, hours in evidence.items():
@@ -2618,6 +2633,16 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             if abs(new - old) > 1e-9:
                 self._trims[key] = new
                 changed = True
+            # Stamp the moment a trim reaches the cap and clear it when it
+            # leaves; the question "how long has the cap been binding" then has
+            # a date instead of a reconstruction.
+            cap_since = getattr(self, "_trim_cap_since", None)
+            if cap_since is None:
+                cap_since = self._trim_cap_since = {}
+            if abs(abs(new) - TRIM_MAX_C) <= 1e-9:
+                cap_since.setdefault(key, now_ts)
+            else:
+                cap_since.pop(key, None)
         if not changed and not evidence_changed:
             return
         if changed:

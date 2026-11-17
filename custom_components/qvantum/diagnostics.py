@@ -630,6 +630,16 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         ),
         # Hours behind each point's trim; 0 means the trim is deliberately 0.
         "trim_evidence": dict(getattr(coordinator, "_trim_evidence", None) or {}),
+        # When each trim reached TRIM_MAX_C, cleared when it leaves. The trims
+        # themselves are attributes on the point sensors, which the recorder
+        # does not keep, so "how long has the cap been binding?" had no answer
+        # in the data — two sessions reconstructed it two days apart.
+        "trim_cap_since": {
+            key: stamp
+            for key, stamp in (
+                getattr(coordinator, "_trim_cap_since", None) or {}
+            ).items()
+        },
         # The trims the last active period ended with, and the baseline they
         # were learned against: a re-activation applies them only when that
         # baseline is still current, so a dump has to show both sides.
