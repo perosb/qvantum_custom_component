@@ -925,7 +925,12 @@ use `/local/qvantum-curve-card.js` as the resource URL.
   the chip would read "not assessed" every day without ever carrying
   information.
 - **Term chips** — outdoor, night/day, solar, load, trims and total, all in K
-  (they are temperature *differences*, not absolute temperatures).
+  (they are temperature *differences*, not absolute temperatures). The trims
+  chip shows the trim **in force** at the current outdoor temperature, not the
+  sum over the knots: each knot applies at its own outdoor temperature, so a sum
+  has no physical meaning — measured 2026-11-17 the card read `+4.5 K` while the
+  trim acting at 1.7 °C was `+2.00` (0 °C and +10 °C at the cap, +20 °C at 0.51).
+  The per-knot values and their evidence hours are in the footer.
 - **Footer** — three facts the term chips cannot carry. *Baseline learned*: the
   hours and outdoor span the baseline rests on. *Trim evidence*: the hours
   behind each knot's trim, so "+3.8 K" is readable as 151 measured hours at
