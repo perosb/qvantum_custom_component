@@ -28,6 +28,8 @@ from custom_components.qvantum.heating_curve import (
 )
 from custom_components.qvantum.curve_coordinator import (
     INDOOR_MARGIN_CYCLES,
+    TRIM_MAX_C,
+    TRIM_UPDATE_GAIN,
     READY_MIN_HOURS,
     CurveSnapshot,
     QvantumCurveCoordinator,
@@ -104,6 +106,52 @@ def make_forecast(
         for index in range(hours)
     )
     return WeatherForecast(points=points)
+
+
+async def test_clearing_the_trims_clears_the_cap_stamps() -> None:
+    """A stamp without its trim would report a cap that is no longer binding.
+
+    Four paths reset the trims — reversion, the pump leaving our curve, the
+    floor lift and the baseline re-learn — and the stamp is persisted, so a
+    leftover would survive a restart and be read as "the cap is binding".
+    """
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._trims = {"curve_0": TRIM_MAX_C}
+    coordinator._trim_cap_since = {"curve_0": 1_000_000.0}
+
+    coordinator._reset_trims()
+
+    assert coordinator._trims == {}
+    assert coordinator._trim_cap_since == {}
+
+
+async def test_a_trim_at_the_cap_records_when_it_got_there() -> None:
+    """The cap's age must be a date, not a reconstruction.
+
+    The trims live as attributes on the point sensors, which the recorder does
+    not keep, so two sessions reconstructed "how long has the cap been binding"
+    from indirect series and landed two days apart.
+    """
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._mode = "active"
+    coordinator._last_trim_ts = None
+    coordinator._async_trim_observations = AsyncMock(return_value=_trim_hours(-1.0))
+    # Start one damped step below the cap so this update lands exactly on it.
+    coordinator._trims = {"curve_10": TRIM_MAX_C - TRIM_UPDATE_GAIN * 0.6}
+
+    await coordinator._async_update_trims(make_result(), 1_000_000.0)
+
+    assert coordinator._trims["curve_10"] == pytest.approx(TRIM_MAX_C)
+    assert coordinator._trim_cap_since["curve_10"] == 1_000_000.0
+
+    # Leaving the cap clears the stamp rather than keeping a stale date.
+    coordinator._trims = {"curve_10": 0.5}
+    coordinator._last_trim_ts = None
+    coordinator._async_trim_observations = AsyncMock(return_value=_trim_hours(1.0))
+    await coordinator._async_update_trims(make_result(), 1_000_000.0 + 86400.0)
+
+    assert "curve_10" not in coordinator._trim_cap_since
 
 
 def make_coordinator(*, values=None, settings=None, store=None):

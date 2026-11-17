@@ -391,7 +391,11 @@ any trim exists; until then a shorter cadence applies, because the hours that
 justify the first correction are already in the window. Trims
 are only applied while active (in shadow the baseline learning owns the curve
 shape) and are cleared
-on reversion or when the baseline is re-learned. This is what keeps a
+on reversion or when the baseline is re-learned. A trim that reaches the cap is
+stamped in `trim_cap_since`, which is what turns "how long has the cap been
+binding?" from a reconstruction into a date; `_reset_trims` clears the stamps
+with the trims, because every path that drops the trims must drop the stamps
+that describe them. This is what keeps a
 mid-autumn activation working through winter: the part of the curve October
 could not observe is corrected by the weather the house actually sees.
 
@@ -811,7 +815,11 @@ missing from the dump cannot be read from a user's report. It carries
 `indoor_margin_c`, `bt2_detected`, `pump_room_c`/`pump_room_source`, the readiness
 gates and the whole model, where `model_daily` holds both the three-column fit
 and the four-column one (`a_w_per_k_4col`, `b_m2_4col`) beside the wind column.
-The trim layer travels too: `trim_evidence` (hours behind each point's trim) and
+The trim layer travels too: `trim_evidence` (hours behind each point's trim),
+`trim_cap_since` (when each trim reached `TRIM_MAX_C`, cleared when it leaves —
+the trims are attributes on the point sensors, which the recorder does not keep,
+so "how long has the cap been binding?" had no answer in the data and two
+analyses of the same installation reconstructed it two days apart) and
 `trim_seed` — the set the last active period ended with, the baseline it was
 learned against, when it was taken and `baseline_matches` against the current
 one, which is what decides whether a re-activation may re-apply it.
