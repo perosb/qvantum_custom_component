@@ -393,7 +393,9 @@ are only applied while active (in shadow the baseline learning owns the curve
 shape) and are cleared
 on reversion or when the baseline is re-learned. A trim that reaches the cap is
 stamped in `trim_cap_since`, which is what turns "how long has the cap been
-binding?" from a reconstruction into a date. This is what keeps a
+binding?" from a reconstruction into a date; `_reset_trims` clears the stamps
+with the trims, because every path that drops the trims must drop the stamps
+that describe them. This is what keeps a
 mid-autumn activation working through winter: the part of the curve October
 could not observe is corrected by the weather the house actually sees.
 

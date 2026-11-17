@@ -1509,7 +1509,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             # that reverted. The seed is only applied when the same baseline
             # comes back, so a moved curve cannot inherit a stale correction.
             self._remember_trim_seed()
-            self._trims = {}
+            self._reset_trims()
             self._last_trim_ts = None
         device_id = getattr(self._main, "device_id", None)
         client = getattr(self._main, "client", None)
@@ -1582,7 +1582,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             self._mode = "shadow"
             self._mark_active_ended()
             self._remember_trim_seed()
-            self._trims = {}
+            self._reset_trims()
             self._last_trim_ts = None
             await self._async_persist()
             self.async_update_listeners()
@@ -1833,7 +1833,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return False
         self._baseline = lifted
         # The shape changed: trims learned against the old baseline are stale.
-        self._trims = {}
+        self._reset_trims()
         _LOGGER.info("Heating-curve baseline lifted to the pump's supply floor")
         return True
 
@@ -2506,7 +2506,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         )
         # The shape changed: any active trims learned against the old baseline
         # are stale (they are only recomputed while active, so clear them here).
-        self._trims = {}
+        self._reset_trims()
         _LOGGER.info(
             "Heating-curve baseline corrected from %s observed Auto hours",
             len(observations),
@@ -2584,6 +2584,18 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             for ts in sorted(set(outdoor) & set(indoor))
             if not power_id or power.get(ts, 0.0) >= MIN_SAMPLE_Q_W
         ]
+
+    def _reset_trims(self) -> None:
+        """Drop the trims and the cap stamps that describe them.
+
+        Every path that clears the trims must clear the stamps with them.
+        Reversion, the pump leaving our curve, the floor lift and the baseline
+        re-learn all reset the trims, and a stamp left behind would keep
+        reporting "the cap is binding" for a correction that no longer exists --
+        and it is persisted, so it would survive a restart.
+        """
+        self._trims = {}
+        self._trim_cap_since = {}
 
     async def _async_update_trims(self, result: Any, now_ts: float) -> None:
         """Slowly fold indoor-error residuals into per-point trims.
