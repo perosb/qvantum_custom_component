@@ -28,6 +28,7 @@ for the published field list.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Mapping
 from datetime import date
 from typing import Any
@@ -129,7 +130,13 @@ _ENTITY_PREFIXES = (
 #: heat-loss fit: without them a SCOP over seven scattered days reads exactly
 #: like one over thirty, which is what an installation that only runs while its
 #: owner tests produces.
-SUMMARY_SCHEMA_VERSION = 13
+#: 14: `curve.trim_max_abs_c` and `curve.trim_cap_days`. The trims were not in
+#: the export at all, so the pool could not see that one of them was sitting on
+#: `TRIM_MAX_C` — `counters.trim_updates` says how often the table changed, never
+#: that the integrator had run out of room. The age is a **duration**, not the
+#: date `trim_cap_since` carries in the diagnostics: the counters block is counts
+#: only, and a date would leave the installation.
+SUMMARY_SCHEMA_VERSION = 14
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -322,6 +329,40 @@ def climate_summary(curve: Any) -> dict[str, Any]:
     }
 
 
+def _trim_max_abs(coordinator: Any) -> float | None:
+    """Largest absolute trim across the knots, or ``None`` when there are none."""
+    trims = getattr(coordinator, "_trims", None)
+    if not isinstance(trims, Mapping):
+        return None
+    values = [
+        abs(value)
+        for value in trims.values()
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+    ]
+    return _number(max(values)) if values else 0.0
+
+
+def _trim_cap_days(coordinator: Any) -> float | None:
+    """How many days the oldest capped trim has been capped, or ``0``.
+
+    A duration rather than the date the diagnostics carry: the counters block is
+    counts only. ``None`` when the clock is unusable.
+    """
+    stamps = getattr(coordinator, "_trim_cap_since", None)
+    if not isinstance(stamps, Mapping) or not stamps:
+        return 0.0
+    oldest = [
+        stamp
+        for stamp in stamps.values()
+        if isinstance(stamp, (int, float)) and not isinstance(stamp, bool)
+    ]
+    if not oldest:
+        return 0.0
+    now = time.time()
+    age_days = (now - min(oldest)) / 86400.0
+    return _number(max(0.0, age_days))
+
+
 def curve_summary(coordinator: Any) -> dict[str, Any] | None:
     """The identified pump room gain, configured against fitted, plus evidence.
 
@@ -371,6 +412,12 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
             getattr(snapshot, "room_error_p90_abs_c", None)
         ),
         "baseline_points": len(baseline) if isinstance(baseline, Mapping) else None,
+        # The trim layer, which the export never carried. `trim_max_abs_c` says
+        # how close the largest trim is to `TRIM_MAX_C` and `trim_cap_days` how
+        # long the oldest capped one has been capped — the difference between
+        # "the integrator converged at the cap" and "it is stuck against it".
+        "trim_max_abs_c": _trim_max_abs(coordinator),
+        "trim_cap_days": _trim_cap_days(coordinator),
         "solar_a_w_per_k": _number(getattr(model, "a_w_per_k", None)),
         "solar_b_m2": _number(getattr(model, "b_m2", None)),
         "solar_trust": _number(getattr(model, "trust", None)),
