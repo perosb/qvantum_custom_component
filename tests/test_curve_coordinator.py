@@ -1161,6 +1161,24 @@ async def test_trim_evidence_round_trips_through_the_store() -> None:
     assert coordinator._trim_evidence == {"curve_0": 9}
 
 
+async def test_trim_cap_since_round_trips_through_the_store() -> None:
+    """A restored stamp must keep the real age, not restart the clock.
+
+    Measured 2026-11-17: on the first boot after the upgrade the store held no
+    stamp, so the first trim update created one and ``trim_cap_days`` read
+    0.002 for a cap that had been binding for days. From the next boot on the
+    stamp must survive.
+    """
+    store = FakeStore(
+        {"trim_cap_since": {"curve_0": 1_000_000.0, "nope": 5.0, "curve_10": True}}
+    )
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator._trim_cap_since == {"curve_0": 1_000_000.0}
+
+
 async def test_trim_observations_require_target_and_indoor() -> None:
     coordinator = make_coordinator(values={"bt2": 21.0})
     coordinator._resolve_statistic_ids = MagicMock(

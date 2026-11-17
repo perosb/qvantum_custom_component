@@ -1140,6 +1140,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     self._trims[key] = float(value)
         cap_since = data.get("trim_cap_since")
         if isinstance(cap_since, dict):
+            if not isinstance(getattr(self, "_trim_cap_since", None), dict):
+                # Defensive: the attribute is created in ``__init__``, and a
+                # restored state must not depend on that having run.
+                self._trim_cap_since = {}
             for key, stamp in cap_since.items():
                 if (
                     key in CURVE_KEYS
