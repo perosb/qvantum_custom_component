@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 from datetime import date
-import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from homeassistant.util import dt as dt_util
 from aiohttp.test_utils import make_mocked_request
 
 from custom_components.qvantum.const import DOMAIN
@@ -243,7 +243,7 @@ def test_the_curve_block_reports_how_long_the_cap_has_been_binding() -> None:
     integrator ran out of room. The age is a duration, not the date the
     diagnostics carry — the counters block is counts only.
     """
-    now = time.time()
+    now = dt_util.utcnow().timestamp()
     coordinator = SimpleNamespace(
         active=True,
         data=None,

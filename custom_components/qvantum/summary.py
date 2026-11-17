@@ -28,7 +28,6 @@ for the published field list.
 
 from __future__ import annotations
 
-import time
 from collections.abc import Mapping
 from datetime import date
 from typing import Any
@@ -37,6 +36,7 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
@@ -358,8 +358,11 @@ def _trim_cap_days(coordinator: Any) -> float | None:
     ]
     if not oldest:
         return 0.0
-    now = time.time()
-    age_days = (now - min(oldest)) / 86400.0
+    # ``dt_util`` and not ``time.time()``: the stamps come from
+    # ``now_ts`` in the curve coordinator, which is ``dt_util.utcnow()``, and HA
+    # freezes that in tests. Mixing the two made the age untestable and would
+    # have drifted if HA ever virtualised the clock.
+    age_days = (dt_util.utcnow().timestamp() - min(oldest)) / 86400.0
     return _number(max(0.0, age_days))
 
 
