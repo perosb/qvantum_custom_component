@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
+import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -26,6 +27,7 @@ from custom_components.qvantum.summary import (
     build_summary,
     counters_summary as summary_counters_summary,
     device_metadata,
+    curve_summary,
     device_summary,
     SensorMode,
     fitted_summary,
@@ -232,6 +234,34 @@ def test_the_firmware_keeps_only_the_display_component() -> None:
 
     device.sw_version = None
     assert device_summary(device)["firmware"] is None
+
+
+def test_the_curve_block_reports_how_long_the_cap_has_been_binding() -> None:
+    """The export never carried the trims, so a saturated one was invisible.
+
+    ``counters.trim_updates`` says how often the table changed, never that the
+    integrator ran out of room. The age is a duration, not the date the
+    diagnostics carry — the counters block is counts only.
+    """
+    now = time.time()
+    coordinator = SimpleNamespace(
+        active=True,
+        data=None,
+        _model=None,
+        _daily_model=None,
+        _baseline=None,
+        _trims={"curve_0": 2.0, "curve_10": 1.4},
+        _trim_cap_since={"curve_0": now - 4 * 86400},
+    )
+
+    curve = curve_summary(coordinator)
+
+    assert curve["trim_max_abs_c"] == 2.0
+    assert curve["trim_cap_days"] == pytest.approx(4.0, abs=0.01)
+
+    # Nothing at the cap reads 0 rather than null: "not stuck" is a fact.
+    coordinator._trim_cap_since = {}
+    assert curve_summary(coordinator)["trim_cap_days"] == 0.0
 
 
 def test_the_fitted_block_carries_the_coverage_behind_its_windows() -> None:
