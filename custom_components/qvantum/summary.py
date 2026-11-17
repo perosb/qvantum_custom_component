@@ -329,10 +329,6 @@ def climate_summary(curve: Any) -> dict[str, Any]:
     }
 
 
-#: The per-knot cap an active trim may reach.
-TRIM_MAX_C = 2.0
-
-
 def _trim_max_abs(coordinator: Any) -> float | None:
     """Largest absolute trim across the knots, or ``None`` when there are none."""
     trims = getattr(coordinator, "_trims", None)
