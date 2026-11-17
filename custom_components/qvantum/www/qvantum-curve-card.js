@@ -10,7 +10,7 @@
  * `/local/qvantum-curve-card.js`. No build step, no dependencies.
  */
 
-const CARD_VERSION = "1.0.2";
+const CARD_VERSION = "1.0.3";
 
 /** Outdoor temperature → the ``curve_*`` key the trim layer is keyed by. */
 const trimKey = (outdoor) =>
@@ -42,6 +42,11 @@ const POINT_METRICS = [
 const ADJUSTMENT_METRIC = "adaptive_curve_adjustment";
 const DEVIATION_METRIC = "adaptive_curve_deviation";
 const SOLAR_METRIC = "adaptive_curve_solar_model";
+//: ``trim_evidence`` lives on the coverage sensor, not on the deviation one —
+//: the card read it from ``dev`` and the footer therefore never rendered on a
+//: real installation, only in a harness that put the attribute where the code
+//: expected it.
+const COVERAGE_METRIC = "adaptive_curve_coverage";
 const SWITCH_METRIC = "adaptive_curve_control";
 const SELECT_METRIC = "curve_type_heating";
 
@@ -50,6 +55,7 @@ const KNOWN_METRICS = [
   ADJUSTMENT_METRIC,
   DEVIATION_METRIC,
   SOLAR_METRIC,
+  COVERAGE_METRIC,
   SWITCH_METRIC,
   SELECT_METRIC,
 ];
@@ -64,6 +70,7 @@ const METRIC_SLUGS = {
   [ADJUSTMENT_METRIC]: "adaptive_curve_adjustment",
   [DEVIATION_METRIC]: "adaptive_curve_deviation",
   [SOLAR_METRIC]: "adaptive_curve_solar_model",
+  [COVERAGE_METRIC]: "adaptive_curve_coverage",
   [SWITCH_METRIC]: "adaptive_curve_control",
 };
 
@@ -472,6 +479,7 @@ class QvantumCurveCard extends HTMLElement {
     const adj = state(ADJUSTMENT_METRIC);
     const dev = state(DEVIATION_METRIC);
     const solar = state(SOLAR_METRIC);
+    const coverage = state(COVERAGE_METRIC);
     const sw = state(SWITCH_METRIC);
 
     const op = this._operatingPoint();
@@ -521,7 +529,7 @@ class QvantumCurveCard extends HTMLElement {
       extrapolated: points
         .filter((p) => p.extrapolated)
         .map((p) => p.outdoor),
-      trimEvidence: attr(dev, "trim_evidence"),
+      trimEvidence: attr(coverage, "trim_evidence"),
       capArmed: attr(dev, "indoor_cap_armed") === true,
       capMargin: num(attr(dev, "indoor_margin_c")),
       ready: attr(dev, "ready") === true,

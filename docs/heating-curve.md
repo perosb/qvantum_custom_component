@@ -930,7 +930,9 @@ use `/local/qvantum-curve-card.js` as the resource URL.
   sum over the knots: each knot applies at its own outdoor temperature, so a sum
   has no physical meaning — measured 2026-11-17 the card read `+4.5 K` while the
   trim acting at 1.7 °C was `+2.00` (0 °C and +10 °C at the cap, +20 °C at 0.51).
-  The per-knot values and their evidence hours are in the footer.
+  The per-knot values and their evidence hours are in the footer, read from the
+  **coverage** sensor — `trim_evidence` is not on the deviation one, and the card
+  looked for it there, so the footer never rendered on a real installation.
 - **Footer** — three facts the term chips cannot carry. *Baseline learned*: the
   hours and outdoor span the baseline rests on. *Trim evidence*: the hours
   behind each knot's trim, so "+3.8 K" is readable as 151 measured hours at
