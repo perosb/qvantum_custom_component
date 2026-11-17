@@ -10,7 +10,7 @@
  * `/local/qvantum-curve-card.js`. No build step, no dependencies.
  */
 
-const CARD_VERSION = "1.0.1";
+const CARD_VERSION = "1.0.2";
 
 /** Outdoor temperature → the ``curve_*`` key the trim layer is keyed by. */
 const trimKey = (outdoor) =>
@@ -88,6 +88,7 @@ const STRINGS = {
     learned: "Baseline learned",
     extrapolated: "extrapolated",
     trimEvidence: "Trim evidence",
+    trimPerKnot: "Trims per knot",
     capBand: "Indoor cap",
     roomError: "room error 24 h",
     tOutdoor: "Outdoor",
@@ -127,6 +128,7 @@ const STRINGS = {
     learned: "Baslinje inlärd",
     extrapolated: "extrapolerade",
     trimEvidence: "Trim-eviden",
+    trimPerKnot: "Trimmar per knut",
     capBand: "Inomhustak",
     roomError: "rumfel 24 h",
     tOutdoor: "Ute",
@@ -841,10 +843,34 @@ class QvantumCurveCard extends HTMLElement {
 
   _terms(model, t) {
     const a = model.adjustment;
-    const trimSum =
-      a.trims && typeof a.trims === "object"
-        ? Object.values(a.trims).reduce((acc, v) => acc + (num(v) ?? 0), 0)
-        : 0;
+    // The trim **in force**, not the sum of the knots. Each knot applies at its
+    // own outdoor temperature, so a sum over the axis has no physical meaning:
+    // measured 2026-11-17 the card read "+4.5 K" while the trim actually acting
+    // at 1.7 °C was +2.00 (0 °C and +10 °C both at the cap, +20 °C at 0.51).
+    const trimInForce = (() => {
+      const knots = model.allPoints
+        .filter((p) => p.trim !== null && p.trim !== undefined)
+        .sort((x, y) => x.outdoor - y.outdoor);
+      if (!knots.length) return 0;
+      const at = num(a.outdoor);
+      if (at === null) {
+        // No outdoor reading: the largest correction is the honest summary.
+        return Math.max(...knots.map((p) => Math.abs(p.trim))) *
+          Math.sign(knots.reduce((acc, p) => acc + p.trim, 0) || 1);
+      }
+      if (at <= knots[0].outdoor) return knots[0].trim;
+      if (at >= knots[knots.length - 1].outdoor) return knots[knots.length - 1].trim;
+      for (let i = 0; i < knots.length - 1; i += 1) {
+        const lo = knots[i];
+        const hi = knots[i + 1];
+        if (at >= lo.outdoor && at <= hi.outdoor) {
+          const span = hi.outdoor - lo.outdoor;
+          if (span === 0) return lo.trim;
+          return lo.trim + ((at - lo.outdoor) * (hi.trim - lo.trim)) / span;
+        }
+      }
+      return 0;
+    })();
     const term = (label, value, cls = "", note = "") =>
       `<span class="term ${cls}"><span class="label">${esc(
         label,
@@ -896,7 +922,7 @@ class QvantumCurveCard extends HTMLElement {
           ? `${fmt(a.loadCoverage, 1)} ${t.hours}`
           : "",
       ),
-      term(t.tTrims, trimSum),
+      term(t.tTrims, trimInForce),
       term(t.tTotal, a.total, "total"),
     ];
     const footer = [];
@@ -914,20 +940,22 @@ class QvantumCurveCard extends HTMLElement {
       // string would run into the next one.
       footer.push(`<span>${learned}</span>`);
     }
-    // Hours behind the trims, worst-evidenced first: "+3.8 K" sums knots that
-    // rest on 151 measured hours and knots the line fit produced with none.
+    // The per-knot detail the chip cannot carry: the trim and the hours behind
+    // it, so a knot resting on 151 measured hours is distinguishable from one
+    // the line fit produced with none.
     const evidence = model.trimEvidence;
     if (evidence && typeof evidence === "object") {
       const parts = model.allPoints
         .filter((p) => (num(evidence[trimKey(p.outdoor)]) ?? 0) > 0 || p.trim)
-        .sort((a, b) => (num(evidence[trimKey(b.outdoor)]) ?? 0) - (num(evidence[trimKey(a.outdoor)]) ?? 0))
+        .sort((a, b) => b.outdoor - a.outdoor)
         .map(
           (p) =>
-            `${fmt(p.outdoor, 0)} °C ${fmt(num(evidence[trimKey(p.outdoor)]) ?? 0, 0)} ${t.hours}`,
+            `${fmt(p.outdoor, 0)} °C ${signed(p.trim ?? 0)} K ` +
+            `(${fmt(num(evidence[trimKey(p.outdoor)]) ?? 0, 0)} ${t.hours})`,
         );
       if (parts.length)
         footer.push(
-          `<span>${esc(t.trimEvidence)}: ${parts.join(" · ")}</span>`,
+          `<span>${esc(t.trimPerKnot)}: ${parts.join(" · ")}</span>`,
         );
     }
     // The indoor cap is a band whose edges follow the 24 h room error; showing
