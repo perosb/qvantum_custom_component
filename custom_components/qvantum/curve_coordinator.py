@@ -928,6 +928,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             is_fixable=True,
             severity=ir.IssueSeverity.WARNING,
             translation_key="curve_ready",
+            # The repairs card renders this as a "Learn more" link in a new
+            # window. The feature is the integration's own, so the explanation
+            # has to be ours: what it writes, what it does not touch, and how to
+            # hand back to Auto.
+            learn_more_url=(
+                "https://github.com/perosb/qvantum_custom_component/blob/main/"
+                "docs/heating-curve.md#activation-and-reversion"
+            ),
         )
 
     def async_decline_ready_issue(self) -> None:

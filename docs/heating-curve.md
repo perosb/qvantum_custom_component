@@ -523,7 +523,9 @@ not the same decision as a comfortable one. The flow offers *activate* (the same
 call the switch makes) or *not now*; a decline is remembered until readiness
 lapses and returns, and the issue is only raised when Modbus writes are enabled,
 since without them the switch is unavailable. `ready_issue_declined` in the
-diagnostics says which of the two happened.
+diagnostics says which of the two happened. The issue carries a **Learn more**
+link to this section, opened in a new window, because the feature is the
+integration's own and the explanation has to be ours.
 
 `ready` becomes true when the **learned
 baseline** — not the adjusted shadow — reproduces the pump over at least three
