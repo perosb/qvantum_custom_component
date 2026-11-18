@@ -58,11 +58,13 @@ with patch(
                 QvantumBaseSensorEntity,
                 QvantumCopSensor,
                 QvantumCurveAdjustmentSensor,
+                QvantumCurveAdviceSensor,
                 QvantumCompressorPowerSensor,
                 QvantumCurveCoverageSensor,
                 QvantumCurveDeviationSensor,
                 QvantumCurvePointSensor,
                 QvantumCurveRoomErrorSensor,
+                QvantumCurveSensorEntity,
                 QvantumCurveSolarModelSensor,
                 QvantumCurveWindModelSensor,
                 QvantumCurrentEntity,
@@ -1133,6 +1135,93 @@ class TestQvantumCurveSensors:
         assert entity.native_value is None
         assert entity.available is False
 
+    def test_advice_sensor_says_ok_inside_the_dead_band(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        entity = QvantumCurveAdviceSensor(
+            coordinator, "adaptive_curve_advice", mock_device
+        )
+
+        assert entity.native_value == "ok"
+        assert entity.suggested_object_id == "adaptive_curve_advice"
+
+    def test_advice_sensor_asks_for_a_lower_curve_when_the_rooms_are_warm(
+        self, mock_device
+    ):
+        coordinator = _curve_coordinator(
+            _curve_snapshot(room_error_median_c=0.8, room_error_median_abs_c=0.8)
+        )
+        entity = QvantumCurveAdviceSensor(
+            coordinator, "adaptive_curve_advice", mock_device
+        )
+
+        assert entity.native_value == "reduce"
+
+    def test_advice_sensor_asks_for_a_higher_curve_when_the_rooms_are_cold(
+        self, mock_device
+    ):
+        coordinator = _curve_coordinator(
+            _curve_snapshot(room_error_median_c=-0.8, room_error_median_abs_c=0.8)
+        )
+        entity = QvantumCurveAdviceSensor(
+            coordinator, "adaptive_curve_advice", mock_device
+        )
+
+        assert entity.native_value == "increase"
+
+    def test_advice_sensor_stays_silent_without_enough_hours(self, mock_device):
+        coordinator = _curve_coordinator(
+            _curve_snapshot(room_error_median_c=1.5, room_error_samples=12)
+        )
+        entity = QvantumCurveAdviceSensor(
+            coordinator, "adaptive_curve_advice", mock_device
+        )
+
+        assert entity.native_value is None
+
+    def test_advice_sensor_stays_silent_without_a_median(self, mock_device):
+        coordinator = _curve_coordinator(
+            _curve_snapshot(room_error_median_c=None, room_error_samples=0)
+        )
+        entity = QvantumCurveAdviceSensor(
+            coordinator, "adaptive_curve_advice", mock_device
+        )
+
+        assert entity.native_value is None
+
+    def test_advice_sensor_carries_the_evidence(self, mock_device):
+        coordinator = _curve_coordinator(_curve_snapshot())
+        entity = QvantumCurveAdviceSensor(
+            coordinator, "adaptive_curve_advice", mock_device
+        )
+
+        assert entity.extra_state_attributes == {
+            "median_c": -0.1,
+            "median_abs_c": 0.3,
+            "p90_abs_c": 0.6,
+            "samples": 72,
+            "source": "room_temp_external",
+            "window_days": 3,
+            "dead_band_c": 0.3,
+            "min_hours": 24,
+            "applies_to": "pump",
+        }
+
+    def test_advice_sensor_name_whose_curve_it_describes(self, mock_device):
+        shadow = QvantumCurveAdviceSensor(
+            _curve_coordinator(_curve_snapshot(shadow=True)),
+            "adaptive_curve_advice",
+            mock_device,
+        )
+        active = QvantumCurveAdviceSensor(
+            _curve_coordinator(_curve_snapshot(shadow=False)),
+            "adaptive_curve_advice",
+            mock_device,
+        )
+
+        # In shadow the pump runs its own table, so the verdict is about that.
+        assert shadow.extra_state_attributes["applies_to"] == "pump"
+        assert active.extra_state_attributes["applies_to"] == "table"
+
     def test_thermal_sensors_report_the_decay_fit(self, mock_device):
         coordinator = _efficiency_coordinator(
             EfficiencySnapshot(
@@ -2079,6 +2168,39 @@ class TestSensorSetup:
         )
 
     @pytest.mark.asyncio
+    async def test_every_curve_entity_is_kept_by_registry_cleanup(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """A created curve entity must be in special_sensor_keys or it is deleted.
+
+        ``finalize_platform_setup`` removes every registry entry whose metric
+        key is not in ``possible_metrics | special_sensor_keys``, so an
+        explicitly created curve sensor that is missing from
+        ``_CURVE_SENSOR_KEYS`` is added and removed in the same setup.
+        """
+        from custom_components.qvantum.const import CONF_MODBUS_TCP
+        from custom_components.qvantum.sensor import _CURVE_SENSOR_KEYS
+
+        mock_config_entry.options = {CONF_MODBUS_TCP: True}
+        mock_coordinator.modbus_enabled = True
+        mock_config_entry.runtime_data.curve_coordinator = _curve_coordinator(
+            _curve_snapshot()
+        )
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        created = {
+            entity._metric_key
+            for entity in async_add_entities.call_args[0][0]
+            if isinstance(entity, QvantumCurveSensorEntity)
+        }
+        assert created <= _CURVE_SENSOR_KEYS
+
     async def test_async_setup_entry_modbus_creates_curve_sensors(
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):

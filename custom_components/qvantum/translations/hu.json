@@ -629,6 +629,9 @@
       "adaptive_curve_room_error": {
         "name": "Adaptív fűtési görbe: helyiségeltérés"
       },
+      "adaptive_curve_advice": {
+        "name": "Adaptív fűtési görbe: javaslat"
+      },
       "adaptive_curve_solar_model": {
         "name": "Adaptív fűtési görbe: szoláris modell"
       },

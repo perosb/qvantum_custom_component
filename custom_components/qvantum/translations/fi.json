@@ -629,6 +629,9 @@
       "adaptive_curve_room_error": {
         "name": "Adaptiivinen lämmityskäyrä: huoneen poikkeama"
       },
+      "adaptive_curve_advice": {
+        "name": "Adaptiivinen lämmityskäyrä: suositus"
+      },
       "adaptive_curve_solar_model": {
         "name": "Adaptiivinen lämmityskäyrä: aurinkomalli"
       },

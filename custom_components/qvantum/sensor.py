@@ -47,7 +47,12 @@ from .efficiency import COP_WINDOW_SECONDS
 from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
-from .curve_coordinator import READY_WINDOW_DAYS, QvantumCurveCoordinator
+from .curve_coordinator import (
+    CURVE_ADVICE_DEAD_BAND_C,
+    CURVE_ADVICE_MIN_HOURS,
+    READY_WINDOW_DAYS,
+    QvantumCurveCoordinator,
+)
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
@@ -205,6 +210,7 @@ _CURVE_SENSOR_KEYS = frozenset(
         "adaptive_curve_adjustment",
         "adaptive_curve_deviation",
         "adaptive_curve_room_error",
+        "adaptive_curve_advice",
         "adaptive_curve_solar_model",
         "adaptive_curve_wind_model",
         "adaptive_curve_coverage",
@@ -512,6 +518,13 @@ async def async_setup_entry(
             sensors.append(
                 QvantumCurveRoomErrorSensor(
                     curve_coordinator, "adaptive_curve_room_error", device
+                )
+            )
+            # The one curve signal that works before readiness: the trims only
+            # run while active, so a shadow install had no verdict to act on.
+            sensors.append(
+                QvantumCurveAdviceSensor(
+                    curve_coordinator, "adaptive_curve_advice", device
                 )
             )
             sensors.append(
@@ -1244,6 +1257,59 @@ class QvantumCurveRoomErrorSensor(QvantumCurveSensorEntity):
             "samples": snapshot.room_error_samples,
             "source": snapshot.room_error_source,
             "window_days": READY_WINDOW_DAYS,
+        }
+
+
+class QvantumCurveAdviceSensor(QvantumCurveSensorEntity):
+    """A one-word verdict on the curve that is actually running.
+
+    While the curve is in shadow the pump runs its own table, so the room
+    error describes *that* curve rather than ours. That is exactly what a user
+    needs before readiness: the trims say nothing yet because they only run
+    while active, and readiness says nothing about the house.
+
+    The state is deliberately untranslated (``reduce`` / ``ok`` / ``increase``).
+    It is something to automate on, and a translated state would change with
+    the UI language.
+    """
+
+    _attr_icon = "mdi:tune-variant"
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the verdict, or ``None`` without enough evidence."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        if (snapshot.room_error_samples or 0) < CURVE_ADVICE_MIN_HOURS:
+            return None
+        median = snapshot.room_error_median_c
+        if median is None:
+            return None
+        if median > CURVE_ADVICE_DEAD_BAND_C:
+            return "reduce"
+        if median < -CURVE_ADVICE_DEAD_BAND_C:
+            return "increase"
+        return "ok"
+
+    @property
+    def extra_state_attributes(self):
+        """Return the evidence behind the verdict and what it refers to."""
+        snapshot = self.coordinator.data
+        if snapshot is None:
+            return None
+        return {
+            "median_c": snapshot.room_error_median_c,
+            "median_abs_c": snapshot.room_error_median_abs_c,
+            "p90_abs_c": snapshot.room_error_p90_abs_c,
+            "samples": snapshot.room_error_samples,
+            "source": snapshot.room_error_source,
+            "window_days": READY_WINDOW_DAYS,
+            "dead_band_c": CURVE_ADVICE_DEAD_BAND_C,
+            "min_hours": CURVE_ADVICE_MIN_HOURS,
+            # A shadow install runs the pump's own curve, so the verdict is
+            # about that table. Once active it is about ours.
+            "applies_to": "pump" if snapshot.shadow else "table",
         }
 
 

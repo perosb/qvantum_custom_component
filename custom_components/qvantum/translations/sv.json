@@ -629,6 +629,9 @@
       "adaptive_curve_room_error": {
         "name": "Adaptiv värmekurva: rumsavvikelse"
       },
+      "adaptive_curve_advice": {
+        "name": "Adaptiv värmekurva: råd"
+      },
       "adaptive_curve_solar_model": {
         "name": "Adaptiv värmekurva: solmodell"
       },
