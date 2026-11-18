@@ -4395,9 +4395,11 @@ async def test_ready_issue_waits_a_day_and_respects_a_decline() -> None:
         kwargs = create_issue.call_args.kwargs
         assert kwargs["translation_key"] == "curve_ready"
         assert kwargs["is_fixable"] is True
-        # The repairs card renders this as a "Learn more" link in a new window.
+        # The repairs card renders this as a "Learn more" link in a new window,
+        # and it points at the description of the curve, not at the on/off
+        # instructions the issue text already carries.
         assert kwargs["learn_more_url"].endswith(
-            "docs/heating-curve.md#activation-and-reversion"
+            "README.md#adaptive-heating-curve"
         )
 
         # A decline silences it for the rest of the streak.
