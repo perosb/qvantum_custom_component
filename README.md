@@ -110,10 +110,10 @@ integration never does; once readiness has held for a day it opens a repair
 issue that asks, with the numbers the gate used.
 
 **The adaptive curve is this integration's feature, not a Qvantum one.** It
-writes the pump's *user-defined* curve table (holdings 24–30) and switches
-holding 22 to User defined; Qvantum's own curve is the Auto curve, which is
-untouched and comes back when you switch the integration's control off.
-Qvantum (the company) does not support this feature.
+writes the pump's *user-defined* curve and switches the pump to User defined;
+Qvantum's own curve is the Auto curve, which is untouched and comes back when
+you switch the integration's control off. Qvantum (the company) does not support
+this feature.
 
 | | Pump's Auto curve | Adaptive curve |
 |---|---|---|
