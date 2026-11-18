@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from types import SimpleNamespace
 
 from custom_components.qvantum import repairs as qvantum_repairs
 from custom_components.qvantum import config_flow as qvantum_config_flow
@@ -208,6 +209,89 @@ async def test_fix_flow_records_a_decline():
 
     set_consent.assert_awaited_once_with(flow.hass, "entry", False)
     assert result["type"] == "create_entry"
+
+
+@pytest.mark.asyncio
+async def test_curve_ready_flow_offers_activation_with_the_numbers():
+    """The invitation carries the figures the gate used.
+
+    A marginal pass (median 1.44 against 1.5) is not the same decision as a
+    comfortable one, so the flow shows what it rests on.
+    """
+    curve = MagicMock()
+    curve.data = SimpleNamespace(
+        median_abs_c=1.44, p95_abs_c=2.46, baseline_learned_hours=148
+    )
+    entry = SimpleNamespace(
+        entry_id="entry",
+        runtime_data=SimpleNamespace(curve_coordinator=curve),
+    )
+    hass = MagicMock()
+    hass.config_entries.async_entries.return_value = [entry]
+
+    flow = await async_create_fix_flow(hass, "curve_ready_entry", None)
+    assert isinstance(flow, qvantum_repairs.CurveReadyFlow)
+    flow.hass = hass
+
+    menu = await flow.async_step_init()
+
+    assert menu["type"] == "menu"
+    assert menu["menu_options"] == ["activate", "decline"]
+    assert menu["description_placeholders"] == {
+        "median": "1.44",
+        "p95": "2.46",
+        "hours": "148",
+    }
+
+
+@pytest.mark.asyncio
+async def test_curve_ready_flow_activates_through_the_coordinator():
+    curve = MagicMock()
+    curve.async_set_control_mode = AsyncMock()
+    entry = SimpleNamespace(
+        entry_id="entry",
+        runtime_data=SimpleNamespace(curve_coordinator=curve),
+    )
+    hass = MagicMock()
+    hass.config_entries.async_entries.return_value = [entry]
+    flow = qvantum_repairs.CurveReadyFlow("entry")
+    flow.hass = hass
+
+    result = await flow.async_step_activate()
+
+    curve.async_set_control_mode.assert_awaited_once_with("active")
+    assert result["type"] == "create_entry"
+
+
+@pytest.mark.asyncio
+async def test_curve_ready_flow_remembers_a_decline():
+    curve = MagicMock()
+    entry = SimpleNamespace(
+        entry_id="entry",
+        runtime_data=SimpleNamespace(curve_coordinator=curve),
+    )
+    hass = MagicMock()
+    hass.config_entries.async_entries.return_value = [entry]
+    flow = qvantum_repairs.CurveReadyFlow("entry")
+    flow.hass = hass
+
+    result = await flow.async_step_decline()
+
+    curve.async_decline_ready_issue.assert_called_once()
+    assert result["type"] == "create_entry"
+
+
+@pytest.mark.asyncio
+async def test_curve_ready_flow_aborts_when_the_entry_is_gone():
+    hass = MagicMock()
+    hass.config_entries.async_entries.return_value = []
+    flow = qvantum_repairs.CurveReadyFlow("entry")
+    flow.hass = hass
+
+    result = await flow.async_step_activate()
+
+    assert result["type"] == "abort"
+    assert result["reason"] == "not_loaded"
 
 
 @pytest.mark.asyncio

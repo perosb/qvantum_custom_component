@@ -928,11 +928,6 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             is_fixable=True,
             severity=ir.IssueSeverity.WARNING,
             translation_key="curve_ready",
-            translation_placeholders={
-                "median": f"{getattr(snapshot, 'median_abs_c', 0.0) or 0.0:.2f}",
-                "p95": f"{getattr(snapshot, 'p95_abs_c', 0.0) or 0.0:.2f}",
-                "hours": f"{getattr(snapshot, 'baseline_learned_hours', 0) or 0}",
-            },
         )
 
     def async_decline_ready_issue(self) -> None:

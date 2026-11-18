@@ -70,8 +70,23 @@ class CurveReadyFlow(RepairsFlow):
     async def async_step_init(
         self, user_input: dict | None = None
     ) -> data_entry_flow.FlowResult:
-        """Offer the two answers; either one closes the issue."""
-        return self.async_show_menu(step_id="init", menu_options=["activate", "decline"])
+        """Offer the two answers, with the numbers the gate used.
+
+        A marginal pass (median 1.44 against 1.5) is not the same decision as a
+        comfortable one, so the figures travel with the question.
+        """
+        curve = self._curve()
+        snapshot = getattr(curve, "data", None)
+        placeholders = {
+            "median": f"{getattr(snapshot, 'median_abs_c', 0.0) or 0.0:.2f}",
+            "p95": f"{getattr(snapshot, 'p95_abs_c', 0.0) or 0.0:.2f}",
+            "hours": f"{getattr(snapshot, 'baseline_learned_hours', 0) or 0}",
+        }
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["activate", "decline"],
+            description_placeholders=placeholders,
+        )
 
     async def async_step_activate(
         self, user_input: dict | None = None

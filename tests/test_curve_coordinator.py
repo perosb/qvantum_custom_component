@@ -4394,11 +4394,7 @@ async def test_ready_issue_waits_a_day_and_respects_a_decline() -> None:
         create_issue.assert_called_once()
         kwargs = create_issue.call_args.kwargs
         assert kwargs["translation_key"] == "curve_ready"
-        assert kwargs["translation_placeholders"] == {
-            "median": "1.44",
-            "p95": "2.46",
-            "hours": "148",
-        }
+        assert kwargs["is_fixable"] is True
 
         # A decline silences it for the rest of the streak.
         coordinator.async_decline_ready_issue()
