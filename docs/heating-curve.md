@@ -1,5 +1,32 @@
 # Heating curve
 
+## TL;DR
+
+- **What it is.** The integration can run its own heating curve instead of the
+  pump's fixed Auto table. It learns the house from the pump's own history and
+  keeps adjusting, so the supply follows the building rather than a table
+  someone picked.
+- **It proves itself first.** It starts in **shadow**: nothing is written, the
+  calculated curve is only compared with the pump's. It must hold a median
+  deviation ≤ 1.5 °C and a p95 ≤ 3.0 °C over at least three days and 24 heating
+  hours before it is considered ready.
+- **You decide.** When it is ready the integration opens a repair issue asking
+  whether to activate it. It never activates itself — it writes to the pump.
+- **What it writes.** The pump's *user-defined* curve, and it switches the pump
+  to User defined. Qvantum's own Auto curve is untouched and comes back the
+  moment you switch the integration's control off.
+- **What it needs.** Modbus, and **Enable writing via Modbus**. It does not exist
+  in cloud mode.
+- **What it does not do.** It does not touch hot water, and it never overrides
+  the pump's own supply limits or the indoor cap.
+- **How to stop it.** Switch *Adaptive heating curve: control* off; the pump
+  returns to Auto and keeps the last table only until then.
+
+The rest of this document is the reference: registers, the fits behind each
+term, the gates, and the write policy.
+
+## Scope
+
 How Qvantum Auto vs User defined heating curves map to Modbus holdings and
 the cloud HTTP `update_settings` command, what the official app does, and
 what this integration exposes.
