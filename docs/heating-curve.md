@@ -332,6 +332,20 @@ The nuisance column is reported (`outdoor_slope_c_per_c`, diagnostics only) and
 never applied; a bucket with no outdoor variation contributes nothing to it and
 the fit degrades to the single-slope form.
 
+**A second confound: the table drifts while the window fills.** Centring removes
+the table's level at one instant, not a level that moves across the window — and
+the trims are still integrating, so hours from before and after a trim change
+were pooled as if the table had been constant. Measured 2026-11-18 (14 days,
+trims 1.51 → 2.00): the pooled fit read **3.79 °C/°C** while the hours before the
+change read **4.90 ± 0.19** and the hours after **5.18 ± 0.26** — a
+between-period slope of **13.5 °C/°C**, a Simpson artefact of the table rising
+while the room error rose with it (mean −0.111 K before, −0.071 K after, with
+the outdoor unchanged at 3.3 °C). A **time** column absorbs it: the same windows
+then read 4.42–5.13 (spread 0.7 instead of 1.4) at R² 0.86–0.93, and its own
+slope lands on the trim drift (+0.09…+0.28 °C/day against ~0.13 measured). It is
+reported as `drift_c_per_day` and never applied; rows without a timestamp
+contribute nothing to it.
+
 **A period's trims are kept when it ends.** A reversion clears them — they
 were learned against the baseline that was current then — but they carry the
 house's difference from the pitched curve, and the damping loop rebuilds that at

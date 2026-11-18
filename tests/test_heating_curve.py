@@ -1206,6 +1206,42 @@ def test_active_room_gain_absorbs_the_shape_inside_a_bucket() -> None:
     assert abs(biased - 5.0) > 0.3
 
 
+def test_active_room_gain_absorbs_a_table_that_drifts() -> None:
+    """The trims move while the window fills, and that is not the room term.
+
+    Centring removes the table's level at one instant, not a level that drifts
+    across the window. Measured on the live install 2026-11-18 (14 days, trims
+    1.51 → 2.00): the pooled fit read 3.79 °C/°C while the hours before the
+    change read 4.90 ± 0.19 and the hours after 5.18 ± 0.26 — a between-period
+    slope of 13.5 °C/°C, a Simpson artefact. The time column moved the same
+    windows to 4.42–5.13 with R² 0.86–0.93.
+    """
+    rows = []
+    start = 1_700_000_000
+    for hour in range(120):
+        # The table climbs 0.5 K over the window, as the trims did.
+        drift = 0.5 * hour / 120.0
+        for bucket in (4.0, 6.0, 8.0):
+            outdoor = bucket + (hour % 5) * 0.4 - 0.8
+            # The room error drifts with the table, as it did on the live
+            # install (mean −0.111 K before the change, −0.071 K after): that
+            # correlation is what turns the drift into a spurious slope.
+            error = 0.2 * ((hour % 5) - 2) + 0.05 * (hour % 3) + 0.3 * hour / 120.0
+            supply = 40.0 - outdoor - 5.0 * error + drift
+            rows.append((outdoor, supply, error, start + hour * 3600))
+
+    estimate = room_gain_from_active_hours(rows)
+
+    assert estimate.valid
+    assert estimate.gain_c_per_c == pytest.approx(5.0, abs=0.15)
+    # The drift column lands on the table's own movement, in °C/day.
+    assert estimate.drift_c_per_day == pytest.approx(0.1, abs=0.05)
+
+    # Without the timestamps the same hours are biased by the drift.
+    untimed = room_gain_from_active_hours([row[:3] for row in rows])
+    assert abs(untimed.gain_c_per_c - 5.0) > 0.2
+
+
 def test_active_room_gain_drops_a_lone_outdoor_bucket() -> None:
     """The leverage immunity: an hour alone in its bucket cannot decide it."""
     rows = active_hours(5.0)

@@ -429,6 +429,11 @@ def _curve_active_gain_diagnostics(estimate: Any) -> dict[str, Any] | None:
         "outdoor_slope_c_per_c": getattr(
             estimate, "outdoor_slope_c_per_c", None
         ),
+        # The absorbed time slope in °C/day: the table itself moving while the
+        # window filled, because the trims were still integrating. It should
+        # land on the trim drift; a 0 means the window held no drift, so the
+        # room slope carries it.
+        "drift_c_per_day": getattr(estimate, "drift_c_per_day", None),
         "valid": getattr(estimate, "valid", None),
         "notes": getattr(estimate, "notes", None),
     }
