@@ -6,6 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
+| [2026.11.9](2026.11.9.md) | 2026-11-18 | Get guidance on adjusting your heating curve |
 | [2026.11.8](2026.11.8.md) | 2026-11-18 | Track how long heating adjustments have reached their limit |
 | [2026.11.7](2026.11.7.md) | 2026-11-16 | Clearer firmware and fit coverage |
 | [2026.11.6](2026.11.6.md) | 2026-11-16 | More reliable SCOP measurements |
