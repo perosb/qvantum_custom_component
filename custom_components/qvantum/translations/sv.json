@@ -1088,6 +1088,29 @@
     "tap_water_capacity_level_conflict": {
       "title": "Appen rapporterar en nivå som inte stämmer med temperaturerna",
       "description": "Pumpen har {start} / {stop} °C som start/stopp för varmvatten, vilket är en förinställning som den här integrationen inte känner igen. Värdena är förmodligen satta manuellt eller via Qvantum-appen."
+    },
+    "curve_ready": {
+      "title": "Adaptiv kurva redo — aktivera den?",
+      "description": "Integrationens egen adaptiva kurva — inte en Qvantum-funktion — har passerat sin beredskapsgrind: median {median} °C mot 1,5, p95 {p95} °C mot 3,0, över {hours} värmetimmar.\n\nAtt aktivera den skriver pumpens användardefinierade kurvtabell (holding 24–30) och ställer holding 22 på User defined. Qvantums egen Auto-kurva rörs inte och kommer tillbaka när du stänger av. Qvantum (företaget) stöder inte den här funktionen.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Adaptiv kurva redo — aktivera den?",
+            "description": "Integrationens egen adaptiva kurva — inte en Qvantum-funktion — har passerat sin beredskapsgrind: median {median} °C mot 1,5, p95 {p95} °C mot 3,0, över {hours} värmetimmar.\n\nAtt aktivera den skriver pumpens användardefinierade kurvtabell (holding 24–30) och ställer holding 22 på User defined. Qvantums egen Auto-kurva rörs inte och kommer tillbaka när du stänger av. Qvantum (företaget) stöder inte den här funktionen."
+          },
+          "activate": {
+            "title": "Aktivera kurvan",
+            "description": "Integrationens egen adaptiva kurva — inte en Qvantum-funktion — har passerat sin beredskapsgrind: median {median} °C mot 1,5, p95 {p95} °C mot 3,0, över {hours} värmetimmar.\n\nAtt aktivera den skriver pumpens användardefinierade kurvtabell (holding 24–30) och ställer holding 22 på User defined. Qvantums egen Auto-kurva rörs inte och kommer tillbaka när du stänger av. Qvantum (företaget) stöder inte den här funktionen."
+          },
+          "decline": {
+            "title": "Inte nu",
+            "description": "Integrationens egen adaptiva kurva — inte en Qvantum-funktion — har passerat sin beredskapsgrind: median {median} °C mot 1,5, p95 {p95} °C mot 3,0, över {hours} värmetimmar.\n\nAtt aktivera den skriver pumpens användardefinierade kurvtabell (holding 24–30) och ställer holding 22 på User defined. Qvantums egen Auto-kurva rörs inte och kommer tillbaka när du stänger av. Qvantum (företaget) stöder inte den här funktionen."
+          }
+        },
+        "abort": {
+          "not_loaded": "Qvantum-integrationen är inte laddad."
+        }
+      }
     }
   }
 }

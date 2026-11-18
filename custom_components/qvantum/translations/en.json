@@ -1088,6 +1088,29 @@
     "tap_water_capacity_level_conflict": {
       "title": "The app reports a level that does not match the temperatures",
       "description": "The pump holds {start} / {stop} °C as hot-water start/stop which is an unknown preset to this integration. These values have probably been set manually or via the Qvantum App."
+    },
+    "curve_ready": {
+      "title": "Adaptive curve ready — activate it?",
+      "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve table (holdings 24–30) and switches holding 22 to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Adaptive curve ready — activate it?",
+            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve table (holdings 24–30) and switches holding 22 to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature."
+          },
+          "activate": {
+            "title": "Activate the curve",
+            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve table (holdings 24–30) and switches holding 22 to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature."
+          },
+          "decline": {
+            "title": "Not now",
+            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve table (holdings 24–30) and switches holding 22 to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature."
+          }
+        },
+        "abort": {
+          "not_loaded": "The Qvantum integration is not loaded."
+        }
+      }
     }
   }
 }

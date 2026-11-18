@@ -36,6 +36,7 @@ from homeassistant.util import dt as dt_util
 
 from .client.models import result_applied
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
+from .repairs import CURVE_READY_PREFIX
 from .const import (
     DOMAIN,
     HP_STATUS_HEATING,
@@ -115,6 +116,12 @@ BASELINE_LEARN_REFRESH_HOURS = 6.0
 #: Rolling window of indoor-error hours behind the active trims.
 TRIM_WINDOW_DAYS = 7
 #: Minimum time between trim updates.
+#: How long ``ready`` must hold before the integration asks the user to
+#: activate. The gate compares a rolling window, so it can pass for one cycle and
+#: fail the next; a day of agreement is the cheapest hysteresis that still
+#: answers within a heating season.
+READY_ISSUE_MIN_HOURS = 24.0
+
 TRIM_REFRESH_HOURS = 24.0
 #: Days of hourly statistics read for the active-hour room-gain measurement.
 ROOM_GAIN_ACTIVE_WINDOW_DAYS = 7
@@ -785,6 +792,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         #: does not keep, so "how long has the cap been binding?" could only be
         #: reconstructed from indirect series — two days apart, measured once.
         self._trim_cap_since: dict[str, float] = {}
+        #: When ``ready`` first became true in the current streak, and whether
+        #: the user already answered "not now" for it. The question is asked
+        #: once per streak: a decline is remembered until readiness lapses.
+        self._ready_since_ts: float | None = None
+        self._ready_issue_declined = False
         self._trim_evidence: dict[str, int] = {}
         self._last_trim_ts: float | None = None
         #: The trims of the last active period, kept across a reversion so the
@@ -873,6 +885,62 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         """Repair issue for a pump that stopped following our table."""
         entry_id = getattr(getattr(self, "config_entry", None), "entry_id", None)
         return f"curve_left_user_defined_{entry_id or 'entry'}"
+
+    def _ready_issue_id(self) -> str:
+        """Repair issue asking the user to activate a ready curve."""
+        entry_id = getattr(getattr(self, "config_entry", None), "entry_id", None)
+        return f"{CURVE_READY_PREFIX}{entry_id or 'entry'}"
+
+    def _async_sync_ready_issue(self, snapshot: Any, now_ts: float) -> None:
+        """Ask once, and only after readiness has held for a day.
+
+        The curve writes to the pump, so activation is the user's decision and
+        the integration never takes it. What it can do is say when the gate has
+        passed — the user has no other way to know — and it says so with the
+        numbers the gate used, because a marginal pass (median 1.44 against 1.5)
+        is not the same decision as a comfortable one.
+        """
+        from homeassistant.helpers import issue_registry as ir
+
+        ready = bool(getattr(snapshot, "ready", False))
+        blocker = getattr(snapshot, "blocker", None)
+        if self.active or not ready or blocker is not None or not self.writable:
+            # Not assessed, already writing, or the pump cannot be written to:
+            # nothing to ask. Without Modbus writes the switch is unavailable, so
+            # an invitation would ask for something the user cannot do.
+            self._ready_since_ts = None
+            self._ready_issue_declined = False
+            ir.async_delete_issue(self.hass, DOMAIN, self._ready_issue_id())
+            return
+        # Defensive: the attributes are created in ``__init__``, and a
+        # coordinator built without it (the test harness does that) must not
+        # raise from a best-effort notification.
+        if not isinstance(getattr(self, "_ready_since_ts", None), (int, float)):
+            self._ready_since_ts = now_ts
+        if getattr(self, "_ready_issue_declined", False):
+            return
+        if now_ts - self._ready_since_ts < READY_ISSUE_MIN_HOURS * 3600.0:
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            self._ready_issue_id(),
+            is_fixable=True,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="curve_ready",
+            translation_placeholders={
+                "median": f"{getattr(snapshot, 'median_abs_c', 0.0) or 0.0:.2f}",
+                "p95": f"{getattr(snapshot, 'p95_abs_c', 0.0) or 0.0:.2f}",
+                "hours": f"{getattr(snapshot, 'baseline_learned_hours', 0) or 0}",
+            },
+        )
+
+    def async_decline_ready_issue(self) -> None:
+        """Remember a "not now" so the question is not repeated for this streak."""
+        from homeassistant.helpers import issue_registry as ir
+
+        self._ready_issue_declined = True
+        ir.async_delete_issue(self.hass, DOMAIN, self._ready_issue_id())
 
     def _async_raise_left_user_defined(self) -> None:
         """Tell the user the pump left User defined; we cannot reassert it.
@@ -972,6 +1040,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "active_since_ts": self._active_since_ts,
             "trims": dict(self._trims),
             "trim_cap_since": dict(getattr(self, "_trim_cap_since", None) or {}),
+            "ready_issue_declined": bool(
+                getattr(self, "_ready_issue_declined", False)
+            ),
             "trim_evidence": dict(self._trim_evidence),
             "trim_seed": (
                 {
@@ -1138,6 +1209,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     and not isinstance(value, bool)
                 ):
                     self._trims[key] = float(value)
+        self._ready_issue_declined = bool(data.get("ready_issue_declined", False))
         cap_since = data.get("trim_cap_since")
         if isinstance(cap_since, dict):
             if not isinstance(getattr(self, "_trim_cap_since", None), dict):
@@ -3130,7 +3202,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         active_trims = (
             dict(result.trims) if self.active and result is not None else {}
         )
-        return CurveSnapshot(
+        snapshot = CurveSnapshot(
             shadow=shadow,
             points=points,
             baseline=baseline,
@@ -3177,3 +3249,5 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             precharge_c=0.0 if result is None else result.precharge_c,
             wind_c=0.0 if result is None else result.wind_c,
         )
+        self._async_sync_ready_issue(snapshot, now_ts)
+        return snapshot

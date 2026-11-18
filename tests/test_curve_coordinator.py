@@ -8,6 +8,7 @@ import time
 from collections import deque
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call, patch
 from zoneinfo import ZoneInfo
 
@@ -4350,8 +4351,90 @@ async def test_active_cycle_clears_a_stale_left_issue() -> None:
         await coordinator._async_compute_snapshot()
 
     create_issue.assert_not_called()
-    delete_issue.assert_called_once()
-    assert delete_issue.call_args.args[2].startswith("curve_left_user_defined_")
+    # Two issues are cleared: the stale "left user defined" one, and the
+    # "curve is ready" invitation, which is meaningless while the curve writes.
+    cleared = {call.args[2] for call in delete_issue.call_args_list}
+    assert "curve_left_user_defined_entry" in cleared
+    assert "curve_ready_entry" in cleared
+
+
+async def test_ready_issue_waits_a_day_and_respects_a_decline() -> None:
+    """The invitation is asked once per streak, and only after a day.
+
+    The gate compares a rolling window, so it can pass for one cycle and fail the
+    next; and the curve writes to the pump, so the integration asks rather than
+    acts. A decline is remembered until readiness lapses.
+    """
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}, live_curve_type=1
+    )
+    coordinator._mode = "shadow"
+    ready = SimpleNamespace(
+        ready=True,
+        blocker=None,
+        median_abs_c=1.44,
+        p95_abs_c=2.46,
+        baseline_learned_hours=148,
+    )
+    start = 1_000_000.0
+
+    with patch.object(cc.ir, "async_create_issue") as create_issue, patch.object(
+        cc.ir, "async_delete_issue"
+    ):
+        # First cycle: the streak starts, nothing is asked yet.
+        coordinator._async_sync_ready_issue(ready, start)
+        create_issue.assert_not_called()
+
+        # Half a day later: still inside the hysteresis.
+        coordinator._async_sync_ready_issue(ready, start + 12 * 3600)
+        create_issue.assert_not_called()
+
+        # A day of agreement: ask, with the numbers the gate used.
+        coordinator._async_sync_ready_issue(ready, start + 25 * 3600)
+        create_issue.assert_called_once()
+        kwargs = create_issue.call_args.kwargs
+        assert kwargs["translation_key"] == "curve_ready"
+        assert kwargs["translation_placeholders"] == {
+            "median": "1.44",
+            "p95": "2.46",
+            "hours": "148",
+        }
+
+        # A decline silences it for the rest of the streak.
+        coordinator.async_decline_ready_issue()
+        create_issue.reset_mock()
+        coordinator._async_sync_ready_issue(ready, start + 48 * 3600)
+        create_issue.assert_not_called()
+
+        # Readiness lapsing clears the decline, so a new streak can ask again.
+        coordinator._async_sync_ready_issue(
+            SimpleNamespace(ready=False, blocker="median"), start + 60 * 3600
+        )
+        assert coordinator._ready_issue_declined is False
+        assert coordinator._ready_since_ts is None
+
+
+async def test_ready_issue_is_not_raised_without_modbus_writes() -> None:
+    """Without writes the switch is unavailable, so an invitation is a dead end."""
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._mode = "shadow"
+    # The fixture's client is a MagicMock, so ``writable`` is truthy by default.
+    coordinator._main.client.writable = False
+    ready = SimpleNamespace(
+        ready=True,
+        blocker=None,
+        median_abs_c=1.0,
+        p95_abs_c=2.0,
+        baseline_learned_hours=100,
+    )
+
+    with patch.object(cc.ir, "async_create_issue") as create_issue, patch.object(
+        cc.ir, "async_delete_issue"
+    ):
+        coordinator._async_sync_ready_issue(ready, 1_000_000.0)
+        coordinator._async_sync_ready_issue(ready, 1_000_000.0 + 48 * 3600)
+
+    create_issue.assert_not_called()
 
 
 async def test_revert_logs_why_it_happened(caplog) -> None:

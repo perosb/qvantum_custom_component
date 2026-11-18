@@ -4,6 +4,13 @@ How Qvantum Auto vs User defined heating curves map to Modbus holdings and
 the cloud HTTP `update_settings` command, what the official app does, and
 what this integration exposes.
 
+**The adaptive curve is this integration's own feature, not a Qvantum one.** It
+writes the pump's *user-defined* curve table (holdings 24–30) and switches
+holding 22 to User defined; Qvantum's own curve is the Auto curve, which is
+untouched and returns when the integration's control is switched off. Qvantum
+(the company) does not support this feature, and a support case about it belongs
+in this repository's issue tracker.
+
 Source for register names and ranges: *Modbus Communication* quick-start
 guide QSG EN 2613-A (D100041). Behaviour below is from live dumps on one
 unit (holdings 22–30 and input 35 `cal_heat_temp`), not from Qvantum
