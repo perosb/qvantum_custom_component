@@ -210,6 +210,7 @@ _CURVE_SENSOR_KEYS = frozenset(
         "adaptive_curve_adjustment",
         "adaptive_curve_deviation",
         "adaptive_curve_room_error",
+        "adaptive_curve_advice",
         "adaptive_curve_solar_model",
         "adaptive_curve_wind_model",
         "adaptive_curve_coverage",

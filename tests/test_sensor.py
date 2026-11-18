@@ -64,6 +64,7 @@ with patch(
                 QvantumCurveDeviationSensor,
                 QvantumCurvePointSensor,
                 QvantumCurveRoomErrorSensor,
+                QvantumCurveSensorEntity,
                 QvantumCurveSolarModelSensor,
                 QvantumCurveWindModelSensor,
                 QvantumCurrentEntity,
@@ -2167,6 +2168,39 @@ class TestSensorSetup:
         )
 
     @pytest.mark.asyncio
+    async def test_every_curve_entity_is_kept_by_registry_cleanup(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_device
+    ):
+        """A created curve entity must be in special_sensor_keys or it is deleted.
+
+        ``finalize_platform_setup`` removes every registry entry whose metric
+        key is not in ``possible_metrics | special_sensor_keys``, so an
+        explicitly created curve sensor that is missing from
+        ``_CURVE_SENSOR_KEYS`` is added and removed in the same setup.
+        """
+        from custom_components.qvantum.const import CONF_MODBUS_TCP
+        from custom_components.qvantum.sensor import _CURVE_SENSOR_KEYS
+
+        mock_config_entry.options = {CONF_MODBUS_TCP: True}
+        mock_coordinator.modbus_enabled = True
+        mock_config_entry.runtime_data.curve_coordinator = _curve_coordinator(
+            _curve_snapshot()
+        )
+
+        with (
+            patch("custom_components.qvantum.entity.disable_entities_by_default"),
+            patch("custom_components.qvantum.entity.cleanup_disabled_entities"),
+        ):
+            async_add_entities = MagicMock()
+            await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+
+        created = {
+            entity._metric_key
+            for entity in async_add_entities.call_args[0][0]
+            if isinstance(entity, QvantumCurveSensorEntity)
+        }
+        assert created <= _CURVE_SENSOR_KEYS
+
     async def test_async_setup_entry_modbus_creates_curve_sensors(
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):
