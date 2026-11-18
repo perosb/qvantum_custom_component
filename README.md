@@ -53,8 +53,8 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **Adaptive heating curve (Modbus) — the headline feature:** Learns the house from the forecast, sun and delivered heat and writes its own curve back; shadow mode first, readiness gate, hand-back on failure. [Details](docs/heating-curve.md).
 - **Curve card:** A bundled Lovelace card (`qvantum-curve-card`) that graphs the baseline, shadow curve, written pump table and adjustment terms.
 - **Monitoring:** Temperatures, pressure, energy, power, system status, defrost, connectivity, filter time, and other heat-pump metrics. Machine-internal values (refrigerant circuit, speeds, lifetime counters, settings read-backs) live under the **Diagnostics** entity category. Alarm codes carry Qvantum's friendly name in a `description` attribute.
-- **Efficiency analytics:** COP and rolling SCOP (the DHW COP includes tank charges made with the electric element alone — parallel with, or after, the compressor — and is capped at 1.0 when no compressor work was involved), auxiliary-heat share, building heat-loss coefficient, heating degree hours and weather-normalized consumption, DHW standing loss (quoted at a 40 K tank-to-ambient difference), a DHW heat-meter plausibility check, compressor cycling/duty/speed and average power, plus an A–F efficiency health grade. All derived from data the integration already polls — no extra hardware.
-- **Thermal mass:** the envelope time constant and heat capacity (`UA × τ`) are identified from how fast the rooms cool while the pump is not heating — hot water, defrost, idle. They say how quickly a house reacts to a pause; both are diagnostics, and both stay unavailable until the window holds enough decays across a spread of outdoor temperatures.
+- **Efficiency analytics:** COP and rolling SCOP, auxiliary-heat share, the building's heat-loss coefficient, heating degree hours and weather-normalized consumption, DHW standing loss, a DHW heat-meter plausibility check, compressor cycling/duty/speed and average power, plus an A–F efficiency health grade. All derived from data the integration already polls — no extra hardware. [How each figure is measured →](docs/derived-metrics.md)
+- **Thermal mass:** the envelope time constant and heat capacity, identified from how fast the rooms cool while the pump is not heating. They say how quickly the house reacts to a pause; both are diagnostics and appear once enough cool-downs have been observed.
 - **Solar:** Current solar irradiance and a self-calibrated solar-gain estimate from Open-Meteo, in both cloud and Modbus mode. No PV system is required.
 - **Control:** Operation modes, target temperatures, vacation mode, ventilation, and supported settings.
 - **Hot water (`water_heater`):** Tank temperature and DHW stop target with Eco, Normal, Extra, Smart, and Off modes.
@@ -62,10 +62,6 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 - **Device automations:** Triggers and conditions for defrost, compressor blocking, freeze protection, Wi-Fi/cloud connectivity, and a ventilation filter due in under 48 hours.
 - **External room sensor:** The integration can feed a Home Assistant temperature sensor to the pump as the external room temperature, refreshed continuously (never slower than every 4 minutes) so the app's external room sensor mode stays fed.
 - **Modbus writes:** Optional local writes for supported targets, DHW, fan, operation, room compensation, and sensor settings.
-
-#### Device automation details
-
-Available triggers and conditions depend on the entities present. They cover defrosting, compressor blocking, freeze protection, Wi-Fi/cloud disconnection, and a ventilation filter with fewer than 48 hours remaining.
 
 #### External room temperature feed
 
@@ -82,12 +78,10 @@ Enable the built-in feed (Modbus mode, **Enable writing via Modbus** on):
    (e.g. an average of your room sensors).
 3. Select **External** as "Source for indoor temperature".
 
-The integration then writes a smoothed value (5-minute time constant) on its
-own schedule, refreshed even when the value has not changed. It is never
-slower than every 4 minutes, regardless of the configured poll interval, so
-the pump's watchdog stays satisfied. Manual writes to the feed's number entity
-are overwritten by the next refresh while the feed is active. Clear the picker
-to turn the feed off.
+The integration then writes a smoothed value on its own schedule, never slower
+than every 4 minutes, so the pump's watchdog stays satisfied. Manual writes to
+the feed's number entity are overwritten by the next refresh while the feed is
+active; clear the picker to turn it off.
 
 Either way the pump's external room temperature is also exposed as a sensor —
 `room_temp_ext` in cloud mode, and a diagnostic sensor next to the feed number
@@ -243,6 +237,16 @@ actions:
 - [Derived metrics](docs/derived-metrics.md) — power, COP and DHW: how each figure is computed and where it can mislead.
 - [Tap-water capacity](docs/tap-water-capacity.md) — the 1–7 preset, why the start/stop pair is the truth and what the two repair issues mean.
 - [Telemetry](docs/telemetry.md) — what the opt-in summary export contains and how it is stored.
+
+## Getting help
+
+Open an issue in the [issue tracker](https://github.com/perosb/qvantum_custom_component/issues)
+— a diagnostics download (**Settings → Devices & Services → Qvantum → ⋮ →
+Download diagnostics**) answers most questions about a specific installation,
+and it is redacted before it leaves your system.
+
+The adaptive curve is this integration's feature, not a Qvantum one: a question
+about it belongs here, not with Qvantum support.
 
 ## Changelog
 
