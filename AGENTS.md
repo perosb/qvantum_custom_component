@@ -142,7 +142,10 @@ present in the payload, so absent registers degrade to no entity.
   `compressor_power` (input 93) must stay in the modbus metrics payload even
   though `powertotal` folds it in: its diagnostic sensor records the long-term
   statistics `compressor_power_avg` reads, and a popped key left that average
-  permanently `None`.
+  permanently `None`. Since firmware 1.12 `powertotal` is the pump's **own**
+  reading (input 92) when that address answers above 0, and the estimate
+  (base + relay stages + `compressor_power`) only when it reads 0 — which is
+  what 1.11 answers, and also what a unit that is off reports.
 - Modbus client: every operation is bounded by an operation timeout and maps
   failures to `TransportError`; holding writes are validated for signedness and
   the datasheet MIN/MAX (`MODBUS_HOLDING_RANGE`, `client/modbus/model.py`)
@@ -546,7 +549,17 @@ review has to catch:
 - `dhwpower` is instantaneous and must **not** be integrated for energy;
   `heatingpower` is a counter rate that holds between steps (a ~3–4 min average —
   no heating-water flow exists to replace it, so it must not be "fixed" into a
-  rolling window either).
+  rolling window either). Three invariants keep that hold honest: it is derived
+  on **both** transports (the envelope fits read its hourly means and are
+  transport-agnostic, so the entity is created explicitly rather than through a
+  fetch list), it is only held while the **compressor is turning** (`hp_status`
+  is the pump's mode, not a running signal), and a step that implies a
+  physically impossible rate is **rejected** rather than published — the counter
+  can flush several 0.1 kWh increments in consecutive polls.
+- The SCOP window measures **every counter over the same interval**. The
+  recorder keeps a separate history per entity, so a counter added or enabled
+  later starts inside the window; giving each its own span divides a heating
+  delta over N days by an electrical delta over M days.
 - A new COP-store field belongs in the diagnostics `cop` block in the same PR.
 - The two tap-water comfort sensors are **estimates** from a tank model
   (`tap_water_minutes`, `tap_water_cap`), never a volume, an energy or the
@@ -598,6 +611,13 @@ The rules that must not drift:
   knot is `floor_pinned` (nothing to act on), **not** `clamped` — `days_clamped`
   pools actionable points only, and a floor pin would otherwise fire at every
   installation on every mild day.
+- The integration **never activates the curve itself** — it writes to the pump,
+  so that decision is the user's. When `ready` has held for a day in shadow it
+  opens the fixable `curve_ready` issue with the gate's median/p95/heating hours;
+  a decline is remembered (`ready_issue_declined`, persisted) until readiness
+  lapses, and the issue is only raised when Modbus writes are enabled, because
+  without them the switch is unavailable. The text says whose feature it is: the
+  integration's, not Qvantum's.
 - When the pump stops following our table (the app or a cloud profile moved the
   curve type) the coordinator drops to shadow, clears the trims and opens
   `curve_left_user_defined` — and deliberately does **not** write Auto back: that
@@ -609,7 +629,8 @@ The rules that must not drift:
   `entry.async_on_unload`, which cannot run then). Reload and HA shutdown keep the
   table on purpose.
 - `diagnostics.py` mirrors the curve state: a new `CurveSnapshot` or persisted
-  curve field goes into `_curve_diagnostics` in the same PR. A field missing from
+  curve field goes into `_curve_diagnostics` in the same PR, and the efficiency
+  snapshot has its own `efficiency` block for the same reason. A field missing from
   the dump cannot be read from a user's report.
 - Both external-room metrics must stay enabled: `room_temp_ext` sits in
   `DEFAULT_ENABLED_HTTP_ONLY_METRICS`, `room_temp_external` is created explicitly
