@@ -762,6 +762,34 @@ async def test_efficiency_diagnostics_absent_without_a_snapshot(hass):
 
 
 @pytest.mark.asyncio
+async def test_curve_dumps_the_forecast_temperature_beside_the_term(hass):
+    """`outdoor_c` is a term in kelvin, not the forecast air temperature.
+
+    Measured 2026-11-18: a report read `outdoor_c` −0.07 as the forecast
+    temperature and compared it with `bt1` 1.1 °C, concluding the outside was
+    1.2 K warmer than forecast. BT1 tracks Open-Meteo to +0.01 K median over
+    238 h, so there was nothing to explain — the two numbers had different units.
+    """
+    hour = int(dt_util.utcnow().timestamp()) // 3600 * 3600
+    forecast = SimpleNamespace(
+        temperature_by_hour=lambda: {hour: 2.75},
+        wind_by_hour=lambda: {},
+    )
+    curve = SimpleNamespace(
+        data=None,
+        _forecast=forecast,
+        active=False,
+        writable=False,
+    )
+    runtime = _runtime(_coordinator(), curve=curve)
+
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    assert result["curve"]["forecast_now_c"] == 2.75
+    json.dumps(result)
+
+
+@pytest.mark.asyncio
 async def test_curve_diagnostics_absent_in_cloud_mode(hass):
     runtime = _runtime(_coordinator(), maintenance=_maintenance())
     result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
