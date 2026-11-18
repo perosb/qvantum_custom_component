@@ -540,8 +540,22 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
             power_window.coverage_seconds(dt_util.utcnow().timestamp()) / 3600.0, 2
         )
 
+    # The forecast temperature the terms were derived from. The dump carried the
+    # outdoor *term* (`outdoor_c`, kelvin, clamped ±1.0) alone, and a report read
+    # it as the forecast air temperature and compared it with BT1: measured
+    # 2026-11-18, `outdoor_c` −0.07 K against `bt1` 1.1 °C was written up as
+    # "1.2 K warmer outside than the forecast", which compares a temperature with
+    # a difference. BT1 itself tracks Open-Meteo to +0.01 K median over 238 h, so
+    # there was no discrepancy to explain.
+    forecast = getattr(coordinator, "_forecast", None)
+    forecast_now = None
+    if forecast is not None:
+        now_hour = int(dt_util.utcnow().timestamp()) // 3600 * 3600
+        forecast_now = forecast.temperature_by_hour().get(now_hour)
+
     return {
         "active": bool(getattr(coordinator, "active", False)),
+        "forecast_now_c": forecast_now,
         "writable": bool(getattr(coordinator, "writable", False)),
         "mode": getattr(coordinator, "_mode", None),
         "shadow": None if snapshot is None else getattr(snapshot, "shadow", None),
