@@ -524,8 +524,10 @@ call the switch makes) or *not now*; a decline is remembered until readiness
 lapses and returns, and the issue is only raised when Modbus writes are enabled,
 since without them the switch is unavailable. `ready_issue_declined` in the
 diagnostics says which of the two happened. The issue carries a **Learn more**
-link to this section, opened in a new window, because the feature is the
-integration's own and the explanation has to be ours.
+link, opened in a new window, to the README section that *describes* the curve —
+what it is, how it learns, what it writes and what it does not touch — because
+the feature is the integration's own and the explanation has to be ours. The
+on/off instructions are in the issue text itself.
 
 `ready` becomes true when the **learned
 baseline** — not the adjusted shadow — reproduces the pump over at least three

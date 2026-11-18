@@ -928,12 +928,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             severity=ir.IssueSeverity.WARNING,
             translation_key="curve_ready",
             # The repairs card renders this as a "Learn more" link in a new
-            # window. The feature is the integration's own, so the explanation
-            # has to be ours: what it writes, what it does not touch, and how to
-            # hand back to Auto.
+            # window. It points at the section that *describes the curve* — what
+            # it is, how it learns, what it writes and what it does not touch —
+            # not at the on/off instructions, which the issue text already
+            # carries.
             learn_more_url=(
                 "https://github.com/perosb/qvantum_custom_component/blob/main/"
-                "docs/heating-curve.md#activation-and-reversion"
+                "README.md#adaptive-heating-curve"
             ),
         )
 
