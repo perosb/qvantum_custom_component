@@ -1090,28 +1090,28 @@
       "description": "Pumppu käyttää {start} / {stop} °C käyttöveden aloitus-/lopetuslämpötilana, eikä tämä integraatio tunne tätä esiasetusta. Arvot on todennäköisesti asetettu käsin tai Qvantum-sovelluksella."
     },
     "curve_ready": {
-      "title": "Adaptive curve ready — activate it?",
+      "title": "Mukautuva käyrä valmis – otetaanko käyttöön?",
       "fix_flow": {
         "step": {
           "init": {
-            "title": "Adaptive curve ready — activate it?",
-            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve and switches the pump to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature.",
+            "title": "Mukautuva käyrä valmis – otetaanko käyttöön?",
+            "description": "Integraation oma mukautuva käyrä – ei Qvantumin ominaisuus – on läpäissyt valmiusporttinsa: mediaani {median} °C rajaa 1,5 vastaan, p95 {p95} °C rajaa 3,0 vastaan, {hours} lämmitystunnin ajalta.\n\nKäyttöönotto kirjoittaa pumpun käyttäjän määrittämän käyrän ja vaihtaa pumpun tilaan User defined. Qvantumin oma Auto-käyrä säilyy koskemattomana ja palaa, kun kytket sen pois. Myöhemmin voit kytkeä sen päälle tai pois integraation entiteeteistä kytkimellä ”Mukautuva lämmityskäyrä: ohjaus”. Qvantum (yritys) ei tue tätä ominaisuutta.",
             "menu_options": {
-              "activate": "Activate the curve",
-              "decline": "Not now"
+              "activate": "Ota käyrä käyttöön",
+              "decline": "Ei nyt"
             }
           },
           "activate": {
-            "title": "Activate the curve",
-            "description": "The curve starts writing the pump's user-defined table. Switch \"Adaptive heating curve: control\" off to hand back to Auto."
+            "title": "Ota käyrä käyttöön",
+            "description": "Käyrä alkaa kirjoittaa pumpun käyttäjän määrittämää käyrää. Kytke ”Mukautuva lämmityskäyrä: ohjaus” pois, niin ohjaus palaa Autolle."
           },
           "decline": {
-            "title": "Not now",
-            "description": "The question is not asked again until readiness lapses and returns."
+            "title": "Ei nyt",
+            "description": "Kysymys ei palaa ennen kuin valmius häviää ja palaa uudelleen."
           }
         },
         "abort": {
-          "not_loaded": "The Qvantum integration is not loaded."
+          "not_loaded": "Qvantum-integraatiota ei ole ladattu."
         }
       }
     }

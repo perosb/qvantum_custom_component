@@ -1090,28 +1090,28 @@
       "description": "Pompa używa {start} / {stop} °C jako temperatury start/stop ciepłej wody, a to ustawienie wstępne nie jest znane tej integracji. Wartości te zostały prawdopodobnie ustawione ręcznie lub w aplikacji Qvantum."
     },
     "curve_ready": {
-      "title": "Adaptive curve ready — activate it?",
+      "title": "Krzywa adaptacyjna gotowa – aktywować?",
       "fix_flow": {
         "step": {
           "init": {
-            "title": "Adaptive curve ready — activate it?",
-            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve and switches the pump to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature.",
+            "title": "Krzywa adaptacyjna gotowa – aktywować?",
+            "description": "Własna krzywa adaptacyjna integracji – nie funkcja Qvantum – przeszła bramkę gotowości: mediana {median} °C wobec 1,5, p95 {p95} °C wobec 3,0, w {hours} godzinach grzania.\n\nAktywacja zapisuje zdefiniowaną przez użytkownika krzywą pompy i przełącza pompę na User defined. Własna krzywa Auto firmy Qvantum pozostaje nietknięta i wraca, gdy ją wyłączysz. Później włączysz ją lub wyłączysz przełącznikiem „Adaptacyjna krzywa grzewcza: sterowanie” wśród encji integracji. Qvantum (firma) nie wspiera tej funkcji.",
             "menu_options": {
-              "activate": "Activate the curve",
-              "decline": "Not now"
+              "activate": "Aktywuj krzywą",
+              "decline": "Nie teraz"
             }
           },
           "activate": {
-            "title": "Activate the curve",
-            "description": "The curve starts writing the pump's user-defined table. Switch \"Adaptive heating curve: control\" off to hand back to Auto."
+            "title": "Aktywuj krzywą",
+            "description": "Krzywa zaczyna zapisywać zdefiniowaną przez użytkownika krzywą pompy. Wyłącz „Adaptacyjna krzywa grzewcza: sterowanie”, aby oddać sterowanie do Auto."
           },
           "decline": {
-            "title": "Not now",
-            "description": "The question is not asked again until readiness lapses and returns."
+            "title": "Nie teraz",
+            "description": "Pytanie nie wróci, dopóki gotowość nie zniknie i nie pojawi się ponownie."
           }
         },
         "abort": {
-          "not_loaded": "The Qvantum integration is not loaded."
+          "not_loaded": "Integracja Qvantum nie jest załadowana."
         }
       }
     }

@@ -1095,7 +1095,7 @@
         "step": {
           "init": {
             "title": "Adaptive curve ready — activate it?",
-            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve and switches the pump to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature.",
+            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve and switches the pump to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Later you can turn it on or off with the switch \"Adaptive heating curve: control\" among the integration's entities. Qvantum (the company) does not support this feature.",
             "menu_options": {
               "activate": "Activate the curve",
               "decline": "Not now"

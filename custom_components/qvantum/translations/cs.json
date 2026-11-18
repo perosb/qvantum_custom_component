@@ -1090,28 +1090,28 @@
       "description": "Čerpadlo používá {start} / {stop} °C jako start/stop teplé vody, což je předvolba, kterou tato integrace nezná. Hodnoty byly pravděpodobně nastaveny ručně nebo v aplikaci Qvantum."
     },
     "curve_ready": {
-      "title": "Adaptive curve ready — activate it?",
+      "title": "Adaptivní křivka je připravena – aktivovat?",
       "fix_flow": {
         "step": {
           "init": {
-            "title": "Adaptive curve ready — activate it?",
-            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve and switches the pump to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature.",
+            "title": "Adaptivní křivka je připravena – aktivovat?",
+            "description": "Vlastní adaptivní křivka integrace – nikoli funkce Qvantum – prošla branou připravenosti: medián {median} °C proti 1,5, p95 {p95} °C proti 3,0, za {hours} topných hodin.\n\nAktivací se zapíše uživatelsky definovaná křivka pumpy a pumpa se přepne na User defined. Vlastní křivka Qvantum Auto zůstane nedotčena a vrátí se, když ji vypnete. Později ji zapnete nebo vypnete přepínačem „Adaptivní křivka: ovládání“ v entitách integrace. Qvantum (společnost) tuto funkci nepodporuje.",
             "menu_options": {
-              "activate": "Activate the curve",
-              "decline": "Not now"
+              "activate": "Aktivovat křivku",
+              "decline": "Teď ne"
             }
           },
           "activate": {
-            "title": "Activate the curve",
-            "description": "The curve starts writing the pump's user-defined table. Switch \"Adaptive heating curve: control\" off to hand back to Auto."
+            "title": "Aktivovat křivku",
+            "description": "Křivka začne zapisovat uživatelsky definovanou křivku pumpy. Vypnutím přepínače „Adaptivní křivka: ovládání“ vrátíte řízení na Auto."
           },
           "decline": {
-            "title": "Not now",
-            "description": "The question is not asked again until readiness lapses and returns."
+            "title": "Teď ne",
+            "description": "Otázka se znovu neobjeví, dokud připravenost nezmizí a nevrátí se."
           }
         },
         "abort": {
-          "not_loaded": "The Qvantum integration is not loaded."
+          "not_loaded": "Integrace Qvantum není načtena."
         }
       }
     }

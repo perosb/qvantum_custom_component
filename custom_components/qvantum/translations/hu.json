@@ -1090,28 +1090,28 @@
       "description": "A szivattyú {start} / {stop} °C-ot használ a használivíz indítási/leállítási hőmérsékleteként, ami egy ismeretlen előbeállítás ehhez az integrációhoz. Ezeket az értékeket valószínűleg kézzel vagy a Qvantum alkalmazásban állították be."
     },
     "curve_ready": {
-      "title": "Adaptive curve ready — activate it?",
+      "title": "Adaptív görbe kész – aktiválja?",
       "fix_flow": {
         "step": {
           "init": {
-            "title": "Adaptive curve ready — activate it?",
-            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve and switches the pump to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature.",
+            "title": "Adaptív görbe kész – aktiválja?",
+            "description": "Az integráció saját adaptív görbéje – nem Qvantum-funkció – átlépte a készenléti kapuját: medián {median} °C az 1,5-höz, p95 {p95} °C a 3,0-hoz képest, {hours} fűtési órán át.\n\nAktiváláskor a szivattyú felhasználó által meghatározott görbéje íródik ki, és a szivattyú User defined módba vált. A Qvantum saját Auto-görbéje érintetlen marad, és visszatér, amikor kikapcsolja. Később az integráció entitásai között a „Adaptív fűtési görbe: vezérlés” kapcsolóval bármikor be- vagy kikapcsolhatja. A Qvantum (a vállalat) nem támogatja ezt a funkciót.",
             "menu_options": {
-              "activate": "Activate the curve",
-              "decline": "Not now"
+              "activate": "Görbe aktiválása",
+              "decline": "Most nem"
             }
           },
           "activate": {
-            "title": "Activate the curve",
-            "description": "The curve starts writing the pump's user-defined table. Switch \"Adaptive heating curve: control\" off to hand back to Auto."
+            "title": "Görbe aktiválása",
+            "description": "A görbe mostantól a szivattyú felhasználó által meghatározott görbéjét írja. Kapcsolja ki az „Adaptív fűtési görbe: vezérlés” kapcsolót, hogy a vezérlés visszatérjen az Autóhoz."
           },
           "decline": {
-            "title": "Not now",
-            "description": "The question is not asked again until readiness lapses and returns."
+            "title": "Most nem",
+            "description": "A kérdés csak akkor jelenik meg újra, ha a készenlét megszűnik, majd visszatér."
           }
         },
         "abort": {
-          "not_loaded": "The Qvantum integration is not loaded."
+          "not_loaded": "A Qvantum integráció nincs betöltve."
         }
       }
     }

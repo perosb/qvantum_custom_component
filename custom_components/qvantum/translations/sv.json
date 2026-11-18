@@ -1095,7 +1095,7 @@
         "step": {
           "init": {
             "title": "Adaptiv kurva redo — aktivera den?",
-            "description": "Integrationens egen adaptiva kurva — inte en Qvantum-funktion — har passerat sin beredskapsgrind: median {median} °C mot 1,5, p95 {p95} °C mot 3,0, över {hours} värmetimmar.\n\nAtt aktivera den skriver pumpens användardefinierade kurva och ställer pumpen på User defined. Qvantums egen Auto-kurva rörs inte och kommer tillbaka när du stänger av. Qvantum (företaget) stöder inte den här funktionen.",
+            "description": "Integrationens egen adaptiva kurva — inte en Qvantum-funktion — har passerat sin beredskapsgrind: median {median} °C mot 1,5, p95 {p95} °C mot 3,0, över {hours} värmetimmar.\n\nAtt aktivera den skriver pumpens användardefinierade kurva och ställer pumpen på User defined. Qvantums egen Auto-kurva rörs inte och kommer tillbaka när du stänger av. Senare slår du den på eller av med reglaget \"Adaptiv värmekurva: styrning\" bland integrationens entiteter. Qvantum (företaget) stöder inte den här funktionen.",
             "menu_options": {
               "activate": "Aktivera kurvan",
               "decline": "Inte nu"

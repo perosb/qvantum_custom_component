@@ -1090,28 +1090,28 @@
       "description": "La pompe utilise {start} / {stop} °C comme température de départ/arrêt de l'eau chaude, un préréglage que cette intégration ne connaît pas. Ces valeurs ont probablement été définies manuellement ou via l'application Qvantum."
     },
     "curve_ready": {
-      "title": "Adaptive curve ready — activate it?",
+      "title": "Courbe adaptative prête : l'activer ?",
       "fix_flow": {
         "step": {
           "init": {
-            "title": "Adaptive curve ready — activate it?",
-            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve and switches the pump to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature.",
+            "title": "Courbe adaptative prête : l'activer ?",
+            "description": "La courbe adaptative de l'intégration elle-même — et non une fonction Qvantum — a franchi sa porte de préparation : médiane {median} °C contre 1,5, p95 {p95} °C contre 3,0, sur {hours} heures de chauffage.\n\nL'activer écrit la courbe définie par l'utilisateur de la pompe et bascule la pompe sur User defined. La courbe Auto de Qvantum reste intacte et revient dès que vous la désactivez. Plus tard, activez-la ou désactivez-la avec l'interrupteur « Courbe de chauffage adaptative : contrôle » parmi les entités de l'intégration. Qvantum (l'entreprise) ne prend pas en charge cette fonction.",
             "menu_options": {
-              "activate": "Activate the curve",
-              "decline": "Not now"
+              "activate": "Activer la courbe",
+              "decline": "Pas maintenant"
             }
           },
           "activate": {
-            "title": "Activate the curve",
-            "description": "The curve starts writing the pump's user-defined table. Switch \"Adaptive heating curve: control\" off to hand back to Auto."
+            "title": "Activer la courbe",
+            "description": "La courbe commence à écrire la courbe définie par l'utilisateur de la pompe. Désactivez « Courbe de chauffage adaptative : contrôle » pour rendre la main à Auto."
           },
           "decline": {
-            "title": "Not now",
-            "description": "The question is not asked again until readiness lapses and returns."
+            "title": "Pas maintenant",
+            "description": "La question ne reviendra qu'une fois la préparation perdue puis retrouvée."
           }
         },
         "abort": {
-          "not_loaded": "The Qvantum integration is not loaded."
+          "not_loaded": "L'intégration Qvantum n'est pas chargée."
         }
       }
     }

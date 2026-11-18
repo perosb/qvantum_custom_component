@@ -1090,28 +1090,28 @@
       "description": "Pumpen bruger {start} / {stop} °C som start/stop for varmt vand, hvilket er en forudindstilling, som denne integration ikke kender. Værdierne er sandsynligvis sat manuelt eller via Qvantum-appen."
     },
     "curve_ready": {
-      "title": "Adaptive curve ready — activate it?",
+      "title": "Adaptiv kurve klar – aktivér den?",
       "fix_flow": {
         "step": {
           "init": {
-            "title": "Adaptive curve ready — activate it?",
-            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve and switches the pump to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Qvantum (the company) does not support this feature.",
+            "title": "Adaptiv kurve klar – aktivér den?",
+            "description": "Integrationens egen adaptive kurve – ikke en Qvantum-funktion – har passeret sin parathedsgrænse: median {median} °C mod 1,5, p95 {p95} °C mod 3,0, over {hours} varmetimer.\n\nNår du aktiverer den, skrives pumpens brugerdefinerede kurve, og pumpen skifter til User defined. Qvantums egen Auto-kurve er urørt og vender tilbage, når du slår den fra. Senere kan du slå den til eller fra med kontakten »Adaptiv varmekurve: styring« blandt integrationens entiteter. Qvantum (virksomheden) understøtter ikke denne funktion.",
             "menu_options": {
-              "activate": "Activate the curve",
-              "decline": "Not now"
+              "activate": "Aktivér kurven",
+              "decline": "Ikke nu"
             }
           },
           "activate": {
-            "title": "Activate the curve",
-            "description": "The curve starts writing the pump's user-defined table. Switch \"Adaptive heating curve: control\" off to hand back to Auto."
+            "title": "Aktivér kurven",
+            "description": "Kurven begynder at skrive pumpens brugerdefinerede kurve. Slå kontakten »Adaptiv varmekurve: styring« fra for at give styringen tilbage til Auto."
           },
           "decline": {
-            "title": "Not now",
-            "description": "The question is not asked again until readiness lapses and returns."
+            "title": "Ikke nu",
+            "description": "Spørgsmålet vises ikke igen, før paratheden falder bort og vender tilbage."
           }
         },
         "abort": {
-          "not_loaded": "The Qvantum integration is not loaded."
+          "not_loaded": "Qvantum-integrationen er ikke indlæst."
         }
       }
     }
