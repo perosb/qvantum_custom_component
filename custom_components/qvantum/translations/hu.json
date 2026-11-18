@@ -1088,6 +1088,32 @@
     "tap_water_capacity_level_conflict": {
       "title": "Az alkalmazás a hőmérsékletekkel nem egyező szintet jelez",
       "description": "A szivattyú {start} / {stop} °C-ot használ a használivíz indítási/leállítási hőmérsékleteként, ami egy ismeretlen előbeállítás ehhez az integrációhoz. Ezeket az értékeket valószínűleg kézzel vagy a Qvantum alkalmazásban állították be."
+    },
+    "curve_ready": {
+      "title": "Adaptív görbe kész – aktiválja?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Adaptív görbe kész – aktiválja?",
+            "description": "Az integráció saját adaptív görbéje – nem Qvantum-funkció – átlépte a készenléti kapuját: medián {median} °C az 1,5-höz, p95 {p95} °C a 3,0-hoz képest, {hours} fűtési órán át.\n\nAktiváláskor a szivattyú felhasználó által meghatározott görbéje íródik ki, és a szivattyú User defined módba vált. A Qvantum saját Auto-görbéje érintetlen marad, és visszatér, amikor kikapcsolja. Később az integráció entitásai között a „Adaptív fűtési görbe: vezérlés” kapcsolóval bármikor be- vagy kikapcsolhatja. A Qvantum (a vállalat) nem támogatja ezt a funkciót.",
+            "menu_options": {
+              "activate": "Görbe aktiválása",
+              "decline": "Most nem"
+            }
+          },
+          "activate": {
+            "title": "Görbe aktiválása",
+            "description": "A görbe mostantól a szivattyú felhasználó által meghatározott görbéjét írja. Kapcsolja ki az „Adaptív fűtési görbe: vezérlés” kapcsolót, hogy a vezérlés visszatérjen az Autóhoz."
+          },
+          "decline": {
+            "title": "Most nem",
+            "description": "A kérdés csak akkor jelenik meg újra, ha a készenlét megszűnik, majd visszatér."
+          }
+        },
+        "abort": {
+          "not_loaded": "A Qvantum integráció nincs betöltve."
+        }
+      }
     }
   }
 }

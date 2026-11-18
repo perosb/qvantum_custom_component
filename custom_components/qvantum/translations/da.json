@@ -1088,6 +1088,32 @@
     "tap_water_capacity_level_conflict": {
       "title": "Appen rapporterer et niveau, der ikke passer til temperaturerne",
       "description": "Pumpen bruger {start} / {stop} °C som start/stop for varmt vand, hvilket er en forudindstilling, som denne integration ikke kender. Værdierne er sandsynligvis sat manuelt eller via Qvantum-appen."
+    },
+    "curve_ready": {
+      "title": "Adaptiv kurve klar – aktivér den?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Adaptiv kurve klar – aktivér den?",
+            "description": "Integrationens egen adaptive kurve – ikke en Qvantum-funktion – har passeret sin parathedsgrænse: median {median} °C mod 1,5, p95 {p95} °C mod 3,0, over {hours} varmetimer.\n\nNår du aktiverer den, skrives pumpens brugerdefinerede kurve, og pumpen skifter til User defined. Qvantums egen Auto-kurve er urørt og vender tilbage, når du slår den fra. Senere kan du slå den til eller fra med kontakten »Adaptiv varmekurve: styring« blandt integrationens entiteter. Qvantum (virksomheden) understøtter ikke denne funktion.",
+            "menu_options": {
+              "activate": "Aktivér kurven",
+              "decline": "Ikke nu"
+            }
+          },
+          "activate": {
+            "title": "Aktivér kurven",
+            "description": "Kurven begynder at skrive pumpens brugerdefinerede kurve. Slå kontakten »Adaptiv varmekurve: styring« fra for at give styringen tilbage til Auto."
+          },
+          "decline": {
+            "title": "Ikke nu",
+            "description": "Spørgsmålet vises ikke igen, før paratheden falder bort og vender tilbage."
+          }
+        },
+        "abort": {
+          "not_loaded": "Qvantum-integrationen er ikke indlæst."
+        }
+      }
     }
   }
 }

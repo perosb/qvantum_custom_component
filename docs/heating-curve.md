@@ -4,6 +4,13 @@ How Qvantum Auto vs User defined heating curves map to Modbus holdings and
 the cloud HTTP `update_settings` command, what the official app does, and
 what this integration exposes.
 
+**The adaptive curve is this integration's own feature, not a Qvantum one.** It
+writes the pump's *user-defined* curve and switches the pump to User defined;
+Qvantum's own curve is the Auto curve, which is untouched and returns when the
+integration's control is switched off. Qvantum (the company) does not support
+this feature, and a support case about it belongs in this repository's issue
+tracker. The registers behind it are in the table below.
+
 Source for register names and ranges: *Modbus Communication* quick-start
 guide QSG EN 2613-A (D100041). Behaviour below is from live dumps on one
 unit (holdings 22–30 and input 35 `cal_heat_temp`), not from Qvantum
@@ -506,7 +513,21 @@ Entities:
 
 ### Activation and reversion
 
-The switch never turns itself on. `ready` becomes true when the **learned
+The switch never turns itself on, and the integration never activates the curve
+on its own — it writes to the pump, so that decision is the user's. What it does
+instead is **ask**: once `ready` has held for a day in shadow (the gate compares
+a rolling window, so it can pass for one cycle and fail the next) it opens a
+fixable repair issue with the figures the gate used — median, p95 and the
+heating hours behind them — because a marginal pass (median 1.44 against 1.5) is
+not the same decision as a comfortable one. The flow offers *activate* (the same
+call the switch makes) or *not now*; a decline is remembered until readiness
+lapses and returns, and the issue is only raised when Modbus writes are enabled,
+since without them the switch is unavailable. `ready_issue_declined` in the
+diagnostics says which of the two happened. The issue carries a **Learn more**
+link to this section, opened in a new window, because the feature is the
+integration's own and the explanation has to be ours.
+
+`ready` becomes true when the **learned
 baseline** — not the adjusted shadow — reproduces the pump over at least three
 full local days: a median absolute deviation ≤ 1.5 °C and a 95th percentile
 ≤ 3.0 °C, over heating hours only (`heatingpower` above the same floor the

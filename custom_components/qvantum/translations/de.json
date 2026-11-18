@@ -1088,6 +1088,32 @@
     "tap_water_capacity_level_conflict": {
       "title": "Die App meldet eine Stufe, die nicht zu den Temperaturen passt",
       "description": "Die Pumpe verwendet {start} / {stop} °C als Start-/Stopptemperatur für Warmwasser. Diese Voreinstellung kennt diese Integration nicht. Die Werte wurden vermutlich manuell oder über die Qvantum-App gesetzt."
+    },
+    "curve_ready": {
+      "title": "Adaptive Kurve bereit – aktivieren?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Adaptive Kurve bereit – aktivieren?",
+            "description": "Die eigene adaptive Kurve der Integration – keine Qvantum-Funktion – hat ihre Bereitschaftsprüfung bestanden: Median {median} °C gegen 1,5, p95 {p95} °C gegen 3,0, über {hours} Heizstunden.\n\nBeim Aktivieren wird die benutzerdefinierte Kurve der Pumpe geschrieben und die Pumpe auf User defined gestellt. Qvantums eigene Auto-Kurve bleibt unberührt und kommt zurück, sobald du sie ausschaltest. Später schaltest du sie über den Schalter „Adaptive Heizkurve: Steuerung“ bei den Entitäten der Integration ein oder aus. Qvantum (das Unternehmen) unterstützt diese Funktion nicht.",
+            "menu_options": {
+              "activate": "Kurve aktivieren",
+              "decline": "Jetzt nicht"
+            }
+          },
+          "activate": {
+            "title": "Kurve aktivieren",
+            "description": "Die Kurve schreibt ab jetzt die benutzerdefinierte Kurve der Pumpe. Schalte „Adaptive Heizkurve: Steuerung“ aus, um die Steuerung an Auto zurückzugeben."
+          },
+          "decline": {
+            "title": "Jetzt nicht",
+            "description": "Die Frage erscheint erst wieder, wenn die Bereitschaft entfällt und erneut eintritt."
+          }
+        },
+        "abort": {
+          "not_loaded": "Die Qvantum-Integration ist nicht geladen."
+        }
+      }
     }
   }
 }

@@ -653,6 +653,12 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         # themselves are attributes on the point sensors, which the recorder
         # does not keep, so "how long has the cap been binding?" had no answer
         # in the data — two sessions reconstructed it two days apart.
+        # Whether the user answered "not now" to the activation invitation. A
+        # report cannot otherwise tell "they declined" from "readiness never
+        # held long enough to ask".
+        "ready_issue_declined": bool(
+            getattr(coordinator, "_ready_issue_declined", False)
+        ),
         "trim_cap_since": {
             key: stamp
             for key, stamp in (

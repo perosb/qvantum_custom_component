@@ -106,7 +106,14 @@ compared with the pump's own. Once the deviation has stayed within the
 readiness gate — median ≤ 1.5 °C, p95 ≤ 3.0 °C over at least three days and 24
 heating hours — `sensor.qvantum_adaptive_curve_deviation` reports `ready`, and
 you can turn on `switch.qvantum_adaptive_curve_control` yourself. The
-integration never does.
+integration never does; once readiness has held for a day it opens a repair
+issue that asks, with the numbers the gate used.
+
+**The adaptive curve is this integration's feature, not a Qvantum one.** It
+writes the pump's *user-defined* curve and switches the pump to User defined;
+Qvantum's own curve is the Auto curve, which is untouched and comes back when
+you switch the integration's control off. Qvantum (the company) does not support
+this feature.
 
 | | Pump's Auto curve | Adaptive curve |
 |---|---|---|

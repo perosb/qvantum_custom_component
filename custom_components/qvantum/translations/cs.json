@@ -1088,6 +1088,32 @@
     "tap_water_capacity_level_conflict": {
       "title": "Aplikace hlásí úroveň, která neodpovídá teplotám",
       "description": "Čerpadlo používá {start} / {stop} °C jako start/stop teplé vody, což je předvolba, kterou tato integrace nezná. Hodnoty byly pravděpodobně nastaveny ručně nebo v aplikaci Qvantum."
+    },
+    "curve_ready": {
+      "title": "Adaptivní křivka je připravena – aktivovat?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Adaptivní křivka je připravena – aktivovat?",
+            "description": "Vlastní adaptivní křivka integrace – nikoli funkce Qvantum – prošla branou připravenosti: medián {median} °C proti 1,5, p95 {p95} °C proti 3,0, za {hours} topných hodin.\n\nAktivací se zapíše uživatelsky definovaná křivka pumpy a pumpa se přepne na User defined. Vlastní křivka Qvantum Auto zůstane nedotčena a vrátí se, když ji vypnete. Později ji zapnete nebo vypnete přepínačem „Adaptivní křivka: ovládání“ v entitách integrace. Qvantum (společnost) tuto funkci nepodporuje.",
+            "menu_options": {
+              "activate": "Aktivovat křivku",
+              "decline": "Teď ne"
+            }
+          },
+          "activate": {
+            "title": "Aktivovat křivku",
+            "description": "Křivka začne zapisovat uživatelsky definovanou křivku pumpy. Vypnutím přepínače „Adaptivní křivka: ovládání“ vrátíte řízení na Auto."
+          },
+          "decline": {
+            "title": "Teď ne",
+            "description": "Otázka se znovu neobjeví, dokud připravenost nezmizí a nevrátí se."
+          }
+        },
+        "abort": {
+          "not_loaded": "Integrace Qvantum není načtena."
+        }
+      }
     }
   }
 }

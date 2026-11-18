@@ -1088,6 +1088,32 @@
     "tap_water_capacity_level_conflict": {
       "title": "De app meldt een niveau dat niet bij de temperaturen past",
       "description": "De pomp gebruikt {start} / {stop} °C als start-/stoptemperatuur voor warm water; deze voorinstelling is onbekend voor deze integratie. De waarden zijn waarschijnlijk handmatig of via de Qvantum-app ingesteld."
+    },
+    "curve_ready": {
+      "title": "Adaptieve curve gereed – activeren?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Adaptieve curve gereed – activeren?",
+            "description": "De eigen adaptieve curve van de integratie – geen Qvantum-functie – is door zijn gereedheidspoort: mediaan {median} °C tegen 1,5, p95 {p95} °C tegen 3,0, over {hours} verwarmingsuren.\n\nActiveren schrijft de door de gebruiker gedefinieerde curve van de pomp en zet de pomp op User defined. Qvantums eigen Auto-curve blijft onaangeroerd en komt terug zodra je hem uitzet. Later zet je hem aan of uit met de schakelaar ‘Adaptieve verwarmingscurve: regeling’ bij de entiteiten van de integratie. Qvantum (het bedrijf) ondersteunt deze functie niet.",
+            "menu_options": {
+              "activate": "Curve activeren",
+              "decline": "Niet nu"
+            }
+          },
+          "activate": {
+            "title": "Curve activeren",
+            "description": "De curve schrijft vanaf nu de door de gebruiker gedefinieerde curve van de pomp. Zet ‘Adaptieve verwarmingscurve: regeling’ uit om de regeling aan Auto terug te geven."
+          },
+          "decline": {
+            "title": "Niet nu",
+            "description": "De vraag komt pas terug als de gereedheid wegvalt en weer optreedt."
+          }
+        },
+        "abort": {
+          "not_loaded": "De Qvantum-integratie is niet geladen."
+        }
+      }
     }
   }
 }

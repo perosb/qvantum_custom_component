@@ -42,7 +42,7 @@ custom_components/qvantum/
   diagnostics.py              # config-entry support dump
   summary.py                  # identifier-free summary export + download view
   telemetry.py                # opt-in consent, token, uploader
-  repairs.py                  # telemetry consent fix flow
+  repairs.py                  # fix flows: telemetry consent, curve-ready invitation
   config_flow.py
   const.py                    # HA keys; re-exports client constants
   sensor.py, binary_sensor.py, climate.py, number.py, switch.py,

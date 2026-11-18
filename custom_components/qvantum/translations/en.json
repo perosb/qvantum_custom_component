@@ -1088,6 +1088,32 @@
     "tap_water_capacity_level_conflict": {
       "title": "The app reports a level that does not match the temperatures",
       "description": "The pump holds {start} / {stop} °C as hot-water start/stop which is an unknown preset to this integration. These values have probably been set manually or via the Qvantum App."
+    },
+    "curve_ready": {
+      "title": "Adaptive curve ready — activate it?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Adaptive curve ready — activate it?",
+            "description": "The integration's own adaptive curve — not a Qvantum feature — has passed its readiness gate: median {median} °C against 1.5, p95 {p95} °C against 3.0, over {hours} heating hours.\n\nActivating it writes the pump's user-defined curve and switches the pump to User defined. Qvantum's own Auto curve is untouched and comes back when you switch it off. Later you can turn it on or off with the switch \"Adaptive heating curve: control\" among the integration's entities. Qvantum (the company) does not support this feature.",
+            "menu_options": {
+              "activate": "Activate the curve",
+              "decline": "Not now"
+            }
+          },
+          "activate": {
+            "title": "Activate the curve",
+            "description": "The curve starts writing the pump's user-defined table. Switch \"Adaptive heating curve: control\" off to hand back to Auto."
+          },
+          "decline": {
+            "title": "Not now",
+            "description": "The question is not asked again until readiness lapses and returns."
+          }
+        },
+        "abort": {
+          "not_loaded": "The Qvantum integration is not loaded."
+        }
+      }
     }
   }
 }

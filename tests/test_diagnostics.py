@@ -762,6 +762,17 @@ async def test_efficiency_diagnostics_absent_without_a_snapshot(hass):
 
 
 @pytest.mark.asyncio
+async def test_curve_dumps_whether_the_invitation_was_declined(hass):
+    """A report must tell "they declined" from "readiness never held"."""
+    curve = SimpleNamespace(data=None, _ready_issue_declined=True)
+    runtime = _runtime(_coordinator(), curve=curve)
+
+    result = await async_get_config_entry_diagnostics(hass, _entry(runtime))
+
+    assert result["curve"]["ready_issue_declined"] is True
+
+
+@pytest.mark.asyncio
 async def test_curve_dumps_the_forecast_temperature_beside_the_term(hass):
     """`outdoor_c` is a term in kelvin, not the forecast air temperature.
 

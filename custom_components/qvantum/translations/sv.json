@@ -1088,6 +1088,32 @@
     "tap_water_capacity_level_conflict": {
       "title": "Appen rapporterar en nivå som inte stämmer med temperaturerna",
       "description": "Pumpen har {start} / {stop} °C som start/stopp för varmvatten, vilket är en förinställning som den här integrationen inte känner igen. Värdena är förmodligen satta manuellt eller via Qvantum-appen."
+    },
+    "curve_ready": {
+      "title": "Adaptiv kurva redo — aktivera den?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Adaptiv kurva redo — aktivera den?",
+            "description": "Integrationens egen adaptiva kurva — inte en Qvantum-funktion — har passerat sin beredskapsgrind: median {median} °C mot 1,5, p95 {p95} °C mot 3,0, över {hours} värmetimmar.\n\nAtt aktivera den skriver pumpens användardefinierade kurva och ställer pumpen på User defined. Qvantums egen Auto-kurva rörs inte och kommer tillbaka när du stänger av. Senare slår du den på eller av med reglaget \"Adaptiv värmekurva: styrning\" bland integrationens entiteter. Qvantum (företaget) stöder inte den här funktionen.",
+            "menu_options": {
+              "activate": "Aktivera kurvan",
+              "decline": "Inte nu"
+            }
+          },
+          "activate": {
+            "title": "Aktivera kurvan",
+            "description": "Kurvan börjar skriva pumpens användardefinierade tabell. Stäng av \"Adaptiv värmekurva: styrning\" för att lämna tillbaka till Auto."
+          },
+          "decline": {
+            "title": "Inte nu",
+            "description": "Frågan ställs inte igen förrän beredskapen faller och återkommer."
+          }
+        },
+        "abort": {
+          "not_loaded": "Qvantum-integrationen är inte laddad."
+        }
+      }
     }
   }
 }
