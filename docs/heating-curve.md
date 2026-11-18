@@ -514,6 +514,23 @@ Entities:
   compares our baseline with the pump, which says nothing about the house once
   the curve is active; this measures whether the rooms actually follow the
   target, on whichever indoor sensor the trims are reading. Diagnostic entity.
+- `sensor.qvantum_adaptive_curve_advice` — the same measurement as a **verdict**:
+  `reduce` / `ok` / `increase`, from the signed `median_c` with a
+  `CURVE_ADVICE_DEAD_BAND_C` (0.3 K) dead band, and `unknown` until
+  `CURVE_ADVICE_MIN_HOURS` (24) hours of indoor error exist. It is the only
+  curve signal that works **before readiness**: the trims say nothing in shadow
+  because they only run while active, and readiness compares our baseline with
+  the pump rather than the house with the target. The `applies_to` attribute
+  says whose curve the verdict describes — `pump` while in shadow (the pump runs
+  its own table, so that is the curve the rooms feel) and `table` once active.
+  Main-UI entity, enabled by default. The state is deliberately untranslated:
+  it is something to automate on, and a translated state would move with the UI
+  language.
+  This replaces the `heating_curve_advisor` that #263 added and #286 removed.
+  That one ran a 6 h window with a ±1.0 K threshold, which contradicts what the
+  trims are built on — a single mild evening is not evidence, and the
+  integrator moves ~0.1 K/day with a two-day half-life. The verdict therefore
+  reads the readiness window's median, not a fresh six hours.
 - `sensor.qvantum_adaptive_curve_solar_model` — the **applied** trust in %
   (the day-block model's when it is valid, otherwise the hourly one), with the
   hourly coefficients (`a_w_per_k`, `b_m2`, `b_std_err`, `r2_opaque`,

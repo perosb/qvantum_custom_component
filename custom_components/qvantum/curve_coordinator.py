@@ -122,6 +122,13 @@ TRIM_REFRESH_HOURS = 24.0
 #: fail the next; a day of agreement is the cheapest hysteresis that still
 #: answers within a heating season.
 READY_ISSUE_MIN_HOURS = 24.0
+#: Dead band for the room-error verdict. Below it the reading says nothing:
+#: the indoor sensors resolve ~0.1 K and the pump's own room term moves the
+#: supply by a fraction of a kelvin.
+CURVE_ADVICE_DEAD_BAND_C = 0.3
+#: Hours of indoor-error evidence behind the verdict. Fewer cannot outvote a
+#: single mild evening, which is the mistake the removed 6 h advisor made.
+CURVE_ADVICE_MIN_HOURS = 24
 #: Days of hourly statistics read for the active-hour room-gain measurement.
 ROOM_GAIN_ACTIVE_WINDOW_DAYS = 7
 #: Faster cadence until the first trims exist: the evidence needed for them is
