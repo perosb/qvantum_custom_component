@@ -2364,8 +2364,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 f"{ROOM_GAIN_ACTIVE_WINDOW_DAYS} days"
             )
         target_c = float(target)
+        # The timestamp travels with each hour: the fit uses it to absorb a
+        # table that drifts while the window fills (the trims are still
+        # integrating), which otherwise pools hours from before and after a
+        # trim change as if the table had been constant.
         observations = [
-            (outdoor[ts], supply[ts], indoor[ts] - target_c)
+            (outdoor[ts], supply[ts], indoor[ts] - target_c, ts)
             for ts in sorted(set(outdoor) & set(supply) & set(indoor))
             if ts >= self._active_since_ts
             and (not power_id or power.get(ts, 0.0) >= MIN_SAMPLE_Q_W)

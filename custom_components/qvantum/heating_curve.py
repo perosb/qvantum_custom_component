@@ -781,6 +781,11 @@ class ActiveRoomGain:
     #: term; reported so a dump shows the absorption worked (it should land on
     #: the curve's slope, not on 0 and not on something wild).
     outdoor_slope_c_per_c: float | None = None
+    #: The time column's slope in °C/day: how fast the table itself moved while
+    #: the window filled. It should land on the trim drift (a few tenths of a
+    #: kelvin per day while the integrator is still moving) and is reported so a
+    #: dump shows the absorption worked.
+    drift_c_per_day: float | None = None
     valid: bool = False
     notes: str = ""
 
@@ -790,6 +795,51 @@ class ActiveRoomGain:
         if not self.std_err_c_per_c:
             return None
         return self.gain_c_per_c / self.std_err_c_per_c
+
+
+def _solve_normal_equations(
+    matrix: Sequence[Sequence[float]], vector: Sequence[float]
+) -> list[float] | None:
+    """Solve ``matrix · beta = vector`` by Gauss-Jordan, or ``None`` if singular."""
+    size = len(matrix)
+    rows = [list(matrix[i]) + [vector[i]] for i in range(size)]
+    for column in range(size):
+        pivot = max(range(column, size), key=lambda r: abs(rows[r][column]))
+        if abs(rows[pivot][column]) < 1e-12:
+            return None
+        rows[column], rows[pivot] = rows[pivot], rows[column]
+        for other in range(size):
+            if other == column:
+                continue
+            factor = rows[other][column] / rows[column][column]
+            for k in range(column, size + 1):
+                rows[other][k] -= factor * rows[column][k]
+    return [rows[i][size] / rows[i][i] for i in range(size)]
+
+
+def _invert(matrix: Sequence[Sequence[float]]) -> list[list[float]] | None:
+    """Inverse of a small symmetric matrix, or ``None`` if singular."""
+    size = len(matrix)
+    rows = [
+        list(matrix[i]) + [1.0 if i == j else 0.0 for j in range(size)]
+        for i in range(size)
+    ]
+    for column in range(size):
+        pivot = max(range(column, size), key=lambda r: abs(rows[r][column]))
+        if abs(rows[pivot][column]) < 1e-12:
+            return None
+        rows[column], rows[pivot] = rows[pivot], rows[column]
+        divisor = rows[column][column]
+        rows[column] = [value / divisor for value in rows[column]]
+        for other in range(size):
+            if other == column:
+                continue
+            factor = rows[other][column]
+            rows[other] = [
+                value - factor * base
+                for value, base in zip(rows[other], rows[column])
+            ]
+    return [row[size:] for row in rows]
 
 
 def room_gain_from_active_hours(
@@ -830,14 +880,38 @@ def room_gain_from_active_hours(
     moved it to 4.75 ± 0.20 with the nuisance at −0.85 °C/°C — the curve's own
     slope. The nuisance column is reported, never applied, and a bucket with no
     outdoor variation simply contributes nothing to it.
-    """
-    clean: list[tuple[float, float, float]] = []
-    for outdoor, supply, error in observations:
-        values = (float(outdoor), float(supply), float(error))
-        if all(math.isfinite(value) for value in values):
-            clean.append(values)
 
-    errors = [error for _, _, error in clean]
+    A **time** column absorbs the other confound: the table itself moves while
+    the window fills, because the trims are still integrating. Centring inside a
+    bucket removes the table's level *at one instant*, not a level that drifts
+    across the window, so hours from before and after a trim change are pooled
+    as if the table had been constant. Measured on a live install (2026-11-18,
+    14 days, trims 1.51 → 2.00): the pooled fit read 3.79 °C/°C while the hours
+    before the change read 4.90 ± 0.19 and the hours after 5.18 ± 0.26 — the
+    between-period slope was 13.5 °C/°C, a Simpson artefact of the table moving
+    while the room error moved with it. Adding the time column moved the same
+    windows to 4.42–5.13 (spread 0.7 instead of 1.4) with R² 0.86–0.93, and its
+    own slope lands on the trim drift (+0.09…+0.28 °C/day against ~0.13 measured).
+    Rows without a timestamp simply contribute nothing to it.
+    """
+    clean: list[tuple[float, float, float, float | None]] = []
+    for row in observations:
+        outdoor, supply, error = row[0], row[1], row[2]
+        stamp = row[3] if len(row) > 3 else None
+        values = (float(outdoor), float(supply), float(error))
+        if not all(math.isfinite(value) for value in values):
+            continue
+        when = None
+        if stamp is not None:
+            try:
+                when = float(stamp)
+            except (TypeError, ValueError):
+                when = None
+            if when is not None and not math.isfinite(when):
+                when = None
+        clean.append((*values, when))
+
+    errors = [error for _, _, error, _ in clean]
     span_c = max(errors) - min(errors) if errors else 0.0
 
     def unusable(notes: str) -> ActiveRoomGain:
@@ -856,10 +930,10 @@ def room_gain_from_active_hours(
             f"the room error barely moved ({span_c:.2f} °C < {min_span_c:.2f})"
         )
 
-    groups: dict[float, list[tuple[float, float, float]]] = {}
-    for outdoor, supply, error in clean:
+    groups: dict[float, list[tuple[float, float, float, float | None]]] = {}
+    for outdoor, supply, error, when in clean:
         groups.setdefault(round(outdoor / bucket_c), []).append(
-            (error, supply, outdoor)
+            (error, supply, outdoor, when)
         )
     usable = [group for group in groups.values() if len(group) >= min_bucket_hours]
     hours = sum(len(group) for group in usable)
@@ -875,54 +949,75 @@ def room_gain_from_active_hours(
             ),
         )
 
-    def fit(rows: Sequence[Sequence[tuple[float, float, float]]], n_buckets: int):
-        """Centred two-column fit: room slope, se, r², residual std, nuisance.
+    def fit(rows: Sequence[Sequence[tuple]], n_buckets: int):
+        """Centred fit: room slope, se, r², residual std, the two nuisances.
 
         The outdoor column is centred inside the same bucket, so it carries
         only the shape the bucket mean could not absorb. When a bucket has no
         outdoor variation the column is empty and the fit degrades to the
         single-slope form, which is what synthetic and single-temperature
         buckets need.
+
+        The time column is centred the same way and absorbs a table that drifts
+        while the window fills — the trims are still integrating, so hours from
+        before and after a change would otherwise be pooled as if the table had
+        been constant. It is only used when every row carries a timestamp.
         """
         xs: list[float] = []
         ys: list[float] = []
         zs: list[float] = []
+        ts: list[float] = []
+        timed = all(row[3] is not None for group in rows for row in group)
         for group in rows:
             mean_error = sum(row[0] for row in group) / len(group)
             mean_supply = sum(row[1] for row in group) / len(group)
             mean_outdoor = sum(row[2] for row in group) / len(group)
-            for error, supply, outdoor in group:
+            mean_time = (
+                sum(row[3] for row in group) / len(group) if timed else 0.0
+            )
+            for error, supply, outdoor, when in group:
                 xs.append(error - mean_error)
                 ys.append(supply - mean_supply)
                 zs.append(outdoor - mean_outdoor)
+                if timed:
+                    ts.append((when - mean_time) / 86400.0)
         sxx = sum(value * value for value in xs)
         if sxx <= 1e-12:
             return None
-        sxy = sum(x * y for x, y in zip(xs, ys))
-        szz = sum(value * value for value in zs)
-        if szz <= 1e-12:
-            slope = sxy / sxx
-            nuisance = None
-            residual = [y - slope * x for x, y in zip(xs, ys)]
-            variance = sum(value * value for value in residual) / max(
-                1, len(xs) - n_buckets - 1
-            )
-            se = math.sqrt(variance / sxx)
-        else:
-            sxz = sum(x * z for x, z in zip(xs, zs))
-            szy = sum(z * y for z, y in zip(zs, ys))
-            determinant = sxx * szz - sxz * sxz
-            if determinant <= 1e-12:
-                # The room error and the outdoor move together inside the
-                # buckets, so neither slope is separable from the other.
-                return None
-            slope = (sxy * szz - szy * sxz) / determinant
-            nuisance = (szy * sxx - sxy * sxz) / determinant
-            residual = [y - slope * x - nuisance * z for x, y, z in zip(xs, ys, zs)]
-            variance = sum(value * value for value in residual) / max(
-                1, len(xs) - n_buckets - 2
-            )
-            se = math.sqrt(variance * szz / determinant)
+        # Columns: the room error, then whichever nuisances carry variation.
+        columns: list[list[float]] = [xs]
+        if sum(value * value for value in zs) > 1e-12:
+            columns.append(zs)
+        if timed and sum(value * value for value in ts) > 1e-12:
+            columns.append(ts)
+        n_columns = len(columns)
+        matrix = [
+            [sum(a * b for a, b in zip(columns[i], columns[j])) for j in range(n_columns)]
+            for i in range(n_columns)
+        ]
+        vector = [sum(a * y for a, y in zip(columns[i], ys)) for i in range(n_columns)]
+        beta = _solve_normal_equations(matrix, vector)
+        if beta is None:
+            # The columns move together inside the buckets, so no slope is
+            # separable from the others.
+            return None
+        slope = beta[0]
+        nuisance = beta[1] if n_columns > 1 and columns[1] is zs else None
+        drift = beta[-1] if timed and columns[-1] is ts else None
+        residual = [
+            y - sum(b * column[index] for b, column in zip(beta, columns))
+            for index, y in enumerate(ys)
+        ]
+        variance = sum(value * value for value in residual) / max(
+            1, len(xs) - n_buckets - n_columns
+        )
+        # Standard error of the first coefficient from the inverse's corner.
+        inverse = _invert(matrix)
+        se = (
+            math.sqrt(variance * inverse[0][0])
+            if inverse is not None and inverse[0][0] > 0.0
+            else float("nan")
+        )
         mean_y = sum(ys) / len(ys)
         total = sum((y - mean_y) ** 2 for y in ys)
         return (
@@ -931,6 +1026,7 @@ def room_gain_from_active_hours(
             1.0 - sum(value * value for value in residual) / total if total else None,
             math.sqrt(variance),
             nuisance,
+            drift,
         )
 
     fitted = fit(usable, len(usable))
@@ -945,7 +1041,7 @@ def room_gain_from_active_hours(
                 "the buckets"
             ),
         )
-    slope, std_err, r2, residual_std, nuisance = fitted
+    slope, std_err, r2, residual_std, nuisance, drift = fitted
     gain = -slope
 
     # Leave-one-out: the swing that tells whether one hour carries the number.
@@ -1003,6 +1099,7 @@ def room_gain_from_active_hours(
         residual_std_c=residual_std,
         leave_one_out_c_per_c=leave_one_out,
         outdoor_slope_c_per_c=nuisance,
+        drift_c_per_day=drift,
         valid=valid,
         notes=notes,
     )
