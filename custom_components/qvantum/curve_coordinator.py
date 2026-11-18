@@ -116,13 +116,12 @@ BASELINE_LEARN_REFRESH_HOURS = 6.0
 #: Rolling window of indoor-error hours behind the active trims.
 TRIM_WINDOW_DAYS = 7
 #: Minimum time between trim updates.
+TRIM_REFRESH_HOURS = 24.0
 #: How long ``ready`` must hold before the integration asks the user to
 #: activate. The gate compares a rolling window, so it can pass for one cycle and
 #: fail the next; a day of agreement is the cheapest hysteresis that still
 #: answers within a heating season.
 READY_ISSUE_MIN_HOURS = 24.0
-
-TRIM_REFRESH_HOURS = 24.0
 #: Days of hourly statistics read for the active-hour room-gain measurement.
 ROOM_GAIN_ACTIVE_WINDOW_DAYS = 7
 #: Faster cadence until the first trims exist: the evidence needed for them is
