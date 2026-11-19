@@ -916,9 +916,13 @@ async def _async_hand_back_curve(
         # by its own control lock. Reverting through it stops those writes
         # first; a temporary unit beside it could be overtaken by a scheduled
         # write, and two clients would race for the pump's single TCP slot.
-        if not curve.active:
+        pending = bool(getattr(curve, "_revert_pending", False))
+        if not curve.active and not pending:
             return False
         try:
+            # Shadow mode also retries a latched revert when the curve is
+            # already inactive: an earlier Auto write may have failed, leaving
+            # the pump on our table with nothing to retry it after the handover.
             await curve.async_set_control_mode("shadow")
         except Exception as err:  # noqa: BLE001 — best effort
             _LOGGER.warning(

@@ -1701,3 +1701,21 @@ class TestCurveHandBackWithLiveCoordinator:
         curve._revert_pending = True
 
         assert not await _async_hand_back_curve(hass, entry, reason="reconfiguring")
+
+    @pytest.mark.asyncio
+    async def test_a_latched_revert_is_retried_before_the_handover(
+        self, hass, mock_config_entry
+    ):
+        """Shadow with a latched failure must still try, or the handover strands it."""
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry, curve = self._entry(mock_config_entry, active=False)
+        curve._revert_pending = True
+
+        async def _retry(_mode):
+            curve._revert_pending = False
+
+        curve.async_set_control_mode = AsyncMock(side_effect=_retry)
+
+        assert await _async_hand_back_curve(hass, entry, reason="reconfiguring")
+        curve.async_set_control_mode.assert_awaited_once_with("shadow")
