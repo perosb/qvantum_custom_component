@@ -13,6 +13,7 @@ from .client.modbus.maps import heating_curve_points
 from .const import HeatingCurveType, SensorMode
 from .coordinator import QvantumDataUpdateCoordinator, async_apply_setting
 from .entity import QvantumEntity, finalize_platform_setup
+from .coordinator import is_cloud, is_full_payload
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,14 +30,15 @@ async def async_setup_entry(
     values = coordinator.data.get("values", {})
     entities = []
     select_keys = {"curve_type_heating"}
-    if coordinator.modbus_enabled:
-        # Sensor mode writes holding 9; there is no cloud setter for it.
+    if is_full_payload(coordinator):
+        # Sensor mode is a canonical setting (`sensor_mode`); the cloud has no
+        # setter for it.
         select_keys.add("use_operation_sensor")
         if "use_operation_sensor" in values:
             entities.append(
                 QvantumSelectEntity(coordinator, "use_operation_sensor", device)
             )
-    else:
+    if is_cloud(coordinator):
         # SmartControl is cloud-only (holdings 163/164 have no cloud writes).
         select_keys.add("use_adaptive")
         if "use_adaptive" in values:

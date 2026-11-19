@@ -13,6 +13,7 @@ from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .curve_coordinator import QvantumCurveCoordinator
 from .entity import QvantumEntity, finalize_platform_setup
+from .coordinator import is_cloud
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ async def async_setup_entry(
         "op_man_addition",
         "man_mode",
     ]
-    if not coordinator.modbus_enabled:
+    if is_cloud(coordinator):
         # Cloud-only writes: SmartControl and vacation_mode. On Modbus,
         # vacation_mode is a read-only input (binary sensor).
         switch_names.extend(["enable_sc_sh", "enable_sc_dhw", "vacation_mode"])
@@ -48,9 +49,7 @@ async def async_setup_entry(
 
     curve_coordinator = getattr(config_entry.runtime_data, "curve_coordinator", None)
     switch_metrics = set(switch_names)
-    if coordinator.modbus_enabled and isinstance(
-        curve_coordinator, QvantumCurveCoordinator
-    ):
+    if isinstance(curve_coordinator, QvantumCurveCoordinator):
         sensors.append(
             QvantumCurveControlSwitch(coordinator, curve_coordinator, device)
         )

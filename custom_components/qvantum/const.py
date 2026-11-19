@@ -117,6 +117,15 @@ CONF_MODBUS_HOST = "modbus_host"
 CONF_MODBUS_PORT = "modbus_port"
 CONF_MODBUS_UNIT_ID = "modbus_unit_id"
 CONF_MODBUS_SCAN_INTERVAL = "modbus_scan_interval"
+
+# Transport vocabulary, so platform code can ask "is this the cloud" instead of
+# reading `modbus_enabled` as "not cloud" — two different questions that one flag
+# cannot answer once a third transport exists. An entry without
+# `CONF_TRANSPORT` keeps working: the resolver falls back to `CONF_MODBUS_TCP`,
+# which is all that existed before.
+CONF_TRANSPORT = "transport"
+TRANSPORT_CLOUD = "cloud"
+TRANSPORT_MODBUS = "modbus"
 # HA sensor the integration feeds to holding 14 (room_temp_external) every
 # poll while Modbus writing is enabled. Realizes the app's "ext modbus" sensor
 # mode: the pump drops the mode and raises alarm 8 when the fed value is older

@@ -55,6 +55,7 @@ from .curve_coordinator import (
 )
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
+from .coordinator import is_full_payload
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -399,12 +400,12 @@ async def async_setup_entry(
     values = coordinator.data.get("values", {})
     disabled_metrics = (
         DEFAULT_DISABLED_MODBUS_METRICS
-        if coordinator.modbus_enabled
+        if is_full_payload(coordinator)
         else DEFAULT_DISABLED_HTTP_METRICS
     )
 
     # Define possible metrics for the current mode
-    if coordinator.modbus_enabled:
+    if is_full_payload(coordinator):
         possible_metrics = set(
             DEFAULT_ENABLED_MODBUS_METRICS + DEFAULT_DISABLED_MODBUS_METRICS
         )

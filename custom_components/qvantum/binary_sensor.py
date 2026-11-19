@@ -22,6 +22,7 @@ from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
+from .coordinator import is_full_payload
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -89,12 +90,12 @@ async def async_setup_entry(
     values = coordinator.data.get("values", {})
     disabled_metrics = (
         DEFAULT_DISABLED_MODBUS_METRICS
-        if coordinator.modbus_enabled
+        if is_full_payload(coordinator)
         else DEFAULT_DISABLED_HTTP_METRICS
     )
 
     names = list(BINARY_SENSOR_NAMES)
-    if coordinator.modbus_enabled:
+    if is_full_payload(coordinator):
         names.extend(MODBUS_ONLY_BINARY_SENSORS)
 
     for metric in sorted(names):
