@@ -64,6 +64,9 @@ from .const import (
     CONF_EXTERNAL_ROOM_TEMP_ENTITY,
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
+    CONF_TRANSPORT,
+    TRANSPORT_CLOUD,
+    TRANSPORT_MODBUS,
     EXTERNAL_ROOM_TEMP_EMA_TAU,
     EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
@@ -183,15 +186,66 @@ def _firmware_metadata_from_sw_version(sw_version: str | None) -> dict:
     return metadata
 
 
+def transport_kind(coordinator: Any) -> str:
+    """Return the coordinator's transport: ``cloud`` or ``modbus``.
+
+    Platform code needs two different questions answered — "is this the cloud"
+    (a curated payload and no canonical settings writes) and "does this carry
+    the full payload" — and reading ``modbus_enabled`` as "not cloud" answers
+    neither once a third transport exists. A module function rather than a
+    property because the test suite drives the platforms with a bare
+    ``MagicMock`` coordinator, where a property would answer with another mock.
+    """
+    transport = getattr(coordinator, "transport", None)
+    if transport in (TRANSPORT_CLOUD, TRANSPORT_MODBUS):
+        return str(transport)
+    # Test harness and partial setups: derive from the Modbus flag, which is
+    # what every caller used before there was a transport field.
+    enabled = bool(getattr(coordinator, "modbus_enabled", False))
+    return TRANSPORT_MODBUS if enabled else TRANSPORT_CLOUD
+
+
+def is_cloud(coordinator: Any) -> bool:
+    """True only for the cloud transport."""
+    return transport_kind(coordinator) == TRANSPORT_CLOUD
+
+
+def is_full_payload(coordinator: Any) -> bool:
+    """True for the transports that carry every metric and canonical setting."""
+    return transport_kind(coordinator) != TRANSPORT_CLOUD
+
+
 class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinator):
     """Qvantum coordinator."""
 
     @staticmethod
+    def resolve_transport(config_entry: ConfigEntry) -> str:
+        """Return the entry's transport.
+
+        Only transports that exist are honoured, and only a flow that builds the
+        matching client may write ``CONF_TRANSPORT`` — an entry claiming one
+        there is no client for would get the wrong one and the platforms would
+        then create the wrong entity set. Anything else falls back to
+        ``CONF_MODBUS_TCP``, which is what every entry had before.
+        """
+        explicit = config_entry.options.get(
+            CONF_TRANSPORT, config_entry.data.get(CONF_TRANSPORT)
+        )
+        if explicit in (TRANSPORT_CLOUD, TRANSPORT_MODBUS):
+            return str(explicit)
+        enabled = bool(
+            config_entry.options.get(
+                CONF_MODBUS_TCP, config_entry.data.get(CONF_MODBUS_TCP, False)
+            )
+        )
+        return TRANSPORT_MODBUS if enabled else TRANSPORT_CLOUD
+
+    @staticmethod
     def resolve_poll_interval(config_entry: ConfigEntry) -> tuple[bool, int]:
         """Return (modbus_enabled, poll_interval_seconds) from a config entry."""
-        modbus_enabled = config_entry.options.get(
-            CONF_MODBUS_TCP,
-            config_entry.data.get(CONF_MODBUS_TCP, False),
+        modbus_enabled = (
+            QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+            == TRANSPORT_MODBUS
         )
         if not modbus_enabled:
             poll_interval = config_entry.options.get(
@@ -222,6 +276,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         extra_dhw: ExtraDhwTimer | None = None,
     ) -> None:
         """Initialize coordinator."""
+        self.transport = self.resolve_transport(config_entry)
         self.modbus_enabled, self.poll_interval = self.resolve_poll_interval(
             config_entry
         )
@@ -594,7 +649,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         """
         if not isinstance(cached, dict) or not cached.get("id"):
             return False
-        if self.modbus_enabled:
+        if not is_cloud(self):
             return True
         metadata = cached.get("device_metadata")
         return isinstance(metadata, dict) and bool(metadata)
@@ -1053,9 +1108,12 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             extract_metric_key,
         )
 
+        # The full-payload transports share one default entity set: only the
+        # cloud API returns a curated subset.
+        full_payload = is_full_payload(self)
         default_metrics = (
             DEFAULT_ENABLED_MODBUS_METRICS
-            if self.modbus_enabled
+            if full_payload
             else DEFAULT_ENABLED_HTTP_METRICS
         )
 
@@ -1074,7 +1132,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             # HTTP-only disabled metrics are only known in HTTP mode.
             # Modbus disabled metrics are known in Modbus mode.
             allowed_metrics = set(default_metrics)
-            if self.modbus_enabled:
+            if full_payload:
                 allowed_metrics |= set(DEFAULT_DISABLED_MODBUS_METRICS)
             else:
                 allowed_metrics |= set(DEFAULT_DISABLED_HTTP_METRICS)
@@ -1102,7 +1160,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             # Always include required metrics; Modbus-only intermediate metrics are
             # only needed when Modbus is enabled (they don't exist in the HTTP API).
             final_metrics = set(REQUIRED_METRICS)
-            if self.modbus_enabled:
+            if full_payload:
                 final_metrics.update(REQUIRED_MODBUS_METRICS)
 
             if not known_metrics:
@@ -1133,11 +1191,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             "No device registry entry found for device %s, returning all default enabled metrics",
             device_id,
         )
-        # Always include required metrics; Modbus-only intermediate metrics are
-        # only needed when Modbus is enabled (they don't exist in the HTTP API).
+        # Always include required metrics; the Modbus-only intermediate metrics
+        # only exist where the payload carries them.
         final_metrics = set(default_metrics)
         final_metrics.update(REQUIRED_METRICS)
-        if self.modbus_enabled:
+        if full_payload:
             final_metrics.update(REQUIRED_MODBUS_METRICS)
         return sorted(final_metrics)
 

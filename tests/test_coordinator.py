@@ -5862,3 +5862,144 @@ class TestExternalRoomTempFeed:
             coordinator.async_configure_external_room_feed()
         track.assert_not_called()
         assert coordinator._external_room_feed_unsub is None
+
+
+class TestFullPayloadDefaults:
+    """The default entity set follows the payload, not the transport name."""
+
+    @staticmethod
+    def _enabled(transport: str) -> list[str]:
+        from unittest.mock import patch as _patch
+
+        from custom_components.qvantum.const import (
+            TRANSPORT_CLOUD,
+            TRANSPORT_MODBUS,
+        )
+
+        with _patch(
+            "homeassistant.helpers.update_coordinator.DataUpdateCoordinator.__init__"
+        ) as super_init, _patch(
+            "custom_components.qvantum.entity.async_get_qvantum_device_entry",
+            return_value=None,
+        ):
+            super_init.return_value = None
+            config_entry = MagicMock()
+            config_entry.options.get.return_value = 30
+            config_entry.data = {}
+            config_entry.unique_id = "test_device"
+            coordinator = QvantumDataUpdateCoordinator(
+                MagicMock(), config_entry, client=make_client_mock()
+            )
+            coordinator.hass = MagicMock()
+            coordinator.transport = transport
+            coordinator.modbus_enabled = transport == TRANSPORT_MODBUS
+            return coordinator._get_enabled_metrics("test_device")
+
+    def test_the_full_payload_transport_gets_the_modbus_defaults(self):
+        from custom_components.qvantum.const import TRANSPORT_MODBUS
+
+        modbus = set(self._enabled(TRANSPORT_MODBUS))
+
+        # ``dhwpower`` is a Modbus-only default: derived from bf1/bt33/bt34.
+        assert "dhwpower" in modbus
+
+    def test_cloud_keeps_the_curated_default_set(self):
+        from custom_components.qvantum.const import TRANSPORT_CLOUD
+
+        cloud = set(self._enabled(TRANSPORT_CLOUD))
+
+        assert "dhwpower" not in cloud
+        assert "bt1" in cloud
+
+
+from custom_components.qvantum.coordinator import (  # noqa: E402
+    is_cloud,
+    is_full_payload,
+)
+
+
+class TestTransportKind:
+    """The transport decides the payload, not a Modbus flag read as "not cloud"."""
+
+    @staticmethod
+    def _coord(transport, *, modbus):
+        from custom_components.qvantum.const import (
+            TRANSPORT_CLOUD,
+            TRANSPORT_MODBUS,
+        )
+
+        coord = MagicMock()
+        coord.modbus_enabled = modbus
+        if transport is not None:
+            coord.transport = transport
+        return coord
+
+    def test_cloud_is_only_the_cloud(self):
+        from custom_components.qvantum.const import TRANSPORT_CLOUD, TRANSPORT_MODBUS
+        from custom_components.qvantum.coordinator import is_cloud, is_full_payload
+
+        assert is_cloud(self._coord(TRANSPORT_CLOUD, modbus=False))
+        assert is_full_payload(self._coord(TRANSPORT_CLOUD, modbus=False)) is False
+
+        coord = self._coord(TRANSPORT_MODBUS, modbus=True)
+        assert not is_cloud(coord)
+        assert is_full_payload(coord)
+
+    def test_a_bare_mock_falls_back_to_the_modbus_flag(self):
+        """The platforms are driven by MagicMock coordinators in the suite."""
+        from custom_components.qvantum.coordinator import is_cloud, is_full_payload
+
+        assert is_cloud(self._coord(None, modbus=False))
+        assert not is_full_payload(self._coord(None, modbus=False))
+        assert not is_cloud(self._coord(None, modbus=True))
+        assert is_full_payload(self._coord(None, modbus=True))
+
+    def test_the_resolver_falls_back_to_the_modbus_flag(self):
+        """An entry created before CONF_TRANSPORT existed must still resolve."""
+        from custom_components.qvantum.const import (
+            CONF_MODBUS_TCP,
+            CONF_TRANSPORT,
+            TRANSPORT_CLOUD,
+            TRANSPORT_MODBUS,
+        )
+        from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+        def resolve(data):
+            entry = MagicMock()
+            entry.data = data
+            entry.options = {}
+            return QvantumDataUpdateCoordinator.resolve_transport(entry)
+
+        assert resolve({CONF_MODBUS_TCP: True}) == TRANSPORT_MODBUS
+        assert resolve({CONF_MODBUS_TCP: False}) == TRANSPORT_CLOUD
+        # The explicit field wins over the legacy flag.
+        assert (
+            resolve({CONF_MODBUS_TCP: True, CONF_TRANSPORT: TRANSPORT_CLOUD})
+            == TRANSPORT_CLOUD
+        )
+
+    def test_a_transport_without_a_client_is_not_honoured(self):
+        """No entry may claim a transport the setup cannot build a client for.
+
+        `__init__` picks the client from the Modbus flag, so honouring an
+        unknown transport would hand back the wrong client while the platforms
+        believed the other one — the mix-up this vocabulary exists to prevent.
+        """
+        from custom_components.qvantum.const import (
+            CONF_MODBUS_TCP,
+            CONF_TRANSPORT,
+            TRANSPORT_MODBUS,
+        )
+        from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
+
+        entry = MagicMock()
+        entry.options = {}
+        entry.data = {CONF_MODBUS_TCP: True, CONF_TRANSPORT: "mqtt"}
+
+        assert (
+            QvantumDataUpdateCoordinator.resolve_transport(entry) == TRANSPORT_MODBUS
+        )
+        # And the predicate agrees, because it reads the same resolver output.
+        coord = self._coord(TRANSPORT_MODBUS, modbus=True)
+        assert not is_cloud(coord)
+        assert is_full_payload(coord)

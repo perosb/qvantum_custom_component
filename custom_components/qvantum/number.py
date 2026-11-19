@@ -23,6 +23,7 @@ from .const import (
 )
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity, cleanup_disabled_entities
+from .coordinator import is_full_payload
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -110,7 +111,7 @@ async def async_setup_entry(
         "dhw_priority_time": (30, 180, 30),
         **{key: _HEATING_CURVE_POINT_RANGE for key in HEATING_CURVE_OUTDOOR_TEMPS},
     }
-    if coordinator.modbus_enabled:
+    if is_full_payload(coordinator):
         # The register maps own the documented min/max; keep the HA step.
         for metric_key, (configured_min, _, step_val) in NUMBER_CONFIG.items():
             documented = metric_range(metric_key)

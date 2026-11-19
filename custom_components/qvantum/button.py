@@ -16,6 +16,7 @@ from . import MyConfigEntry
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .entity import QvantumEntity, finalize_platform_setup
+from .coordinator import is_cloud
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ async def async_setup_entry(
     buttons = []
     buttons.append(QvantumButtonEntity(coordinator, "extra_tap_water_60min", device))
     button_keys = {"extra_tap_water_60min"}
-    if not coordinator.modbus_enabled:
+    if is_cloud(coordinator):
         buttons.append(
             QvantumButtonEntity(
                 coordinator, "elevate_access", device, maintenance_coordinator

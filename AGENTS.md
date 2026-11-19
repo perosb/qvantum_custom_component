@@ -165,7 +165,18 @@ present in the payload, so absent registers degrade to no entity.
 - Exceptions: `AuthError`, `TransportError`, `RateLimitError` (aliases
   `APIAuthError`, `APIConnectionError`, `APIRateLimitError`). Never name a class
   `ConnectionError`.
-- Device-registry lookups are **scoped to the owning config entry**:
+- Platform code asks `is_cloud(coordinator)` / `is_full_payload(coordinator)`
+(`coordinator.py`) instead of reading `modbus_enabled` as "not cloud". The two
+questions are different — the cloud returns a curated payload and has no
+canonical settings setter, the other transports have both — and the flag answers
+neither once a third transport exists. `resolve_transport()` honours only a transport
+whose client the setup can build — cloud or Modbus today — and falls back to
+`CONF_MODBUS_TCP` otherwise, which covers every entry created before
+`CONF_TRANSPORT` existed and refuses one claiming a transport with no client
+(the platforms would otherwise create the wrong entity set for the client the
+setup actually built).
+
+Device-registry lookups are **scoped to the owning config entry**:
   `async_get_device_by_identifier((DOMAIN, ident), entry.entry_id)`, or
   `async_get_device_by_connection` / `async_get_devices`. Identifiers and
   connections are only unique *per config entry* since HA 2026.8, so
