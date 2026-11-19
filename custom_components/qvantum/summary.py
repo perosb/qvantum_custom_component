@@ -136,6 +136,11 @@ _ENTITY_PREFIXES = (
 #: that the integrator had run out of room. The age is a **duration**, not the
 #: date `trim_cap_since` carries in the diagnostics: the counters block is counts
 #: only, and a date would leave the installation.
+#: 15: `counters` on a cloud row. The block was documented as Modbus-only because
+#: the curve was, and now that the curve runs on an elevated cloud account a
+#: cloud row carries reverts, trim updates and the days a knot was clamped. A
+#: consumer that learned "counters is always zero on cloud" is the reader this
+#: version exists for; nothing about the block's shape changed.
 SUMMARY_SCHEMA_VERSION = 15
 
 #: Plant settings that describe the control loops. Everything else in the

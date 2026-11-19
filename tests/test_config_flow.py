@@ -1085,12 +1085,26 @@ class TestCurveTermsInOptions:
         assert not any(key.startswith("curve_") for key in saved)
 
     @pytest.mark.asyncio
-    async def test_cloud_form_has_no_terms(self, hass):
+    async def test_cloud_form_has_the_terms_when_the_curve_runs(self, hass):
+        """The curve runs on an elevated cloud account, so its terms belong here."""
+        from types import SimpleNamespace
+
         from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
 
-        flow = QvantumOptionsFlowHandler(
-            self._entry(None, modbus=False)
-        )
+        curve = SimpleNamespace(terms={"solar": True})
+        flow = QvantumOptionsFlowHandler(self._entry(curve, modbus=False))
+
+        result = await flow.async_step_init()
+
+        defaults = _schema_defaults(result)
+        assert [key for key in defaults if key.startswith("curve_")]
+
+    async def test_cloud_form_has_no_terms_without_a_coordinator(self, hass):
+        from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
+
+        entry = self._entry(None, modbus=False)
+        entry.runtime_data = None
+        flow = QvantumOptionsFlowHandler(entry)
 
         result = await flow.async_step_init()
 
