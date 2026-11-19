@@ -2301,11 +2301,14 @@ class TestSensorSetup:
     async def test_async_setup_entry_http_does_not_create_curve_sensors(
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):
-        """The custom curve is Modbus-only; cloud mode skips its sensors."""
+        """No curve coordinator (a cloud account without write access) means none.
+
+        The coordinator, not `modbus_enabled`, is what decides: every transport
+        now creates one, and the curve's own `writable` gate keeps it in shadow
+        when the transport may not write.
+        """
         mock_coordinator.modbus_enabled = False
-        mock_config_entry.runtime_data.curve_coordinator = _curve_coordinator(
-            _curve_snapshot()
-        )
+        mock_config_entry.runtime_data.curve_coordinator = None
 
         with (
             patch("custom_components.qvantum.entity.disable_entities_by_default"),

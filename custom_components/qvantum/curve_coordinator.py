@@ -44,7 +44,11 @@ from .const import (
     HeatingCurveType,
     SensorMode,
 )
-from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .coordinator import (
+    QvantumDataUpdateCoordinator,
+    handle_setting_update_response,
+    write_access,
+)
 from .heating_curve import (
     CURVE_KEYS,
     MAX_SUPPLY_C,
@@ -1021,9 +1025,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
 
     @property
     def writable(self) -> bool:
-        """True when the Modbus client accepts holding writes."""
-        client = getattr(self._main, "client", None)
-        return bool(getattr(client, "writable", False))
+        """True when this transport may write the pump's settings.
+
+        Modbus needs the write option and MQTT its own; the cloud needs an
+        elevated account, because its settings writes are 403 for a plain user.
+        """
+        return write_access(self._main)
 
     @property
     def terms(self) -> dict[str, bool]:

@@ -48,10 +48,13 @@ class Device(TypedDict, total=False):
 def result_applied(result: dict[str, Any] | None) -> bool:
     """Return True when a write result reports the setting as applied.
 
-    Modbus answers ``{"status": "APPLIED"}``; some cloud endpoints answer
-    ``{"heatpump_status": "APPLIED"}``. A settings PATCH answers
-    ``{"success": true}``, which carries no state and is not treated as
-    applied, so callers fall back to the next poll.
+    Modbus answers ``{"status": "APPLIED"}``. The cloud answers
+    ``{"status": "APPLIED", "res": {...}}`` on a settings PATCH and
+    ``{"heatpump_status": "APPLIED"}`` on a command (measured 2026-11-19:
+    ``total_latency`` 1.7-2.4 s, the pump's own key in ``res``). Anything else —
+    an empty body, a bare ``{"success": true}`` if an endpoint ever returns one
+    — carries no state and is not treated as applied, so callers fall back to
+    the next poll.
     """
     return bool(
         result

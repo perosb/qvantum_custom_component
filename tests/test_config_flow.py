@@ -553,6 +553,11 @@ class TestQvantumConfigFlow:
             patch.object(
                 config_flow, "async_update_reload_and_abort"
             ) as mock_update,
+            # The hand-back talks to the pump; the flow is what this tests.
+            patch(
+                "custom_components.qvantum._async_hand_back_curve",
+                AsyncMock(return_value=False),
+            ),
         ):
             mock_update.return_value = {"type": "abort"}
             result = await config_flow.async_step_reconfigure_cloud(

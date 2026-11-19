@@ -6003,3 +6003,68 @@ class TestTransportKind:
         coord = self._coord(TRANSPORT_MODBUS, modbus=True)
         assert not is_cloud(coord)
         assert is_full_payload(coord)
+
+
+class TestCloudWriteAccess:
+    """The cloud's write path needs an elevated account, not a client flag."""
+
+    @staticmethod
+    def _coord(*, write_level):
+        from custom_components.qvantum.const import TRANSPORT_CLOUD
+
+        coord = MagicMock()
+        coord.transport = TRANSPORT_CLOUD
+        coord.modbus_enabled = False
+        maintenance = MagicMock()
+        maintenance.data = {
+            "access_level": {"writeAccessLevel": write_level}
+        }
+        coord.config_entry.runtime_data.maintenance_coordinator = maintenance
+        return coord
+
+    def test_an_elevated_account_may_write(self):
+        from custom_components.qvantum.coordinator import (
+            cloud_write_access,
+            write_access,
+        )
+
+        coord = self._coord(write_level=20)
+        assert cloud_write_access(coord) is True
+        assert write_access(coord) is True
+
+    def test_a_plain_account_may_not(self):
+        from custom_components.qvantum.coordinator import (
+            cloud_write_access,
+            write_access,
+        )
+
+        coord = self._coord(write_level=10)
+        assert cloud_write_access(coord) is False
+        assert write_access(coord) is False
+
+    def test_a_missing_access_level_is_not_permission(self):
+        from custom_components.qvantum.coordinator import cloud_write_access
+
+        coord = self._coord(write_level=20)
+        coord.config_entry.runtime_data.maintenance_coordinator.data = {}
+        assert cloud_write_access(coord) is False
+        coord.config_entry.runtime_data.maintenance_coordinator.data = {
+            "access_level": None
+        }
+        assert cloud_write_access(coord) is False
+
+    def test_modbus_and_mqtt_keep_their_own_flag(self):
+        from custom_components.qvantum.const import TRANSPORT_MODBUS
+
+        from unittest.mock import MagicMock as _M
+
+        coord = _M()
+        coord.transport = TRANSPORT_MODBUS
+        coord.modbus_enabled = True
+        coord.client = _M()
+        coord.client.writable = True
+        from custom_components.qvantum.coordinator import write_access
+
+        assert write_access(coord) is True
+        coord.client.writable = False
+        assert write_access(coord) is False

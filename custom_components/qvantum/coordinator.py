@@ -215,6 +215,40 @@ def is_full_payload(coordinator: Any) -> bool:
     return transport_kind(coordinator) != TRANSPORT_CLOUD
 
 
+#: Cloud write access level that means "service tech": the account may change
+#: the pump's own settings, which is what `elevate_access` grants.
+CLOUD_WRITE_ACCESS_LEVEL = 20
+
+
+def cloud_write_access(coordinator: Any) -> bool:
+    """Whether the cloud account may write to this device.
+
+    The cloud's settings writes require an elevated ("Remote Service") account;
+    a plain user gets 403. The maintenance coordinator carries the level, so the
+    answer is a property of that data, not of the client.
+    """
+    config_entry = getattr(coordinator, "config_entry", None)
+    runtime = getattr(config_entry, "runtime_data", None)
+    maintenance = getattr(runtime, "maintenance_coordinator", None)
+    if maintenance is None:
+        return False
+    data = maintenance.data
+    if not data:
+        return False
+    access_level = data.get("access_level")
+    if not isinstance(access_level, dict):
+        return False
+    return int(access_level.get("writeAccessLevel", 0)) >= CLOUD_WRITE_ACCESS_LEVEL
+
+
+def write_access(coordinator: Any) -> bool:
+    """Whether the coordinator's transport may write settings right now."""
+    if is_cloud(coordinator):
+        return cloud_write_access(coordinator)
+    client = getattr(coordinator, "client", None)
+    return bool(getattr(client, "writable", False))
+
+
 class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinator):
     """Qvantum coordinator."""
 

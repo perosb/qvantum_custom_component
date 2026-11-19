@@ -15,8 +15,10 @@
 - **What it writes.** The pump's *user-defined* curve, and it switches the pump
   to User defined. Qvantum's own Auto curve is untouched and comes back the
   moment you switch the integration's control off.
-- **What it needs.** Modbus, and **Enable writing via Modbus**. It does not exist
-  in cloud mode.
+- **What it needs.** A transport that can write settings: **Modbus** with
+  *Enable writing via Modbus*, the MQTT transport with its own write flag, or the
+  **cloud** with an elevated account (`elevate_access`, service-tech rights — a
+  plain account is refused with 403).
 - **What it does not do.** It does not touch hot water, and it never overrides
   the pump's own supply limits or the indoor cap.
 - **How to stop it.** Switch *Adaptive heating curve: control* off; the pump
@@ -208,9 +210,11 @@ generator.
 
 ## Adaptive curve control
 
-**Modbus-only** and requires the Modbus write option. The module freezes the
-pump's current seven-point table (holding 24–30) as the baseline and computes
-**one** shared adjustment in °C, applied to all seven points:
+Runs on every transport that can write the pump's settings — Modbus with the
+write option, MQTT with its write flag, the cloud with an elevated account. The
+module freezes the pump's current seven-point table (holding 24–30) as the
+baseline and computes **one** shared adjustment in °C, applied to all seven
+points:
 
 | Term | Source |
 |---|---|
@@ -680,11 +684,11 @@ reload, and Home Assistant shutting down, deliberately leave the written table
 in place so the pump keeps heating with the last curve while nothing is
 running.
 
-**Reconfiguring away from Modbus** (to the cloud) reverts it too, for the same
-reason: the cloud cannot write holding 22, so after the switch nothing would
-maintain the table. The entry survives, so the removal hook would never fire —
-the reconfigure path calls the same `_async_hand_back_curve` helper before it
-hands over. That helper reverts through the entry's **live coordinator** when
+**Reconfiguring away from Modbus** (to the cloud) reverts it only when the
+account **cannot** write — a plain account gets 403, so after the switch nothing
+would maintain the table. With service-tech rights the curve simply continues on
+the cloud and the table is kept. The entry survives, so the removal hook would
+never fire; the reconfigure path makes the call itself. That helper reverts through the entry's **live coordinator** when
 there is one: its control lock stops the curve's own writes first, whereas a
 temporary Modbus unit beside a loaded coordinator could be overtaken by a
 scheduled write — and two clients would race for the pump's single TCP slot.

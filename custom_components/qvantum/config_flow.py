@@ -402,14 +402,20 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             info = await _async_validate_cloud_step(self.hass, user_input, errors)
             if info is not None:
-                # The cloud cannot write holding 22, so the User-defined table
-                # this entry last wrote would run unsupervised with frozen
-                # trims. Removal hands it back; so does leaving Modbus.
+                # The curve runs on the cloud too, so leaving Modbus does not
+                # strand it — unless the account cannot write, in which case the
+                # table this entry last wrote would run unsupervised. Removal
+                # always hands it back; a reconfigure only when the destination
+                # cannot carry it.
                 from . import _async_hand_back_curve
+                from .coordinator import cloud_write_access
 
-                await _async_hand_back_curve(
-                    self.hass, config_entry, reason="reconfiguring"
-                )
+                runtime = getattr(config_entry, "runtime_data", None)
+                incoming = getattr(runtime, "coordinator", None)
+                if incoming is None or not cloud_write_access(incoming):
+                    await _async_hand_back_curve(
+                        self.hass, config_entry, reason="reconfiguring"
+                    )
                 return self.async_update_reload_and_abort(
                     config_entry,
                     unique_id=info.get("serial") or info["title"],
@@ -568,6 +574,14 @@ class QvantumOptionsFlowHandler(OptionsFlow):
             )
         )
 
+    def _curve_enabled(self) -> bool:
+        """Whether the advisory curve exists for this entry.
+
+        The coordinator's presence is the gate now that every transport creates
+        one; whether it may *write* is the coordinator's own `writable`.
+        """
+        return self._curve_coordinator() is not None
+
     def _curve_coordinator(self):
         """The curve coordinator, when this entry has one loaded.
 
@@ -580,7 +594,7 @@ class QvantumOptionsFlowHandler(OptionsFlow):
 
     async def _async_apply_curve_terms(self, user_input) -> None:
         """Persist the four term switches the dialog submitted, if any."""
-        if not self._modbus_enabled():
+        if not self._curve_enabled():
             return
         curve = self._curve_coordinator()
         if curve is None:
@@ -709,6 +723,8 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                     vol.Optional(
                         CONF_TELEMETRY, default=telemetry_granted
                     ): bool,
+                    # The curve runs here too, so its terms belong in the dialog.
+                    **_curve_term_schema(self._curve_coordinator()),
                 }
             )
 

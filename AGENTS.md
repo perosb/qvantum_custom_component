@@ -581,8 +581,15 @@ review has to catch:
 
 ## Adaptive curve
 
-Modbus-only. The module freezes the pump's seven-point table as a baseline and
-writes it back adjusted; `docs/heating-curve.md` is the full description
+Runs on every transport that can write settings — Modbus, MQTT and the cloud —
+and `QvantumCurveCoordinator.writable` (`coordinator.write_access`) is the gate:
+the Modbus write option, the MQTT write flag, or an **elevated** cloud account
+(`writeAccessLevel >= 20`, what `elevate_access` grants; a plain account gets
+403). The cloud does not return `min_heating_supply`/`max_heating_supply` or
+holding 23, so there `_supply_bounds` falls back to the datasheet range and
+`temp_compensation_curve` stays empty — the curve runs, the clamp is looser.
+The module freezes the pump's seven-point table as a baseline and writes it
+back adjusted; `docs/heating-curve.md` is the full description
 (readiness, room gain, trims, solar and wind identification, write policy, card).
 The rules that must not drift:
 
