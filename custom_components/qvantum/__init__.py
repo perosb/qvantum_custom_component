@@ -906,7 +906,12 @@ async def _async_hand_back_curve(
         return False
     runtime = getattr(config_entry, "runtime_data", None)
     curve = getattr(runtime, "curve_coordinator", None)
-    if isinstance(curve, QvantumCurveCoordinator):
+    # Only while the entry is loaded: ``async_unload_entry`` leaves
+    # ``runtime_data`` in place but closes the client, so a coordinator reached
+    # from a removed entry would silently fail to write.
+    if isinstance(curve, QvantumCurveCoordinator) and _qvantum_entry_is_active(
+        config_entry
+    ):
         # A loaded entry owns a live coordinator, and its writes are serialised
         # by its own control lock. Reverting through it stops those writes
         # first; a temporary unit beside it could be overtaken by a scheduled
@@ -921,6 +926,15 @@ async def _async_hand_back_curve(
                 reason,
                 config_entry.entry_id,
                 err,
+            )
+            return False
+        # The coordinator latches a failed revert instead of raising, so the
+        # outcome — not the absence of an exception — is what to trust.
+        if curve.active or getattr(curve, "_revert_pending", False):
+            _LOGGER.warning(
+                "Adaptive curve revert did not take while %s %s",
+                reason,
+                config_entry.entry_id,
             )
             return False
         _LOGGER.info(
