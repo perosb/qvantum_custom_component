@@ -33,7 +33,7 @@ custom_components/qvantum/
   __init__.py                 # setup/unload, RuntimeData, migrations
   coordinator.py              # poll, derived metrics, extra-DHW helper
   maintenance_coordinator.py  # firmware / elevate-access (cloud)
-  curve_coordinator.py        # adaptive curve: forecast, readiness, trims (Modbus only)
+  curve_coordinator.py        # adaptive curve: forecast, readiness, trims
   efficiency_coordinator.py   # rolling SCOP / aux / building / DHW / cycling
   extra_dhw.py                # ExtraDhwTimer (HA Store + async_call_later)
   calculations.py             # power / tap-water / instantaneous COP
@@ -71,7 +71,7 @@ docs/releases/<tag>.md       # generated per-release notes + README.md index
 
 `config_entry.runtime_data` (`RuntimeData`): `coordinator`,
 `maintenance_coordinator`, `device`, `client`, `extra_dhw` (Modbus only),
-`curve_coordinator` (Modbus only) and `efficiency_coordinator` (both
+`curve_coordinator` and `efficiency_coordinator` (both
 transports), Modbus host/port/unit. Platforms read `runtime_data.coordinator`
 and `device`.
 
@@ -492,10 +492,12 @@ control is offered when a write would fail.
 Optimistic writes (`handle_setting_update_response` / `async_apply_setting`) land
 in `values` before the next poll, so a setting whose *state* is derived from
 another key must move that key too via `extra_updates` — otherwise the UI shows
-the old state until the next poll. Cloud settings PATCHes answer
-`{"success": true}`, which is not APPLIED (`client.models.result_applied`), so
-every cloud settings write stays poll-driven (up to 120 s) while Modbus applies
-optimistically.
+the old state until the next poll. Every transport confirms: Modbus with
+`{"status": "APPLIED"}`, a cloud settings PATCH with `{"status": "APPLIED",
+"res": {...}}` and a cloud command with `{"heatpump_status": "APPLIED"}`, MQTT on
+`cmd-res`. `client.models.result_applied` is the one check, so a cloud write
+applies optimistically like a Modbus one; a response that carries no state is
+not applied and the caller waits for the next poll.
 
 **Tap-water capacity** is the case where this matters most: the level is derived
 from the start/stop pair, the pair is the truth, and a pair outside
@@ -581,9 +583,9 @@ review has to catch:
 
 ## Adaptive curve
 
-Runs on every transport that can write settings — Modbus, MQTT and the cloud —
-and `QvantumCurveCoordinator.writable` (`coordinator.write_access`) is the gate:
-the Modbus write option, the MQTT write flag, or an **elevated** cloud account
+Runs on every transport that can write settings — Modbus and the cloud — and
+`QvantumCurveCoordinator.writable` (`coordinator.write_access`) is the gate: the
+Modbus write option, or an **elevated** cloud account
 (`writeAccessLevel >= 20`, what `elevate_access` grants; a plain account gets
 403). The cloud does not return `min_heating_supply`/`max_heating_supply` or
 holding 23, so there `_supply_bounds` falls back to the datasheet range and

@@ -1155,8 +1155,8 @@ class TestCurveHandBackOnReconfigure:
         assert result["type"] == "form"
 
 
-class TestReconfigureCloudKeepsTheCurve:
-    """Leaving Modbus for an elevated cloud account continues the curve."""
+class TestReconfigureCloudHandsBack:
+    """Leaving Modbus always hands the pump back, whatever the destination."""
 
     @staticmethod
     def _flow(hass, *, cloud_can_write: bool):
@@ -1175,28 +1175,11 @@ class TestReconfigureCloudKeepsTheCurve:
         return flow
 
     @pytest.mark.asyncio
-    async def test_an_elevated_account_keeps_the_table(self, hass):
-        flow = self._flow(hass, cloud_can_write=True)
-        with (
-            patch(
-                "custom_components.qvantum.config_flow.validate_input",
-                AsyncMock(return_value={"title": "t", "serial": "1"}),
-            ),
-            patch(
-                "custom_components.qvantum.coordinator.cloud_write_access",
-                return_value=True,
-            ),
-            patch(
-                "custom_components.qvantum._async_hand_back_curve", AsyncMock()
-            ) as hand_back,
-        ):
-            await flow.async_step_reconfigure_cloud({"username": "a", "password": "b"})
-
-        hand_back.assert_not_awaited()
-
-    @pytest.mark.asyncio
-    async def test_a_plain_account_hands_it_back(self, hass):
-        flow = self._flow(hass, cloud_can_write=False)
+    async def test_the_table_is_handed_back(self, hass):
+        # The destination's write rights are unknown at this point — the cloud
+        # access level arrives with the maintenance coordinator at setup — so
+        # the safe end state is the pump's own Auto curve.
+        flow = self._flow(hass, cloud_can_write=None)
         with (
             patch(
                 "custom_components.qvantum.config_flow.validate_input",

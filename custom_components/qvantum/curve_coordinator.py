@@ -1027,8 +1027,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
     def writable(self) -> bool:
         """True when this transport may write the pump's settings.
 
-        Modbus needs the write option and MQTT its own; the cloud needs an
-        elevated account, because its settings writes are 403 for a plain user.
+        Modbus needs the write option; the cloud needs an elevated account,
+        because its settings writes are 403 for a plain user.
         """
         return write_access(self._main)
 

@@ -402,9 +402,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     # The adaptive curve writes settings (curve_type_heating and the seven
     # knots), so every transport that can write them can run it: Modbus via
-    # holding registers, MQTT via `set`, the cloud via /commands once the
-    # account is elevated. It never blocks setup: the update method degrades to
-    # a blocker snapshot on any failure.
+    # holding registers, the cloud via /commands once the account is elevated.
+    # It never blocks setup: the update method degrades to a blocker snapshot on
+    # any failure.
     curve_coordinator: QvantumCurveCoordinator | None = None
     curve_coordinator = QvantumCurveCoordinator(hass, config_entry, coordinator)
     await curve_coordinator.async_restore()
@@ -963,7 +963,7 @@ async def _async_hand_back_curve(
     The pump keeps running whatever table we last wrote, with frozen trims,
     offset and adjustments. That is deliberate while the entry stays on Modbus
     (a reload or an HA shutdown must not disturb the pump), but the moment the
-    entry is removed — or moved to the cloud, which cannot write holding 22 —
+    entry is removed — or moved to a transport its account may not write —
     nothing is left to maintain it, so the pump gets its own Auto curve back.
 
     Best effort: disabled writes, an unreadable curve Store and an unreachable

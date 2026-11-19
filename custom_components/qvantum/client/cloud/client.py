@@ -515,7 +515,13 @@ class QvantumCloudClient:
     async def _patch_device_settings(
         self, device_id: str, payload: dict
     ) -> dict[str, Any]:
-        """PATCH device settings; the body carries no applied state."""
+        """PATCH device settings.
+
+        The pump answers ``{"status": "APPLIED", "res": {<its own key>: "ok"},
+        "total_latency": <ms>}`` — measured 2026-11-19 — which
+        ``models.result_applied`` accepts, so the caller may apply the value
+        optimistically instead of waiting for the next poll.
+        """
         _LOGGER.debug(json.dumps(payload))
         return await self._request_json(
             "patch",

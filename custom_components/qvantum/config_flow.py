@@ -402,20 +402,16 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             info = await _async_validate_cloud_step(self.hass, user_input, errors)
             if info is not None:
-                # The curve runs on the cloud too, so leaving Modbus does not
-                # strand it — unless the account cannot write, in which case the
-                # table this entry last wrote would run unsupervised. Removal
-                # always hands it back; a reconfigure only when the destination
-                # cannot carry it.
+                # Hand the pump back before the switch. The destination's write
+                # rights are not known yet — the cloud access level arrives with
+                # the maintenance coordinator at setup — so the safe end state is
+                # the pump's own Auto curve; the user activates the curve again
+                # on the new transport if they want it there.
                 from . import _async_hand_back_curve
-                from .coordinator import cloud_write_access
 
-                runtime = getattr(config_entry, "runtime_data", None)
-                incoming = getattr(runtime, "coordinator", None)
-                if incoming is None or not cloud_write_access(incoming):
-                    await _async_hand_back_curve(
-                        self.hass, config_entry, reason="reconfiguring"
-                    )
+                await _async_hand_back_curve(
+                    self.hass, config_entry, reason="reconfiguring"
+                )
                 return self.async_update_reload_and_abort(
                     config_entry,
                     unique_id=info.get("serial") or info["title"],
