@@ -505,6 +505,21 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 self.hass, host, port, unit_id, errors
             )
             if info is not None:
+                # A move to Modbus without the write option cannot maintain a
+                # table this entry wrote on another transport, and the writes-off
+                # guard only covers a Modbus entry losing the option. Hand it
+                # back first.
+                from . import _async_hand_back_curve
+                from .coordinator import QvantumDataUpdateCoordinator
+
+                if (
+                    not write_enabled
+                    and QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+                    != TRANSPORT_MODBUS
+                ):
+                    await _async_hand_back_curve(
+                        self.hass, config_entry, reason="reconfiguring"
+                    )
                 reconfigure_options = {
                     CONF_MODBUS_TCP: True,
                     CONF_MODBUS_WRITE: write_enabled,

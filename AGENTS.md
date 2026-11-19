@@ -494,8 +494,8 @@ in `values` before the next poll, so a setting whose *state* is derived from
 another key must move that key too via `extra_updates` — otherwise the UI shows
 the old state until the next poll. Every transport confirms: Modbus with
 `{"status": "APPLIED"}`, a cloud settings PATCH with `{"status": "APPLIED",
-"res": {...}}` and a cloud command with `{"heatpump_status": "APPLIED"}`, MQTT on
-`cmd-res`. `client.models.result_applied` is the one check, so a cloud write
+"res": {...}}` and a cloud command with `{"heatpump_status": "APPLIED"}`.
+`client.models.result_applied` is the one check, so a cloud write
 applies optimistically like a Modbus one; a response that carries no state is
 not applied and the caller waits for the next poll.
 

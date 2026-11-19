@@ -585,6 +585,11 @@ class TestQvantumConfigFlow:
             patch.object(
                 config_flow, "async_update_reload_and_abort"
             ) as mock_update,
+            # The hand-back talks to the pump; the flow is what this tests.
+            patch(
+                "custom_components.qvantum._async_hand_back_curve",
+                AsyncMock(return_value=False),
+            ),
         ):
             mock_update.return_value = {"type": "abort"}
             result = await config_flow.async_step_reconfigure_modbus(
@@ -620,6 +625,10 @@ class TestQvantumConfigFlow:
             patch.object(
                 config_flow, "async_update_reload_and_abort"
             ) as mock_update,
+            patch(
+                "custom_components.qvantum._async_hand_back_curve",
+                AsyncMock(return_value=False),
+            ),
         ):
             mock_update.return_value = {"type": "abort"}
             await config_flow.async_step_reconfigure_modbus(
@@ -1257,3 +1266,70 @@ class TestReconfigureCloudFromCloud:
             )
 
         hand_back.assert_awaited_once()
+
+
+class TestReconfigureModbusWithoutWrites:
+    """A move to Modbus with writes off cannot carry another transport's table."""
+
+    @staticmethod
+    def _flow(hass, *, current_transport):
+        from custom_components.qvantum.config_flow import QvantumConfigFlow
+
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.unique_id = "serial"
+        entry.options = {"transport": current_transport}
+        entry.data = {"transport": current_transport}
+        flow = QvantumConfigFlow()
+        flow.hass = hass
+        flow._reconfigure_entry = MagicMock(return_value=entry)
+        flow.async_update_reload_and_abort = MagicMock(return_value={"type": "abort"})
+        return flow
+
+    @pytest.mark.asyncio
+    async def test_leaving_the_cloud_without_writes_hands_it_back(self, hass):
+        flow = self._flow(hass, current_transport="cloud")
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_modbus",
+                AsyncMock(return_value={"title": "t", "serial": "1"}),
+            ),
+            patch(
+                "custom_components.qvantum._async_hand_back_curve", AsyncMock()
+            ) as hand_back,
+        ):
+            await flow.async_step_reconfigure_modbus(
+                {
+                    "modbus_host": "hp.local",
+                    "modbus_port": 502,
+                    "modbus_unit_id": 1,
+                    "modbus_scan_interval": 15,
+                    "modbus_write": False,
+                }
+            )
+
+        hand_back.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_leaving_the_cloud_with_writes_keeps_the_curve(self, hass):
+        flow = self._flow(hass, current_transport="cloud")
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_modbus",
+                AsyncMock(return_value={"title": "t", "serial": "1"}),
+            ),
+            patch(
+                "custom_components.qvantum._async_hand_back_curve", AsyncMock()
+            ) as hand_back,
+        ):
+            await flow.async_step_reconfigure_modbus(
+                {
+                    "modbus_host": "hp.local",
+                    "modbus_port": 502,
+                    "modbus_unit_id": 1,
+                    "modbus_scan_interval": 15,
+                    "modbus_write": True,
+                }
+            )
+
+        hand_back.assert_not_awaited()
