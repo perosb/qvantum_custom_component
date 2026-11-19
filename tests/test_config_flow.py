@@ -1082,3 +1082,69 @@ class TestCurveTermsInOptions:
 
         defaults = _schema_defaults(result)
         assert not [key for key in defaults if key.startswith("curve_")]
+
+
+class TestCurveHandBackOnReconfigure:
+    """Leaving Modbus for the cloud must not leave a frozen table on the pump."""
+
+    @staticmethod
+    def _flow(hass, entry):
+        from custom_components.qvantum.config_flow import QvantumConfigFlow
+
+        flow = QvantumConfigFlow()
+        flow.hass = hass
+        flow._reconfigure_entry = MagicMock(return_value=entry)
+        flow.async_update_reload_and_abort = MagicMock(return_value={"type": "abort"})
+        return flow
+
+    @pytest.mark.asyncio
+    async def test_reconfigure_cloud_hands_the_curve_back(self, hass):
+        from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
+
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.options = {CONF_MODBUS_TCP: True, CONF_MODBUS_WRITE: True}
+        entry.data = {CONF_MODBUS_TCP: True, CONF_MODBUS_WRITE: True}
+        flow = self._flow(hass, entry)
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_input",
+                AsyncMock(return_value={"title": "Qvantum QE-6 (1)", "serial": "1"}),
+            ),
+            patch(
+                "custom_components.qvantum._async_hand_back_curve",
+                AsyncMock(return_value=True),
+            ) as hand_back,
+        ):
+            await flow.async_step_reconfigure_cloud(
+                {"username": "a@b.se", "password": "x"}
+            )
+
+        hand_back.assert_awaited_once()
+        assert hand_back.await_args.kwargs["reason"] == "reconfiguring"
+
+    @pytest.mark.asyncio
+    async def test_reconfigure_cloud_without_valid_input_touches_nothing(self, hass):
+        from custom_components.qvantum.const import CONF_MODBUS_TCP
+
+        entry = MagicMock()
+        entry.options = {CONF_MODBUS_TCP: True}
+        entry.data = {CONF_MODBUS_TCP: True}
+        flow = self._flow(hass, entry)
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_input",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "custom_components.qvantum._async_hand_back_curve", AsyncMock()
+            ) as hand_back,
+        ):
+            result = await flow.async_step_reconfigure_cloud(
+                {"username": "a@b.se", "password": "x"}
+            )
+
+        hand_back.assert_not_awaited()
+        assert result["type"] == "form"

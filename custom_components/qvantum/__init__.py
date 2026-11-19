@@ -884,14 +884,32 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
         await async_forget_telemetry_state(hass, config_entry.entry_id)
     except Exception as err:  # noqa: BLE001 — removal is best effort
         _LOGGER.debug("Could not drop telemetry state: %s", err)
+    await _async_hand_back_curve(hass, config_entry, reason="removing")
+
+
+async def _async_hand_back_curve(
+    hass: HomeAssistant, config_entry: ConfigEntry, *, reason: str
+) -> bool:
+    """Revert the user-defined table when nothing will supervise it any more.
+
+    The pump keeps running whatever table we last wrote, with frozen trims,
+    offset and adjustments. That is deliberate while the entry stays on Modbus
+    (a reload or an HA shutdown must not disturb the pump), but the moment the
+    entry is removed — or moved to the cloud, which cannot write holding 22 —
+    nothing is left to maintain it, so the pump gets its own Auto curve back.
+
+    Best effort: cloud mode, disabled writes, an unreadable curve Store and an
+    unreachable pump all skip it without failing the caller. Returns True only
+    when the write actually happened.
+    """
     if not _modbus_write_enabled(config_entry):
-        return
+        return False
     if await async_stored_curve_mode(hass, config_entry) != "active":
-        return
+        return False
     try:
         async with _async_temporary_modbus_unit(hass, config_entry) as unit:
             if unit is None:
-                return
+                return False
             client = QvantumModbusClient(unit, writable=True)
             try:
                 await client.set_curve_type_heating(
@@ -900,14 +918,18 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
             finally:
                 await client.close()
         _LOGGER.info(
-            "Adaptive curve reverted to the pump's Auto curve before removing %s",
+            "Adaptive curve reverted to the pump's Auto curve before %s %s",
+            reason,
             config_entry.entry_id,
         )
+        return True
     except asyncio.CancelledError:
         raise
     except Exception as err:  # noqa: BLE001 — best effort
         _LOGGER.warning(
-            "Could not revert the adaptive curve while removing %s: %s",
+            "Could not revert the adaptive curve while %s %s: %s",
+            reason,
             config_entry.entry_id,
             err,
         )
+        return False

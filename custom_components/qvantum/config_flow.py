@@ -402,6 +402,14 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             info = await _async_validate_cloud_step(self.hass, user_input, errors)
             if info is not None:
+                # The cloud cannot write holding 22, so the User-defined table
+                # this entry last wrote would run unsupervised with frozen
+                # trims. Removal hands it back; so does leaving Modbus.
+                from . import _async_hand_back_curve
+
+                await _async_hand_back_curve(
+                    self.hass, config_entry, reason="reconfiguring"
+                )
                 return self.async_update_reload_and_abort(
                     config_entry,
                     unique_id=info.get("serial") or info["title"],
