@@ -436,27 +436,6 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                         ),
                     },
                     reason="reconfigure_successful",
-                    )
-                await _async_hand_back_curve(
-                    self.hass, config_entry, reason="reconfiguring"
-                )
-                return self.async_update_reload_and_abort(
-                    config_entry,
-                    unique_id=info.get("serial") or info["title"],
-                    data={
-                        CONF_USERNAME: user_input[CONF_USERNAME],
-                        CONF_PASSWORD: user_input[CONF_PASSWORD],
-                        CONF_MODBUS_TCP: False,
-                        CONF_MODBUS_WRITE: False,
-                    },
-                    options={
-                        CONF_MODBUS_TCP: False,
-                        CONF_MODBUS_WRITE: False,
-                        CONF_SCAN_INTERVAL: config_entry.options.get(
-                            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-                        ),
-                    },
-                    reason="reconfigure_successful",
                 )
         return self.async_show_form(
             step_id="reconfigure_cloud",
