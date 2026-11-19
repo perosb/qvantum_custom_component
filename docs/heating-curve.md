@@ -568,8 +568,8 @@ fixable repair issue with the figures the gate used — median, p95 and the
 heating hours behind them — because a marginal pass (median 1.44 against 1.5) is
 not the same decision as a comfortable one. The flow offers *activate* (the same
 call the switch makes) or *not now*; a decline is remembered until readiness
-lapses and returns, and the issue is only raised when Modbus writes are enabled,
-since without them the switch is unavailable. `ready_issue_declined` in the
+lapses and returns, and the issue is only raised when the curve's transport can
+write (`writable`), since without it the switch is unavailable. `ready_issue_declined` in the
 diagnostics says which of the two happened. The issue carries a **Learn more**
 link, opened in a new window, to the README section that *describes* the curve —
 what it is, how it learns, what it writes and what it does not touch — because

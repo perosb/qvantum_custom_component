@@ -408,12 +408,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     curve_coordinator: QvantumCurveCoordinator | None = None
     curve_coordinator = QvantumCurveCoordinator(hass, config_entry, coordinator)
     await curve_coordinator.async_restore()
-    try:
-        await curve_coordinator.async_refresh()
-    except asyncio.CancelledError:
-        raise
-    except Exception as err:
-        _LOGGER.debug("Curve coordinator first refresh failed: %s", err)
+    # Its first refresh waits: `writable` asks `write_access`, and on the cloud
+    # that needs the maintenance coordinator's access level. Refreshing here
+    # would read "not writable" and revert a restored active curve with
+    # `writes_disabled` on every restart.
 
     # Firmware/access monitoring is cloud-only: its entities are created only in
     # cloud mode, so Modbus mode must not build the coordinator either.
@@ -483,6 +481,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         modbus_port=modbus_port,
         modbus_unit_id=modbus_unit_id,
     )
+    try:
+        await curve_coordinator.async_refresh()
+    except asyncio.CancelledError:
+        raise
+    except Exception as err:
+        _LOGGER.debug("Curve coordinator first refresh failed: %s", err)
+
     # External room temperature feed (Modbus only) runs on its own timer so a
     # slow poll interval cannot starve the pump's sensor watchdog.
     coordinator.async_configure_external_room_feed()

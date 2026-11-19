@@ -635,8 +635,8 @@ The rules that must not drift:
   so that decision is the user's. When `ready` has held for a day in shadow it
   opens the fixable `curve_ready` issue with the gate's median/p95/heating hours;
   a decline is remembered (`ready_issue_declined`, persisted) until readiness
-  lapses, and the issue is only raised when Modbus writes are enabled, because
-  without them the switch is unavailable. The text says whose feature it is: the
+  lapses, and the issue is only raised when the curve's transport can write
+  (`curve.writable`), because without it the switch is unavailable. The text says whose feature it is: the
   integration's, not Qvantum's.
 - When the pump stops following our table (the app or a cloud profile moved the
   curve type) the coordinator drops to shadow, clears the trims and opens
