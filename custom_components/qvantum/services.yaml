@@ -16,7 +16,8 @@ set_curve_control:
   description: >-
     Adaptive heating-curve control mode. "shadow" only computes and logs the
     curve; "active" writes the seven points and switches the pump to User
-    defined. Modbus only, and only one of the two modes is ever active.
+    defined. Needs a transport that can write the pump's settings, and only one
+    of the two modes is ever active.
   fields:
     mode:
       description: Mode to apply
@@ -36,8 +37,8 @@ set_curve_terms:
     the measured COP falls below its learned reference; pre-charge raises it
     ahead of a forecast cold snap; wind raises it while a wind sensitivity
     identified for this installation reports extra envelope loss. The same
-    switches are in the integration's Configure dialog. Modbus only, and the
-    terms only act while the curve is active.
+    switches are in the integration's Configure dialog. The terms only act while
+    the curve is active.
   fields:
     solar:
       description: >-
@@ -73,7 +74,7 @@ recalibrate:
     Re-run the day-block calibration now instead of waiting for the next
     attempt (at most once a day). Identifies the solar aperture and the wind
     column from the recorder history and Open-Meteo; it writes nothing to the
-    heat pump. Modbus only.
+    heat pump.
 
 export_summary:
   name: export_summary

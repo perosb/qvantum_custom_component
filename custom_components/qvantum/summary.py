@@ -136,7 +136,7 @@ _ENTITY_PREFIXES = (
 #: that the integrator had run out of room. The age is a **duration**, not the
 #: date `trim_cap_since` carries in the diagnostics: the counters block is counts
 #: only, and a date would leave the installation.
-SUMMARY_SCHEMA_VERSION = 14
+SUMMARY_SCHEMA_VERSION = 15
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.

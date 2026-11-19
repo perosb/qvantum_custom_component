@@ -403,19 +403,26 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             info = await _async_validate_cloud_step(self.hass, user_input, errors)
             if info is not None:
-                # Only when *leaving* Modbus. A cloud→cloud reconfigure (a
-                # password change) keeps the curve running, like a Modbus→Modbus
-                # one; and when leaving, the destination's write rights are not
-                # known yet — the access level arrives with the maintenance
-                # coordinator at setup — so the safe end state is the pump's own
-                # Auto curve.
+                # Hand back when leaving Modbus, and when the account changes.
+                # A password change on the same account keeps the curve running,
+                # like a Modbus→Modbus reconfigure; a *different* account may
+                # not be elevated, and then after the switch nothing could write
+                # the table this entry last wrote. The destination's rights are
+                # unknown at either point — the access level arrives with the
+                # maintenance coordinator at setup — so the safe end state is
+                # the pump's own Auto curve.
                 from . import _async_hand_back_curve
                 from .coordinator import QvantumDataUpdateCoordinator
 
-                if (
+                leaving_modbus = (
                     QvantumDataUpdateCoordinator.resolve_transport(config_entry)
                     == TRANSPORT_MODBUS
-                ):
+                )
+                same_account = (
+                    config_entry.data.get(CONF_USERNAME)
+                    == user_input[CONF_USERNAME]
+                )
+                if leaving_modbus or not same_account:
                     await _async_hand_back_curve(
                         self.hass, config_entry, reason="reconfiguring"
                     )
