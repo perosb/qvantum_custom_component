@@ -904,6 +904,31 @@ async def _async_hand_back_curve(
     """
     if not _modbus_write_enabled(config_entry):
         return False
+    runtime = getattr(config_entry, "runtime_data", None)
+    curve = getattr(runtime, "curve_coordinator", None)
+    if isinstance(curve, QvantumCurveCoordinator):
+        # A loaded entry owns a live coordinator, and its writes are serialised
+        # by its own control lock. Reverting through it stops those writes
+        # first; a temporary unit beside it could be overtaken by a scheduled
+        # write, and two clients would race for the pump's single TCP slot.
+        if not curve.active:
+            return False
+        try:
+            await curve.async_set_control_mode("shadow")
+        except Exception as err:  # noqa: BLE001 — best effort
+            _LOGGER.warning(
+                "Could not revert the adaptive curve while %s %s: %s",
+                reason,
+                config_entry.entry_id,
+                err,
+            )
+            return False
+        _LOGGER.info(
+            "Adaptive curve reverted to the pump's Auto curve before %s %s",
+            reason,
+            config_entry.entry_id,
+        )
+        return True
     if await async_stored_curve_mode(hass, config_entry) != "active":
         return False
     try:

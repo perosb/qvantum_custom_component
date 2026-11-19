@@ -1593,3 +1593,52 @@ class TestTemporaryModbusUnit:
         borrow.assert_called_once()
         borrowed.__aenter__.assert_awaited_once()
         borrowed.__aexit__.assert_awaited_once()
+
+
+class TestCurveHandBackWithLiveCoordinator:
+    """A loaded entry must revert through its own coordinator, not a second client."""
+
+    @staticmethod
+    def _entry(mock_config_entry, *, active: bool):
+        from custom_components.qvantum.curve_coordinator import (
+            QvantumCurveCoordinator,
+        )
+
+        curve = MagicMock(spec=QvantumCurveCoordinator)
+        curve.active = active
+        curve.async_set_control_mode = AsyncMock()
+        entry = mock_config_entry
+        entry.options = {"modbus_tcp": True, "modbus_write": True}
+        entry.runtime_data = MagicMock()
+        entry.runtime_data.curve_coordinator = curve
+        return entry, curve
+
+    @pytest.mark.asyncio
+    async def test_reverts_through_the_live_coordinator(self, hass, mock_config_entry):
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry, curve = self._entry(mock_config_entry, active=True)
+
+        with (
+            patch(
+                "custom_components.qvantum._async_temporary_modbus_unit"
+            ) as temporary,
+            patch(
+                "custom_components.qvantum.QvantumModbusClient"
+            ) as temporary_client,
+        ):
+            assert await _async_hand_back_curve(hass, entry, reason="reconfiguring")
+
+        curve.async_set_control_mode.assert_awaited_once_with("shadow")
+        # A second Modbus client beside the live one would race the pump.
+        temporary.assert_not_called()
+        temporary_client.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_shadow_curve_needs_no_revert(self, hass, mock_config_entry):
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry, curve = self._entry(mock_config_entry, active=False)
+
+        assert not await _async_hand_back_curve(hass, entry, reason="reconfiguring")
+        curve.async_set_control_mode.assert_not_awaited()

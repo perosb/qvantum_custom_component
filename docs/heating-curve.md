@@ -684,7 +684,11 @@ running.
 reason: the cloud cannot write holding 22, so after the switch nothing would
 maintain the table. The entry survives, so the removal hook would never fire —
 the reconfigure path calls the same `_async_hand_back_curve` helper before it
-hands over. A reconfigure that stays on Modbus with writes enabled keeps the
+hands over. That helper reverts through the entry's **live coordinator** when
+there is one: its control lock stops the curve's own writes first, whereas a
+temporary Modbus unit beside a loaded coordinator could be overtaken by a
+scheduled write — and two clients would race for the pump's single TCP slot.
+The temporary unit is only for removal, where nothing is loaded any more. A reconfigure that stays on Modbus with writes enabled keeps the
 table, like a reload; unchecking Modbus writes in the same step is the existing
 writes-off guard, which reverts it.
 
