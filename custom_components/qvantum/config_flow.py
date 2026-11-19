@@ -54,6 +54,7 @@ from .const import (
     CONF_MODBUS_UNIT_ID,
     CONF_MODBUS_WRITE,
     CONF_TELEMETRY,
+    TRANSPORT_MODBUS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -402,13 +403,40 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             info = await _async_validate_cloud_step(self.hass, user_input, errors)
             if info is not None:
-                # Hand the pump back before the switch. The destination's write
-                # rights are not known yet — the cloud access level arrives with
-                # the maintenance coordinator at setup — so the safe end state is
-                # the pump's own Auto curve; the user activates the curve again
-                # on the new transport if they want it there.
+                # Only when *leaving* Modbus. A cloud→cloud reconfigure (a
+                # password change) keeps the curve running, like a Modbus→Modbus
+                # one; and when leaving, the destination's write rights are not
+                # known yet — the access level arrives with the maintenance
+                # coordinator at setup — so the safe end state is the pump's own
+                # Auto curve.
                 from . import _async_hand_back_curve
+                from .coordinator import QvantumDataUpdateCoordinator
 
+                if (
+                    QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+                    == TRANSPORT_MODBUS
+                ):
+                    await _async_hand_back_curve(
+                        self.hass, config_entry, reason="reconfiguring"
+                    )
+                return self.async_update_reload_and_abort(
+                    config_entry,
+                    unique_id=info.get("serial") or info["title"],
+                    data={
+                        CONF_USERNAME: user_input[CONF_USERNAME],
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        CONF_MODBUS_TCP: False,
+                        CONF_MODBUS_WRITE: False,
+                    },
+                    options={
+                        CONF_MODBUS_TCP: False,
+                        CONF_MODBUS_WRITE: False,
+                        CONF_SCAN_INTERVAL: config_entry.options.get(
+                            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                        ),
+                    },
+                    reason="reconfigure_successful",
+                    )
                 await _async_hand_back_curve(
                     self.hass, config_entry, reason="reconfiguring"
                 )

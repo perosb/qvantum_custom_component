@@ -686,9 +686,11 @@ running.
 **Reconfiguring away from Modbus** (to the cloud) hands it back too. The
 destination's write rights are not known at that point — the cloud access level
 arrives with the maintenance coordinator at setup — so the pump gets its own Auto
-curve and the user activates the curve again on the new transport. The entry
-survives, so the removal hook would never fire; the reconfigure path makes the
-call itself. That helper reverts through the entry's **live coordinator** when
+curve and the user activates the curve again on the new transport. A
+cloud→cloud reconfigure (a password change) keeps it, like a Modbus→Modbus one.
+The entry survives, so the removal hook would never fire; the reconfigure path
+makes the call itself, and it reverts through the live coordinator (its control
+lock) rather than a second client. That helper reverts through the entry's **live coordinator** when
 there is one: its control lock stops the curve's own writes first, whereas a
 temporary Modbus unit beside a loaded coordinator could be overtaken by a
 scheduled write — and two clients would race for the pump's single TCP slot.

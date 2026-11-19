@@ -970,11 +970,10 @@ async def _async_hand_back_curve(
     pump all skip it without failing the caller. Returns True only when the
     write actually happened.
     """
-    if QvantumDataUpdateCoordinator.resolve_transport(config_entry) == TRANSPORT_CLOUD:
-        # The cloud can write holding 22 — it just cannot do it through the
-        # entry's client, which ``async_unload_entry`` has already closed.
-        return await _async_hand_back_curve_cloud(hass, config_entry, reason=reason)
-    if not _modbus_write_enabled(config_entry):
+    transport = QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+    # The cloud may write holding 22; whether this *account* may is the API's
+    # answer (403 otherwise), so the Modbus write option is not its gate.
+    if transport != TRANSPORT_CLOUD and not _modbus_write_enabled(config_entry):
         return False
     runtime = getattr(config_entry, "runtime_data", None)
     curve = getattr(runtime, "curve_coordinator", None)
@@ -1019,6 +1018,10 @@ async def _async_hand_back_curve(
             config_entry.entry_id,
         )
         return True
+    if transport == TRANSPORT_CLOUD:
+        # Nothing is loaded (removal): the entry's own client is closed, so the
+        # revert needs a fresh one built from the stored credentials.
+        return await _async_hand_back_curve_cloud(hass, config_entry, reason=reason)
     if await async_stored_curve_mode(hass, config_entry) != "active":
         return False
     try:

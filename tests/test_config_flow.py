@@ -1196,3 +1196,34 @@ class TestReconfigureCloudHandsBack:
             await flow.async_step_reconfigure_cloud({"username": "a", "password": "b"})
 
         hand_back.assert_awaited_once()
+
+
+class TestReconfigureCloudFromCloud:
+    """A cloud→cloud reconfigure keeps the curve; nothing is handed back."""
+
+    @pytest.mark.asyncio
+    async def test_a_password_change_does_not_touch_the_curve(self, hass):
+        from custom_components.qvantum.config_flow import QvantumConfigFlow
+
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.unique_id = "serial"
+        entry.options = {"transport": "cloud"}
+        entry.data = {"transport": "cloud"}
+        flow = QvantumConfigFlow()
+        flow.hass = hass
+        flow._reconfigure_entry = MagicMock(return_value=entry)
+        flow.async_update_reload_and_abort = MagicMock(return_value={"type": "abort"})
+
+        with (
+            patch(
+                "custom_components.qvantum.config_flow.validate_input",
+                AsyncMock(return_value={"title": "t", "serial": "1"}),
+            ),
+            patch(
+                "custom_components.qvantum._async_hand_back_curve", AsyncMock()
+            ) as hand_back,
+        ):
+            await flow.async_step_reconfigure_cloud({"username": "a", "password": "b"})
+
+        hand_back.assert_not_awaited()
