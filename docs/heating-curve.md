@@ -680,12 +680,13 @@ reload, and Home Assistant shutting down, deliberately leave the written table
 in place so the pump keeps heating with the last curve while nothing is
 running.
 
-**Reconfiguring away from Modbus** (to the cloud, or to the MQTT transport)
-reverts it too, for the same reason: neither transport can write holding 22, so
-after the switch nothing would maintain the table. The entry survives, so the
-removal hook would never fire — the reconfigure path calls the same
-`_async_hand_back_curve` helper before it hands over. A reconfigure that stays
-on Modbus keeps the table, like a reload.
+**Reconfiguring away from Modbus** (to the cloud) reverts it too, for the same
+reason: the cloud cannot write holding 22, so after the switch nothing would
+maintain the table. The entry survives, so the removal hook would never fire —
+the reconfigure path calls the same `_async_hand_back_curve` helper before it
+hands over. A reconfigure that stays on Modbus with writes enabled keeps the
+table, like a reload; unchecking Modbus writes in the same step is the existing
+writes-off guard, which reverts it.
 
 ### Write policy
 
