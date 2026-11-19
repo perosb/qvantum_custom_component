@@ -81,9 +81,9 @@ mean one shower and no mapping follows from physics.
 ## Writes
 
 Cloud writes levels 2–5 as the level setting and only 1/6/7 as a start/stop
-pair; Modbus always writes the pair. The cloud PATCH answers
-`{"success": true}`, which is not APPLIED, so a cloud capacity write stays
-poll-driven (up to 120 s) while the Modbus pair write applies optimistically.
+pair; Modbus always writes the pair. Both confirm — Modbus with `{"status":
+"APPLIED"}`, the cloud PATCH with `{"status": "APPLIED", "res": {...}}` — so both
+apply optimistically.
 
 Because the state is derived from the pair, the optimistic write has to move the
 pair too — that is what `extra_updates` is for. Updating only

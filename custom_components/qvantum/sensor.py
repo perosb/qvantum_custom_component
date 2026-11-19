@@ -55,7 +55,7 @@ from .curve_coordinator import (
 )
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
-from .coordinator import is_full_payload
+from .coordinator import is_cloud, is_full_payload
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -498,59 +498,59 @@ async def async_setup_entry(
                     coordinator, "compressor_power", device, True
                 )
             )
-        curve_coordinator = getattr(
-            config_entry.runtime_data, "curve_coordinator", None
+    curve_coordinator = getattr(
+        config_entry.runtime_data, "curve_coordinator", None
+    )
+    if isinstance(curve_coordinator, QvantumCurveCoordinator):
+        for curve_key in _CURVE_POINT_METRICS:
+            sensors.append(
+                QvantumCurvePointSensor(curve_coordinator, curve_key, device)
+            )
+        sensors.append(
+            QvantumCurveAdjustmentSensor(
+                curve_coordinator, "adaptive_curve_adjustment", device
+            )
         )
-        if isinstance(curve_coordinator, QvantumCurveCoordinator):
-            for curve_key in _CURVE_POINT_METRICS:
-                sensors.append(
-                    QvantumCurvePointSensor(curve_coordinator, curve_key, device)
-                )
-            sensors.append(
-                QvantumCurveAdjustmentSensor(
-                    curve_coordinator, "adaptive_curve_adjustment", device
-                )
+        sensors.append(
+            QvantumCurveDeviationSensor(
+                curve_coordinator, "adaptive_curve_deviation", device
             )
-            sensors.append(
-                QvantumCurveDeviationSensor(
-                    curve_coordinator, "adaptive_curve_deviation", device
-                )
+        )
+        sensors.append(
+            QvantumCurveRoomErrorSensor(
+                curve_coordinator, "adaptive_curve_room_error", device
             )
-            sensors.append(
-                QvantumCurveRoomErrorSensor(
-                    curve_coordinator, "adaptive_curve_room_error", device
-                )
+        )
+        # The one curve signal that works before readiness: the trims only
+        # run while active, so a shadow install had no verdict to act on.
+        sensors.append(
+            QvantumCurveAdviceSensor(
+                curve_coordinator, "adaptive_curve_advice", device
             )
-            # The one curve signal that works before readiness: the trims only
-            # run while active, so a shadow install had no verdict to act on.
-            sensors.append(
-                QvantumCurveAdviceSensor(
-                    curve_coordinator, "adaptive_curve_advice", device
-                )
+        )
+        sensors.append(
+            QvantumCurveSolarModelSensor(
+                curve_coordinator, "adaptive_curve_solar_model", device
             )
-            sensors.append(
-                QvantumCurveSolarModelSensor(
-                    curve_coordinator, "adaptive_curve_solar_model", device
-                )
+        )
+        # The wind column is part of the same day-block fit but answers a
+        # different question ("does my house have an identifiable wind
+        # term?"), and without its own entity that answer hides inside
+        # another sensor's attributes.
+        sensors.append(
+            QvantumCurveWindModelSensor(
+                curve_coordinator, "adaptive_curve_wind_model", device
             )
-            # The wind column is part of the same day-block fit but answers a
-            # different question ("does my house have an identifiable wind
-            # term?"), and without its own entity that answer hides inside
-            # another sensor's attributes.
-            sensors.append(
-                QvantumCurveWindModelSensor(
-                    curve_coordinator, "adaptive_curve_wind_model", device
-                )
+        )
+        # Opt-in diagnostic: how much of the seven-point curve the learned
+        # baseline has actually seen. It is the one entity that answers
+        # "is the curve only half learned?" without a support dump.
+        sensors.append(
+            QvantumCurveCoverageSensor(
+                curve_coordinator, "adaptive_curve_coverage", device, False
             )
-            # Opt-in diagnostic: how much of the seven-point curve the learned
-            # baseline has actually seen. It is the one entity that answers
-            # "is the curve only half learned?" without a support dump.
-            sensors.append(
-                QvantumCurveCoverageSensor(
-                    curve_coordinator, "adaptive_curve_coverage", device, False
-                )
-            )
-    else:
+        )
+    if is_cloud(coordinator):
         # Cloud-only: firmware and access level from the HTTP API
         maintenance_coordinator = config_entry.runtime_data.maintenance_coordinator
         sensors.append(
@@ -617,16 +617,23 @@ async def async_setup_entry(
         sensors.append(
             QvantumEfficiencyHealthSensor(efficiency_coordinator, device, True)
         )
-    if coordinator.modbus_enabled:
+    if not is_cloud(coordinator):
         special_sensor_keys.update(
             {
                 "display_fw_version",
                 "room_temp_external",
                 "compressor_power",
-                *_CURVE_SENSOR_KEYS,
             }
         )
-    else:
+    # The curve keys are kept whenever the curve exists, not only on Modbus:
+    # `cleanup_disabled_entities` prunes any registry entry whose metric key is
+    # in neither `possible_metrics` nor `special_sensor_keys`.
+    if not is_cloud(coordinator) or isinstance(
+        getattr(config_entry.runtime_data, "curve_coordinator", None),
+        QvantumCurveCoordinator,
+    ):
+        special_sensor_keys.update(_CURVE_SENSOR_KEYS)
+    if is_cloud(coordinator):
         special_sensor_keys.update(
             {
                 "expiresAt",

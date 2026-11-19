@@ -15,8 +15,9 @@
 - **What it writes.** The pump's *user-defined* curve, and it switches the pump
   to User defined. Qvantum's own Auto curve is untouched and comes back the
   moment you switch the integration's control off.
-- **What it needs.** Modbus, and **Enable writing via Modbus**. It does not exist
-  in cloud mode.
+- **What it needs.** A transport that can write settings: **Modbus** with
+  *Enable writing via Modbus*, or the **cloud** with an elevated account
+  (`elevate_access`, service-tech rights — a plain account is refused with 403).
 - **What it does not do.** It does not touch hot water, and it never overrides
   the pump's own supply limits or the indoor cap.
 - **How to stop it.** Switch *Adaptive heating curve: control* off; the pump
@@ -208,9 +209,11 @@ generator.
 
 ## Adaptive curve control
 
-**Modbus-only** and requires the Modbus write option. The module freezes the
-pump's current seven-point table (holding 24–30) as the baseline and computes
-**one** shared adjustment in °C, applied to all seven points:
+Runs on every transport that can write the pump's settings — Modbus with the
+write option, or the cloud with an elevated account. The
+module freezes the pump's current seven-point table (holding 24–30) as the
+baseline and computes **one** shared adjustment in °C, applied to all seven
+points:
 
 | Term | Source |
 |---|---|
@@ -565,8 +568,8 @@ fixable repair issue with the figures the gate used — median, p95 and the
 heating hours behind them — because a marginal pass (median 1.44 against 1.5) is
 not the same decision as a comfortable one. The flow offers *activate* (the same
 call the switch makes) or *not now*; a decline is remembered until readiness
-lapses and returns, and the issue is only raised when Modbus writes are enabled,
-since without them the switch is unavailable. `ready_issue_declined` in the
+lapses and returns, and the issue is only raised when the curve's transport can
+write (`writable`), since without it the switch is unavailable. `ready_issue_declined` in the
 diagnostics says which of the two happened. The issue carries a **Learn more**
 link, opened in a new window, to the README section that *describes* the curve —
 what it is, how it learns, what it writes and what it does not touch — because
@@ -680,11 +683,16 @@ reload, and Home Assistant shutting down, deliberately leave the written table
 in place so the pump keeps heating with the last curve while nothing is
 running.
 
-**Reconfiguring away from Modbus** (to the cloud) reverts it too, for the same
-reason: the cloud cannot write holding 22, so after the switch nothing would
-maintain the table. The entry survives, so the removal hook would never fire —
-the reconfigure path calls the same `_async_hand_back_curve` helper before it
-hands over. That helper reverts through the entry's **live coordinator** when
+**Reconfiguring away from Modbus** (to the cloud) hands it back too. The
+destination's write rights are not known at that point — the cloud access level
+arrives with the maintenance coordinator at setup — so the pump gets its own Auto
+curve and the user activates the curve again on the new transport. A password
+change on the **same** cloud account keeps it, like a Modbus→Modbus reconfigure;
+switching to a different account hands it back too, because that account may not
+be elevated.
+The entry survives, so the removal hook would never fire; the reconfigure path
+makes the call itself, and it reverts through the live coordinator (its control
+lock) rather than a second client. That helper reverts through the entry's **live coordinator** when
 there is one: its control lock stops the curve's own writes first, whereas a
 temporary Modbus unit beside a loaded coordinator could be overtaken by a
 scheduled write — and two clients would race for the pump's single TCP slot.

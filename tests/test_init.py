@@ -1719,3 +1719,96 @@ class TestCurveHandBackWithLiveCoordinator:
 
         assert await _async_hand_back_curve(hass, entry, reason="reconfiguring")
         curve.async_set_control_mode.assert_awaited_once_with("shadow")
+
+
+class TestCurveHandBackOnCloud:
+    """Removal on the cloud hands the table back through a fresh client."""
+
+    @staticmethod
+    def _entry(*, active=True, credentials=True):
+        entry = MagicMock()
+        entry.entry_id = "entry-1"
+        entry.unique_id = "3010100244154033"
+        entry.data = {
+            "username": "u@example.com" if credentials else None,
+            "password": "p" if credentials else None,
+        }
+        entry.options = {"transport": "cloud"}
+        entry.runtime_data = None
+        return entry
+
+    @classmethod
+    def _patch(cls, *, stored="active", response=None, error=None):
+        client = MagicMock()
+        client.close = AsyncMock()
+        client.set_curve_type_heating = AsyncMock(
+            side_effect=error if error is not None else None,
+            return_value=response if response is not None else {"status": "APPLIED"},
+        )
+        return client, (
+            patch(
+                "custom_components.qvantum.async_stored_curve_mode",
+                new_callable=AsyncMock,
+                return_value=stored,
+            ),
+            patch(
+                "custom_components.qvantum.QvantumCloudClient", return_value=client
+            ),
+            patch(
+                "custom_components.qvantum.async_get_clientsession",
+                return_value=object(),
+            ),
+        )
+
+    @pytest.mark.asyncio
+    async def test_reverts_through_a_fresh_client(self, hass):
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry = self._entry()
+        client, (stored, cls, session) = self._patch()
+        with stored, cls, session:
+            assert await _async_hand_back_curve(hass, entry, reason="removing")
+
+        client.set_curve_type_heating.assert_awaited_once_with(entry.unique_id, 0)
+        client.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_a_shadow_curve_is_left_alone(self, hass):
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry = self._entry()
+        client, patches = self._patch(stored="shadow")
+        with patches[0], patches[1], patches[2]:
+            assert not await _async_hand_back_curve(hass, entry, reason="removing")
+        client.set_curve_type_heating.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_no_credentials_means_no_client(self, hass):
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry = self._entry(credentials=False)
+        client, patches = self._patch()
+        with patches[0], patches[1] as cls, patches[2]:
+            assert not await _async_hand_back_curve(hass, entry, reason="removing")
+        cls.assert_not_called()
+        client.set_curve_type_heating.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_an_unapplied_revert_is_reported_as_failure(self, hass):
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry = self._entry()
+        client, patches = self._patch(response={"success": True})
+        with patches[0], patches[1], patches[2]:
+            assert not await _async_hand_back_curve(hass, entry, reason="removing")
+        client.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_a_transport_error_is_swallowed(self, hass):
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry = self._entry()
+        client, patches = self._patch(error=RuntimeError("no api"))
+        with patches[0], patches[1], patches[2]:
+            assert not await _async_hand_back_curve(hass, entry, reason="removing")
+        client.close.assert_awaited_once()

@@ -33,6 +33,7 @@ from homeassistant.const import (
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client.cloud import QvantumCloudClient
+from .client.models import result_applied
 from .client.constants import DHW_MODE_NORMAL
 from .client.modbus import QvantumModbusClient
 from .const import (
@@ -50,6 +51,7 @@ from .const import (
     DEFAULT_MODBUS_PORT,
     DEFAULT_MODBUS_UNIT_ID,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
+    TRANSPORT_CLOUD,
 )
 from .coordinator import QvantumDataUpdateCoordinator
 from .curve_coordinator import QvantumCurveCoordinator, async_stored_curve_mode
@@ -398,18 +400,18 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     await _async_sync_extra_hot_water_service(hass)
 
-    # Custom heating curve (shadow) is Modbus-only. It never blocks setup:
-    # the update method degrades to a blocker snapshot on any failure.
+    # The adaptive curve writes settings (curve_type_heating and the seven
+    # knots), so every transport that can write them can run it: Modbus via
+    # holding registers, the cloud via /commands once the account is elevated.
+    # It never blocks setup: the update method degrades to a blocker snapshot on
+    # any failure.
     curve_coordinator: QvantumCurveCoordinator | None = None
-    if modbus_enabled:
-        curve_coordinator = QvantumCurveCoordinator(hass, config_entry, coordinator)
-        await curve_coordinator.async_restore()
-        try:
-            await curve_coordinator.async_refresh()
-        except asyncio.CancelledError:
-            raise
-        except Exception as err:
-            _LOGGER.debug("Curve coordinator first refresh failed: %s", err)
+    curve_coordinator = QvantumCurveCoordinator(hass, config_entry, coordinator)
+    await curve_coordinator.async_restore()
+    # Its first refresh waits: `writable` asks `write_access`, and on the cloud
+    # that needs the maintenance coordinator's access level. Refreshing here
+    # would read "not writable" and revert a restored active curve with
+    # `writes_disabled` on every restart.
 
     # Firmware/access monitoring is cloud-only: its entities are created only in
     # cloud mode, so Modbus mode must not build the coordinator either.
@@ -479,6 +481,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         modbus_port=modbus_port,
         modbus_unit_id=modbus_unit_id,
     )
+    try:
+        await curve_coordinator.async_refresh()
+    except asyncio.CancelledError:
+        raise
+    except Exception as err:
+        _LOGGER.debug("Curve coordinator first refresh failed: %s", err)
+
     # External room temperature feed (Modbus only) runs on its own timer so a
     # slow poll interval cannot starve the pump's sensor watchdog.
     coordinator.async_configure_external_room_feed()
@@ -887,6 +896,70 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     await _async_hand_back_curve(hass, config_entry, reason="removing")
 
 
+async def _async_hand_back_curve_cloud(
+    hass: HomeAssistant, config_entry: ConfigEntry, *, reason: str
+) -> bool:
+    """Hand the curve back through a fresh cloud client.
+
+    The entry's own client is closed by ``async_unload_entry``, so removal has
+    to build one from the stored credentials; the device id comes from the
+    runtime while the entry is loaded and from the unique id (the serial) once it
+    is not.
+    """
+    if await async_stored_curve_mode(hass, config_entry) != "active":
+        return False
+    runtime = getattr(config_entry, "runtime_data", None)
+    main = getattr(runtime, "coordinator", None)
+    device_id = getattr(main, "device_id", None) if main is not None else None
+    device_id = device_id or config_entry.unique_id
+    username = config_entry.data.get(CONF_USERNAME)
+    password = config_entry.data.get(CONF_PASSWORD)
+    if not (device_id and username and password):
+        return False
+    client = QvantumCloudClient(
+        username,
+        password,
+        user_agent=(
+            f"Home Assistant/{MAJOR_VERSION}.{MINOR_VERSION}.{PATCH_VERSION} "
+            f"Qvantum/{VERSION}"
+        ),
+        session=async_get_clientsession(hass),
+    )
+    try:
+        response = await client.set_curve_type_heating(
+            device_id, int(HeatingCurveType.AUTO)
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as err:  # noqa: BLE001 — best effort
+        _LOGGER.warning(
+            "Could not revert the adaptive curve while %s %s: %s",
+            reason,
+            config_entry.entry_id,
+            err,
+        )
+        return False
+    finally:
+        try:
+            await client.close()
+        except Exception:  # noqa: BLE001 — never fail the caller on cleanup
+            _LOGGER.debug("Could not close the cloud client", exc_info=True)
+    if not result_applied(response):
+        _LOGGER.warning(
+            "Adaptive curve revert was not applied while %s %s: %s",
+            reason,
+            config_entry.entry_id,
+            response,
+        )
+        return False
+    _LOGGER.info(
+        "Adaptive curve reverted to the pump's Auto curve before %s %s",
+        reason,
+        config_entry.entry_id,
+    )
+    return True
+
+
 async def _async_hand_back_curve(
     hass: HomeAssistant, config_entry: ConfigEntry, *, reason: str
 ) -> bool:
@@ -895,14 +968,17 @@ async def _async_hand_back_curve(
     The pump keeps running whatever table we last wrote, with frozen trims,
     offset and adjustments. That is deliberate while the entry stays on Modbus
     (a reload or an HA shutdown must not disturb the pump), but the moment the
-    entry is removed — or moved to the cloud, which cannot write holding 22 —
+    entry is removed — or moved to a transport its account may not write —
     nothing is left to maintain it, so the pump gets its own Auto curve back.
 
-    Best effort: cloud mode, disabled writes, an unreadable curve Store and an
-    unreachable pump all skip it without failing the caller. Returns True only
-    when the write actually happened.
+    Best effort: disabled writes, an unreadable curve Store and an unreachable
+    pump all skip it without failing the caller. Returns True only when the
+    write actually happened.
     """
-    if not _modbus_write_enabled(config_entry):
+    transport = QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+    # The cloud may write holding 22; whether this *account* may is the API's
+    # answer (403 otherwise), so the Modbus write option is not its gate.
+    if transport != TRANSPORT_CLOUD and not _modbus_write_enabled(config_entry):
         return False
     runtime = getattr(config_entry, "runtime_data", None)
     curve = getattr(runtime, "curve_coordinator", None)
@@ -947,6 +1023,10 @@ async def _async_hand_back_curve(
             config_entry.entry_id,
         )
         return True
+    if transport == TRANSPORT_CLOUD:
+        # Nothing is loaded (removal): the entry's own client is closed, so the
+        # revert needs a fresh one built from the stored credentials.
+        return await _async_hand_back_curve_cloud(hass, config_entry, reason=reason)
     if await async_stored_curve_mode(hass, config_entry) != "active":
         return False
     try:

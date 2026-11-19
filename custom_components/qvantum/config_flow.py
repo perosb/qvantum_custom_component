@@ -54,6 +54,7 @@ from .const import (
     CONF_MODBUS_UNIT_ID,
     CONF_MODBUS_WRITE,
     CONF_TELEMETRY,
+    TRANSPORT_MODBUS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -402,14 +403,29 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             info = await _async_validate_cloud_step(self.hass, user_input, errors)
             if info is not None:
-                # The cloud cannot write holding 22, so the User-defined table
-                # this entry last wrote would run unsupervised with frozen
-                # trims. Removal hands it back; so does leaving Modbus.
+                # Hand back when leaving Modbus, and when the account changes.
+                # A password change on the same account keeps the curve running,
+                # like a Modbus→Modbus reconfigure; a *different* account may
+                # not be elevated, and then after the switch nothing could write
+                # the table this entry last wrote. The destination's rights are
+                # unknown at either point — the access level arrives with the
+                # maintenance coordinator at setup — so the safe end state is
+                # the pump's own Auto curve.
                 from . import _async_hand_back_curve
+                from .coordinator import QvantumDataUpdateCoordinator
 
-                await _async_hand_back_curve(
-                    self.hass, config_entry, reason="reconfiguring"
+                leaving_modbus = (
+                    QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+                    == TRANSPORT_MODBUS
                 )
+                same_account = (
+                    config_entry.data.get(CONF_USERNAME)
+                    == user_input[CONF_USERNAME]
+                )
+                if leaving_modbus or not same_account:
+                    await _async_hand_back_curve(
+                        self.hass, config_entry, reason="reconfiguring"
+                    )
                 return self.async_update_reload_and_abort(
                     config_entry,
                     unique_id=info.get("serial") or info["title"],
@@ -489,6 +505,21 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 self.hass, host, port, unit_id, errors
             )
             if info is not None:
+                # A move to Modbus without the write option cannot maintain a
+                # table this entry wrote on another transport, and the writes-off
+                # guard only covers a Modbus entry losing the option. Hand it
+                # back first.
+                from . import _async_hand_back_curve
+                from .coordinator import QvantumDataUpdateCoordinator
+
+                if (
+                    not write_enabled
+                    and QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+                    != TRANSPORT_MODBUS
+                ):
+                    await _async_hand_back_curve(
+                        self.hass, config_entry, reason="reconfiguring"
+                    )
                 reconfigure_options = {
                     CONF_MODBUS_TCP: True,
                     CONF_MODBUS_WRITE: write_enabled,
@@ -568,6 +599,14 @@ class QvantumOptionsFlowHandler(OptionsFlow):
             )
         )
 
+    def _curve_enabled(self) -> bool:
+        """Whether the advisory curve exists for this entry.
+
+        The coordinator's presence is the gate now that every transport creates
+        one; whether it may *write* is the coordinator's own `writable`.
+        """
+        return self._curve_coordinator() is not None
+
     def _curve_coordinator(self):
         """The curve coordinator, when this entry has one loaded.
 
@@ -580,7 +619,7 @@ class QvantumOptionsFlowHandler(OptionsFlow):
 
     async def _async_apply_curve_terms(self, user_input) -> None:
         """Persist the four term switches the dialog submitted, if any."""
-        if not self._modbus_enabled():
+        if not self._curve_enabled():
             return
         curve = self._curve_coordinator()
         if curve is None:
@@ -709,6 +748,8 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                     vol.Optional(
                         CONF_TELEMETRY, default=telemetry_granted
                     ): bool,
+                    # The curve runs here too, so its terms belong in the dialog.
+                    **_curve_term_schema(self._curve_coordinator()),
                 }
             )
 

@@ -498,19 +498,19 @@ class TestQvantumNumberEntity:
     async def test_capacity_write_without_applied_state_waits_for_the_poll(
         self, mock_coordinator, mock_device
     ):
-        """The cloud settings PATCH answers ``{"success": true}``, not APPLIED.
+        """A body with no applied state must not move the pair.
 
-        Nothing is applied optimistically there, so the entity keeps the pair
-        the last poll returned and corrects itself on the next one (up to
-        120 s in cloud mode). Moving the level or the pair would be inventing a
-        state the endpoint never reported.
+        The cloud answers ``{"status": "APPLIED", "res": {...}}`` today, but the
+        client passes the body through untouched, so any endpoint that reports
+        nothing still has to wait for the next poll. Moving the level or the
+        pair would be inventing a state that was never reported.
         """
         values = mock_coordinator.data["values"]
         values["tap_water_capacity_target"] = 2
         values["tap_water_start"] = 52
         values["tap_water_stop"] = 62
         mock_coordinator.client.set_tap_water_capacity_target = AsyncMock(
-            return_value={"success": True}
+            return_value={}
         )
         entity = QvantumNumberEntity(
             mock_coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
@@ -1497,3 +1497,36 @@ class TestPriorityTimeNumbers:
         assert by_key["heating_priority_time"]._attr_native_min_value == 30
         assert by_key["dhw_priority_time"]._attr_native_step == 30
         assert by_key["dhw_priority_time"]._attr_native_unit_of_measurement == "min"
+
+
+@pytest.mark.asyncio
+async def test_a_measured_cloud_patch_applies_optimistically(
+    mock_coordinator, mock_device
+):
+    """The shape the cloud actually answers (measured 2026-11-19) is APPLIED.
+
+    ``{"status": "APPLIED", "res": {"dhw_normal_start": "ok"}, "total_latency":
+    2226}`` — so the value lands in ``values`` here instead of waiting up to
+    120 s for the next poll.
+    """
+    values = mock_coordinator.data["values"]
+    values["tap_water_capacity_target"] = 2
+    values["tap_water_start"] = 52
+    values["tap_water_stop"] = 62
+    mock_coordinator.client.set_tap_water_capacity_target = AsyncMock(
+        return_value={
+            "status": "APPLIED",
+            "res": {"dhw_normal_start": "ok"},
+            "total_latency": 2226,
+        }
+    )
+    entity = QvantumNumberEntity(
+        mock_coordinator, "tap_water_capacity_target", 1, 7, 1, mock_device
+    )
+
+    await entity.async_set_native_value(3)
+
+    assert values["tap_water_capacity_target"] == 3
+    # The pair moved with it: the level is derived from the pair.
+    assert values["tap_water_start"] != 52
+    assert values["tap_water_stop"] != 62

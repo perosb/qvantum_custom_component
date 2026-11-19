@@ -7,8 +7,9 @@ Modbus client can do SmartControl, or that a cloud client can write holding
 registers.
 
 Write methods return the raw API body as a plain dict: Modbus answers
-``{"status": "APPLIED"}`` while cloud passes through the API response (the
-settings PATCH path answers ``{"success": true}``). Callers must treat the
+``{"status": "APPLIED"}``, a cloud settings PATCH ``{"status": "APPLIED",
+"res": {...}}`` and a cloud command ``{"heatpump_status": "APPLIED"}``; the cloud
+client passes the response through untouched. Callers must treat the
 response as opaque and check it with ``models.result_applied`` before applying
 optimistic updates; ``ApplyResult`` documents the APPLIED shape.
 """

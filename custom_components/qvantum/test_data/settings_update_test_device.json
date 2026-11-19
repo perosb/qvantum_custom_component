@@ -1,3 +1,4 @@
 {
-  "success": true
+  "status": "APPLIED",
+  "res": {"dhw_normal_start": "ok"}
 }

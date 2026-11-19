@@ -1,4 +1,4 @@
-"""Custom heating-curve coordinator (Modbus only, shadow until activated).
+"""Adaptive heating curve: freeze the pump's table, learn, write it back.
 
 On a slow interval this coordinator fetches the Open-Meteo forecast, reads
 long-term recorder statistics for the calibration window, freezes the Auto
@@ -44,7 +44,11 @@ from .const import (
     HeatingCurveType,
     SensorMode,
 )
-from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .coordinator import (
+    QvantumDataUpdateCoordinator,
+    handle_setting_update_response,
+    write_access,
+)
 from .heating_curve import (
     CURVE_KEYS,
     MAX_SUPPLY_C,
@@ -912,7 +916,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         blocker = getattr(snapshot, "blocker", None)
         if self.active or not ready or blocker is not None or not self.writable:
             # Not assessed, already writing, or the pump cannot be written to:
-            # nothing to ask. Without Modbus writes the switch is unavailable, so
+            # nothing to ask. Without write access the switch is unavailable, so
             # an invitation would ask for something the user cannot do.
             self._ready_since_ts = None
             self._ready_issue_declined = False
@@ -1021,9 +1025,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
 
     @property
     def writable(self) -> bool:
-        """True when the Modbus client accepts holding writes."""
-        client = getattr(self._main, "client", None)
-        return bool(getattr(client, "writable", False))
+        """True when this transport may write the pump's settings.
+
+        Modbus needs the write option; the cloud needs an elevated account,
+        because its settings writes are 403 for a plain user.
+        """
+        return write_access(self._main)
 
     @property
     def terms(self) -> dict[str, bool]:
@@ -1457,7 +1464,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if self._baseline is None:
             raise HomeAssistantError("No frozen curve baseline yet")
         if not self.writable:
-            raise HomeAssistantError("Modbus writes are not enabled")
+            raise HomeAssistantError("Writes are not enabled for this transport")
         device_id = getattr(self._main, "device_id", None)
         if not device_id:
             raise HomeAssistantError("No Qvantum device id available")
@@ -1647,7 +1654,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         """Write changed points while active; a failure reverts to Auto."""
         if not self.writable:
             await self._async_revert(
-                "Modbus writes are disabled", code="writes_disabled"
+                "writes are disabled for this transport", code="writes_disabled"
             )
             return
         device_id = getattr(self._main, "device_id", None)

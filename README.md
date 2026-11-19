@@ -11,7 +11,7 @@ It has been tested on the **QE** (exhaust air) and **QG** (ground source) famili
 
 ### Highlights
 
-- **Self-learning heating curve (Modbus).** Instead of the pump's fixed Auto
+- **Self-learning heating curve.** Instead of the pump's fixed Auto
   curve, the integration learns how your house responds to the forecast, the
   sun and the heat it delivers, then writes its own curve back. It starts in
   shadow mode, takes over only when the comparison is ready, and hands control
@@ -50,7 +50,7 @@ Sign in with your Qvantum account email and password. Metrics, firmware, SmartCo
 
 ### Features
 
-- **Adaptive heating curve (Modbus) — the headline feature:** Learns the house from the forecast, sun and delivered heat and writes its own curve back; shadow mode first, readiness gate, hand-back on failure. [Details](docs/heating-curve.md).
+- **Adaptive heating curve — the headline feature:** Learns the house from the forecast, sun and delivered heat and writes its own curve back; shadow mode first, readiness gate, hand-back on failure. [Details](docs/heating-curve.md).
 - **Curve card:** A bundled Lovelace card (`qvantum-curve-card`) that graphs the baseline, shadow curve, written pump table and adjustment terms.
 - **Monitoring:** Temperatures, pressure, energy, power, system status, defrost, connectivity, filter time, and other heat-pump metrics. Machine-internal values (refrigerant circuit, speeds, lifetime counters, settings read-backs) live under the **Diagnostics** entity category. Alarm codes carry Qvantum's friendly name in a `description` attribute.
 - **Efficiency analytics:** COP and rolling SCOP, auxiliary-heat share, the building's heat-loss coefficient, heating degree hours and weather-normalized consumption, DHW standing loss, a DHW heat-meter plausibility check, compressor cycling/duty/speed and average power, plus an A–F efficiency health grade. All derived from data the integration already polls — no extra hardware. [How each figure is measured →](docs/derived-metrics.md)
@@ -168,7 +168,7 @@ Cloud extra ventilation is a timed boost; local Modbus fan extra is a sticky pre
 
 #### `qvantum.set_curve_control` and `qvantum.set_curve_terms`
 
-Adaptive-curve control (Modbus only). `set_curve_control` switches between
+Adaptive-curve control. `set_curve_control` switches between
 `shadow` and `active`; `set_curve_terms` toggles the optional control terms.
 Both are off/opt-in by default.
 

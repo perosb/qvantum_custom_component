@@ -45,7 +45,9 @@ The complete field list:
 | climate | the outdoor span the installation has been observed in, heating hours |
 | curve | the trim layer (`trim_max_abs_c` — how close the largest trim is to the cap — and `trim_cap_days`, how long the oldest capped one has been capped, a duration rather than the diagnostics' date), room gain grouped as `configured` / `applied` / `fitted`, with `window`, `valid`, `notes`, evidence hours, standard error (with `t`) and leave-one-out swing; readiness `median_abs_c` **and** the signed `median_c`, `p95_abs_c`, `window_hours` and the room error over the same window (`room_error_median_abs_c`, `room_error_p90_abs_c`) — plus the `blocker` that says whether the gate failed or was never assessed (while the curve writes the readiness figures are `null` and `blocker` is `active`, because the deviation is then our own trims); the solar model (`a`, `b`, trust, days — the hourly `b` keeps its value while `trust` is 0 when it misses the t ≥ 2.5 gate, so the pair is not a bug), the day-block model's evidence (`daily_solar_t_stat`, `daily_solar_r2`, `daily_solar_valid`, `daily_solar_notes`: which gate refused it) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours *and days* behind it and whether its gates let it act) |
 | fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure, with `reference_delta_k`, `loss_w_per_k` and the newest window's evidence), cycling, SCOP over the 30-day window **and** over the 90-day one (`scop_total_90d` — the health grade reads the 30-day figure, so the longer window is what separates a shoulder-season row from a poor installation), auxiliary-heat share, health grade, and the **coverage** behind the two windows (`scop_coverage_days`, `building_coverage_days`) — without them a SCOP over seven scattered days reads exactly like one over thirty |
-| counters | curve reverts **and their per-code split** (`revert_reasons`: `switched_off`, `write_failed`, `write_not_applied`, `points_unverified`, `point_not_stuck`, `writes_disabled`, `no_device_id`, `table_invalid`, `other` — the total says how often, the code says why), trim updates, days with an actionable clamped or an extrapolated knot, and the date the counters were reset at (*Modbus only*) |
+| counters | curve reverts **and their per-code split** (`revert_reasons`: `switched_off`, `write_failed`, `write_not_applied`, `points_unverified`, `point_not_stuck`, `writes_disabled`, `no_device_id`, `table_invalid`, `other` — the total says how often, the code says why), trim updates, days with an actionable clamped or an extrapolated knot, and the date the counters were reset at — populated on every transport that can
+run the curve, since the coordinator exists wherever the pump's settings can be
+written |
 | verdicts | reserved for derived analysis results (currently empty) |
 
 It **never** contains: entity ids or names, coordinates, energy totals,
@@ -108,6 +110,12 @@ a table we computed wrong or a user switching control off — four different
 fixes, and the reason only ever existed in the installation's own log. The codes
 are a fixed set (`REVERT_REASONS` in `const.py`), so the block stays counts and
 never a log, and an absent code is exported as zero rather than omitted.
+
+v15 moves what `counters` means on a cloud row. The block was documented as
+*Modbus only* because the curve was, and now that the curve runs on an elevated
+cloud account a cloud row carries reverts, trim updates and the days a knot was
+clamped. A consumer that learned "`counters` is always zero on cloud" is exactly
+the reader this version exists for; nothing in the block's shape changed.
 
 v14 adds `curve.trim_max_abs_c` and `curve.trim_cap_days`. The trim layer was
 not in the export at all, so the pool could not see that one of them was sitting

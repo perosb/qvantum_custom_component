@@ -115,7 +115,11 @@ def _first_entry(hass: HomeAssistant):
 
 
 def _find_curve_coordinator(hass: HomeAssistant):
-    """Return the loaded adaptive-curve coordinator, if any (Modbus only)."""
+    """Return the loaded adaptive-curve coordinator, if any.
+
+    Every transport that can write settings has one; whether it may write is the
+    coordinator's own ``writable``.
+    """
     for entry in hass.config_entries.async_entries(DOMAIN):
         runtime = getattr(entry, "runtime_data", None)
         candidate = getattr(runtime, "curve_coordinator", None)
@@ -182,7 +186,7 @@ async def async_setup_services(hass: HomeAssistant):
     )
 
     async def set_curve_control(service_call: ServiceCall) -> Any:
-        """Shadow or active custom heating-curve control (Modbus only)."""
+        """Shadow or active custom heating-curve control."""
         data = service_call.data
         mode = data["mode"]
         curve_coordinator = _find_curve_coordinator(service_call.hass)
