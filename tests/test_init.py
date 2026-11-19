@@ -1593,3 +1593,129 @@ class TestTemporaryModbusUnit:
         borrow.assert_called_once()
         borrowed.__aenter__.assert_awaited_once()
         borrowed.__aexit__.assert_awaited_once()
+
+
+class TestCurveHandBackWithLiveCoordinator:
+    """A loaded entry must revert through its own coordinator, not a second client."""
+
+    @staticmethod
+    def _unit_context(*, unit=object()):
+        @asynccontextmanager
+        async def context(_hass, _entry):
+            yield unit
+
+        return context
+
+    @staticmethod
+    def _entry(mock_config_entry, *, active: bool):
+        from custom_components.qvantum.curve_coordinator import (
+            QvantumCurveCoordinator,
+        )
+
+        curve = MagicMock(spec=QvantumCurveCoordinator)
+        curve.active = active
+        curve._revert_pending = False
+
+        async def _set_mode(mode):
+            # A real revert clears ``active``; the mock must too, or the
+            # outcome check sees a latch.
+            curve.active = False
+
+        curve.async_set_control_mode = AsyncMock(side_effect=_set_mode)
+        entry = mock_config_entry
+        entry.options = {"modbus_tcp": True, "modbus_write": True}
+        entry.runtime_data = MagicMock()
+        entry.runtime_data.curve_coordinator = curve
+        return entry, curve
+
+    @pytest.mark.asyncio
+    async def test_reverts_through_the_live_coordinator(self, hass, mock_config_entry):
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry, curve = self._entry(mock_config_entry, active=True)
+
+        with (
+            patch(
+                "custom_components.qvantum._async_temporary_modbus_unit"
+            ) as temporary,
+            patch(
+                "custom_components.qvantum.QvantumModbusClient"
+            ) as temporary_client,
+        ):
+            assert await _async_hand_back_curve(hass, entry, reason="reconfiguring")
+
+        curve.async_set_control_mode.assert_awaited_once_with("shadow")
+        # A second Modbus client beside the live one would race the pump.
+        temporary.assert_not_called()
+        temporary_client.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_shadow_curve_needs_no_revert(self, hass, mock_config_entry):
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry, curve = self._entry(mock_config_entry, active=False)
+
+        assert not await _async_hand_back_curve(hass, entry, reason="reconfiguring")
+        curve.async_set_control_mode.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_removed_entry_does_not_use_the_closed_coordinator(
+        self, hass, mock_config_entry
+    ):
+        """Unload closes the client but leaves runtime_data behind."""
+        from custom_components.qvantum import _async_hand_back_curve
+        from custom_components.qvantum.const import DOMAIN
+        from homeassistant.config_entries import ConfigEntryState
+
+        entry, curve = self._entry(mock_config_entry, active=True)
+        entry.state = ConfigEntryState.NOT_LOADED
+
+        with patch(
+            "custom_components.qvantum.async_stored_curve_mode",
+            AsyncMock(return_value="active"),
+        ), patch(
+            "custom_components.qvantum._async_temporary_modbus_unit",
+            new=self._unit_context(),
+        ), patch(
+            "custom_components.qvantum.QvantumModbusClient"
+        ) as client_cls:
+            client_cls.return_value.set_curve_type_heating = AsyncMock()
+            client_cls.return_value.close = AsyncMock()
+            assert await _async_hand_back_curve(hass, entry, reason="removing")
+
+        curve.async_set_control_mode.assert_not_awaited()
+        client_cls.return_value.set_curve_type_heating.assert_awaited_once_with(
+            entry.entry_id, 0
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_latched_failure_is_not_reported_as_success(
+        self, hass, mock_config_entry
+    ):
+        """The coordinator latches a failed revert instead of raising."""
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry, curve = self._entry(mock_config_entry, active=True)
+        curve.async_set_control_mode = AsyncMock(side_effect=lambda _m: None)
+        # Still active afterwards: the write did not take.
+        curve._revert_pending = True
+
+        assert not await _async_hand_back_curve(hass, entry, reason="reconfiguring")
+
+    @pytest.mark.asyncio
+    async def test_a_latched_revert_is_retried_before_the_handover(
+        self, hass, mock_config_entry
+    ):
+        """Shadow with a latched failure must still try, or the handover strands it."""
+        from custom_components.qvantum import _async_hand_back_curve
+
+        entry, curve = self._entry(mock_config_entry, active=False)
+        curve._revert_pending = True
+
+        async def _retry(_mode):
+            curve._revert_pending = False
+
+        curve.async_set_control_mode = AsyncMock(side_effect=_retry)
+
+        assert await _async_hand_back_curve(hass, entry, reason="reconfiguring")
+        curve.async_set_control_mode.assert_awaited_once_with("shadow")

@@ -884,14 +884,75 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
         await async_forget_telemetry_state(hass, config_entry.entry_id)
     except Exception as err:  # noqa: BLE001 — removal is best effort
         _LOGGER.debug("Could not drop telemetry state: %s", err)
+    await _async_hand_back_curve(hass, config_entry, reason="removing")
+
+
+async def _async_hand_back_curve(
+    hass: HomeAssistant, config_entry: ConfigEntry, *, reason: str
+) -> bool:
+    """Revert the user-defined table when nothing will supervise it any more.
+
+    The pump keeps running whatever table we last wrote, with frozen trims,
+    offset and adjustments. That is deliberate while the entry stays on Modbus
+    (a reload or an HA shutdown must not disturb the pump), but the moment the
+    entry is removed — or moved to the cloud, which cannot write holding 22 —
+    nothing is left to maintain it, so the pump gets its own Auto curve back.
+
+    Best effort: cloud mode, disabled writes, an unreadable curve Store and an
+    unreachable pump all skip it without failing the caller. Returns True only
+    when the write actually happened.
+    """
     if not _modbus_write_enabled(config_entry):
-        return
+        return False
+    runtime = getattr(config_entry, "runtime_data", None)
+    curve = getattr(runtime, "curve_coordinator", None)
+    # Only while the entry is loaded: ``async_unload_entry`` leaves
+    # ``runtime_data`` in place but closes the client, so a coordinator reached
+    # from a removed entry would silently fail to write.
+    if isinstance(curve, QvantumCurveCoordinator) and _qvantum_entry_is_active(
+        config_entry
+    ):
+        # A loaded entry owns a live coordinator, and its writes are serialised
+        # by its own control lock. Reverting through it stops those writes
+        # first; a temporary unit beside it could be overtaken by a scheduled
+        # write, and two clients would race for the pump's single TCP slot.
+        pending = bool(getattr(curve, "_revert_pending", False))
+        if not curve.active and not pending:
+            return False
+        try:
+            # Shadow mode also retries a latched revert when the curve is
+            # already inactive: an earlier Auto write may have failed, leaving
+            # the pump on our table with nothing to retry it after the handover.
+            await curve.async_set_control_mode("shadow")
+        except Exception as err:  # noqa: BLE001 — best effort
+            _LOGGER.warning(
+                "Could not revert the adaptive curve while %s %s: %s",
+                reason,
+                config_entry.entry_id,
+                err,
+            )
+            return False
+        # The coordinator latches a failed revert instead of raising, so the
+        # outcome — not the absence of an exception — is what to trust.
+        if curve.active or getattr(curve, "_revert_pending", False):
+            _LOGGER.warning(
+                "Adaptive curve revert did not take while %s %s",
+                reason,
+                config_entry.entry_id,
+            )
+            return False
+        _LOGGER.info(
+            "Adaptive curve reverted to the pump's Auto curve before %s %s",
+            reason,
+            config_entry.entry_id,
+        )
+        return True
     if await async_stored_curve_mode(hass, config_entry) != "active":
-        return
+        return False
     try:
         async with _async_temporary_modbus_unit(hass, config_entry) as unit:
             if unit is None:
-                return
+                return False
             client = QvantumModbusClient(unit, writable=True)
             try:
                 await client.set_curve_type_heating(
@@ -900,14 +961,18 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
             finally:
                 await client.close()
         _LOGGER.info(
-            "Adaptive curve reverted to the pump's Auto curve before removing %s",
+            "Adaptive curve reverted to the pump's Auto curve before %s %s",
+            reason,
             config_entry.entry_id,
         )
+        return True
     except asyncio.CancelledError:
         raise
     except Exception as err:  # noqa: BLE001 — best effort
         _LOGGER.warning(
-            "Could not revert the adaptive curve while removing %s: %s",
+            "Could not revert the adaptive curve while %s %s: %s",
+            reason,
             config_entry.entry_id,
             err,
         )
+        return False
