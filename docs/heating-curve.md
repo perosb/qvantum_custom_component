@@ -1022,9 +1022,12 @@ use `/local/qvantum-curve-card.js` as the resource URL.
 - **±band** — shaded strip of `band` °C around the shadow curve; this is the
   ≥1 °C write-threshold visualized.
 - **Operating point** — ring, only when `operating_point` is configured.
-- **Status chips** — Active/Shadow (switch), Ready/blocker, Pump
-  User-defined/Auto, clamped to supply limits, **extrapolated knots**, indoor
-  cap, solar-model trust. The extrapolation chip counts the knots the chart
+- **Status chips** — Active/Shadow (switch), the **advice** verdict, Ready/blocker,
+  Pump User-defined/Auto, clamped to supply limits, **extrapolated knots**,
+  indoor cap, solar-model trust. The advice chip is the only one that says what
+  to *do* (`reduce` / `ok` / `increase`, from the signed room error over the last
+  day); the rest say why. It is absent — not neutralised — until a day of room
+  error exists, and its tooltip carries the median and the sample count. The extrapolation chip counts the knots the chart
   draws as the line fit's shape rather than as a measurement — six of seven is
   the normal state while the learned baseline span is narrower than the weather,
   and without the chip that shape reads like any other point.

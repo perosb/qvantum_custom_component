@@ -47,6 +47,9 @@ const SOLAR_METRIC = "adaptive_curve_solar_model";
 //: real installation, only in a harness that put the attribute where the code
 //: expected it.
 const COVERAGE_METRIC = "adaptive_curve_coverage";
+//: The one entity that answers "what should I do": a verdict from the signed
+//: room error, `unknown` until it has a day of it.
+const ADVICE_METRIC = "adaptive_curve_advice";
 const SWITCH_METRIC = "adaptive_curve_control";
 const SELECT_METRIC = "curve_type_heating";
 
@@ -56,6 +59,7 @@ const KNOWN_METRICS = [
   DEVIATION_METRIC,
   SOLAR_METRIC,
   COVERAGE_METRIC,
+  ADVICE_METRIC,
   SWITCH_METRIC,
   SELECT_METRIC,
 ];
@@ -71,6 +75,7 @@ const METRIC_SLUGS = {
   [DEVIATION_METRIC]: "adaptive_curve_deviation",
   [SOLAR_METRIC]: "adaptive_curve_solar_model",
   [COVERAGE_METRIC]: "adaptive_curve_coverage",
+  [ADVICE_METRIC]: "adaptive_curve_advice",
   [SWITCH_METRIC]: "adaptive_curve_control",
 };
 
@@ -110,10 +115,11 @@ const STRINGS = {
     tTotal: "Total",
     outdoorAxis: "Outdoor temperature (°C)",
     waiting: "Waiting for curve data…",
-    notFound:
-      "Qvantum adaptive curve entities not found. This card is Modbus-only.",
+    notFound: "Qvantum adaptive curve entities not found.",
     hours: "h",
     days: "d",
+    advice: { reduce: "Reduce", ok: "OK", increase: "Increase" },
+    adviceMedian: "median",
   },
   sv: {
     baseline: "Baslinje (fryst)",
@@ -150,10 +156,11 @@ const STRINGS = {
     tTotal: "Totalt",
     outdoorAxis: "Utetemperatur (°C)",
     waiting: "Väntar på kurvdata…",
-    notFound:
-      "Qvantum adaptiva kurventiteter hittades inte. Kortet är endast för Modbus.",
+    notFound: "Qvantum adaptiva kurventiteter hittades inte.",
     hours: "h",
     days: "d",
+    advice: { reduce: "Sänk", ok: "OK", increase: "Höj" },
+    adviceMedian: "median",
   },
 };
 
@@ -480,6 +487,7 @@ class QvantumCurveCard extends HTMLElement {
     const dev = state(DEVIATION_METRIC);
     const solar = state(SOLAR_METRIC);
     const coverage = state(COVERAGE_METRIC);
+    const advice = state(ADVICE_METRIC);
     const sw = state(SWITCH_METRIC);
 
     const op = this._operatingPoint();
@@ -502,6 +510,17 @@ class QvantumCurveCard extends HTMLElement {
         adjustment: known(ADJUSTMENT_METRIC),
         select: known(SELECT_METRIC),
         solar: known(SOLAR_METRIC),
+        advice: known(ADVICE_METRIC),
+      },
+      advice: {
+        state: advice?.state,
+        median: num(attr(advice, "median_c")),
+        medianAbs: num(attr(advice, "median_abs_c")),
+        p90: num(attr(advice, "p90_abs_c")),
+        samples: num(attr(advice, "samples")),
+        appliesTo: attr(advice, "applies_to"),
+        deadBand: num(attr(advice, "dead_band_c")),
+        minHours: num(attr(advice, "min_hours")),
       },
       adjustment: {
         total: num(adj?.state),
@@ -810,6 +829,24 @@ class QvantumCurveCard extends HTMLElement {
           )}</span>`
         : `<span class="chip">${esc(t.noData)}</span>`,
     );
+    // The verdict first: it is the only chip that says what to do, and the
+    // rest describe why. `unknown` until a day of room error exists, so it is
+    // absent rather than neutralised on a fresh installation.
+    if (model.known.advice && model.advice.state) {
+      const label = t.advice[model.advice.state];
+      if (label) {
+        const detail = [];
+        if (model.advice.median !== null)
+          detail.push(`${t.adviceMedian} ${fmt(model.advice.median, 2)} °C`);
+        if (model.advice.samples !== null)
+          detail.push(`${fmt(model.advice.samples, 0)} ${t.hours}`);
+        chips.push(
+          `<span class="chip ${model.advice.state === "ok" ? "ok" : "warn"}"${
+            detail.length ? ` title="${esc(detail.join(" · "))}"` : ""
+          }>${esc(label)}</span>`,
+        );
+      }
+    }
     if (model.known.deviation) {
       // The gate is a pre-activation question and is only assessed in shadow.
       // While the curve writes the module reports `active`, and a chip that
