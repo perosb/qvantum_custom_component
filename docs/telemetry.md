@@ -115,7 +115,15 @@ fixes, and the reason only ever existed in the installation's own log. The codes
 are a fixed set (`REVERT_REASONS` in `const.py`), so the block stays counts and
 never a log, and an absent code is exported as zero rather than omitted.
 
-v16 adds `fitted.dhw_standing_episodes` and `fitted.dhw_standing_hours`, the
+v16 does two things. `plant.max_heating_supply` stops being null on a cloud row:
+the pump's own supply limits are not in the curated `/settings` list, so the
+client now reads `min_supply`/`max_supply` from the internal `/values` endpoint
+(the names the app itself uses) and aliases them. A consumer that learned "the
+supply limits are null on cloud" is the reader this version exists for — the
+same shape as v15's `counters`, and the reason it is a version rather than a
+silent fill.
+
+It also adds `fitted.dhw_standing_episodes` and `fitted.dhw_standing_hours`, the
 evidence behind the standing-loss coefficient. That figure is an **EMA**, so the
 published number is the same whether it rests on one tank-cooling night or
 twenty — a two-day-old entry that had never been idle overnight and a mature
@@ -162,12 +170,10 @@ through a numeric check — so the name was dropped and the field read null. It
 was the only plant field null on a cloud row: of 31 cloud rows in the pool,
 `room_comp_factor`, `curve type`, `indoor_temperature_offset`, the tap-water
 pair and `stop_heating` all arrived as numbers, and only the supply limits were
-null — they were read from the curated `/settings` list, which does not carry
-them; the cloud client now requests `min_supply`/`max_supply` from the internal
-`/values` endpoint and aliases them, so `max_heating_supply` is filled on a cloud
-row too. The export now maps the two names to
-`SensorMode`'s integers, so a cloud row and a Modbus row can be compared, and
-an unrecognised name still exports null rather than a number.
+null, because the curated `/settings` list does not carry them. The export now
+maps the two names to `SensorMode`'s integers, so a cloud row and a Modbus row
+can be compared, and an unrecognised name still exports null rather than a
+number.
 
 ### The installation token
 
