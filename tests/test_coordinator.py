@@ -2186,10 +2186,12 @@ class TestCalculateHeatingPower:
             if "self._calculate_heating_power_mean(values)" in line
         )
 
-        # Both live in the poll body (12 spaces). The mean one is nested inside
-        # the Modbus-only gate (16), the value one is not.
+        # Both live in the poll body (12 spaces), not inside the Modbus-only
+        # gate (16). The load term reads a 30-minute rolling mean, so the
+        # cloud's counter staircase aliases it no more than it aliases the
+        # hourly means the fits consume.
         assert len(call) - len(call.lstrip()) == 12
-        assert len(load_term) - len(load_term.lstrip()) == 16
+        assert len(load_term) - len(load_term.lstrip()) == 12
 
     def test_missing_heatingenergy_skipped(self):
         """If heatingenergy is absent, the method does nothing."""

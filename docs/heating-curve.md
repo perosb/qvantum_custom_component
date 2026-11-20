@@ -228,7 +228,9 @@ adjustment, a cold house blocks downward), it never drives a term. Points are
 clamped to 10–80 °C and fall toward warmer outdoors.
 
 The load term's input is a rolling mean of `heatingpower` accumulated at poll
-resolution over two hours (`HeatingPowerWindow`), not the instantaneous figure. It has to span whole
+resolution over two hours (`HeatingPowerWindow`), not the instantaneous figure —
+which is why it runs on the cloud as well: a mean over the window is the energy
+over the window, whatever the poll interval. It has to span whole
 compressor cycles: a single sample per curve cycle is either an "on" or an "off"
 value, and a heat pump that cycles then looks like a pump that coasts — or, right
 after a cycle ends, like no data at all. Idle polls contribute 0 W (coasting is
