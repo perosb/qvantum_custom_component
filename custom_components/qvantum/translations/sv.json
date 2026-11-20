@@ -886,7 +886,8 @@
         "description": "Välj hur Home Assistant kommunicerar med värmepumpen. Du kan byta senare via omkonfiguration.",
         "menu_options": {
           "cloud": "Qvantum-moln (HTTP)",
-          "modbus": "Lokal Modbus (offline)"
+          "modbus": "Lokal Modbus (offline)",
+          "mqtt": "MQTT (experimentell)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Växla mellan moln-HTTP och lokal Modbus, eller uppdatera den aktuella anslutningen.",
         "menu_options": {
           "reconfigure_cloud": "Qvantum-moln (HTTP)",
-          "reconfigure_modbus": "Lokal Modbus (offline)"
+          "reconfigure_modbus": "Lokal Modbus (offline)",
+          "reconfigure_mqtt": "MQTT (experimentell)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "Din e-postadress för Qvantum-kontot.",
           "password": "Ditt lösenord för Qvantum-kontot."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Läser en ögonblicksbild från en MQTT-broker. Kräver MQTT-integrationen och en enhet som publicerar på topicsen. Experimentell: protokollet är tills vidare vårt eget, eftersom Qvantums display ännu inte publicerar några mätvärden.",
+        "data": {
+          "mqtt_topic_prefix": "Topic-prefix",
+          "mqtt_serial": "Värmepumpens serienummer",
+          "mqtt_write": "Tillåt skrivning via MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Prefix före serienumret. Standard är qvantum.",
+          "mqtt_serial": "Väljer topicsen och enhetens id. Måste matcha det serienummer som publicerar till brokern."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Läser en ögonblicksbild från en MQTT-broker. Kräver MQTT-integrationen och en enhet som publicerar på topicsen. Experimentell: protokollet är tills vidare vårt eget, eftersom Qvantums display ännu inte publicerar några mätvärden.",
+        "data": {
+          "mqtt_topic_prefix": "Topic-prefix",
+          "mqtt_serial": "Värmepumpens serienummer",
+          "mqtt_write": "Tillåt skrivning via MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Prefix före serienumret. Standard är qvantum.",
+          "mqtt_serial": "Väljer topicsen och enhetens id. Måste matcha det serienummer som publicerar till brokern."
         }
       }
     }

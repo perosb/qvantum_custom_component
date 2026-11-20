@@ -886,7 +886,8 @@
         "description": "Vyberte, jak má Home Assistant komunikovat s tepelným čerpadlem. Režim lze později změnit v novém nastavení.",
         "menu_options": {
           "cloud": "Qvantum cloud (HTTP)",
-          "modbus": "Místní Modbus (offline)"
+          "modbus": "Místní Modbus (offline)",
+          "mqtt": "MQTT (experimentální)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Přepněte mezi cloudovým HTTP a místním Modbusem nebo aktualizujte aktuální připojení.",
         "menu_options": {
           "reconfigure_cloud": "Qvantum cloud (HTTP)",
-          "reconfigure_modbus": "Místní Modbus (offline)"
+          "reconfigure_modbus": "Místní Modbus (offline)",
+          "reconfigure_mqtt": "MQTT (experimentální)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "E-mailová adresa vašeho účtu Qvantum.",
           "password": "Heslo k vašemu účtu Qvantum."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Odebírá snímek z brokeru MQTT. Vyžaduje integraci MQTT a zařízení, které na témata publikuje. Experimentální: protokol je zatím náš vlastní.",
+        "data": {
+          "mqtt_topic_prefix": "Předpona tématu",
+          "mqtt_serial": "Sériové číslo čerpadla",
+          "mqtt_write": "Povolit zápis přes MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Předpona před sériovým číslem. Výchozí je qvantum.",
+          "mqtt_serial": "Určuje témata a identifikátor zařízení. Musí odpovídat sériovému číslu, které publikuje na broker."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Odebírá snímek z brokeru MQTT. Vyžaduje integraci MQTT a zařízení, které na témata publikuje. Experimentální: protokol je zatím náš vlastní.",
+        "data": {
+          "mqtt_topic_prefix": "Předpona tématu",
+          "mqtt_serial": "Sériové číslo čerpadla",
+          "mqtt_write": "Povolit zápis přes MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Předpona před sériovým číslem. Výchozí je qvantum.",
+          "mqtt_serial": "Určuje témata a identifikátor zařízení. Musí odpovídat sériovému číslu, které publikuje na broker."
         }
       }
     }

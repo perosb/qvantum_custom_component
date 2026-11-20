@@ -54,8 +54,16 @@ from .const import (
     CONF_MODBUS_UNIT_ID,
     CONF_MODBUS_WRITE,
     CONF_TELEMETRY,
+    CONF_MQTT_SERIAL,
+    CONF_TRANSPORT,
+    CONF_MQTT_TOPIC_PREFIX,
+    CONF_MQTT_WRITE,
+    DEFAULT_MQTT_TOPIC_PREFIX,
     TRANSPORT_MODBUS,
+    TRANSPORT_MQTT,
 )
+
+from .coordinator import resolve_transport
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -91,6 +99,21 @@ def _modbus_user_schema(
         }
     )
 
+
+def _mqtt_user_schema(
+    *,
+    prefix: str = DEFAULT_MQTT_TOPIC_PREFIX,
+    serial: str = "",
+    write_enabled: bool = False,
+) -> vol.Schema:
+    """Build the MQTT form, preserving submitted values on retry."""
+    return vol.Schema(
+        {
+            vol.Required(CONF_MQTT_TOPIC_PREFIX, default=prefix): str,
+            vol.Required(CONF_MQTT_SERIAL, default=serial): str,
+            vol.Optional(CONF_MQTT_WRITE, default=write_enabled): bool,
+        }
+    )
 
 def _normalize_modbus_scan_interval(value: Any) -> int:
     """Coerce Modbus scan interval to int and enforce the configured minimum."""
@@ -259,7 +282,7 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         """Choose cloud HTTP or local Modbus."""
         return self.async_show_menu(
             step_id="user",
-            menu_options=["cloud", "modbus"],
+            menu_options=["cloud", "modbus", "mqtt"],
         )
 
     async def async_step_cloud(
@@ -346,13 +369,59 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_mqtt(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Set up against an MQTT broker (POC).
+
+        No validation round-trip: the pump may not be online yet, and the
+        retained snapshot arrives on its own. A wrong serial simply leaves the
+        entry without data until it is corrected.
+        """
+        prefix = DEFAULT_MQTT_TOPIC_PREFIX
+        serial = ""
+        write_enabled = False
+        if user_input is not None:
+            prefix = str(user_input.get(CONF_MQTT_TOPIC_PREFIX, "")).strip("/")
+            serial = str(user_input.get(CONF_MQTT_SERIAL, "")).strip()
+            write_enabled = bool(user_input.get(CONF_MQTT_WRITE, False))
+            if prefix and serial:
+                await self.async_set_unique_id(serial)
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(
+                    title=f"Qvantum MQTT ({serial})",
+                    data={
+                        CONF_TRANSPORT: TRANSPORT_MQTT,
+                        CONF_MODBUS_TCP: False,
+                        CONF_MODBUS_WRITE: False,
+                        CONF_MQTT_TOPIC_PREFIX: prefix,
+                        CONF_MQTT_SERIAL: serial,
+                        CONF_MQTT_WRITE: write_enabled,
+                    },
+                    options={
+                        CONF_TRANSPORT: TRANSPORT_MQTT,
+                        CONF_MODBUS_TCP: False,
+                        CONF_MODBUS_WRITE: False,
+                        CONF_MQTT_TOPIC_PREFIX: prefix,
+                        CONF_MQTT_SERIAL: serial,
+                        CONF_MQTT_WRITE: write_enabled,
+                    },
+                )
+        return self.async_show_form(
+            step_id="mqtt",
+            data_schema=_mqtt_user_schema(
+                prefix=prefix, serial=serial, write_enabled=write_enabled
+            ),
+            errors={},
+        )
+
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Choose cloud or Modbus when reconfiguring."""
         return self.async_show_menu(
             step_id="reconfigure",
-            menu_options=["reconfigure_cloud", "reconfigure_modbus"],
+            menu_options=["reconfigure_cloud", "reconfigure_modbus", "reconfigure_mqtt"],
         )
 
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
@@ -557,6 +626,77 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
+    async def async_step_reconfigure_mqtt(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Reconfigure onto an MQTT broker.
+
+        No validation round-trip, for the same reason as a fresh entry: the
+        pump may not be publishing yet, and the retained snapshot arrives on
+        its own.
+        """
+        config_entry = self._reconfigure_entry()
+        prefix = str(
+            config_entry.options.get(
+                CONF_MQTT_TOPIC_PREFIX,
+                config_entry.data.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+            )
+        )
+        serial = str(
+            config_entry.options.get(
+                CONF_MQTT_SERIAL, config_entry.data.get(CONF_MQTT_SERIAL, "")
+            )
+        )
+        write_enabled = bool(
+            config_entry.options.get(
+                CONF_MQTT_WRITE, config_entry.data.get(CONF_MQTT_WRITE, False)
+            )
+        )
+        if user_input is not None:
+            prefix = str(user_input.get(CONF_MQTT_TOPIC_PREFIX, "")).strip("/")
+            serial = str(user_input.get(CONF_MQTT_SERIAL, "")).strip()
+            write_enabled = bool(user_input.get(CONF_MQTT_WRITE, False))
+            if prefix and serial:
+                # MQTT cannot reach holding 22, so the user-defined table this
+                # entry last wrote would run unsupervised with frozen trims.
+                # A removal hands it back; so does leaving Modbus.
+                from . import _async_hand_back_curve
+
+                await _async_hand_back_curve(
+                    self.hass, config_entry, reason="reconfiguring"
+                )
+                return self.async_update_reload_and_abort(
+                    config_entry,
+                    unique_id=serial,
+                    data={
+                        CONF_TRANSPORT: TRANSPORT_MQTT,
+                        CONF_MODBUS_TCP: False,
+                        CONF_MODBUS_WRITE: False,
+                        CONF_MQTT_TOPIC_PREFIX: prefix,
+                        CONF_MQTT_SERIAL: serial,
+                        CONF_MQTT_WRITE: write_enabled,
+                    },
+                    options=_apply_external_room_temp_option(
+                        {
+                            CONF_TRANSPORT: TRANSPORT_MQTT,
+                            CONF_MODBUS_TCP: False,
+                            CONF_MODBUS_WRITE: False,
+                            CONF_MQTT_TOPIC_PREFIX: prefix,
+                            CONF_MQTT_SERIAL: serial,
+                            CONF_MQTT_WRITE: write_enabled,
+                        },
+                        config_entry.options.get(CONF_EXTERNAL_ROOM_TEMP_ENTITY),
+                    ),
+                    reason="reconfigure_successful",
+                )
+        return self.async_show_form(
+            step_id="reconfigure_mqtt",
+            data_schema=_mqtt_user_schema(
+                prefix=prefix, serial=serial, write_enabled=write_enabled
+            ),
+            errors={},
+        )
+
 def _curve_term_schema(curve) -> dict:
     """The optional curve-term switches, pre-filled from the coordinator.
 
@@ -598,6 +738,10 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                 entry.data.get(CONF_MODBUS_TCP, False),
             )
         )
+
+    def _transport(self) -> str:
+        """The entry's transport, for the branches that only apply to one."""
+        return resolve_transport(self._source_entry())
 
     def _curve_enabled(self) -> bool:
         """Whether the advisory curve exists for this entry.
@@ -682,7 +826,19 @@ class QvantumOptionsFlowHandler(OptionsFlow):
         telemetry_granted = (
             telemetry_state.get("consent") == CONSENT_GRANTED
         )
-        if self._modbus_enabled():
+        if self._transport() == TRANSPORT_MQTT:
+            # MQTT: nothing to poll (the broker pushes), so no interval — and the
+            # curve's own options, because it writes settings through `set` just
+            # as well as through a holding register.
+            data_schema = vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_TELEMETRY, default=telemetry_granted
+                    ): bool,
+                    **_curve_term_schema(self._curve_coordinator()),
+                }
+            )
+        elif self._modbus_enabled():
             data_schema = vol.Schema(
                 {
                     vol.Required(

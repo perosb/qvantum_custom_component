@@ -886,7 +886,8 @@
         "description": "Válassza ki, hogyan kommunikáljon a Home Assistant a hőszivattyúval. Később az újrakonfigurálással válthat.",
         "menu_options": {
           "cloud": "Qvantum felhő (HTTP)",
-          "modbus": "Helyi Modbus (offline)"
+          "modbus": "Helyi Modbus (offline)",
+          "mqtt": "MQTT (kísérleti)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Váltson a felhő HTTP és a helyi Modbus között, vagy frissítse az aktuális kapcsolatot.",
         "menu_options": {
           "reconfigure_cloud": "Qvantum felhő (HTTP)",
-          "reconfigure_modbus": "Helyi Modbus (offline)"
+          "reconfigure_modbus": "Helyi Modbus (offline)",
+          "reconfigure_mqtt": "MQTT (kísérleti)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "A Qvantum-fiókod e-mail-címe.",
           "password": "A Qvantum-fiókod jelszava."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Pillanatképet olvas egy MQTT brokerről. Az MQTT integrációt és egy a témákra publikáló eszközt igényel. Kísérleti: a protokoll egyelőre a sajátunk.",
+        "data": {
+          "mqtt_topic_prefix": "Téma előtag",
+          "mqtt_serial": "A szivattyú sorozatszáma",
+          "mqtt_write": "Írás engedélyezése MQTT-n"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Előtag a sorozatszám előtt. Alapértelmezett: qvantum.",
+          "mqtt_serial": "A témákat és az eszköz azonosítóját határozza meg. Meg kell egyeznie a brokerre publikáló sorozatszámmal."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Pillanatképet olvas egy MQTT brokerről. Az MQTT integrációt és egy a témákra publikáló eszközt igényel. Kísérleti: a protokoll egyelőre a sajátunk.",
+        "data": {
+          "mqtt_topic_prefix": "Téma előtag",
+          "mqtt_serial": "A szivattyú sorozatszáma",
+          "mqtt_write": "Írás engedélyezése MQTT-n"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Előtag a sorozatszám előtt. Alapértelmezett: qvantum.",
+          "mqtt_serial": "A témákat és az eszköz azonosítóját határozza meg. Meg kell egyeznie a brokerre publikáló sorozatszámmal."
         }
       }
     }

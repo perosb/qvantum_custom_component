@@ -33,6 +33,7 @@ from homeassistant.const import (
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client.cloud import QvantumCloudClient
+from .client.mqtt import QvantumMqttClient
 from .client.models import result_applied
 from .client.constants import DHW_MODE_NORMAL
 from .client.modbus import QvantumModbusClient
@@ -51,8 +52,13 @@ from .const import (
     DEFAULT_MODBUS_PORT,
     DEFAULT_MODBUS_UNIT_ID,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
+    CONF_MQTT_SERIAL,
+    CONF_MQTT_TOPIC_PREFIX,
+    CONF_MQTT_WRITE,
+    DEFAULT_MQTT_TOPIC_PREFIX,
     TRANSPORT_CLOUD,
     TRANSPORT_MODBUS,
+    TRANSPORT_MQTT,
 )
 from .coordinator import QvantumDataUpdateCoordinator, resolve_transport
 from .curve_coordinator import QvantumCurveCoordinator, async_stored_curve_mode
@@ -125,6 +131,58 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     except Exception as err:  # noqa: BLE001 — never block setup on asset errors
         _LOGGER.debug("Could not register Qvantum curve card asset: %s", err)
     return True
+
+
+async def _async_mqtt_client(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> QvantumMqttClient:
+    """Build the MQTT transport on top of Home Assistant's MQTT integration."""
+    from homeassistant.components import mqtt
+
+    if not await mqtt.async_wait_for_mqtt_client(hass):
+        raise ConfigEntryNotReady(
+            "The MQTT integration is not configured; it is required for the "
+            "MQTT transport"
+        )
+
+    prefix = str(
+        config_entry.options.get(
+            CONF_MQTT_TOPIC_PREFIX,
+            config_entry.data.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+        )
+    )
+    serial = str(
+        config_entry.options.get(
+            CONF_MQTT_SERIAL, config_entry.data.get(CONF_MQTT_SERIAL, "")
+        )
+    )
+    writable = bool(
+        config_entry.options.get(
+            CONF_MQTT_WRITE, config_entry.data.get(CONF_MQTT_WRITE, False)
+        )
+    )
+
+    async def _subscribe(topic: str, callback) -> Callable[[], None]:
+        def _on_message(message) -> None:
+            # The broker's callback can arrive on a worker thread; hand it to
+            # the event loop so the coordinator is only touched from there.
+            hass.loop.call_soon_threadsafe(callback, message.payload)
+
+        return await mqtt.async_subscribe(hass, topic, _on_message, qos=1)
+
+    async def _publish(topic: str, payload: str, retain: bool = False) -> None:
+        await mqtt.async_publish(hass, topic, payload, qos=1, retain=retain)
+
+    client = QvantumMqttClient(
+        topic_prefix=prefix,
+        serial=serial,
+        device_id=serial,
+        subscribe=_subscribe,
+        publish=_publish,
+        writable=writable,
+    )
+    await client.async_start()
+    return client
 
 
 def _modbus_link_settings(config_entry: ConfigEntry) -> tuple[bool, str, int, int]:
@@ -324,7 +382,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     # port and unit, which only a Modbus entry has.
     transport = resolve_transport(config_entry)
     modbus_enabled = transport == TRANSPORT_MODBUS
-    if modbus_enabled:
+    if modbus_enabled or transport == TRANSPORT_MQTT:
         username = None
         password = None
     else:
@@ -364,6 +422,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
             user_agent=user_agent,
             session=async_get_clientsession(hass),
         )
+
+    if transport == TRANSPORT_MQTT:
+        client = await _async_mqtt_client(hass, config_entry)
 
     coordinator = QvantumDataUpdateCoordinator(
         hass, config_entry, client=client, extra_dhw=extra_dhw
@@ -473,6 +534,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     remove_listener = config_entry.add_update_listener(_async_update_listener)
     config_entry.async_on_unload(remove_listener)
+
+    if isinstance(client, QvantumMqttClient):
+        # Push transport: a new snapshot asks the coordinator for a refresh, so
+        # derived metrics and entity updates keep going through one path.
+        remove_push = client.add_listener(
+            lambda: hass.async_create_task(coordinator.async_request_refresh())
+        )
+        config_entry.async_on_unload(remove_push)
+        config_entry.async_on_unload(client.close)
 
     config_entry.runtime_data = RuntimeData(
         coordinator,

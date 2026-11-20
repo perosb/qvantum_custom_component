@@ -886,7 +886,8 @@
         "description": "Wybierz, jak Home Assistant ma komunikować się z pompą ciepła. Tryb można później zmienić przez rekonfigurację.",
         "menu_options": {
           "cloud": "Chmura Qvantum (HTTP)",
-          "modbus": "Lokalny Modbus (offline)"
+          "modbus": "Lokalny Modbus (offline)",
+          "mqtt": "MQTT (eksperymentalny)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Przełącz między chmurą HTTP a lokalnym Modbusem albo zaktualizuj bieżące połączenie.",
         "menu_options": {
           "reconfigure_cloud": "Chmura Qvantum (HTTP)",
-          "reconfigure_modbus": "Lokalny Modbus (offline)"
+          "reconfigure_modbus": "Lokalny Modbus (offline)",
+          "reconfigure_mqtt": "MQTT (eksperymentalny)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "Adres e-mail Twojego konta Qvantum.",
           "password": "Hasło Twojego konta Qvantum."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Odczytuje migawkę z brokera MQTT. Wymaga integracji MQTT i urządzenia publikującego w tematach. Eksperymentalne: protokół jest na razie nasz.",
+        "data": {
+          "mqtt_topic_prefix": "Prefiks tematu",
+          "mqtt_serial": "Numer seryjny pompy",
+          "mqtt_write": "Zezwól na zapis przez MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Prefiks przed numerem seryjnym. Domyślnie qvantum.",
+          "mqtt_serial": "Określa tematy i identyfikator urządzenia. Musi odpowiadać numerowi seryjnemu publikującemu do brokera."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Odczytuje migawkę z brokera MQTT. Wymaga integracji MQTT i urządzenia publikującego w tematach. Eksperymentalne: protokół jest na razie nasz.",
+        "data": {
+          "mqtt_topic_prefix": "Prefiks tematu",
+          "mqtt_serial": "Numer seryjny pompy",
+          "mqtt_write": "Zezwól na zapis przez MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Prefiks przed numerem seryjnym. Domyślnie qvantum.",
+          "mqtt_serial": "Określa tematy i identyfikator urządzenia. Musi odpowiadać numerowi seryjnemu publikującemu do brokera."
         }
       }
     }

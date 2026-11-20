@@ -886,7 +886,8 @@
         "description": "Choisissez comment Home Assistant communique avec la pompe à chaleur. Vous pourrez changer plus tard via la reconfiguration.",
         "menu_options": {
           "cloud": "Cloud Qvantum (HTTP)",
-          "modbus": "Modbus local (hors ligne)"
+          "modbus": "Modbus local (hors ligne)",
+          "mqtt": "MQTT (expérimental)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Basculez entre le HTTP cloud et le Modbus local, ou mettez à jour la connexion actuelle.",
         "menu_options": {
           "reconfigure_cloud": "Cloud Qvantum (HTTP)",
-          "reconfigure_modbus": "Modbus local (hors ligne)"
+          "reconfigure_modbus": "Modbus local (hors ligne)",
+          "reconfigure_mqtt": "MQTT (expérimental)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "L'adresse e-mail de votre compte Qvantum.",
           "password": "Le mot de passe de votre compte Qvantum."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Lit un instantané depuis un courtier MQTT. Nécessite l'intégration MQTT et un appareil qui publie sur les topics. Expérimental : le protocole est le nôtre pour l'instant.",
+        "data": {
+          "mqtt_topic_prefix": "Préfixe du topic",
+          "mqtt_serial": "Numéro de série de la pompe",
+          "mqtt_write": "Autoriser l'écriture via MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Préfixe avant le numéro de série. Par défaut qvantum.",
+          "mqtt_serial": "Détermine les topics et l'identifiant de l'appareil. Doit correspondre au numéro de série qui publie sur le courtier."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Lit un instantané depuis un courtier MQTT. Nécessite l'intégration MQTT et un appareil qui publie sur les topics. Expérimental : le protocole est le nôtre pour l'instant.",
+        "data": {
+          "mqtt_topic_prefix": "Préfixe du topic",
+          "mqtt_serial": "Numéro de série de la pompe",
+          "mqtt_write": "Autoriser l'écriture via MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Préfixe avant le numéro de série. Par défaut qvantum.",
+          "mqtt_serial": "Détermine les topics et l'identifiant de l'appareil. Doit correspondre au numéro de série qui publie sur le courtier."
         }
       }
     }

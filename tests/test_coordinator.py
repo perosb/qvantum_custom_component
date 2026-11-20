@@ -5981,13 +5981,27 @@ class TestTransportKind:
             == TRANSPORT_CLOUD
         )
 
-    def test_a_transport_without_a_client_is_not_honoured(self):
-        """No entry may claim a transport the setup cannot build a client for.
+    def test_a_transport_with_a_client_is_honoured(self):
+        """An entry may claim a transport the setup can build a client for."""
+        from custom_components.qvantum.const import (
+            CONF_MODBUS_TCP,
+            CONF_TRANSPORT,
+            TRANSPORT_MQTT,
+        )
+        from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
 
-        `__init__` picks the client from the Modbus flag, so honouring an
-        unknown transport would hand back the wrong client while the platforms
-        believed the other one — the mix-up this vocabulary exists to prevent.
-        """
+        entry = MagicMock()
+        entry.options = {}
+        entry.data = {CONF_MODBUS_TCP: True, CONF_TRANSPORT: TRANSPORT_MQTT}
+
+        assert QvantumDataUpdateCoordinator.resolve_transport(entry) == TRANSPORT_MQTT
+        # And the predicates agree, because they read the same resolver output.
+        coord = self._coord(TRANSPORT_MQTT, modbus=False)
+        assert not is_cloud(coord)
+        assert is_full_payload(coord)
+
+    def test_a_transport_without_a_client_falls_back_to_the_flag(self):
+        """A value with no client behind it must not be trusted."""
         from custom_components.qvantum.const import (
             CONF_MODBUS_TCP,
             CONF_TRANSPORT,
@@ -5997,15 +6011,9 @@ class TestTransportKind:
 
         entry = MagicMock()
         entry.options = {}
-        entry.data = {CONF_MODBUS_TCP: True, CONF_TRANSPORT: "mqtt"}
+        entry.data = {CONF_MODBUS_TCP: True, CONF_TRANSPORT: "carrier-pigeon"}
 
-        assert (
-            QvantumDataUpdateCoordinator.resolve_transport(entry) == TRANSPORT_MODBUS
-        )
-        # And the predicate agrees, because it reads the same resolver output.
-        coord = self._coord(TRANSPORT_MODBUS, modbus=True)
-        assert not is_cloud(coord)
-        assert is_full_payload(coord)
+        assert QvantumDataUpdateCoordinator.resolve_transport(entry) == TRANSPORT_MODBUS
 
 
     def test_the_resolver_is_a_module_function(self):

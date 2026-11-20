@@ -886,7 +886,8 @@
         "description": "Kies hoe Home Assistant met de warmtepomp communiceert. U kunt later wisselen via herconfiguratie.",
         "menu_options": {
           "cloud": "Qvantum-cloud (HTTP)",
-          "modbus": "Lokale Modbus (offline)"
+          "modbus": "Lokale Modbus (offline)",
+          "mqtt": "MQTT (experimenteel)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Schakel tussen cloud-HTTP en lokale Modbus, of werk de huidige verbinding bij.",
         "menu_options": {
           "reconfigure_cloud": "Qvantum-cloud (HTTP)",
-          "reconfigure_modbus": "Lokale Modbus (offline)"
+          "reconfigure_modbus": "Lokale Modbus (offline)",
+          "reconfigure_mqtt": "MQTT (experimenteel)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "Het e-mailadres van je Qvantum-account.",
           "password": "Het wachtwoord van je Qvantum-account."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Leest een momentopname van een MQTT-broker. Vereist de MQTT-integratie en een apparaat dat op de topics publiceert. Experimenteel: het protocol is voorlopig ons eigen.",
+        "data": {
+          "mqtt_topic_prefix": "Topic-voorvoegsel",
+          "mqtt_serial": "Serienummer van de warmtepomp",
+          "mqtt_write": "Schrijven via MQTT toestaan"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Voorvoegsel voor het serienummer. Standaard qvantum.",
+          "mqtt_serial": "Bepaalt de topics en het apparaat-id. Moet overeenkomen met het serienummer dat naar de broker publiceert."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Leest een momentopname van een MQTT-broker. Vereist de MQTT-integratie en een apparaat dat op de topics publiceert. Experimenteel: het protocol is voorlopig ons eigen.",
+        "data": {
+          "mqtt_topic_prefix": "Topic-voorvoegsel",
+          "mqtt_serial": "Serienummer van de warmtepomp",
+          "mqtt_write": "Schrijven via MQTT toestaan"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Voorvoegsel voor het serienummer. Standaard qvantum.",
+          "mqtt_serial": "Bepaalt de topics en het apparaat-id. Moet overeenkomen met het serienummer dat naar de broker publiceert."
         }
       }
     }

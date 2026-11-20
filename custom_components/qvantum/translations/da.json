@@ -886,7 +886,8 @@
         "description": "Vælg, hvordan Home Assistant kommunikerer med varmepumpen. Du kan skifte senere via genkonfiguration.",
         "menu_options": {
           "cloud": "Qvantum-sky (HTTP)",
-          "modbus": "Lokal Modbus (offline)"
+          "modbus": "Lokal Modbus (offline)",
+          "mqtt": "MQTT (eksperimentel)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Skift mellem sky-HTTP og lokal Modbus, eller opdater den aktuelle forbindelse.",
         "menu_options": {
           "reconfigure_cloud": "Qvantum-sky (HTTP)",
-          "reconfigure_modbus": "Lokal Modbus (offline)"
+          "reconfigure_modbus": "Lokal Modbus (offline)",
+          "reconfigure_mqtt": "MQTT (eksperimentel)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "Din e-mailadresse til Qvantum-kontoen.",
           "password": "Din adgangskode til Qvantum-kontoen."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Læser et snapshot fra en MQTT-broker. Kræver MQTT-integrationen og en enhed, der publicerer på emnerne. Eksperimentel: protokollen er indtil videre vores egen.",
+        "data": {
+          "mqtt_topic_prefix": "Emnepræfiks",
+          "mqtt_serial": "Pumpens serienummer",
+          "mqtt_write": "Tillad skrivning via MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Præfiks før serienummeret. Standard er qvantum.",
+          "mqtt_serial": "Bestemmer emnerne og enhedens id. Skal matche det serienummer, der publicerer til brokeren."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Læser et snapshot fra en MQTT-broker. Kræver MQTT-integrationen og en enhed, der publicerer på emnerne. Eksperimentel: protokollen er indtil videre vores egen.",
+        "data": {
+          "mqtt_topic_prefix": "Emnepræfiks",
+          "mqtt_serial": "Pumpens serienummer",
+          "mqtt_write": "Tillad skrivning via MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Præfiks før serienummeret. Standard er qvantum.",
+          "mqtt_serial": "Bestemmer emnerne og enhedens id. Skal matche det serienummer, der publicerer til brokeren."
         }
       }
     }

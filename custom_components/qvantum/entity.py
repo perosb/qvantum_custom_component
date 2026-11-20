@@ -12,7 +12,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
-from .const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE, DOMAIN
+from .const import (
+    CONF_MODBUS_TCP,
+    CONF_MODBUS_WRITE,
+    DOMAIN,
+    TRANSPORT_MQTT,
+)
 from .coordinator import QvantumDataUpdateCoordinator, is_cloud
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
@@ -102,6 +107,10 @@ class QvantumAccessMixin:
         try:
             if not isinstance(self.coordinator, QvantumDataUpdateCoordinator):
                 return True  # Maintenance entities always available
+            if getattr(self.coordinator, "transport", None) == TRANSPORT_MQTT:
+                # No cloud access level and no holding registers: the link's
+                # own write flag is the whole answer.
+                return bool(getattr(self.coordinator.client, "writable", False))
             if not is_cloud(self.coordinator):
                 if getattr(self, "_metric_key", None) in _CLOUD_ONLY_WRITE_METRICS:
                     return False

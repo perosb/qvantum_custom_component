@@ -886,7 +886,8 @@
         "description": "Elige cómo Home Assistant se comunica con la bomba de calor. Puedes cambiarlo más tarde mediante la reconfiguración.",
         "menu_options": {
           "cloud": "Nube Qvantum (HTTP)",
-          "modbus": "Modbus local (sin conexión)"
+          "modbus": "Modbus local (sin conexión)",
+          "mqtt": "MQTT (experimental)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Cambia entre HTTP en la nube y Modbus local, o actualiza la conexión actual.",
         "menu_options": {
           "reconfigure_cloud": "Nube Qvantum (HTTP)",
-          "reconfigure_modbus": "Modbus local (sin conexión)"
+          "reconfigure_modbus": "Modbus local (sin conexión)",
+          "reconfigure_mqtt": "MQTT (experimental)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "El correo electrónico de tu cuenta de Qvantum.",
           "password": "La contraseña de tu cuenta de Qvantum."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Lee una instantánea de un broker MQTT. Requiere la integración MQTT y un dispositivo que publique en los temas. Experimental: el protocolo es propio por ahora.",
+        "data": {
+          "mqtt_topic_prefix": "Prefijo del tema",
+          "mqtt_serial": "Número de serie de la bomba",
+          "mqtt_write": "Permitir escritura por MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Prefijo antes del número de serie. Por defecto qvantum.",
+          "mqtt_serial": "Determina los temas y el id del dispositivo. Debe coincidir con el número de serie que publica en el broker."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Lee una instantánea de un broker MQTT. Requiere la integración MQTT y un dispositivo que publique en los temas. Experimental: el protocolo es propio por ahora.",
+        "data": {
+          "mqtt_topic_prefix": "Prefijo del tema",
+          "mqtt_serial": "Número de serie de la bomba",
+          "mqtt_write": "Permitir escritura por MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Prefijo antes del número de serie. Por defecto qvantum.",
+          "mqtt_serial": "Determina los temas y el id del dispositivo. Debe coincidir con el número de serie que publica en el broker."
         }
       }
     }

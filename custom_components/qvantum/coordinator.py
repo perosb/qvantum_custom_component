@@ -64,9 +64,11 @@ from .const import (
     CONF_EXTERNAL_ROOM_TEMP_ENTITY,
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
+    CONF_MQTT_SERIAL,
     CONF_TRANSPORT,
     TRANSPORT_CLOUD,
     TRANSPORT_MODBUS,
+    TRANSPORT_MQTT,
     EXTERNAL_ROOM_TEMP_EMA_TAU,
     EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
@@ -86,6 +88,7 @@ _COP_KEYS = ("cop_heating", "cop_dhw")
 
 # Cap a Retry-After backoff so a hostile/huge value cannot park the poller
 # for hours; a successful poll restores the configured interval.
+_OFFLINE_RETRY_SECONDS = 300.0
 _MAX_RATE_LIMIT_BACKOFF_SECONDS = 3600
 
 _COMPRESSOR_TO_HP_STATUS_MAP = {
@@ -186,6 +189,28 @@ def _firmware_metadata_from_sw_version(sw_version: str | None) -> dict:
     return metadata
 
 
+def resolve_transport(config_entry: Any) -> str:
+    """Return the entry's transport: ``cloud``, ``modbus`` or ``mqtt``.
+
+    Only transports that exist are honoured, and only a flow that builds the
+    matching client may write ``CONF_TRANSPORT`` — an entry claiming one there is
+    no client for would get the wrong one and the platforms would then create the
+    wrong entity set. Anything else falls back to ``CONF_MODBUS_TCP``, which is
+    what every entry had before.
+
+    A module function rather than only a staticmethod on the coordinator: the
+    suite patches ``QvantumDataUpdateCoordinator`` wholesale, and a static call on
+    the patched class answers with a mock.
+    """
+    options = getattr(config_entry, "options", None) or {}
+    data = getattr(config_entry, "data", None) or {}
+    explicit = options.get(CONF_TRANSPORT, data.get(CONF_TRANSPORT))
+    if explicit in (TRANSPORT_CLOUD, TRANSPORT_MODBUS, TRANSPORT_MQTT):
+        return str(explicit)
+    enabled = bool(options.get(CONF_MODBUS_TCP, data.get(CONF_MODBUS_TCP, False)))
+    return TRANSPORT_MODBUS if enabled else TRANSPORT_CLOUD
+
+
 def transport_kind(coordinator: Any) -> str:
     """Return the coordinator's transport: ``cloud`` or ``modbus``.
 
@@ -197,7 +222,7 @@ def transport_kind(coordinator: Any) -> str:
     ``MagicMock`` coordinator, where a property would answer with another mock.
     """
     transport = getattr(coordinator, "transport", None)
-    if transport in (TRANSPORT_CLOUD, TRANSPORT_MODBUS):
+    if transport in (TRANSPORT_CLOUD, TRANSPORT_MODBUS, TRANSPORT_MQTT):
         return str(transport)
     # Test harness and partial setups: derive from the Modbus flag, which is
     # what every caller used before there was a transport field.
@@ -280,12 +305,17 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         return resolve_transport(config_entry)
 
     @staticmethod
-    def resolve_poll_interval(config_entry: ConfigEntry) -> tuple[bool, int]:
-        """Return (modbus_enabled, poll_interval_seconds) from a config entry."""
-        modbus_enabled = (
-            QvantumDataUpdateCoordinator.resolve_transport(config_entry)
-            == TRANSPORT_MODBUS
-        )
+    def resolve_poll_interval(config_entry: ConfigEntry) -> tuple[bool, int | None]:
+        """Return (modbus_enabled, poll_interval_seconds) from a config entry.
+
+        ``None`` means "do not poll". A push transport is refreshed by the
+        broker, so a timer would only re-read a cache it already has; the pump's
+        availability topic is what says whether it is still there.
+        """
+        transport = QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+        if transport == TRANSPORT_MQTT:
+            return False, None
+        modbus_enabled = transport == TRANSPORT_MODBUS
         if not modbus_enabled:
             poll_interval = config_entry.options.get(
                 CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
@@ -436,12 +466,20 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             config_entry=config_entry,
             name=f"{DOMAIN} ({config_entry.unique_id})",
             update_method=self.async_update_data,
-            update_interval=timedelta(seconds=self.poll_interval),
+            update_interval=(
+                None
+                if self.poll_interval is None
+                else timedelta(seconds=self.poll_interval)
+            ),
         )
 
         # Enabled metrics only change when the registries change (user toggles
         # an entity, a device appears, ...). The first poll runs before the
         # entity registration events, which immediately invalidate the entry.
+        # One-shot retry while the update is failing, and only then: a push
+        # transport has no interval, so a failure would otherwise wait for the
+        # pump to speak — forever, if its `online` message was lost.
+        self._offline_retry: Callable[[], None] | None = None
         self._enabled_metrics_cache: dict[str, list[str]] = {}
         # Registry events are global; remember which ids belong to this entry
         # so a removal (already gone from the registry) can still be matched.
@@ -467,7 +505,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
         self.poll_interval = poll_interval
         # DataUpdateCoordinator reschedules when update_interval is assigned.
-        self.update_interval = timedelta(seconds=poll_interval)
+        self.update_interval = (
+            None if poll_interval is None else timedelta(seconds=poll_interval)
+        )
         _LOGGER.debug(
             "Updated poll interval to %ss for %s",
             poll_interval,
@@ -477,7 +517,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
     def _apply_rate_limit_backoff(self, retry_after: float | None) -> None:
         """Temporarily widen the poll interval while the API throttles us."""
-        if not retry_after or retry_after <= self.poll_interval:
+        if self.poll_interval is None or not retry_after:
+            return
+        if retry_after <= self.poll_interval:
             return
         seconds = min(float(retry_after), _MAX_RATE_LIMIT_BACKOFF_SECONDS)
         current = getattr(self, "update_interval", None)
@@ -489,7 +531,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
     def _restore_poll_interval(self) -> None:
         """Restore the configured interval after a throttled period."""
-        desired = timedelta(seconds=self.poll_interval)
+        desired = (
+            None
+            if self.poll_interval is None
+            else timedelta(seconds=self.poll_interval)
+        )
         if getattr(self, "update_interval", None) != desired:
             self.update_interval = desired
 
@@ -763,6 +809,26 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 )
 
         if self._device is not None:
+            return
+
+        if transport_kind(self) == TRANSPORT_MQTT:
+            # The MQTT snapshot carries no identity, so the entry's serial is
+            # the device id. Nothing to probe and no cloud to ask.
+            serial = str(
+                self._config_entry.options.get(
+                    CONF_MQTT_SERIAL,
+                    self._config_entry.data.get(CONF_MQTT_SERIAL, ""),
+                )
+            )
+            if not serial:
+                raise UpdateFailed("MQTT transport needs a serial number")
+            self._device = {
+                "id": serial,
+                "serial": serial,
+                "vendor": "Qvantum",
+                "model": "Qvantum",
+            }
+            await self._persist_device_state()
             return
 
         if self.modbus_enabled:
@@ -1476,6 +1542,50 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             )
 
     async def async_update_data(self):
+        """Fetch data, and keep a bounded retry alive while it fails.
+
+        Success cancels the retry; a failure schedules one. Transports with a
+        poll interval retry on their own, so this only arms when there is no
+        interval to fall back on.
+        """
+        try:
+            result = await self._async_fetch_data()
+        except UpdateFailed:
+            self._schedule_offline_retry()
+            raise
+        self._cancel_offline_retry()
+        return result
+
+    def _schedule_offline_retry(self) -> None:
+        """Arm a one-shot retry for an interval-less transport."""
+        if self.poll_interval is not None:
+            return
+        if self._offline_retry is not None:
+            return
+        from homeassistant.helpers.event import async_call_later
+
+        self._offline_retry = async_call_later(
+            self.hass, _OFFLINE_RETRY_SECONDS, self._async_offline_retry
+        )
+        _LOGGER.debug(
+            "Push transport failed; retrying in %ss", _OFFLINE_RETRY_SECONDS
+        )
+
+    def _cancel_offline_retry(self) -> None:
+        if self._offline_retry is not None:
+            self._offline_retry()
+            self._offline_retry = None
+
+    async def _async_offline_retry(self, _now) -> None:
+        self._offline_retry = None
+        await self.async_request_refresh()
+
+    async def async_shutdown(self) -> None:
+        """Drop a pending retry before the entry goes away."""
+        self._cancel_offline_retry()
+        await super().async_shutdown()
+
+    async def _async_fetch_data(self):
         """Fetch data from API endpoint."""
         try:
             await self._ensure_device()

@@ -886,7 +886,8 @@
         "description": "Valitse, miten Home Assistant keskustelee lämpöpumpun kanssa. Voit vaihtaa myöhemmin uudelleenmäärityksessä.",
         "menu_options": {
           "cloud": "Qvantum-pilvi (HTTP)",
-          "modbus": "Paikallinen Modbus (offline)"
+          "modbus": "Paikallinen Modbus (offline)",
+          "mqtt": "MQTT (kokeellinen)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Vaihda pilvi-HTTP:n ja paikallisen Modbusin välillä tai päivitä nykyinen yhteys.",
         "menu_options": {
           "reconfigure_cloud": "Qvantum-pilvi (HTTP)",
-          "reconfigure_modbus": "Paikallinen Modbus (offline)"
+          "reconfigure_modbus": "Paikallinen Modbus (offline)",
+          "reconfigure_mqtt": "MQTT (kokeellinen)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "Qvantum-tilisi sähköpostiosoite.",
           "password": "Qvantum-tilisi salasana."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Lukee tilannekuvan MQTT-välittäjältä. Vaatii MQTT-integraation ja laitteen, joka julkaisee aiheisiin. Kokeellinen: protokolla on toistaiseksi oma.",
+        "data": {
+          "mqtt_topic_prefix": "Aiheen etuliite",
+          "mqtt_serial": "Pumpun sarjanumero",
+          "mqtt_write": "Salli kirjoitus MQTT:n kautta"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Etuliite ennen sarjanumeroa. Oletus qvantum.",
+          "mqtt_serial": "Valitsee aiheet ja laitetunnisteen. Sen on vastattava sarjanumeroa, joka julkaisee välittäjälle."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Lukee tilannekuvan MQTT-välittäjältä. Vaatii MQTT-integraation ja laitteen, joka julkaisee aiheisiin. Kokeellinen: protokolla on toistaiseksi oma.",
+        "data": {
+          "mqtt_topic_prefix": "Aiheen etuliite",
+          "mqtt_serial": "Pumpun sarjanumero",
+          "mqtt_write": "Salli kirjoitus MQTT:n kautta"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Etuliite ennen sarjanumeroa. Oletus qvantum.",
+          "mqtt_serial": "Valitsee aiheet ja laitetunnisteen. Sen on vastattava sarjanumeroa, joka julkaisee välittäjälle."
         }
       }
     }

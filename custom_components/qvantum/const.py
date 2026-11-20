@@ -126,6 +126,15 @@ CONF_MODBUS_SCAN_INTERVAL = "modbus_scan_interval"
 CONF_TRANSPORT = "transport"
 TRANSPORT_CLOUD = "cloud"
 TRANSPORT_MODBUS = "modbus"
+TRANSPORT_MQTT = "mqtt"
+
+# MQTT transport (experimental). The protocol is the integration's own: the
+# display's MQTT API does not publish metrics yet, so this speaks to a broker a
+# pump (or the simulator in tools/) is publishing on.
+CONF_MQTT_TOPIC_PREFIX = "mqtt_topic_prefix"
+CONF_MQTT_SERIAL = "mqtt_serial"
+CONF_MQTT_WRITE = "mqtt_write"
+DEFAULT_MQTT_TOPIC_PREFIX = "qvantum"
 # HA sensor the integration feeds to holding 14 (room_temp_external) every
 # poll while Modbus writing is enabled. Realizes the app's "ext modbus" sensor
 # mode: the pump drops the mode and raises alarm 8 when the fed value is older

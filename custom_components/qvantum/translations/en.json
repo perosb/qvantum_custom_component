@@ -886,7 +886,8 @@
         "description": "Choose how Home Assistant talks to the heat pump. You can switch later via reconfigure.",
         "menu_options": {
           "cloud": "Qvantum cloud (HTTP)",
-          "modbus": "Local Modbus (offline)"
+          "modbus": "Local Modbus (offline)",
+          "mqtt": "MQTT (experimental)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Switch between cloud HTTP and local Modbus, or update the current connection.",
         "menu_options": {
           "reconfigure_cloud": "Qvantum cloud (HTTP)",
-          "reconfigure_modbus": "Local Modbus (offline)"
+          "reconfigure_modbus": "Local Modbus (offline)",
+          "reconfigure_mqtt": "MQTT (experimental)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "Your Qvantum account email.",
           "password": "Your Qvantum account password."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Reads a snapshot from an MQTT broker. Requires the MQTT integration and a device that publishes to the topics. Experimental: the protocol is our own for now, because Qvantum's display does not publish metrics yet.",
+        "data": {
+          "mqtt_topic_prefix": "Topic prefix",
+          "mqtt_serial": "Heat pump serial number",
+          "mqtt_write": "Enable writing via MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Prefix before the serial number. Default is qvantum.",
+          "mqtt_serial": "Selects the topics and the device id. Must match the serial number publishing to the broker."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Reads a snapshot from an MQTT broker. Requires the MQTT integration and a device that publishes to the topics. Experimental: the protocol is our own for now, because Qvantum's display does not publish metrics yet.",
+        "data": {
+          "mqtt_topic_prefix": "Topic prefix",
+          "mqtt_serial": "Heat pump serial number",
+          "mqtt_write": "Enable writing via MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Prefix before the serial number. Default is qvantum.",
+          "mqtt_serial": "Selects the topics and the device id. Must match the serial number publishing to the broker."
         }
       }
     }

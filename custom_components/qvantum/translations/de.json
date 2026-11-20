@@ -886,7 +886,8 @@
         "description": "Wählen Sie, wie Home Assistant mit der Wärmepumpe kommuniziert. Sie können später über die Rekonfiguration wechseln.",
         "menu_options": {
           "cloud": "Qvantum Cloud (HTTP)",
-          "modbus": "Lokaler Modbus (offline)"
+          "modbus": "Lokaler Modbus (offline)",
+          "mqtt": "MQTT (experimentell)"
         }
       },
       "cloud": {
@@ -918,7 +919,8 @@
         "description": "Zwischen Cloud-HTTP und lokalem Modbus wechseln oder die aktuelle Verbindung aktualisieren.",
         "menu_options": {
           "reconfigure_cloud": "Qvantum Cloud (HTTP)",
-          "reconfigure_modbus": "Lokaler Modbus (offline)"
+          "reconfigure_modbus": "Lokaler Modbus (offline)",
+          "reconfigure_mqtt": "MQTT (experimentell)"
         }
       },
       "reconfigure_cloud": {
@@ -955,6 +957,32 @@
         "data_description": {
           "username": "E-Mail-Adresse deines Qvantum-Kontos.",
           "password": "Passwort deines Qvantum-Kontos."
+        }
+      },
+      "mqtt": {
+        "title": "MQTT",
+        "description": "Liest einen Snapshot von einem MQTT-Broker. Benötigt die MQTT-Integration und ein Gerät, das auf die Topics veröffentlicht. Experimentell: Das Protokoll ist vorerst unser eigenes.",
+        "data": {
+          "mqtt_topic_prefix": "Topic-Präfix",
+          "mqtt_serial": "Seriennummer der Wärmepumpe",
+          "mqtt_write": "Schreiben über MQTT erlauben"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Präfix vor der Seriennummer. Standard ist qvantum.",
+          "mqtt_serial": "Bestimmt die Topics und die Geräte-ID. Muss der Seriennummer entsprechen, die an den Broker veröffentlicht."
+        }
+      },
+      "reconfigure_mqtt": {
+        "title": "MQTT",
+        "description": "Liest einen Snapshot von einem MQTT-Broker. Benötigt die MQTT-Integration und ein Gerät, das auf die Topics veröffentlicht. Experimentell: Das Protokoll ist vorerst unser eigenes.",
+        "data": {
+          "mqtt_topic_prefix": "Topic-Präfix",
+          "mqtt_serial": "Seriennummer der Wärmepumpe",
+          "mqtt_write": "Schreiben über MQTT erlauben"
+        },
+        "data_description": {
+          "mqtt_topic_prefix": "Präfix vor der Seriennummer. Standard ist qvantum.",
+          "mqtt_serial": "Bestimmt die Topics und die Geräte-ID. Muss der Seriennummer entsprechen, die an den Broker veröffentlicht."
         }
       }
     }

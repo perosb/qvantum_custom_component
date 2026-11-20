@@ -1,0 +1,504 @@
+"""Tests for the MQTT transport POC (client side, no broker)."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+
+import pytest
+
+from custom_components.qvantum.client.exceptions import TransportError
+from custom_components.qvantum.client.mqtt import (
+    QvantumMqttClient,
+    availability_topic,
+    command_topic,
+    decode_envelope,
+    encode_envelope,
+    response_topic,
+    state_topic,
+)
+
+PREFIX = "qvantum"
+SERIAL = "3010100244154033"
+
+
+class FakeBroker:
+    """Minimal broker: records publishes and lets a test push messages."""
+
+    def __init__(self) -> None:
+        self.published: list[tuple[str, str, bool]] = []
+        self.subscriptions: dict[str, object] = {}
+        self.unsubscribed: list[str] = []
+
+    async def subscribe(self, topic, callback):
+        self.subscriptions[topic] = callback
+
+        def _unsubscribe() -> None:
+            self.subscriptions.pop(topic, None)
+            self.unsubscribed.append(topic)
+
+        return _unsubscribe
+
+    async def publish(self, topic, payload, retain=False):
+        self.published.append((topic, payload, retain))
+
+    def deliver(self, topic, payload) -> None:
+        callback = self.subscriptions.get(topic)
+        assert callback is not None, f"nothing subscribed to {topic}"
+        callback(payload)
+
+
+def _client(broker: FakeBroker, *, writable: bool = True, timeout: float = 0.2):
+    return QvantumMqttClient(
+        topic_prefix=PREFIX,
+        serial=SERIAL,
+        device_id="dev-1",
+        subscribe=broker.subscribe,
+        publish=broker.publish,
+        writable=writable,
+        response_timeout=timeout,
+    )
+
+
+def _state(metrics: dict, settings: dict) -> str:
+    return encode_envelope(SERIAL, {"metrics": metrics, "settings": settings})
+
+
+def test_topics_are_built_under_prefix_and_serial():
+    assert state_topic(PREFIX, SERIAL) == f"qvantum/{SERIAL}/state"
+    assert command_topic(PREFIX, SERIAL) == f"qvantum/{SERIAL}/cmd"
+    assert response_topic(PREFIX, SERIAL) == f"qvantum/{SERIAL}/cmd-res"
+    assert availability_topic(PREFIX, SERIAL) == f"qvantum/{SERIAL}/availability"
+    # A trailing slash on the prefix must not double up.
+    assert state_topic("qvantum/", SERIAL) == f"qvantum/{SERIAL}/state"
+
+
+def test_envelope_round_trip():
+    raw = encode_envelope(SERIAL, {"set": {"curve_10": 30}})
+    assert json.loads(raw) == {"hpid": SERIAL, "p": {"set": {"curve_10": 30}}}
+    assert decode_envelope(raw) == {"set": {"curve_10": 30}}
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [None, "", "not json", "[]", '{"hpid":"x"}', '{"hpid":"x","p":[]}'],
+)
+def test_decode_envelope_rejects_malformed(raw):
+    assert decode_envelope(raw) is None
+
+
+async def test_start_subscribes_and_announces_availability():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    assert set(broker.subscriptions) == {
+        state_topic(PREFIX, SERIAL),
+        response_topic(PREFIX, SERIAL),
+        # The last will is what separates "nothing changed" from "nothing is
+        # there"; without it a dead pump keeps serving its last snapshot.
+        availability_topic(PREFIX, SERIAL),
+    }
+    assert broker.published == [
+        (availability_topic(PREFIX, SERIAL), "online", True)
+    ]
+
+
+async def test_reads_are_served_from_the_pushed_snapshot():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    broker.deliver(
+        state_topic(PREFIX, SERIAL),
+        _state({"bt1": 3.2, "bt2": 20.4}, {"curve_10": 29, "curve_0": 20}),
+    )
+
+    metrics = await client.get_metrics("dev-1")
+    assert metrics == {"metrics": {"bt1": 3.2, "bt2": 20.4}}
+
+    filtered = await client.get_metrics("dev-1", enabled_metrics=["bt1"])
+    assert filtered == {"metrics": {"bt1": 3.2}}
+
+    settings = await client.get_settings("dev-1")
+    assert settings == {
+        "settings": [
+            {"name": "curve_10", "value": 29},
+            {"name": "curve_0", "value": 20},
+        ]
+    }
+
+
+async def test_reads_fail_before_the_first_snapshot():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    with pytest.raises(TransportError, match="No MQTT state"):
+        await client.get_metrics("dev-1")
+    with pytest.raises(TransportError, match="No MQTT state"):
+        await client.get_settings("dev-1")
+
+
+async def test_listener_fires_on_every_snapshot():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    calls: list[int] = []
+    remove = client.add_listener(lambda: calls.append(1))
+
+    broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 1.0}, {}))
+    broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 2.0}, {}))
+    assert len(calls) == 2
+
+    remove()
+    broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 3.0}, {}))
+    assert len(calls) == 2
+
+
+async def test_malformed_state_is_ignored():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    broker.deliver(state_topic(PREFIX, SERIAL), "garbage")
+    with pytest.raises(TransportError):
+        await client.get_metrics("dev-1")
+
+
+async def test_write_publishes_a_command_and_waits_for_the_response():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    async def _answer() -> None:
+        await asyncio.sleep(0)
+        broker.deliver(
+            response_topic(PREFIX, SERIAL),
+            encode_envelope(SERIAL, {"ok": True, "applied": {"curve_10": 30}}),
+        )
+
+    task = asyncio.create_task(_answer())
+    result = await client.update_setting("dev-1", "curve_10", 30)
+    await task
+
+    assert result == {"status": "APPLIED"}
+    topic, payload, retain = broker.published[-1]
+    assert topic == command_topic(PREFIX, SERIAL)
+    assert retain is False
+    assert json.loads(payload) == {
+        "hpid": SERIAL,
+        "p": {"set": {"curve_10": 30}},
+    }
+
+
+async def test_write_times_out_without_a_response():
+    broker = FakeBroker()
+    client = _client(broker, timeout=0.05)
+    await client.async_start(wait_for_state=False)
+
+    with pytest.raises(TransportError, match="No MQTT response"):
+        await client.update_setting("dev-1", "curve_10", 30)
+
+
+async def test_write_rejected_by_the_pump():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    async def _reject() -> None:
+        await asyncio.sleep(0)
+        broker.deliver(
+            response_topic(PREFIX, SERIAL),
+            encode_envelope(SERIAL, {"ok": False, "error": "out of range"}),
+        )
+
+    task = asyncio.create_task(_reject())
+    with pytest.raises(TransportError, match="out of range"):
+        await client.update_setting("dev-1", "curve_10", 99)
+    await task
+
+
+async def test_writes_are_refused_when_disabled():
+    broker = FakeBroker()
+    client = _client(broker, writable=False)
+    await client.async_start(wait_for_state=False)
+
+    assert client.writable is False
+    with pytest.raises(TransportError, match="writes are disabled"):
+        await client.update_setting("dev-1", "curve_10", 30)
+
+
+async def test_empty_write_is_a_no_op():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    assert await client.update_settings("dev-1", {}) == {"status": "APPLIED"}
+    assert broker.published[-1][0] == availability_topic(PREFIX, SERIAL)
+
+
+async def test_tap_water_capacity_maps_to_the_start_stop_pair():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    async def _answer() -> None:
+        await asyncio.sleep(0)
+        broker.deliver(
+            response_topic(PREFIX, SERIAL),
+            encode_envelope(SERIAL, {"ok": True}),
+        )
+
+    task = asyncio.create_task(_answer())
+    await client.set_tap_water_capacity_target("dev-1", 3)
+    await task
+
+    sent = json.loads(broker.published[-1][1])["p"]["set"]
+    assert set(sent) == {"tap_water_start", "tap_water_stop"}
+
+
+async def test_extra_tap_water_writes_the_mode_only():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    async def _answer() -> None:
+        await asyncio.sleep(0)
+        broker.deliver(
+            response_topic(PREFIX, SERIAL),
+            encode_envelope(SERIAL, {"ok": True}),
+        )
+
+    task = asyncio.create_task(_answer())
+    await client.set_extra_tap_water("dev-1", 120)
+    await task
+
+    sent = json.loads(broker.published[-1][1])["p"]["set"]
+    assert sent == {"extra_tap_water": 2}
+
+
+async def test_close_unsubscribes_and_marks_offline():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+    await client.close()
+
+    assert broker.subscriptions == {}
+    assert broker.published[-1] == (
+        availability_topic(PREFIX, SERIAL),
+        "offline",
+        True,
+    )
+
+
+def test_client_satisfies_the_shared_protocol():
+    """The coordinator types its client as ``QvantumClient``; MQTT must fit."""
+    from custom_components.qvantum.client.protocol import QvantumClient
+
+    broker = FakeBroker()
+    client = _client(broker)
+    assert isinstance(client, QvantumClient)
+
+
+async def test_start_waits_for_the_first_snapshot():
+    """A push transport has nothing to read until the retained state lands."""
+    broker = FakeBroker()
+    client = _client(broker)
+
+    async def _publish_soon() -> None:
+        await asyncio.sleep(0.01)
+        broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 1.0}, {}))
+
+    task = asyncio.create_task(_publish_soon())
+    await client.async_start(timeout=1.0)
+    await task
+
+    assert (await client.get_metrics("dev-1"))["metrics"] == {"bt1": 1.0}
+
+
+async def test_start_times_out_when_the_pump_never_answers():
+    broker = FakeBroker()
+    client = _client(broker)
+
+    with pytest.raises(TransportError, match="No MQTT state"):
+        await client.async_start(timeout=0.05)
+
+
+async def test_command_publishes_and_returns_the_result():
+    """The third verb: an operation that is not a setting."""
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    async def _answer() -> None:
+        await asyncio.sleep(0)
+        broker.deliver(
+            response_topic(PREFIX, SERIAL),
+            encode_envelope(
+                SERIAL,
+                {"ok": True, "result": {"points": [{"id": 721, "value": 3600}]}},
+            ),
+        )
+
+    task = asyncio.create_task(_answer())
+    result = await client.send_command("dev-1", "read_all_setpoints")
+    await task
+
+    assert result == {"points": [{"id": 721, "value": 3600}]}
+    assert json.loads(broker.published[-1][1]) == {
+        "hpid": SERIAL,
+        "p": {"cmd": {"name": "read_all_setpoints", "args": {}}},
+    }
+
+
+async def test_read_only_command_works_on_a_read_only_link():
+    """Reading the setpoint list must not need a write-enabled entry."""
+    broker = FakeBroker()
+    client = _client(broker, writable=False)
+    await client.async_start(wait_for_state=False)
+
+    async def _answer() -> None:
+        await asyncio.sleep(0)
+        broker.deliver(
+            response_topic(PREFIX, SERIAL),
+            encode_envelope(SERIAL, {"ok": True, "result": {"points": []}}),
+        )
+
+    task = asyncio.create_task(_answer())
+    result = await client.send_command(
+        "dev-1", "read_all_setpoints", writable_command=False
+    )
+    await task
+    assert result == {"points": []}
+
+
+async def test_writing_command_is_refused_when_disabled():
+    broker = FakeBroker()
+    client = _client(broker, writable=False)
+    await client.async_start(wait_for_state=False)
+
+    with pytest.raises(TransportError, match="writes are disabled"):
+        await client.send_command("dev-1", "limit_max_compressor_speed")
+
+
+async def test_command_rejection_surfaces_the_pump_error():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    async def _reject() -> None:
+        await asyncio.sleep(0)
+        broker.deliver(
+            response_topic(PREFIX, SERIAL),
+            encode_envelope(
+                SERIAL,
+                {"ok": False, "error": "'limitStep' has invalid value, expecting 0 - 5"},
+            ),
+        )
+
+    task = asyncio.create_task(_reject())
+    with pytest.raises(TransportError, match="expecting 0 - 5"):
+        await client.send_command(
+            "dev-1", "limit_max_compressor_speed", {"limitStep": 9}
+        )
+    await task
+
+
+async def test_offline_pump_makes_reads_fail():
+    """A dead pump must not keep serving frozen values."""
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+    broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 1.0}, {"curve_0": 20}))
+
+    assert client.online is True
+    assert (await client.get_metrics("dev-1"))["metrics"] == {"bt1": 1.0}
+
+    broker.deliver(availability_topic(PREFIX, SERIAL), "offline")
+
+    assert client.online is False
+    with pytest.raises(TransportError, match="offline"):
+        await client.get_metrics("dev-1")
+    with pytest.raises(TransportError, match="offline"):
+        await client.get_settings("dev-1")
+
+
+async def test_the_pump_comes_back_online():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+    broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 1.0}, {}))
+
+    broker.deliver(availability_topic(PREFIX, SERIAL), "offline")
+    broker.deliver(availability_topic(PREFIX, SERIAL), "online")
+
+    assert client.online is True
+    assert (await client.get_metrics("dev-1"))["metrics"] == {"bt1": 1.0}
+
+
+async def test_availability_changes_notify_listeners():
+    """The coordinator learns about the flip the same way it learns about data."""
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    calls: list[int] = []
+    client.add_listener(lambda: calls.append(1))
+
+    broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 1.0}, {}))
+    broker.deliver(availability_topic(PREFIX, SERIAL), "offline")
+    # A repeat of the same value is not a change.
+    broker.deliver(availability_topic(PREFIX, SERIAL), "offline")
+    broker.deliver(availability_topic(PREFIX, SERIAL), "online")
+
+    assert len(calls) == 3
+
+
+async def test_unknown_availability_payload_stays_online():
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    broker.deliver(availability_topic(PREFIX, SERIAL), "garbage")
+
+    assert client.online is False  # anything that is not "online" is not online
+    broker.deliver(availability_topic(PREFIX, SERIAL), "online")
+    assert client.online is True
+
+
+async def test_an_identical_snapshot_does_not_wake_anyone():
+    """Republishing the same values is not news and must not refresh."""
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    calls: list[int] = []
+    client.add_listener(lambda: calls.append(1))
+    snapshot = _state({"bt1": 1.0}, {"curve_0": 20})
+
+    broker.deliver(state_topic(PREFIX, SERIAL), snapshot)
+    broker.deliver(state_topic(PREFIX, SERIAL), snapshot)
+    assert len(calls) == 1
+
+    broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 2.0}, {"curve_0": 20}))
+    assert len(calls) == 2
+
+
+async def test_a_write_while_offline_fails_fast():
+    """A known-dead pump must not cost a five-second timeout on every write."""
+    broker = FakeBroker()
+    client = _client(broker, timeout=5.0)
+    await client.async_start(wait_for_state=False)
+    broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 1.0}, {}))
+    broker.deliver(availability_topic(PREFIX, SERIAL), "offline")
+
+    started = asyncio.get_running_loop().time()
+    with pytest.raises(TransportError, match="offline"):
+        await client.update_setting("dev-1", "curve_0", 20)
+    elapsed = asyncio.get_running_loop().time() - started
+
+    assert elapsed < 1.0  # not the 5 s response timeout
+    # Nothing was published: the command never left.
+    assert broker.published[-1][0] == availability_topic(PREFIX, SERIAL)
