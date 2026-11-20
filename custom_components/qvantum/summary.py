@@ -141,7 +141,12 @@ _ENTITY_PREFIXES = (
 #: cloud row carries reverts, trim updates and the days a knot was clamped. A
 #: consumer that learned "counters is always zero on cloud" is the reader this
 #: version exists for; nothing about the block's shape changed.
-SUMMARY_SCHEMA_VERSION = 15
+#: 16: `fitted.dhw_standing_episodes` and `fitted.dhw_standing_hours`. The
+#: coefficient is a blend and has no window of its own, so a fresh installation
+#: and a mature one carried the same figure — the pool could compare the
+#: number but not weigh it. `thermal_episodes` already does this for the
+#: building fit.
+SUMMARY_SCHEMA_VERSION = 16
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -175,6 +180,10 @@ FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (
     "thermal_mass_kwh_per_k",
     "thermal_episodes",
     "dhw_standing_loss",
+    # The evidence behind the coefficient: it is an EMA, so the published figure
+    # is the same whether it rests on one tank-cooling night or twenty.
+    "dhw_standing_episodes",
+    "dhw_standing_hours",
     "compressor_starts_per_hour",
     "compressor_run_hours_24h",
     "compressor_duty_cycle",

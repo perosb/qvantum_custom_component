@@ -172,6 +172,8 @@ class EfficiencySnapshot:
     dhw_standing_loss: float | None = None
     dhw_standing_loss_w_per_k: float | None = None
     dhw_standing_window: dict[str, float | str] | None = None
+    dhw_standing_episodes: int = 0
+    dhw_standing_hours: float = 0.0
     compressor_starts_per_hour: float | None = None
     compressor_run_hours_24h: float | None = None
     compressor_speed_avg: float | None = None
@@ -346,6 +348,12 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         self._dhw_standing_loss_per_k: float | None = None
         # Evidence behind the newest accepted window (hours, drop, ΔT, volume).
         self._dhw_standing_window: dict[str, Any] | None = None
+        # How much evidence the EMA rests on. The coefficient is a blend, so it
+        # has no window of its own — one night and twenty look exactly alike
+        # without these, and a pooled row then reads a fresh installation as a
+        # mature one.
+        self._dhw_standing_episodes: int = 0
+        self._dhw_standing_hours: float = 0.0
         # Only the EMA is persisted; an open window is deliberately dropped on
         # restart because the tank may have been drawn while nothing sampled it
         # and resuming would book that draw as standing loss.
@@ -602,6 +610,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
                 dhw_standing_loss=dhw_standing_loss,
                 dhw_standing_loss_w_per_k=self._standing_loss_w_per_k(),
                 dhw_standing_window=self._dhw_standing_window,
+            dhw_standing_episodes=int(getattr(self, "_dhw_standing_episodes", 0)),
+            dhw_standing_hours=float(getattr(self, "_dhw_standing_hours", 0.0)),
                 dhw_heat_meter_deviation=dhw_meter_deviation,
                 dhw_heat_meter_warning=dhw_meter_warning,
                 dhw_heat_meter_estimated_kwh=dhw_meter_estimated_kwh,
@@ -982,6 +992,12 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         window = data.get("dhw_standing_window")
         if isinstance(window, dict):
             self._dhw_standing_window = window
+        episodes = _finite(data.get("dhw_standing_episodes"))
+        if episodes is not None and episodes >= 0:
+            self._dhw_standing_episodes = int(episodes)
+        hours = _finite(data.get("dhw_standing_hours"))
+        if hours is not None and hours >= 0.0:
+            self._dhw_standing_hours = float(hours)
 
     def _schedule_dhw_save(self) -> None:
         """Persist the EMA after a short delay (one save per burst)."""
@@ -993,6 +1009,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
                 lambda: {
                     "dhw_standing_loss_per_k": self._dhw_standing_loss_per_k,
                     "dhw_standing_window": self._dhw_standing_window,
+                    "dhw_standing_episodes": self._dhw_standing_episodes,
+                    "dhw_standing_hours": self._dhw_standing_hours,
                 },
                 60,
             )
@@ -1115,6 +1133,14 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             return
         self._dhw_standing_loss_per_k = blend(
             getattr(self, "_dhw_standing_loss_per_k", None), sample
+        )
+        self._dhw_standing_episodes = (
+            int(getattr(self, "_dhw_standing_episodes", 0)) + 1
+        )
+        self._dhw_standing_hours = round(
+            float(getattr(self, "_dhw_standing_hours", 0.0))
+            + (last[0] - start[0]) / 3600.0,
+            2,
         )
         self._dhw_standing_window = {
             "hours": round((last[0] - start[0]) / 3600.0, 2),

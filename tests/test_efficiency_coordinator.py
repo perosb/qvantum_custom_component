@@ -49,6 +49,8 @@ def make_coordinator() -> QvantumEfficiencyCoordinator:
     coordinator._dhw_idle_last = None
     coordinator._dhw_standing_loss_per_k = None
     coordinator._dhw_standing_window = None
+    coordinator._dhw_standing_episodes = 0
+    coordinator._dhw_standing_hours = 0.0
     coordinator._store = None
     return coordinator
 
@@ -848,6 +850,29 @@ class TestDhwStandingLoss:
         daily = 175.0 * 4.186 / 3600.0 * 2.0 / 8.0 * 24.0
         assert value == pytest.approx(daily / 39.0 * 40.0)
 
+    def test_an_accepted_window_counts_as_evidence(self):
+        """The coefficient is an EMA, so what it rests on has to be counted.
+
+        One tank-cooling night and twenty produce the same published figure;
+        without the count a pooled row reads a fresh installation as a mature
+        one.
+        """
+        coordinator = make_coordinator()
+        assert coordinator._dhw_standing_episodes == 0
+        assert coordinator._dhw_standing_hours == 0.0
+
+        for index in range(2):
+            base = 1000.0 + index * 24 * 3600
+            self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
+            coordinator._update_dhw_standing_loss(base)
+            self._values(coordinator, bt30=53.0, bf1_l_min=0.0, hp_status=0, bt2=15.0)
+            coordinator._update_dhw_standing_loss(base + 8 * 3600)
+            self._values(coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0, bt2=15.0)
+            assert coordinator._update_dhw_standing_loss(base + 9 * 3600) is not None
+
+        assert coordinator._dhw_standing_episodes == 2
+        assert coordinator._dhw_standing_hours == pytest.approx(16.0)
+
     def test_identified_volume_replaces_the_datasheet_volume(self):
         """The coordinator exposes the identified volume as a method, not an
         attribute: reading the bound method would silently use 175 L."""
@@ -874,6 +899,9 @@ class TestDhwStandingLoss:
         self._values(coordinator, bt30=53.0, bf1_l_min=6.0, hp_status=0)
         assert coordinator._update_dhw_standing_loss(1000.0 + 9 * 3600) is None
         assert coordinator._dhw_standing_window is None
+        # A discarded window is not evidence either.
+        assert coordinator._dhw_standing_episodes == 0
+        assert coordinator._dhw_standing_hours == 0.0
 
     def test_ambient_falls_back_to_the_configured_room_sensor(self):
         coordinator = make_coordinator()
@@ -1000,11 +1028,15 @@ class TestDhwStandingLoss:
         coordinator = make_coordinator()
         self._values(coordinator, bt30=55.0, bf1_l_min=0.0, hp_status=0)
         coordinator._dhw_standing_loss_per_k = 0.06
+        coordinator._dhw_standing_episodes = 3
+        coordinator._dhw_standing_hours = 21.5
         with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
             snapshot = await coordinator._async_compute_snapshot()
 
         assert snapshot.dhw_standing_loss == pytest.approx(2.4)
         assert snapshot.dhw_standing_loss_w_per_k == pytest.approx(2.5)
+        assert snapshot.dhw_standing_episodes == 3
+        assert snapshot.dhw_standing_hours == pytest.approx(21.5)
 
 async def test_thermal_metrics_reports_the_decay_fit() -> None:
     """The decay fit drives the time constant and, with UA, the capacity."""
@@ -1175,6 +1207,35 @@ class TestDhwStandingLossPersistence:
 
         assert coordinator._dhw_standing_loss_per_k == pytest.approx(0.0625)
         assert coordinator._dhw_standing_window == {"hours": 6.0}
+
+    @pytest.mark.asyncio
+    async def test_the_evidence_count_survives_a_restart(self):
+        coordinator = make_coordinator()
+        store = self._Store({"dhw_standing_episodes": 4, "dhw_standing_hours": 31.5})
+        coordinator._store = store
+
+        await coordinator.async_restore()
+
+        assert coordinator._dhw_standing_episodes == 4
+        assert coordinator._dhw_standing_hours == pytest.approx(31.5)
+
+        coordinator._schedule_dhw_save()
+        assert store.saved[-1]["dhw_standing_episodes"] == 4
+        assert store.saved[-1]["dhw_standing_hours"] == pytest.approx(31.5)
+
+    @pytest.mark.asyncio
+    async def test_a_nonsense_count_is_ignored(self):
+        for payload in (
+            {"dhw_standing_episodes": -1, "dhw_standing_hours": -2.0},
+            {"dhw_standing_episodes": "x", "dhw_standing_hours": "y"},
+        ):
+            coordinator = make_coordinator()
+            coordinator._store = self._Store(payload)
+
+            await coordinator.async_restore()
+
+            assert coordinator._dhw_standing_episodes == 0
+            assert coordinator._dhw_standing_hours == 0.0
 
     @pytest.mark.asyncio
     async def test_restore_ignores_unusable_payloads(self):
