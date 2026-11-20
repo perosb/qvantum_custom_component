@@ -145,6 +145,39 @@ be attributed (an element step with no flag, or a compressor step that landed in
 an idle interval) is **never dropped silently** — it is returned separately and
 counted in `cop.unattributed_kwh`, because a vanishing kWh is how a COP drifts.
 
+## The efficiency health grade
+
+A letter from three components, `health_grade` in `plant_analytics.py`:
+
+| Component | Weight | Scored |
+|---|---:|---|
+| `scop` | 0.5 | 2.0 → 0.0, 5.0 → 1.0 |
+| `aux_share` | 0.25 | lower is better |
+| `cycling` | 0.25 | starts/hour |
+
+Missing components are excluded and the remaining weights renormalise, so
+`coverage` says how much of the picture a letter rests on; nothing available
+means no letter rather than a fabricated F. Letters: A ≥ 0.85, B ≥ 0.7,
+C ≥ 0.55, D ≥ 0.4, else F.
+
+**Which window the letter measures.** SCOP enters as the **30-day**
+`scop_total`, while the 2.0–5.0 range it is scored against is the *seasonal*
+air-source one. The two are deliberately not matched: matching them would mean
+calibrating a 30-day range, which nothing has done, and a fixed yardstick at
+least makes two installations comparable. The cost is that the letter is **not a
+stable property of a house** — measured 2026-11-20 over 26 pooled installations
+with two or more rows, the 30-day figure moved **0.27** (median), 0.64 (p90) and
+**1.18** (max) within one installation, and one letter step is 0.9 SCOP (weight
+0.5 across a 3.0-wide range), so a single swing crosses two steps for an
+unchanged house. Read it as a recent snapshot.
+
+**It is a SCOP grade with two tie-breakers.** Over the same 28 graded
+installations, **21** moved up at least one letter when the SCOP component was
+removed. The 90-day figure (`scop_total_90d`) travels beside the letter in the
+summary export precisely so the longer window can be read *without* the letter
+being computed from it — switching the grade to it would make the letter lag a
+fix by three months and leave it `null` on every installation younger than that.
+
 ## `cop_heating`
 
 A rolling one-hour window of counter deltas over **heating-mode electrical
