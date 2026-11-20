@@ -117,7 +117,10 @@ published number is the same whether it rests on one tank-cooling night or
 twenty — a two-day-old entry that had never been idle overnight and a mature
 installation exported the identical field. `thermal_episodes` already does this
 for the building fit; the standing loss was the one fitted figure in the row with
-no window beside it.
+no window beside it. Both counts are `null` until one is accepted: an
+installation upgraded from an earlier version carries a coefficient it learnt
+before the counters, and `0` beside a non-null coefficient would read as
+"measured, nothing there".
 
 v15 moves what `counters` means on a cloud row. The block was documented as
 *Modbus only* because the curve was, and now that the curve runs on an elevated
