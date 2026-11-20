@@ -583,7 +583,15 @@ This explains why a 12–20 kW draw can last only minutes before the tank cools,
 | Input 101/102 | `coolingenergy` | Cooling energy | If present. |
 | Input 93 | `compressor_power` | Compressor electrical power | W; direct measurement. |
 | Input 88/89 | `compressor_run_time` / `starts` | Run time / starts | Lifetime; never reset. |
+| Input 90 | `ventilation_fan_run_time` | Fan run time | Lifetime; never reset. |
 | Input 91 | `ventilation_filter_time_left` | Filter hours remaining | Counts down. |
+
+The four lifetime counters are **not** Modbus-only: the cloud's internal
+`/values` endpoint answers them as `compressor`, `compressorstart`, `fan` and
+`filtertimeleft` (measured 2026-11-20 from the app's own request), and the cloud
+client translates the canonical names on the way out and aliases them back. They
+were listed as Modbus-only because the curated `/settings` list does not carry
+them, which is a different question from what the pump reports.
 
 **Identity and firmware.** Inputs 191–193 are the display firmware triple, and
 they are the only firmware the pump reports: the cloud adds two component

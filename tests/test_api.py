@@ -191,10 +191,54 @@ class TestQvantumCloudClient:
         assert "names%5B%5D=min_supply" in url
         assert "names%5B%5D=max_supply" in url
         assert "use_internal_names=true" in url
+        # The lifetime counters are requested under the API's names, not ours.
+        assert "names%5B%5D=compressor" in url
+        assert "names%5B%5D=compressorstart" in url
+        assert "names%5B%5D=fan" in url
+        assert "names%5B%5D=filtertimeleft" in url
+        assert "compressor_run_time" not in url
         # Aliased to the canonical names the rest of the integration reads.
         assert result["metrics"]["min_heating_supply"] == 20
         assert result["metrics"]["max_heating_supply"] == 60
         assert result["metrics"]["bt1"] == -1.2
+
+    @pytest.mark.asyncio
+    async def test_get_metrics_translates_the_lifetime_counters(self, authenticated_api):
+        """A canonical name the API does not know is sent under its own name.
+
+        `compressor_run_time` is input 88 on Modbus and `compressor` in the
+        cloud's internal vocabulary; asking for the canonical name would return
+        nothing and log a missing-metric warning on every poll.
+        """
+        cm, _ = authenticated_api._session.make_cm_response(
+            status=200,
+            json_data={
+                "values": {
+                    "compressor": 3713,
+                    "compressorstart": 5085,
+                    "fan": 7612,
+                    "filtertimeleft": 612,
+                },
+                "total_latency": 2221,
+            },
+        )
+        authenticated_api._session.get.return_value = cm
+
+        result = await authenticated_api.get_metrics(
+            "test_device",
+            [
+                "compressor_run_time",
+                "compressor_starts",
+                "ventilation_fan_run_time",
+                "ventilation_filter_time_left",
+            ],
+        )
+
+        metrics = result["metrics"]
+        assert metrics["compressor_run_time"] == 3713
+        assert metrics["compressor_starts"] == 5085
+        assert metrics["ventilation_fan_run_time"] == 7612
+        assert metrics["ventilation_filter_time_left"] == 612
 
     @pytest.mark.asyncio
     async def test_set_tap_water(self, mock_session):
