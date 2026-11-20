@@ -18,7 +18,6 @@ from custom_components.qvantum.client.modbus.maps import MODBUS_HOLDING_TO_SETTI
 from custom_components.qvantum.summary import (
     FITTED_EFFICIENCY_KEYS,
     REVERT_REASONS,
-    MODBUS_ONLY_PLANT_KEYS,
     PLANT_KEYS,
     QvantumSummaryView,
     SUMMARY_FILENAME,
@@ -193,7 +192,6 @@ def test_plant_keys_are_canonical_setting_names() -> None:
     for key in PLANT_KEYS:
         assert key in canonical, f"{key} is not a canonical setting name"
     # Modbus-only fields are declared, not silently promised.
-    assert set(MODBUS_ONLY_PLANT_KEYS) <= set(PLANT_KEYS)
 
 
 def test_a_cloud_payload_leaves_the_supply_limits_null() -> None:

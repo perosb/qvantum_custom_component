@@ -41,7 +41,7 @@ The complete field list:
 | section | fields |
 |---|---|
 | device | manufacturer, model, firmware (**the display component only** — the cloud also reports two component builds, `display/cc/inv`, and Modbus has no register for them, so the export keeps the part both transports produce; device metadata, never user data). `model` is empty on local Modbus: the pump reports serial and firmware only |
-| plant | `sensor_mode` (the register integer on both transports — the cloud's `bt2` / `ext_room_sensor` names are normalised in the export), `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (*Modbus only* — the cloud API does not expose them, so they are null there) |
+| plant | `sensor_mode` (the register integer on both transports — the cloud's `bt2` / `ext_room_sensor` names are normalised in the export), `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (read on both transports; the cloud's curated `/settings` list does not carry them, so the client fetches `min_supply`/`max_supply` with the metrics and aliases them) |
 | climate | the outdoor span the installation has been observed in, heating hours |
 | curve | the trim layer (`trim_max_abs_c` — how close the largest trim is to the cap — and `trim_cap_days`, how long the oldest capped one has been capped, a duration rather than the diagnostics' date), room gain grouped as `configured` / `applied` / `fitted`, with `window`, `valid`, `notes`, evidence hours, standard error (with `t`) and leave-one-out swing; readiness `median_abs_c` **and** the signed `median_c`, `p95_abs_c`, `window_hours` and the room error over the same window (`room_error_median_abs_c`, `room_error_p90_abs_c`) — plus the `blocker` that says whether the gate failed or was never assessed (while the curve writes the readiness figures are `null` and `blocker` is `active`, because the deviation is then our own trims); the solar model (`a`, `b`, trust, days — the hourly `b` keeps its value while `trust` is 0 when it misses the t ≥ 2.5 gate, so the pair is not a bug), the day-block model's evidence (`daily_solar_t_stat`, `daily_solar_r2`, `daily_solar_valid`, `daily_solar_notes`: which gate refused it) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours *and days* behind it and whether its gates let it act) |
 | fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure, with `reference_delta_k`, `loss_w_per_k`, the newest window's evidence and the count it rests on — `dhw_standing_episodes`, `dhw_standing_hours`), cycling, SCOP over the 30-day window **and** over the 90-day one (`scop_total_90d` — the health grade reads the 30-day figure, so the longer window is what separates a shoulder-season row from a poor installation), auxiliary-heat share, health grade, and the **coverage** behind the two windows (`scop_coverage_days`, `building_coverage_days`) — without them a SCOP over seven scattered days reads exactly like one over thirty |
@@ -115,7 +115,15 @@ fixes, and the reason only ever existed in the installation's own log. The codes
 are a fixed set (`REVERT_REASONS` in `const.py`), so the block stays counts and
 never a log, and an absent code is exported as zero rather than omitted.
 
-v16 adds `fitted.dhw_standing_episodes` and `fitted.dhw_standing_hours`, the
+v16 does two things. `plant.max_heating_supply` stops being null on a cloud row:
+the pump's own supply limits are not in the curated `/settings` list, so the
+client now reads `min_supply`/`max_supply` from the internal `/values` endpoint
+(the names the app itself uses) and aliases them. A consumer that learned "the
+supply limits are null on cloud" is the reader this version exists for — the
+same shape as v15's `counters`, and the reason it is a version rather than a
+silent fill.
+
+It also adds `fitted.dhw_standing_episodes` and `fitted.dhw_standing_hours`, the
 evidence behind the standing-loss coefficient. That figure is an **EMA**, so the
 published number is the same whether it rests on one tank-cooling night or
 twenty — a two-day-old entry that had never been idle overnight and a mature
@@ -162,9 +170,10 @@ through a numeric check — so the name was dropped and the field read null. It
 was the only plant field null on a cloud row: of 31 cloud rows in the pool,
 `room_comp_factor`, `curve type`, `indoor_temperature_offset`, the tap-water
 pair and `stop_heating` all arrived as numbers, and only the supply limits were
-null by design (`MODBUS_ONLY_PLANT_KEYS`). The export now maps the two names to
-`SensorMode`'s integers, so a cloud row and a Modbus row can be compared, and
-an unrecognised name still exports null rather than a number.
+null, because the curated `/settings` list does not carry them. The export now
+maps the two names to `SensorMode`'s integers, so a cloud row and a Modbus row
+can be compared, and an unrecognised name still exports null rather than a
+number.
 
 ### The installation token
 

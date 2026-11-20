@@ -142,11 +142,15 @@ _ENTITY_PREFIXES = (
 #: cloud row carries reverts, trim updates and the days a knot was clamped. A
 #: consumer that learned "counters is always zero on cloud" is the reader this
 #: version exists for; nothing about the block's shape changed.
-#: 16: `fitted.dhw_standing_episodes` and `fitted.dhw_standing_hours`. The
-#: coefficient is a blend and has no window of its own, so a fresh installation
-#: and a mature one carried the same figure — the pool could compare the
-#: number but not weigh it. `thermal_episodes` already does this for the
-#: building fit.
+#: 16: two changes. `plant.max_heating_supply` stops being null on a cloud row —
+#: the pump's supply limits are not in the curated `/settings` list, so the
+#: client reads `min_supply`/`max_supply` from the internal `/values` endpoint
+#: and aliases them. A consumer that learned "the supply limits are null on
+#: cloud" is the reader this version exists for, the same shape as v15's
+#: `counters`. And `fitted.dhw_standing_episodes`/`dhw_standing_hours`: the
+#: coefficient is a blend with no window of its own, so a fresh installation and
+#: a mature one carried the same figure — the pool could compare the number but
+#: not weigh it. `thermal_episodes` already does this for the building fit.
 SUMMARY_SCHEMA_VERSION = 16
 
 #: Plant settings that describe the control loops. Everything else in the
@@ -166,10 +170,6 @@ PLANT_KEYS: tuple[str, ...] = (
     "max_heating_supply",
     "stop_heating",
 )
-
-#: The pump's own supply limits are Modbus-only: the cloud API does not expose
-#: them, so those fields are legitimately ``None`` on a cloud export.
-MODBUS_ONLY_PLANT_KEYS: tuple[str, ...] = ("max_heating_supply",)
 
 #: Identified building/envelope figures, straight off the efficiency snapshot.
 FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (

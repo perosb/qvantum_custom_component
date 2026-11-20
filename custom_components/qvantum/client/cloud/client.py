@@ -15,6 +15,7 @@ from urllib.parse import quote, urlencode
 import aiohttp
 
 from ..constants import (
+    CLOUD_EXTRA_VALUE_NAMES,
     HEATING_CURVE_HTTP_KEYS,
     SETTING_UPDATE_APPLIED,
     TAP_WATER_CAPACITY_START_STOP,
@@ -749,6 +750,11 @@ class QvantumCloudClient:
                 if enabled_metrics is not None
                 else list(http_values.keys())
             )
+            # The aliased supply limits are not in the fetch universe (they are
+            # settings, not entities), so they are copied explicitly.
+            for canonical in CLOUD_EXTRA_VALUE_NAMES.values():
+                if canonical in http_values:
+                    metrics[canonical] = http_values[canonical]
             for metric_name in names:
                 if metric_name in http_values:
                     metrics[metric_name] = http_values[metric_name]
@@ -801,9 +807,15 @@ class QvantumCloudClient:
         extra: dict[str, str] = {}
         if etag_header:
             extra["If-None-Match"] = etag_header
+        # The pump's own supply limits are not in the curated settings list; the
+        # app reads them from this endpoint, so they ride along with the metrics
+        # and are aliased to their canonical names below.
+        requested = list(metric_names) + [
+            name for name in CLOUD_EXTRA_VALUE_NAMES if name not in metric_names
+        ]
         query = urlencode(
             [("use_internal_names", "true"), ("timeout", METRICS_TIMEOUT_SECONDS)]
-            + [("names[]", name) for name in metric_names]
+            + [("names[]", name) for name in requested]
         )
         async with self._track_request(
             self._session.get(
@@ -816,8 +828,13 @@ class QvantumCloudClient:
                 case 200:
                     data = await self._decode_json(response)
                     _LOGGER.debug("HTTP values fetched: %s", data)
+                    values = data.get("values", {})
+                    if isinstance(values, dict):
+                        for api_name, canonical in CLOUD_EXTRA_VALUE_NAMES.items():
+                            if api_name in values and canonical not in values:
+                                values[canonical] = values[api_name]
                     return (
-                        data.get("values", {}),
+                        values,
                         response.headers.get("ETag"),
                         data.get("total_latency"),
                     )

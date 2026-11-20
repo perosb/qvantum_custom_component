@@ -167,6 +167,36 @@ class TestQvantumCloudClient:
         assert result["metrics"]["latency"] == metrics_data["total_latency"]
 
     @pytest.mark.asyncio
+    async def test_get_metrics_asks_for_the_pumps_supply_limits(self, authenticated_api):
+        """The pump's own limits are not in the curated settings list.
+
+        Measured 2026-11-20 from the Android app's own request: the internal
+        ``/values`` endpoint answers ``min_supply``/``max_supply`` (20/60 on a
+        pump whose Modbus holdings 19/20 read the same). Without them the cloud
+        curve validated its table against the datasheet range instead of the
+        pump's limits.
+        """
+        cm, _ = authenticated_api._session.make_cm_response(
+            status=200,
+            json_data={
+                "values": {"bt1": -1.2, "min_supply": 20, "max_supply": 60},
+                "total_latency": 574,
+            },
+        )
+        authenticated_api._session.get.return_value = cm
+
+        result = await authenticated_api.get_metrics("test_device", ["bt1"])
+
+        url = authenticated_api._session.get.call_args.args[0]
+        assert "names%5B%5D=min_supply" in url
+        assert "names%5B%5D=max_supply" in url
+        assert "use_internal_names=true" in url
+        # Aliased to the canonical names the rest of the integration reads.
+        assert result["metrics"]["min_heating_supply"] == 20
+        assert result["metrics"]["max_heating_supply"] == 60
+        assert result["metrics"]["bt1"] == -1.2
+
+    @pytest.mark.asyncio
     async def test_set_tap_water(self, mock_session):
         """Test setting tap water settings."""
         settings_update_data = load_test_data("settings_update_test_device.json")
