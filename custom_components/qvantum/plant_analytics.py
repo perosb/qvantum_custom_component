@@ -23,7 +23,19 @@ DEFAULT_HEALTH_WEIGHTS: dict[str, float] = {
     "aux_share": 0.25,
     "cycling": 0.25,
 }
-#: SCOP score: 2.0 -> 0.0, 5.0 -> 1.0 (air-source seasonal range).
+#: SCOP score: 2.0 -> 0.0, 5.0 -> 1.0.
+#:
+#: The range is the **seasonal** air-source one, while the figure scored is the
+#: 30-day ``scop_total`` — and the two are deliberately not matched. Matching
+#: them would mean calibrating a 30-day range, which nothing has done; scoring
+#: the shorter window against the seasonal range at least answers a question
+#: with a fixed yardstick ("how is this installation doing now, against a whole
+#: season"). The cost is that the letter is **not a stable property of a
+#: house**: measured 2026-11-20 over 26 pooled installations with two or more
+#: rows, the 30-day figure moved 0.27 (median), 0.64 (p90) and 1.18 (max) within
+#: one installation, and one letter step is 0.9 SCOP (weight 0.5 across a
+#: 3.0-wide range) — so a single swing can cross two steps for an unchanged
+#: house. Read the letter as a recent snapshot, not a verdict.
 SCOP_WORST = 2.0
 SCOP_BEST = 5.0
 #: Auxiliary-heat share score: 0.0 -> 1.0, 0.2 -> 0.0.
@@ -405,6 +417,14 @@ def health_grade(
     raw figure. Components that are missing or not finite are excluded and the
     remaining weights renormalise; ``coverage`` is the available share of the
     total weight. An empty result yields no letter rather than a fabricated F.
+
+    The ``scop`` figure is the **30-day** one (see :data:`SCOP_WORST`), and it
+    carries half the weight — measured over the same 26 installations, 21 of 28
+    moved up at least one letter when that component was removed. The letter is
+    therefore a recent SCOP grade with two tie-breakers, not a broad health
+    verdict; the 90-day figure travels beside it in the summary export
+    (``scop_total_90d``) so a reader can see the longer window without the
+    letter being computed from it.
     """
     weights = weights or DEFAULT_HEALTH_WEIGHTS
     components: dict[str, float] = {}

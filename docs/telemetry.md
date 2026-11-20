@@ -101,7 +101,11 @@ the 30-day figure while `SCOP_WORST`/`SCOP_BEST` in `plant_analytics.py` are
 documented as a *seasonal* range, so a shoulder-season row and a genuinely poor
 installation produce the same letter. The pool could not tell them apart without
 the longer window in the same row; the number already existed as an attribute on
-the SCOP sensor, and the export is what makes it poolable.
+the SCOP sensor, and the export is what makes it poolable. The longer window is
+there to be **read beside** the letter, not to compute it: on the first 15 pooled
+pairs it is lower in 11, and switching the grade to it would lag a fix by three
+months and leave every installation younger than that without a letter
+(`docs/derived-metrics.md`).
 
 v11 also adds `counters.revert_reasons`, the per-code split of `reverts`. The
 total already said how often an installation was kicked out of active control;
