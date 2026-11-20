@@ -3,7 +3,7 @@
 The Qvantum app offers a hot-water capacity level 1–7. On the pump that level is
 only a **pair of temperatures** — hot-water start and stop — and the integration
 treats the pair as the truth. This file records why, what the entity reports when
-the pair is not in the table, and what the two repair issues mean.
+the pair is not in the table, and what the one repair issue means.
 
 ## The pair is the level
 
@@ -26,8 +26,8 @@ reported 55/65 as 2. Instead:
   exemption in the number platform's availability check), with
   `start_stop_pair`, `pair_mapped`, `nearest_capacity` and `reported_capacity`
   attributes;
-- `_async_sync_tap_water_capacity_issue` keeps the repair issues in step with the
-  mismatch.
+- `_async_sync_tap_water_capacity_issue` keeps the one repair issue in step with
+  the mismatch, and deletes every other issue id on each sync.
 
 `nearest_tap_water_capacity_level` is only the entity's *attribute* hint, never
 the state and never part of an issue text.
