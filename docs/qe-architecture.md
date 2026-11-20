@@ -233,6 +233,12 @@ Rooms → extract air devices → duct → filter HQ1 (G3) → evaporator EP11 �
 
 - Filter class G3. `[M]`
 - `ventilation_filter_time_left` (input 91) is the hours remaining until filter replacement. `[R]`
+- The pump reports no absolute replacement date, so the integration derives one:
+  the `calendar` platform anchors a due date on the first observed reading,
+  persists it so a restart does not move the event, and resets the anchor when
+  the hours jump up (a new filter). It runs on **both** transports — the cloud
+  answers `filtertimeleft` on its internal `/values` endpoint, which the client
+  aliases to the same key.
 - The fan must be stopped before replacing the filter. `[M]`
 
 ---
