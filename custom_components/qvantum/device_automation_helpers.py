@@ -16,6 +16,7 @@ from .const import (
     DHW_TANK_LOW_SHOWERS,
     FILTER_SOON_DUE_HOURS,
 )
+from .coordinator import write_access
 
 # Metric key -> (entity domain). Used to discover entities for a device.
 BINARY_STATUS_METRICS: dict[str, str] = {
@@ -160,12 +161,7 @@ def _switch_metric_writable(hass: HomeAssistant, entry: er.RegistryEntry) -> boo
     coordinator = getattr(runtime, "coordinator", None)
     if coordinator is None:
         return False
-    if getattr(coordinator, "modbus_enabled", False):
-        return bool(getattr(getattr(coordinator, "client", None), "writable", False))
-    maintenance_coordinator = getattr(runtime, "maintenance_coordinator", None)
-    data = getattr(maintenance_coordinator, "data", None) or {}
-    access_level = data.get("access_level") or {}
-    return access_level.get("writeAccessLevel", 0) >= 20
+    return write_access(coordinator)
 
 
 def async_entries_for_status_metrics(

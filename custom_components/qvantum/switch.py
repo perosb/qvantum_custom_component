@@ -153,7 +153,7 @@ class QvantumSwitchEntity(QvantumEntity, SwitchEntity):
                 )
 
             case "vacation_mode":
-                if getattr(self.coordinator, "modbus_enabled", False):
+                if not is_cloud(self.coordinator):
                     return False
                 return values.get("vacation_mode") is not None
 

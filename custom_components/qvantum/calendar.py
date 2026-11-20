@@ -31,7 +31,7 @@ from .const import (
     FILTER_CALENDAR_EVENT_DAYS,
     FILTER_CALENDAR_RESET_JUMP_HOURS,
 )
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, is_full_payload
 from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,10 +53,10 @@ async def async_setup_entry(
 ) -> None:
     """Set up the filter calendar. Modbus only: cloud has no filter hours."""
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
-    modbus_enabled = bool(getattr(coordinator, "modbus_enabled", False))
-    calendar_keys = {FILTER_DUE_METRIC} if modbus_enabled else set()
+    full_payload = is_full_payload(coordinator)
+    calendar_keys = {FILTER_DUE_METRIC} if full_payload else set()
 
-    if modbus_enabled:
+    if full_payload:
         store = Store(
             hass,
             _STORE_VERSION,

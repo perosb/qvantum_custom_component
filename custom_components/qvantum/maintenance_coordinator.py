@@ -17,6 +17,7 @@ from .client.cloud import QvantumCloudClient
 from .client.exceptions import AuthError as APIAuthError
 from .client.exceptions import RateLimitError as APIRateLimitError
 from .const import DOMAIN, FIRMWARE_KEYS
+from .coordinator import is_cloud
 import traceback
 
 _LOGGER = logging.getLogger(__name__)
@@ -135,7 +136,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
             }
 
         except APIAuthError as err:
-            if getattr(self.main_coordinator, "modbus_enabled", False):
+            if not is_cloud(self.main_coordinator):
                 return self._cloud_unavailable_result(err)
             _LOGGER.error("Authentication error during firmware check: %s", err)
             raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
@@ -143,7 +144,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
             _LOGGER.warning("Rate limit exceeded during firmware check: %s", err)
             raise UpdateFailed(f"Rate limit exceeded: {err}") from err
         except Exception as err:
-            if getattr(self.main_coordinator, "modbus_enabled", False):
+            if not is_cloud(self.main_coordinator):
                 return self._cloud_unavailable_result(err)
             _LOGGER.error("Error checking firmware updates: %s", err)
             stack_trace = traceback.format_exc()

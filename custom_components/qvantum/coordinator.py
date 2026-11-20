@@ -241,6 +241,28 @@ def cloud_write_access(coordinator: Any) -> bool:
     return int(access_level.get("writeAccessLevel", 0)) >= CLOUD_WRITE_ACCESS_LEVEL
 
 
+def resolve_transport(config_entry: Any) -> str:
+    """Return the entry's transport: ``cloud`` or ``modbus``.
+
+    Only transports that exist are honoured, and only a flow that builds the
+    matching client may write ``CONF_TRANSPORT`` — an entry claiming one there is
+    no client for would get the wrong one and the platforms would then create the
+    wrong entity set. Anything else falls back to ``CONF_MODBUS_TCP``, which is
+    what every entry had before.
+
+    A module function rather than only a staticmethod on the coordinator: the
+    suite patches ``QvantumDataUpdateCoordinator`` wholesale in the setup tests,
+    and a static call on the patched class answers with a mock.
+    """
+    options = getattr(config_entry, "options", None) or {}
+    data = getattr(config_entry, "data", None) or {}
+    explicit = options.get(CONF_TRANSPORT, data.get(CONF_TRANSPORT))
+    if explicit in (TRANSPORT_CLOUD, TRANSPORT_MODBUS):
+        return str(explicit)
+    enabled = bool(options.get(CONF_MODBUS_TCP, data.get(CONF_MODBUS_TCP, False)))
+    return TRANSPORT_MODBUS if enabled else TRANSPORT_CLOUD
+
+
 def write_access(coordinator: Any) -> bool:
     """Whether the coordinator's transport may write settings right now."""
     if is_cloud(coordinator):
@@ -254,25 +276,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
 
     @staticmethod
     def resolve_transport(config_entry: ConfigEntry) -> str:
-        """Return the entry's transport.
-
-        Only transports that exist are honoured, and only a flow that builds the
-        matching client may write ``CONF_TRANSPORT`` — an entry claiming one
-        there is no client for would get the wrong one and the platforms would
-        then create the wrong entity set. Anything else falls back to
-        ``CONF_MODBUS_TCP``, which is what every entry had before.
-        """
-        explicit = config_entry.options.get(
-            CONF_TRANSPORT, config_entry.data.get(CONF_TRANSPORT)
-        )
-        if explicit in (TRANSPORT_CLOUD, TRANSPORT_MODBUS):
-            return str(explicit)
-        enabled = bool(
-            config_entry.options.get(
-                CONF_MODBUS_TCP, config_entry.data.get(CONF_MODBUS_TCP, False)
-            )
-        )
-        return TRANSPORT_MODBUS if enabled else TRANSPORT_CLOUD
+        """Return the entry's transport (see the module function)."""
+        return resolve_transport(config_entry)
 
     @staticmethod
     def resolve_poll_interval(config_entry: ConfigEntry) -> tuple[bool, int]:

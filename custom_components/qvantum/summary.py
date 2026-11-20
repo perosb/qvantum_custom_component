@@ -47,6 +47,7 @@ from .const import (
     VERSION,
 )
 from .statistics import INDOOR_METRIC_KEYS
+from .coordinator import transport_kind
 
 #: Where the summary can be downloaded while logged in. The browser session
 #: carries the auth, so no token travels in the URL.
@@ -597,9 +598,7 @@ async def async_build_summary(hass: HomeAssistant) -> dict[str, Any] | None:
         efficiency = getattr(runtime, "efficiency_coordinator", None)
         return build_summary(
             version=VERSION,
-            transport=(
-                "modbus" if getattr(coordinator, "modbus_enabled", False) else "cloud"
-            ),
+            transport=transport_kind(coordinator),
             device=(
                 device_metadata(hass, str(device_id), entry.entry_id)
                 if device_id

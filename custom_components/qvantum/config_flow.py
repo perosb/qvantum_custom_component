@@ -412,10 +412,10 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 # maintenance coordinator at setup — so the safe end state is
                 # the pump's own Auto curve.
                 from . import _async_hand_back_curve
-                from .coordinator import QvantumDataUpdateCoordinator
+                from .coordinator import resolve_transport
 
                 leaving_modbus = (
-                    QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+                    resolve_transport(config_entry)
                     == TRANSPORT_MODBUS
                 )
                 same_account = (
@@ -510,11 +510,11 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
                 # guard only covers a Modbus entry losing the option. Hand it
                 # back first.
                 from . import _async_hand_back_curve
-                from .coordinator import QvantumDataUpdateCoordinator
+                from .coordinator import resolve_transport
 
                 if (
                     not write_enabled
-                    and QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+                    and resolve_transport(config_entry)
                     != TRANSPORT_MODBUS
                 ):
                     await _async_hand_back_curve(
