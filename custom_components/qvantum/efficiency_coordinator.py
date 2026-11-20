@@ -172,8 +172,11 @@ class EfficiencySnapshot:
     dhw_standing_loss: float | None = None
     dhw_standing_loss_w_per_k: float | None = None
     dhw_standing_window: dict[str, float | str] | None = None
-    dhw_standing_episodes: int = 0
-    dhw_standing_hours: float = 0.0
+    #: ``None`` means *not counted yet*, which is not the same as zero: an
+    #: installation upgraded from a version without the counters carries a
+    #: coefficient it learnt before them.
+    dhw_standing_episodes: int | None = None
+    dhw_standing_hours: float | None = None
     compressor_starts_per_hour: float | None = None
     compressor_run_hours_24h: float | None = None
     compressor_speed_avg: float | None = None
@@ -352,8 +355,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         # has no window of its own — one night and twenty look exactly alike
         # without these, and a pooled row then reads a fresh installation as a
         # mature one.
-        self._dhw_standing_episodes: int = 0
-        self._dhw_standing_hours: float = 0.0
+        self._dhw_standing_episodes: int | None = None
+        self._dhw_standing_hours: float | None = None
         # Only the EMA is persisted; an open window is deliberately dropped on
         # restart because the tank may have been drawn while nothing sampled it
         # and resuming would book that draw as standing loss.
@@ -610,10 +613,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
                 dhw_standing_loss=dhw_standing_loss,
                 dhw_standing_loss_w_per_k=self._standing_loss_w_per_k(),
                 dhw_standing_window=self._dhw_standing_window,
-                dhw_standing_episodes=int(
-                    getattr(self, "_dhw_standing_episodes", 0)
-                ),
-                dhw_standing_hours=float(getattr(self, "_dhw_standing_hours", 0.0)),
+                dhw_standing_episodes=getattr(self, "_dhw_standing_episodes", None),
+                dhw_standing_hours=getattr(self, "_dhw_standing_hours", None),
                 dhw_heat_meter_deviation=dhw_meter_deviation,
                 dhw_heat_meter_warning=dhw_meter_warning,
                 dhw_heat_meter_estimated_kwh=dhw_meter_estimated_kwh,
@@ -744,8 +745,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             dhw_standing_loss=dhw_standing_loss,
             dhw_standing_loss_w_per_k=self._standing_loss_w_per_k(),
             dhw_standing_window=self._dhw_standing_window,
-            dhw_standing_episodes=int(getattr(self, "_dhw_standing_episodes", 0)),
-            dhw_standing_hours=float(getattr(self, "_dhw_standing_hours", 0.0)),
+            dhw_standing_episodes=getattr(self, "_dhw_standing_episodes", None),
+            dhw_standing_hours=getattr(self, "_dhw_standing_hours", None),
             compressor_starts_per_hour=cycling_rate,
             compressor_run_hours_24h=run_hours_delta,
             compressor_speed_avg=speed_avg,
@@ -1138,12 +1139,9 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         self._dhw_standing_loss_per_k = blend(
             getattr(self, "_dhw_standing_loss_per_k", None), sample
         )
-        self._dhw_standing_episodes = (
-            int(getattr(self, "_dhw_standing_episodes", 0)) + 1
-        )
+        self._dhw_standing_episodes = int(self._dhw_standing_episodes or 0) + 1
         self._dhw_standing_hours = round(
-            float(getattr(self, "_dhw_standing_hours", 0.0))
-            + (last[0] - start[0]) / 3600.0,
+            float(self._dhw_standing_hours or 0.0) + (last[0] - start[0]) / 3600.0,
             2,
         )
         self._dhw_standing_window = {

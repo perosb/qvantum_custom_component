@@ -199,6 +199,12 @@ ambient and its source, ΔT, volume) travels as sensor attributes, and the
 an EMA, so a single night and twenty publish the same figure, and a pooled row
 cannot weigh what it cannot count.
 
+Both are **`null` until something is counted**, never `0`. An installation that
+upgrades keeps the coefficient it learnt before the counters existed, and `0`
+beside a non-null coefficient would read as "measured, nothing there" — a state
+that cannot occur, since every accepted window produces one. `0` therefore only
+ever appears with a null coefficient.
+
 The ambient is only a BT2 that is a **temperature**. BT2 is a wired room-air
 sensor whose room the installer picks, so it proxies the tank's surroundings
 rather than measuring them; an install whose tank stands colder than BT2's room
