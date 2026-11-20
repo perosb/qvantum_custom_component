@@ -851,6 +851,43 @@ async def test_an_unusable_factor_keeps_a_fitted_gain() -> None:
     assert coordinator._room_gain_source == "bt2"
 
 
+async def test_a_clamped_fit_is_not_stored_as_a_measurement() -> None:
+    """A gain of exactly zero is the clamp, and a clamp is not a measurement.
+
+    ``room_compensation_gain`` clamps a negative room slope to 0.0. Stored as a
+    fit it exports as ``valid: true`` at 0.00, which a reader compares against
+    the configured factor as if the two disagreed — measured on the pool:
+    three of seven Auto fits were exactly 0.00 beside factors of 1.50, 1.00 and
+    0.50.
+    """
+    coordinator = make_coordinator(values=configured_values(), settings=SETTINGS)
+    coordinator._async_room_gain = AsyncMock(return_value=(0.0, "bt2"))
+    coordinator._async_persist = AsyncMock()
+    coordinator._room_gain_fitted = 1.7
+    coordinator._room_gain_fitted_source = "bt2"
+
+    await coordinator._async_refresh_room_gain(coordinator._main_values())
+
+    assert coordinator._room_gain_fitted is None
+    assert coordinator._room_gain_fitted_source is None
+    # The pump's own factor still owns what is applied.
+    assert coordinator._room_gain is None or coordinator._room_gain != 0.0
+
+
+async def test_a_zero_fit_still_applies_no_correction_when_no_factor_exists() -> None:
+    """Diagnostics are dropped; the applied gain keeps today's behaviour."""
+    coordinator = make_coordinator(
+        values=configured_values(factor=None), settings=SETTINGS
+    )
+    coordinator._async_room_gain = AsyncMock(return_value=(0.0, "bt2"))
+    coordinator._async_persist = AsyncMock()
+
+    await coordinator._async_refresh_room_gain(coordinator._main_values())
+
+    assert coordinator._room_gain == pytest.approx(0.0)
+    assert coordinator._room_gain_fitted is None
+
+
 async def test_a_configured_factor_is_not_overwritten_by_the_fit() -> None:
     """The fit runs as a cross-check; the pump's factor stays applied."""
     with_factor = make_coordinator(values=configured_values(), settings=SETTINGS)
