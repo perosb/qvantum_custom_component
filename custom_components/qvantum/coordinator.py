@@ -1305,24 +1305,20 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # one the pump no longer uses.
         pair_is_numeric = nearest_tap_water_capacity_level(tap_stop) is not None
 
-        # Two different situations, two different texts: the pair is simply not
-        # in our (pre-firmware-change) table, or the table maps the pair to a
-        # level the transport disagrees with. Only the second one has a level to
-        # report, and mixing them put the literal word "none" into the first.
+        # One issue, for the one situation the user can act on: a pair that is
+        # not in our table at all. A transport label that disagrees with the pair
+        # is *not* one — the level is our own label derived from the pair, the
+        # cloud's is the app's, and the entity already reports both (state from
+        # the pair, ``reported_capacity`` from the app). Raising an unfixable
+        # warning about a label nothing in Home Assistant can move only asks the
+        # user to reconcile two numbers the integration has already decided
+        # between.
         mismatch = None
         pair_known = tap_start is not None and tap_stop is not None
         if capacity is None and pair_known and pair_is_numeric:
             # A pair that is not a number is not a level either, but nothing can
             # be said about which one it is close to — no issue for that.
             mismatch = {"kind": "unmapped", "start": tap_start, "stop": tap_stop}
-        elif capacity is not None and reported is not None and reported != capacity:
-            mismatch = {
-                "kind": "level_conflict",
-                "start": tap_start,
-                "stop": tap_stop,
-                "pair_level": capacity,
-                "reported": reported,
-            }
         self._tap_water_capacity_mismatch = mismatch
 
     def _tap_water_capacity_issue_id(self, kind: str | None = None) -> str:
@@ -1377,23 +1373,6 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                     "stop": str(mismatch["stop"]),
                 },
             )
-            return
-        ir.async_create_issue(
-            self.hass,
-            DOMAIN,
-            self._tap_water_capacity_issue_id("level_conflict"),
-            is_fixable=False,
-            severity=ir.IssueSeverity.WARNING,
-            translation_key="tap_water_capacity_level_conflict",
-            # Both issues carry the same text: it names the pair and says the
-            # preset is unknown here, because start/stop are the truth and the
-            # level label is the stale side. The conflict stays distinguishable
-            # by issue id and by the entity's pair/reported attributes.
-            translation_placeholders={
-                "start": str(mismatch["start"]),
-                "stop": str(mismatch["stop"]),
-            },
-        )
 
     async def _sync_modbus_extra_dhw_timer(
         self, values: dict[str, Any], *, poll_started: float

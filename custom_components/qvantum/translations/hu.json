@@ -1088,10 +1088,6 @@
       "title": "Ismeretlen használivíz-kapacitás",
       "description": "A szivattyú {start} / {stop} °C-ot használ a használivíz indítási/leállítási hőmérsékleteként, ami egy ismeretlen előbeállítás ehhez az integrációhoz. Ezeket az értékeket valószínűleg kézzel vagy a Qvantum alkalmazásban állították be."
     },
-    "tap_water_capacity_level_conflict": {
-      "title": "Az alkalmazás a hőmérsékletekkel nem egyező szintet jelez",
-      "description": "A szivattyú {start} / {stop} °C-ot használ a használivíz indítási/leállítási hőmérsékleteként, ami egy ismeretlen előbeállítás ehhez az integrációhoz. Ezeket az értékeket valószínűleg kézzel vagy a Qvantum alkalmazásban állították be."
-    },
     "curve_ready": {
       "title": "Adaptív görbe kész – aktiválja?",
       "fix_flow": {

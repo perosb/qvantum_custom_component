@@ -1088,10 +1088,6 @@
       "title": "Nieznana pojemność ciepłej wody",
       "description": "Pompa używa {start} / {stop} °C jako temperatury start/stop ciepłej wody, a to ustawienie wstępne nie jest znane tej integracji. Wartości te zostały prawdopodobnie ustawione ręcznie lub w aplikacji Qvantum."
     },
-    "tap_water_capacity_level_conflict": {
-      "title": "Aplikacja zgłasza poziom niezgodny z temperaturami",
-      "description": "Pompa używa {start} / {stop} °C jako temperatury start/stop ciepłej wody, a to ustawienie wstępne nie jest znane tej integracji. Wartości te zostały prawdopodobnie ustawione ręcznie lub w aplikacji Qvantum."
-    },
     "curve_ready": {
       "title": "Krzywa adaptacyjna gotowa – aktywować?",
       "fix_flow": {

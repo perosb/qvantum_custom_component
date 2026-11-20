@@ -1088,10 +1088,6 @@
       "title": "Capacité d'eau chaude inconnue",
       "description": "La pompe utilise {start} / {stop} °C comme température de départ/arrêt de l'eau chaude, un préréglage que cette intégration ne connaît pas. Ces valeurs ont probablement été définies manuellement ou via l'application Qvantum."
     },
-    "tap_water_capacity_level_conflict": {
-      "title": "L'application signale un niveau qui ne correspond pas aux températures",
-      "description": "La pompe utilise {start} / {stop} °C comme température de départ/arrêt de l'eau chaude, un préréglage que cette intégration ne connaît pas. Ces valeurs ont probablement été définies manuellement ou via l'application Qvantum."
-    },
     "curve_ready": {
       "title": "Courbe adaptative prête : l'activer ?",
       "fix_flow": {

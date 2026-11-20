@@ -1088,10 +1088,6 @@
       "title": "Warmwasserkapazität ist unbekannt",
       "description": "Die Pumpe verwendet {start} / {stop} °C als Start-/Stopptemperatur für Warmwasser. Diese Voreinstellung kennt diese Integration nicht. Die Werte wurden vermutlich manuell oder über die Qvantum-App gesetzt."
     },
-    "tap_water_capacity_level_conflict": {
-      "title": "Die App meldet eine Stufe, die nicht zu den Temperaturen passt",
-      "description": "Die Pumpe verwendet {start} / {stop} °C als Start-/Stopptemperatur für Warmwasser. Diese Voreinstellung kennt diese Integration nicht. Die Werte wurden vermutlich manuell oder über die Qvantum-App gesetzt."
-    },
     "curve_ready": {
       "title": "Adaptive Kurve bereit – aktivieren?",
       "fix_flow": {

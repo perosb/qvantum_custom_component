@@ -15,7 +15,7 @@ live in `docs/` and are read on demand, before touching that area:
 | QE hardware model: 175 L buffer tank, through-flow DHW, BT30/BT31, draw power | `docs/qe-architecture.md` (compact: `docs/qe-architecture-quick-reference.md`) |
 | Derived metrics: power, COP, DHW, tank volume, standing loss | `docs/derived-metrics.md` |
 | Adaptive curve: readiness, room gain, trims, solar/wind model, write policy | `docs/heating-curve.md` |
-| Tap-water capacity 1–7 and its two repair issues | `docs/tap-water-capacity.md` |
+| Tap-water capacity 1–7 and its repair issue | `docs/tap-water-capacity.md` |
 | Per-compressor-unit registers on QG (EP10/EP11), why the legacy values are means | `docs/compressor-units.md` |
 | Alarm codes and their friendly names (source, English-only policy) | `docs/alarm-codes.md` |
 | Telemetry consent, uploader, `SUMMARY_SCHEMA_VERSION` | `docs/telemetry.md` |
@@ -502,8 +502,8 @@ not applied and the caller waits for the next poll.
 **Tap-water capacity** is the case where this matters most: the level is derived
 from the start/stop pair, the pair is the truth, and a pair outside
 `TAP_WATER_CAPACITY_MAPPINGS` must not be rounded to a nearest level (the entity
-reports `unknown` with its attributes, and two separate repair issues track the
-two situations — none of them on a read-only Modbus link). `TAP_WATER_CAPACITY_START_STOP`
+reports `unknown` with its attributes, and one repair issue tracks a pair that is
+not in the table at all — none of them on a read-only Modbus link). `TAP_WATER_CAPACITY_START_STOP`
 in `client/constants.py` is the shared inverse. The saga, the measured
 firmware change and why the table must not be re-pointed by guessing:
 `docs/tap-water-capacity.md`.

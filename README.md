@@ -235,7 +235,7 @@ actions:
 - [Alarm codes](docs/alarm-codes.md) — where the friendly names come from, the app-only codes 252/391 and the English-only policy.
 - [Heating curve](docs/heating-curve.md) — Auto vs User defined, registers and the adaptive curve.
 - [Derived metrics](docs/derived-metrics.md) — power, COP and DHW: how each figure is computed and where it can mislead.
-- [Tap-water capacity](docs/tap-water-capacity.md) — the 1–7 preset, why the start/stop pair is the truth and what the two repair issues mean.
+- [Tap-water capacity](docs/tap-water-capacity.md) — the 1–7 preset, why the start/stop pair is the truth and what the repair issue means.
 - [Telemetry](docs/telemetry.md) — what the opt-in summary export contains and how it is stored.
 
 ## Getting help

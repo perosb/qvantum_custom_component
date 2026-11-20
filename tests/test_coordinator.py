@@ -1722,8 +1722,14 @@ class TestDeriveTapWaterCapacity:
             "stop": 65,
         }
 
-    def test_reported_level_that_disagrees_with_the_pair_is_a_mismatch(self):
-        """55/70 is level 4; a cloud level of 5 is stale and must be reported."""
+    def test_a_reported_level_that_disagrees_is_not_a_mismatch(self):
+        """The level is *our* label derived from the pair; the app's is an attribute.
+
+        55/70 is level 4 in our table and the cloud says 5. The pair is what
+        heats the tank, the entity's state comes from it, and `reported_capacity`
+        carries the app's number — so there is nothing to warn about, and nothing
+        in Home Assistant could move the app's label anyway.
+        """
         coordinator = self._make_coordinator()
         values = {
             "tap_water_capacity_target": 5,
@@ -1731,13 +1737,9 @@ class TestDeriveTapWaterCapacity:
             "tap_water_stop": 70,
         }
         coordinator._derive_tap_water_capacity(values)
-        assert coordinator._tap_water_capacity_mismatch == {
-            "kind": "level_conflict",
-            "start": 55,
-            "stop": 70,
-            "pair_level": 4,
-            "reported": 5,
-        }
+        assert coordinator._tap_water_capacity_mismatch is None
+        # The transport's own label is left untouched for the entity attribute.
+        assert values["tap_water_capacity_target"] == 5
 
     def test_agreement_is_not_a_mismatch(self):
         """Cloud level 4 with pair 55/70 is consistent."""
@@ -1861,8 +1863,8 @@ class TestDeriveTapWaterCapacity:
             "tap_water_capacity_unmapped"
         )
 
-    def test_issue_raised_for_a_level_conflict(self):
-        """A mapped pair whose cloud level disagrees names both levels."""
+    def test_a_disagreeing_level_raises_nothing_and_clears_the_old_issue(self):
+        """Releases before this one raised a conflict issue; it must not survive."""
         coordinator = self._make_coordinator()
         values = {
             "tap_water_capacity_target": 5,
@@ -1874,13 +1876,12 @@ class TestDeriveTapWaterCapacity:
             coordinator_module.ir, "async_create_issue"
         ) as create_issue, patch.object(
             coordinator_module.ir, "async_delete_issue"
-        ):
+        ) as delete_issue:
             coordinator._async_sync_tap_water_capacity_issue()
-        kwargs = create_issue.call_args.kwargs
-        assert kwargs["translation_key"] == "tap_water_capacity_level_conflict"
-        # Both texts name only the pair: a level in the text pointed the user at
-        # the wrong thing to fix.
-        assert kwargs["translation_placeholders"] == {"start": "55", "stop": "70"}
+
+        create_issue.assert_not_called()
+        deleted = [call.args[2] for call in delete_issue.call_args_list]
+        assert any("level_conflict" in issue_id for issue_id in deleted)
 
     def test_issue_cleared_when_the_pair_maps_again(self):
         """A capacity write or the pump moving back clears the issue."""
