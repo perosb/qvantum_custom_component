@@ -6006,6 +6006,30 @@ class TestTransportKind:
         assert is_full_payload(coord)
 
 
+    def test_the_resolver_is_a_module_function(self):
+        """The setup tests patch the coordinator class wholesale.
+
+        A static call on the patched class answers with a mock, so a setup path
+        that depends on the transport would silently take the cloud branch for
+        every entry — measured on the MQTT branch as 48 red tests with no
+        obvious cause.
+        """
+        from unittest.mock import patch
+
+        from custom_components.qvantum.const import CONF_MODBUS_TCP, TRANSPORT_MODBUS
+        from custom_components.qvantum.coordinator import (
+            QvantumDataUpdateCoordinator,
+            resolve_transport,
+        )
+
+        entry = MagicMock()
+        entry.options = {}
+        entry.data = {CONF_MODBUS_TCP: True}
+
+        with patch.object(QvantumDataUpdateCoordinator, "resolve_transport"):
+            assert resolve_transport(entry) == TRANSPORT_MODBUS
+
+
 class TestCloudWriteAccess:
     """The cloud's write path needs an elevated account, not a client flag."""
 

@@ -169,7 +169,16 @@ present in the payload, so absent registers degrade to no entity.
 (`coordinator.py`) instead of reading `modbus_enabled` as "not cloud". The two
 questions are different — the cloud returns a curated payload and has no
 canonical settings setter, the other transports have both — and the flag answers
-neither once a third transport exists. `resolve_transport()` honours only a transport
+neither once a third transport exists. A question that genuinely *is* Modbus keeps the flag: a holding-register write
+(`select`, `number`), an input-register source (display firmware), the link
+report in the diagnostics. A question about the payload, a cloud-only control or
+"can this transport write" does not.
+`resolve_transport()` is a **module function** for the same reason
+`transport_kind()` is one: the setup tests patch `QvantumDataUpdateCoordinator`
+wholesale, so a static call on the patched class answers with a mock and every
+entry takes the cloud branch. `__init__.py` derives `modbus_enabled` from it, so
+the resolver is the single source of truth.
+`resolve_transport()` honours only a transport
 whose client the setup can build — cloud or Modbus today — and falls back to
 `CONF_MODBUS_TCP` otherwise, which covers every entry created before
 `CONF_TRANSPORT` existed and refuses one claiming a transport with no client

@@ -52,8 +52,9 @@ from .const import (
     DEFAULT_MODBUS_UNIT_ID,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
     TRANSPORT_CLOUD,
+    TRANSPORT_MODBUS,
 )
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, resolve_transport
 from .curve_coordinator import QvantumCurveCoordinator, async_stored_curve_mode
 from .telemetry import async_forget as async_forget_telemetry_state
 from .telemetry import async_maybe_prompt, async_schedule_uploads
@@ -318,6 +319,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     modbus_enabled, modbus_host, modbus_port, modbus_unit_id = _modbus_link_settings(
         config_entry
     )
+    # One source of truth: the resolver answers which transport the entry is,
+    # and the flag is derived from it. The link settings still supply host,
+    # port and unit, which only a Modbus entry has.
+    transport = resolve_transport(config_entry)
+    modbus_enabled = transport == TRANSPORT_MODBUS
     if modbus_enabled:
         username = None
         password = None
@@ -369,7 +375,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     # HTTP mode needs live cloud metadata. Modbus mode only needs a device id
     # (from HTTP, cache, or the device registry) so a down cloud API cannot
     # block local startup.
-    require_metadata = not modbus_enabled
+    require_metadata = transport == TRANSPORT_CLOUD
     device_data = _coordinator_device(coordinator)
     if not _has_required_device(device_data, require_metadata=require_metadata):
         _LOGGER.error(
@@ -405,7 +411,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     # holding registers, the cloud via /commands once the account is elevated.
     # It never blocks setup: the update method degrades to a blocker snapshot on
     # any failure.
-    curve_coordinator: QvantumCurveCoordinator | None = None
     curve_coordinator = QvantumCurveCoordinator(hass, config_entry, coordinator)
     await curve_coordinator.async_restore()
     # Its first refresh waits: `writable` asks `write_access`, and on the cloud
@@ -416,7 +421,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     # Firmware/access monitoring is cloud-only: its entities are created only in
     # cloud mode, so Modbus mode must not build the coordinator either.
     maintenance_coordinator: QvantumMaintenanceCoordinator | None = None
-    if not modbus_enabled:
+    if transport == TRANSPORT_CLOUD:
         maintenance_coordinator = QvantumMaintenanceCoordinator(
             hass, config_entry, coordinator
         )
@@ -975,7 +980,7 @@ async def _async_hand_back_curve(
     pump all skip it without failing the caller. Returns True only when the
     write actually happened.
     """
-    transport = QvantumDataUpdateCoordinator.resolve_transport(config_entry)
+    transport = resolve_transport(config_entry)
     # The cloud may write holding 22; whether this *account* may is the API's
     # answer (403 otherwise), so the Modbus write option is not its gate.
     if transport != TRANSPORT_CLOUD and not _modbus_write_enabled(config_entry):

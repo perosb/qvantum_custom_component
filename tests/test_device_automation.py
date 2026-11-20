@@ -57,17 +57,20 @@ def _hass_with_write_access(
     write_access_level: int | None = None,
 ) -> MagicMock:
     """Build a hass stub whose config entry reports the given write access."""
-    coordinator = SimpleNamespace(
-        modbus_enabled=modbus, client=SimpleNamespace(writable=writable)
-    )
     maintenance = SimpleNamespace(
         data=None
         if write_access_level is None
         else {"access_level": {"writeAccessLevel": write_access_level}}
     )
-    runtime = SimpleNamespace(
-        coordinator=coordinator, maintenance_coordinator=maintenance
+    runtime = SimpleNamespace(maintenance_coordinator=maintenance)
+    # ``write_access`` reaches the maintenance coordinator the way the real
+    # coordinator does — through its config entry — so the stub must carry one.
+    coordinator = SimpleNamespace(
+        modbus_enabled=modbus,
+        client=SimpleNamespace(writable=writable),
+        config_entry=SimpleNamespace(runtime_data=runtime),
     )
+    runtime.coordinator = coordinator
     hass = MagicMock()
     hass.config_entries.async_get_entry.return_value = SimpleNamespace(
         runtime_data=runtime

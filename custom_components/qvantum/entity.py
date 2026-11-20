@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
 from .const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE, DOMAIN
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, is_cloud
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
 if TYPE_CHECKING:
@@ -102,7 +102,7 @@ class QvantumAccessMixin:
         try:
             if not isinstance(self.coordinator, QvantumDataUpdateCoordinator):
                 return True  # Maintenance entities always available
-            if getattr(self.coordinator, "modbus_enabled", False):
+            if not is_cloud(self.coordinator):
                 if getattr(self, "_metric_key", None) in _CLOUD_ONLY_WRITE_METRICS:
                     return False
                 return self._is_modbus_write_allowed()

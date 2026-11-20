@@ -597,7 +597,7 @@ async def async_setup_entry(
     if isinstance(efficiency_coordinator, QvantumEfficiencyCoordinator):
         special_sensor_keys.add(_EFFICIENCY_HEALTH_KEY)
         for efficiency_key, config in _EFFICIENCY_SENSOR_CONFIG.items():
-            if config.get("modbus_only") and not coordinator.modbus_enabled:
+            if config.get("modbus_only") and not is_full_payload(coordinator):
                 # Modbus-only series have no cloud statistics; leaving the key
                 # out of special_sensor_keys also lets registry cleanup remove
                 # a stale entity after a transport switch.
@@ -628,11 +628,7 @@ async def async_setup_entry(
     # The curve keys are kept whenever the curve exists, not only on Modbus:
     # `cleanup_disabled_entities` prunes any registry entry whose metric key is
     # in neither `possible_metrics` nor `special_sensor_keys`.
-    if not is_cloud(coordinator) or isinstance(
-        getattr(config_entry.runtime_data, "curve_coordinator", None),
-        QvantumCurveCoordinator,
-    ):
-        special_sensor_keys.update(_CURVE_SENSOR_KEYS)
+    special_sensor_keys.update(_CURVE_SENSOR_KEYS)
     if is_cloud(coordinator):
         special_sensor_keys.update(
             {
