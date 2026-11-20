@@ -338,7 +338,13 @@ async def test_setup_entry_modbus_creates_calendar():
 
 
 @pytest.mark.asyncio
-async def test_setup_entry_cloud_creates_nothing():
+async def test_setup_entry_cloud_creates_the_calendar_too():
+    """The cloud answers `filtertimeleft`, so the calendar is not Modbus-only.
+
+    It was gated on the full payload while the cloud was believed not to expose
+    the hours at all; the client now aliases `filtertimeleft` to
+    `ventilation_filter_time_left`, so both transports report it.
+    """
     entry = _config_entry(modbus=False)
     async_add_entities = MagicMock()
 
@@ -347,8 +353,8 @@ async def test_setup_entry_cloud_creates_nothing():
     ) as cleanup:
         await async_setup_entry(MagicMock(), entry, async_add_entities)
 
-    async_add_entities.assert_not_called()
-    assert cleanup.call_args.args[2] == set()
+    async_add_entities.assert_called_once()
+    assert cleanup.call_args.args[2] == {FILTER_DUE_METRIC}
     assert cleanup.call_args.args[3] == "calendar"
 
 

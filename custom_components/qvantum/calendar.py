@@ -1,11 +1,16 @@
-"""Read-only ventilation-filter replacement calendar (Modbus only).
+"""Read-only ventilation-filter replacement calendar.
 
-The pump reports ``ventilation_filter_time_left`` (input register 91, hours)
-but no absolute replacement date, and the cloud API does not expose the metric
-at all. The calendar derives a stable "due" anchor from the first observed
-reading and persists it so a restart does not move the event. A jump up in the
-remaining hours means a new filter was fitted; the anchor is then reset. The
-due date is exposed as a single all-day event on the local due date.
+The pump reports ``ventilation_filter_time_left`` (input register 91, hours) but
+no absolute replacement date. The calendar derives a stable "due" anchor from
+the first observed reading and persists it so a restart does not move the event.
+A jump up in the remaining hours means a new filter was fitted; the anchor is
+then reset. The due date is exposed as a single all-day event on the local due
+date.
+
+The metric is available on both transports: Modbus reads input 91, and the cloud
+answers ``filtertimeleft`` on its internal ``/values`` endpoint, which the client
+aliases. The calendar was Modbus-only while the cloud was believed not to expose
+it at all.
 """
 
 from __future__ import annotations
@@ -31,12 +36,12 @@ from .const import (
     FILTER_CALENDAR_EVENT_DAYS,
     FILTER_CALENDAR_RESET_JUMP_HOURS,
 )
-from .coordinator import QvantumDataUpdateCoordinator, is_full_payload
+from .coordinator import QvantumDataUpdateCoordinator
 from .entity import QvantumEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-# Input register 91 in client/modbus/maps.py; absent from the HTTP API.
+# Input register 91 in client/modbus/maps.py; `filtertimeleft` on the cloud.
 FILTER_METRIC = "ventilation_filter_time_left"
 FILTER_DUE_METRIC = "ventilation_filter_due"
 
@@ -51,28 +56,26 @@ async def async_setup_entry(
     config_entry: MyConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the filter calendar. Modbus only: cloud has no filter hours."""
+    """Set up the filter calendar on every transport that reports the hours."""
     coordinator: QvantumDataUpdateCoordinator = config_entry.runtime_data.coordinator
-    full_payload = is_full_payload(coordinator)
-    calendar_keys = {FILTER_DUE_METRIC} if full_payload else set()
+    calendar_keys = {FILTER_DUE_METRIC}
 
-    if full_payload:
-        store = Store(
-            hass,
-            _STORE_VERSION,
-            f"{DOMAIN}.filter_calendar.{config_entry.entry_id}",
-        )
+    store = Store(
+        hass,
+        _STORE_VERSION,
+        f"{DOMAIN}.filter_calendar.{config_entry.entry_id}",
+    )
 
-        async_add_entities(
-            [
-                QvantumFilterCalendarEntity(
-                    coordinator, config_entry.runtime_data.device, store
-                )
-            ]
-        )
+    async_add_entities(
+        [
+            QvantumFilterCalendarEntity(
+                coordinator, config_entry.runtime_data.device, store
+            )
+        ]
+    )
 
-    # Prune the entity registry when switching to cloud mode, or when an old
-    # calendar metric is no longer provided.
+    # Prune the entity registry when an old calendar metric is no longer
+    # provided.
     from .entity import cleanup_disabled_entities
 
     cleanup_disabled_entities(hass, coordinator, calendar_keys, "calendar")
