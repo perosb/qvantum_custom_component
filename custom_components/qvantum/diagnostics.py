@@ -244,6 +244,8 @@ _EFFICIENCY_FIELDS = (
     "thermal_mass_kwh_per_k",
     "thermal_episodes",
     "dhw_standing_loss",
+    "dhw_standing_episodes",
+    "dhw_standing_hours",
     "compressor_starts_per_hour",
     "compressor_run_hours_24h",
     "compressor_duty_cycle",

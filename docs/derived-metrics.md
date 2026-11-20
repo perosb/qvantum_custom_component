@@ -193,7 +193,11 @@ after a 69 °C extra-hot-water run moved a live install from 2.5 to 5.1 kWh/d.
 The volume is the identified one when present, and the store key is
 `dhw_standing_loss_per_k`; a snapshot written under the old key is ignored,
 never reinterpreted. The newest window's evidence (hours, drop, tank mean,
-ambient and its source, ΔT, volume) travels as sensor attributes.
+ambient and its source, ΔT, volume) travels as sensor attributes, and the
+**number of accepted windows and their total hours** (`dhw_standing_episodes`,
+`dhw_standing_hours`, both persisted) travel with the summary: the coefficient is
+an EMA, so a single night and twenty publish the same figure, and a pooled row
+cannot weigh what it cannot count.
 
 The ambient is only a BT2 that is a **temperature**. BT2 is a wired room-air
 sensor whose room the installer picks, so it proxies the tank's surroundings

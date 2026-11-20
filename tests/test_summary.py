@@ -116,6 +116,8 @@ def efficiency_snapshot():
         thermal_gain_k_per_h=0.12,
         thermal_mass_kwh_per_k=1.7,
         dhw_standing_loss=0.04,
+        dhw_standing_episodes=3,
+        dhw_standing_hours=21.5,
         compressor_starts_per_hour=1.2,
         scop_total=2.66,
         scop_total_90d=2.81,
@@ -345,6 +347,20 @@ def test_fitted_carries_both_scop_windows() -> None:
     assert fitted["scop_total"] == 2.66
     assert fitted["scop_total_90d"] == 2.81
     assert fitted["scop_total_90d"] != fitted["scop_total"]
+
+
+def test_fitted_counts_the_standing_loss_evidence() -> None:
+    """The coefficient is an EMA, so the row carries what it rests on.
+
+    One tank-cooling night and twenty publish the same kWh/day figure, so a
+    two-day-old entry read exactly like a mature installation until the count
+    travelled beside it (``thermal_episodes`` already does this for the building
+    fit).
+    """
+    fitted = build()["fitted"]
+
+    assert fitted["dhw_standing_episodes"] == 3
+    assert fitted["dhw_standing_hours"] == pytest.approx(21.5)
 
 
 def test_climate_comes_from_the_curve_snapshot() -> None:
