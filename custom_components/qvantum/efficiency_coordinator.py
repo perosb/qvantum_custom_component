@@ -610,8 +610,10 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
                 dhw_standing_loss=dhw_standing_loss,
                 dhw_standing_loss_w_per_k=self._standing_loss_w_per_k(),
                 dhw_standing_window=self._dhw_standing_window,
-            dhw_standing_episodes=int(getattr(self, "_dhw_standing_episodes", 0)),
-            dhw_standing_hours=float(getattr(self, "_dhw_standing_hours", 0.0)),
+                dhw_standing_episodes=int(
+                    getattr(self, "_dhw_standing_episodes", 0)
+                ),
+                dhw_standing_hours=float(getattr(self, "_dhw_standing_hours", 0.0)),
                 dhw_heat_meter_deviation=dhw_meter_deviation,
                 dhw_heat_meter_warning=dhw_meter_warning,
                 dhw_heat_meter_estimated_kwh=dhw_meter_estimated_kwh,
@@ -742,6 +744,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             dhw_standing_loss=dhw_standing_loss,
             dhw_standing_loss_w_per_k=self._standing_loss_w_per_k(),
             dhw_standing_window=self._dhw_standing_window,
+            dhw_standing_episodes=int(getattr(self, "_dhw_standing_episodes", 0)),
+            dhw_standing_hours=float(getattr(self, "_dhw_standing_hours", 0.0)),
             compressor_starts_per_hour=cycling_rate,
             compressor_run_hours_24h=run_hours_delta,
             compressor_speed_avg=speed_avg,

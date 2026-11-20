@@ -1038,6 +1038,45 @@ class TestDhwStandingLoss:
         assert snapshot.dhw_standing_episodes == 3
         assert snapshot.dhw_standing_hours == pytest.approx(21.5)
 
+    async def test_the_evidence_count_reaches_the_main_snapshot(self):
+        """The path every installation with recorder rows takes.
+
+        The recorder-less early return is not the one a real install hits, so a
+        field threaded only there reports zero for everybody — exactly the
+        fresh-versus-mature ambiguity the count exists to remove.
+        """
+        coordinator = make_coordinator()
+        coordinator._dhw_standing_episodes = 3
+        coordinator._dhw_standing_hours = 21.5
+        rows = {
+            "sensor.heatingenergy": _hourly_rows(30.0),
+            "sensor.dhwenergy": _hourly_rows(10.0),
+            "sensor.compressorenergy": _hourly_rows(10.0),
+            "sensor.additionalenergy": _hourly_rows(4.0),
+        }
+        with (
+            patch.object(
+                ec,
+                "resolve_statistic_entity_ids",
+                return_value={
+                    "heatingenergy": "sensor.heatingenergy",
+                    "dhwenergy": "sensor.dhwenergy",
+                    "compressorenergy": "sensor.compressorenergy",
+                    "additionalenergy": "sensor.additionalenergy",
+                },
+            ),
+            patch.object(
+                ec, "async_statistics_during_period", AsyncMock(return_value=rows)
+            ),
+        ):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        # Prove the main path ran: the early return carries none of these.
+        assert snapshot.scop_total is not None
+        assert snapshot.coverage_days == pytest.approx(10.0)
+        assert snapshot.dhw_standing_episodes == 3
+        assert snapshot.dhw_standing_hours == pytest.approx(21.5)
+
 async def test_thermal_metrics_reports_the_decay_fit() -> None:
     """The decay fit drives the time constant and, with UA, the capacity."""
     coordinator = make_coordinator()
