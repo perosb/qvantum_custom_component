@@ -807,12 +807,16 @@ class QvantumCloudClient:
         extra: dict[str, str] = {}
         if etag_header:
             extra["If-None-Match"] = etag_header
-        # The pump's own supply limits are not in the curated settings list; the
-        # app reads them from this endpoint, so they ride along with the metrics
-        # and are aliased to their canonical names below.
-        requested = list(metric_names) + [
-            name for name in CLOUD_EXTRA_VALUE_NAMES if name not in metric_names
-        ]
+        # Some values are not in the curated settings list and are not known to
+        # the API under their canonical names: the pump's supply limits, the
+        # lifetime counters and the filter hours. The app reads them from this
+        # endpoint under the firmware's internal names, so a canonical name is
+        # translated on the way out and aliased back on the way in.
+        api_names = {canonical: api for api, canonical in CLOUD_EXTRA_VALUE_NAMES.items()}
+        requested = [api_names.get(name, name) for name in metric_names]
+        for api_name in CLOUD_EXTRA_VALUE_NAMES:
+            if api_name not in requested:
+                requested.append(api_name)
         query = urlencode(
             [("use_internal_names", "true"), ("timeout", METRICS_TIMEOUT_SECONDS)]
             + [("names[]", name) for name in requested]

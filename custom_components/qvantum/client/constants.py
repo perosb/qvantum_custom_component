@@ -76,6 +76,14 @@ HEATING_CURVE_HTTP_KEYS = {
 CLOUD_EXTRA_VALUE_NAMES = {
     "min_supply": "min_heating_supply",
     "max_supply": "max_heating_supply",
+    # The lifetime counters and the filter hours, which the app reads under the
+    # firmware's internal names. Modbus has them as inputs 88-91; the cloud's
+    # curated settings list does not, so they were Modbus-only until measured
+    # (2026-11-20, the app's own request).
+    "compressor": "compressor_run_time",
+    "compressorstart": "compressor_starts",
+    "fan": "ventilation_fan_run_time",
+    "filtertimeleft": "ventilation_filter_time_left",
 }
 
 
