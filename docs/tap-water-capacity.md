@@ -32,26 +32,27 @@ reported 55/65 as 2. Instead:
 `nearest_tap_water_capacity_level` is only the entity's *attribute* hint, never
 the state and never part of an issue text.
 
-## The two repair issues
+## The one repair issue
 
-Two **separate** issues, because the situations differ:
+`tap_water_capacity_unmapped`, raised when the pair is **not in the table at
+all** — no level exists, and the entity reports `unknown` with the pair and
+`nearest_capacity` as attributes.
 
-| Issue id | When |
-|---|---|
-| `tap_water_capacity_unmapped` | the pair is not in the table at all — no level exists |
-| `tap_water_capacity_level_conflict` | the table maps the pair to one level and the transport reports another |
+A transport label that disagrees with a *mapped* pair is deliberately **not** an
+issue. The level is our own label derived from the pair, the cloud's is the
+app's, and the entity already reports both: the state comes from the pair, and
+`reported_capacity` carries the app's number. Answering a mapped pair with an
+unfixable warning asked the user to reconcile two numbers the integration had
+already decided between, and the text could only name the pair — "an unknown
+preset" — which is false when the pair *is* level 4 in our table.
 
-Both carry the **same** text on purpose. It names the pair and says the preset is
-unknown to this integration and was probably set by hand or in the app. Naming a
-level told the user to fix the side that was stale, and the conflict is still
-identifiable by issue id and by the entity's `pair_mapped` /
-`reported_capacity` attributes. Each has its own issue-id suffix, and every
-other id is deleted on every sync — **including the legacy unsuffixed
-`tap_water_capacity_mismatch_<entry>`**, which releases up to 2026.10.18 raised
-and which lives in HA's issue store across restarts. Without that delete an
-upgrading installation keeps the old issue next to the new one forever.
+Releases up to 2026.11.9 also raised `tap_water_capacity_level_conflict`. Its id
+is deleted on every sync along with the legacy unsuffixed
+`tap_water_capacity_mismatch_<entry>` (raised up to 2026.10.18), because both
+live in HA's issue store across restarts and an upgrading installation would
+otherwise keep them forever.
 
-**Neither issue is raised on a read-only Modbus link** (`modbus_enabled` and
+**The issue is never raised on a read-only Modbus link** (`modbus_enabled` and
 `client.writable is False`): the pair was then moved by the app or the cloud, the
 integration has no write path back, and a current-firmware pump holds a pair
 outside the table anyway — so the issue would ask for something nobody can do

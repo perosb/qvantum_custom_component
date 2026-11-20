@@ -1088,10 +1088,6 @@
       "title": "Warmwatercapaciteit is onbekend",
       "description": "De pomp gebruikt {start} / {stop} °C als start-/stoptemperatuur voor warm water; deze voorinstelling is onbekend voor deze integratie. De waarden zijn waarschijnlijk handmatig of via de Qvantum-app ingesteld."
     },
-    "tap_water_capacity_level_conflict": {
-      "title": "De app meldt een niveau dat niet bij de temperaturen past",
-      "description": "De pomp gebruikt {start} / {stop} °C als start-/stoptemperatuur voor warm water; deze voorinstelling is onbekend voor deze integratie. De waarden zijn waarschijnlijk handmatig of via de Qvantum-app ingesteld."
-    },
     "curve_ready": {
       "title": "Adaptieve curve gereed – activeren?",
       "fix_flow": {

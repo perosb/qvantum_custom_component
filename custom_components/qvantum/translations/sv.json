@@ -1088,10 +1088,6 @@
       "title": "Varmvattenkapaciteten är okänd",
       "description": "Pumpen har {start} / {stop} °C som start/stopp för varmvatten, vilket är en förinställning som den här integrationen inte känner igen. Värdena är förmodligen satta manuellt eller via Qvantum-appen."
     },
-    "tap_water_capacity_level_conflict": {
-      "title": "Appen rapporterar en nivå som inte stämmer med temperaturerna",
-      "description": "Pumpen har {start} / {stop} °C som start/stopp för varmvatten, vilket är en förinställning som den här integrationen inte känner igen. Värdena är förmodligen satta manuellt eller via Qvantum-appen."
-    },
     "curve_ready": {
       "title": "Adaptiv kurva redo — aktivera den?",
       "fix_flow": {

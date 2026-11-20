@@ -1088,10 +1088,6 @@
       "title": "Käyttöveden kapasiteetti on tuntematon",
       "description": "Pumppu käyttää {start} / {stop} °C käyttöveden aloitus-/lopetuslämpötilana, eikä tämä integraatio tunne tätä esiasetusta. Arvot on todennäköisesti asetettu käsin tai Qvantum-sovelluksella."
     },
-    "tap_water_capacity_level_conflict": {
-      "title": "Sovellus ilmoittaa tason, joka ei vastaa lämpötiloja",
-      "description": "Pumppu käyttää {start} / {stop} °C käyttöveden aloitus-/lopetuslämpötilana, eikä tämä integraatio tunne tätä esiasetusta. Arvot on todennäköisesti asetettu käsin tai Qvantum-sovelluksella."
-    },
     "curve_ready": {
       "title": "Mukautuva käyrä valmis – otetaanko käyttöön?",
       "fix_flow": {

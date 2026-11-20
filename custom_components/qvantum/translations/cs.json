@@ -1088,10 +1088,6 @@
       "title": "Neznámá kapacita teplé vody",
       "description": "Čerpadlo používá {start} / {stop} °C jako start/stop teplé vody, což je předvolba, kterou tato integrace nezná. Hodnoty byly pravděpodobně nastaveny ručně nebo v aplikaci Qvantum."
     },
-    "tap_water_capacity_level_conflict": {
-      "title": "Aplikace hlásí úroveň, která neodpovídá teplotám",
-      "description": "Čerpadlo používá {start} / {stop} °C jako start/stop teplé vody, což je předvolba, kterou tato integrace nezná. Hodnoty byly pravděpodobně nastaveny ručně nebo v aplikaci Qvantum."
-    },
     "curve_ready": {
       "title": "Adaptivní křivka je připravena – aktivovat?",
       "fix_flow": {

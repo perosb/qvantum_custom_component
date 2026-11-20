@@ -1088,10 +1088,6 @@
       "title": "Capacidad de agua caliente desconocida",
       "description": "La bomba utiliza {start} / {stop} °C como temperatura de arranque/parada del agua caliente, un ajuste predefinido que esta integración no conoce. Es probable que estos valores se hayan fijado manualmente o desde la aplicación Qvantum."
     },
-    "tap_water_capacity_level_conflict": {
-      "title": "La aplicación informa un nivel que no coincide con las temperaturas",
-      "description": "La bomba utiliza {start} / {stop} °C como temperatura de arranque/parada del agua caliente, un ajuste predefinido que esta integración no conoce. Es probable que estos valores se hayan fijado manualmente o desde la aplicación Qvantum."
-    },
     "curve_ready": {
       "title": "Curva adaptativa lista: ¿activarla?",
       "fix_flow": {
