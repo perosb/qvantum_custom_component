@@ -70,8 +70,9 @@ HEATING_CURVE_HTTP_KEYS = {
 #: the integration uses. Measured 2026-11-20 from the Android app's own request:
 #: ``/api/internal/v1/devices/<id>/values?names=max_supply&names=min_supply&…``
 #: answers ``{"max_supply": 60, "min_supply": 20, …}`` on a pump whose Modbus
-#: holdings 20/21 read 20/60. Without them the cloud curve validated its table
-#: against the datasheet range (10-80 °C) instead of the pump's own limits.
+#: holdings 19/20 (``max_heating_supply``/``min_heating_supply``) read 60/20.
+#: Without them the cloud curve validated its table against the datasheet range
+#: (10-80 °C) instead of the pump's own limits.
 CLOUD_EXTRA_VALUE_NAMES = {
     "min_supply": "min_heating_supply",
     "max_supply": "max_heating_supply",

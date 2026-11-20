@@ -172,7 +172,7 @@ class TestQvantumCloudClient:
 
         Measured 2026-11-20 from the Android app's own request: the internal
         ``/values`` endpoint answers ``min_supply``/``max_supply`` (20/60 on a
-        pump whose Modbus holdings 20/21 read the same). Without them the cloud
+        pump whose Modbus holdings 19/20 read the same). Without them the cloud
         curve validated its table against the datasheet range instead of the
         pump's limits.
         """
