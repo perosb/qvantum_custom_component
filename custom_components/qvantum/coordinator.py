@@ -1585,12 +1585,17 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             # and thermal fits read this sensor's hourly means, and they are
             # transport-agnostic. At the cloud's 120 s poll the series is a coarse
             # staircase — one 0.1 kWh step reads 3 kW — but the hourly mean is the
-            # energy over that hour, which is what the fits consume. The load term
-            # stays Modbus-only because it needs the instantaneous figure.
+            # energy over that hour, which is what the fits consume.
             self._calculate_heating_power(values)
 
+            # The load term reads a 30-minute rolling mean, not the instantaneous
+            # figure, so the staircase aliases it no more than it aliases the
+            # hourly means: a mean over the window *is* the energy over the
+            # window. Measured 2026-11-20 on a cloud entry: `heatingpower`
+            # derived 1465.7 W and 2368.2 W from 0.1 kWh steps at a 120 s poll.
+            self._calculate_heating_power_mean(values)
+
             if self.modbus_enabled:
-                self._calculate_heating_power_mean(values)
                 self._calculate_dhw_power(values)
                 self._calculate_tap_water_cap(values)
                 self._persist_dhw_state()

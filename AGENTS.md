@@ -636,7 +636,9 @@ The rules that must not drift:
   identifiable term" is the correct answer for a sheltered site.
 - The load term is fed by a **poll-resolution rolling mean** of `heatingpower`
   with a 30-minute coverage gate — never by one sample per curve cycle, which
-  aliases the compressor's cycling. Below the gate nothing is published.
+  aliases the compressor's cycling. Below the gate nothing is published. It runs
+  on **both** transports: a mean over the window is the energy over the window,
+  so the cloud's 120 s counter staircase does not alias it.
 - Writes are **masked and hysteretic**, never "whatever changed": only knots the
   forecast (or the measured outdoor reading) can reach, plus a 0.75 K dead band
   per knot, and the table is validated as what the pump will **end up** with.
