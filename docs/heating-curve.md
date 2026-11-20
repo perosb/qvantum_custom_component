@@ -458,7 +458,12 @@ could not observe is corrected by the weather the house actually sees.
 
 Computed points are clamped to the pump's own min/max heating supply (holding
 19/20) when those are known, not just the register range 10–80 °C, so a point
-is never written above what the firmware will actually use. A knot the baseline
+is never written above what the firmware will actually use. On the cloud those
+limits are not in the curated `/settings` list; the client reads
+`min_supply`/`max_supply` from the internal `/values` endpoint (the names the
+app itself uses) and aliases them, so the clamp is the same on both transports.
+Measured 2026-11-20: a pump whose holdings read 20/60 answered `min_supply` 20
+and `max_supply` 60, while the fallback would have allowed 10–80. A knot the baseline
 already sits on at that floor — the warm end, after the floor lift — cannot
 express a request below it; that is reported as `floor_pinned` (structural,
 nothing to adjust) rather than `clamped` (a demand the baseline point should

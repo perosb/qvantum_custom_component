@@ -596,9 +596,14 @@ Runs on every transport that can write settings — Modbus and the cloud — and
 `QvantumCurveCoordinator.writable` (`coordinator.write_access`) is the gate: the
 Modbus write option, or an **elevated** cloud account
 (`writeAccessLevel >= 20`, what `elevate_access` grants; a plain account gets
-403). The cloud does not return `min_heating_supply`/`max_heating_supply` or
-holding 23, so there `_supply_bounds` falls back to the datasheet range and
-`temp_compensation_curve` stays empty — the curve runs, the clamp is looser.
+403). The cloud's curated `/settings` list carries neither the pump's supply
+limits nor holding 23, so `temp_compensation_curve` stays empty there. The
+limits **are** readable: the app reads `min_supply`/`max_supply` from the
+internal `/values` endpoint, so the cloud client requests them with the metrics
+and aliases them to `min_heating_supply`/`max_heating_supply`
+(`CLOUD_EXTRA_VALUE_NAMES`). Without that alias `_supply_bounds` fell back to the
+datasheet range (10-80 °C) while the pump's own limits were 20-60, so the table
+was validated against a 20 K wider span than the pump accepts.
 The module freezes the pump's seven-point table as a baseline and writes it
 back adjusted; `docs/heating-curve.md` is the full description
 (readiness, room gain, trims, solar and wind identification, write policy, card).

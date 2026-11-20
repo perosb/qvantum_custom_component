@@ -162,7 +162,10 @@ through a numeric check — so the name was dropped and the field read null. It
 was the only plant field null on a cloud row: of 31 cloud rows in the pool,
 `room_comp_factor`, `curve type`, `indoor_temperature_offset`, the tap-water
 pair and `stop_heating` all arrived as numbers, and only the supply limits were
-null by design (`MODBUS_ONLY_PLANT_KEYS`). The export now maps the two names to
+null — they were read from the curated `/settings` list, which does not carry
+them; the cloud client now requests `min_supply`/`max_supply` from the internal
+`/values` endpoint and aliases them, so `max_heating_supply` is filled on a cloud
+row too. The export now maps the two names to
 `SensorMode`'s integers, so a cloud row and a Modbus row can be compared, and
 an unrecognised name still exports null rather than a number.
 

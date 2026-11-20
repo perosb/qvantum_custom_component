@@ -167,10 +167,6 @@ PLANT_KEYS: tuple[str, ...] = (
     "stop_heating",
 )
 
-#: The pump's own supply limits are Modbus-only: the cloud API does not expose
-#: them, so those fields are legitimately ``None`` on a cloud export.
-MODBUS_ONLY_PLANT_KEYS: tuple[str, ...] = ("max_heating_supply",)
-
 #: Identified building/envelope figures, straight off the efficiency snapshot.
 FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (
     "heat_loss_w_per_k",
