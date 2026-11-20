@@ -2388,6 +2388,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         )
         await self._async_persist()
 
+    async def _async_clear_fitted_room_gain(self) -> None:
+        """Drop the stored diagnostic fit: a rejected fit is not a measurement."""
+        if self._room_gain_fitted is None and self._room_gain_fitted_source is None:
+            return
+        self._room_gain_fitted = None
+        self._room_gain_fitted_source = None
+        await self._async_persist()
+
     async def _async_clear_room_gain(self) -> None:
         """Drop the stored gain: an unusable factor means no correction."""
         self._room_gain = None
@@ -2632,7 +2640,16 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return
         if identified is None:
             return
-        await self._async_store_fitted_room_gain(*identified)
+        gain, gain_source = identified
+        # A gain of exactly zero is the *clamp*, not a measurement:
+        # ``room_compensation_gain`` clamps a negative room slope — "noise, not
+        # a cooling loop" in its own words — to 0.0. Storing that would export a
+        # rejected fit as a valid one at 0.00, which a reader compares against
+        # the configured factor as if the two disagreed.
+        if gain <= 0.0:
+            await self._async_clear_fitted_room_gain()
+        else:
+            await self._async_store_fitted_room_gain(gain, gain_source)
         if configured is not None:
             # The pump's own factor stays applied; the fit is the cross-check.
             return

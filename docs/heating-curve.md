@@ -328,6 +328,12 @@ the fallback and the diagnostics-only `fitted` slope — nothing that is applied
 while a factor exists. Because the *current* gain is applied retroactively to every
 hour of the readiness window, a factor change moves the reported `deviation` and
 `median_abs_c`; that is the correction following the pump, not a reset.
+A **negative** room slope is noise, not a cooling loop, and the fit clamps it to
+zero to mean "no correction". That clamp is not a measurement: the diagnostics
+store null instead, so a rejected fit cannot travel as `valid: true` at 0.00
+beside a configured factor it never disagreed with — three of seven pooled Auto
+fits were exactly 0.00 for that reason.
+
 Whether configured or fitted, the gain **travels with the indoor sensor it
 belongs to**: if the payload reports a different sensor the correction is
 skipped rather than subtracting one sensor's room term from another's error. It
