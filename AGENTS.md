@@ -602,8 +602,8 @@ limits **are** readable: the app reads `min_supply`/`max_supply` from the
 internal `/values` endpoint, so the cloud client requests them with the metrics
 and aliases them to `min_heating_supply`/`max_heating_supply`
 (`CLOUD_EXTRA_VALUE_NAMES`). Without that alias `_supply_bounds` fell back to the
-datasheet range (10-80 °C) while the pump's own limits were 20-60, so the table
-was validated against a 20 K wider span than the pump accepts.
+datasheet range, so the table was validated against a span the pump does not
+accept; the measurement is in `docs/heating-curve.md`.
 The module freezes the pump's seven-point table as a baseline and writes it
 back adjusted; `docs/heating-curve.md` is the full description
 (readiness, room gain, trims, solar and wind identification, write policy, card).
