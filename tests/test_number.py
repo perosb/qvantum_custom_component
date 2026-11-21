@@ -834,6 +834,50 @@ class TestQvantumNumberEntity:
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
 
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_dhw_start_extra(
+        self, mock_coordinator, mock_device
+    ):
+        """Test setting dhw_start_extra writes via Modbus holding register."""
+        mock_coordinator.data["values"]["dhw_start_extra"] = 60
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_start_extra", 20, 80, 1, mock_device
+        )
+
+        mock_coordinator.async_write_metric = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        mock_coordinator.client.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_set_native_value(70.0)
+
+        mock_coordinator.async_write_metric.assert_called_once_with(
+            "test_device_123", "dhw_start_extra", 70
+        )
+        mock_coordinator.client.update_setting.assert_not_called()
+        assert mock_coordinator.data["values"]["dhw_start_extra"] == 70
+
+    def test_dhw_extra_start_stop_bounds(self, mock_coordinator, mock_device):
+        """Test dynamic bounds between dhw_start_extra and dhw_stop_extra."""
+        mock_coordinator.data["values"]["dhw_start_extra"] = 65
+        mock_coordinator.data["values"]["dhw_stop_extra"] = 75
+
+        start_entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_start_extra", 20, 80, 1, mock_device
+        )
+        stop_entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_stop_extra", 20, 80, 1, mock_device
+        )
+
+        assert start_entity.native_max_value == 74
+        assert stop_entity.native_min_value == 66
+
 
 class TestNumberSetup:
     """Test number platform setup."""
