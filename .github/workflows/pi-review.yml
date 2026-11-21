@@ -3,15 +3,24 @@ name: pi-review
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  # Review any pull request on demand — the only way a fork PR gets reviewed,
+  # since `pull_request` runs from a fork carry no secrets.
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number to review
+        required: true
 
 concurrency:
-  group: pi-review-${{ github.event.pull_request.number }}
+  group: pi-review-${{ github.event.pull_request.number || inputs.pr }}
   cancel-in-progress: true
 
 jobs:
   review:
-    # Fork PRs get no repository secrets, so the run would fail on the missing key.
-    if: github.event.pull_request.head.repo.fork == false
+    # Fork PRs get no repository secrets, so an automatic run would fail on the
+    # missing key. A dispatch is started by someone with write access and is the
+    # supported way to review one.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -19,8 +28,46 @@ jobs:
       pull-requests: write
       issues: write
     steps:
+      # The reviewer's own code — prompt, extensions, post_review — comes from the
+      # default branch, never from the pull request: a PR that edits
+      # `.github/pi/` would otherwise rewrite the thing reviewing it.
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A dispatch has no event payload, so the SHAs are looked up; the
+      # pull_request path takes them straight from it.
+      - name: Resolve the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            json=$(gh api "repos/${{ github.repository }}/pulls/$NUMBER")
+            BASE_SHA=$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["base"]["sha"])')
+            HEAD_SHA=$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["head"]["sha"])')
+          fi
+          {
+            echo "number=$NUMBER"
+            echo "base_sha=$BASE_SHA"
+            echo "head_sha=$HEAD_SHA"
+          } >> "$GITHUB_OUTPUT"
+
+      # The pull request's tree is checked out as *data*: nothing in it is run,
+      # and `repo_read`/`repo_grep` are rooted here so the reviewer can verify a
+      # claim against the code it is reviewing. `refs/pull/<n>/head` exists in
+      # the base repository for fork PRs too.
+      - name: Check out the pull request head (data only)
+        uses: actions/checkout@v6
+        with:
+          ref: refs/pull/${{ steps.pr.outputs.number }}/head
+          path: pr-head
           fetch-depth: 0
           persist-credentials: false
 
@@ -32,8 +79,8 @@ jobs:
       - name: Check changed paths
         id: changed
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
           tooling_only=true
           review_additions=0
@@ -48,7 +95,7 @@ jobs:
             esac
             [ "$additions" = "-" ] && continue
             review_additions=$((review_additions + additions))
-          done < <(git diff --numstat "${BASE_SHA}...${HEAD_SHA}")
+          done < <(git -C pr-head diff --numstat "${BASE_SHA}...${HEAD_SHA}")
           echo "tooling_only=$tooling_only" >> "$GITHUB_OUTPUT"
           echo "review_additions=$review_additions" >> "$GITHUB_OUTPUT"
 
@@ -62,11 +109,11 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.npm
-          key: npm-pi-${{ runner.os }}-1.4.0
+          key: npm-pi-${{ runner.os }}-1.6.0
 
       - name: Install pi
         if: steps.changed.outputs.tooling_only != 'true'
-        run: npm install -g @earendil-works/pi-coding-agent@1.4.0
+        run: npm install -g @earendil-works/pi-coding-agent@1.6.0
 
       # Repo-owned extensions so CI matches local review runs. The guardrails
       # reference the OpenRouter account preset ("perosb") for ZDR/price-sorted
@@ -83,21 +130,26 @@ jobs:
       - name: Build PR diff
         if: steps.changed.outputs.tooling_only != 'true'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: git diff --unified=8 "${BASE_SHA}...${HEAD_SHA}" > /tmp/pr.diff
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        run: |
+          git -C pr-head diff --unified=8 "${BASE_SHA}...${HEAD_SHA}" > /tmp/pr.diff
 
       - name: Run pi review
         if: steps.changed.outputs.tooling_only != 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           # Root the repo-scoped lookup tools at the checkout explicitly.
-          PI_REVIEW_ROOT: ${{ github.workspace }}
+          PI_REVIEW_ROOT: ${{ github.workspace }}/pr-head
           # Cost heuristic: pick the full model only when the reviewable source
           # diff is large. Translations, tests, docs and .github are excluded
           # from the count (see the changed-paths step) since they add volume,
           # not complexity.
-          PI_MODEL: ${{ steps.changed.outputs.review_additions > 250 && 'openrouter/~z-ai/glm-latest' || 'openrouter/~z-ai/glm-flash-latest' }}
+          # Explicit ids, not the `~…-latest` aliases: on pi 1.6 those resolve to
+          # a dated snapshot that rejects the mid-conversation reasoning update
+          # ("Mid-conversation reasoning effort (configuration_update) is not
+          # supported on z-ai/glm-5.3-flash-20260826", measured 2026-11-21).
+          PI_MODEL: ${{ steps.changed.outputs.review_additions > 250 && 'openrouter/z-ai/glm-5.3' || 'openrouter/z-ai/glm-5.3-flash' }}
           # Opt-in progress log: set the repository variable PI_REVIEW_LOG=1 to
           # stream the reviewer's thinking, tool calls, usage and retries into
           # the Actions log. Unset (default) keeps this step as quiet as before.
@@ -128,8 +180,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           PI_REVIEW_MIN_SEVERITY: high
         run: |
           python3 .github/pi/post_review.py /tmp/pi-events.jsonl \
-            "${{ github.event.pull_request.number }}" --head-sha "$HEAD_SHA"
+            "${{ steps.pr.outputs.number }}" --head-sha "$HEAD_SHA"

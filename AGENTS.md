@@ -355,6 +355,16 @@ now wrong* is the one that changed. What has to move, when:
 | Tap-water capacity level, its table or its repair issues | `docs/tap-water-capacity.md` |
 | Workflow, tooling, release automation | `AGENTS.md` |
 
+A **fork PR is not reviewed automatically**: `pull_request` runs from a fork get
+no repository secrets, so the job is skipped. Review one on demand with
+**Actions → pi-review → Run workflow** and the PR number. That run checks out the
+default branch for the reviewer's own code (prompt, extensions, `post_review.py`)
+and the PR head into `pr-head/` as **data only** — `repo_read`/`repo_grep` are
+rooted there, and nothing in it is executed — so a PR that edits `.github/pi/`
+cannot rewrite the thing reviewing it. `pi` is pinned at **1.6.0** and the model
+ids are explicit (`z-ai/glm-5.3`, `z-ai/glm-5.3-flash`): the `~…-latest` aliases
+resolve to a dated snapshot that rejects 1.6's mid-conversation reasoning update.
+
 The reviewer's output contract is JSON; when the model answers in prose instead,
 `post_review.py` posts that text as a fallback comment and **passes with a
 `::warning::`** — failing the check there blocked two merges (#430, #434) on a
