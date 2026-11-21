@@ -14,7 +14,11 @@ from homeassistant.const import Platform
 from homeassistant.core import callback
 from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
+from homeassistant.exceptions import (
+    ConfigEntryError,
+    ConfigEntryNotReady,
+    HomeAssistantError,
+)
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -386,8 +390,17 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         username = None
         password = None
     else:
-        username = config_entry.data[CONF_USERNAME]
-        password = config_entry.data[CONF_PASSWORD]
+        # A KeyError here means the entry says "cloud" while carrying no
+        # credentials — the shape a transport switch leaves behind if the code
+        # that wrote it and the code that reads it disagree. Say so instead of
+        # raising from a dict lookup.
+        username = config_entry.data.get(CONF_USERNAME)
+        password = config_entry.data.get(CONF_PASSWORD)
+        if not username or not password:
+            raise ConfigEntryError(
+                "The cloud transport needs a username and password. Reconfigure "
+                "the entry to add them, or pick a transport that has none."
+            )
     try:
         modbus_unit = _async_modbus_unit(hass, config_entry)
     except HomeAssistantError as err:

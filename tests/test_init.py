@@ -280,10 +280,17 @@ class TestIntegrationSetup:
     async def test_async_setup_entry_cloud_requires_credentials(
         self, hass, mock_config_entry
     ):
-        """Cloud setup must fail fast when username or password is missing."""
+        """Cloud setup must fail fast, and say what is missing.
+
+        A `KeyError` from a dict lookup was what a transport switch produced when
+        the code that wrote the entry and the code that read it disagreed about
+        what the transport means — a traceback with no hint of the cause.
+        """
+        from homeassistant.exceptions import ConfigEntryError
+
         mock_config_entry.data = {}
         mock_config_entry.options = {}
-        with pytest.raises(KeyError):
+        with pytest.raises(ConfigEntryError, match="username and password"):
             await async_setup_entry(hass, mock_config_entry)
 
     @pytest.mark.asyncio
