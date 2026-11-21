@@ -67,6 +67,7 @@ TEMPERATURE_NUMBER_METRICS = frozenset(
         "indoor_temperature_offset",
         "tap_water_start",
         "tap_water_stop",
+        "dhw_start_extra",
         "dhw_stop_extra",
         "room_temp_external",
         *HEATING_CURVE_OUTDOOR_TEMPS,
@@ -94,6 +95,7 @@ async def async_setup_entry(
         "indoor_temperature_offset": (-10, 10, 1),
         "tap_water_stop": (TAP_WATER_TEMP_MIN, TAP_WATER_TEMP_MAX, TAP_WATER_TEMP_STEP),
         "tap_water_start": (TAP_WATER_TEMP_MIN, TAP_WATER_TEMP_MAX, TAP_WATER_TEMP_STEP),
+        "dhw_start_extra": (20, 80, 1),
         "dhw_stop_extra": (60, 80, 5),
         "fan_normal": (0, 100, 5),
         "fan_speed_2": (0, 100, 5),
@@ -182,24 +184,30 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
         """Return min; DHW stop stays above the current start temperature."""
         min_value = self._attr_native_min_value
         max_value = self._attr_native_max_value
-        if self._metric_key != "tap_water_stop":
-            return min_value
-        start = _as_int(self._values.get("tap_water_start"))
-        if start is None:
-            return min_value
-        return min(max_value, max(min_value, start + self._attr_native_step))
+        if self._metric_key == "tap_water_stop":
+            start = _as_int(self._values.get("tap_water_start"))
+            if start is not None:
+                return min(max_value, max(min_value, start + self._attr_native_step))
+        elif self._metric_key == "dhw_stop_extra":
+            start = _as_int(self._values.get("dhw_start_extra"))
+            if start is not None:
+                return min(max_value, max(min_value, start + self._attr_native_step))
+        return min_value
 
     @property
     def native_max_value(self) -> float:
         """Return max; DHW start stays below the current stop temperature."""
         min_value = self._attr_native_min_value
         max_value = self._attr_native_max_value
-        if self._metric_key != "tap_water_start":
-            return max_value
-        stop = _as_int(self._values.get("tap_water_stop"))
-        if stop is None:
-            return max_value
-        return max(min_value, min(max_value, stop - self._attr_native_step))
+        if self._metric_key == "tap_water_start":
+            stop = _as_int(self._values.get("tap_water_stop"))
+            if stop is not None:
+                return max(min_value, min(max_value, stop - self._attr_native_step))
+        elif self._metric_key == "dhw_start_extra":
+            stop = _as_int(self._values.get("dhw_stop_extra"))
+            if stop is not None:
+                return max(min_value, min(max_value, stop - self._attr_native_step))
+        return max_value
 
     @property
     def suggested_object_id(self) -> str | None:
@@ -278,9 +286,11 @@ class QvantumNumberEntity(QvantumEntity, NumberEntity):
                     self._hpid, self._metric_key, coordinator_update_value
                 )
 
-            case "dhw_stop_extra" | "room_temp_external":
+            case "dhw_start_extra" | "dhw_stop_extra" | "room_temp_external":
                 coordinator_update_value = (
-                    int(value) if self._metric_key == "dhw_stop_extra" else value
+                    value
+                    if self._metric_key == "room_temp_external"
+                    else int(value)
                 )
                 response = await self.coordinator.async_write_metric(
                     self._hpid, self._metric_key, coordinator_update_value
