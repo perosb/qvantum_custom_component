@@ -113,22 +113,28 @@ class PumpSimulator:
             return True, {"limitStep": step, "maxSpeed": self.LIMIT_STEPS[step]}, None
         return False, {}, f"unknown command: {name}"
 
-    def follow(self, snapshot: dict[str, Any]) -> bool:
+    def follow(self, snapshot: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
         """Adopt a live snapshot, keeping settings this instance wrote.
 
-        Returns True when anything moved, so the caller can publish only on a
-        change instead of on every poll.
+        Returns ``{key: (old, new)}`` for everything that moved, so the caller
+        can publish only on a change *and* say which values changed — "followed a
+        change" without the values was a line that told you nothing.
         """
-        changed = False
+        changed: dict[str, tuple[Any, Any]] = {}
         metrics = snapshot.get("metrics") or {}
-        if metrics != self.metrics:
+        for key, value in metrics.items():
+            previous = self.metrics.get(key)
+            if previous != value:
+                changed[key] = (previous, value)
+        for key in self.metrics.keys() - metrics.keys():
+            changed[key] = (self.metrics[key], None)
+        if changed:
             self.metrics = dict(metrics)
-            changed = True
         for key, value in (snapshot.get("settings") or {}).items():
             if key in self.written or self.settings.get(key) == value:
                 continue
+            changed[key] = (self.settings.get(key), value)
             self.settings[key] = value
-            changed = True
         return changed
 
     def apply(self, requested: dict[str, Any]) -> tuple[bool, dict[str, Any], str | None]:
@@ -277,10 +283,29 @@ def main(argv: list[str]) -> int:
                 except (urllib.error.URLError, ValueError) as err:
                     print(f"  follow failed: {err}", flush=True)
                     continue
-                if pump.follow(live):
+                changed = pump.follow(live)
+                if changed:
                     publish_state()
+                    stamp = time.strftime("%H:%M:%S")
                     if args.verbose:
-                        print("  followed a change from the source", flush=True)
+                        for key, (before, after) in sorted(changed.items()):
+                            print(f"[{stamp}]   {key}: {before!r} -> {after!r}", flush=True)
+                    else:
+                        shown = ", ".join(
+                            f"{key}={after!r}"
+                            for key, (_, after) in sorted(changed.items())[:5]
+                        )
+                        more = (
+                            ""
+                            if len(changed) <= 5
+                            else f" (+{len(changed) - 5} more)"
+                        )
+                        print(
+                            f"[{stamp}] published {len(pump.metrics)} metrics, "
+                            f"{len(pump.settings)} settings — {len(changed)} changed: "
+                            f"{shown}{more}",
+                            flush=True,
+                        )
 
         threading.Thread(target=_follow, daemon=True).start()
 
