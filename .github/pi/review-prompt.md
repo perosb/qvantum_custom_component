@@ -25,6 +25,12 @@ unused, or not implemented until you have checked:
 - Does the claim depend on how unchanged code behaves? `repo_read` it.
 - Inconclusive lookup (no match, tool error, ambiguous)? **Omit the comment.**
   Do not guess, and never raise an unverified guess to `critical`.
+- **Home Assistant core is not in the checkout.** A claim about HA's own
+  behaviour — a service handler, an entity base class, a component's validation
+  — cannot be verified with `repo_grep`/`repo_read`, so omit it. Measured
+  2026-11-21: a review claimed `number.set_value` bypasses an entity's
+  min/max; `homeassistant/components/number/services.py` validates against them
+  and clamps to the native range, so the "hole" it reported did not exist.
 - Reserve `critical` for defects the diff itself proves — wrong register,
   security, data loss. "I could not see it in the diff" is not `critical`.
 
