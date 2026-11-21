@@ -115,6 +115,13 @@ fixes, and the reason only ever existed in the installation's own log. The codes
 are a fixed set (`REVERT_REASONS` in `const.py`), so the block stays counts and
 never a log, and an absent code is exported as zero rather than omitted.
 
+v18 adds `fitted.eta_s_percent` / `fitted.eu_class` and their `_90d` twins: the
+measured SCOP expressed in the **EU energy label's** unit
+(`ηs = SCOP / 2.5 · 100`, Regulation 811/2013) and the class that follows from it,
+so a row can be compared with the class the product was declared with. Additive,
+and deliberately separate from `efficiency_health_grade` — that letter is a
+composite on our own 2.0–5.0 range, and the same window reads D there and A+ here.
+
 v17 adds `fitted.scop_coverage_days_90d`, the observed days behind the 90-day
 SCOP. That figure has been exported since v11 with no coverage beside it, so a
 90-day SCOP over nine observed days read exactly like one over ninety — the

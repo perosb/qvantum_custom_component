@@ -395,6 +395,55 @@ class HealthGrade:
     components: dict[str, float]
 
 
+#: EU primary-energy conversion coefficient (Regulation 811/2013): a factor
+#: reflecting the estimated 40 % average EU generation efficiency, fixed at 2.5.
+EU_CONVERSION_COEFFICIENT = 2.5
+
+#: Seasonal space heating energy efficiency classes for heat pumps other than
+#: low-temperature ones (811/2013 Annex II, Table 1), highest first.
+EU_ETA_S_CLASSES: tuple[tuple[float, str], ...] = (
+    (150.0, "A+++"),
+    (125.0, "A++"),
+    (98.0, "A+"),
+    (90.0, "A"),
+    (82.0, "B"),
+    (75.0, "C"),
+    (36.0, "D"),
+    (34.0, "E"),
+    (30.0, "F"),
+)
+
+
+def seasonal_space_heating_efficiency(scop: object) -> float | None:
+    """Measured ηs in percent, from a measured SCOP.
+
+    ``ηs = SCOP / CC · 100`` with ``CC = 2.5`` (811/2013). The regulation then
+    subtracts corrections for the temperature-control class, standby and
+    crankcase heating; those depend on the installed control and are **not**
+    applied here, which makes the figure conservative rather than generous — a
+    pump with good controls scores higher on its label than this computes.
+
+    It is not a season either: the input is a rolling window of measured
+    operation, not the reference annual demand at average-climate conditions.
+    Read it as "what the installation achieved, expressed in the label's unit".
+    """
+    value = _finite(scop)
+    if value is None or value <= 0.0:
+        return None
+    return round(value / EU_CONVERSION_COEFFICIENT * 100.0, 1)
+
+
+def eu_energy_class(eta_s: object) -> str | None:
+    """The 811/2013 space-heating class for an ηs in percent."""
+    value = _finite(eta_s)
+    if value is None:
+        return None
+    for threshold, letter in EU_ETA_S_CLASSES:
+        if value >= threshold:
+            return letter
+    return "G"
+
+
 def _letter(score: float) -> str:
     if score >= 0.85:
         return "A"

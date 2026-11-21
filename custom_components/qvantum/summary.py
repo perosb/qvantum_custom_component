@@ -38,6 +38,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
 
+from .plant_analytics import (
+    eu_energy_class,
+    seasonal_space_heating_efficiency,
+)
 from .const import (
     DOMAIN,
     REVERT_REASONS,
@@ -142,6 +146,13 @@ _ENTITY_PREFIXES = (
 #: cloud row carries reverts, trim updates and the days a knot was clamped. A
 #: consumer that learned "counters is always zero on cloud" is the reader this
 #: version exists for; nothing about the block's shape changed.
+#: 18: `fitted.eta_s_percent` / `fitted.eu_class` and their `_90d` twins — the
+#: measured SCOP expressed in the EU energy label's unit (`ηs = SCOP / 2.5 · 100`,
+#: Regulation 811/2013), so a row can be compared with the class the product was
+#: declared with. Additive, and deliberately separate from
+#: `efficiency_health_grade`: that letter is a composite scored on our own
+#: 2.0-5.0 range, this one is the regulated scale, and the same installation can
+#: read D there and A+ here.
 #: 17: `fitted.scop_coverage_days_90d`, the observed days behind the 90-day SCOP.
 #: The long figure has been exported since v11 without one, so a 90-day SCOP over
 #: nine observed days read exactly like one over ninety — the mistake
@@ -157,7 +168,7 @@ _ENTITY_PREFIXES = (
 #: coefficient is a blend with no window of its own, so a fresh installation and
 #: a mature one carried the same figure — the pool could compare the number but
 #: not weigh it. `thermal_episodes` already does this for the building fit.
-SUMMARY_SCHEMA_VERSION = 17
+SUMMARY_SCHEMA_VERSION = 18
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -199,6 +210,12 @@ FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (
     # one, so a shoulder-season row and a poor installation look alike without
     # the longer window beside it.
     "scop_total_90d",
+    # The same two figures in the EU label's unit and class. A string field
+    # (the class) beside numbers; the export coerces it as a short enum.
+    "eta_s_percent",
+    "eu_class",
+    "eta_s_percent_90d",
+    "eu_class_90d",
     "aux_heat_share",
     "efficiency_health_grade",
     "efficiency_health_score",
@@ -583,12 +600,21 @@ def fitted_summary(snapshot: Any) -> dict[str, Any]:
         "scop_coverage_days": "coverage_days",
         "scop_coverage_days_90d": "scop_coverage_days_90d",
     }
+    # The EU label's unit is derived, not stored: ηs follows from the SCOP, and
+    # the class from ηs, so the two can never drift apart.
+    derived: dict[str, Any] = {}
+    for suffix, scop_key in (("", "scop_total"), ("_90d", "scop_total_90d")):
+        eta_s = seasonal_space_heating_efficiency(getattr(snapshot, scop_key, None))
+        derived[f"eta_s_percent{suffix}"] = eta_s
+        derived[f"eu_class{suffix}"] = _short_string(eu_energy_class(eta_s))
     return {
         key: (
             _short_string(getattr(snapshot, attribute.get(key, key), None))
             if key == "efficiency_health_grade"
             else _number(getattr(snapshot, attribute.get(key, key), None))
         )
+        if key not in derived
+        else derived[key]
         for key in FITTED_EFFICIENCY_KEYS
     }
 
