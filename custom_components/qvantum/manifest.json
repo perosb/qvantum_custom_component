@@ -5,6 +5,9 @@
         "http",
         "recorder"
     ],
+    "categories": [
+        "climate.heat_pumps_air_conditioning"
+    ],
     "codeowners": [
         "@perosb"
     ],
@@ -13,6 +16,7 @@
         "modbus"
     ],
     "documentation": "https://github.com/perosb/qvantum_custom_component",
+    "integration_type": "device",
     "iot_class": "cloud_polling",
     "issue_tracker": "https://github.com/perosb/qvantum_custom_component/issues",
     "requirements": [
