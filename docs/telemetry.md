@@ -44,7 +44,7 @@ The complete field list:
 | plant | `sensor_mode` (the register integer on both transports — the cloud's `bt2` / `ext_room_sensor` names are normalised in the export), `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (read on both transports; the cloud's curated `/settings` list does not carry them, so the client fetches `min_supply`/`max_supply` with the metrics and aliases them) |
 | climate | the outdoor span the installation has been observed in, heating hours |
 | curve | the trim layer (`trim_max_abs_c` — how close the largest trim is to the cap — and `trim_cap_days`, how long the oldest capped one has been capped, a duration rather than the diagnostics' date), room gain grouped as `configured` / `applied` / `fitted`, with `window`, `valid`, `notes`, evidence hours, standard error (with `t`) and leave-one-out swing; readiness `median_abs_c` **and** the signed `median_c`, `p95_abs_c`, `window_hours` and the room error over the same window (`room_error_median_abs_c`, `room_error_p90_abs_c`) — plus the `blocker` that says whether the gate failed or was never assessed (while the curve writes the readiness figures are `null` and `blocker` is `active`, because the deviation is then our own trims); the solar model (`a`, `b`, trust, days — the hourly `b` keeps its value while `trust` is 0 when it misses the t ≥ 2.5 gate, so the pair is not a bug), the day-block model's evidence (`daily_solar_t_stat`, `daily_solar_r2`, `daily_solar_valid`, `daily_solar_notes`: which gate refused it) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours *and days* behind it and whether its gates let it act) |
-| fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure, with `reference_delta_k`, `loss_w_per_k`, the newest window's evidence and the count it rests on — `dhw_standing_episodes`, `dhw_standing_hours`), cycling, SCOP over the 30-day window **and** over the 90-day one (`scop_total_90d` — the health grade reads the 30-day figure, so the longer window is what separates a shoulder-season row from a poor installation), auxiliary-heat share, health grade, and the **coverage** behind the two windows (`scop_coverage_days`, `building_coverage_days`) — without them a SCOP over seven scattered days reads exactly like one over thirty |
+| fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure, with `reference_delta_k`, `loss_w_per_k`, the newest window's evidence and the count it rests on — `dhw_standing_episodes`, `dhw_standing_hours`), cycling, SCOP over the 30-day window **and** over the 90-day one (`scop_total_90d` — the health grade reads the 30-day figure, so the longer window is what separates a shoulder-season row from a poor installation), auxiliary-heat share, health grade, and the **coverage** behind each window (`scop_coverage_days`, `scop_coverage_days_90d`, `building_coverage_days`) — without them a SCOP over seven scattered days reads exactly like one over thirty |
 | counters | curve reverts **and their per-code split** (`revert_reasons`: `switched_off`, `write_failed`, `write_not_applied`, `points_unverified`, `point_not_stuck`, `writes_disabled`, `no_device_id`, `table_invalid`, `other` — the total says how often, the code says why), trim updates, days with an actionable clamped or an extrapolated knot, and the date the counters were reset at — populated on every transport that can
 run the curve, since the coordinator exists wherever the pump's settings can be
 written |
@@ -114,6 +114,15 @@ a table we computed wrong or a user switching control off — four different
 fixes, and the reason only ever existed in the installation's own log. The codes
 are a fixed set (`REVERT_REASONS` in `const.py`), so the block stays counts and
 never a log, and an absent code is exported as zero rather than omitted.
+
+v17 adds `fitted.scop_coverage_days_90d`, the observed days behind the 90-day
+SCOP. That figure has been exported since v11 with no coverage beside it, so a
+90-day SCOP over nine observed days read exactly like one over ninety — the
+mistake `scop_coverage_days` already prevents for the 30-day window. Additive:
+no existing field changes meaning, and the health grade still reads the 30-day
+figure, so a consumer that learned the old shape keeps working. What it unlocks
+is the comparison the pool could not make: both windows, each with its own
+evidence, in the same row.
 
 v16 does two things. `plant.max_heating_supply` stops being null on a cloud row:
 the pump's own supply limits are not in the curated `/settings` list, so the
