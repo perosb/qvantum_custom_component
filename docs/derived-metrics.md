@@ -173,6 +173,13 @@ with two or more rows, the 30-day figure moved **0.27** (median), 0.64 (p90) and
 0.5 across a 3.0-wide range), so a single swing crosses two steps for an
 unchanged house. Read it as a recent snapshot.
 
+**Both windows travel, each with its own coverage.** `scop_total` (30 days) and
+`scop_total_90d` are computed from the same counters over different windows, and
+the summary carries `scop_coverage_days` / `scop_coverage_days_90d` beside them —
+without the second, a 90-day SCOP over nine observed days reads exactly like one
+over ninety. The letter still reads the 30-day figure; the pair is what makes the
+window question answerable from the data instead of from an argument.
+
 **It is a SCOP grade with two tie-breakers.** Over the same 28 graded
 installations, **21** moved up at least one letter when the SCOP component was
 removed. The 90-day figure (`scop_total_90d`) travels beside the letter in the

@@ -1561,8 +1561,15 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
                 if snapshot.thermal_gain_k_per_h is None
                 else round(snapshot.thermal_gain_k_per_h, 3)
             )
-        if self._metric_key == "scop_total" and snapshot.scop_total_90d is not None:
-            attributes["scop_90d"] = round(snapshot.scop_total_90d, 2)
+        if self._metric_key == "scop_total":
+            if snapshot.scop_total_90d is not None:
+                attributes["scop_90d"] = round(snapshot.scop_total_90d, 2)
+            # The evidence behind each window, so the two figures can be
+            # compared: a 90-day SCOP over nine observed days is not a season.
+            attributes["coverage_days"] = round(snapshot.coverage_days, 2)
+            attributes["coverage_days_90d"] = round(
+                snapshot.scop_coverage_days_90d, 2
+            )
         if self._metric_key == "dhw_standing_loss":
             attributes["attribution"] = (
                 "free-cooling windows, quoted at a fixed tank-to-ambient difference"

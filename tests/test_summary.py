@@ -120,6 +120,8 @@ def efficiency_snapshot():
         compressor_starts_per_hour=1.2,
         scop_total=2.66,
         scop_total_90d=2.81,
+        coverage_days=27.5,
+        scop_coverage_days_90d=61.0,
         efficiency_health_grade="B",
         efficiency_health_score=0.72,
         efficiency_health_coverage=0.8,
@@ -345,6 +347,19 @@ def test_fitted_carries_both_scop_windows() -> None:
     assert fitted["scop_total"] == 2.66
     assert fitted["scop_total_90d"] == 2.81
     assert fitted["scop_total_90d"] != fitted["scop_total"]
+
+
+def test_fitted_carries_the_coverage_of_both_scop_windows() -> None:
+    """A 90-day SCOP over nine observed days is not a season.
+
+    The long figure has been exported since v11 without a coverage beside it, so
+    it read exactly like one over ninety days — the mistake `scop_coverage_days`
+    already prevents for the 30-day window.
+    """
+    fitted = build()["fitted"]
+
+    assert fitted["scop_coverage_days"] == pytest.approx(27.5)
+    assert fitted["scop_coverage_days_90d"] == pytest.approx(61.0)
 
 
 def test_fitted_counts_the_standing_loss_evidence() -> None:

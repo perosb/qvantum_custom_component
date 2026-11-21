@@ -142,6 +142,12 @@ _ENTITY_PREFIXES = (
 #: cloud row carries reverts, trim updates and the days a knot was clamped. A
 #: consumer that learned "counters is always zero on cloud" is the reader this
 #: version exists for; nothing about the block's shape changed.
+#: 17: `fitted.scop_coverage_days_90d`, the observed days behind the 90-day SCOP.
+#: The long figure has been exported since v11 without one, so a 90-day SCOP over
+#: nine observed days read exactly like one over ninety — the mistake
+#: `scop_coverage_days` already prevents for the 30-day window. Additive: no
+#: existing field changes meaning, and the health grade still reads the 30-day
+#: figure.
 #: 16: two changes. `plant.max_heating_supply` stops being null on a cloud row —
 #: the pump's supply limits are not in the curated `/settings` list, so the
 #: client reads `min_supply`/`max_supply` from the internal `/values` endpoint
@@ -151,7 +157,7 @@ _ENTITY_PREFIXES = (
 #: coefficient is a blend with no window of its own, so a fresh installation and
 #: a mature one carried the same figure — the pool could compare the number but
 #: not weigh it. `thermal_episodes` already does this for the building fit.
-SUMMARY_SCHEMA_VERSION = 16
+SUMMARY_SCHEMA_VERSION = 17
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -202,6 +208,9 @@ FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (
     # an installation that only runs while its owner tests produces the second
     # while looking like the first.
     "scop_coverage_days",
+    # The same coverage for the 90-day window, so the two SCOP figures can be
+    # weighed against each other instead of only against the calendar.
+    "scop_coverage_days_90d",
     "building_coverage_days",
 )
 
@@ -570,7 +579,10 @@ def fitted_summary(snapshot: Any) -> dict[str, Any]:
         return {key: None for key in FITTED_EFFICIENCY_KEYS}
     # ``scop_coverage_days`` is the snapshot's ``coverage_days``: the weakest
     # counter's observed days in the 30-day SCOP window.
-    attribute = {"scop_coverage_days": "coverage_days"}
+    attribute = {
+        "scop_coverage_days": "coverage_days",
+        "scop_coverage_days_90d": "scop_coverage_days_90d",
+    }
     return {
         key: (
             _short_string(getattr(snapshot, attribute.get(key, key), None))

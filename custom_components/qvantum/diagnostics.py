@@ -253,6 +253,7 @@ _EFFICIENCY_FIELDS = (
     "efficiency_health_score",
     "efficiency_health_coverage",
     "coverage_days",
+    "scop_coverage_days_90d",
     "building_coverage_days",
     "building_fit_rows",
     "building_indoor_key",
