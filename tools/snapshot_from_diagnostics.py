@@ -44,15 +44,25 @@ EXTRA_SETTING_KEYS = frozenset(
 
 
 def setting_keys() -> set[str]:
-    """Canonical settings names, read out of the holding map source."""
+    """Canonical settings names, read out of the holding map source.
+
+    Both halves of the map: a **cloud** payload carries its values (``man_mode``,
+    ``indoor_temperature_offset``), a **Modbus** payload carries its keys
+    (``allow_heating``, ``heating_offset``) — ``get_settings`` filters the
+    holdings by those keys. Taking only the values left twelve settings on a
+    Modbus snapshot classified as read-only metrics, so the simulator answered
+    ``unknown setting`` for them.
+    """
     source = MAPS.read_text(encoding="utf-8")
     block = re.search(
         r"MODBUS_HOLDING_TO_SETTINGS_MAP[^=]*=\s*\{(.*?)\n\}", source, re.S
     )
     if block is None:
         raise SystemExit(f"could not find the holding map in {MAPS}")
-    names = set(re.findall(r':\s*"([a-z0-9_]+)"', block.group(1)))
-    return names | set(EXTRA_SETTING_KEYS)
+    body = block.group(1)
+    cloud_names = set(re.findall(r':\s*"([a-z0-9_]+)"', body))
+    modbus_names = set(re.findall(r'^\s{4}"([a-z0-9_]+)"\s*:', body, re.M))
+    return cloud_names | modbus_names | set(EXTRA_SETTING_KEYS)
 
 
 def split(diagnostics: dict) -> dict:

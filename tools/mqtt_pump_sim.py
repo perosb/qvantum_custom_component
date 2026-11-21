@@ -27,7 +27,7 @@ consumes the same readings over MQTT:
     python3 tools/mqtt_pump_sim.py --follow http://homeassistant.local:8123 \
         --token-file ~/.ha-token --entry <config_entry_id> --serial POC0001
 
-Requires ``paho-mqtt`` (``uv pip install paho-mqtt``).
+Requires ``paho-mqtt`` (``uv run --with paho-mqtt python tools/mqtt_pump_sim.py``).
 """
 
 from __future__ import annotations
