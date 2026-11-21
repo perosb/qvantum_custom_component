@@ -1669,12 +1669,14 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             self._calculate_dhw_meter(values)
             await self._persist_cop_state()
 
-            # Derived on both transports: the efficiency coordinator's heat-loss
-            # and thermal fits read this sensor's hourly means, and they are
-            # transport-agnostic. At the cloud's 120 s poll the series is a coarse
-            # staircase — one 0.1 kWh step reads 3 kW — but the hourly mean is the
-            # energy over that hour, which is what the fits consume.
-            self._calculate_heating_power(values)
+            # Derived where the payload does not carry it: the cloud has no
+            # such metric and Modbus has no such register, but a push transport
+            # relays the producing instance's own figure. Re-deriving it there
+            # divides one counter step by the *message* gap — a 0.1 kWh step over
+            # 10 s reads 36 kW, which the ceiling rejects — so the series would be
+            # held or zero while the snapshot already held the right number.
+            if "heatingpower" not in values:
+                self._calculate_heating_power(values)
 
             # The load term reads a 30-minute rolling mean, not the instantaneous
             # figure, so the staircase aliases it no more than it aliases the

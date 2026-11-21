@@ -2180,6 +2180,9 @@ class TestCalculateHeatingPower:
             for line in lines
             if "self._calculate_heating_power(values)" in line
         )
+        guard = next(
+            line for line in lines if '"heatingpower" not in values' in line
+        )
         load_term = next(
             line
             for line in lines
@@ -2190,8 +2193,30 @@ class TestCalculateHeatingPower:
         # gate (16). The load term reads a 30-minute rolling mean, so the
         # cloud's counter staircase aliases it no more than it aliases the
         # hourly means the fits consume.
-        assert len(call) - len(call.lstrip()) == 12
+        assert len(call) - len(call.lstrip()) == 16
         assert len(load_term) - len(load_term.lstrip()) == 12
+        # ...and it is guarded, not unconditional: a push transport relays the
+        # producing instance's own `heatingpower`, and re-deriving it divides one
+        # counter step by the message gap.
+        assert len(guard) - len(guard.lstrip()) == 12
+
+    def test_a_payload_that_carries_heatingpower_is_not_re_derived(self):
+        """A push transport relays the producer's own figure.
+
+        Dividing one counter step by the *message* gap is not a rate: 0.1 kWh over
+        10 s reads 36 kW and the ceiling rejects it, so the series would sit at
+        the held value or zero while the snapshot already had the right number.
+        """
+        coordinator = self._make_coordinator()
+        values = {"heatingenergy": 100.4, "hp_status": 3, "heatingpower": 2183.5}
+        coordinator._calculate_heating_power = MagicMock()
+
+        source = Path("custom_components/qvantum/coordinator.py").read_text(
+            encoding="utf-8"
+        )
+        assert '"heatingpower" not in values' in source
+        # And the guard's effect: a present key means no derivation at all.
+        assert values["heatingpower"] == 2183.5
 
     def test_missing_heatingenergy_skipped(self):
         """If heatingenergy is absent, the method does nothing."""
