@@ -349,6 +349,23 @@ def test_fitted_carries_both_scop_windows() -> None:
     assert fitted["scop_total_90d"] != fitted["scop_total"]
 
 
+def test_fitted_expresses_scop_in_the_eu_labels_unit() -> None:
+    """The label's unit is derived from the SCOP, so the two cannot drift.
+
+    ηs = SCOP / 2.5 × 100 (Regulation 811/2013, CC = 2.5), and the class comes
+    from ηs. It is deliberately separate from `efficiency_health_grade`: 2.66
+    is a D on our 2.0-5.0 range and an A+ on the regulated one.
+    """
+    fitted = build()["fitted"]
+
+    assert fitted["eta_s_percent"] == pytest.approx(106.4)
+    assert fitted["eu_class"] == "A+"
+    assert fitted["eta_s_percent_90d"] == pytest.approx(112.4)
+    assert fitted["eu_class_90d"] == "A+"
+    # The two letters are different scales, not a disagreement.
+    assert fitted["efficiency_health_grade"] != fitted["eu_class"]
+
+
 def test_fitted_carries_the_coverage_of_both_scop_windows() -> None:
     """A 90-day SCOP over nine observed days is not a season.
 

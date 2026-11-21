@@ -25,7 +25,7 @@ from custom_components.qvantum.plant_analytics import (
 
 
 class TestStartsPerHour:
-    def test_rate(self):
+    def test_the_rate(self):
         assert starts_per_hour(6.0, 3.0) == pytest.approx(2.0)
 
     def test_too_little_run_time_is_none(self):
@@ -346,3 +346,34 @@ class TestHeatingPowerWindow:
         window.add(now_ts=1_000_060.0, power_w="x")
         window.add(now_ts=1_000_120.0, power_w=-5.0)
         assert window.coverage_seconds(1_000_120.0) == 0.0
+
+
+def test_the_eu_label_unit_follows_the_regulation() -> None:
+    """ηs = SCOP / CC · 100 with CC = 2.5, and the class from table 1.
+
+    The thresholds are the regulation's, not ours: A+++ is 150 %, A+ 98 %, D 36 %.
+    Omitting the F(i) corrections makes the figure conservative.
+    """
+    from custom_components.qvantum.plant_analytics import (
+        eu_energy_class,
+        seasonal_space_heating_efficiency,
+    )
+
+    assert seasonal_space_heating_efficiency(2.5) == pytest.approx(100.0)
+    assert seasonal_space_heating_efficiency(None) is None
+    assert seasonal_space_heating_efficiency(0.0) is None
+
+    # The regulation's boundaries, both sides of each.
+    assert eu_energy_class(150.0) == "A+++"
+    assert eu_energy_class(149.9) == "A++"
+    assert eu_energy_class(125.0) == "A++"
+    assert eu_energy_class(98.0) == "A+"
+    assert eu_energy_class(97.9) == "A"
+    assert eu_energy_class(75.0) == "C"
+    assert eu_energy_class(36.0) == "D"
+    assert eu_energy_class(29.9) == "G"
+    assert eu_energy_class(None) is None
+
+    # A measured SCOP of 2.84 — this installation — is an A+ on the label's
+    # scale while the health grade calls the same window D.
+    assert eu_energy_class(seasonal_space_heating_efficiency(2.84)) == "A+"

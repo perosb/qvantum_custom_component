@@ -46,6 +46,10 @@ from .dhw_loss import REFERENCE_DELTA_K
 from .efficiency import COP_WINDOW_SECONDS
 from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 from . import MyConfigEntry
+from .plant_analytics import (
+    eu_energy_class,
+    seasonal_space_heating_efficiency,
+)
 from .coordinator import QvantumDataUpdateCoordinator
 from .curve_coordinator import (
     CURVE_ADVICE_DEAD_BAND_C,
@@ -1570,6 +1574,18 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
             attributes["coverage_days_90d"] = round(
                 snapshot.scop_coverage_days_90d, 2
             )
+            # The same figures in the unit the EU energy label uses, so the
+            # product's declared class and the installation's measured one can
+            # be compared. Corrections omitted, so this is the conservative
+            # direction; it is not the health grade's letter.
+            for window, scop in (
+                ("", snapshot.scop_total),
+                ("_90d", snapshot.scop_total_90d),
+            ):
+                eta_s = seasonal_space_heating_efficiency(scop)
+                if eta_s is not None:
+                    attributes[f"eta_s_percent{window}"] = eta_s
+                    attributes[f"eu_class{window}"] = eu_energy_class(eta_s)
         if self._metric_key == "dhw_standing_loss":
             attributes["attribution"] = (
                 "free-cooling windows, quoted at a fixed tank-to-ambient difference"

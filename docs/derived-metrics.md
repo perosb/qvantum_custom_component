@@ -180,6 +180,18 @@ without the second, a 90-day SCOP over nine observed days reads exactly like one
 over ninety. The letter still reads the 30-day figure; the pair is what makes the
 window question answerable from the data instead of from an argument.
 
+**This letter is not the EU energy label's letter.** The EU label declares a
+heat pump's class from its **seasonal space heating energy efficiency**
+`ηs = SCOP / CC · 100` with `CC = 2.5` (Regulation 811/2013), scored against
+A+++ ≥ 150 % down to G < 30 % — i.e. roughly SCOP 0.9–3.75. Our range is 2.0–5.0,
+so the two letters are not comparable: the same window that scores **D** here is
+an **A+** there. The SCOP sensor therefore carries both readings side by side —
+`eta_s_percent` / `eu_class` and their `_90d` twins — so a measured installation
+can be compared with the class its product was declared with. The corrections the
+regulation then subtracts (temperature-control class, standby, crankcase heating)
+are not applied, which makes the derived figure conservative, and it is a window
+of measured operation rather than the reference season.
+
 **It is a SCOP grade with two tie-breakers.** Over the same 28 graded
 installations, **21** moved up at least one letter when the SCOP component was
 removed. The 90-day figure (`scop_total_90d`) travels beside the letter in the
