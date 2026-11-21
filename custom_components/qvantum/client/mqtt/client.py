@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -63,6 +64,9 @@ class QvantumMqttClient:
 
         self._metrics: dict[str, Any] = {}
         self._settings: dict[str, Any] = {}
+        #: ``monotonic()`` of the last state message, for the age the coordinator
+        #: publishes as ``latency``. A push transport has no round-trip to time.
+        self._last_state_at: float | None = None
         self._unsubscribers: list[Callable[[], None]] = []
         self._listeners: list[Callable[[], None]] = []
         self._pending: asyncio.Future[dict[str, Any]] | None = None
@@ -161,6 +165,7 @@ class QvantumMqttClient:
         if isinstance(settings, dict) and settings != self._settings:
             self._settings = settings
             changed = True
+        self._last_state_at = time.monotonic()
         self._first_state.set()
         if not changed:
             # A publisher that republishes on a timer is not news. Waking the
@@ -211,19 +216,29 @@ class QvantumMqttClient:
         device_id: str,
         enabled_metrics: list[str] | None = None,
     ) -> MetricsPayload:
-        """Return the last snapshot; the pump pushes, we do not poll."""
+        """Return the last snapshot; the pump pushes, we do not poll.
+
+        ``latency`` is the **age of that snapshot** in milliseconds, not a
+        round-trip: a push transport has nothing to time, and the snapshot's own
+        ``latency`` belongs to whoever produced it — on a followed installation
+        that is another instance's Modbus poll, which says nothing about this
+        link.
+        """
         self._require_online()
         if not self._metrics:
             raise TransportError("No MQTT state received yet")
         if enabled_metrics is None:
-            return {"metrics": dict(self._metrics)}
-        return {
-            "metrics": {
+            metrics = dict(self._metrics)
+        else:
+            metrics = {
                 key: value
                 for key, value in self._metrics.items()
                 if key in enabled_metrics
             }
-        }
+        if self._last_state_at is not None:
+            age_ms = (time.monotonic() - self._last_state_at) * 1000.0
+            metrics["latency"] = int(age_ms)
+        return {"metrics": metrics}
 
     async def get_settings(self, device_id: str) -> SettingsPayload:
         """Return the settings half of the last snapshot."""

@@ -121,7 +121,10 @@ class TestMqttClientWiring:
         publish.assert_awaited_once()
         assert publish.await_args.args[1] == "qvantum/3010100244154033/availability"
         assert publish.await_args.kwargs["retain"] is True
-        assert (await client.get_metrics("x"))["metrics"] == {"bt1": 1.0}
+        metrics = (await client.get_metrics("x"))["metrics"]
+        assert metrics["bt1"] == 1.0
+        # The age of the snapshot, not the producer's round-trip.
+        assert isinstance(metrics["latency"], int)
 
     async def test_missing_mqtt_integration_raises_not_ready(self, hass):
         from homeassistant.exceptions import ConfigEntryNotReady

@@ -60,6 +60,17 @@ def _client(broker: FakeBroker, *, writable: bool = True, timeout: float = 0.2):
     )
 
 
+def _without_age(payload: dict) -> dict:
+    """The metrics without the injected ``latency`` (the snapshot's age).
+
+    A push transport has no round-trip to time, so ``get_metrics`` reports how
+    old the snapshot is instead. The age is asserted on its own below.
+    """
+    metrics = dict(payload["metrics"])
+    metrics.pop("latency", None)
+    return metrics
+
+
 def _state(metrics: dict, settings: dict) -> str:
     return encode_envelope(SERIAL, {"metrics": metrics, "settings": settings})
 
@@ -104,6 +115,28 @@ async def test_start_subscribes_and_announces_availability():
     ]
 
 
+async def test_latency_is_the_age_of_the_snapshot(monkeypatch):
+    """A push transport has no round-trip, so `latency` is how old the data is.
+
+    The snapshot's own `latency` belongs to whoever produced it — on a followed
+    installation that is another instance's Modbus poll, which says nothing
+    about this link.
+    """
+    broker = FakeBroker()
+    client = _client(broker)
+    await client.async_start(wait_for_state=False)
+
+    now = 1000.0
+    monkeypatch.setattr("custom_components.qvantum.client.mqtt.client.time.monotonic", lambda: now)
+    broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 1.0, "latency": 42}, {}))
+    first = (await client.get_metrics("dev-1"))["metrics"]["latency"]
+    assert first == 0
+
+    now += 12.5
+    later = (await client.get_metrics("dev-1"))["metrics"]["latency"]
+    assert later == 12_500
+
+
 async def test_reads_are_served_from_the_pushed_snapshot():
     broker = FakeBroker()
     client = _client(broker)
@@ -115,10 +148,14 @@ async def test_reads_are_served_from_the_pushed_snapshot():
     )
 
     metrics = await client.get_metrics("dev-1")
-    assert metrics == {"metrics": {"bt1": 3.2, "bt2": 20.4}}
+    assert _without_age(metrics) == {"bt1": 3.2, "bt2": 20.4}
+    # The age of the snapshot, not a round-trip — and it travels even through
+    # the filter, because freshness is a property of the link.
+    assert isinstance(metrics["metrics"]["latency"], int)
 
     filtered = await client.get_metrics("dev-1", enabled_metrics=["bt1"])
-    assert filtered == {"metrics": {"bt1": 3.2}}
+    assert _without_age(filtered) == {"bt1": 3.2}
+    assert "latency" in filtered["metrics"]
 
     settings = await client.get_settings("dev-1")
     assert settings == {
@@ -315,7 +352,7 @@ async def test_start_waits_for_the_first_snapshot():
     await client.async_start(timeout=1.0)
     await task
 
-    assert (await client.get_metrics("dev-1"))["metrics"] == {"bt1": 1.0}
+    assert _without_age(await client.get_metrics("dev-1")) == {"bt1": 1.0}
 
 
 async def test_start_times_out_when_the_pump_never_answers():
@@ -414,7 +451,7 @@ async def test_offline_pump_makes_reads_fail():
     broker.deliver(state_topic(PREFIX, SERIAL), _state({"bt1": 1.0}, {"curve_0": 20}))
 
     assert client.online is True
-    assert (await client.get_metrics("dev-1"))["metrics"] == {"bt1": 1.0}
+    assert _without_age(await client.get_metrics("dev-1")) == {"bt1": 1.0}
 
     broker.deliver(availability_topic(PREFIX, SERIAL), "offline")
 
@@ -435,7 +472,7 @@ async def test_the_pump_comes_back_online():
     broker.deliver(availability_topic(PREFIX, SERIAL), "online")
 
     assert client.online is True
-    assert (await client.get_metrics("dev-1"))["metrics"] == {"bt1": 1.0}
+    assert _without_age(await client.get_metrics("dev-1")) == {"bt1": 1.0}
 
 
 async def test_availability_changes_notify_listeners():
