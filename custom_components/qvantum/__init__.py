@@ -34,10 +34,6 @@ from .client.constants import DHW_MODE_NORMAL
 from .client.modbus import QvantumModbusClient
 from .client.models import result_applied
 from .const import (
-    CONF_MODBUS_HOST,
-    CONF_MODBUS_PORT,
-    CONF_MODBUS_TCP,
-    CONF_MODBUS_UNIT_ID,
     CONF_MODBUS_WRITE,
     CONFIG_VERSION,
     DEFAULT_MODBUS_HOST,
@@ -50,6 +46,7 @@ from .const import (
     TRANSPORT_MODBUS,
     VERSION,
     HeatingCurveType,
+    modbus_link_settings,
 )
 from .coordinator import QvantumDataUpdateCoordinator, resolve_transport
 from .curve_coordinator import QvantumCurveCoordinator, async_stored_curve_mode
@@ -127,35 +124,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
-def _modbus_link_settings(config_entry: ConfigEntry) -> tuple[bool, str, int, int]:
-    """Return (enabled, host, port, unit_id) from entry options/data."""
-    enabled = bool(
-        config_entry.options.get(
-            CONF_MODBUS_TCP,
-            config_entry.data.get(CONF_MODBUS_TCP, False),
-        )
-    )
-    host = str(
-        config_entry.options.get(
-            CONF_MODBUS_HOST,
-            config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
-        )
-    )
-    port = int(
-        config_entry.options.get(
-            CONF_MODBUS_PORT,
-            config_entry.data.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
-        )
-    )
-    unit_id = int(
-        config_entry.options.get(
-            CONF_MODBUS_UNIT_ID,
-            config_entry.data.get(CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID),
-        )
-    )
-    return enabled, host, port, unit_id
-
-
 def _qvantum_entry_is_active(entry: ConfigEntry) -> bool:
     """Return True for loaded or in-setup entries (tests may omit state)."""
     state = getattr(entry, "state", None)
@@ -214,7 +182,7 @@ def _modbus_write_enabled(config_entry: ConfigEntry) -> bool:
 
 def _async_modbus_unit(hass: HomeAssistant, config_entry: ConfigEntry):
     """Borrow a unit from the shared Home Assistant Modbus connection."""
-    enabled, host, port, unit_id = _modbus_link_settings(config_entry)
+    enabled, host, port, unit_id = modbus_link_settings(config_entry)
     if not enabled:
         return None
     from homeassistant.components.modbus import async_get_unit
@@ -238,7 +206,7 @@ async def _async_temporary_modbus_unit(hass: HomeAssistant, config_entry: Config
     owner. The temporary unit is opened and closed here instead, and yields
     ``None`` when the entry is not on Modbus.
     """
-    enabled, host, port, unit_id = _modbus_link_settings(config_entry)
+    enabled, host, port, unit_id = modbus_link_settings(config_entry)
     if not enabled:
         yield None
         return
@@ -316,7 +284,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     user_agent = f"Home Assistant/{MAJOR_VERSION}.{MINOR_VERSION}.{PATCH_VERSION} Qvantum/{VERSION}"
 
-    modbus_enabled, modbus_host, modbus_port, modbus_unit_id = _modbus_link_settings(
+    modbus_enabled, modbus_host, modbus_port, modbus_unit_id = modbus_link_settings(
         config_entry
     )
     # One source of truth: the resolver answers which transport the entry is,
@@ -518,7 +486,7 @@ def _modbus_transport_changed(
     config_entry: ConfigEntry, runtime: RuntimeData
 ) -> bool:
     """Return True when Modbus enablement or host requires a full reload."""
-    new_enabled, new_host, new_port, new_unit_id = _modbus_link_settings(config_entry)
+    new_enabled, new_host, new_port, new_unit_id = modbus_link_settings(config_entry)
 
     if new_enabled != bool(runtime.coordinator.modbus_enabled):
         return True

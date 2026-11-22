@@ -606,6 +606,35 @@ class TestQvantumConfigFlow:
         assert mock_update.call_args.kwargs["options"]["modbus_host"] == "hp.local"
 
     @pytest.mark.asyncio
+    async def test_reconfigure_modbus_starts_from_the_entrys_stored_link(
+        self, hass, config_flow
+    ):
+        """The form is prefilled from the same reader setup uses.
+
+        Both the flow and `async_setup_entry` read the link through
+        `const.modbus_link_settings`; when the flow read the keys itself, a
+        changed default or a renamed option could prefill a form with values the
+        integration would never connect with.
+        """
+        config_entry = MagicMock()
+        config_entry.data = {"modbus_host": "old.local", "modbus_port": 1502}
+        config_entry.options = {"modbus_unit_id": 7}
+        config_entry.unique_id = "test_unique_id"
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_get_entry.return_value = config_entry
+        config_flow.context = {"entry_id": "test_entry_id"}
+
+        with patch(
+            "custom_components.qvantum.config_flow._modbus_user_schema"
+        ) as schema:
+            result = await config_flow.async_step_reconfigure_modbus(None)
+
+        assert result["step_id"] == "reconfigure_modbus"
+        assert schema.call_args.kwargs["host"] == "old.local"
+        assert schema.call_args.kwargs["port"] == 1502
+        assert schema.call_args.kwargs["unit_id"] == 7
+
+    @pytest.mark.asyncio
     async def test_reconfigure_modbus_preserves_external_room_temp_entity(
         self, hass, config_flow
     ):
