@@ -179,6 +179,21 @@ HTTP_CLOUD_LOOKUP_TIMEOUT = 15
 MODBUS_SW_VERSION_REFRESH_INTERVAL = 3600
 
 # Metrics available in both HTTP and Modbus modes
+#: The picpin relay status bits, in register order. Both the poll's metric list
+#: and the binary sensors read this, so a relay added to one is never missing
+#: from the other.
+PICPIN_RELAY_KEYS: tuple[str, ...] = (
+    "picpin_relay_heat_l1",
+    "picpin_relay_heat_l2",
+    "picpin_relay_heat_l3",
+    "picpin_relay_gp10",
+    "picpin_relay_qm10",
+    "picpin_relay_qn8_1",
+    "picpin_relay_qn8_2",
+    "picpin_relay_gp3",
+    "picpin_relay_ha12",
+)
+
 DEFAULT_ENABLED_METRICS = [
     "bf1_l_min",
     "bt1",
@@ -206,15 +221,7 @@ DEFAULT_ENABLED_METRICS = [
     "gp1_speed",
     "gp2_speed",
     "hp_status",
-    "picpin_relay_heat_l1",
-    "picpin_relay_heat_l2",
-    "picpin_relay_heat_l3",
-    "picpin_relay_gp10",
-    "picpin_relay_qm10",
-    "picpin_relay_qn8_1",
-    "picpin_relay_qn8_2",
-    "picpin_relay_gp3",
-    "picpin_relay_ha12",
+    *PICPIN_RELAY_KEYS,
     "qn8position",
     "compressorenergy",
     "additionalenergy",
@@ -592,15 +599,7 @@ DHW_EMA_ALPHA = (
 # Binary sensor names
 BINARY_SENSOR_NAMES = [
     "cooling_enabled",
-    "picpin_relay_heat_l1",
-    "picpin_relay_heat_l2",
-    "picpin_relay_heat_l3",
-    "picpin_relay_gp10",
-    "picpin_relay_qm10",
-    "picpin_relay_qn8_1",
-    "picpin_relay_qn8_2",
-    "picpin_relay_gp3",
-    "picpin_relay_ha12",
+    *PICPIN_RELAY_KEYS,
     "dhwdemand",
     "heatingdemand",
     "coolingdemand",
