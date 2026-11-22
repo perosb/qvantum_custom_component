@@ -25,10 +25,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntry, DeviceInfo
 from homeassistant.helpers.entity_registry import (
     async_entries_for_config_entry,
-    async_migrate_entries,
-)
-from homeassistant.helpers.entity_registry import (
     async_get as async_get_entity_registry,
+    async_migrate_entries,
 )
 
 from .client.cloud import QvantumCloudClient
@@ -60,8 +58,11 @@ from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
 from .summary import QvantumSummaryView
-from .telemetry import async_forget as async_forget_telemetry_state
-from .telemetry import async_maybe_prompt, async_schedule_uploads
+from .telemetry import (
+    async_forget as async_forget_telemetry_state,
+    async_maybe_prompt,
+    async_schedule_uploads,
+)
 
 _LOGGER = logging.getLogger(__name__)
 

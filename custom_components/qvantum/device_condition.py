@@ -16,8 +16,6 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import (
     condition,
-)
-from homeassistant.helpers import (
     config_validation as cv,
 )
 from homeassistant.helpers.typing import ConfigType

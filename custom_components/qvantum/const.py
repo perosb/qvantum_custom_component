@@ -6,59 +6,23 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .client.constants import (
     BASE_SYSTEM_POWER_W as BASE_SYSTEM_POWER_W,
-)
-from .client.constants import (
     DHW_MODE_ECO as DHW_MODE_ECO,
-)
-from .client.constants import (
     DHW_MODE_EXTRA as DHW_MODE_EXTRA,
-)
-from .client.constants import (
     DHW_MODE_NORMAL as DHW_MODE_NORMAL,
-)
-from .client.constants import (
     DHW_MODE_SMART as DHW_MODE_SMART,
-)
-from .client.constants import (
     FAN_SPEED_STATE_EXTRA as FAN_SPEED_STATE_EXTRA,
-)
-from .client.constants import (
     FAN_SPEED_STATE_NORMAL as FAN_SPEED_STATE_NORMAL,
-)
-from .client.constants import (
     FAN_SPEED_STATE_OFF as FAN_SPEED_STATE_OFF,
-)
-from .client.constants import (
     FAN_SPEED_VALUE_EXTRA as FAN_SPEED_VALUE_EXTRA,
-)
-from .client.constants import (
     FAN_SPEED_VALUE_NORMAL as FAN_SPEED_VALUE_NORMAL,
-)
-from .client.constants import (
     FAN_SPEED_VALUE_OFF as FAN_SPEED_VALUE_OFF,
-)
-from .client.constants import (
     HEATING_CURVE_HTTP_KEYS as HEATING_CURVE_HTTP_KEYS,
-)
-from .client.constants import (
     RELAY_HEAT_L1_POWER_W as RELAY_HEAT_L1_POWER_W,
-)
-from .client.constants import (
     RELAY_HEAT_L2_POWER_W as RELAY_HEAT_L2_POWER_W,
-)
-from .client.constants import (
     RELAY_HEAT_L3_POWER_W as RELAY_HEAT_L3_POWER_W,
-)
-from .client.constants import (
     RELAY_STAGE_POWER_MAP as RELAY_STAGE_POWER_MAP,
-)
-from .client.constants import (
     SETTING_UPDATE_APPLIED as SETTING_UPDATE_APPLIED,
-)
-from .client.constants import (
     TAP_WATER_CAPACITY_MAPPINGS as TAP_WATER_CAPACITY_MAPPINGS,
-)
-from .client.constants import (
     TAP_WATER_CAPACITY_START_STOP as TAP_WATER_CAPACITY_START_STOP,
 )
 

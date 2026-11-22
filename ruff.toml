@@ -17,3 +17,11 @@ select = [
     "B",    # bugbear: likely bugs, not style
     "RUF100",  # a `# noqa` that suppresses nothing
 ]
+
+[lint.isort]
+# `from .const import (A as A, B as B)` is how a re-export is written; without
+# this, isort splits each alias onto its own import statement, which turned
+# `const.py`'s seventeen re-exports into seventeen blocks.
+combine-as-imports = true
+# …and wrap the combined statement instead of letting it run past the line limit.
+force-wrap-aliases = true
