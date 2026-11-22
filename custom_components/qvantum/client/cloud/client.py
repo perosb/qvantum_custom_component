@@ -18,7 +18,7 @@ from ..constants import (
     CLOUD_EXTRA_VALUE_NAMES,
     HEATING_CURVE_HTTP_KEYS,
     SETTING_UPDATE_APPLIED,
-    TAP_WATER_CAPACITY_START_STOP,
+    tap_water_capacity_pair,
 )
 from ..exceptions import AuthError, RateLimitError, TransportError
 from ..models import MetricsPayload, SettingsPayload
@@ -673,13 +673,8 @@ class QvantumCloudClient:
 
         Custom levels fall back to a start/stop PATCH pair.
         """
-        if capacity not in TAP_WATER_CAPACITY_START_STOP:
-            raise ValueError(
-                f"Unsupported tap water capacity {capacity}; expected one of "
-                f"{sorted(TAP_WATER_CAPACITY_START_STOP)}"
-            )
+        start, stop = tap_water_capacity_pair(capacity)
         if capacity in _CUSTOM_CAPACITIES:
-            start, stop = TAP_WATER_CAPACITY_START_STOP[capacity]
             _LOGGER.debug(
                 "Setting tap water capacity %s maps to stop %s and start %s.",
                 capacity,
