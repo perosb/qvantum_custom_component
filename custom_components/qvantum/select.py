@@ -6,14 +6,17 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
 from .client.modbus.maps import heating_curve_points
 from .const import HeatingCurveType, SensorMode
-from .coordinator import QvantumDataUpdateCoordinator, async_apply_setting
+from .coordinator import (
+    QvantumDataUpdateCoordinator,
+    async_apply_setting,
+    is_cloud,
+    is_full_payload,
+)
 from .entity import QvantumEntity, finalize_platform_setup
-from .coordinator import is_cloud, is_full_payload
 
 _LOGGER = logging.getLogger(__name__)
 

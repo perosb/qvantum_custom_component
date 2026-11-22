@@ -7,7 +7,7 @@ HTTP path uses, so coordinators and entities do not need to change.
 from __future__ import annotations
 
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..constants import (
     BASE_SYSTEM_POWER_W,
@@ -205,7 +205,7 @@ def decode_sw_version(identity: QvantumIdentity) -> str | None:
     return f"{int(major)}.{int(minor)}.{int(patch)}"
 
 
-async def async_probe_identity(unit: "ModbusUnit") -> tuple[str, str | None]:
+async def async_probe_identity(unit: ModbusUnit) -> tuple[str, str | None]:
     """Read serial and firmware from a unit. Raises if serial is missing."""
     identity = QvantumIdentity(unit)
     await identity.async_update()
@@ -265,7 +265,7 @@ class QvantumModbusDevice:
             return
         try:
             await self.compressor_units.async_update()
-        except Exception:  # noqa: BLE001 - optional block, any failure skips it
+        except Exception:
             self._compressor_units_failures += 1
             self._compressor_units_ok = False
             _LOGGER.debug(

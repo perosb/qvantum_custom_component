@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any, Mapping
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -32,7 +33,6 @@ from .building import (
     fit_time_constant,
     weather_normalized_heating,
 )
-from .numeric import finite
 from .const import (
     DHW_COMPRESSOR_STATE_HOT_WATER,
     DHW_TANK_VOLUME_L,
@@ -40,13 +40,13 @@ from .const import (
     HP_STATUS_HOT_WATER,
 )
 from .dhw_loss import (
-    REFERENCE_DELTA_K,
     blend,
     mean_delta_k,
     reference_loss_kwh_per_day,
     standing_loss_per_k,
 )
 from .efficiency import aux_heat_share, scop_from_counters
+from .numeric import finite
 from .open_meteo import (
     FORECAST_REUSE_HOURS,
     OpenMeteoError,
@@ -256,7 +256,8 @@ def _window_delta(
     if len(window) < 2:
         return None, coverage_days
     total = 0.0
-    for (_, before), (_, after) in zip(window, window[1:]):
+    # Consecutive pairs: the two sides differ by one by construction.
+    for (_, before), (_, after) in zip(window, window[1:], strict=False):
         step = after - before
         if step > 0.0:
             total += step
@@ -278,7 +279,7 @@ def _span_delta(
     if len(window) < 2:
         return None, len(window)
     total = 0.0
-    for (_, before), (_, after) in zip(window, window[1:]):
+    for (_, before), (_, after) in zip(window, window[1:], strict=False):
         step = after - before
         if step > 0.0:
             total += step
@@ -577,7 +578,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             return await self._async_compute_snapshot()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — analytics must stay alive
+        except Exception as err:
             _LOGGER.debug("Efficiency update failed: %s", err)
             return self.data or EfficiencySnapshot()
 
@@ -981,7 +982,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             return
         try:
             data = await store.async_load()
-        except Exception as err:  # noqa: BLE001 — restore is best effort
+        except Exception as err:
             _LOGGER.debug("Could not restore efficiency state: %s", err)
             return
         if not isinstance(data, dict):
@@ -1014,7 +1015,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
                 },
                 60,
             )
-        except Exception:  # noqa: BLE001 — persistence must not break the poll
+        except Exception:
             _LOGGER.debug("Could not schedule efficiency state save", exc_info=True)
 
     def _update_dhw_standing_loss(self, now_ts: float) -> float | None:

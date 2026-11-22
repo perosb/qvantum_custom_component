@@ -2,6 +2,7 @@
 
 from enum import IntFlag
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 
@@ -72,7 +73,6 @@ with patch(
                             from custom_components.qvantum.const import (
                                 SENSOR_MODE_HTTP_BT2,
                                 SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
-                                SETTING_UPDATE_APPLIED,
                                 SensorMode,
                             )
 

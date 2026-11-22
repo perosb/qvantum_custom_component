@@ -445,6 +445,15 @@ enough. Verify in a `/tmp` worktree (see *Git*).
 
 ## Tests
 
+`ruff` is a gate, not a suggestion: `ruff.toml` at the root selects a deliberately
+narrow set (`E4/E7/E9`, `F`, `I`, `UP`, `B`, `RUF100`) and the `lint` job runs
+`ruff check` on the whole repository, `tests/` and `.github/scripts/` included. It
+is pinned in the workflow (`ruff==0.17.6`) because a new release can add a rule
+that turns the gate red on its own. `D` (docstrings), `ANN` (annotations) and
+`E501` are deliberately out — their backlog is real but fixing it is a separate
+decision, and `E501` would flag forty lines, most of them log format strings.
+Run it locally with `uv run --with ruff==0.17.6 ruff check --fix`.
+
 ```bash
 ./run-tests.sh          # venv + requirements-test.txt + pytest
 python -m pytest        # repo root; pytest.ini sets coverage + timeout

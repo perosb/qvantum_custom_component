@@ -16,7 +16,7 @@ it at all.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from homeassistant.components.calendar import (
@@ -175,7 +175,7 @@ class QvantumFilterCalendarEntity(QvantumEntity, CalendarEntity):
         due_at = data.get("due_at")
         anchor_hours = data.get("anchor_hours")
         if isinstance(due_at, (int, float)) and not isinstance(due_at, bool):
-            self._due_at = datetime.fromtimestamp(float(due_at), tz=timezone.utc)
+            self._due_at = datetime.fromtimestamp(float(due_at), tz=UTC)
         if isinstance(anchor_hours, (int, float)) and not isinstance(
             anchor_hours, bool
         ):

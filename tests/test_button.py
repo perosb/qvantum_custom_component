@@ -1,12 +1,13 @@
 """Tests for Qvantum button entities."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from homeassistant.const import EntityCategory
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from custom_components.qvantum.button import QvantumButtonEntity, async_setup_entry
 from custom_components.qvantum import RuntimeData
+from custom_components.qvantum.button import QvantumButtonEntity, async_setup_entry
 
 
 @pytest.fixture

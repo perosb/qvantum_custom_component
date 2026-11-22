@@ -1,8 +1,7 @@
 """Interfaces with the Qvantum Heat Pump api sensors."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Type
+from datetime import UTC, datetime
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -10,55 +9,54 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    UnitOfEnergy,
-    UnitOfTemperature,
-    UnitOfPower,
-    UnitOfTime,
-    EntityCategory,
-    UnitOfPressure,
-    UnitOfElectricCurrent,
     PERCENTAGE,
+    EntityCategory,
+    UnitOfElectricCurrent,
+    UnitOfEnergy,
+    UnitOfPower,
+    UnitOfPressure,
+    UnitOfTemperature,
+    UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.util import dt as dt_utils
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_utils
 
+from . import MyConfigEntry
+from .alarm_codes import alarm_description
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
-from .solar_gain import DAILY_MIN_COLD_WIND_DAYS as _MIN_COLD_WIND_DAYS
-from .solar_gain import DAILY_MIN_COLD_WIND_HOURS as _MIN_COLD_WIND_HOURS
 from .const import (
-    DEFAULT_ENABLED_HTTP_METRICS,
-    DEFAULT_ENABLED_MODBUS_METRICS,
+    CURRENT_METRICS,
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
+    DEFAULT_ENABLED_HTTP_METRICS,
+    DEFAULT_ENABLED_MODBUS_METRICS,
+    ENERGY_METRICS,
     EXCLUDED_METRIC_NAMES,
     EXCLUDED_METRIC_PATTERNS,
-    TEMPERATURE_METRICS,
-    ENERGY_METRICS,
     POWER_METRICS,
-    CURRENT_METRICS,
     PRESSURE_METRICS,
+    TEMPERATURE_METRICS,
 )
-from .alarm_codes import alarm_description
-from .dhw_loss import REFERENCE_DELTA_K
-from .efficiency import COP_WINDOW_SECONDS
-from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
-from . import MyConfigEntry
-from .plant_analytics import (
-    eu_label,
-)
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, is_cloud, is_full_payload
 from .curve_coordinator import (
     CURVE_ADVICE_DEAD_BAND_C,
     CURVE_ADVICE_MIN_HOURS,
     READY_WINDOW_DAYS,
     QvantumCurveCoordinator,
 )
+from .dhw_loss import REFERENCE_DELTA_K
+from .efficiency import COP_WINDOW_SECONDS
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
+from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
-from .coordinator import is_cloud, is_full_payload
+from .plant_analytics import (
+    eu_label,
+)
+from .solar_gain import DAILY_MIN_COLD_WIND_DAYS as _MIN_COLD_WIND_DAYS
+from .solar_gain import DAILY_MIN_COLD_WIND_HOURS as _MIN_COLD_WIND_HOURS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -165,7 +163,6 @@ _DIAGNOSTIC_SENSORS = frozenset(
         "curve_offset_total",
         "cooling_offset_total",
         "room_temp_filtered",
-        "price_region",
         "calc_suppy_cpr",
         "guide_des_temp",
         "guide_he",
@@ -1827,7 +1824,7 @@ class QvantumTimerEntity(QvantumBaseSensorEntity):
         epoch = self._values.get(self._metric_key)
         if epoch is None or epoch <= 0:
             return None
-        return datetime.fromtimestamp(epoch, tz=timezone.utc)
+        return datetime.fromtimestamp(epoch, tz=UTC)
 
     @property
     def available(self):
@@ -1879,7 +1876,7 @@ def _should_exclude_metric(metric: str) -> bool:
     return any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
 
 
-def _get_sensor_type(metric: str) -> Type[QvantumBaseSensorEntity]:
+def _get_sensor_type(metric: str) -> type[QvantumBaseSensorEntity]:
     """Map a metric name to a sensor class (ENERGY_METRICS before POWER_METRICS)."""
     if any(pattern in metric for pattern in TEMPERATURE_METRICS):
         return QvantumTemperatureEntity

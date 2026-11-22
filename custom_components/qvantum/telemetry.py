@@ -20,9 +20,8 @@ from __future__ import annotations
 import logging
 import secrets
 import time
+from datetime import datetime, timedelta
 from typing import Any
-
-from datetime import datetime, timedelta, timezone
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
@@ -91,7 +90,7 @@ async def async_load_state(hass: HomeAssistant, entry_id: str) -> dict[str, Any]
         return {}
     try:
         data = await store.async_load()
-    except Exception as err:  # noqa: BLE001 — consent state is best effort
+    except Exception as err:
         _LOGGER.debug("Could not load telemetry state: %s", err)
         return {}
     return dict(data) if isinstance(data, dict) else {}
@@ -106,7 +105,7 @@ async def async_save_state(
         return
     try:
         await store.async_save(data)
-    except Exception as err:  # noqa: BLE001 — a failed save must not break setup
+    except Exception as err:
         _LOGGER.debug("Could not save telemetry state: %s", err)
 
 
@@ -222,7 +221,7 @@ async def async_upload_summary(
                     response.status,
                 )
                 return False
-    except Exception as err:  # noqa: BLE001 — telemetry must never break a poll
+    except Exception as err:
         _LOGGER.debug("Summary upload failed: %s", err)
         return False
 
@@ -258,7 +257,7 @@ async def async_delete_telemetry(hass: HomeAssistant, entry_id: str) -> bool:
             headers={"User-Agent": "qvantum-hacs-telemetry"},
         ) as response:
             return response.status == 200
-    except Exception as err:  # noqa: BLE001 — best effort
+    except Exception as err:
         _LOGGER.debug("Could not erase telemetry rows: %s", err)
         return False
 
@@ -270,7 +269,7 @@ async def async_schedule_uploads(hass: HomeAssistant, entry_id: str):
     async def _tick(_now: datetime) -> None:
         try:
             await async_upload_summary(hass, entry_id)
-        except Exception as err:  # noqa: BLE001 — never break the scheduler
+        except Exception as err:
             _LOGGER.debug("Scheduled summary upload failed: %s", err)
 
     return async_track_time_interval(hass, _tick, UPLOAD_CHECK_INTERVAL)
@@ -284,5 +283,5 @@ async def async_forget(hass: HomeAssistant, entry_id: str) -> None:
         return
     try:
         await store.async_remove()
-    except Exception as err:  # noqa: BLE001 — removal is best effort
+    except Exception as err:
         _LOGGER.debug("Could not remove telemetry state: %s", err)

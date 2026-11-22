@@ -2,9 +2,9 @@ import json
 import logging
 from typing import Any
 
+import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
-import homeassistant.helpers.config_validation as cv
 
 from .client.exceptions import (
     APIAuthError,
@@ -12,12 +12,12 @@ from .client.exceptions import (
     APIRateLimitError,
 )
 from .const import DOMAIN
-from .telemetry import async_delete_telemetry, async_upload_summary
 from .summary import (
     SUMMARY_FILENAME,
     SUMMARY_URL,
     async_build_summary,
 )
+from .telemetry import async_delete_telemetry, async_upload_summary
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -276,7 +276,7 @@ async def async_setup_services(hass: HomeAssistant):
             return {"qvantum": {"exception": "not_loaded"}}
         try:
             sent = await async_upload_summary(hass, entry.entry_id, force=True)
-        except Exception as err:  # noqa: BLE001 — report, never raise at the caller
+        except Exception as err:
             _LOGGER.error("Summary upload failed: %s", err)
             return {"qvantum": {"exception": "unknown_error", "details": str(err)}}
         return {"qvantum": {"sent": sent}}
@@ -297,7 +297,7 @@ async def async_setup_services(hass: HomeAssistant):
             return {"qvantum": {"exception": "not_loaded"}}
         try:
             deleted = await async_delete_telemetry(hass, entry.entry_id)
-        except Exception as err:  # noqa: BLE001 — report, never raise at the caller
+        except Exception as err:
             _LOGGER.error("Could not erase uploaded summaries: %s", err)
             return {"qvantum": {"exception": "unknown_error", "details": str(err)}}
         return {"qvantum": {"deleted": deleted}}

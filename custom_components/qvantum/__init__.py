@@ -3,66 +3,65 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
 import inspect
 import logging
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.const import Platform
-from homeassistant.core import callback
-from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
-from homeassistant.helpers.device_registry import DeviceEntry
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_registry import (
-    async_entries_for_config_entry,
-    async_get as async_get_entity_registry,
-    async_migrate_entries,
-)
 from homeassistant.components.persistent_notification import async_dismiss
-
-
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import (
     CONF_PASSWORD,
     CONF_USERNAME,
+    MAJOR_VERSION,
+    MINOR_VERSION,
+    PATCH_VERSION,
+    Platform,
 )
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceEntry, DeviceInfo
+from homeassistant.helpers.entity_registry import (
+    async_entries_for_config_entry,
+    async_migrate_entries,
+)
+from homeassistant.helpers.entity_registry import (
+    async_get as async_get_entity_registry,
+)
 
 from .client.cloud import QvantumCloudClient
-from .client.models import result_applied
 from .client.constants import DHW_MODE_NORMAL
 from .client.modbus import QvantumModbusClient
+from .client.models import result_applied
 from .const import (
-    DOMAIN,
-    VERSION,
-    CONFIG_VERSION,
-    FIRMWARE_KEYS,
-    HeatingCurveType,
-    CONF_MODBUS_TCP,
-    CONF_MODBUS_WRITE,
     CONF_MODBUS_HOST,
     CONF_MODBUS_PORT,
+    CONF_MODBUS_TCP,
     CONF_MODBUS_UNIT_ID,
+    CONF_MODBUS_WRITE,
+    CONFIG_VERSION,
     DEFAULT_MODBUS_HOST,
     DEFAULT_MODBUS_PORT,
     DEFAULT_MODBUS_UNIT_ID,
+    DOMAIN,
+    FIRMWARE_KEYS,
     HTTP_CLOUD_LOOKUP_TIMEOUT,
     TRANSPORT_CLOUD,
     TRANSPORT_MODBUS,
+    VERSION,
+    HeatingCurveType,
 )
 from .coordinator import QvantumDataUpdateCoordinator, resolve_transport
 from .curve_coordinator import QvantumCurveCoordinator, async_stored_curve_mode
-from .telemetry import async_forget as async_forget_telemetry_state
-from .telemetry import async_maybe_prompt, async_schedule_uploads
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
 from .summary import QvantumSummaryView
+from .telemetry import async_forget as async_forget_telemetry_state
+from .telemetry import async_maybe_prompt, async_schedule_uploads
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -107,7 +106,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         try:
             hass.http.register_view(QvantumSummaryView())
             _SUMMARY_VIEW_REGISTERED = True
-        except Exception as err:  # noqa: BLE001 — never block setup on a view
+        except Exception as err:
             _LOGGER.debug("Could not register the Qvantum summary view: %s", err)
     if _CARD_REGISTERED:
         return True
@@ -122,7 +121,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             [StaticPathConfig(_CARD_URL_PATH, str(card_path), False)]
         )
         _CARD_REGISTERED = True
-    except Exception as err:  # noqa: BLE001 — never block setup on asset errors
+    except Exception as err:
         _LOGGER.debug("Could not register Qvantum curve card asset: %s", err)
     return True
 
@@ -430,7 +429,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
                 maintenance_coordinator.async_config_entry_first_refresh(),
                 timeout=HTTP_CLOUD_LOOKUP_TIMEOUT,
             )
-        except (ConfigEntryNotReady, asyncio.TimeoutError) as err:
+        except (TimeoutError, ConfigEntryNotReady) as err:
             if isinstance(err, asyncio.TimeoutError):
                 raise ConfigEntryNotReady(
                     "Firmware/access check timed out"
@@ -462,13 +461,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     )
     try:
         await efficiency_coordinator.async_restore()
-    except Exception as err:  # noqa: BLE001 — a blank EMA is not a setup error
+    except Exception as err:
         _LOGGER.debug("Efficiency state restore failed: %s", err)
     try:
         await efficiency_coordinator.async_refresh()
     except asyncio.CancelledError:
         raise
-    except Exception as err:  # noqa: BLE001 — analytics must not block setup
+    except Exception as err:
         _LOGGER.debug("Efficiency coordinator first refresh failed: %s", err)
 
     remove_listener = config_entry.add_update_listener(_async_update_listener)
@@ -501,13 +500,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     # Best effort: a telemetry prompt must never block setup.
     try:
         await async_maybe_prompt(hass, config_entry.entry_id)
-    except Exception as err:  # noqa: BLE001 — optional surface
+    except Exception as err:
         _LOGGER.debug("Telemetry prompt unavailable: %s", err)
     try:
         config_entry.async_on_unload(
             await async_schedule_uploads(hass, config_entry.entry_id)
         )
-    except Exception as err:  # noqa: BLE001 — a timer must not block setup
+    except Exception as err:
         _LOGGER.debug("Could not schedule summary uploads: %s", err)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
@@ -896,7 +895,7 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     # Nothing left to relate consent to once the entry is gone.
     try:
         await async_forget_telemetry_state(hass, config_entry.entry_id)
-    except Exception as err:  # noqa: BLE001 — removal is best effort
+    except Exception as err:
         _LOGGER.debug("Could not drop telemetry state: %s", err)
     await _async_hand_back_curve(hass, config_entry, reason="removing")
 
@@ -936,7 +935,7 @@ async def _async_hand_back_curve_cloud(
         )
     except asyncio.CancelledError:
         raise
-    except Exception as err:  # noqa: BLE001 — best effort
+    except Exception as err:
         _LOGGER.warning(
             "Could not revert the adaptive curve while %s %s: %s",
             reason,
@@ -947,7 +946,7 @@ async def _async_hand_back_curve_cloud(
     finally:
         try:
             await client.close()
-        except Exception:  # noqa: BLE001 — never fail the caller on cleanup
+        except Exception:
             _LOGGER.debug("Could not close the cloud client", exc_info=True)
     if not result_applied(response):
         _LOGGER.warning(
@@ -1005,7 +1004,7 @@ async def _async_hand_back_curve(
             # already inactive: an earlier Auto write may have failed, leaving
             # the pump on our table with nothing to retry it after the handover.
             await curve.async_set_control_mode("shadow")
-        except Exception as err:  # noqa: BLE001 — best effort
+        except Exception as err:
             _LOGGER.warning(
                 "Could not revert the adaptive curve while %s %s: %s",
                 reason,
@@ -1053,7 +1052,7 @@ async def _async_hand_back_curve(
         return True
     except asyncio.CancelledError:
         raise
-    except Exception as err:  # noqa: BLE001 — best effort
+    except Exception as err:
         _LOGGER.warning(
             "Could not revert the adaptive curve while %s %s: %s",
             reason,

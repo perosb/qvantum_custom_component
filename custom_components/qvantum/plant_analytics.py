@@ -12,8 +12,8 @@ coverage so a grade built from one signal is never mistaken for a full picture.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Mapping, Sequence
 
 from .numeric import finite
 

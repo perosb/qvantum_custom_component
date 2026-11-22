@@ -2,18 +2,18 @@
 
 import sys
 import types
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.qvantum.client.modbus.device import IdentityProbeError
 from custom_components.qvantum.config_flow import (
-    QvantumConfigFlow,
     CannotConnect,
     InvalidAuth,
+    QvantumConfigFlow,
     _normalize_modbus_scan_interval,
     validate_input,
     validate_modbus,
@@ -1154,7 +1154,6 @@ class TestCurveHandBackOnReconfigure:
 
     @pytest.mark.asyncio
     async def test_reconfigure_cloud_without_valid_input_touches_nothing(self, hass):
-        from custom_components.qvantum.const import CONF_MODBUS_TCP
 
         entry = MagicMock()
         entry.options = {"modbus_tcp": True}

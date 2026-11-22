@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -814,7 +814,7 @@ class TestCalculateCop:
     def test_charge_segment_restarts_after_the_maximum_duration(self):
         """A demand flag that never clears must not keep an ancient baseline."""
         calculator = _Calculator()
-        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=UTC)
         t_stuck = t0 + timedelta(seconds=DHW_CHARGE_MAX_SECONDS + 60)
         with patch(
             "custom_components.qvantum.calculations.dt_util.utcnow",
@@ -894,7 +894,7 @@ class TestCalculateCop:
 
     def test_holds_last_value_after_the_window_goes_idle(self):
         calculator = _Calculator()
-        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=UTC)
         t1 = t0 + timedelta(seconds=10)
         t_idle = t0 + timedelta(seconds=COP_WINDOW_SECONDS + 20)
 
@@ -924,7 +924,7 @@ class TestCalculateCop:
 
     def test_window_drops_samples_older_than_the_window(self):
         calculator = _Calculator()
-        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=UTC)
         t1 = t0 + timedelta(seconds=100)
         t2 = t0 + timedelta(seconds=COP_WINDOW_SECONDS + 100)
 
@@ -955,7 +955,7 @@ class TestCalculateCop:
     def test_keeps_the_previous_sample_when_polls_exceed_the_window(self):
         """A poll interval longer than the window still yields a ratio."""
         calculator = _Calculator()
-        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 10, 10, 0, 0, 0, tzinfo=UTC)
         t1 = t0 + timedelta(seconds=COP_WINDOW_SECONDS * 2)
 
         with patch(

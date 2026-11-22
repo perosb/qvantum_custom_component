@@ -3,6 +3,8 @@
 import ast
 from pathlib import Path
 
+from custom_components.qvantum import client as qvantum_client
+from custom_components.qvantum.client import constants as client_constants
 from custom_components.qvantum.client.exceptions import (
     APIAuthError,
     APIConnectionError,
@@ -19,9 +21,6 @@ from custom_components.qvantum.const import (
     SETTING_UPDATE_APPLIED,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
-from custom_components.qvantum import client as qvantum_client
-from custom_components.qvantum.client import constants as client_constants
-
 
 CLIENT_ROOT = (
     Path(__file__).resolve().parents[1] / "custom_components" / "qvantum" / "client"

@@ -60,6 +60,28 @@ jobs:
           python3 .github/scripts/check_docs.py \
             --base "$BASE_SHA" --head "$HEAD_SHA" --labels-json "$PR_LABELS"
 
+  lint:
+    # What the suite cannot see: unused imports, undefined names, import order,
+    # syntax the minimum Python already replaces, and likely bugs. Rules live in
+    # `ruff.toml`, pinned here so a new ruff release cannot turn the gate red on
+    # its own.
+    needs: changes
+    if: needs.changes.result != 'success' || needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Install ruff
+        run: pip install ruff==0.17.6
+
+      - name: Ruff
+        run: ruff check --output-format=github
+
   test:
     needs: changes
     # Skipped only when every changed file is prose (docs/, *.md at the repo

@@ -3,6 +3,7 @@
 import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 import voluptuous as vol
 
@@ -36,13 +37,13 @@ class MockSupportsResponse:
 
 # Patch the imports before importing the services module
 with patch("homeassistant.core.SupportsResponse", MockSupportsResponse):
+    from custom_components.qvantum.const import DOMAIN
     from custom_components.qvantum.services import (
         EXTRA_TAP_WATER_SCHEMA,
         SET_CURVE_CONTROL_SCHEMA,
         SET_CURVE_TERMS_SCHEMA,
         async_setup_services,
     )
-    from custom_components.qvantum.const import DOMAIN
 
 
 @pytest.fixture

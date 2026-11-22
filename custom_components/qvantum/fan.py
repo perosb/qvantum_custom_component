@@ -1,20 +1,19 @@
 """Interfaces with the Qvantum Heat Pump api sensors."""
 
 import logging
+from typing import Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from typing import Optional, Any
 
-from .const import (
-    FAN_SPEED_STATE_OFF,
-    FAN_SPEED_STATE_NORMAL,
-    FAN_SPEED_STATE_EXTRA,
-)
 from . import MyConfigEntry
+from .const import (
+    FAN_SPEED_STATE_EXTRA,
+    FAN_SPEED_STATE_NORMAL,
+    FAN_SPEED_STATE_OFF,
+)
 from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
 from .entity import QvantumEntity
 
@@ -103,9 +102,9 @@ class QvantumFanEntity(QvantumEntity, FanEntity):
 
     async def async_turn_on(
         self,
-        speed: Optional[str] = None,
-        percentage: Optional[int] = None,
-        preset_mode: Optional[str] = None,
+        speed: str | None = None,
+        percentage: int | None = None,
+        preset_mode: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Turn on the fan."""

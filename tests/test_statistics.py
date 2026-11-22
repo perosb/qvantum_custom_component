@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from custom_components.qvantum import statistics as stats
@@ -144,7 +144,7 @@ def test_pick_indoor_metric_key_falls_back_until_the_new_sensor_has_history() ->
 async def test_statistics_returns_empty_without_ids():
     assert (
         await stats.async_statistics_during_period(
-            MagicMock(), set(), datetime.now(timezone.utc)
+            MagicMock(), set(), datetime.now(UTC)
         )
         == {}
     )
@@ -154,7 +154,7 @@ async def test_statistics_returns_empty_when_recorder_unavailable():
     with patch("homeassistant.components.recorder.get_instance", side_effect=KeyError):
         assert (
             await stats.async_statistics_during_period(
-                MagicMock(), {"sensor.x"}, datetime.now(timezone.utc)
+                MagicMock(), {"sensor.x"}, datetime.now(UTC)
             )
             == {}
         )
@@ -162,7 +162,7 @@ async def test_statistics_returns_empty_when_recorder_unavailable():
 
 async def test_statistics_uses_recorder_executor_and_maps_errors():
     hass = MagicMock()
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     rows = {"sensor.x": [{"start": 100, "sum": 1.0}]}
     recorder = MagicMock()
     recorder.async_add_executor_job = AsyncMock(return_value=rows)

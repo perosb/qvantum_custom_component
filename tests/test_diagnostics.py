@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from homeassistant.util import dt as dt_util
 
-from custom_components.qvantum.heating_curve import ActiveRoomGain
 from custom_components.qvantum.curve_coordinator import CurveSnapshot
 from custom_components.qvantum.diagnostics import (
     TO_REDACT,
@@ -17,8 +17,7 @@ from custom_components.qvantum.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from custom_components.qvantum.efficiency_coordinator import EfficiencySnapshot
-from homeassistant.util import dt as dt_util
-
+from custom_components.qvantum.heating_curve import ActiveRoomGain
 from custom_components.qvantum.open_meteo import HourlyWeather, WeatherForecast, hour_ts
 from custom_components.qvantum.plant_analytics import DhwMeterWindow
 from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
@@ -315,12 +314,12 @@ async def test_cop_diagnostics_reports_held_figures_and_the_open_charge(hass):
     coordinator = _coordinator()
     coordinator._cop_last = {"cop_heating": 3.4, "cop_dhw": 1.0}
     coordinator._cop_last_times = {
-        "cop_heating": datetime(2026, 10, 18, 8, 0, tzinfo=timezone.utc),
-        "cop_dhw": datetime(2026, 10, 18, 9, 0, tzinfo=timezone.utc),
+        "cop_heating": datetime(2026, 10, 18, 8, 0, tzinfo=UTC),
+        "cop_dhw": datetime(2026, 10, 18, 9, 0, tzinfo=UTC),
     }
     coordinator._dhw_tank_liters = 143.2
     coordinator._dhw_charge = SimpleNamespace(
-        started=datetime(2026, 10, 18, 9, 3, tzinfo=timezone.utc),
+        started=datetime(2026, 10, 18, 9, 3, tzinfo=UTC),
         start_tank=57.3,
         last_tank=64.1,
         draw_kwh=0.2,

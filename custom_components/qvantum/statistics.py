@@ -11,8 +11,9 @@ This is a Home Assistant module, not part of ``client/``.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -223,6 +224,6 @@ async def async_statistics_during_period(
             None,
             types or {"mean"},
         )
-    except Exception as err:  # noqa: BLE001 — recorder may be unavailable
+    except Exception as err:
         _LOGGER.debug("Recorder statistics unavailable: %s", err)
         return {}

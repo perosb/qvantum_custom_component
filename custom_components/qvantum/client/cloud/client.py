@@ -7,9 +7,9 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import quote, urlencode
 
 import aiohttp
@@ -68,8 +68,8 @@ def _parse_retry_after(response: aiohttp.ClientResponse) -> float | None:
     if when is None:
         return None
     if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
-    return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
+        when = when.replace(tzinfo=UTC)
+    return max(0.0, (when - datetime.now(UTC)).total_seconds())
 
 
 class QvantumCloudClient:
@@ -436,7 +436,7 @@ class QvantumCloudClient:
                     getattr(err, "retry_after", None),
                 )
                 raise
-            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            except (TimeoutError, aiohttp.ClientError) as err:
                 # Connection-level failures must be typed and cached too, or
                 # every waiter retries the network in the flaky cases the
                 # cooldown targets.
@@ -491,7 +491,7 @@ class QvantumCloudClient:
         self,
         method: str,
         url: str,
-        payload: Optional[dict] = None,
+        payload: dict | None = None,
         validate_status: bool = True,
     ) -> dict[str, Any]:
         """Send a JSON request and return the decoded body.
@@ -567,7 +567,7 @@ class QvantumCloudClient:
 
     async def set_extra_tap_water(self, device_id: str, minutes: int) -> dict[str, Any]:
         """Request extra DHW via the commands endpoint (cloud encodes minutes)."""
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now(UTC)
         if minutes == 0:
             stop_time = int(current_time.timestamp())
             indefinite = False
@@ -624,7 +624,7 @@ class QvantumCloudClient:
         self, device_id: str, preset_mode: str
     ) -> dict[str, Any]:
         """Write the fan preset via the commands endpoint."""
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now(UTC)
         match preset_mode:
             case "off":
                 payload = {"set_fan_mode": {"mode": 0}}
@@ -800,7 +800,7 @@ class QvantumCloudClient:
         self,
         device_id: str,
         metric_names: list[str],
-        etag_header: Optional[str] = None,
+        etag_header: str | None = None,
     ) -> tuple[dict | None, str | None, int | None]:
         self._ensure_open()
         await self._ensure_valid_token()
@@ -1040,8 +1040,8 @@ class QvantumCloudClient:
         except (TypeError, ValueError):
             return False
         if expires_at_dt.tzinfo is None:
-            expires_at_dt = expires_at_dt.replace(tzinfo=timezone.utc)
-        return expires_at_dt < datetime.now(timezone.utc) + timedelta(days=1)
+            expires_at_dt = expires_at_dt.replace(tzinfo=UTC)
+        return expires_at_dt < datetime.now(UTC) + timedelta(days=1)
 
     async def elevate_access(self, device_id: str) -> dict[str, Any] | None:
         data = await self.get_access_level(device_id)

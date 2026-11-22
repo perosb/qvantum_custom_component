@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import date
 from urllib.parse import parse_qs, urlparse
 
@@ -361,7 +360,7 @@ async def test_get_json_maps_transport_and_payload_errors() -> None:
     with pytest.raises(OpenMeteoError, match="ClientConnectionError"):
         await fetch_forecast(session, 0.0, 0.0)
 
-    session = FakeSession([FakeResponse(error=asyncio.TimeoutError())])
+    session = FakeSession([FakeResponse(error=TimeoutError())])
     with pytest.raises(OpenMeteoError, match="request failed"):
         await fetch_forecast(session, 0.0, 0.0)
 

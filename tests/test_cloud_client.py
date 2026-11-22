@@ -4,7 +4,7 @@ import asyncio
 import json
 import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 from unittest.mock import AsyncMock
 
@@ -734,7 +734,7 @@ async def test_rate_limit_error_carries_retry_after_seconds(mock_session):
 
 @pytest.mark.asyncio
 async def test_rate_limit_error_parses_http_date_retry_after(mock_session):
-    when = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=90))
+    when = format_datetime(datetime.now(UTC) + timedelta(seconds=90))
     cm, _ = mock_session.make_cm_response(
         status=429, json_data={}, headers={"Retry-After": when}
     )
@@ -799,7 +799,7 @@ async def test_extra_tap_water_uses_utc_epoch(mock_session):
     mock_session.post.return_value = cm
     client = _authed_client(mock_session)
 
-    before = datetime.now(timezone.utc).timestamp()
+    before = datetime.now(UTC).timestamp()
     await client.set_extra_tap_water("dev1", 60)
 
     payload = mock_session.post.call_args.kwargs["json"]["command"][

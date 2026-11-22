@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from .client.protocol import QvantumClient
@@ -106,7 +106,7 @@ class ExtraDhwTimer:
         """After *minutes*, write DHW mode back to Normal."""
         if minutes <= 0:
             return
-        restore_at = datetime.now(timezone.utc).timestamp() + minutes * 60
+        restore_at = datetime.now(UTC).timestamp() + minutes * 60
         await self.async_schedule_at(device_id, restore_at, persist=True)
 
     async def async_schedule_at(
@@ -114,7 +114,7 @@ class ExtraDhwTimer:
     ) -> None:
         """Schedule restore at an absolute UTC epoch; persist when requested."""
         self.cancel(clear_store=False)
-        remaining = restore_at - datetime.now(timezone.utc).timestamp()
+        remaining = restore_at - datetime.now(UTC).timestamp()
         if not self.hass:
             return
         self.restore_at = restore_at
@@ -171,7 +171,7 @@ class ExtraDhwTimer:
         restore_at = data.get("restore_at")
         if not device_id:
             return
-        now = datetime.now(timezone.utc).timestamp()
+        now = datetime.now(UTC).timestamp()
         if (
             isinstance(restore_at, bool)
             or not isinstance(restore_at, (int, float))

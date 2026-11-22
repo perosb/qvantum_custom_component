@@ -215,11 +215,11 @@ async def test_async_setup_entry(
     hass, mock_config_entry, mock_coordinator, mock_device
 ):
     """Test setting up binary sensor entities."""
-    from custom_components.qvantum.binary_sensor import (
-        async_setup_entry,
-        QvantumBaseBinaryEntity,
-    )
     from custom_components.qvantum import RuntimeData
+    from custom_components.qvantum.binary_sensor import (
+        QvantumBaseBinaryEntity,
+        async_setup_entry,
+    )
 
     # Mock the entity registry
     mock_entity_registry = MagicMock()
@@ -289,11 +289,11 @@ async def test_async_setup_entry_modbus_includes_pump_relay(
     hass, mock_config_entry, mock_coordinator, mock_device
 ):
     """Modbus setup creates picpin_relay_pump; HTTP setup does not."""
-    from custom_components.qvantum.binary_sensor import (
-        async_setup_entry,
-        QvantumBaseBinaryEntity,
-    )
     from custom_components.qvantum import RuntimeData
+    from custom_components.qvantum.binary_sensor import (
+        QvantumBaseBinaryEntity,
+        async_setup_entry,
+    )
 
     hass.data["entity_registry"] = MagicMock()
     mock_device_registry = MagicMock()
@@ -334,11 +334,11 @@ async def test_async_setup_entry_creates_efficiency_binary(
     hass, mock_config_entry, mock_coordinator, mock_device
 ):
     """Both recorder-derived flags are created when the coordinator exists."""
-    from custom_components.qvantum.binary_sensor import (
-        async_setup_entry,
-        QvantumEfficiencyBinaryEntity,
-    )
     from custom_components.qvantum import RuntimeData
+    from custom_components.qvantum.binary_sensor import (
+        QvantumEfficiencyBinaryEntity,
+        async_setup_entry,
+    )
     from custom_components.qvantum.efficiency_coordinator import (
         EfficiencySnapshot,
         QvantumEfficiencyCoordinator,
