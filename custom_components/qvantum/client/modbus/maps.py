@@ -325,10 +325,11 @@ MODBUS_HOLDING_RANGE: dict[str, tuple[float, float]] = {
     "filtertime_outdoor": (0, 48),
     "use_operation_sensor": (0, 4),
     "desired_indoor_temp": (15, 25),
-    # Pump firmware quirk: the Modbus write path clamps room compensation to
-    # 0.5-2, while the HTTP API accepts 0-10. A register set over HTTP (e.g. 5)
-    # is read back as-is, so a live read can hold a value above this range — the
-    # range bounds our writes, not the pump's possible state.
+    # The Modbus write path takes only the range the firmware tables give for
+    # holding 13 — 0.5-2 in every dump we have (1.12.8, 1.13.0) — while the
+    # cloud API accepts 0-10. A register set above that range (e.g. 5) is read
+    # back as-is, so a live read can hold one: the range bounds our writes, not
+    # the pump's possible state.
     "room_compensation": (0.5, 2),
     "room_temp_external": (-5, 40),
     "heating_offset": (-9, 9),
