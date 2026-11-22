@@ -15,6 +15,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Callable, Mapping, Sequence
 
+from .numeric import finite
+
 #: A cycling figure needs at least this much compressor run time (hours).
 MIN_RUN_HOURS = 1.0
 #: Component weights in the health grade; missing components renormalise.
@@ -71,17 +73,6 @@ HEATING_POWER_MAX_INTERVAL_SECONDS = 900.0
 HEATING_POWER_MIN_COVERAGE_SECONDS = 1800.0
 
 
-def _finite(value: object) -> float | None:
-    """Coerce to a finite float, rejecting bools and non-numeric input."""
-    if isinstance(value, bool) or value is None:
-        return None
-    try:
-        numeric = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError, OverflowError):
-        return None
-    return numeric if math.isfinite(numeric) else None
-
-
 def _clamp01(value: float) -> float:
     """Clamp a score into [0, 1]."""
     return max(0.0, min(1.0, value))
@@ -98,8 +89,8 @@ def starts_per_hour(
     ``None`` when either counter delta is missing, negative (reset), or there
     was too little running time for the rate to mean anything.
     """
-    starts = _finite(starts_delta)
-    run_hours = _finite(run_hours_delta)
+    starts = finite(starts_delta)
+    run_hours = finite(run_hours_delta)
     if starts is None or run_hours is None:
         return None
     if starts < 0.0 or run_hours < min_run_hours:
@@ -125,7 +116,7 @@ def mean_while_running(
     for ts, value in points:
         if not (start_ts <= ts < end_ts):
             continue
-        numeric = _finite(value)
+        numeric = finite(value)
         if numeric is None or numeric <= min_value:
             continue
         values.append(numeric)
@@ -146,9 +137,9 @@ def dhw_heat_meter_power_w(
     not being heated (ΔT ≤ 0), so idle hours never contribute a fake
     zero-draw estimate.
     """
-    flow = _finite(flow_l_min)
-    hot = _finite(hot_out_c)
-    cold = _finite(cold_in_c)
+    flow = finite(flow_l_min)
+    hot = finite(hot_out_c)
+    cold = finite(cold_in_c)
     if flow is None or hot is None or cold is None or flow <= 0.0:
         return None
     delta_t = hot - cold
@@ -189,12 +180,12 @@ class DhwMeterWindow:
         meter_kwh: object,
     ) -> None:
         """Book one poll: the metered step and the interval's flow × ΔT."""
-        now = _finite(now_ts)
+        now = finite(now_ts)
         if now is None:
             return
         previous_ts = self.last_ts
         previous_meter = self.last_meter_kwh
-        meter = _finite(meter_kwh)
+        meter = finite(meter_kwh)
         self.last_ts = now
         if meter is not None:
             self.last_meter_kwh = meter
@@ -218,7 +209,7 @@ class DhwMeterWindow:
 
     def totals(self, now_ts: object) -> tuple[float, float, float]:
         """``(estimated_kwh, metered_kwh, draw_hours)`` over the window."""
-        now = _finite(now_ts)
+        now = finite(now_ts)
         if now is not None:
             self._prune(now)
         estimated = sum(slot[0] for slot in self.buckets.values())
@@ -255,7 +246,7 @@ class DhwMeterWindow:
         for row in rows:
             if not isinstance(row, (list, tuple)) or len(row) != 4:
                 continue
-            bucket, estimated, metered, seconds = (_finite(item) for item in row)
+            bucket, estimated, metered, seconds = (finite(item) for item in row)
             if bucket is None or estimated is None or metered is None:
                 continue
             if seconds is None or estimated < 0.0 or metered < 0.0:
@@ -306,14 +297,14 @@ class HeatingPowerWindow:
         counted: bool = True,
     ) -> None:
         """Book one poll: its power weighted by the elapsed interval."""
-        now = _finite(now_ts)
+        now = finite(now_ts)
         if now is None:
             return
         previous = self.last_ts
         self.last_ts = now
         if previous is not None and counted:
             elapsed = now - previous
-            power = _finite(power_w)
+            power = finite(power_w)
             if 0.0 < elapsed <= HEATING_POWER_MAX_INTERVAL_SECONDS and power is not None:
                 if power >= 0.0:
                     bucket = (
@@ -327,7 +318,7 @@ class HeatingPowerWindow:
 
     def coverage_seconds(self, now_ts: object) -> float:
         """Seconds of usable evidence inside the window."""
-        now = _finite(now_ts)
+        now = finite(now_ts)
         if now is not None:
             self._prune(now)
         return sum(slot[1] for slot in self.buckets.values())
@@ -356,8 +347,8 @@ class HeatingPowerWindow:
 
 def duty_cycle(run_hours: object, window_hours: object) -> float | None:
     """Share of the observed window spent running, clamped to [0, 1]."""
-    run = _finite(run_hours)
-    window = _finite(window_hours)
+    run = finite(run_hours)
+    window = finite(window_hours)
     if run is None or window is None or window <= 0.0:
         return None
     return _clamp01(run / window)
@@ -427,7 +418,7 @@ def seasonal_space_heating_efficiency(scop: object) -> float | None:
     operation, not the reference annual demand at average-climate conditions.
     Read it as "what the installation achieved, expressed in the label's unit".
     """
-    value = _finite(scop)
+    value = finite(scop)
     if value is None or value <= 0.0:
         return None
     return round(value / EU_CONVERSION_COEFFICIENT * 100.0, 1)
@@ -435,7 +426,7 @@ def seasonal_space_heating_efficiency(scop: object) -> float | None:
 
 def eu_energy_class(eta_s: object) -> str | None:
     """The 811/2013 space-heating class for an ηs in percent."""
-    value = _finite(eta_s)
+    value = finite(eta_s)
     if value is None:
         return None
     for threshold, letter in EU_ETA_S_CLASSES:
@@ -482,7 +473,7 @@ def health_grade(
     total_weight = 0.0
     for key, weight in weights.items():
         total_weight += weight
-        raw = _finite(values.get(key))
+        raw = finite(values.get(key))
         if raw is None:
             continue
         scorer = _SCORERS.get(key)

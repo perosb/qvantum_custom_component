@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, Mapping
@@ -33,6 +32,7 @@ from .building import (
     fit_time_constant,
     weather_normalized_heating,
 )
+from .numeric import finite
 from .const import (
     DHW_COMPRESSOR_STATE_HOT_WATER,
     DHW_TANK_VOLUME_L,
@@ -210,17 +210,6 @@ class EfficiencySnapshot:
     building_fit_rows: int = 0
     building_indoor_key: str | None = None
     updated_at: str | None = None
-
-
-def _finite(value: object) -> float | None:
-    """Coerce to a finite float, rejecting bools and non-numeric input."""
-    if isinstance(value, bool) or value is None:
-        return None
-    try:
-        numeric = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError, OverflowError):
-        return None
-    return numeric if math.isfinite(numeric) else None
 
 
 def _stat_series(rows: list[Any], field: str) -> list[tuple[int, float]]:
@@ -432,8 +421,8 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         location or forecast simply yields ``None`` values.
         """
         config = getattr(self.hass, "config", None)
-        latitude = _finite(getattr(config, "latitude", None))
-        longitude = _finite(getattr(config, "longitude", None))
+        latitude = finite(getattr(config, "latitude", None))
+        longitude = finite(getattr(config, "longitude", None))
         if latitude is None or longitude is None:
             return SolarSnapshot()
 
@@ -944,9 +933,9 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         published, so one short draw cannot produce a wild percentage.
         """
         values = self._main_values()
-        estimated_kwh = _finite(values.get("dhw_meter_estimated_kwh"))
-        metered_kwh = _finite(values.get("dhw_meter_metered_kwh"))
-        draw_hours = _finite(values.get("dhw_meter_draw_hours")) or 0.0
+        estimated_kwh = finite(values.get("dhw_meter_estimated_kwh"))
+        metered_kwh = finite(values.get("dhw_meter_metered_kwh"))
+        draw_hours = finite(values.get("dhw_meter_draw_hours")) or 0.0
         if estimated_kwh is None or metered_kwh is None:
             return None, None, estimated_kwh, metered_kwh, draw_hours
         if (
@@ -960,10 +949,10 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
 
     def _dhw_is_idle(self, values: Mapping[str, Any]) -> float | None:
         """Tank temperature when the DHW circuit is idle, else ``None``."""
-        tank = _finite(values.get("bt30"))
+        tank = finite(values.get("bt30"))
         if tank is None:
             return None
-        flow = _finite(values.get("bf1_l_min"))
+        flow = finite(values.get("bf1_l_min"))
         # A missing flow metric must not count as "no draw": without it a hot
         # water draw during the window is indistinguishable from tank cooling
         # and the standing loss would be silently inflated.
@@ -997,16 +986,16 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             return
         if not isinstance(data, dict):
             return
-        value = _finite(data.get("dhw_standing_loss_per_k"))
+        value = finite(data.get("dhw_standing_loss_per_k"))
         if value is not None and value > 0.0:
             self._dhw_standing_loss_per_k = value
         window = data.get("dhw_standing_window")
         if isinstance(window, dict):
             self._dhw_standing_window = window
-        episodes = _finite(data.get("dhw_standing_episodes"))
+        episodes = finite(data.get("dhw_standing_episodes"))
         if episodes is not None and episodes >= 0:
             self._dhw_standing_episodes = int(episodes)
-        hours = _finite(data.get("dhw_standing_hours"))
+        hours = finite(data.get("dhw_standing_hours"))
         if hours is not None and hours >= 0.0:
             self._dhw_standing_hours = float(hours)
 
@@ -1051,7 +1040,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
 
     def _standing_loss_w_per_k(self) -> float | None:
         """The coefficient in watts per kelvin, for the sensor attributes."""
-        per_k = _finite(getattr(self, "_dhw_standing_loss_per_k", None))
+        per_k = finite(getattr(self, "_dhw_standing_loss_per_k", None))
         if per_k is None or per_k <= 0.0:
             return None
         return per_k * 1000.0 / 24.0
@@ -1089,7 +1078,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             and int(bit) != 1
         )
         for key in DHW_AMBIENT_KEYS:
-            ambient = _finite(values.get(key))
+            ambient = finite(values.get(key))
             if ambient is None:
                 continue
             if key == "bt2" and (
@@ -1112,7 +1101,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         silently fall through to the datasheet volume for every window.
         """
         getter = getattr(self._main, "dhw_tank_liters", None)
-        identified = _finite(getter() if callable(getter) else getter)
+        identified = finite(getter() if callable(getter) else getter)
         if identified is not None and identified > 0.0:
             return identified
         return DHW_TANK_VOLUME_L

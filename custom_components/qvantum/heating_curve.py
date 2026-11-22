@@ -47,6 +47,7 @@ from .solar_gain import (
     effective_solar_model,
     smooth_ghi,
 )
+from .numeric import median
 
 CURVE_KEYS: tuple[str, ...] = tuple(HEATING_CURVE_OUTDOOR_TEMPS)
 OUTDOOR_TEMPS: tuple[int, ...] = tuple(HEATING_CURVE_OUTDOOR_TEMPS.values())
@@ -599,15 +600,6 @@ def load_adjustment_c(
     return -LOAD_MAX_C * _clamp(shortfall / LOAD_SPAN, 0.0, 1.0)
 
 
-def _median(values: Sequence[float]) -> float:
-    ordered = sorted(values)
-    n = len(ordered)
-    mid = n // 2
-    if n % 2:
-        return ordered[mid]
-    return 0.5 * (ordered[mid - 1] + ordered[mid])
-
-
 def _fit_line(x: Sequence[float], y: Sequence[float]) -> tuple[float, float]:
     """Ordinary least squares ``y ≈ slope·x + intercept``."""
     n = len(x)
@@ -669,7 +661,7 @@ def corrected_baseline(
         return None
     bucket_x = sorted(buckets)
     slope, intercept = _fit_line(
-        [float(x) for x in bucket_x], [_median(buckets[x]) for x in bucket_x]
+        [float(x) for x in bucket_x], [median(buckets[x]) for x in bucket_x]
     )
 
     correction = {

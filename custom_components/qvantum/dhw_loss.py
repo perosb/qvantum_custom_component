@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import math
 
+from .numeric import finite
+
 #: Volumetric heat capacity of water: 4.186 kJ/(kg·K) / 3600 = kWh per litre per K.
 WATER_KWH_PER_LITER_K = 4.186 / 3600.0
 #: Shorter windows are dominated by sensor resolution.
@@ -61,24 +63,13 @@ def element_only_tank_balance(
     does not carry these metrics keeps identifying exactly as before, so the
     guard tightens only where the data exists.
     """
-    shunt = _finite(shunt_position)
+    shunt = finite(shunt_position)
     if shunt is not None and shunt > 0.0:
         return False
-    heating = _finite(heating_kwh)
+    heating = finite(heating_kwh)
     if heating is not None and heating > 0.0:
         return False
     return True
-
-
-def _finite(value: object) -> float | None:
-    """Coerce to a finite float, rejecting bools and non-numeric input."""
-    if isinstance(value, bool) or value is None:
-        return None
-    try:
-        numeric = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError, OverflowError):
-        return None
-    return numeric if math.isfinite(numeric) else None
 
 
 def standing_loss_kwh_per_day(
@@ -91,9 +82,9 @@ def standing_loss_kwh_per_day(
     ``None`` when the window is too short, the fall too small, or the volume
     unusable — a two-hour, 0.1 K reading says nothing about a day.
     """
-    drop = _finite(drop_k)
-    duration = _finite(hours)
-    volume = _finite(volume_l)
+    drop = finite(drop_k)
+    duration = finite(hours)
+    volume = finite(volume_l)
     if drop is None or duration is None or volume is None:
         return None
     if drop < MIN_DROP_K or duration < MIN_WINDOW_HOURS or volume <= 0.0:
@@ -113,9 +104,9 @@ def mean_delta_k(
     ``None`` when any input is unusable or the difference is under
     :data:`MIN_DELTA_K`, which would turn sensor resolution into a loss figure.
     """
-    start = _finite(tank_start)
-    end = _finite(tank_end)
-    room = _finite(ambient)
+    start = finite(tank_start)
+    end = finite(tank_end)
+    room = finite(ambient)
     if start is None or end is None or room is None:
         return None
     delta = (start + end) / 2.0 - room
@@ -139,7 +130,7 @@ def standing_loss_per_k(
     window moved the published figure by 30 %.
     """
     daily = standing_loss_kwh_per_day(drop_k, hours, volume_l)
-    delta = _finite(delta_k)
+    delta = finite(delta_k)
     if daily is None or delta is None or delta < MIN_DELTA_K:
         return None
     return daily / delta
@@ -149,7 +140,7 @@ def reference_loss_kwh_per_day(
     per_k: object, delta_k: float = REFERENCE_DELTA_K
 ) -> float | None:
     """The per-kelvin loss quoted as kWh/d at ``delta_k`` tank-to-ambient."""
-    coefficient = _finite(per_k)
+    coefficient = finite(per_k)
     if coefficient is None or coefficient <= 0.0:
         return None
     return coefficient * delta_k

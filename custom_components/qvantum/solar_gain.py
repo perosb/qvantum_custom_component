@@ -48,6 +48,8 @@ import math
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
+from .numeric import median
+
 #: Recency half-life for the exponential weights (effective memory ≈ 60 days).
 HALF_LIFE_DAYS: float = 30.0
 #: GHI below this is considered opaque (night / heavy overcast) for stage 1.
@@ -261,16 +263,6 @@ def smooth_ghi(
     return total / total_w
 
 
-def _median(values: Sequence[float]) -> float:
-    """Median of a non-empty sequence."""
-    ordered = sorted(values)
-    n = len(ordered)
-    mid = n // 2
-    if n % 2:
-        return ordered[mid]
-    return 0.5 * (ordered[mid - 1] + ordered[mid])
-
-
 def _recency_weights(
     samples: Sequence[SolarSample], now_ts: int, half_life_days: float
 ) -> list[float]:
@@ -309,8 +301,8 @@ def _robust_weights_line(
 ) -> list[float]:
     """One Huber pass on studentised residuals of ``y ≈ a·x + c``."""
     residuals = [yi - (a * xi + c) for xi, yi in zip(x, y)]
-    center = _median(residuals)
-    scale = MAD_SCALE * _median([abs(r - center) for r in residuals])
+    center = median(residuals)
+    scale = MAD_SCALE * median([abs(r - center) for r in residuals])
     if scale < 1e-9:
         mean = sum(residuals) / len(residuals)
         scale = math.sqrt(sum((r - mean) ** 2 for r in residuals) / len(residuals))
@@ -344,8 +336,8 @@ def _robust_weights_solar(
 ) -> list[float]:
     """One Huber pass for the through-origin residual fit."""
     e = [ri - b * ii for ii, ri in zip(i_vals, residual)]
-    center = _median(e)
-    scale = MAD_SCALE * _median([abs(ei - center) for ei in e])
+    center = median(e)
+    scale = MAD_SCALE * median([abs(ei - center) for ei in e])
     if scale < 1e-9:
         mean = sum(e) / len(e)
         scale = math.sqrt(sum((ei - mean) ** 2 for ei in e) / len(e))
