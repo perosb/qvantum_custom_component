@@ -115,7 +115,7 @@ class TestHandleSettingUpdateResponse:
             "values": {"extra_tap_water": "on", "tap_stop": 1712232000}
         }
         coordinator.async_set_updated_data = MagicMock()
-        coordinator.client = MagicMock()
+        coordinator.client = make_client_mock()
         coordinator.extra_dhw = MagicMock()
         coordinator.extra_dhw.restore_at = 1712232000.0
 
@@ -161,7 +161,7 @@ class TestHandleSettingUpdateResponse:
         coordinator = MagicMock()
         coordinator.data = {"values": {"extra_tap_water": "off"}}
         coordinator.async_set_updated_data = MagicMock()
-        coordinator.client = MagicMock()
+        coordinator.client = make_client_mock()
         coordinator.extra_dhw = MagicMock()
         coordinator.extra_dhw.restore_at = 1712232000.7
 
@@ -180,7 +180,7 @@ class TestHandleSettingUpdateResponse:
             "values": {"extra_tap_water": "off", "tap_stop": 1712232000}
         }
         coordinator.async_set_updated_data = MagicMock()
-        coordinator.client = MagicMock()
+        coordinator.client = make_client_mock()
         coordinator.extra_dhw = MagicMock()
         coordinator.extra_dhw.restore_at = None
 
@@ -199,7 +199,7 @@ class TestHandleSettingUpdateResponse:
             "values": {"extra_tap_water": "on", "tap_stop": 1712232000}
         }
         coordinator.async_set_updated_data = MagicMock()
-        coordinator.client = MagicMock()
+        coordinator.client = make_client_mock()
         coordinator.extra_dhw = MagicMock()
         coordinator.extra_dhw.restore_at = 1712232000.0
 
@@ -218,7 +218,7 @@ class TestHandleSettingUpdateResponse:
             "values": {"extra_tap_water": "on", "tap_stop": 1712232000}
         }
         coordinator.async_set_updated_data = MagicMock()
-        coordinator.client = MagicMock()
+        coordinator.client = make_client_mock()
         coordinator.extra_dhw = MagicMock()
         coordinator.extra_dhw.restore_at = 1712232000.0
 

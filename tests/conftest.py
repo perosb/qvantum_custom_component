@@ -16,7 +16,17 @@ pytest_plugins = ["pytest_homeassistant_custom_component"]
 
 
 def make_client_mock(*, modbus: bool = False) -> MagicMock:
-    """Transport mock that passes strict ``isinstance`` checks in production."""
+    """Transport mock that passes strict ``isinstance`` checks in production.
+
+    Spec'd on purpose: a bare ``MagicMock`` invents any attribute, so an
+    assertion on a method the client does not have passes without proving
+    anything. Prefer this over ``MagicMock()`` for ``coordinator.client``.
+
+    Do **not** copy the pattern to the coordinator itself: its mock's public and
+    private state is 100 instance attributes that a class spec cannot see, and
+    production reads most of them through ``getattr(coordinator, name, None)`` —
+    which would silently answer ``None`` instead of a mock.
+    """
     if modbus:
         from custom_components.qvantum.client.modbus import QvantumModbusClient
 
@@ -159,6 +169,9 @@ def mock_coordinator():
     coordinator.async_config_entry_first_refresh = AsyncMock()
     coordinator.async_restore_dhw_state = AsyncMock()
     coordinator.async_restore_cop_state = AsyncMock()
+    # A transport mock with a spec, so a test that asserts on a client method
+    # the client does not have fails instead of passing silently.
+    coordinator.client = make_client_mock()
 
     # Mock the maintenance coordinator for access level checking
     config_entry = Mock()

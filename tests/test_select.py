@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.exceptions import HomeAssistantError
 
+from tests.conftest import make_client_mock
+
 
 # Create mock base classes that don't have metaclass conflicts
 class MockCoordinatorEntity:
@@ -53,7 +55,7 @@ def mock_coordinator():
             "smart_dhw_mode": 0,  # legacy - not used in values mode
         },
     }
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 

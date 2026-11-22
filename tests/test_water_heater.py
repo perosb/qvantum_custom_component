@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.exceptions import HomeAssistantError
 
+from tests.conftest import make_client_mock
+
 
 class MockCoordinatorEntity:
     def __init__(self, coordinator):
@@ -73,7 +75,7 @@ def mock_coordinator():
             "op_man_dhw": 1,
         },
     }
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.client.set_tap_water = AsyncMock(return_value=_applied())
     coordinator.client.update_setting = AsyncMock(return_value=_applied())
     coordinator.async_set_extra_tap_water = AsyncMock(return_value=_applied())
@@ -380,7 +382,7 @@ def _spec_coordinator(write_level: int):
     }
     coordinator.modbus_enabled = False
     coordinator.last_update_success = True
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.extra_dhw = MagicMock()
     coordinator.extra_dhw.async_clear = AsyncMock()
     coordinator.config_entry = MagicMock()
@@ -447,7 +449,7 @@ def _modbus_no_write_coordinator():
     }
     coordinator.modbus_enabled = True
     coordinator.last_update_success = True
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.extra_dhw = MagicMock()
     coordinator.extra_dhw.async_clear = AsyncMock()
     coordinator.config_entry = MagicMock()

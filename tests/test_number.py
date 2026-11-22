@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.conftest import make_client_mock
+
 
 # Create mock base classes that don't have metaclass conflicts
 class MockCoordinatorEntity:
@@ -48,7 +50,7 @@ def mock_coordinator():
             "fan_speed_2": 25,
         },
     }
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 
@@ -1381,7 +1383,7 @@ class TestNumberAvailabilityAndWriteGuard:
         }
         coordinator.modbus_enabled = False
         coordinator.last_update_success = True
-        coordinator.client = MagicMock()
+        coordinator.client = make_client_mock()
         coordinator.config_entry = MagicMock()
         maintenance = MagicMock()
         maintenance.data = {"access_level": {"writeAccessLevel": 10}}
