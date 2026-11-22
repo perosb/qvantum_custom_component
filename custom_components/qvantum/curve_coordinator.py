@@ -99,6 +99,7 @@ from .statistics import (
     pick_indoor_metric_key,
     resolve_statistic_entity_ids,
 )
+from .numeric import finite
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -644,15 +645,6 @@ def _daily_from_state(state: Any) -> SolarDailyModel | None:
     if not isinstance(state, dict):
         return None
 
-    def optional(raw: Any) -> float | None:
-        if raw is None or isinstance(raw, bool):
-            return None
-        try:
-            value = float(raw)
-        except (TypeError, ValueError):
-            return None
-        return value if math.isfinite(value) else None
-
     try:
         return SolarDailyModel(
             a_w_per_k=float(state["a"]),
@@ -661,27 +653,27 @@ def _daily_from_state(state: Any) -> SolarDailyModel | None:
             trust=float(state.get("trust", 0.0)),
             r2=float(state.get("r2", 0.0)),
             n_days=int(state.get("n_days", 0)),
-            b_std_err=optional(state.get("b_std_err")),
-            t_stat=optional(state.get("t_stat")),
-            b_first_half_m2=optional(state.get("b_first_half")),
-            b_second_half_m2=optional(state.get("b_second_half")),
-            b_jackknife_min_m2=optional(state.get("b_jackknife_min")),
-            b_jackknife_max_m2=optional(state.get("b_jackknife_max")),
+            b_std_err=finite(state.get("b_std_err")),
+            t_stat=finite(state.get("t_stat")),
+            b_first_half_m2=finite(state.get("b_first_half")),
+            b_second_half_m2=finite(state.get("b_second_half")),
+            b_jackknife_min_m2=finite(state.get("b_jackknife_min")),
+            b_jackknife_max_m2=finite(state.get("b_jackknife_max")),
             valid=bool(state.get("valid", False)),
             notes=str(state.get("notes", "")),
-            w_per_ms=optional(state.get("w")),
-            w_std_err=optional(state.get("w_std_err")),
-            w_t_stat=optional(state.get("w_t_stat")),
+            w_per_ms=finite(state.get("w")),
+            w_std_err=finite(state.get("w_std_err")),
+            w_t_stat=finite(state.get("w_t_stat")),
             wind_hours=int(state.get("wind_hours") or 0),
             wind_cold_hours=int(state.get("wind_cold_hours") or 0),
             wind_evidence_days=int(state.get("wind_evidence_days") or 0),
-            wind_vif=optional(state.get("wind_vif")),
+            wind_vif=finite(state.get("wind_vif")),
             wind_valid=bool(state.get("wind_valid", False)),
             wind_notes=str(state.get("wind_notes", "")),
-            a_w_per_k_4col=optional(state.get("a_4col")),
-            b_m2_4col=optional(state.get("b_4col")),
-            w_first_half_ms=optional(state.get("w_first_half")),
-            w_second_half_ms=optional(state.get("w_second_half")),
+            a_w_per_k_4col=finite(state.get("a_4col")),
+            b_m2_4col=finite(state.get("b_4col")),
+            w_first_half_ms=finite(state.get("w_first_half")),
+            w_second_half_ms=finite(state.get("w_second_half")),
         )
     except (KeyError, TypeError, ValueError):
         return None
@@ -710,15 +702,6 @@ def _active_gain_from_state(state: Any) -> ActiveRoomGain | None:
     if not isinstance(state, dict):
         return None
 
-    def optional(raw: Any) -> float | None:
-        if raw is None or isinstance(raw, bool):
-            return None
-        try:
-            value = float(raw)
-        except (TypeError, ValueError):
-            return None
-        return value if math.isfinite(value) else None
-
     try:
         return ActiveRoomGain(
             gain_c_per_c=float(state["gain"]),
@@ -726,11 +709,11 @@ def _active_gain_from_state(state: Any) -> ActiveRoomGain | None:
             hours=int(state.get("hours", 0)),
             buckets=int(state.get("buckets", 0)),
             span_c=float(state.get("span", 0.0)),
-            std_err_c_per_c=optional(state.get("std_err")),
-            r2=optional(state.get("r2")),
-            residual_std_c=optional(state.get("residual")),
-            leave_one_out_c_per_c=optional(state.get("loo")),
-            outdoor_slope_c_per_c=optional(state.get("outdoor_slope")),
+            std_err_c_per_c=finite(state.get("std_err")),
+            r2=finite(state.get("r2")),
+            residual_std_c=finite(state.get("residual")),
+            leave_one_out_c_per_c=finite(state.get("loo")),
+            outdoor_slope_c_per_c=finite(state.get("outdoor_slope")),
             valid=bool(state.get("valid", False)),
             notes=str(state.get("notes", "")),
         )

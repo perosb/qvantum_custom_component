@@ -50,7 +50,7 @@ custom_components/qvantum/
   device_trigger.py, device_condition.py, device_automation_helpers.py
   services.py / services.yaml
   # pure math, no HA imports:
-  efficiency.py, heating_curve.py, solar_gain.py, building.py,
+  numeric.py, efficiency.py, heating_curve.py, solar_gain.py, building.py,
   dhw_loss.py, plant_analytics.py
   open_meteo.py               # forecast/history fetch (temperature, GHI, wind)
   client/                     # vendored comms — no Home Assistant imports

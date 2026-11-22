@@ -18,6 +18,8 @@ import math
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
+from .numeric import finite
+
 #: Heating base temperature (°C) for degree hours (European convention).
 DEFAULT_BASE_TEMP_C = 15.0
 #: Minimum usable hours before a heat-loss fit is published.
@@ -170,17 +172,6 @@ def _fit_episodes(
     return slope, mean_y - slope * mean_x
 
 
-def _finite(value: object) -> float | None:
-    """Coerce to a finite float, rejecting bools and non-numeric input."""
-    if isinstance(value, bool) or value is None:
-        return None
-    try:
-        numeric = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError, OverflowError):
-        return None
-    return numeric if math.isfinite(numeric) else None
-
-
 def degree_hours(
     outdoor_by_hour: Mapping[int, float],
     *,
@@ -193,7 +184,7 @@ def degree_hours(
     """
     total = 0.0
     for value in outdoor_by_hour.values():
-        outdoor = _finite(value)
+        outdoor = finite(value)
         if outdoor is None:
             continue
         total += max(0.0, base_c - outdoor)
@@ -208,8 +199,8 @@ def weather_normalized_heating(
     ``None`` when either side is missing or non-positive — normalizing by zero
     degree hours would divide by a warm month.
     """
-    energy = _finite(heating_kwh)
-    degree_hours_val = _finite(degree_hours_k)
+    energy = finite(heating_kwh)
+    degree_hours_val = finite(degree_hours_k)
     if energy is None or degree_hours_val is None:
         return None
     if energy <= 0.0 or degree_hours_val <= 0.0:
@@ -236,9 +227,9 @@ def fit_heat_loss(
     for item in hours:
         if not isinstance(item, (tuple, list)) or len(item) != 3:
             continue
-        ts = _finite(item[0])
-        delta_t = _finite(item[1])
-        heat_w = _finite(item[2])
+        ts = finite(item[0])
+        delta_t = finite(item[1])
+        heat_w = finite(item[2])
         if ts is None or delta_t is None or heat_w is None:
             continue
         if delta_t < MIN_DELTA_T_K or heat_w < MIN_HEAT_POWER_W:

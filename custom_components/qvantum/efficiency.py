@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import math
 
+from .numeric import finite
+
 #: Counter drops smaller than this are treated as noise, not a reset. The kWh
 #: counters move in 0.1 kWh steps, so this is safely below one step.
 COUNTER_NOISE_KWH = 1e-6
@@ -56,17 +58,6 @@ COP_MIN_ELECTRICAL_KWH = 0.2
 COP_MIN_THERMAL_KWH = 0.2
 
 
-def _finite(value: object) -> float | None:
-    """Coerce to a finite float, rejecting bools and non-numeric input."""
-    if isinstance(value, bool) or value is None:
-        return None
-    try:
-        numeric = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError, OverflowError):
-        return None
-    return numeric if math.isfinite(numeric) else None
-
-
 def energy_delta(previous: object, current: object) -> float | None:
     """Delta between two cumulative counter reads.
 
@@ -74,8 +65,8 @@ def energy_delta(previous: object, current: object) -> float | None:
     means the interval delta is unknown, not negative consumption. Small
     negatives within counter rounding are clamped to zero.
     """
-    before = _finite(previous)
-    after = _finite(current)
+    before = finite(previous)
+    after = finite(current)
     if before is None or after is None:
         return None
     delta = after - before
@@ -90,8 +81,8 @@ def cop_ratio(thermal_kwh: object, electrical_kwh: object) -> float | None:
     ``None`` unless both are finite and electrical input is measurably
     positive; a COP without measured electrical input is not a measurement.
     """
-    thermal = _finite(thermal_kwh)
-    electrical = _finite(electrical_kwh)
+    thermal = finite(thermal_kwh)
+    electrical = finite(electrical_kwh)
     if thermal is None or electrical is None:
         return None
     if electrical < MIN_ELECTRICAL_KWH or thermal < MIN_THERMAL_KWH:
@@ -110,10 +101,10 @@ def cap_dhw_ratio(ratio: object, dhw_compressor_kwh: object) -> float | None:
     reads the stratified top hotter than the mean, or the assumed tank volume
     is too large — so the ratio is clamped rather than published.
     """
-    value = _finite(ratio)
+    value = finite(ratio)
     if value is None:
         return None
-    compressor = _finite(dhw_compressor_kwh)
+    compressor = finite(dhw_compressor_kwh)
     if compressor is None or compressor < MIN_ELECTRICAL_KWH:
         return min(value, RESISTIVE_COP_CEILING)
     return value
@@ -121,8 +112,8 @@ def cap_dhw_ratio(ratio: object, dhw_compressor_kwh: object) -> float | None:
 
 def aux_heat_share(additional_kwh: object, compressor_kwh: object) -> float | None:
     """Share of electrical input that came from auxiliary heat, in [0, 1]."""
-    additional = _finite(additional_kwh)
-    compressor = _finite(compressor_kwh)
+    additional = finite(additional_kwh)
+    compressor = finite(compressor_kwh)
     if additional is None or compressor is None:
         return None
     total = additional + compressor
@@ -144,10 +135,10 @@ def scop_from_counters(
     window; the counter split between modes is not available, so this is the
     system figure only.
     """
-    heating = _finite(heating_kwh)
-    dhw = _finite(dhw_kwh)
-    compressor = _finite(compressor_kwh)
-    additional = _finite(additional_kwh)
+    heating = finite(heating_kwh)
+    dhw = finite(dhw_kwh)
+    compressor = finite(compressor_kwh)
+    additional = finite(additional_kwh)
     if heating is None or dhw is None or compressor is None or additional is None:
         return None
     return cop_ratio(heating + dhw, compressor + additional)
