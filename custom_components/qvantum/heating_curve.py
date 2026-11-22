@@ -39,6 +39,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import TypeGuard
 
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
 from .numeric import median
@@ -1128,8 +1129,13 @@ BT2_MAX_PLAUSIBLE_C = 45.0
 BT2_MAX_DIVERGENCE_C = 10.0
 
 
-def _room_reading_is_plausible(value: object) -> bool:
-    """True for a number that could be an indoor temperature."""
+def _room_reading_is_plausible(value: object) -> TypeGuard[float]:
+    """True for a number that could be an indoor temperature.
+
+    A ``TypeGuard`` rather than a plain ``bool``: callers rely on the guard to
+    make the value usable as a float, and saying so lets the checker see the
+    invariant instead of re-asserting it at every call site.
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
     return BT2_MIN_PLAUSIBLE_C <= float(value) <= BT2_MAX_PLAUSIBLE_C
@@ -1212,7 +1218,9 @@ def pump_room_reading(
             float(bt2_c) if usable and bt2_c is not None else None,
             "bt2" if usable else "none",
         )
-    elif usable and external_mode:
+    elif usable and external_mode and bt2_c is not None:
+        # `usable` already implies a plausible BT2 reading; the explicit test
+        # states the invariant the blend depends on.
         reading = PumpRoomReading(
             (float(configured_c) + float(bt2_c)) / 2.0, "blended"
         )

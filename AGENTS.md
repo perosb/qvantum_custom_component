@@ -457,6 +457,19 @@ decision, and `E501` would flag forty lines, most of them log format strings.
 B as B)` stays one statement — without it every alias gets its own block.
 Run it locally with `uv run --with ruff==0.17.6 ruff check --fix`.
 
+Type checking is a gate **only for the seven Home-Assistant-free modules** —
+`numeric`, `efficiency`, `building`, `dhw_loss`, `plant_analytics`,
+`heating_curve`, `solar_gain` — listed in `mypy.ini` and run by the `types` job
+(`mypy==2.4.1`). They carry the curve's and the solar term's arithmetic, where a
+type error becomes a wrong number in the pump rather than a missing field in a
+report. The HA-facing modules are deliberately out: their
+`getattr(coordinator, name, None)` reads are defensive on purpose (the test
+harness builds half a coordinator), `getattr` with a literal name is invisible to
+a checker anyway, and the class of bug those two modules actually suffered —
+an export field missing from the dump — is pinned by a parity test in
+`tests/test_diagnostics.py`. Do not "finish" the job by adding the whole
+integration: that needs the persisted coordinator state declared first.
+
 ```bash
 ./run-tests.sh          # venv + requirements-test.txt + pytest
 python -m pytest        # repo root; pytest.ini sets coverage + timeout

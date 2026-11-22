@@ -46,7 +46,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from .numeric import median
@@ -426,7 +426,9 @@ def fit_solar_model(
     opaque = [s for s in samples if s.ghi_wm2 < OPAQUE_GHI_MAX_WM2]
     solar = [s for s in samples if s.ghi_wm2 >= OPAQUE_GHI_MAX_WM2]
     n_opaque, n_solar = len(opaque), len(solar)
-    empty = dict(
+    # A dataclass, not a dict: `SolarModel(**empty)` cannot be checked, and the
+    # fields it carries are the model's whole contract.
+    empty = SolarModel(
         a_w_per_k=0.0,
         b_m2=0.0,
         c_w=0.0,
@@ -440,7 +442,7 @@ def fit_solar_model(
     )
 
     if n_opaque < MIN_FIT_ROWS:
-        return SolarModel(**empty, notes=f"opaque rows {n_opaque} < {MIN_FIT_ROWS}")
+        return replace(empty, notes=f"opaque rows {n_opaque} < {MIN_FIT_ROWS}")
 
     x_opaque = [s.delta_t_k for s in opaque]
     y_opaque = [s.q_heat_w for s in opaque]
@@ -450,11 +452,11 @@ def fit_solar_model(
         robust_w = _robust_weights_line(x_opaque, y_opaque, w_opaque, a, c)
         a, c = _weighted_line(x_opaque, y_opaque, robust_w)
     except ValueError as err:
-        return SolarModel(**empty, notes=f"opaque fit failed: {err}")
+        return replace(empty, notes=f"opaque fit failed: {err}")
     if a <= 0.0:
-        return SolarModel(**{**empty, "a_w_per_k": a, "c_w": c}, notes="a ≤ 0")
+        return replace(empty, a_w_per_k=a, c_w=c, notes="a ≤ 0")
     if not (math.isfinite(a) and math.isfinite(c)):
-        return SolarModel(**empty, notes="non-finite fit")
+        return replace(empty, notes="non-finite fit")
 
     pred_opaque = [a * xi + c for xi in x_opaque]
     r2_opaque = _weighted_r2(y_opaque, pred_opaque, robust_w)
@@ -766,7 +768,7 @@ def _ols_three(
 ) -> tuple[tuple[float, float, float], tuple[float, float, float], float]:
     """Three-regressor case of :func:`_ols_columns`."""
     beta, stderr, r2 = _ols_columns((x1, x2, x3), y)
-    return (beta[0], beta[1], beta[2]), (stderr[0], stderr[1], stderr[2]), r2  # type: ignore[return-value]
+    return (beta[0], beta[1], beta[2]), (stderr[0], stderr[1], stderr[2]), r2
 
 
 def _fit_daily_rows(
@@ -964,10 +966,15 @@ def _fit_wind_coefficient(
 
     # No single day may carry the wind estimate either.
     jackknife: list[float] = []
+    # ``Sequence`` has no ``__add__``: slice a list once rather than relying on
+    # whatever the caller passed (a tuple would work, a range would not).
+    remaining_days = list(days)
     for index in range(n_days):
         try:
             jackknife.append(
-                _fit_daily_wind_rows(days[:index] + days[index + 1 :])[3]
+                _fit_daily_wind_rows(
+                    remaining_days[:index] + remaining_days[index + 1 :]
+                )[3]
             )
         except ValueError:
             jackknife.append(float("nan"))
