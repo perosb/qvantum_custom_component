@@ -56,6 +56,7 @@ from custom_components.qvantum.solar_gain import (
     SolarModel,
     SolarSample,
 )
+from tests.conftest import make_client_mock
 
 CURVE_KEYS = (
     "curve_30",
@@ -161,6 +162,7 @@ def make_coordinator(*, values=None, settings=None, store=None):
     ):
         coordinator = QvantumCurveCoordinator.__new__(QvantumCurveCoordinator)
     main = MagicMock()
+    main.client = make_client_mock()
     # Production merges holding-register settings into the values section.
     main.data = {"values": {**(values or {}), **(settings or {})}}
     main.device_id = "test_device_123"

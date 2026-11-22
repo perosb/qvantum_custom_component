@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.conftest import make_client_mock
+
 
 # Create mock base classes that don't have metaclass conflicts
 class MockCoordinatorEntity:
@@ -80,7 +82,7 @@ def mock_coordinator():
             "smart_price_heating_enabled": True,
         },
     }
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 
