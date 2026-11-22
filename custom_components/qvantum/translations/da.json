@@ -828,6 +828,9 @@
       },
       "curve_30": {
         "name": "Varmekurve 1: 30°C"
+      },
+      "dhw_start_extra": {
+        "name": "Starttemperatur for ekstra varmt vand"
       }
     },
     "climate": {
