@@ -435,6 +435,16 @@ def eu_energy_class(eta_s: object) -> str | None:
     return "G"
 
 
+def eu_label(scop: object) -> tuple[float | None, str | None]:
+    """The EU label's unit and class for a SCOP: ``(ηs in percent, class)``.
+
+    One call, because the class is a function of ηs: deriving them apart is how
+    a figure and its letter end up disagreeing.
+    """
+    eta_s = seasonal_space_heating_efficiency(scop)
+    return eta_s, eu_energy_class(eta_s)
+
+
 def _letter(score: float) -> str:
     if score >= 0.85:
         return "A"

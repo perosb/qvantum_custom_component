@@ -19,6 +19,7 @@ from homeassistant.util import dt as dt_util
 
 from .open_meteo import hour_ts as weather_hour_ts
 from .plant_analytics import HeatingPowerWindow
+from .plant_analytics import eu_label
 
 # Keys that must never leave the instance. ``async_redact_data`` applies these
 # recursively, so they cover config-entry data as well as nested client state.
@@ -274,6 +275,13 @@ def _efficiency_diagnostics(coordinator: Any) -> dict[str, Any] | None:
     block: dict[str, Any] = {
         field: getattr(snapshot, field, None) for field in _EFFICIENCY_FIELDS
     }
+    # The EU label's unit and class are derived from the SCOP, not stored, so
+    # they have no snapshot field to read: a report that cannot show them
+    # cannot answer "why is my class A+?" — and the export carries them.
+    for suffix, scop_field in (("", "scop_total"), ("_90d", "scop_total_90d")):
+        eta_s, eu_class = eu_label(getattr(snapshot, scop_field, None))
+        block[f"eta_s_percent{suffix}"] = eta_s
+        block[f"eu_class{suffix}"] = eu_class
     block["updated_at"] = getattr(snapshot, "updated_at", None)
     components = getattr(snapshot, "efficiency_health_components", None)
     if isinstance(components, dict):

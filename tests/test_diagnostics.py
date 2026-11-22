@@ -13,8 +13,10 @@ from custom_components.qvantum.heating_curve import ActiveRoomGain
 from custom_components.qvantum.curve_coordinator import CurveSnapshot
 from custom_components.qvantum.diagnostics import (
     TO_REDACT,
+    _efficiency_diagnostics,
     async_get_config_entry_diagnostics,
 )
+from custom_components.qvantum.efficiency_coordinator import EfficiencySnapshot
 from homeassistant.util import dt as dt_util
 
 from custom_components.qvantum.open_meteo import HourlyWeather, WeatherForecast, hour_ts
@@ -832,3 +834,46 @@ async def test_curve_diagnostics_tolerates_malformed_state(hass):
     assert curve_result["load_power_coverage_hours"] is None
     assert curve_result["write_scope"] == []
     json.dumps(result)
+
+
+def test_the_efficiency_dump_carries_every_exported_figure() -> None:
+    """Every figure the summary exports must be readable from a dump.
+
+    The export and the dump are two whitelists over the same snapshot, and they
+    had already drifted: the EU label's unit and class were added to the export
+    and never reached the dump, so a report could not answer "why is my class
+    A+?". A new export field therefore fails here until the dump carries it.
+    """
+    from custom_components.qvantum.summary import (
+        _SNAPSHOT_ATTRIBUTE,
+        FITTED_EFFICIENCY_KEYS,
+    )
+
+    snapshot = EfficiencySnapshot(
+        scop_total=2.84,
+        scop_total_90d=2.55,
+        heat_loss_w_per_k=100.5,
+        coverage_days=29.9,
+    )
+    block = _efficiency_diagnostics(SimpleNamespace(data=snapshot))
+    assert block is not None
+
+    missing = [
+        key
+        for key in FITTED_EFFICIENCY_KEYS
+        if _SNAPSHOT_ATTRIBUTE.get(key, key) not in block
+    ]
+    assert missing == []
+
+
+def test_the_efficiency_dump_derives_the_same_eu_label_as_the_export() -> None:
+    from custom_components.qvantum.summary import fitted_summary
+
+    snapshot = EfficiencySnapshot(scop_total=2.84, scop_total_90d=2.55)
+    block = _efficiency_diagnostics(SimpleNamespace(data=snapshot))
+    exported = fitted_summary(snapshot)
+
+    assert block is not None
+    for key in ("eta_s_percent", "eu_class", "eta_s_percent_90d", "eu_class_90d"):
+        assert block[key] == exported[key]
+    assert block["eu_class"] == "A+"
