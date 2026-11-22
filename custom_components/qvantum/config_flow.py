@@ -53,6 +53,7 @@ from .const import (
     MIN_SCAN_INTERVAL,
     TRANSPORT_MODBUS,
     VERSION,
+    modbus_link_settings,
 )
 from .telemetry import CONSENT_GRANTED, async_load_state, async_set_consent
 
@@ -463,24 +464,8 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         """Reconfigure using local Modbus TCP."""
         errors: dict[str, str] = {}
         config_entry = self._reconfigure_entry()
-        host = _normalize_modbus_host(
-            config_entry.options.get(
-                CONF_MODBUS_HOST,
-                config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
-            )
-        )
-        port = int(
-            config_entry.options.get(
-                CONF_MODBUS_PORT,
-                config_entry.data.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
-            )
-        )
-        unit_id = int(
-            config_entry.options.get(
-                CONF_MODBUS_UNIT_ID,
-                config_entry.data.get(CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID),
-            )
-        )
+        _, host, port, unit_id = modbus_link_settings(config_entry)
+        host = _normalize_modbus_host(host)
         interval = _normalize_modbus_scan_interval(
             config_entry.options.get(
                 CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL

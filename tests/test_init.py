@@ -21,7 +21,6 @@ from custom_components.qvantum import (
     _device_sw_version,
     _firmware_triple,
     _has_required_device,
-    _modbus_link_settings,
     async_migrate_entry,
     async_remove_config_entry_device,
     async_remove_entry,
@@ -29,6 +28,7 @@ from custom_components.qvantum import (
     async_setup_entry,
     async_unload_entry,
 )
+from custom_components.qvantum.const import modbus_link_settings
 
 # Mock HA imports after importing real functions
 # sys.modules['custom_components.qvantum'] = MagicMock()
@@ -102,7 +102,7 @@ class TestSetupDeviceRequirements:
             "modbus_unit_id": 7,
         }
         entry.data = {}
-        assert _modbus_link_settings(entry) == (True, "hp.local", 1502, 7)
+        assert modbus_link_settings(entry) == (True, "hp.local", 1502, 7)
 
     @pytest.mark.asyncio
     async def test_sync_extra_hot_water_registers_for_cloud_entry(self, hass):
@@ -1568,7 +1568,7 @@ class TestTemporaryModbusUnit:
     async def test_yields_none_without_modbus(self):
         entry = MagicMock()
         with patch(
-            "custom_components.qvantum._modbus_link_settings",
+            "custom_components.qvantum.modbus_link_settings",
             return_value=(False, "host", 502, 1),
         ):
             async with _async_temporary_modbus_unit(MagicMock(), entry) as unit:
@@ -1589,7 +1589,7 @@ class TestTemporaryModbusUnit:
         monkeypatch.setitem(sys.modules, "homeassistant.components.modbus", modbus)
 
         with patch(
-            "custom_components.qvantum._modbus_link_settings",
+            "custom_components.qvantum.modbus_link_settings",
             return_value=(True, "host", 502, 1),
         ):
             async with _async_temporary_modbus_unit(MagicMock(), entry) as unit:

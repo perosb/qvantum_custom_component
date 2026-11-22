@@ -1,8 +1,12 @@
 """Constants for the Qvantum Heat Pump Integration."""
 
 from enum import IntEnum
+from typing import TYPE_CHECKING
 
 from homeassistant.exceptions import HomeAssistantError
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
 
 from .client.constants import (
     BASE_SYSTEM_POWER_W as BASE_SYSTEM_POWER_W,
@@ -645,3 +649,32 @@ def default_metric_creates_entity(metric: str) -> bool:
     if metric in EXCLUDED_METRIC_NAMES:
         return True
     return not any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
+
+
+def modbus_link_settings(config_entry: ConfigEntry) -> tuple[bool, str, int, int]:
+    """Return (enabled, host, port, unit_id) from entry options/data."""
+    enabled = bool(
+        config_entry.options.get(
+            CONF_MODBUS_TCP,
+            config_entry.data.get(CONF_MODBUS_TCP, False),
+        )
+    )
+    host = str(
+        config_entry.options.get(
+            CONF_MODBUS_HOST,
+            config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
+        )
+    )
+    port = int(
+        config_entry.options.get(
+            CONF_MODBUS_PORT,
+            config_entry.data.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
+        )
+    )
+    unit_id = int(
+        config_entry.options.get(
+            CONF_MODBUS_UNIT_ID,
+            config_entry.data.get(CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID),
+        )
+    )
+    return enabled, host, port, unit_id
