@@ -38,17 +38,17 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
 
-from .plant_analytics import eu_label
 from .const import (
     DOMAIN,
     REVERT_REASONS,
     SENSOR_MODE_HTTP_BT2,
     SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
-    SensorMode,
     VERSION,
+    SensorMode,
 )
-from .statistics import INDOOR_METRIC_KEYS
 from .coordinator import transport_kind
+from .plant_analytics import eu_label
+from .statistics import INDOOR_METRIC_KEYS
 
 #: Where the summary can be downloaded while logged in. The browser session
 #: carries the auth, so no token travels in the URL.

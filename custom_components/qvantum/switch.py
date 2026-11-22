@@ -3,17 +3,15 @@
 import logging
 from typing import Any
 
-from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
+from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MyConfigEntry
-from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response, is_cloud
 from .curve_coordinator import QvantumCurveCoordinator
 from .entity import QvantumEntity, finalize_platform_setup
-from .coordinator import is_cloud
 
 _LOGGER = logging.getLogger(__name__)
 

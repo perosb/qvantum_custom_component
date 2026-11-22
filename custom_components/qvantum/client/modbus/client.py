@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Callable, Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from modbus_connection import ModbusError, ModbusUnit
 
@@ -185,7 +186,7 @@ class QvantumModbusClient:
                 )
             except asyncio.CancelledError:
                 raise
-            except asyncio.TimeoutError as err:
+            except TimeoutError as err:
                 _LOGGER.error("Modbus timeout %s", error_label)
                 raise TransportError(
                     None,

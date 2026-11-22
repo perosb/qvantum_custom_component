@@ -1,6 +1,7 @@
 """Tests for Qvantum number entities."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 
@@ -19,15 +20,15 @@ with patch(
     "homeassistant.helpers.update_coordinator.CoordinatorEntity", MockCoordinatorEntity
 ):
     with patch("homeassistant.components.number.NumberEntity", MockNumberEntity):
-        from homeassistant.helpers.device_registry import DeviceInfo
-        from homeassistant.const import UnitOfTemperature
         from homeassistant.components.number import NumberDeviceClass
+        from homeassistant.const import UnitOfTemperature
+        from homeassistant.helpers.device_registry import DeviceInfo
 
+        from custom_components.qvantum.const import HeatingCurveType, SensorMode
         from custom_components.qvantum.number import (
             QvantumNumberEntity,
             async_setup_entry,
         )
-        from custom_components.qvantum.const import HeatingCurveType, SensorMode
 
 
 @pytest.fixture
@@ -220,8 +221,7 @@ class TestQvantumNumberEntity:
 
     def test_state_with_mapping_capacity_1(self, mock_device):
         """Test getting entity state when stop/start match capacity 1 mapping."""
-        from unittest.mock import Mock
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, Mock
 
         coordinator = Mock()
         coordinator.data = {
@@ -241,8 +241,7 @@ class TestQvantumNumberEntity:
 
     def test_state_with_mapping_capacity_6(self, mock_device):
         """Test getting entity state when stop/start match capacity 6 mapping."""
-        from unittest.mock import Mock
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, Mock
 
         coordinator = Mock()
         coordinator.data = {
@@ -266,8 +265,7 @@ class TestQvantumNumberEntity:
         Issue #421: 55/65 was shown as 2 (nearest stop 62) while the app and
         the pump showed 5. A plausible wrong number is worse than nothing.
         """
-        from unittest.mock import Mock
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, Mock
 
         coordinator = Mock()
         coordinator.data = {
@@ -287,8 +285,7 @@ class TestQvantumNumberEntity:
 
     def test_state_with_none_stop(self, mock_device):
         """Test getting entity state when tap_water_stop is None."""
-        from unittest.mock import Mock
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, Mock
 
         coordinator = Mock()
         coordinator.data = {
@@ -308,8 +305,7 @@ class TestQvantumNumberEntity:
 
     def test_state_with_none_start(self, mock_device):
         """Test getting entity state when tap_water_start is None."""
-        from unittest.mock import Mock
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, Mock
 
         coordinator = Mock()
         coordinator.data = {
@@ -1373,6 +1369,7 @@ class TestNumberAvailabilityAndWriteGuard:
     async def test_set_native_value_requires_write_access(self, mock_device):
         """A service call cannot bypass the write-access check."""
         from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
 
         coordinator = MagicMock(spec=QvantumDataUpdateCoordinator)

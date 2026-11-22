@@ -12,17 +12,16 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import MyConfigEntry
 from .const import (
     BINARY_SENSOR_NAMES,
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
     MODBUS_ONLY_BINARY_SENSORS,
 )
-from . import MyConfigEntry
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, is_full_payload
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
-from .coordinator import is_full_payload
 
 _LOGGER = logging.getLogger(__name__)
 

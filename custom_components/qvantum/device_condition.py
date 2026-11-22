@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.const import (
     CONF_CONDITION,
     CONF_DEVICE_ID,
@@ -17,6 +16,8 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import (
     condition,
+)
+from homeassistant.helpers import (
     config_validation as cv,
 )
 from homeassistant.helpers.typing import ConfigType

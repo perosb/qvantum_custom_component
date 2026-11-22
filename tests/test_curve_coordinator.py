@@ -7,7 +7,7 @@ import math
 import time
 from collections import deque
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call, patch
 from zoneinfo import ZoneInfo
@@ -17,21 +17,11 @@ from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.qvantum import curve_coordinator as cc
 from custom_components.qvantum.const import HP_STATUS_HEATING, REVERT_REASONS
-from custom_components.qvantum.heating_curve import (
-    WIND_MAX_C,
-    ActiveRoomGain,
-    COP_FEEDBACK_MAX_C,
-    PRECHARGE_MAX_C,
-    TOTAL_MAX_C,
-    CurveResult,
-    interpolate_supply,
-    normalize_baseline,
-)
 from custom_components.qvantum.curve_coordinator import (
     INDOOR_MARGIN_CYCLES,
+    READY_MIN_HOURS,
     TRIM_MAX_C,
     TRIM_UPDATE_GAIN,
-    READY_MIN_HOURS,
     CurveSnapshot,
     QvantumCurveCoordinator,
     _median_sorted,
@@ -44,6 +34,16 @@ from custom_components.qvantum.curve_coordinator import (
     points_within_limits,
     room_error_summary,
     signal_blocker,
+)
+from custom_components.qvantum.heating_curve import (
+    COP_FEEDBACK_MAX_C,
+    PRECHARGE_MAX_C,
+    TOTAL_MAX_C,
+    WIND_MAX_C,
+    ActiveRoomGain,
+    CurveResult,
+    interpolate_supply,
+    normalize_baseline,
 )
 from custom_components.qvantum.open_meteo import (
     HourlyWeather,
@@ -66,7 +66,7 @@ CURVE_KEYS = (
     "curve_minus_20",
     "curve_minus_30",
 )
-BASELINE = dict(zip(CURVE_KEYS, (25.0, 30.0, 36.0, 42.0, 48.0, 54.0, 60.0)))
+BASELINE = dict(zip(CURVE_KEYS, (25.0, 30.0, 36.0, 42.0, 48.0, 54.0, 60.0), strict=True))
 SETTINGS = {
     **BASELINE,
     "curve_type_heating": 0,
@@ -1015,7 +1015,7 @@ def _trim_hours(
     ]
 
 
-LOW_WARM_END = dict(zip(CURVE_KEYS, (16.8, 18.6, 27.5, 35.9, 45.7, 57.5, 59.4)))
+LOW_WARM_END = dict(zip(CURVE_KEYS, (16.8, 18.6, 27.5, 35.9, 45.7, 57.5, 59.4), strict=True))
 
 
 async def test_snapshot_lifts_a_stored_baseline_to_the_supply_floor() -> None:
@@ -1409,8 +1409,8 @@ def test_assess_readiness_passes_signal_through() -> None:
 
 
 def test_assess_readiness_requires_window_coverage() -> None:
-    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc).timestamp()
-    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc).timestamp()
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=UTC).timestamp()
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=UTC).timestamp()
     deviations = _hourly_buckets(int(midnight), int(now), 0.2)
     # Drop enough of the window to fail coverage.
     for ts in list(deviations)[:20]:
@@ -1424,8 +1424,8 @@ def test_assess_readiness_requires_window_coverage() -> None:
 
 
 def test_assess_readiness_ready_and_value_blockers() -> None:
-    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc).timestamp()
-    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc).timestamp()
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=UTC).timestamp()
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=UTC).timestamp()
     window = range(int(midnight), int(now), 3600)
 
     good = {ts: 0.5 for ts in window}
@@ -1475,8 +1475,8 @@ def test_assess_readiness_is_not_assessed_while_active() -> None:
     on a live install 2026-11-12: median 1.84 °C against trims of 1.44–1.50 and
     a −0.15 °C adjustment. The gate therefore reports no verdict and no numbers.
     """
-    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc).timestamp()
-    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc).timestamp()
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=UTC).timestamp()
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=UTC).timestamp()
     window = {ts: 1.8 for ts in range(int(midnight), int(now), 3600)}
 
     result = assess_readiness(window, int(now), ZoneInfo("UTC"), active=True)
@@ -1495,8 +1495,8 @@ def test_assess_readiness_is_not_assessed_while_active() -> None:
 
 
 def test_assess_readiness_coverage_uses_covered_hours() -> None:
-    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc).timestamp()
-    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc).timestamp()
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=UTC).timestamp()
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=UTC).timestamp()
     window = {ts: 0.5 for ts in range(int(midnight), int(now), 3600)}
     # Heating-only sample: a third of the window, but the recorder covered it.
     heating = dict(list(window.items())[:28])
@@ -1526,8 +1526,8 @@ def test_assess_readiness_coverage_uses_covered_hours() -> None:
 
 
 def test_room_error_summary_reports_median_and_p90() -> None:
-    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc)
-    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=UTC)
     window = list(range(int(midnight.timestamp()), int(now.timestamp()), 3600))
     tz = ZoneInfo("UTC")
 
@@ -1551,8 +1551,8 @@ def test_room_error_summary_reports_median_and_p90() -> None:
 
 
 def test_room_error_summary_needs_enough_usable_hours() -> None:
-    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc)
-    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=UTC)
     window = list(range(int(midnight.timestamp()), int(now.timestamp()), 3600))
     tz = ZoneInfo("UTC")
 
@@ -1611,7 +1611,7 @@ async def test_snapshot_reports_room_tracking() -> None:
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
     coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
     now = time.time()
-    midnight = datetime.fromtimestamp(now, timezone.utc).replace(
+    midnight = datetime.fromtimestamp(now, UTC).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     window = range(int((midnight - timedelta(days=3)).timestamp()), int(now), 3600)
@@ -1728,7 +1728,7 @@ async def test_snapshot_ready_with_model_and_window() -> None:
     coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
     coordinator._daylight = MagicMock(return_value=None)
     now = time.time()
-    midnight = datetime.fromtimestamp(now, timezone.utc).replace(
+    midnight = datetime.fromtimestamp(now, UTC).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     start = int((midnight - timedelta(days=3)).timestamp())
@@ -2075,7 +2075,9 @@ async def test_push_indoor_margin_averages_window() -> None:
 async def test_indoor_series_prefers_the_configured_sensor() -> None:
     coordinator = make_coordinator(values={"sensor_mode": 4})
     resolved = {"room_temp_external": "sensor.x", "bt2": "sensor.y"}
-    rows = lambda mean, count: [{"start": index, "mean": mean} for index in range(count)]
+    def rows(mean, count):
+        return [{"start": index, "mean": mean} for index in range(count)]
+
     enough = cc.INDOOR_METRIC_MIN_HOURS
 
     key, series = coordinator._indoor_series(
@@ -2483,7 +2485,7 @@ def test_resolve_without_device_id_returns_empty() -> None:
 
 async def test_statistics_returns_empty_without_ids_or_recorder() -> None:
     coordinator = make_coordinator()
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
 
     assert await coordinator._async_statistics(set(), start) == {}
 
@@ -2493,7 +2495,7 @@ async def test_statistics_returns_empty_without_ids_or_recorder() -> None:
 
 async def test_statistics_uses_recorder_executor_and_maps_errors() -> None:
     coordinator = make_coordinator()
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     rows = {"sensor.x": [{"start": 100, "mean": 1.0}]}
     recorder = MagicMock()
     recorder.async_add_executor_job = AsyncMock(return_value=rows)
@@ -2614,13 +2616,13 @@ async def test_readiness_hours_skips_idle_and_missing_inputs() -> None:
 
 def test_daylight_builds_phase_and_degrades() -> None:
     coordinator = make_coordinator()
-    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
 
     def astral_date(hass, event, day):
         from homeassistant.helpers.sun import SUN_EVENT_SUNRISE
 
         hour = 6 if event == SUN_EVENT_SUNRISE else 18
-        base = datetime(2026, 3, 10, hour, 0, tzinfo=timezone.utc)
+        base = datetime(2026, 3, 10, hour, 0, tzinfo=UTC)
         return base + timedelta(days=(day - now.date()).days)
 
     with patch("homeassistant.helpers.sun.get_astral_event_date", side_effect=astral_date):
@@ -2671,7 +2673,7 @@ async def test_snapshot_keeps_readiness_when_forecast_refetch_fails() -> None:
     coordinator._model = make_model()
     coordinator._async_calibrate = AsyncMock()
     now = time.time()
-    midnight = datetime.fromtimestamp(now, timezone.utc).replace(
+    midnight = datetime.fromtimestamp(now, UTC).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     window = range(int((midnight - timedelta(days=3)).timestamp()), int(now), 3600)
@@ -4287,7 +4289,7 @@ async def test_the_active_gain_fetches_a_full_window_for_the_picker() -> None:
     await coordinator._async_room_gain_from_active()
 
     start = coordinator._async_statistics.await_args.args[1]
-    assert start < datetime.now(timezone.utc) - timedelta(days=6)
+    assert start < datetime.now(UTC) - timedelta(days=6)
 
 
 async def test_the_active_gain_explains_why_it_cannot_measure() -> None:

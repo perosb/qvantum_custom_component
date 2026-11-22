@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from custom_components.qvantum.const import DOMAIN
 from custom_components.qvantum.entity import (
     QvantumAccessMixin,
     QvantumEntity,
@@ -14,7 +15,6 @@ from custom_components.qvantum.entity import (
     has_native_temperature_api,
     resolve_device_id,
 )
-from custom_components.qvantum.const import DOMAIN
 
 
 class DummyAccessEntity(QvantumAccessMixin):
@@ -57,8 +57,8 @@ def test_has_write_access_denied_in_modbus_mode():
 
 def test_has_write_access_allowed_when_modbus_write_enabled():
     """Direct holding writes are available when Modbus writing is on."""
-    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
     from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
 
     coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
     coordinator.modbus_enabled = True
@@ -77,8 +77,8 @@ def test_has_write_access_allowed_when_modbus_write_enabled():
 
 def test_has_write_access_denied_for_smartcontrol_in_modbus_mode():
     """SmartControl has no holding-register write."""
-    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
     from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
 
     coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
     coordinator.modbus_enabled = True
@@ -96,8 +96,8 @@ def test_has_write_access_denied_for_smartcontrol_in_modbus_mode():
 
 def test_has_write_access_denies_http_only_entity_when_cloud_unavailable():
     """HTTP-backed Qvantum entities must not become writable during an outage."""
-    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
     from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
 
     coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
     coordinator.config_entry = MagicMock()
@@ -119,8 +119,8 @@ def test_has_write_access_denies_http_only_entity_when_cloud_unavailable():
 
 def test_has_write_access_allows_modbus_metric_when_cloud_unavailable():
     """Holding-register writes stay available when Modbus writing is enabled."""
-    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
     from custom_components.qvantum.const import CONF_MODBUS_TCP, CONF_MODBUS_WRITE
+    from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
 
     coordinator = QvantumDataUpdateCoordinator.__new__(QvantumDataUpdateCoordinator)
     coordinator.config_entry = MagicMock()

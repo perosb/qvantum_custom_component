@@ -2,6 +2,7 @@
 
 from enum import IntFlag
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 
@@ -50,11 +51,11 @@ with patch(
                         ):
                             from homeassistant.helpers.device_registry import DeviceInfo
 
+                            from custom_components.qvantum import RuntimeData
                             from custom_components.qvantum.fan import (
                                 QvantumFanEntity,
                                 async_setup_entry,
                             )
-                            from custom_components.qvantum import RuntimeData
 
 
 @pytest.fixture

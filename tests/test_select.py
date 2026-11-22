@@ -1,8 +1,9 @@
 """Tests for Qvantum select entities."""
 
-from homeassistant.exceptions import HomeAssistantError
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+from homeassistant.exceptions import HomeAssistantError
 
 
 # Create mock base classes that don't have metaclass conflicts
@@ -27,11 +28,11 @@ with patch(
     with patch("homeassistant.components.select.SelectEntity", MockSelectEntity):
         from homeassistant.helpers.device_registry import DeviceInfo
 
+        from custom_components.qvantum.const import HeatingCurveType, SensorMode
         from custom_components.qvantum.select import (
             QvantumSelectEntity,
             async_setup_entry,
         )
-        from custom_components.qvantum.const import HeatingCurveType, SensorMode
 
 
 @pytest.fixture

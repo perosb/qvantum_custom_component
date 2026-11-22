@@ -2,48 +2,48 @@
 
 import asyncio
 import logging
-import pytest
-from pathlib import Path
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from homeassistant.const import CONF_SCAN_INTERVAL
+from homeassistant.util import dt as dt_util
+
 from custom_components.qvantum import coordinator as coordinator_module
-from custom_components.qvantum.coordinator import (
-    async_apply_setting,
-    handle_setting_update_response,
-    QvantumDataUpdateCoordinator,
-    _firmware_metadata_from_sw_version,
-)
-from tests.conftest import make_client_mock
 from custom_components.qvantum.client.exceptions import (
     APIAuthError,
     RateLimitError,
     TransportError,
 )
-from custom_components.qvantum.efficiency import COP_WINDOW_SECONDS
 from custom_components.qvantum.const import (
-    DHW_MODE_EXTRA,
-    DHW_MODE_NORMAL,
     CONF_EXTERNAL_ROOM_TEMP_ENTITY,
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     DEFAULT_ENABLED_HTTP_METRICS,
     DEFAULT_MODBUS_SCAN_INTERVAL,
-    DEFAULT_SCAN_INTERVAL,
-    DOMAIN,
     DHW_CAP_HYSTERESIS_C,
     DHW_COMPRESSOR_STATE_HOT_WATER,
     DHW_EMA_ALPHA,
+    DHW_MODE_EXTRA,
+    DHW_MODE_NORMAL,
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_SESSION_GAP_SEC,
     DHW_SHOWER_DURATION_MIN,
+    DOMAIN,
     MIN_MODBUS_SCAN_INTERVAL,
     MODBUS_SW_VERSION_REFRESH_INTERVAL,
     REQUIRED_METRICS,
 )
-from homeassistant.const import CONF_SCAN_INTERVAL
-from homeassistant.util import dt as dt_util
+from custom_components.qvantum.coordinator import (
+    QvantumDataUpdateCoordinator,
+    _firmware_metadata_from_sw_version,
+    async_apply_setting,
+    handle_setting_update_response,
+)
+from custom_components.qvantum.efficiency import COP_WINDOW_SECONDS
+from tests.conftest import make_client_mock
 
 
 def _modbus_options_get(key, default=None):
@@ -1936,7 +1936,7 @@ class TestCalculateHeatingPower:
         values = {"heatingenergy": 100.0, "hp_status": 3}
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
-            mock_now.return_value = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+            mock_now.return_value = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
             coordinator._calculate_heating_power(values)
 
         assert values["heatingpower"] == 0
@@ -1945,8 +1945,8 @@ class TestCalculateHeatingPower:
     def test_calculates_power_from_delta(self):
         """After two calls, heatingpower = delta_kWh / delta_s * 3_600_000."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)  # 15 s later
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)  # 15 s later
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
@@ -1962,8 +1962,8 @@ class TestCalculateHeatingPower:
     def test_negative_delta_clamped_to_zero(self):
         """A negative delta (counter reset) produces 0 W, not a negative value."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
@@ -1978,8 +1978,8 @@ class TestCalculateHeatingPower:
     def test_not_heating_resets_power_to_zero(self):
         """When hp_status != 3, heatingpower is always 0 regardless of energy."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             # Establish a prior computed power
@@ -2006,8 +2006,8 @@ class TestCalculateHeatingPower:
         (measured on a live QE-6: 1846 W held at 0 rpm and 0 W electrical).
         """
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
@@ -2037,8 +2037,8 @@ class TestCalculateHeatingPower:
     def test_electrical_input_gates_when_speed_is_absent(self):
         """Input 93 answers where speed does not; either zero stops the hold."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
@@ -2058,8 +2058,8 @@ class TestCalculateHeatingPower:
     def test_no_compressor_metric_keeps_the_previous_behaviour(self):
         """Without either signal the mode alone decides, as before."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
@@ -2079,9 +2079,8 @@ class TestCalculateHeatingPower:
         pushed the load term's mean from 3.5 to 9.8 kW and silenced it.
         """
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
-        t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
@@ -2111,9 +2110,9 @@ class TestCalculateHeatingPower:
     def test_the_next_step_after_a_burst_measures_normally(self):
         """The anchors advance, so the flush is not inherited by the next step."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
-        t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)
+        t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
@@ -2138,7 +2137,7 @@ class TestCalculateHeatingPower:
             assert burst["heatingpower"] == 240.0
 
             mock_now.return_value = datetime(
-                2026, 4, 6, 12, 0, 45, tzinfo=timezone.utc
+                2026, 4, 6, 12, 0, 45, tzinfo=UTC
             )
             after = {
                 "heatingenergy": 100.402,
@@ -2153,8 +2152,8 @@ class TestCalculateHeatingPower:
     def test_no_compressor_power_means_no_ceiling(self):
         """Without an electrical reading there is no basis for a ceiling."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
@@ -2204,9 +2203,9 @@ class TestCalculateHeatingPower:
     def test_zero_delta_holds_last_power_while_heating(self):
         """When hp_status==3 and counter has not ticked, last computed power is held."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
-        t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)
+        t2 = datetime(2026, 4, 6, 12, 0, 30, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
@@ -2230,8 +2229,8 @@ class TestCalculateHeatingPower:
     def test_updates_tracking_state_after_each_call(self):
         """_last_heatingenergy and _last_heatingenergy_time are updated each call."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
-        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        t1 = datetime(2026, 4, 6, 12, 0, 15, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             mock_now.return_value = t0
@@ -2252,7 +2251,7 @@ class TestCalculateHeatingPower:
         uses the full ~48 s accumulation period to produce ≈ 7 500 W.
         """
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
 
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
             # Poll 1: establish baseline
@@ -2726,8 +2725,8 @@ class TestCopPersistence:
         coordinator = self._make_coordinator()
         coordinator._cop_last = {"cop_heating": 3.5, "cop_dhw": 1.7}
         coordinator._cop_last_times = {
-            "cop_heating": datetime(2026, 10, 10, 7, 0, tzinfo=timezone.utc),
-            "cop_dhw": datetime(2026, 10, 10, 6, 0, tzinfo=timezone.utc),
+            "cop_heating": datetime(2026, 10, 10, 7, 0, tzinfo=UTC),
+            "cop_dhw": datetime(2026, 10, 10, 6, 0, tzinfo=UTC),
         }
         coordinator._dhw_tank_liters = 143.2
         with (
@@ -3059,7 +3058,7 @@ class TestCalculateTapWaterCap:
         - published cap remains stable across the pulse sequence
         """
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 16, 17, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 16, 17, 0, 0, tzinfo=UTC)
 
         # Establish a published baseline used by warmup interpolation.
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
@@ -3119,7 +3118,7 @@ class TestCalculateTapWaterCap:
         must not start a tracked session and must not update any shower EMA or add
         an event record — even after the flow-snapshot gap expires."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 17, 4, 20, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 4, 20, 0, tzinfo=UTC)
 
         # Pre-seed known EMA state to verify it is unchanged after the session.
         coordinator._last_shower_duration_min = 3.4
@@ -3161,7 +3160,7 @@ class TestCalculateTapWaterCap:
         elapses since the last qualifying-flow stop, regardless of how many low-flow
         bursts happen in between."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 17, 5, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 5, 0, 0, tzinfo=UTC)
 
         # Real shower: qualifying flow for 2 minutes.
         for i in range(8):
@@ -3215,7 +3214,7 @@ class TestCalculateTapWaterCap:
         """Low-flow bursts while a session is paused must not change finalized
         session metrics (avg_flow, avg_cold, avg_outlet_temp, water_used_l)."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 17, 5, 30, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 5, 30, 0, tzinfo=UTC)
 
         # Qualifying shower: 8 polls over 2 minutes at 4.0 L/min.
         for i in range(8):
@@ -3261,7 +3260,7 @@ class TestCalculateTapWaterCap:
     def test_warmup_restarts_after_gap_expiry_then_flow_resumes(self):
         """If a pause exceeds the session gap, resumed flow starts a new warmup window."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 16, 18, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 16, 18, 0, 0, tzinfo=UTC)
 
         # Baseline publish before any flow.
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
@@ -3304,7 +3303,7 @@ class TestCalculateTapWaterCap:
         """If flow resumes after a long gap with no idle poll in between, previous
         session is finalized first so old/new samples do not mix."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 16, 19, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 16, 19, 0, 0, tzinfo=UTC)
 
         # Start and collect two active-flow samples in session A.
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as mock_now:
@@ -3492,7 +3491,7 @@ class TestCalculateTapWaterCap:
           warmup_progress=0.5 → expected output: 1.7 showers, 10 min
         """
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=UTC)
 
         # Pre-seed the state that would exist before this shower event started.
         coordinator._last_published_tap_water_cap = 2.0
@@ -3547,7 +3546,7 @@ class TestCalculateTapWaterCap:
           → EMA candidate = 0.3*2.27 + 0.7*5.0 = 4.181  → published ≈ 4.2
         """
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=UTC)
 
         coordinator._last_tap_water_cap = 5.0
         # No shower-specific EMA values → defaults apply for cold/flow/shower_temp.
@@ -3589,7 +3588,7 @@ class TestCalculateTapWaterCap:
         Old broken output would have been 5.0 (no-op ramp).
         """
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 14, 12, 0, 0, tzinfo=UTC)
 
         coordinator._last_tap_water_cap = 5.0
         coordinator._last_published_tap_water_cap = 5.0
@@ -3791,11 +3790,12 @@ class TestCalculateTapWaterCap:
         # With cold_mean=12.0, flow=7.0 (default), shower_temp=DHW_SHOWER_TEMP_C (38.0):
         # minutes = 175/7.0 * ln((60-12)/(38-12)) = 25.0 * ln(48/26) ≈ 25.0 * 0.613 ≈ 15.3; showers ≈ 2.6
         import math
+
         from custom_components.qvantum.const import (
-            DHW_TANK_VOLUME_L,
-            DHW_SHOWER_TEMP_C,
-            DHW_SHOWER_DURATION_MIN,
             DHW_DEFAULT_FLOW_LPM,
+            DHW_SHOWER_DURATION_MIN,
+            DHW_SHOWER_TEMP_C,
+            DHW_TANK_VOLUME_L,
         )
 
         expected_min = (DHW_TANK_VOLUME_L / DHW_DEFAULT_FLOW_LPM) * math.log(
@@ -3933,7 +3933,7 @@ class TestCalculateTapWaterCap:
         coordinator = self._make_coordinator()
         now = dt_util.utcnow()
         # Simulate 11 completed 2-minute showers (gap already expired for each)
-        for i in range(11):
+        for _ in range(11):
             pause_time = now - timedelta(seconds=DHW_SESSION_GAP_SEC + 1)
             shower_start = pause_time - timedelta(minutes=2)
             coordinator._shower_start_time = shower_start
@@ -4344,7 +4344,7 @@ class TestCalculateTapWaterCap:
     def test_back_to_back_showers_samples_do_not_mix(self):
         """Session A finalizes cleanly; session B starts with empty sample buffers."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=UTC)
 
         def _poll(t, bf1, bt30=60.0, bt33=10.0, bt34=None):
             v = {"bt30": bt30, "bf1_l_min": bf1, "bt33": bt33}
@@ -4379,7 +4379,7 @@ class TestCalculateTapWaterCap:
     def test_back_to_back_showers_ema_updates_incrementally(self):
         """Each completed shower shifts duration and flow EMAs by exactly one step."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 17, 7, 30, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 7, 30, 0, tzinfo=UTC)
 
         def _run_shower(start, duration_sec=300, flow=4.0):
             for i in range(duration_sec // 15):
@@ -4435,7 +4435,7 @@ class TestCalculateTapWaterCap:
         # First no-flow poll with tank partially recovered to 52 C.
         values = {"bt30": 52.0, "bf1_l_min": 0.0}
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
-            m.return_value = datetime(2026, 4, 17, 6, 0, 0, tzinfo=timezone.utc)
+            m.return_value = datetime(2026, 4, 17, 6, 0, 0, tzinfo=UTC)
             coordinator._calculate_tap_water_cap(values)
 
         # (52-10)/(43.8-10) = 42/33.8 ≈ 1.243 → valid ratio > 1
@@ -4464,10 +4464,10 @@ class TestCalculateTapWaterCap:
         coordinator._last_published_tap_water_cap = 6.0
         coordinator._last_published_tap_water_minutes = 30
         coordinator._tap_water_cap_start_time = datetime(
-            2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc
+            2026, 4, 17, 7, 0, 0, tzinfo=UTC
         ) - timedelta(seconds=65)
 
-        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=UTC)
 
         def _poll(t, cold):
             v = {"bt30": 60.0, "bf1_l_min": 4.0, "bt33": cold}
@@ -4498,7 +4498,7 @@ class TestCalculateTapWaterCap:
         """If bt30 is absent for one poll the function must early-return but leave
         all session state (start time, samples) intact."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=UTC)
 
         # Open a session with two good polls.
         for i in range(2):
@@ -4555,7 +4555,7 @@ class TestCalculateTapWaterCap:
         assert coordinator._shower_start_time is None
         assert coordinator._tap_water_cap_start_time is None
 
-        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=UTC)
         with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
             m.return_value = t0
             coordinator._calculate_tap_water_cap(
@@ -4574,7 +4574,7 @@ class TestCalculateTapWaterCap:
         """Once a session is finalized by gap expiry, a low-flow burst (0.8 L/min,
         below DHW_MIN_SHOWER_FLOW_LPM) must not reopen a session."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 7, 0, 0, tzinfo=UTC)
 
         def _poll(t, bf1, bt30=60.0):
             with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
@@ -4604,7 +4604,7 @@ class TestCalculateTapWaterCap:
         cold-temperature EMA must converge monotonically toward 18 C."""
         coordinator = self._make_coordinator()
         coordinator._last_shower_cold_temp = 8.0
-        t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=UTC)
 
         cold_readings = []
         for i in range(10):
@@ -4631,7 +4631,7 @@ class TestCalculateTapWaterCap:
         """A 75-second active-flow rinse at 4 L/min (> DHW_MIN_SHOWER_DURATION_MIN=1.0 min)
         must finalize and add exactly one entry to the history."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=UTC)
 
         # 5 polls × 15 s = 75 s active flow.
         for i in range(5):
@@ -4660,7 +4660,7 @@ class TestCalculateTapWaterCap:
         """A 45-second active-flow burst (0.75 min < DHW_MIN_SHOWER_DURATION_MIN) at qualifying
         flow must not create a history entry or update duration/flow EMAs."""
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 17, 8, 0, 0, tzinfo=UTC)
 
         for i in range(3):
             with patch("custom_components.qvantum.calculations.dt_util.utcnow") as m:
@@ -4690,7 +4690,7 @@ class TestCalculateTapWaterCap:
         waits, then taps again — the session should not corrupt shower EMAs.
         """
         coordinator = self._make_coordinator()
-        t0 = datetime(2026, 4, 18, 7, 0, 0, tzinfo=timezone.utc)
+        t0 = datetime(2026, 4, 18, 7, 0, 0, tzinfo=UTC)
 
         # First burst: ~30 s of active flow (2 polls × 15 s).
         for i in range(2):
@@ -4865,7 +4865,9 @@ class TestDeviceLookupWhenHttpDown:
     ):
         """APIConnectionError during poll raises UpdateFailed without unexpected error trace."""
         import logging
+
         from homeassistant.helpers.update_coordinator import UpdateFailed
+
         from custom_components.qvantum.client.exceptions import TransportError
 
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=False)
@@ -4892,7 +4894,9 @@ class TestDeviceLookupWhenHttpDown:
     ):
         """HTTP 429 raises UpdateFailed as a warning, not as an unexpected error."""
         import logging
+
         from homeassistant.helpers.update_coordinator import UpdateFailed
+
         from custom_components.qvantum.client.exceptions import RateLimitError
 
         coordinator, mock_api = self._make_coordinator(mock_super_init, modbus=False)
@@ -5875,7 +5879,6 @@ class TestFullPayloadDefaults:
         from unittest.mock import patch as _patch
 
         from custom_components.qvantum.const import (
-            TRANSPORT_CLOUD,
             TRANSPORT_MODBUS,
         )
 
@@ -5926,10 +5929,6 @@ class TestTransportKind:
 
     @staticmethod
     def _coord(transport, *, modbus):
-        from custom_components.qvantum.const import (
-            TRANSPORT_CLOUD,
-            TRANSPORT_MODBUS,
-        )
 
         coord = MagicMock()
         coord.modbus_enabled = modbus
@@ -6081,9 +6080,9 @@ class TestCloudWriteAccess:
         assert cloud_write_access(coord) is False
 
     def test_modbus_and_mqtt_keep_their_own_flag(self):
-        from custom_components.qvantum.const import TRANSPORT_MODBUS
-
         from unittest.mock import MagicMock as _M
+
+        from custom_components.qvantum.const import TRANSPORT_MODBUS
 
         coord = _M()
         coord.transport = TRANSPORT_MODBUS

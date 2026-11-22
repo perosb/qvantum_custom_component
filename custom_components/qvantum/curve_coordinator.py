@@ -18,11 +18,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-import time
 from collections import deque
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Mapping
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
@@ -34,9 +34,8 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-from .client.models import result_applied
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
-from .repairs import CURVE_READY_PREFIX
+from .client.models import result_applied
 from .const import (
     DOMAIN,
     HP_STATUS_HEATING,
@@ -50,13 +49,14 @@ from .coordinator import (
     write_access,
 )
 from .heating_curve import (
-    CURVE_KEYS,
     MAX_SUPPLY_C,
     MIN_SUPPLY_C,
     ROOM_GAIN_MAX_C,
     TOTAL_MAX_C,
     TRIM_MAX_C,
+    ActiveRoomGain,
     DayPhase,
+    PumpRoomReading,
     compute_curve,
     cop_feedback_adjustment_c,
     corrected_baseline,
@@ -66,8 +66,6 @@ from .heating_curve import (
     normalize_baseline,
     points_in_reach,
     precharge_adjustment_c,
-    ActiveRoomGain,
-    PumpRoomReading,
     pump_room_reading,
     room_compensation_gain,
     room_corrected_deviation,
@@ -75,6 +73,7 @@ from .heating_curve import (
     trim_evidence_hours,
     trim_residuals,
 )
+from .numeric import finite
 from .open_meteo import (
     FORECAST_REUSE_HOURS,
     OpenMeteoError,
@@ -82,6 +81,7 @@ from .open_meteo import (
     fetch_forecast,
     fetch_weather_history,
 )
+from .repairs import CURVE_READY_PREFIX
 from .solar_gain import (
     MIN_SAMPLE_Q_W,
     SolarDailyModel,
@@ -99,7 +99,6 @@ from .statistics import (
     pick_indoor_metric_key,
     resolve_statistic_entity_ids,
 )
-from .numeric import finite
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -210,7 +209,7 @@ async def async_stored_curve_mode(
         data = await store.async_load()
     except asyncio.CancelledError:
         raise
-    except Exception:  # noqa: BLE001 — best effort
+    except Exception:
         return None
     if not isinstance(data, dict):
         return None
@@ -468,7 +467,7 @@ def readiness_window(now_ts: int, tz: ZoneInfo) -> tuple[float, float]:
 
 def room_error_summary(
     hourly_errors: Mapping[int, float], now_ts: int, tz: ZoneInfo
-) -> "RoomTracking | None":
+) -> RoomTracking | None:
     """Median and p90 of the hourly ``indoor − target`` over the window.
 
     Readiness asks whether our baseline still matches the pump, which becomes
@@ -1426,7 +1425,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             response = await awaitable
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — transport failures revert
+        except Exception as err:
             _LOGGER.warning("Curve write %s failed: %s", label, err)
             await self._async_revert(
                 f"write failed ({label})", code="write_failed"
@@ -1463,7 +1462,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             live = await self._async_read_pump_settings()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — fall back to the poll cache
+        except Exception as err:
             _LOGGER.debug("Could not read the live curve type: %s", err)
             live = self._main_values()
         if live.get("curve_type_heating") != HeatingCurveType.AUTO:
@@ -1508,7 +1507,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             readback = await self._async_read_pump_settings()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — verification is mandatory
+        except Exception as err:
             await self._async_revert(
                 "curve points could not be verified", code="points_unverified"
             )
@@ -1607,7 +1606,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     self._revert_pending = True
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001 — connection may be gone
+            except Exception:
                 self._revert_pending = True
         elif was_active:
             self._revert_pending = True
@@ -1627,7 +1626,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             )
         except asyncio.CancelledError:
             raise
-        except Exception:  # noqa: BLE001 — retry next cycle
+        except Exception:
             return
         if result_applied(response):
             self._revert_pending = False
@@ -1794,7 +1793,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return await self._async_compute_snapshot()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — coordinator must stay alive
+        except Exception as err:
             _LOGGER.warning("Curve update failed: %s", err)
             return self.data or self._empty_snapshot()
 
@@ -2018,7 +2017,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             )
             ghi = history.ghi_by_hour
             maps = await self._async_hourly_maps()
-        except Exception as err:  # noqa: BLE001 — calibration is best effort
+        except Exception as err:
             _LOGGER.debug("Solar calibration unavailable: %s", err)
             self._last_calibration_ok = False
             await self._async_persist()
@@ -2268,7 +2267,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             statistic_ids.add(power_id)
         start = dt_util.utcnow() - timedelta(days=BASELINE_LEARN_DAYS)
         if since_ts is not None:
-            start = max(start, datetime.fromtimestamp(since_ts, tz=timezone.utc))
+            start = max(start, datetime.fromtimestamp(since_ts, tz=UTC))
         rows = await self._async_statistics(statistic_ids, start)
 
         def _series(entity_id: str) -> dict[int, float]:
@@ -2473,7 +2472,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             estimate = await self._async_room_gain_from_active()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — measurement is best effort
+        except Exception as err:
             _LOGGER.debug("Active-hour room-gain measurement unavailable: %s", err)
             return
         if estimate is not None:
@@ -2524,7 +2523,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         start = dt_util.utcnow() - timedelta(days=BASELINE_LEARN_DAYS)
         if self._last_active_ts is not None:
             start = max(
-                start, datetime.fromtimestamp(self._last_active_ts, tz=timezone.utc)
+                start, datetime.fromtimestamp(self._last_active_ts, tz=UTC)
             )
         rows = await self._async_statistics(statistic_ids, start)
 
@@ -2573,7 +2572,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             )
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — correction is best effort
+        except Exception as err:
             _LOGGER.debug("Baseline learning unavailable: %s", err)
             return
         if not observations:
@@ -2618,7 +2617,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             identified = await self._async_room_gain()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — identification is best effort
+        except Exception as err:
             _LOGGER.debug("Room-compensation gain unavailable: %s", err)
             return
         if identified is None:
@@ -2720,7 +2719,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             observations = await self._async_trim_observations()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — trims are best effort
+        except Exception as err:
             _LOGGER.debug("Trim update unavailable: %s", err)
             return
         if not observations:
@@ -2777,7 +2776,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         """
         if not self.active:
             return
-        today = datetime.fromtimestamp(now_ts, timezone.utc).date().isoformat()
+        today = datetime.fromtimestamp(now_ts, UTC).date().isoformat()
         changed = False
         for points, days_field in (
             (clamped_points, "clamped_days"),
@@ -3040,7 +3039,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             next_sunrise = get_astral_event_date(
                 self.hass, SUN_EVENT_SUNRISE, today + timedelta(days=1)
             )
-        except Exception:  # noqa: BLE001 — no location/astral data
+        except Exception:
             return None
         dates = (sunrise, sunset, previous_sunset, next_sunrise)
         if any(value is None for value in dates):

@@ -1,8 +1,8 @@
 """Tests for Qvantum sensors."""
 
-from datetime import datetime, timezone
-from types import SimpleNamespace
 from dataclasses import replace
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -40,11 +40,11 @@ with patch(
                 SensorStateClass,
             )
             from homeassistant.const import (
-                UnitOfTemperature,
+                UnitOfElectricCurrent,
                 UnitOfEnergy,
                 UnitOfPower,
                 UnitOfPressure,
-                UnitOfElectricCurrent,
+                UnitOfTemperature,
                 UnitOfTime,
             )
             from homeassistant.helpers.device_registry import DeviceInfo
@@ -53,39 +53,6 @@ with patch(
             from custom_components.qvantum.client.modbus.maps import (
                 MODBUS_INPUT_REGISTER_MAP,
             )
-            from custom_components.qvantum.sensor import (
-                QvantumAccessExpireEntity,
-                QvantumBaseSensorEntity,
-                QvantumCopSensor,
-                QvantumCurveAdjustmentSensor,
-                QvantumCurveAdviceSensor,
-                QvantumCompressorPowerSensor,
-                QvantumCurveCoverageSensor,
-                QvantumCurveDeviationSensor,
-                QvantumCurvePointSensor,
-                QvantumCurveRoomErrorSensor,
-                QvantumCurveSensorEntity,
-                QvantumCurveSolarModelSensor,
-                QvantumCurveWindModelSensor,
-                QvantumCurrentEntity,
-                QvantumDhwHeatMeterSensor,
-                QvantumEfficiencyHealthSensor,
-                QvantumEfficiencySensorEntity,
-                QvantumSolarGainSensor,
-                QvantumSolarGhiSensor,
-                QvantumDiagnosticEntity,
-                QvantumDisplayFirmwareEntity,
-                QvantumEnergyEntity,
-                QvantumFirmwareLastCheckSensorEntity,
-                QvantumFirmwareSensorEntity,
-                QvantumPowerEntity,
-                QvantumPressureEntity,
-                QvantumTemperatureEntity,
-                QvantumTimerEntity,
-                QvantumTotalEnergyEntity,
-                _get_sensor_type,
-                async_setup_entry,
-            )
             from custom_components.qvantum.curve_coordinator import (
                 CurveSnapshot,
                 QvantumCurveCoordinator,
@@ -93,6 +60,39 @@ with patch(
             from custom_components.qvantum.efficiency_coordinator import (
                 EfficiencySnapshot,
                 QvantumEfficiencyCoordinator,
+            )
+            from custom_components.qvantum.sensor import (
+                QvantumAccessExpireEntity,
+                QvantumBaseSensorEntity,
+                QvantumCompressorPowerSensor,
+                QvantumCopSensor,
+                QvantumCurrentEntity,
+                QvantumCurveAdjustmentSensor,
+                QvantumCurveAdviceSensor,
+                QvantumCurveCoverageSensor,
+                QvantumCurveDeviationSensor,
+                QvantumCurvePointSensor,
+                QvantumCurveRoomErrorSensor,
+                QvantumCurveSensorEntity,
+                QvantumCurveSolarModelSensor,
+                QvantumCurveWindModelSensor,
+                QvantumDhwHeatMeterSensor,
+                QvantumDiagnosticEntity,
+                QvantumDisplayFirmwareEntity,
+                QvantumEfficiencyHealthSensor,
+                QvantumEfficiencySensorEntity,
+                QvantumEnergyEntity,
+                QvantumFirmwareLastCheckSensorEntity,
+                QvantumFirmwareSensorEntity,
+                QvantumPowerEntity,
+                QvantumPressureEntity,
+                QvantumSolarGainSensor,
+                QvantumSolarGhiSensor,
+                QvantumTemperatureEntity,
+                QvantumTimerEntity,
+                QvantumTotalEnergyEntity,
+                _get_sensor_type,
+                async_setup_entry,
             )
             from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
 
@@ -1313,6 +1313,7 @@ class TestQvantumEfficiencySensors:
     def mock_config_entry(self, mock_coordinator, mock_device):
         """Config entry whose runtime data can carry a real efficiency coordinator."""
         from homeassistant.config_entries import ConfigEntry
+
         from custom_components.qvantum import RuntimeData
 
         config_entry = MagicMock(spec=ConfigEntry)
@@ -1360,7 +1361,7 @@ class TestQvantumEfficiencySensors:
         self, mock_coordinator, mock_device
     ):
         """A held figure reports when it was last computed."""
-        computed_at = datetime(2026, 10, 10, 7, 0, tzinfo=timezone.utc)
+        computed_at = datetime(2026, 10, 10, 7, 0, tzinfo=UTC)
         mock_coordinator.cop_last_updated.return_value = computed_at
         mock_coordinator.data["values"].update({"cop_heating": 4.2})
         entity = QvantumCopSensor(mock_coordinator, "cop_heating", mock_device)
@@ -1750,6 +1751,7 @@ class TestSensorSetup:
     def mock_config_entry(self, mock_coordinator, mock_device):
         """Mock config entry with runtime data."""
         from homeassistant.config_entries import ConfigEntry
+
         from custom_components.qvantum import RuntimeData
 
         config_entry = MagicMock(spec=ConfigEntry)
@@ -1838,7 +1840,6 @@ class TestSensorSetup:
         self, mock_hass, mock_config_entry, mock_coordinator, mock_device
     ):
         """Test that entities in DEFAULT_DISABLED_HTTP_METRICS are disabled on first setup."""
-        from custom_components.qvantum.const import DEFAULT_DISABLED_HTTP_METRICS
 
         # Mock entity registry - entities don't exist yet (first setup)
         mock_entity_registry = mock_hass.data["entity_registry"]
@@ -2603,7 +2604,7 @@ class TestQvantumFirmwareLastCheckSensorEntity:
         assert state.minute == 0
         assert state.second == 0
         assert state.tzinfo is not None
-        assert state.tzinfo == timezone.utc
+        assert state.tzinfo == UTC
 
     def test_state_none_when_no_data(self, mock_firmware_coordinator, mock_device):
         """Test last check returns None when no data available."""

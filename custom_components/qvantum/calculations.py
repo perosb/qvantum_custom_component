@@ -4,33 +4,33 @@ from __future__ import annotations
 
 import logging
 import math
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from itertools import pairwise
-from collections.abc import Mapping
-from typing import Any, Callable
+from typing import Any
 
 from homeassistant.util import dt as dt_util
 
 from .const import (
     DHW_CAP_HYSTERESIS_C,
+    DHW_CHARGE_MAX_SECONDS,
     DHW_COMPRESSOR_STATE_HOT_WATER,
     DHW_DEFAULT_COLD_TEMP_C,
     DHW_DEFAULT_FLOW_LPM,
     DHW_EMA_ALPHA,
     DHW_FLOW_SNAPSHOT_THRESHOLD_LPM,
-    DHW_MIN_SHOWER_FLOW_LPM,
-    DHW_MIN_SHOWER_DURATION_MIN,
-    DHW_MIN_TEMPERATURE_DELTA_C,
     DHW_MAX_SHOWER_HISTORY_SIZE,
+    DHW_MIN_SHOWER_DURATION_MIN,
+    DHW_MIN_SHOWER_FLOW_LPM,
+    DHW_MIN_TEMPERATURE_DELTA_C,
     DHW_OUTLET_TEMP_THRESHOLD_DELTA_C,
     DHW_ROLLING_BUFFER_WINDOW_SEC,
     DHW_SESSION_GAP_SEC,
-    DHW_SHOWER_TEMP_STABLE_MIN_OFFSET_SEC,
-    DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC,
     DHW_SHOWER_DURATION_MIN,
     DHW_SHOWER_TEMP_C,
-    DHW_CHARGE_MAX_SECONDS,
+    DHW_SHOWER_TEMP_STABLE_MAX_OFFSET_SEC,
+    DHW_SHOWER_TEMP_STABLE_MIN_OFFSET_SEC,
     DHW_TANK_ID_MIN_KWH,
     DHW_TANK_ID_MIN_RISE_C,
     DHW_TANK_LITERS_ALPHA,
@@ -40,7 +40,6 @@ from .const import (
     HP_STATUS_HEATING,
     HP_STATUS_HOT_WATER,
     HP_STATUS_IDLE,
-    SensorMode,
 )
 from .dhw_loss import (
     WATER_KWH_PER_LITER_K,

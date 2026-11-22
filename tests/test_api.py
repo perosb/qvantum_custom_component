@@ -9,9 +9,9 @@ import json
 import logging
 import os
 import time
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from modbus_connection.mock import MockModbusConnection
 
 from custom_components.qvantum.client.cloud import QvantumCloudClient
@@ -54,7 +54,7 @@ def load_test_data(filename):
         os.path.dirname(__file__), "..", "custom_components", "qvantum", "test_data"
     )
     filepath = os.path.join(test_data_dir, filename)
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -468,7 +468,7 @@ class TestQvantumCloudClient:
         api._token = "test_token"
         api._token_expiry = time.monotonic() + 3600
 
-        with pytest.raises(Exception):  # APIAuthError
+        with pytest.raises(APIAuthError):
             await api.get_metrics("test_device")
 
     @pytest.mark.asyncio

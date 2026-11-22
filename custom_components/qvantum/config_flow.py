@@ -7,7 +7,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -30,22 +29,11 @@ from homeassistant.helpers.selector import (
 from .client.cloud import QvantumCloudClient
 from .client.exceptions import APIAuthError, APIConnectionError, APIRateLimitError
 from .client.modbus.device import IdentityProbeError, async_probe_identity
-from .telemetry import CONSENT_GRANTED, async_load_state, async_set_consent
 from .const import (
     CONF_CURVE_COP,
     CONF_CURVE_PRECHARGE,
     CONF_CURVE_SOLAR,
     CONF_CURVE_WIND,
-    DEFAULT_MODBUS_HOST,
-    DEFAULT_MODBUS_PORT,
-    DEFAULT_MODBUS_SCAN_INTERVAL,
-    DEFAULT_MODBUS_UNIT_ID,
-    DEFAULT_SCAN_INTERVAL,
-    DOMAIN,
-    MIN_MODBUS_SCAN_INTERVAL,
-    MIN_SCAN_INTERVAL,
-    VERSION,
-    CONFIG_VERSION,
     CONF_EXTERNAL_ROOM_TEMP_ENTITY,
     CONF_MODBUS_HOST,
     CONF_MODBUS_PORT,
@@ -54,8 +42,19 @@ from .const import (
     CONF_MODBUS_UNIT_ID,
     CONF_MODBUS_WRITE,
     CONF_TELEMETRY,
+    CONFIG_VERSION,
+    DEFAULT_MODBUS_HOST,
+    DEFAULT_MODBUS_PORT,
+    DEFAULT_MODBUS_SCAN_INTERVAL,
+    DEFAULT_MODBUS_UNIT_ID,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    MIN_MODBUS_SCAN_INTERVAL,
+    MIN_SCAN_INTERVAL,
     TRANSPORT_MODBUS,
+    VERSION,
 )
+from .telemetry import CONSENT_GRANTED, async_load_state, async_set_consent
 
 _LOGGER = logging.getLogger(__name__)
 

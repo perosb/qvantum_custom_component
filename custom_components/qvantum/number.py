@@ -2,7 +2,7 @@
 
 import logging
 
-from homeassistant.components.number import NumberEntity, NumberDeviceClass
+from homeassistant.components.number import NumberDeviceClass, NumberEntity
 from homeassistant.const import UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -12,18 +12,21 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import MyConfigEntry
 from .client.modbus import HEATING_CURVE_OUTDOOR_TEMPS, metric_range
 from .const import (
-    HeatingCurveType,
     TAP_WATER_CAPACITY_MAPPINGS,
     TAP_WATER_CAPACITY_START_STOP,
     TAP_WATER_TEMP_MAX,
     TAP_WATER_TEMP_MIN,
     TAP_WATER_TEMP_STEP,
+    HeatingCurveType,
     ensure_tap_water_start_below_stop,
     nearest_tap_water_capacity_level,
 )
-from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
+from .coordinator import (
+    QvantumDataUpdateCoordinator,
+    handle_setting_update_response,
+    is_full_payload,
+)
 from .entity import QvantumEntity, cleanup_disabled_entities
-from .coordinator import is_full_payload
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -45,8 +45,9 @@ and never to zero unless that fit is unusable too.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .numeric import median
 
@@ -280,7 +281,7 @@ def _weighted_line(
 ) -> tuple[float, float]:
     """Weighted least squares ``y ≈ a·x + c``."""
     sw = swx = swy = swxx = swxy = 0.0
-    for xi, yi, wi in zip(x, y, w):
+    for xi, yi, wi in zip(x, y, w, strict=True):
         sw += wi
         swx += wi * xi
         swy += wi * yi
@@ -300,7 +301,7 @@ def _robust_weights_line(
     x: Sequence[float], y: Sequence[float], w: Sequence[float], a: float, c: float
 ) -> list[float]:
     """One Huber pass on studentised residuals of ``y ≈ a·x + c``."""
-    residuals = [yi - (a * xi + c) for xi, yi in zip(x, y)]
+    residuals = [yi - (a * xi + c) for xi, yi in zip(x, y, strict=True)]
     center = median(residuals)
     scale = MAD_SCALE * median([abs(r - center) for r in residuals])
     if scale < 1e-9:
@@ -310,14 +311,14 @@ def _robust_weights_line(
         return list(w)
 
     sw = swx = swxx = 0.0
-    for xi, wi in zip(x, w):
+    for xi, wi in zip(x, w, strict=True):
         sw += wi
         swx += wi * xi
         swxx += wi * xi * xi
     det = swxx * sw - swx * swx
 
     robust: list[float] = []
-    for xi, residual, wi in zip(x, residuals, w):
+    for xi, residual, wi in zip(x, residuals, w, strict=True):
         leverage = wi * (swxx - 2.0 * swx * xi + sw * xi * xi) / det
         leverage = min(max(leverage, 0.0), 0.999)
         student = residual / (scale * math.sqrt(1.0 - leverage))
@@ -335,7 +336,7 @@ def _robust_weights_solar(
     b: float,
 ) -> list[float]:
     """One Huber pass for the through-origin residual fit."""
-    e = [ri - b * ii for ii, ri in zip(i_vals, residual)]
+    e = [ri - b * ii for ii, ri in zip(i_vals, residual, strict=True)]
     center = median(e)
     scale = MAD_SCALE * median([abs(ei - center) for ei in e])
     if scale < 1e-9:
@@ -344,9 +345,9 @@ def _robust_weights_solar(
     if scale < 1e-9:
         return list(w)
 
-    sxx = sum(wi * ii * ii for wi, ii in zip(w, i_vals))
+    sxx = sum(wi * ii * ii for wi, ii in zip(w, i_vals, strict=True))
     out: list[float] = []
-    for ii, ei, wi in zip(i_vals, e, w):
+    for ii, ei, wi in zip(i_vals, e, w, strict=True):
         leverage = min(max(wi * ii * ii / sxx, 0.0), 0.999)
         student = ei / (scale * math.sqrt(1.0 - leverage))
         if abs(student) <= ROBUST_CUTOFF:
@@ -360,9 +361,9 @@ def _weighted_r2(
     y: Sequence[float], pred: Sequence[float], w: Sequence[float]
 ) -> float:
     sw = sum(w)
-    y_mean = sum(wi * yi for yi, wi in zip(y, w)) / sw
-    ss_tot = sum(wi * (yi - y_mean) ** 2 for yi, wi in zip(y, w))
-    ss_res = sum(wi * (yi - pi) ** 2 for yi, pi, wi in zip(y, pred, w))
+    y_mean = sum(wi * yi for yi, wi in zip(y, w, strict=True)) / sw
+    ss_tot = sum(wi * (yi - y_mean) ** 2 for yi, wi in zip(y, w, strict=True))
+    ss_res = sum(wi * (yi - pi) ** 2 for yi, pi, wi in zip(y, pred, w, strict=True))
     if ss_tot < 1e-9:
         return 0.0
     return 1.0 - ss_res / ss_tot
@@ -383,8 +384,8 @@ def _through_origin_std_err(
     b: float,
 ) -> float:
     """Standard error of the through-origin slope (n ≥ 3, Σw·I² > 0)."""
-    sxx = sum(wi * ii * ii for wi, ii in zip(w, i_vals))
-    ss_res = sum(wi * (ri - b * ii) ** 2 for wi, ii, ri in zip(w, i_vals, residual))
+    sxx = sum(wi * ii * ii for wi, ii in zip(w, i_vals, strict=True))
+    ss_res = sum(wi * (ri - b * ii) ** 2 for wi, ii, ri in zip(w, i_vals, residual, strict=True))
     sigma2 = ss_res / (len(i_vals) - 1)
     return math.sqrt(sigma2 / sxx)
 
@@ -469,9 +470,9 @@ def fit_solar_model(
 
         def _fit_b(weights: Sequence[float]) -> float:
             cross = sum(
-                wi * ii * ri for wi, ii, ri in zip(weights, i_vals, residual)
+                wi * ii * ri for wi, ii, ri in zip(weights, i_vals, residual, strict=True)
             )
-            weight_ii = sum(wi * ii * ii for wi, ii in zip(weights, i_vals))
+            weight_ii = sum(wi * ii * ii for wi, ii in zip(weights, i_vals, strict=True))
             return max(0.0, cross / weight_ii)
 
         b = _fit_b(w_solar)
@@ -709,7 +710,7 @@ def _invert_square(matrix: Sequence[Sequence[float]]) -> list[list[float]]:
             factor = aug[row][col]
             if factor:
                 aug[row] = [
-                    value - factor * base for value, base in zip(aug[row], aug[col])
+                    value - factor * base for value, base in zip(aug[row], aug[col], strict=True)
                 ]
     return [row[size:] for row in aug]
 
@@ -732,10 +733,10 @@ def _ols_columns(
     if n < k + 1:
         raise ValueError("too few rows")
     xtx = [
-        [sum(a * b for a, b in zip(columns[i], columns[j])) for j in range(k)]
+        [sum(a * b for a, b in zip(columns[i], columns[j], strict=True)) for j in range(k)]
         for i in range(k)
     ]
-    xty = [sum(a * b for a, b in zip(columns[i], targets)) for i in range(k)]
+    xty = [sum(a * b for a, b in zip(columns[i], targets, strict=True)) for i in range(k)]
     inverse = _invert_square(xtx)
     beta = tuple(
         sum(inverse[i][j] * xty[j] for j in range(k)) for i in range(k)

@@ -1,0 +1,19 @@
+# Static analysis the test suite cannot do. Deliberately narrow: every rule here
+# is enforced, so adding one is a decision, not a wish list. `D` (docstrings) and
+# `ANN` (annotations) are left out until the backlog they report is worth fixing;
+# `E501` is out because the repo has forty lines over 100 and most are log format
+# strings and docstring tables where a wrap costs more than it gains.
+line-length = 100
+target-version = "py314"
+
+[lint]
+select = [
+    "E4",   # import errors
+    "E7",   # statements that are not what they look like
+    "E9",   # syntax / runtime errors
+    "F",    # pyflakes: unused imports, undefined names, redefinitions
+    "I",    # import order
+    "UP",   # pyupgrade: syntax the minimum Python already supports
+    "B",    # bugbear: likely bugs, not style
+    "RUF100",  # a `# noqa` that suppresses nothing
+]

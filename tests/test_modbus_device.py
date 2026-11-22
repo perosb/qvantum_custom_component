@@ -4,11 +4,15 @@ import pytest
 from modbus_connection.exceptions import IllegalDataAddressError
 from modbus_connection.mock import MockModbusConnection
 
-from custom_components.qvantum.const import (
-    BINARY_SENSOR_NAMES,
-    DEFAULT_ENABLED_MODBUS_METRICS,
-    MODBUS_ONLY_BINARY_SENSORS,
-    REQUIRED_MODBUS_METRICS,
+from custom_components.qvantum.client.modbus.device import (
+    IdentityProbeError,
+    QvantumModbusDevice,
+    async_probe_identity,
+    build_metrics_payload,
+    build_settings_payload,
+    component_values,
+    holding_field_for_metric,
+    metric_range,
 )
 from custom_components.qvantum.client.modbus.maps import (
     HEATING_CURVE_OUTDOOR_TEMPS,
@@ -21,21 +25,17 @@ from custom_components.qvantum.client.modbus.maps import (
     RELAY_BIT_MAP,
     heating_curve_points,
 )
-from custom_components.qvantum.client.modbus.device import (
-    IdentityProbeError,
-    QvantumModbusDevice,
-    async_probe_identity,
-    build_metrics_payload,
-    build_settings_payload,
-    component_values,
-    holding_field_for_metric,
-    metric_range,
-)
 from custom_components.qvantum.client.modbus.model import (
     QvantumCompressorUnits,
     QvantumIdentity,
     QvantumInputs,
     QvantumSettings,
+)
+from custom_components.qvantum.const import (
+    BINARY_SENSOR_NAMES,
+    DEFAULT_ENABLED_MODBUS_METRICS,
+    MODBUS_ONLY_BINARY_SENSORS,
+    REQUIRED_MODBUS_METRICS,
 )
 
 

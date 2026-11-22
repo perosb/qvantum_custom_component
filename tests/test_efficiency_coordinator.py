@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -59,7 +59,7 @@ def _hourly_rows(
     delta_kwh: float, *, hours: int = 240, end_ts: int | None = None
 ) -> list[dict]:
     """``hours`` hourly cumulative points ending now, rising by ``delta_kwh``."""
-    end_ts = end_ts or int(datetime.now(timezone.utc).timestamp())
+    end_ts = end_ts or int(datetime.now(UTC).timestamp())
     step = delta_kwh / (hours - 1)
     return [
         {"start": end_ts - (hours - 1 - index) * 3600, "sum": step * index}
@@ -335,7 +335,7 @@ class TestBuildingMetrics:
 
     async def test_computes_building_metrics_and_rising_trend(self):
         coordinator = make_coordinator()
-        now_ts = int(datetime.now(timezone.utc).timestamp())
+        now_ts = int(datetime.now(UTC).timestamp())
         rows = self._series(now_ts=now_ts)
         with (
             self._patch_resolve(),
@@ -357,7 +357,7 @@ class TestBuildingMetrics:
 
     async def test_trend_is_none_without_previous_window(self):
         coordinator = make_coordinator()
-        now_ts = int(datetime.now(timezone.utc).timestamp())
+        now_ts = int(datetime.now(UTC).timestamp())
         cutoff = now_ts - 30 * 86400
         rows = {
             key: [row for row in value if row["start"] >= cutoff]
@@ -376,7 +376,7 @@ class TestBuildingMetrics:
     async def test_normalized_uses_aligned_hours(self):
         """Energy and degree hours must cover exactly the same hours."""
         coordinator = make_coordinator()
-        now_ts = int(datetime.now(timezone.utc).timestamp())
+        now_ts = int(datetime.now(UTC).timestamp())
         series = self._series(now_ts=now_ts)
         cutoff = now_ts - 10 * 86400
         rows = {
@@ -405,7 +405,7 @@ class TestBuildingMetrics:
 
     async def test_short_building_history_publishes_nothing(self):
         coordinator = make_coordinator()
-        now_ts = int(datetime.now(timezone.utc).timestamp())
+        now_ts = int(datetime.now(UTC).timestamp())
         cutoff = now_ts - 2 * 86400
         rows = {
             key: [row for row in value if row["start"] >= cutoff]
@@ -456,7 +456,7 @@ class TestCyclingAndHealth:
 
     async def test_computes_cycling_and_health(self):
         coordinator = make_coordinator()
-        now_ts = int(datetime.now(timezone.utc).timestamp())
+        now_ts = int(datetime.now(UTC).timestamp())
         hours = 24
         rows = {
             "sensor.starts": [
@@ -517,7 +517,7 @@ class TestOperatingPoint:
 
     async def test_computes_operating_point(self):
         coordinator = make_coordinator()
-        now_ts = int(datetime.now(timezone.utc).timestamp())
+        now_ts = int(datetime.now(UTC).timestamp())
         hours = 24
 
         def rows(value):
@@ -647,7 +647,7 @@ class TestDhwHeatMeter:
 class TestSolar:
     @staticmethod
     def _fixed_now():
-        return datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
+        return datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
 
     async def test_ghi_now_and_forecast_peak(self):
         """GHI needs only Open-Meteo, so it works with no model and no stats."""
@@ -1178,7 +1178,7 @@ class TestSolarDaily:
     async def test_refresh_fits_the_day_block_model(self):
         """The day-block fit must actually see the series it is given."""
         coordinator = make_coordinator()
-        fixed = datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
+        fixed = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
         now_ts = int(fixed.timestamp())
         days = 30
         mean_series: dict[str, list[tuple[int, float]]] = {

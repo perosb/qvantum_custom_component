@@ -12,9 +12,13 @@ import pytest
 
 from custom_components.qvantum.numeric import median
 from custom_components.qvantum.solar_gain import (
+    DAILY_MIN_COLD_WIND_DAYS,
+    DAILY_MIN_COLD_WIND_HOURS,
+    DAILY_MIN_COLD_WIND_HOURS_PER_DAY,
     DAILY_MIN_DAYS,
     DAILY_MIN_R2,
     DAILY_MIN_T_STAT,
+    DAILY_MIN_WIND_T_STAT,
     MIN_FIT_ROWS,
     MIN_SAMPLE_Q_W,
     OPAQUE_GHI_MAX_WM2,
@@ -22,10 +26,7 @@ from custom_components.qvantum.solar_gain import (
     SolarDay,
     SolarModel,
     SolarSample,
-    DAILY_MIN_COLD_WIND_DAYS,
-    DAILY_MIN_COLD_WIND_HOURS,
-    DAILY_MIN_COLD_WIND_HOURS_PER_DAY,
-    DAILY_MIN_WIND_T_STAT,
+    _fit_wind_coefficient,
     _ols_three,
     _recency_weights,
     _robust_weights_line,
@@ -34,7 +35,6 @@ from custom_components.qvantum.solar_gain import (
     aggregate_days,
     build_samples,
     effective_solar_model,
-    _fit_wind_coefficient,
     fit_daily_solar_model,
     fit_solar_model,
     smooth_ghi,

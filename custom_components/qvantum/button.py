@@ -2,21 +2,18 @@
 
 import logging
 
+from homeassistant.components.button import ButtonEntity
 from homeassistant.const import (
     EntityCategory,
 )
-
-
-from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import MyConfigEntry
-from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response
-from .maintenance_coordinator import QvantumMaintenanceCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, handle_setting_update_response, is_cloud
 from .entity import QvantumEntity, finalize_platform_setup
-from .coordinator import is_cloud
+from .maintenance_coordinator import QvantumMaintenanceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 

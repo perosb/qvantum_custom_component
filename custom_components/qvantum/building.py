@@ -15,8 +15,8 @@ and a recency-weighted sample rather than a single reading.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Mapping, Sequence
 
 from .numeric import finite
 
@@ -162,7 +162,7 @@ def _fit_episodes(
     delta_ts: Sequence[float], slopes: Sequence[float]
 ) -> tuple[float | None, float]:
     """``(slope, intercept)`` of the episode line, slope ``None`` when flat."""
-    points = list(zip(delta_ts, slopes))
+    points = list(zip(delta_ts, slopes, strict=True))
     slope = _slope(points)
     if slope is None:
         return None, 0.0
