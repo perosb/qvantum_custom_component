@@ -55,8 +55,10 @@ from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .plant_analytics import (
     eu_label,
 )
-from .solar_gain import DAILY_MIN_COLD_WIND_DAYS as _MIN_COLD_WIND_DAYS
-from .solar_gain import DAILY_MIN_COLD_WIND_HOURS as _MIN_COLD_WIND_HOURS
+from .solar_gain import (
+    DAILY_MIN_COLD_WIND_DAYS as _MIN_COLD_WIND_DAYS,
+    DAILY_MIN_COLD_WIND_HOURS as _MIN_COLD_WIND_HOURS,
+)
 
 _LOGGER = logging.getLogger(__name__)
 

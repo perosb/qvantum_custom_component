@@ -18,9 +18,11 @@ from homeassistant.const import (
 )
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    issue_registry as ir,
+)
 from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
 from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
 from homeassistant.helpers.event import async_track_time_interval
@@ -33,11 +35,7 @@ from .client.cloud import QvantumCloudClient
 from .client.constants import alias_heating_curve_settings
 from .client.exceptions import (
     AuthError as APIAuthError,
-)
-from .client.exceptions import (
     RateLimitError as APIRateLimitError,
-)
-from .client.exceptions import (
     TransportError as APIConnectionError,
 )
 from .client.modbus import QvantumModbusClient, metric_range

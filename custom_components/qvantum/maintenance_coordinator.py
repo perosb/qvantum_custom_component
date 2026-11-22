@@ -16,8 +16,10 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .client.cloud import QvantumCloudClient
-from .client.exceptions import AuthError as APIAuthError
-from .client.exceptions import RateLimitError as APIRateLimitError
+from .client.exceptions import (
+    AuthError as APIAuthError,
+    RateLimitError as APIRateLimitError,
+)
 from .const import DOMAIN, FIRMWARE_KEYS
 from .coordinator import is_cloud
 

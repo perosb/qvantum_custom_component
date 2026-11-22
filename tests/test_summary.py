@@ -25,14 +25,12 @@ from custom_components.qvantum.summary import (
     QvantumSummaryView,
     SensorMode,
     build_summary,
+    counters_summary as summary_counters_summary,
     curve_summary,
     device_metadata,
     device_summary,
     fitted_summary,
     plant_summary,
-)
-from custom_components.qvantum.summary import (
-    counters_summary as summary_counters_summary,
 )
 
 ENTRY_ID = "01JTESTENTRY0000000000000"

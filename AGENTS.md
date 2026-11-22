@@ -452,6 +452,9 @@ is pinned in the workflow (`ruff==0.17.6`) because a new release can add a rule
 that turns the gate red on its own. `D` (docstrings), `ANN` (annotations) and
 `E501` are deliberately out — their backlog is real but fixing it is a separate
 decision, and `E501` would flag forty lines, most of them log format strings.
+`isort` keeps aliased re-exports combined and wrapped
+(`combine-as-imports`/`force-wrap-aliases`), so `from .const import (A as A,
+B as B)` stays one statement — without it every alias gets its own block.
 Run it locally with `uv run --with ruff==0.17.6 ruff check --fix`.
 
 ```bash

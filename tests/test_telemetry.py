@@ -7,9 +7,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.qvantum import config_flow as qvantum_config_flow
-from custom_components.qvantum import repairs as qvantum_repairs
-from custom_components.qvantum import telemetry
+from custom_components.qvantum import (
+    config_flow as qvantum_config_flow,
+    repairs as qvantum_repairs,
+    telemetry,
+)
 from custom_components.qvantum.repairs import TelemetryConsentFlow, async_create_fix_flow
 
 
