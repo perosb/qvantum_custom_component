@@ -138,7 +138,8 @@ present in the payload, so absent registers degrade to no entity.
   `MODBUS_HOLDING_TO_SETTINGS_MAP` gives it a canonical name (`get_settings`
   filters by that map). A register in `MODBUS_HOLDING_REGISTER_MAP` without a
   settings entry is polled and then dropped, so no entity can exist for it
-  (holding 74 is deliberate: the app has no cooling-priority setting).
+  (holding 74 is deliberate: the app has no cooling-priority setting; holding 58
+  is `dhw_start_extra`, exposed as a number entity alongside `dhw_stop_extra`).
   `compressor_power` (input 93) must stay in the modbus metrics payload even
   though `powertotal` folds it in: its diagnostic sensor records the long-term
   statistics `compressor_power_avg` reads, and a popped key left that average
