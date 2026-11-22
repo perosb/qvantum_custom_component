@@ -23,7 +23,7 @@ from ..constants import (
     FAN_SPEED_VALUE_NORMAL,
     FAN_SPEED_VALUE_OFF,
     SETTING_UPDATE_APPLIED,
-    TAP_WATER_CAPACITY_START_STOP,
+    tap_water_capacity_pair,
 )
 from ..exceptions import TransportError
 from ..models import MetricsPayload, SettingsPayload
@@ -363,12 +363,7 @@ class QvantumModbusClient:
     async def set_tap_water_capacity_target(
         self, device_id: str, capacity: int
     ) -> dict[str, Any]:
-        if capacity not in TAP_WATER_CAPACITY_START_STOP:
-            raise ValueError(
-                f"Unsupported tap water capacity {capacity}; expected one of "
-                f"{sorted(TAP_WATER_CAPACITY_START_STOP)}"
-            )
-        start, stop = TAP_WATER_CAPACITY_START_STOP[capacity]
+        start, stop = tap_water_capacity_pair(capacity)
         _LOGGER.debug(
             "Setting tap water capacity %s maps to stop %s and start %s.",
             capacity,
