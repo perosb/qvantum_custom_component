@@ -339,7 +339,13 @@ there in the same PR.
 The dump carries an `efficiency` block beside `curve`: a **fixed list** of the
 snapshot's headline figures — not every attribute, so a field absent from this
 list is absent rather than null — plus two inputs of its own:
-`building_fit_rows` and `building_indoor_key`. A null `heat_loss_w_per_k` has two very different causes —
+`building_fit_rows` and `building_indoor_key`, and the four figures the export
+*derives* rather than stores: `eta_s_percent` / `eu_class` and their `_90d`
+twins. The derivation is `plant_analytics.eu_label`, called by the sensor
+attributes, the summary export and the dump, so a report can answer "why is my
+class A+?" instead of pointing at a figure it cannot see. `tests/test_diagnostics.py`
+pins the parity: every key in `summary.FITTED_EFFICIENCY_KEYS` must appear in the
+dump, so the two whitelists cannot drift apart again. A null `heat_loss_w_per_k` has two very different causes —
 too few hours where indoor, outdoor and power coincide, or a slope that is not
 positive — and the published figure cannot say which. Measured on an installation
 whose dump showed `building_coverage_days` 24.79 with the coefficient null and

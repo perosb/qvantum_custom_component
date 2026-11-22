@@ -38,10 +38,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
 
-from .plant_analytics import (
-    eu_energy_class,
-    seasonal_space_heating_efficiency,
-)
+from .plant_analytics import eu_label
 from .const import (
     DOMAIN,
     REVERT_REASONS,
@@ -187,6 +184,14 @@ PLANT_KEYS: tuple[str, ...] = (
     "max_heating_supply",
     "stop_heating",
 )
+
+#: Export key -> snapshot field, where the two names differ. ``scop_coverage_days``
+#: is the snapshot's ``coverage_days``: the weakest counter's observed days in the
+#: 30-day SCOP window, named for the figure it qualifies.
+_SNAPSHOT_ATTRIBUTE: dict[str, str] = {
+    "scop_coverage_days": "coverage_days",
+    "scop_coverage_days_90d": "scop_coverage_days_90d",
+}
 
 #: Identified building/envelope figures, straight off the efficiency snapshot.
 FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (
@@ -594,24 +599,18 @@ def fitted_summary(snapshot: Any) -> dict[str, Any]:
     """Identified envelope figures from the efficiency snapshot."""
     if snapshot is None:
         return {key: None for key in FITTED_EFFICIENCY_KEYS}
-    # ``scop_coverage_days`` is the snapshot's ``coverage_days``: the weakest
-    # counter's observed days in the 30-day SCOP window.
-    attribute = {
-        "scop_coverage_days": "coverage_days",
-        "scop_coverage_days_90d": "scop_coverage_days_90d",
-    }
     # The EU label's unit is derived, not stored: ηs follows from the SCOP, and
     # the class from ηs, so the two can never drift apart.
     derived: dict[str, Any] = {}
     for suffix, scop_key in (("", "scop_total"), ("_90d", "scop_total_90d")):
-        eta_s = seasonal_space_heating_efficiency(getattr(snapshot, scop_key, None))
+        eta_s, eu_class = eu_label(getattr(snapshot, scop_key, None))
         derived[f"eta_s_percent{suffix}"] = eta_s
-        derived[f"eu_class{suffix}"] = _short_string(eu_energy_class(eta_s))
+        derived[f"eu_class{suffix}"] = _short_string(eu_class)
     return {
         key: (
-            _short_string(getattr(snapshot, attribute.get(key, key), None))
+            _short_string(getattr(snapshot, _SNAPSHOT_ATTRIBUTE.get(key, key), None))
             if key == "efficiency_health_grade"
-            else _number(getattr(snapshot, attribute.get(key, key), None))
+            else _number(getattr(snapshot, _SNAPSHOT_ATTRIBUTE.get(key, key), None))
         )
         if key not in derived
         else derived[key]

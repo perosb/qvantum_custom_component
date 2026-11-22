@@ -47,8 +47,7 @@ from .efficiency import COP_WINDOW_SECONDS
 from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
 from . import MyConfigEntry
 from .plant_analytics import (
-    eu_energy_class,
-    seasonal_space_heating_efficiency,
+    eu_label,
 )
 from .coordinator import QvantumDataUpdateCoordinator
 from .curve_coordinator import (
@@ -1582,10 +1581,10 @@ class QvantumEfficiencySensorEntity(CoordinatorEntity, SensorEntity):
                 ("", snapshot.scop_total),
                 ("_90d", snapshot.scop_total_90d),
             ):
-                eta_s = seasonal_space_heating_efficiency(scop)
+                eta_s, eu_class = eu_label(scop)
                 if eta_s is not None:
                     attributes[f"eta_s_percent{window}"] = eta_s
-                    attributes[f"eu_class{window}"] = eu_energy_class(eta_s)
+                    attributes[f"eu_class{window}"] = eu_class
         if self._metric_key == "dhw_standing_loss":
             attributes["attribution"] = (
                 "free-cooling windows, quoted at a fixed tank-to-ambient difference"
