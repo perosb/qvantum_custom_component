@@ -872,11 +872,11 @@ class TestQvantumNumberEntity:
             mock_coordinator, "dhw_start_extra", 20, 80, 1, mock_device
         )
         stop_entity = QvantumNumberEntity(
-            mock_coordinator, "dhw_stop_extra", 20, 80, 1, mock_device
+            mock_coordinator, "dhw_stop_extra", 60, 80, 5, mock_device
         )
 
         assert start_entity.native_max_value == 74
-        assert stop_entity.native_min_value == 66
+        assert stop_entity.native_min_value == 70
 
 
 class TestNumberSetup:
