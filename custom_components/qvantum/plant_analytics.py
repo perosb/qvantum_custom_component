@@ -12,7 +12,7 @@ coverage so a grade built from one signal is never mistaken for a full picture.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from .numeric import finite
@@ -212,10 +212,38 @@ class DhwMeterWindow:
         now = finite(now_ts)
         if now is not None:
             self._prune(now)
-        estimated = sum(slot[0] for slot in self.buckets.values())
-        metered = sum(slot[1] for slot in self.buckets.values())
-        draw_hours = sum(slot[2] for slot in self.buckets.values()) / 3600.0
-        return estimated, metered, draw_hours
+        return self._sum(self.buckets.values())
+
+    def split_totals(
+        self, now_ts: object, recent_seconds: float = 86400.0
+    ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+        """``(recent, prior)`` totals, each ``(estimated_kwh, metered_kwh, draw_hours)``.
+
+        The level of the comparison carries a structural bias — an integral over
+        poll instants misses the part of a short draw that falls between two
+        polls — so the level alone cannot say whether anything changed. The two
+        halves of the window can: a constant bias reads the same in both, while
+        a sensor drifting or a counter resetting moves one against the other.
+        """
+        now = finite(now_ts)
+        if now is None:
+            return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
+        self._prune(now)
+        boundary = now - max(0.0, float(recent_seconds))
+        recent = [slot for key, slot in self.buckets.items() if key >= boundary]
+        prior = [slot for key, slot in self.buckets.items() if key < boundary]
+        return self._sum(recent), self._sum(prior)
+
+    @staticmethod
+    def _sum(slots: Iterable[list[float]]) -> tuple[float, float, float]:
+        estimated = 0.0
+        metered = 0.0
+        seconds = 0.0
+        for slot in slots:
+            estimated += slot[0]
+            metered += slot[1]
+            seconds += slot[2]
+        return estimated, metered, seconds / 3600.0
 
     def signature(self) -> tuple:
         """Change marker for the persisted snapshot."""

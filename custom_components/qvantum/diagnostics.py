@@ -246,6 +246,10 @@ _EFFICIENCY_FIELDS = (
     "dhw_standing_loss",
     "dhw_standing_episodes",
     "dhw_standing_hours",
+    # The DHW-meter comparison: the level carries a structural bias, so the
+    # dump also carries the two halves the warning compares.
+    "dhw_heat_meter_deviation_recent",
+    "dhw_heat_meter_deviation_prior",
     "compressor_starts_per_hour",
     "compressor_run_hours_24h",
     "compressor_duty_cycle",

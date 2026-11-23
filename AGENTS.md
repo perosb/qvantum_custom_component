@@ -598,7 +598,11 @@ review has to catch:
   snapshot is ignored, never reinterpreted. The open free-cooling window is
   deliberately not persisted.
 - The DHW heat-meter comparison is a **poll-resolution integral**; `mean(flow) ·
-  mean(ΔT)` is not the integral of `flow · ΔT` and lands far below it.
+  mean(ΔT)` is not the integral of `flow · ΔT` and lands far below it. Its
+  **warning compares the window's two halves, not the level**: the level carries
+  a structural bias (measured −23 % for three weeks with short draws), so a
+  level threshold is permanently on — movement ≥ 5 points, or a level beyond
+  ±40 %, is what fires.
 - The buffer-tank volume is **identified** (element-only balance), and
   `element_only_tank_balance` must keep both guards — shunt closed
   (`qn8position` = 0) and no `heatingenergy` counter step — or the element's
