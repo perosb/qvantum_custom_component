@@ -1357,3 +1357,169 @@ class TestDhwStandingLossPersistence:
         coordinator._update_dhw_standing_loss(1000.0 + 2 * 3600)
 
         assert store.saved == []
+
+
+class TestDhwHeatMeterWarning:
+    """The warning tracks movement, not the level.
+
+    The level carries a structural bias — an integral over poll instants misses
+    the part of a short draw that falls between two polls — measured at a steady
+    -23 % on the owner's installation for three weeks. A level threshold was
+    therefore permanently on, which teaches the user to ignore it.
+    """
+
+    @staticmethod
+    def _values(coordinator, **values):
+        coordinator._main.data = {"values": values}
+
+    @staticmethod
+    def _window(*halves):
+        window = MagicMock()
+        window.split_totals.return_value = halves
+        return window
+
+    async def test_a_steady_biased_level_does_not_warn(self):
+        coordinator = make_coordinator()
+        # -23 % now and -23 % in the previous half: the bias, not a change.
+        coordinator._main._dhw_meter = self._window(
+            (30.0, 39.0, 3.0), (30.0, 39.0, 3.0)
+        )
+        self._values(
+            coordinator,
+            dhw_meter_estimated_kwh=60.0,
+            dhw_meter_metered_kwh=78.0,
+            dhw_meter_draw_hours=6.0,
+        )
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_heat_meter_deviation == pytest.approx(-23.08, abs=0.05)
+        assert snapshot.dhw_heat_meter_warning is False
+        assert snapshot.dhw_heat_meter_deviation_recent == pytest.approx(-23.08, abs=0.05)
+        assert snapshot.dhw_heat_meter_deviation_prior == pytest.approx(-23.08, abs=0.05)
+
+    async def test_a_five_point_move_warns(self):
+        coordinator = make_coordinator()
+        coordinator._main._dhw_meter = self._window(
+            (38.0, 40.0, 3.0),   # -5 %
+            (30.0, 39.0, 3.0),   # -23.1 % -> a move of 18 points
+        )
+        self._values(
+            coordinator,
+            dhw_meter_estimated_kwh=68.0,
+            dhw_meter_metered_kwh=79.0,
+            dhw_meter_draw_hours=6.0,
+        )
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_heat_meter_warning is True
+        assert snapshot.dhw_heat_meter_deviation_recent == pytest.approx(-5.0)
+        assert snapshot.dhw_heat_meter_deviation_prior == pytest.approx(-23.08, abs=0.05)
+
+    async def test_a_small_move_stays_quiet(self):
+        coordinator = make_coordinator()
+        coordinator._main._dhw_meter = self._window(
+            (37.0, 40.0, 3.0),   # -7.5 %
+            (36.4, 40.0, 3.0),   # -9.0 % -> 1.5 points
+        )
+        self._values(
+            coordinator,
+            dhw_meter_estimated_kwh=73.4,
+            dhw_meter_metered_kwh=80.0,
+            dhw_meter_draw_hours=6.0,
+        )
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_heat_meter_warning is False
+
+    async def test_an_extreme_level_warns_without_a_move(self):
+        """A fresh install where the two never agreed has no movement to see."""
+        coordinator = make_coordinator()
+        coordinator._main._dhw_meter = self._window(
+            (10.0, 40.0, 3.0), (10.0, 40.0, 3.0)   # -75 % in both halves
+        )
+        self._values(
+            coordinator,
+            dhw_meter_estimated_kwh=20.0,
+            dhw_meter_metered_kwh=80.0,
+            dhw_meter_draw_hours=6.0,
+        )
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_heat_meter_deviation == pytest.approx(-75.0)
+        assert snapshot.dhw_heat_meter_warning is True
+
+    async def test_a_half_without_evidence_falls_back_to_the_level(self):
+        coordinator = make_coordinator()
+        coordinator._main._dhw_meter = self._window(
+            (0.1, 0.1, 0.1),      # too little draw to compute a half
+            (39.0, 40.0, 3.0),
+        )
+        self._values(
+            coordinator,
+            dhw_meter_estimated_kwh=30.0,
+            dhw_meter_metered_kwh=40.0,
+            dhw_meter_draw_hours=3.1,
+        )
+        with patch.object(ec, "resolve_statistic_entity_ids", return_value={}):
+            snapshot = await coordinator._async_compute_snapshot()
+
+        assert snapshot.dhw_heat_meter_deviation == pytest.approx(-25.0)
+        assert snapshot.dhw_heat_meter_deviation_recent is None
+        assert snapshot.dhw_heat_meter_warning is False
+
+
+async def test_the_recorder_path_reports_both_halves_too():
+    """The dump must carry the halves on the path every normal install takes.
+
+    The empty-keys early return is the recorder-less one; wiring the two fields
+    only there left the diagnostics dump with None for both halves exactly where
+    the warning matters.
+    """
+    coordinator = make_coordinator()
+    coordinator._main._dhw_meter = MagicMock()
+    coordinator._main._dhw_meter.split_totals.return_value = (
+        (38.0, 40.0, 3.0),
+        (30.0, 39.0, 3.0),
+    )
+    coordinator._main.data = {
+        "values": {
+            "dhw_meter_estimated_kwh": 68.0,
+            "dhw_meter_metered_kwh": 79.0,
+            "dhw_meter_draw_hours": 6.0,
+        }
+    }
+    # A recorder-bearing install: the statistics call returns rows, so the
+    # snapshot is built on the main path and not the early return.
+    with patch.object(
+        ec,
+        "resolve_statistic_entity_ids",
+        return_value={"heatingpower": "sensor.power", "bt1": "sensor.outdoor"},
+    ), patch.object(ec, "async_statistics_during_period", AsyncMock(return_value={})):
+        snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.dhw_heat_meter_deviation_recent == pytest.approx(-5.0)
+    assert snapshot.dhw_heat_meter_deviation_prior == pytest.approx(-23.08, abs=0.05)
+    assert snapshot.dhw_heat_meter_warning is True
+
+
+def test_a_malformed_totals_tuple_yields_no_deviation():
+    """The window lives on the main coordinator; a mock must not raise."""
+    coordinator = make_coordinator()
+    assert coordinator._deviation_of("not a tuple") is None
+    assert coordinator._deviation_of((1.0, "x", 3.0)) is None
+    assert coordinator._deviation_of((10.0, 40.0, 3.0)) == pytest.approx(-75.0)
+
+
+def test_a_window_without_a_split_falls_back_to_the_level():
+    """An older coordinator, or a mock, has no split to compare."""
+    coordinator = make_coordinator()
+    coordinator._main._dhw_meter = object()          # no split_totals
+
+    assert coordinator._dhw_heat_meter_warning(-23.1, 1_800_000_000.0) is False
+    assert coordinator._dhw_heat_meter_warning(-50.0, 1_800_000_000.0) is True
+    assert coordinator._dhw_meter_deviation_recent is None
+    assert coordinator._dhw_meter_deviation_prior is None

@@ -122,7 +122,22 @@ DHW_AMBIENT_KEYS = ("bt2", "room_temp_external", "room_temp_ext")
 #: averaging -30 C in would publish ~40 % of the true coefficient.
 BT2_PLACEHOLDER_MAX_C = -25.0
 #: |estimated - metered| above this share of metered is a warning.
-HEAT_METER_WARNING_PERCENT = 20.0
+#: The comparison's **level** carries a structural bias: an integral over poll
+#: instants misses the part of a short draw that falls between two polls. On the
+#: owner's installation (2026-11-23) that bias is a steady -23 % with 3 h of draw
+#: over 7 days, and it did not move for three weeks. A level threshold therefore
+#: either stays permanently on or is set so high it says nothing.
+#:
+#: What *is* a signal is the level moving: it is a 7-day window, so its daily
+#: mean spans +-0.2 points when nothing changes (measured 4-22 Nov), and the one
+#: documented change ramped at ~4 points/day as the window slid over it. Five
+#: points in a day cannot come from sampling noise.
+HEAT_METER_WARNING_CHANGE_PP = 5.0
+#: A level this far from zero is not a sampling bias either way — nothing about
+#: short draws can put the integral 40 % *above* the meter, or 40 % below it
+#: once a draw of a few minutes has been sampled at all. This catches the case a
+#: change test cannot: an installation where the two never agreed.
+HEAT_METER_WARNING_EXTREME_PERCENT = 40.0
 #: Window for degree hours, normalized heating and the heat-loss fit.
 BUILDING_WINDOW_DAYS = 30
 #: Both the current and the previous window need this coverage for a trend.
@@ -185,6 +200,11 @@ class EfficiencySnapshot:
     exhaust_fan_speed_avg: float | None = None
     dhw_heat_meter_deviation: float | None = None
     dhw_heat_meter_warning: bool | None = None
+    #: The level over each half of the window. The warning compares them; a
+    #: report needs both to see *why* it fired (movement) rather than *where*
+    #: the level sits (which carries a structural bias).
+    dhw_heat_meter_deviation_recent: float | None = None
+    dhw_heat_meter_deviation_prior: float | None = None
     dhw_heat_meter_estimated_kwh: float | None = None
     dhw_heat_meter_metered_kwh: float | None = None
     dhw_heat_meter_draw_hours: float = 0.0
@@ -600,7 +620,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             dhw_meter_estimated_kwh,
             dhw_meter_metered_kwh,
             dhw_meter_draw_hours,
-        ) = self._dhw_heat_meter_metrics()
+        ) = self._dhw_heat_meter_metrics(now_ts)
         keys = {**counters, **building, **cycling, **operating}
         if not keys:
             solar = await self._async_solar({}, now_ts)
@@ -612,6 +632,12 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
                 dhw_standing_hours=getattr(self, "_dhw_standing_hours", None),
                 dhw_heat_meter_deviation=dhw_meter_deviation,
                 dhw_heat_meter_warning=dhw_meter_warning,
+                dhw_heat_meter_deviation_recent=getattr(
+                    self, "_dhw_meter_deviation_recent", None
+                ),
+                dhw_heat_meter_deviation_prior=getattr(
+                    self, "_dhw_meter_deviation_prior", None
+                ),
                 dhw_heat_meter_estimated_kwh=dhw_meter_estimated_kwh,
                 dhw_heat_meter_metered_kwh=dhw_meter_metered_kwh,
                 dhw_heat_meter_draw_hours=dhw_meter_draw_hours,
@@ -750,6 +776,12 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             exhaust_fan_speed_avg=fan_avg,
             dhw_heat_meter_deviation=dhw_meter_deviation,
             dhw_heat_meter_warning=dhw_meter_warning,
+            dhw_heat_meter_deviation_recent=getattr(
+                self, "_dhw_meter_deviation_recent", None
+            ),
+            dhw_heat_meter_deviation_prior=getattr(
+                self, "_dhw_meter_deviation_prior", None
+            ),
             dhw_heat_meter_estimated_kwh=dhw_meter_estimated_kwh,
             dhw_heat_meter_metered_kwh=dhw_meter_metered_kwh,
             dhw_heat_meter_draw_hours=dhw_meter_draw_hours,
@@ -918,7 +950,7 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         return deltas, min(coverages) if coverages else 0.0
 
     def _dhw_heat_meter_metrics(
-        self,
+        self, now_ts: float
     ) -> tuple[float | None, bool | None, float | None, float | None, float]:
         """Compare the flow×ΔT DHW estimate against the metered counter.
 
@@ -945,8 +977,68 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
         ):
             return None, None, estimated_kwh, metered_kwh, draw_hours
         deviation = (estimated_kwh - metered_kwh) / metered_kwh * 100.0
-        warning = abs(deviation) >= HEAT_METER_WARNING_PERCENT
+        warning = self._dhw_heat_meter_warning(deviation, now_ts)
         return deviation, warning, estimated_kwh, metered_kwh, draw_hours
+
+    def _deviation_of(self, totals: object) -> float | None:
+        """The percentage for one half of the window, or ``None`` without evidence.
+
+        ``totals`` is validated rather than trusted: the window lives on the main
+        coordinator, and a test harness that hands this one a mock must not turn
+        a comparison into an exception.
+        """
+        try:
+            estimated, metered, draw_hours = totals  # type: ignore[misc]
+        except (TypeError, ValueError):
+            return None
+        numbers = (estimated, metered, draw_hours)
+        if not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool)
+            for value in numbers
+        ):
+            return None
+        if metered < MIN_DHW_METER_KWH or draw_hours < MIN_DHW_METER_DRAW_HOURS:
+            return None
+        return (float(estimated) - float(metered)) / float(metered) * 100.0
+
+    def _dhw_heat_meter_warning(
+        self, deviation: float, now_ts: float
+    ) -> bool | None:
+        """Whether the comparison says something changed, not merely where it sits.
+
+        The level is published either way; it is not what raises the warning. See
+        :data:`HEAT_METER_WARNING_CHANGE_PP` for the measurement behind that.
+
+        Two things can move the warning:
+
+        - the level moved more than :data:`HEAT_METER_WARNING_CHANGE_PP` between
+          the window's two halves — a sensor drifting, a counter resetting, a
+          register re-based;
+        - the level is beyond :data:`HEAT_METER_WARNING_EXTREME_PERCENT`, which
+          no sampling bias explains, and which the change test cannot see if the
+          integration was installed with the fault already present.
+        """
+        extreme = abs(deviation) >= HEAT_METER_WARNING_EXTREME_PERCENT
+        window = getattr(self._main, "_dhw_meter", None)
+        split = getattr(window, "split_totals", None)
+        if split is None:
+            self._dhw_meter_deviation_recent = None
+            self._dhw_meter_deviation_prior = None
+            return extreme
+        try:
+            recent_totals, prior_totals = split(now_ts)
+        except (TypeError, ValueError):
+            # A mock standing in for the main coordinator: no split to compare.
+            self._dhw_meter_deviation_recent = None
+            self._dhw_meter_deviation_prior = None
+            return extreme
+        recent = self._deviation_of(recent_totals)
+        prior = self._deviation_of(prior_totals)
+        self._dhw_meter_deviation_recent = recent
+        self._dhw_meter_deviation_prior = prior
+        if recent is None or prior is None:
+            return extreme
+        return extreme or abs(recent - prior) >= HEAT_METER_WARNING_CHANGE_PP
 
     def _dhw_is_idle(self, values: Mapping[str, Any]) -> float | None:
         """Tank temperature when the DHW circuit is idle, else ``None``."""

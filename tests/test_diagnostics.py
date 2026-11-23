@@ -917,3 +917,19 @@ def test_the_curve_dump_carries_the_setpoint_the_margin_window_belongs_to() -> N
     assert block is not None
     assert block["indoor_margins_target"] == 20.5
 
+
+
+def test_the_efficiency_dump_carries_the_two_halves_of_the_meter_warning() -> None:
+    """The level carries a structural bias; the halves say why the warning fired."""
+    from custom_components.qvantum.diagnostics import _efficiency_diagnostics
+
+    snapshot = EfficiencySnapshot(
+        dhw_heat_meter_deviation=-23.1,
+        dhw_heat_meter_deviation_recent=-5.0,
+        dhw_heat_meter_deviation_prior=-23.1,
+    )
+    block = _efficiency_diagnostics(SimpleNamespace(data=snapshot))
+
+    assert block is not None
+    assert block["dhw_heat_meter_deviation_recent"] == -5.0
+    assert block["dhw_heat_meter_deviation_prior"] == -23.1

@@ -295,9 +295,32 @@ the poll integral landed within 2.8 %.
 and counter-reset guarded) where the interval is known — the main coordinator's
 poll — publishes `dhw_meter_estimated_kwh` / `dhw_meter_metered_kwh` /
 `dhw_meter_draw_hours` in `values`, and is persisted under `dhw_meter` in the COP
-store. The efficiency coordinator only applies the gates (draw time and metered
-energy) and the ±20 % warning, so the figure also works without a recorder.
+store. The efficiency coordinator applies the gates (draw time and metered
+energy) and raises the warning, so the figure also works without a recorder.
 Diagnostics dump it as `cop.dhw_meter`.
+
+**The warning tracks movement, not the level.** The level carries a structural
+bias: an integral over poll instants misses whatever part of a short draw falls
+between two polls. Measured on the owner's QE-6 (2026-11-23): a steady **−23 %**
+with 3.0 h of draw over 7 days, unchanged for three weeks — the metered side
+agreeing with its own monthly counter (6.8 kWh/day both ways), so the shortfall
+was the estimate. A ±20 % level threshold was therefore permanently on, which
+teaches a user to ignore the sensor.
+
+Two things raise it instead:
+
+- the level moved more than **5 points** between the window's two halves. A
+  7-day window's daily mean spans ±0.2 points when nothing changes (measured
+  4–22 Nov), and the one documented change ramped at ~4 points/day as the window
+  slid over it — so 5 points in a day cannot be sampling noise. The dump carries
+  both halves (`dhw_heat_meter_deviation_recent` / `_prior`) so a report shows
+  *why* it fired.
+- the level is beyond **±40 %**, which no sampling bias explains in either
+  direction — the case a change test cannot see, an installation where the two
+  never agreed.
+
+`plant_analytics.DhwMeterWindow.split_totals` supplies the two halves from the
+same buckets, so no extra state is persisted.
 
 ## The identified buffer-tank volume
 

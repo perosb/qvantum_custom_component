@@ -377,3 +377,35 @@ def test_the_eu_label_unit_follows_the_regulation() -> None:
     # A measured SCOP of 2.84 — this installation — is an A+ on the label's
     # scale while the health grade calls the same window D.
     assert eu_energy_class(seasonal_space_heating_efficiency(2.84)) == "A+"
+
+
+def test_split_totals_divides_the_window_into_two_halves() -> None:
+    """The comparison's halves come from the same buckets, half the window each."""
+    from custom_components.qvantum.plant_analytics import (
+        DHW_METER_BUCKET_SECONDS,
+        DHW_METER_WINDOW_SECONDS,
+        DhwMeterWindow,
+    )
+
+    now = 1_800_000_000.0
+    window = DhwMeterWindow()
+    # One bucket six days old, one two days old: default halves are 3.5 days.
+    for age_days, slot in ((6, [1.0, 2.0, 3600.0]), (2, [3.0, 4.0, 1800.0])):
+        key = int((now - age_days * 86400) // DHW_METER_BUCKET_SECONDS)
+        window.buckets[key * DHW_METER_BUCKET_SECONDS] = list(slot)
+
+    recent, prior = window.split_totals(now)
+
+    assert recent == (3.0, 4.0, 0.5)          # the two-day-old bucket
+    assert prior == (1.0, 2.0, 1.0)           # the six-day-old one
+    assert DHW_METER_WINDOW_SECONDS / 2.0 == 3.5 * 86400.0
+
+
+def test_split_totals_of_an_empty_or_undated_window_is_zeros() -> None:
+    from custom_components.qvantum.plant_analytics import DhwMeterWindow
+
+    assert DhwMeterWindow().split_totals(1_800_000_000.0) == (
+        (0.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0),
+    )
+    assert DhwMeterWindow().split_totals(None) == ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
