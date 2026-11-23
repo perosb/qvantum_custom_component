@@ -710,6 +710,10 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
             for ts, margin in (margins or [])
             if isinstance(ts, (int, float)) and isinstance(margin, (int, float))
         ],
+        # The setpoint the samples above belong to: the window is cleared when
+        # it changes, so without it a dump cannot tell a regime change from a
+        # cap that simply drifted.
+        "indoor_margins_target": getattr(coordinator, "_indoor_margins_target", None),
         "load_power_mean_w": live.get("heating_power_mean_w"),
         "load_power_coverage_hours": coverage_hours,
         # Knots of the last active write cycle: a dump must distinguish a knot

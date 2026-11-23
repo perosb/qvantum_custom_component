@@ -1947,6 +1947,7 @@ async def test_async_restore_loads_state() -> None:
                 "corrected": True,
             },
             "indoor_margins": [[1_770_000_000.0, 0.4], ["bad"], [1_770_000_100.0, -0.2]],
+            "indoor_margins_target": 20.0,
             "room_gain": 8.6,
         }
     )
@@ -1970,6 +1971,9 @@ async def test_async_restore_loads_state() -> None:
         (1_770_000_000.0, 0.4),
         (1_770_000_100.0, -0.2),
     ]
+    # The regime travels with the samples, or a reload would either wipe the
+    # window or re-detect a change that never happened.
+    assert coordinator._indoor_margins_target == pytest.approx(20.0)
     assert coordinator._room_gain == pytest.approx(8.6)
 
 

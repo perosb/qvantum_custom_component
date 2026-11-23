@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import deque
 from dataclasses import replace
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -901,3 +902,17 @@ def test_the_curve_dump_shows_both_inputs_of_the_indoor_cap() -> None:
     assert block["indoor_margin_c"] == -0.4
     assert block["indoor_margin_now_c"] == -0.4
     assert block["indoor_margin_mean_c"] == 0.35
+
+
+def test_the_curve_dump_carries_the_setpoint_the_margin_window_belongs_to() -> None:
+    """The window is cleared on a setpoint change, so the regime must be visible."""
+    from custom_components.qvantum.diagnostics import _curve_diagnostics
+
+    coordinator = _curve_coordinator()
+    coordinator._indoor_margins = deque([(1_770_000_000.0, 0.4)])
+    coordinator._indoor_margins_target = 20.5
+
+    block = _curve_diagnostics(coordinator)
+
+    assert block is not None
+    assert block["indoor_margins_target"] == 20.5
