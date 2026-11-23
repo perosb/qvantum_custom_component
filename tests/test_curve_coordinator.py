@@ -4632,3 +4632,81 @@ class TestCurveCounters:
         assert counters["days_clamped"] == 1
         assert counters["days_extrapolated"] == 1
         assert counters["since"] == "2026-10-01"
+
+
+async def test_a_new_setpoint_starts_the_margin_window_over() -> None:
+    """A target step is a new regime: the cap must not judge the house by the old one.
+
+    Measured on a live install (2026-11-23): raising the target 20.0 -> 20.5 left
+    the cap reading +0.35 K warm while the house was 0.4 K cold, because the
+    24 h mean still carried the hours at the previous setpoint.
+    """
+    coordinator = make_coordinator()
+    now = time.time()
+
+    # A day at the old setpoint, two degrees warm.
+    assert coordinator._push_indoor_margin(
+        {"bt2": 22.0, "indoor_temperature_target": 20.0}, now
+    ) == pytest.approx(2.0)
+
+    # The same room at a target 2 K higher: the samples are gone, so the cap
+    # reads this cycle's error and nothing older.
+    assert coordinator._push_indoor_margin(
+        {"bt2": 22.0, "indoor_temperature_target": 22.0}, now + 60
+    ) == pytest.approx(0.0)
+    assert len(coordinator._indoor_margins) == 1
+
+
+async def test_a_missing_setpoint_does_not_wipe_the_margin_window() -> None:
+    """The target drops out of the payload now and then; that is not a change."""
+    coordinator = make_coordinator()
+    now = time.time()
+
+    coordinator._push_indoor_margin(
+        {"bt2": 21.0, "indoor_temperature_target": 20.0}, now
+    )
+    # No target in the payload means no error to store — but the sample it
+    # already has must survive, and the remembered setpoint with it.
+    assert coordinator._push_indoor_margin({"bt2": 21.0}, now + 60) == pytest.approx(1.0)
+    assert len(coordinator._indoor_margins) == 1
+    assert coordinator._indoor_margins_target == pytest.approx(20.0)
+    # Back with the same target: the old sample still counts, so no reset.
+    assert coordinator._push_indoor_margin(
+        {"bt2": 23.0, "indoor_temperature_target": 20.0}, now + 120
+    ) == pytest.approx(2.0)
+    assert len(coordinator._indoor_margins) == 2
+
+
+async def test_a_cold_house_uses_the_current_error_not_the_mean() -> None:
+    """The cap's protective side may not wait a day for a warm mean to expire."""
+    coordinator = make_coordinator()
+    now = time.time()
+
+    # A warm day, then the house turns cold.
+    coordinator._push_indoor_margin(
+        {"bt2": 21.5, "indoor_temperature_target": 20.0}, now
+    )
+    margin = coordinator._push_indoor_margin(
+        {"bt2": 19.6, "indoor_temperature_target": 20.0}, now + 60
+    )
+
+    # -0.4 K now, +0.55 K as the mean: the cold reading wins.
+    assert margin == pytest.approx(-0.4)
+    assert coordinator._indoor_margin_mean == pytest.approx(0.55)
+    assert coordinator._indoor_margin_now == pytest.approx(-0.4)
+
+
+async def test_a_warm_house_keeps_the_mean() -> None:
+    """Smoothing is the point on the warm side: one warm afternoon is not a veto."""
+    coordinator = make_coordinator()
+    now = time.time()
+
+    coordinator._push_indoor_margin(
+        {"bt2": 20.1, "indoor_temperature_target": 20.0}, now
+    )
+    margin = coordinator._push_indoor_margin(
+        {"bt2": 21.0, "indoor_temperature_target": 20.0}, now + 60
+    )
+
+    assert margin == pytest.approx(0.55)
+    assert coordinator._indoor_margin_now == pytest.approx(1.0)

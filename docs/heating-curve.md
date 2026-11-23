@@ -774,8 +774,20 @@ only act while the curve is active. Enable them with
   indoor reading** to act at all: it is fed from the room error and keeps 24 h
   of samples, so without an indoor sensor (`sensor_mode` DISABLED / BT3 / AUX)
   it is inert and nothing brakes the curve in a warm house. The diagnostics
-  report `indoor_cap_armed` (and `indoor_margin_c`) so that state is visible
-  rather than inferred from a warm room.
+  report `indoor_cap_armed`, `indoor_margin_c` and its two inputs
+  `indoor_margin_now_c` / `indoor_margin_mean_c` so that state is visible rather
+  than inferred from a warm room.
+
+  Two rules keep the window honest, and both were added after a measurement
+  (2026-11-23) rather than in advance: a **setpoint change clears the window**,
+  because averaging across it judges the house by a target it no longer has —
+  raising the target 20.0 → 20.5 left the cap reading +0.35 K warm while the
+  house was 0.4 K cold — and a **cold house follows the current reading**, not
+  the mean, because refusing to cut heat from a house already below target is
+  the cap's protective job and a day of smoothing delays it by a day. The warm
+  side keeps the mean: one warm afternoon must not veto the curve. The first
+  rule mirrors `active_since_ts` in the room-gain fit, which refuses to pool
+  hours across a table change for the same reason.
 
 ### Solar model
 
