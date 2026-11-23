@@ -934,12 +934,18 @@ the cap, and `capped_by_indoor` says whether that gap is live.
 
 `diagnostics.curve` mirrors the `CurveSnapshot`/`CurveResult` state, so a new
 snapshot or persisted field has to be added there in the same PR — a field
-missing from the dump cannot be read from a user's report. It carries
+missing from the dump cannot be read from a user's report. That rule is now a
+test, not a sentence: `tests/test_curve_coordinator.py` compares the keys of
+`_state_payload()` against the dump, so a persisted field fails until it is
+either dumped (under its own name or via the documented map) or excluded with a
+stated reason. It carries
 `write_scope` (the knots of the last active cycle), `forecast_ok`, `forecast_reused` and `forecast_now_c` (the forecast hour's air
 temperature — `outdoor_c` beside it is the **term** in kelvin, clamped ±1.0, and
 comparing the two is a category error), `forecast_wind_ms`/`forecast_wind_available`, the load term's
 `load_power_mean_w`/`load_power_coverage_hours`, `indoor_cap_armed` /
-`indoor_margin_c`, `bt2_detected`, `pump_room_c`/`pump_room_source`, the readiness
+`indoor_margin_c` (with its two inputs), `bt2_detected`, `pump_room_c`/`pump_room_source`,
+`terms` (which optional terms are on), `cop_reference`/`cop_samples` (the COP
+feedback's learned reference and the evidence behind each bucket) and the readiness
 gates and the whole model, where `model_daily` holds both the three-column fit
 and the four-column one (`a_w_per_k_4col`, `b_m2_4col`) beside the wind column.
 The trim layer travels too: `trim_evidence` (hours behind each point's trim),
