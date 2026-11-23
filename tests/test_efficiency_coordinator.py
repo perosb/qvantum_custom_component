@@ -1470,3 +1470,56 @@ class TestDhwHeatMeterWarning:
         assert snapshot.dhw_heat_meter_deviation == pytest.approx(-25.0)
         assert snapshot.dhw_heat_meter_deviation_recent is None
         assert snapshot.dhw_heat_meter_warning is False
+
+
+async def test_the_recorder_path_reports_both_halves_too():
+    """The dump must carry the halves on the path every normal install takes.
+
+    The empty-keys early return is the recorder-less one; wiring the two fields
+    only there left the diagnostics dump with None for both halves exactly where
+    the warning matters.
+    """
+    coordinator = make_coordinator()
+    coordinator._main._dhw_meter = MagicMock()
+    coordinator._main._dhw_meter.split_totals.return_value = (
+        (38.0, 40.0, 3.0),
+        (30.0, 39.0, 3.0),
+    )
+    coordinator._main.data = {
+        "values": {
+            "dhw_meter_estimated_kwh": 68.0,
+            "dhw_meter_metered_kwh": 79.0,
+            "dhw_meter_draw_hours": 6.0,
+        }
+    }
+    # A recorder-bearing install: the statistics call returns rows, so the
+    # snapshot is built on the main path and not the early return.
+    with patch.object(
+        ec,
+        "resolve_statistic_entity_ids",
+        return_value={"heatingpower": "sensor.power", "bt1": "sensor.outdoor"},
+    ), patch.object(ec, "async_statistics_during_period", AsyncMock(return_value={})):
+        snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.dhw_heat_meter_deviation_recent == pytest.approx(-5.0)
+    assert snapshot.dhw_heat_meter_deviation_prior == pytest.approx(-23.08, abs=0.05)
+    assert snapshot.dhw_heat_meter_warning is True
+
+
+def test_a_malformed_totals_tuple_yields_no_deviation():
+    """The window lives on the main coordinator; a mock must not raise."""
+    coordinator = make_coordinator()
+    assert coordinator._deviation_of("not a tuple") is None
+    assert coordinator._deviation_of((1.0, "x", 3.0)) is None
+    assert coordinator._deviation_of((10.0, 40.0, 3.0)) == pytest.approx(-75.0)
+
+
+def test_a_window_without_a_split_falls_back_to_the_level():
+    """An older coordinator, or a mock, has no split to compare."""
+    coordinator = make_coordinator()
+    coordinator._main._dhw_meter = object()          # no split_totals
+
+    assert coordinator._dhw_heat_meter_warning(-23.1, 1_800_000_000.0) is False
+    assert coordinator._dhw_heat_meter_warning(-50.0, 1_800_000_000.0) is True
+    assert coordinator._dhw_meter_deviation_recent is None
+    assert coordinator._dhw_meter_deviation_prior is None

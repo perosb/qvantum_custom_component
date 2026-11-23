@@ -776,6 +776,12 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             exhaust_fan_speed_avg=fan_avg,
             dhw_heat_meter_deviation=dhw_meter_deviation,
             dhw_heat_meter_warning=dhw_meter_warning,
+            dhw_heat_meter_deviation_recent=getattr(
+                self, "_dhw_meter_deviation_recent", None
+            ),
+            dhw_heat_meter_deviation_prior=getattr(
+                self, "_dhw_meter_deviation_prior", None
+            ),
             dhw_heat_meter_estimated_kwh=dhw_meter_estimated_kwh,
             dhw_heat_meter_metered_kwh=dhw_meter_metered_kwh,
             dhw_heat_meter_draw_hours=dhw_meter_draw_hours,

@@ -215,7 +215,9 @@ class DhwMeterWindow:
         return self._sum(self.buckets.values())
 
     def split_totals(
-        self, now_ts: object, recent_seconds: float = 86400.0
+        self,
+        now_ts: object,
+        recent_seconds: float = DHW_METER_WINDOW_SECONDS / 2.0,
     ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         """``(recent, prior)`` totals, each ``(estimated_kwh, metered_kwh, draw_hours)``.
 
@@ -224,6 +226,11 @@ class DhwMeterWindow:
         polls — so the level alone cannot say whether anything changed. The two
         halves of the window can: a constant bias reads the same in both, while
         a sensor drifting or a counter resetting moves one against the other.
+
+        The halves are **equal by default**, half the window each. A shorter
+        recent half fails this install's own evidence gate on most days: 3.0 h of
+        draw over 7 days is 0.43 h/day, below the 1.0 h a deviation needs, so a
+        24 h "recent" would read ``None`` and the comparison would never fire.
         """
         now = finite(now_ts)
         if now is None:
