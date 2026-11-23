@@ -320,11 +320,14 @@ class CurveSnapshot:
     #: Wind's contribution to the shared adjustment, 0 whenever the term is off
     #: or the model's wind column failed its gates.
     wind_c: float = 0.0
-    #: The air-side margin the indoor cap acts on (mean room error over the
-    #: last 24 h) and whether it exists at all: without a fresh indoor reading
-    #: the cap is inert, so a warm house cannot veto a raise and nothing brakes
-    #: the curve when the house is warm.
+    #: The air-side margin the indoor cap acted on, and whether it exists at
+    #: all: without a fresh indoor reading the cap is inert, so a warm house
+    #: cannot veto a raise and nothing brakes the curve when the house is warm.
+    #: ``_now_c`` is this cycle's room error and ``_mean_c`` the 24 h mean
+    #: within the current setpoint regime; a cold house acts on the former.
     indoor_margin_c: float | None = None
+    indoor_margin_now_c: float | None = None
+    indoor_margin_mean_c: float | None = None
     indoor_cap_armed: bool = False
 
 
@@ -826,6 +829,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._indoor_margins: deque[tuple[float, float]] = deque(
             maxlen=INDOOR_MARGIN_CYCLES
         )
+        #: The setpoint the samples above belong to. A new target is a new
+        #: regime, and pooling across it judges the house by a setpoint it no
+        #: longer has.
+        self._indoor_margins_target: float | None = None
+        #: The two inputs the margin is chosen from, kept apart so a report can
+        #: show which one the cap acted on.
+        self._indoor_margin_now: float | None = None
+        self._indoor_margin_mean: float | None = None
         #: Knots of the last active write cycle, for the diagnostics dump: it
         #: explains why a knot the dump shows can be older than the computed one.
         self._write_scope: tuple[str, ...] = ()
@@ -1064,6 +1075,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             # moment to measure again — a persisted stamp made a fixed build
             # wait up to six hours before its first attempt.
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
+            "indoor_margins_target": getattr(self, "_indoor_margins_target", None),
             "mode": self._mode,
             "revert_pending": self._revert_pending,
             "counters": self._counters,
@@ -1287,6 +1299,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if fitted_source in INDOOR_METRIC_KEYS:
             self._room_gain_fitted_source = str(fitted_source)
         self._room_gain_active = _active_gain_from_state(data.get("room_gain_active"))
+        margins_target = data.get("indoor_margins_target")
+        if isinstance(margins_target, (int, float)) and not isinstance(
+            margins_target, bool
+        ):
+            self._indoor_margins_target = float(margins_target)
         margins = data.get("indoor_margins")
         if isinstance(margins, list):
             for item in margins:
@@ -2913,7 +2930,41 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return None
         return indoor - float(target)
 
-    def _push_indoor_margin(self, values: Mapping[str, Any], now_ts: float) -> float | None:
+    def _push_indoor_margin(
+        self, values: Mapping[str, Any], now_ts: float
+    ) -> float | None:
+        """Room error the indoor cap acts on, or ``None`` when unknown.
+
+        The cap smooths: one warm afternoon must not veto the curve, so the
+        input is the mean of the last 24 h. Two things that mean cannot do, and
+        this method does:
+
+        - **A new setpoint is a new regime.** Averaging across it judges the
+          house by a target it no longer has — measured on a live install
+          (2026-11-23), a 20.0 -> 20.5 step left the cap reading +0.35 K warm
+          while the house was 0.4 K cold. The window is cleared on a change,
+          the same rule the room-gain fit follows with ``active_since_ts``.
+        - **A cold house must not wait for the average.** Refusing to cut heat
+          from a house already below target is the cap's protective job, and a
+          day of smoothing delays it by a day. The cold side follows the
+          current reading; the warm side keeps the mean.
+        """
+        target = values.get("indoor_temperature_target")
+        target_c = (
+            float(target)
+            if isinstance(target, (int, float)) and not isinstance(target, bool)
+            else None
+        )
+        # A momentarily missing target must not wipe the window.
+        # ``getattr`` because the test harness builds a coordinator without
+        # ``__init__``; the attribute is created there and always settable here.
+        previous_target = getattr(self, "_indoor_margins_target", None)
+        if target_c is not None and previous_target is not None:
+            if target_c != previous_target:
+                self._indoor_margins.clear()
+        if target_c is not None:
+            self._indoor_margins_target = target_c
+
         error = self._room_error(values)
         if error is not None:
             self._indoor_margins.append((now_ts, error))
@@ -2922,9 +2973,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             for ts, margin in self._indoor_margins
             if now_ts - ts <= 24 * 3600.0
         ]
+        self._indoor_margin_now = error
         if not recent:
+            self._indoor_margin_mean = None
             return None
-        return sum(recent) / len(recent)
+        mean = sum(recent) / len(recent)
+        self._indoor_margin_mean = mean
+        if error is not None and error < 0.0 and error < mean:
+            return error
+        return mean
 
     def _push_power(self, values: Mapping[str, Any]) -> float | None:
         """Mean space-heating output over the load term's cycle window.
@@ -3242,6 +3299,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             room_error_samples=0 if room is None else room.samples,
             room_error_source=room_source,
             indoor_margin_c=indoor_margin,
+            indoor_margin_now_c=getattr(self, "_indoor_margin_now", None),
+            indoor_margin_mean_c=getattr(self, "_indoor_margin_mean", None),
             indoor_cap_armed=indoor_margin is not None,
             pump_room_c=self._pump_room_value(values),
             pump_room_source=self._pump_room_source(values),

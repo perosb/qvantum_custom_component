@@ -665,6 +665,12 @@ The rules that must not drift:
   configured reading *is* BT2). Without the gates a placeholder BT2 puts the
   deviation tens of kelvin off. Trims, the indoor cap and `room_error` stay on
   the configured sensor: those describe the house.
+- The indoor cap averages the room error over **24 h**, so two things bound it:
+  a **setpoint change clears the window** (averaging across it judges the house
+  by a target it no longer has) and a **cold house follows the current
+  reading** rather than the mean, because the protective floor may not wait a
+  day. The dump carries `indoor_margin_now_c` / `indoor_margin_mean_c` beside
+  `indoor_margin_c`, so a lagging cap is distinguishable from a biased one.
 - The solar aperture comes from the **day-block energy balance**, never from
   heating hours (the sunny hours are exactly the ones the pump's room term has
   switched off). An ungated window means **no** term, never a preserved older

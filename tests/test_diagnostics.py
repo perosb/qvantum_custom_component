@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections import deque
+from dataclasses import replace
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -876,3 +878,41 @@ def test_the_efficiency_dump_derives_the_same_eu_label_as_the_export() -> None:
     for key in ("eta_s_percent", "eu_class", "eta_s_percent_90d", "eu_class_90d"):
         assert block[key] == exported[key]
     assert block["eu_class"] == "A+"
+
+
+def test_the_curve_dump_shows_both_inputs_of_the_indoor_cap() -> None:
+    """A lagging cap must be distinguishable from a biased one.
+
+    `indoor_margin_c` alone cannot say why the cap reads warm while the house is
+    cold; the current error and the 24 h mean are what separate the two.
+    """
+    from custom_components.qvantum.diagnostics import _curve_diagnostics
+
+    coordinator = _curve_coordinator()
+    coordinator.data = replace(
+        coordinator.data,
+        indoor_margin_c=-0.4,
+        indoor_margin_now_c=-0.4,
+        indoor_margin_mean_c=0.35,
+        indoor_cap_armed=True,
+    )
+    block = _curve_diagnostics(coordinator)
+
+    assert block is not None
+    assert block["indoor_margin_c"] == -0.4
+    assert block["indoor_margin_now_c"] == -0.4
+    assert block["indoor_margin_mean_c"] == 0.35
+
+
+def test_the_curve_dump_carries_the_setpoint_the_margin_window_belongs_to() -> None:
+    """The window is cleared on a setpoint change, so the regime must be visible."""
+    from custom_components.qvantum.diagnostics import _curve_diagnostics
+
+    coordinator = _curve_coordinator()
+    coordinator._indoor_margins = deque([(1_770_000_000.0, 0.4)])
+    coordinator._indoor_margins_target = 20.5
+
+    block = _curve_diagnostics(coordinator)
+
+    assert block is not None
+    assert block["indoor_margins_target"] == 20.5

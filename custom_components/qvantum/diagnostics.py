@@ -594,6 +594,11 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         # The cap needs a fresh indoor reading: without one it is inert and the
         # curve has no warm-house brake, which a support dump should show.
         "indoor_margin_c": getattr(snapshot, "indoor_margin_c", None),
+        # The two inputs the margin is chosen from: a cold house acts on the
+        # current reading, a warm one on the 24 h mean within the setpoint
+        # regime. Without both, a lagging cap looks like a biased one.
+        "indoor_margin_now_c": getattr(snapshot, "indoor_margin_now_c", None),
+        "indoor_margin_mean_c": getattr(snapshot, "indoor_margin_mean_c", None),
         "indoor_cap_armed": getattr(snapshot, "indoor_cap_armed", None),
         # Which room value the removed room term used: the firmware blends the
         # external sensor with BT2 in the external mode, so a dump that only
@@ -705,6 +710,10 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
             for ts, margin in (margins or [])
             if isinstance(ts, (int, float)) and isinstance(margin, (int, float))
         ],
+        # The setpoint the samples above belong to: the window is cleared when
+        # it changes, so without it a dump cannot tell a regime change from a
+        # cap that simply drifted.
+        "indoor_margins_target": getattr(coordinator, "_indoor_margins_target", None),
         "load_power_mean_w": live.get("heating_power_mean_w"),
         "load_power_coverage_hours": coverage_hours,
         # Knots of the last active write cycle: a dump must distinguish a knot
