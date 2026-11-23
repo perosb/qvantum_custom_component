@@ -916,3 +916,4 @@ def test_the_curve_dump_carries_the_setpoint_the_margin_window_belongs_to() -> N
 
     assert block is not None
     assert block["indoor_margins_target"] == 20.5
+

@@ -4714,3 +4714,43 @@ async def test_a_warm_house_keeps_the_mean() -> None:
 
     assert margin == pytest.approx(0.55)
     assert coordinator._indoor_margin_now == pytest.approx(1.0)
+
+
+def test_every_persisted_curve_field_reaches_the_dump() -> None:
+    """A persisted curve field the dump cannot show cannot be read from a report.
+
+    AGENTS.md states the rule — "a new `CurveSnapshot` or persisted curve field
+    goes into `_curve_diagnostics` in the same PR" — and it was still broken
+    three times over: `terms`, `cop_reference` and `cop_samples` had been
+    persisted without ever reaching a dump, so a report could not answer "why
+    did the wind term do nothing?".
+
+    Prose did not hold; this does. A field added to ``_state_payload`` now fails
+    here until it is dumped (possibly under another name, listed below) or
+    excluded with a reason.
+    """
+    from custom_components.qvantum.diagnostics import _curve_diagnostics
+
+    #: Persisted field -> the dump path that carries it, where the names differ.
+    RENAMED = {
+        "active_since_ts": "timestamps",
+        "last_active_ts": "timestamps",
+        "daily_model": "model_daily",
+    }
+    #: Persisted for the restore path only, never for a reader: the stamp form
+    #: of ``calibrated_at``, and the timestamps block already carries a stamp
+    #: for every field in it.
+    DELIBERATELY_NOT_DUMPED = {"calibrated_ts"}
+
+    coordinator = make_coordinator()
+    persisted = set(coordinator._state_payload())
+    dumped = set(_curve_diagnostics(coordinator) or {})
+
+    missing = {
+        key
+        for key in persisted
+        if key not in dumped
+        and RENAMED.get(key) not in dumped
+        and key not in DELIBERATELY_NOT_DUMPED
+    }
+    assert missing == set()

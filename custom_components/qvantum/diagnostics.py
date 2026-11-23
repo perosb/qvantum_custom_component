@@ -724,6 +724,26 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
             for key in (getattr(coordinator, "_write_scope", ()) or ())
             if isinstance(key, str)
         ],
+        # Which optional terms are on. A term that did nothing is either off,
+        # switched on but gated by its own evidence, or on and contributing
+        # nothing — three answers a report cannot separate from the figures.
+        "terms": {
+            str(key): bool(value)
+            for key, value in (getattr(coordinator, "terms", None) or {}).items()
+        },
+        # The learned COP reference the feedback term compares against, and the
+        # samples behind each bucket: a term that stays silent while the
+        # reference is empty looks identical to one that was switched off.
+        "cop_reference": {
+            str(bucket): value
+            for bucket, value in (getattr(coordinator, "_cop_reference", None) or {}).items()
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        },
+        "cop_samples": {
+            str(bucket): count
+            for bucket, count in (getattr(coordinator, "_cop_samples", None) or {}).items()
+            if isinstance(count, int) and not isinstance(count, bool)
+        },
     }
 
 
