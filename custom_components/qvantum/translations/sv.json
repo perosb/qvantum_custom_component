@@ -277,6 +277,12 @@
       "dhwenergy": {
         "name": "Varmvattenenergi"
       },
+      "dhw_charge_electrical_energy": {
+        "name": "El till tankladdning"
+      },
+      "dhw_charge_element_energy": {
+        "name": "Tankladdning, elpatron"
+      },
       "inputcurrent1": {
         "name": "Ingångsström L1"
       },

@@ -15,6 +15,7 @@ from custom_components.qvantum.dhw_loss import (
     element_only_tank_balance,
     mean_delta_k,
     reference_loss_kwh_per_day,
+    shunt_blends_into_heating,
     standing_loss_kwh_per_day,
     standing_loss_per_k,
 )
@@ -121,3 +122,13 @@ def test_element_only_tank_balance_tolerates_missing_readings() -> None:
     assert element_only_tank_balance(shunt_position=None, heating_kwh=None) is True
     assert element_only_tank_balance(shunt_position=True, heating_kwh="x") is True
     assert element_only_tank_balance(shunt_position=0, heating_kwh=float("nan")) is True
+
+
+def test_shunt_blends_into_heating_reads_only_the_position():
+    """One spelling of the rule: open means the tank feeds the circuit."""
+    assert shunt_blends_into_heating(7) is True
+    assert shunt_blends_into_heating(0) is False
+    # Not a reading, so not evidence of heat flow: an install without qn8
+    # behaves as before.
+    assert shunt_blends_into_heating(None) is False
+    assert shunt_blends_into_heating("nonsense") is False

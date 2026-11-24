@@ -34,6 +34,18 @@ MIN_DELTA_K = 10.0
 
 
 
+def shunt_blends_into_heating(shunt_position: object) -> bool:
+    """True when the addition shunt is open, i.e. tank heat goes to the circuit.
+
+    One spelling of the rule, because two callers ask the same physical
+    question: whether the element's energy stayed in the tank. A missing reading
+    is not evidence of heat flow, so an install without ``qn8position`` keeps
+    its previous behaviour.
+    """
+    shunt = finite(shunt_position)
+    return shunt is not None and shunt > 0.0
+
+
 def element_only_tank_balance(
     *,
     shunt_position: object,
@@ -63,8 +75,7 @@ def element_only_tank_balance(
     does not carry these metrics keeps identifying exactly as before, so the
     guard tightens only where the data exists.
     """
-    shunt = finite(shunt_position)
-    if shunt is not None and shunt > 0.0:
+    if shunt_blends_into_heating(shunt_position):
         return False
     heating = finite(heating_kwh)
     if heating is not None and heating > 0.0:

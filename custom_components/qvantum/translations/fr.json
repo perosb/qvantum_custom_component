@@ -277,6 +277,12 @@
       "dhwenergy": {
         "name": "Énergie ECS"
       },
+      "dhw_charge_electrical_energy": {
+        "name": "Électricité de charge du ballon"
+      },
+      "dhw_charge_element_energy": {
+        "name": "Charge du ballon, appoint électrique"
+      },
       "inputcurrent1": {
         "name": "Courant d'entrée L1"
       },

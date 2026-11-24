@@ -277,6 +277,12 @@
       "dhwenergy": {
         "name": "Warmwaterenergie"
       },
+      "dhw_charge_electrical_energy": {
+        "name": "Stroom voor tanklading"
+      },
+      "dhw_charge_element_energy": {
+        "name": "Tanklading, elektrisch element"
+      },
       "inputcurrent1": {
         "name": "Ingangsstroom L1"
       },

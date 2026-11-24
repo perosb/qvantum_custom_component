@@ -44,6 +44,7 @@ from .const import (
 from .dhw_loss import (
     WATER_KWH_PER_LITER_K,
     element_only_tank_balance,
+    shunt_blends_into_heating,
 )
 from .efficiency import (
     COP_MIN_ELECTRICAL_KWH,
@@ -501,13 +502,17 @@ class QvantumCalculationsMixin:
             interval_aux_demand,
             interval_aux_dhw_demand,
         ) in pairwise(history):
-            interval_heating, _, _, u = _split_electrical_input(
-                hp_status=mode,
-                dhw_demand=interval_dhw_demand,
-                aux_demand=interval_aux_demand,
-                aux_dhw_demand=interval_aux_dhw_demand,
-                compressor_kwh=(after["compressorenergy"] - before["compressorenergy"]),
-                aux_kwh=(after["additionalenergy"] - before["additionalenergy"]),
+            interval_heating, interval_dhw, interval_dhw_compressor, u = (
+                _split_electrical_input(
+                    hp_status=mode,
+                    dhw_demand=interval_dhw_demand,
+                    aux_demand=interval_aux_demand,
+                    aux_dhw_demand=interval_aux_dhw_demand,
+                    compressor_kwh=(
+                        after["compressorenergy"] - before["compressorenergy"]
+                    ),
+                    aux_kwh=(after["additionalenergy"] - before["additionalenergy"]),
+                )
             )
             if mode == HP_STATUS_HEATING:
                 heating_thermal += after["heatingenergy"] - before["heatingenergy"]
@@ -517,6 +522,17 @@ class QvantumCalculationsMixin:
                 # the hour would be counted again each time; only the one this
                 # poll closed is new evidence.
                 self._cop_unattributed_kwh += u
+                self._accumulate_dhw_charge_energy(
+                    interval_dhw, interval_dhw_compressor, values
+                )
+                # The counters live on the coordinator, but an energy sensor
+                # reads its value from the poll payload — publishing them here
+                # is what makes the entities report anything at all (the same
+                # pattern as `heating_power_mean_w`).
+                values["dhw_charge_electrical_energy"] = (
+                    self._dhw_charge_electrical_kwh
+                )
+                values["dhw_charge_element_energy"] = self._dhw_charge_element_kwh
 
         # The counters are read as floats, so a sum can land a hair below its
         # nominal value (0.2 -> 0.19999999999999574). Rounding below the
@@ -553,6 +569,40 @@ class QvantumCalculationsMixin:
             self._cop_last.get("cop_heating"),
             self._cop_last.get("cop_dhw"),
         )
+
+    def _accumulate_dhw_charge_energy(
+        self,
+        dhw_kwh: float,
+        dhw_compressor_kwh: float,
+        values: Mapping[str, Any],
+    ) -> None:
+        """Book one interval's DHW-attributed electrical input to the counters.
+
+        Called once per poll with the **same** attribution the COP ratios use.
+        A second classifier keyed on ``hp_status`` would be a copy that drifts
+        from this one, so both read ``_split_electrical_input``.
+
+        Two counters, because they answer different questions:
+
+        - ``dhw_charge_electrical_energy`` counts every kWh the split
+          attributed to hot water. It is electricity, and it is booked whether
+          or not the heat stayed in the tank.
+        - ``dhw_charge_element_energy`` counts the **element's** share of that,
+          and only while the addition shunt is closed: an open shunt
+          (``qn8position`` > 0) blends tank water into the heating circuit, so
+          the element's heat is delivered to the house and belongs to the
+          heating ratio, not to a charge. The two therefore differ whenever a
+          shunt ran, which is why they are two entities and not a ratio.
+        """
+        if not dhw_kwh > 0.0:
+            return
+        self._dhw_charge_electrical_kwh += dhw_kwh
+        element_kwh = dhw_kwh - dhw_compressor_kwh
+        if element_kwh <= 0.0:
+            return
+        if shunt_blends_into_heating(values.get("qn8position")):
+            return
+        self._dhw_charge_element_kwh += element_kwh
 
     def _update_dhw_charge(
         self,

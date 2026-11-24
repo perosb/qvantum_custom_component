@@ -196,6 +196,15 @@ def _cop_diagnostics(coordinator: Any) -> dict[str, Any]:
         "unattributed_kwh": round(
             float(getattr(coordinator, "_cop_unattributed_kwh", 0.0) or 0.0), 3
         ),
+        # The charging electricity the pump has no meter for. Kept beside the
+        # ratios because it explains them: a window where the tank charged reads
+        # as a poor `heating` COP unless this figure is subtracted.
+        "charge_electrical_kwh": round(
+            float(getattr(coordinator, "_dhw_charge_electrical_kwh", 0.0) or 0.0), 3
+        ),
+        "charge_element_kwh": round(
+            float(getattr(coordinator, "_dhw_charge_element_kwh", 0.0) or 0.0), 3
+        ),
         "dhw_charge": None
         if charge is None
         else {

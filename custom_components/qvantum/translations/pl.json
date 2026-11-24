@@ -277,6 +277,12 @@
       "dhwenergy": {
         "name": "Energia DHW"
       },
+      "dhw_charge_electrical_energy": {
+        "name": "Energia ładowania zasobnika"
+      },
+      "dhw_charge_element_energy": {
+        "name": "Ładowanie zasobnika, grzałka"
+      },
       "inputcurrent1": {
         "name": "Prąd wejściowy L1"
       },

@@ -277,6 +277,12 @@
       "dhwenergy": {
         "name": "DHW Energy"
       },
+      "dhw_charge_electrical_energy": {
+        "name": "Tank charging electricity"
+      },
+      "dhw_charge_element_energy": {
+        "name": "Tank charging, element"
+      },
       "inputcurrent1": {
         "name": "Input current L1"
       },

@@ -2646,6 +2646,37 @@ class TestCopPersistence:
             assert coordinator._cop_last_times == {}
 
     @pytest.mark.asyncio
+    async def test_restore_keeps_the_charge_counters(self):
+        """A running total must survive a restart; zero is a valid stored value."""
+        coordinator = self._make_coordinator()
+        stored = {
+            "dhw_charge_electrical_energy": 12.5,
+            "dhw_charge_element_energy": 3.25,
+        }
+        with patch.object(coordinator._cop_store, "async_load", return_value=stored):
+            await coordinator.async_restore_cop_state()
+
+        assert coordinator.dhw_charge_electrical_energy() == pytest.approx(12.5)
+        assert coordinator.dhw_charge_element_energy() == pytest.approx(3.25)
+
+    @pytest.mark.asyncio
+    async def test_restore_rejects_a_negative_or_bogus_charge_counter(self):
+        """A counter cannot run backwards, and a string is not a total."""
+        coordinator = self._make_coordinator()
+        for stored in (
+            {"dhw_charge_electrical_energy": -1.0, "dhw_charge_element_energy": -2},
+            {"dhw_charge_electrical_energy": "12.5", "dhw_charge_element_energy": None},
+        ):
+            coordinator._dhw_charge_electrical_kwh = 4.0
+            coordinator._dhw_charge_element_kwh = 1.0
+            with patch.object(
+                coordinator._cop_store, "async_load", return_value=stored
+            ):
+                await coordinator.async_restore_cop_state()
+            assert coordinator.dhw_charge_electrical_energy() == pytest.approx(4.0)
+            assert coordinator.dhw_charge_element_energy() == pytest.approx(1.0)
+
+    @pytest.mark.asyncio
     async def test_restore_rejects_non_positive_values(self):
         """A zero or negative stored ratio is not a measurement."""
         coordinator = self._make_coordinator()
@@ -2746,6 +2777,8 @@ class TestCopPersistence:
                 "cop_dhw_updated_at": "2026-10-10T06:00:00+00:00",
                 "dhw_tank_liters": 143.2,
                 "dhw_meter": [],
+                "dhw_charge_electrical_energy": 0.0,
+                "dhw_charge_element_energy": 0.0,
             }
         )
 

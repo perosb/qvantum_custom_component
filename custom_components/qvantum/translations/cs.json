@@ -277,6 +277,12 @@
       "dhwenergy": {
         "name": "Energie teplé vody"
       },
+      "dhw_charge_electrical_energy": {
+        "name": "Elektřina pro nabíjení zásobníku"
+      },
+      "dhw_charge_element_energy": {
+        "name": "Nabíjení zásobníku, topné těleso"
+      },
       "inputcurrent1": {
         "name": "Příkon L1"
       },
