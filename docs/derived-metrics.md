@@ -490,3 +490,40 @@ Neither is a volume, an energy or the capacity *level*
 (`tap_water_capacity_target`, which is the app's 1–7 — see
 [tap-water capacity](tap-water-capacity.md)). The flow and duration only update
 while water runs, so the figures hold their last shower's values.
+
+## Measuring the real output: `tools/tank_balance.py`
+
+The tank is a calorimeter, and it is the only honest way to get a level out of
+this installation while `heatingenergy` reads low. The tool computes, over a
+window after a draw:
+
+```
+Q_tank = ΔBT30 · V · c        (V identified at 177.9 L, not the datasheet 175)
+W_el   = Δcompressorenergy + Δadditionalenergy
+Q_air  = Q_tank − W_el        what the exhaust air supplied
+flow   = Q_air / (c_p,air · (BT14 − BT15))
+```
+
+**The window is the whole problem, and the tool opens and closes it for you:**
+
+- it **starts when the tank bottoms out**, not when the draw counter's last step
+  arrives — the tank keeps mixing for a few minutes, and booking that tail books
+  a deficit;
+- it **ends at the first `heatingenergy` step**, because that is where DHW
+  priority releases and the house takes heat again.
+
+**A partial charge cannot be measured, and the tool says so rather than printing
+a number.** `BT30` is one point in a stratified tank: while the top warms, the
+sensor still lags, so the tank rise comes out short — measured 2026-11-24, a
+0.6 kWh charge showed 0.85 kWh in the tank and implied an airflow of
+121 000 m³/h. Two plausibility checks catch it: the air term below 25 % of the
+electricity, and an implied airflow outside 40–400 m³/h. A window is also void if
+a second draw, a defrost, a heating step or an open addition shunt lands inside
+it.
+
+**What it takes to get a clean one.** A shower drops BT30 ~16 K (3.8 kWh drawn),
+so a full refill to the 62 °C stop is ~4.6 kWh — about **2 h** at 2.4 kW. The
+`dhw_priority_time` setting is `(30, 180, 30)` in `number.py`, so 60 minutes
+covers a normal 10 K charge but **not** the recovery from a shower; use 180 for
+the experiment, and expect the house to lose ~0.15 K from the paused heating
+(2.1 kW for 2 h against 28 kWh/K of thermal mass).

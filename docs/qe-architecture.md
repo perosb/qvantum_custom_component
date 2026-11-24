@@ -675,6 +675,18 @@ Each step can lose information:
 
 ## 11. Common misconceptions
 
+**`heatingenergy` is not a validated heat meter.** It reads below the pump's own
+compressor input (the counter reports less heat delivered than electricity
+consumed), which is thermodynamically impossible, so any COP or SCOP built from it
+is a **trend**, not a level. Measured 2026-11-24 03:00–06:00: BT30 rose
+53.7 → 63.5 °C — 2.0 kWh into a 175 L tank — while `heatingenergy` recorded 2.1 kWh
+against 3.9 kWh of compressor work. The tank is the better calorimeter: energy in
+is `ΔBT30 · V · c`, and the volume is identified at **177.9 L** from an
+element-only charge (1.60 kWh measured two independent ways, 0.6 % apart).
+`tools/tank_balance.py` does that balance over a window after a draw and refuses
+to report one it cannot close — run it before trusting any COP figure from this
+installation.
+
 | Incorrect claim | Correct picture | Why it matters |
 |---|---|---|
 | "The 175 L tank is a hot-water tank." | It is a buffer tank for heating water; DHW is through-flow. | Otherwise one assumes the tank can be drained like a DHW tank and that legionella is relevant. |
