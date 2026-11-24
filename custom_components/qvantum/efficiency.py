@@ -60,12 +60,15 @@ COP_MIN_HEATING_ELECTRICAL_KWH = 1.0
 #: a night hour at a 61.7 °C buffer, where the compressor's work went into the
 #: tank and the delivered-heat counter stood still.
 #:
-#: This deliberately does *not* suppress an hour that delivered 0.7 kWh of heat
-#: from 1.5 kWh of electricity (a measured 0.47). That is a real figure for a
-#: real regime — a 70 K lift into a 61.7 °C buffer with the evaporator at
-#: −7.5 °C — and hiding it would be the wrong correction. Defrost is *not* part
-#: of it: the same window ran 15 defrosts at 8 % duty spread evenly across the
-#: hours that scored 3.1–4.1 as well.
+#: The floor is a quantisation bound, not a quality judgement: a genuinely poor
+#: hour is a measurement. The same night produced 1.4 kWh of heat from 3.0 kWh
+#: of electricity — a measured 0.47 — and that publishes, because a 70 K lift
+#: into a 61.7 °C buffer with the evaporator at −7.5 °C is exactly the regime
+#: the sensor exists to show. What does not publish is the thinnest form of it
+#: (0.7 kWh from 1.5 kWh): at a 0.7 kWh denominator the heat counter's own step
+#: is 14 % of the figure. Defrost is *not* part of the explanation — the same
+#: window ran 15 defrosts at 8 % duty, spread evenly across the hours that
+#: scored 3.1–4.1 as well.
 COP_MIN_THERMAL_KWH = 1.0
 
 
