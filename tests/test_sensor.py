@@ -2914,3 +2914,24 @@ class TestQvantumSolarDailyModelSensor:
         assert entity.native_value is None
         assert entity.available is False
         assert entity.extra_state_attributes is None
+
+
+def test_the_air_thermal_power_is_a_power_sensor(mock_coordinator, mock_device) -> None:
+    """It must carry watts and the POWER device class.
+
+    `_get_sensor_type` matches on the substrings `powertotal`, `heatingpower` and
+    `dhwpower`, and this key matches none of them — the base class would publish
+    a unitless number that the recorder cannot treat as power at all.
+    """
+    from custom_components.qvantum.const import THERMAL_POWER_AIR_KEY
+    from custom_components.qvantum.sensor import QvantumPowerEntity
+
+    entity = QvantumPowerEntity(
+        mock_coordinator, THERMAL_POWER_AIR_KEY, mock_device, True
+    )
+
+    # The mocked SensorEntity has no descriptors, so read the attributes the
+    # class sets: `_attr_native_unit_of_measurement` and friends.
+    assert entity._attr_native_unit_of_measurement == UnitOfPower.WATT
+    assert entity._attr_device_class == SensorDeviceClass.POWER
+    assert entity._attr_state_class == SensorStateClass.MEASUREMENT

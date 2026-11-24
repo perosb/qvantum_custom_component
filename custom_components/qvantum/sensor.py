@@ -504,10 +504,11 @@ async def async_setup_entry(
             coordinator, _DEFROST_COUNT_KEY, device, True
         )
     )
+    # Not via `_get_sensor_type`: its power patterns are `powertotal`,
+    # `heatingpower` and `dhwpower`, and this key matches none of them, so the
+    # base class would publish a unitless number with no device or state class.
     sensors.append(
-        _get_sensor_type(THERMAL_POWER_AIR_KEY)(
-            coordinator, THERMAL_POWER_AIR_KEY, device, True
-        )
+        QvantumPowerEntity(coordinator, THERMAL_POWER_AIR_KEY, device, True)
     )
     if coordinator.modbus_enabled:
         # Local Modbus: display firmware from input registers 191-193 and the
