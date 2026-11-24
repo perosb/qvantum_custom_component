@@ -772,6 +772,9 @@
       },
       "cooling_offset_total": {
         "name": "Samlet kølekurveoffset"
+      },
+      "defrost_count": {
+        "name": "Antal afrimninger"
       }
     },
     "number": {

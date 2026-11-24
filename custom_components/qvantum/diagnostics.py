@@ -205,6 +205,11 @@ def _cop_diagnostics(coordinator: Any) -> dict[str, Any]:
         "charge_element_kwh": round(
             float(getattr(coordinator, "_dhw_charge_element_kwh", 0.0) or 0.0), 3
         ),
+        # The only durable defrost record: the pump's flag is a binary_sensor
+        # without long-term statistics, so a count is what makes a past window
+        # answerable. Beside the COP figures because they are read together —
+        # an hour with a defrost is not comparable with one without.
+        "defrost_count": int(getattr(coordinator, "_defrost_count", 0) or 0),
         "dhw_charge": None
         if charge is None
         else {

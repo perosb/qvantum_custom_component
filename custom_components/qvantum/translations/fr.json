@@ -772,6 +772,9 @@
       },
       "cooling_offset_total": {
         "name": "Décalage total de la courbe de refroidissement"
+      },
+      "defrost_count": {
+        "name": "Nombre de dégivrages"
       }
     },
     "number": {

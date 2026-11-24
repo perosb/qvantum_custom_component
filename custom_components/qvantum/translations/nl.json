@@ -772,6 +772,9 @@
       },
       "cooling_offset_total": {
         "name": "Totale offset koelcurve"
+      },
+      "defrost_count": {
+        "name": "Ontdooiingen"
       }
     },
     "number": {

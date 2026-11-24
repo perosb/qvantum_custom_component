@@ -772,6 +772,9 @@
       },
       "cooling_offset_total": {
         "name": "Całkowite przesunięcie krzywej chłodzenia"
+      },
+      "defrost_count": {
+        "name": "Liczba odszraniania"
       }
     },
     "number": {

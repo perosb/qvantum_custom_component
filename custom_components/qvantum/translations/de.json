@@ -772,6 +772,9 @@
       },
       "cooling_offset_total": {
         "name": "Gesamtversatz Kühlkurve"
+      },
+      "defrost_count": {
+        "name": "Anzahl Abtauungen"
       }
     },
     "number": {
