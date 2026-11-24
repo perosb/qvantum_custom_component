@@ -13,6 +13,8 @@ from typing import Any
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    AIR_DENSITY_KG_PER_M3,
+    AIR_HEAT_CAPACITY_J_PER_KG_K,
     DHW_CAP_HYSTERESIS_C,
     DHW_CHARGE_MAX_SECONDS,
     DHW_COMPRESSOR_STATE_HOT_WATER,
@@ -37,6 +39,7 @@ from .const import (
     DHW_TANK_LITERS_MAX,
     DHW_TANK_LITERS_MIN,
     DHW_TANK_VOLUME_L,
+    EXHAUST_AIR_FLOW_M3H,
     HP_STATUS_HEATING,
     HP_STATUS_HOT_WATER,
     HP_STATUS_IDLE,
@@ -55,6 +58,7 @@ from .efficiency import (
     cop_ratio,
     energy_delta,
 )
+from .numeric import finite
 from .plant_analytics import dhw_heat_meter_power_w
 
 _LOGGER = logging.getLogger(__name__)
@@ -570,6 +574,43 @@ class QvantumCalculationsMixin:
             self._cop_last.get("cop_heating"),
             self._cop_last.get("cop_dhw"),
         )
+
+    def _calculate_thermal_power_air(self, values: Mapping[str, Any]) -> None:
+        """Thermal output from the electrical input plus the exhaust-air stream.
+
+        ``heatingpower`` derives from the ``heatingenergy`` counter and inherits
+        its bias — the counter reads 30–40 % below a tank-balance measurement
+        (see ``docs/derived-metrics.md``). This is the independent route: a heat
+        pump's output is the electrical input plus the heat taken out of the air,
+        and both are measured here: ``compressor_power`` (validated at a 0.95
+        ratio against a whole-house meter) and ``BT14 − BT15`` over the identified
+        exhaust-air flow.
+
+        It is the **total** output, heating and tank charging together, because
+        the compressor's work goes wherever the pump sends it. During a heating
+        run it should match ``heatingpower``; during a charge it exceeds it, and
+        that difference is the charge.
+
+        The element is **not** added: the payload carries no element power, and
+        its energy counter steps too coarsely to differentiate. It ran for 0.3 %
+        of the measured month, so the omission is stated rather than hidden — a
+        window with the element on reads low.
+        """
+        power = finite(values.get("compressor_power"))
+        air_in = finite(values.get("bt14"))
+        air_out = finite(values.get("bt15"))
+        if power is None or air_in is None or air_out is None:
+            return
+        # A stopped compressor has no output; the air term is then positive (the
+        # defrost is melting ice with tank heat) and would read as production.
+        speed = finite(values.get("compressormeasuredspeed"))
+        if power <= 0.0 or (speed is not None and speed <= 0.0):
+            return
+        mass_flow_kg_s = EXHAUST_AIR_FLOW_M3H * AIR_DENSITY_KG_PER_M3 / 3600.0
+        air_w = (
+            mass_flow_kg_s * AIR_HEAT_CAPACITY_J_PER_KG_K * (air_in - air_out)
+        )
+        values["thermal_power_air"] = round(power + air_w, 1)
 
     def _accumulate_dhw_charge_energy(
         self,

@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Número de desescarches"
+      },
+      "thermal_power_air": {
+        "name": "Potencia térmica (aire)"
       }
     },
     "number": {

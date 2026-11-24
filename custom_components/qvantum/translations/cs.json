@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Počet odmrazování"
+      },
+      "thermal_power_air": {
+        "name": "Tepelný výkon (vzduch)"
       }
     },
     "number": {

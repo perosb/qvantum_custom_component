@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Ontdooiingen"
+      },
+      "thermal_power_air": {
+        "name": "Warmtevermogen (lucht)"
       }
     },
     "number": {

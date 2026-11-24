@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Antal afrimninger"
+      },
+      "thermal_power_air": {
+        "name": "Varmeeffekt (luft)"
       }
     },
     "number": {

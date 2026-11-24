@@ -1124,3 +1124,49 @@ def test_a_two_step_electrical_window_publishes_nothing():
     values = _values(heatingenergy=100.2, compressorenergy=43.0)
     calculator._calculate_cop(values)
     assert values["cop_heating"] is None
+
+
+class TestThermalPowerAir:
+    """The electrical input plus the exhaust-air stream.
+
+    `heatingpower` derives from the `heatingenergy` counter and inherits its bias;
+    this is the independent route. The air term is `ṁ · c_p · (BT14 − BT15)` over
+    the identified flow, and it must vanish when the compressor is stopped —
+    during a defrost the air term is positive, and reading that as output would
+    report production from a pump that is only melting ice.
+    """
+
+    def test_the_air_stream_is_added_to_the_electrical_input(self):
+        calculator = _Calculator()
+        values = _values(
+            compressor_power=1270.0,
+            compressormeasuredspeed=3200,
+            bt14=21.5,
+            bt15=-1.0,
+        )
+
+        calculator._calculate_thermal_power_air(values)
+
+        # 190 m³/h · 1.2 kg/m³ / 3600 · 1005 J/kgK · 22.5 K = 1432 W
+        assert values["thermal_power_air"] == pytest.approx(2702.0, abs=1.0)
+
+    def test_a_stopped_compressor_publishes_nothing(self):
+        calculator = _Calculator()
+        values = _values(
+            compressor_power=0.0,
+            compressormeasuredspeed=0,
+            bt14=21.5,
+            bt15=8.0,
+        )
+
+        calculator._calculate_thermal_power_air(values)
+
+        assert "thermal_power_air" not in values
+
+    def test_missing_air_temperatures_publish_nothing(self):
+        calculator = _Calculator()
+        values = _values(compressor_power=1270.0, compressormeasuredspeed=3200)
+
+        calculator._calculate_thermal_power_air(values)
+
+        assert "thermal_power_air" not in values

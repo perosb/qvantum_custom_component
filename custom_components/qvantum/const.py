@@ -490,6 +490,21 @@ TEMPERATURE_METRICS = [
     "tap_water_start",
     "tap_water_stop",
 ]
+#: Thermal power derived from the electrical input plus the exhaust-air stream.
+#: Its own key because the entity is created explicitly (a derived key must never
+#: enter ``DEFAULT_ENABLED_*``), and it is deliberately not a `heating*` name: the
+#: figure is the pump's *total* output, heating and tank charging together.
+THERMAL_POWER_AIR_KEY = "thermal_power_air"
+
+#: Exhaust-air volumetric flow, used to derive the air-side heat from
+#: ``BT14 − BT15``. **Identified, not taken from a datasheet**: a tank-balance run
+#: on a QE-6 (2026-11-24) closed its energy balance on ~190 m³/h, which also
+#: matches the house's designed ventilation (0.35 l/s·m² · 150 m²). Every
+#: installation has its own figure; this one is the owner's.
+EXHAUST_AIR_FLOW_M3H = 190.0
+AIR_DENSITY_KG_PER_M3 = 1.2
+AIR_HEAT_CAPACITY_J_PER_KG_K = 1005.0
+
 ENERGY_METRICS = ["energy"]
 POWER_METRICS = ["powertotal", "heatingpower", "dhwpower"]
 CURRENT_METRICS = ["current"]

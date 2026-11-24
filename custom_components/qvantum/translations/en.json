@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Defrost count"
+      },
+      "thermal_power_air": {
+        "name": "Thermal power (air)"
       }
     },
     "number": {

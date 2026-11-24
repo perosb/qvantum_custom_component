@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Leolvasztások száma"
+      },
+      "thermal_power_air": {
+        "name": "Hőteljesítmény (levegő)"
       }
     },
     "number": {

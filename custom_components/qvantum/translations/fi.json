@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Sulatuskerrat"
+      },
+      "thermal_power_air": {
+        "name": "Lämpöteho (ilma)"
       }
     },
     "number": {

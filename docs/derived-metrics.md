@@ -183,6 +183,43 @@ second draw, a defrost, a heating step or an open addition shunt lands inside:
 `defrost_count` supplies the timestamps, and the counter is what makes an hour
 comparable at all.
 
+## `thermal_power_air` — the independent power figure
+
+`heatingpower` is a counter rate on `heatingenergy`, and that counter reads
+**30–40 % below** the tank balance (*the tank as a calorimeter* above), so the
+power figure inherits the bias. This sensor takes the other route:
+
+```
+thermal_power_air = compressor_power + ṁ · c_p · (BT14 − BT15)
+ṁ = EXHAUST_AIR_FLOW_M3H · 1.2 kg/m³ / 3600
+```
+
+A heat pump's output *is* its electrical input plus the heat it takes out of the
+air, and both terms are measured: `compressor_power` (input 93, validated at a
+**0.95** ratio against a whole-house meter over 135 defrosts) and the air stream
+across the evaporator.
+
+**It is total output, not heating.** The compressor's work goes wherever the pump
+sends it, so during a heating run the figure should match `heatingpower`, and
+during a tank charge it exceeds it by exactly the charge. That is why it is not
+named `heatingpower_*`: the name would claim a split the measurement cannot make.
+
+**Three limits, all deliberate:**
+
+- **The flow is an installation constant**, identified at ~190 m³/h by a
+  tank-balance run (2026-11-24) and consistent with the house's designed
+  ventilation. It is not a datasheet value and it is not measured live — there is
+  no flow sensor on the air side.
+- **The element is not included.** The payload carries no element power, and
+  `additionalenergy` steps too coarsely to differentiate. It ran for 0.3 % of the
+  measured month, so a window with the element on reads **low**.
+- **A stopped compressor publishes nothing.** During a defrost the air term is
+  *positive* (tank heat is melting ice) and the compressor is at 0 rpm; adding
+  them would report production from a pump that is only defrosting.
+
+The entity is diagnostic and experimental: its value is the comparison with
+`heatingpower`, not the figure on its own.
+
 ## The electrical split
 
 The counters (`compressorenergy` + `additionalenergy`) are **shared between

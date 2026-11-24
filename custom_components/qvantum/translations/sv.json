@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Antal avfrostningar"
+      },
+      "thermal_power_air": {
+        "name": "Värmeeffekt (luft)"
       }
     },
     "number": {

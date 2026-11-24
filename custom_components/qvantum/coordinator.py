@@ -1682,6 +1682,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             # window. Measured 2026-11-20 on a cloud entry: `heatingpower`
             # derived 1465.7 W and 2368.2 W from 0.1 kWh steps at a 120 s poll.
             self._calculate_heating_power_mean(values)
+            self._calculate_thermal_power_air(values)
 
             if self.modbus_enabled:
                 self._calculate_dhw_power(values)

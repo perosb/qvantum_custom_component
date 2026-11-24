@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Anzahl Abtauungen"
+      },
+      "thermal_power_air": {
+        "name": "Wärmeleistung (Luft)"
       }
     },
     "number": {

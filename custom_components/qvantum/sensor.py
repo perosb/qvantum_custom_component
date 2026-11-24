@@ -39,6 +39,7 @@ from .const import (
     POWER_METRICS,
     PRESSURE_METRICS,
     TEMPERATURE_METRICS,
+    THERMAL_POWER_AIR_KEY,
 )
 from .coordinator import QvantumDataUpdateCoordinator, is_cloud, is_full_payload
 from .curve_coordinator import (
@@ -124,6 +125,9 @@ _DIAGNOSTIC_SENSORS = frozenset(
         *_DHW_CHARGE_KEYS,
         # A lifetime cycle count, beside compressor_starts for the same reason.
         _DEFROST_COUNT_KEY,
+        # A machine-internal figure whose value is that it can be compared with
+        # `heatingpower`; the entity is the comparison, not a comfort reading.
+        THERMAL_POWER_AIR_KEY,
         # Per-compressor-unit QG block (input 119-148): one refrigerant circuit
         # per unit, so these are machine-internal even though the legacy
         # averaged bt10/bt13/... are listed below for the same reason.
@@ -500,6 +504,11 @@ async def async_setup_entry(
             coordinator, _DEFROST_COUNT_KEY, device, True
         )
     )
+    sensors.append(
+        _get_sensor_type(THERMAL_POWER_AIR_KEY)(
+            coordinator, THERMAL_POWER_AIR_KEY, device, True
+        )
+    )
     if coordinator.modbus_enabled:
         # Local Modbus: display firmware from input registers 191-193 and the
         # custom heating-curve shadow sensors (no cloud equivalent).
@@ -618,6 +627,7 @@ async def async_setup_entry(
         *_COP_SENSOR_KEYS,
         *_DHW_CHARGE_KEYS,
         _DEFROST_COUNT_KEY,
+        THERMAL_POWER_AIR_KEY,
     }
 
     # Rolling efficiency figures come from the efficiency coordinator. Created

@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Nombre de dégivrages"
+      },
+      "thermal_power_air": {
+        "name": "Puissance thermique (air)"
       }
     },
     "number": {

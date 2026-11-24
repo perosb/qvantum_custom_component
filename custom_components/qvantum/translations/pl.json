@@ -775,6 +775,9 @@
       },
       "defrost_count": {
         "name": "Liczba odszraniania"
+      },
+      "thermal_power_air": {
+        "name": "Moc cieplna (powietrze)"
       }
     },
     "number": {
