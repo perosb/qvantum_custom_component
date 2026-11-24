@@ -50,7 +50,7 @@ custom_components/qvantum/
   device_trigger.py, device_condition.py, device_automation_helpers.py
   services.py / services.yaml
   # pure math, no HA imports:
-  efficiency.py, heating_curve.py, solar_gain.py, building.py,
+  numeric.py, efficiency.py, heating_curve.py, solar_gain.py, building.py,
   dhw_loss.py, plant_analytics.py
   open_meteo.py               # forecast/history fetch (temperature, GHI, wind)
   client/                     # vendored comms — no Home Assistant imports
@@ -138,7 +138,8 @@ present in the payload, so absent registers degrade to no entity.
   `MODBUS_HOLDING_TO_SETTINGS_MAP` gives it a canonical name (`get_settings`
   filters by that map). A register in `MODBUS_HOLDING_REGISTER_MAP` without a
   settings entry is polled and then dropped, so no entity can exist for it
-  (holding 74 is deliberate: the app has no cooling-priority setting).
+  (holding 74 is deliberate: the app has no cooling-priority setting; holding 58
+  is `dhw_start_extra`, exposed as a number entity alongside `dhw_stop_extra`).
   `compressor_power` (input 93) must stay in the modbus metrics payload even
   though `powertotal` folds it in: its diagnostic sensor records the long-term
   statistics `compressor_power_avg` reads, and a popped key left that average
@@ -355,6 +356,16 @@ now wrong* is the one that changed. What has to move, when:
 | Tap-water capacity level, its table or its repair issues | `docs/tap-water-capacity.md` |
 | Workflow, tooling, release automation | `AGENTS.md` |
 
+A **fork PR is not reviewed automatically**: `pull_request` runs from a fork get
+no repository secrets, so the job is skipped. Review one on demand with
+**Actions → pi-review → Run workflow** and the PR number. That run checks out the
+default branch for the reviewer's own code (prompt, extensions, `post_review.py`)
+and the PR head into `pr-head/` as **data only** — `repo_read`/`repo_grep` are
+rooted there, and nothing in it is executed — so a PR that edits `.github/pi/`
+cannot rewrite the thing reviewing it. `pi` is pinned at **1.6.0** and the model
+ids are explicit (`z-ai/glm-5.3`, `z-ai/glm-5.3-flash`): the `~…-latest` aliases
+resolve to a dated snapshot that rejects 1.6's mid-conversation reasoning update.
+
 The reviewer's output contract is JSON; when the model answers in prose instead,
 `post_review.py` posts that text as a fallback comment and **passes with a
 `::warning::`** — failing the check there blocked two merges (#430, #434) on a
@@ -434,6 +445,31 @@ enough. Verify in a `/tmp` worktree (see *Git*).
 - Missing translations/tests, or coverage below **92%**.
 
 ## Tests
+
+`ruff` is a gate, not a suggestion: `ruff.toml` at the root selects a deliberately
+narrow set (`E4/E7/E9`, `F`, `I`, `UP`, `B`, `RUF100`) and the `lint` job runs
+`ruff check` on the whole repository, `tests/` and `.github/scripts/` included. It
+is pinned in the workflow (`ruff==0.17.6`) because a new release can add a rule
+that turns the gate red on its own. `D` (docstrings), `ANN` (annotations) and
+`E501` are deliberately out — their backlog is real but fixing it is a separate
+decision, and `E501` would flag forty lines, most of them log format strings.
+`isort` keeps aliased re-exports combined and wrapped
+(`combine-as-imports`/`force-wrap-aliases`), so `from .const import (A as A,
+B as B)` stays one statement — without it every alias gets its own block.
+Run it locally with `uv run --with ruff==0.17.6 ruff check --fix`.
+
+Type checking is a gate **only for the seven Home-Assistant-free modules** —
+`numeric`, `efficiency`, `building`, `dhw_loss`, `plant_analytics`,
+`heating_curve`, `solar_gain` — listed in `mypy.ini` and run by the `types` job
+(`mypy==2.4.1`). They carry the curve's and the solar term's arithmetic, where a
+type error becomes a wrong number in the pump rather than a missing field in a
+report. The HA-facing modules are deliberately out: their
+`getattr(coordinator, name, None)` reads are defensive on purpose (the test
+harness builds half a coordinator), `getattr` with a literal name is invisible to
+a checker anyway, and the class of bug those two modules actually suffered —
+an export field missing from the dump — is pinned by a parity test in
+`tests/test_diagnostics.py`. Do not "finish" the job by adding the whole
+integration: that needs the persisted coordinator state declared first.
 
 ```bash
 ./run-tests.sh          # venv + requirements-test.txt + pytest
@@ -562,7 +598,11 @@ review has to catch:
   snapshot is ignored, never reinterpreted. The open free-cooling window is
   deliberately not persisted.
 - The DHW heat-meter comparison is a **poll-resolution integral**; `mean(flow) ·
-  mean(ΔT)` is not the integral of `flow · ΔT` and lands far below it.
+  mean(ΔT)` is not the integral of `flow · ΔT` and lands far below it. Its
+  **warning compares the window's two halves, not the level**: the level carries
+  a structural bias (measured −23 % for three weeks with short draws), so a
+  level threshold is permanently on — movement ≥ 5 points, or a level beyond
+  ±40 %, is what fires.
 - The buffer-tank volume is **identified** (element-only balance), and
   `element_only_tank_balance` must keep both guards — shunt closed
   (`qn8position` = 0) and no `heatingenergy` counter step — or the element's
@@ -629,6 +669,12 @@ The rules that must not drift:
   configured reading *is* BT2). Without the gates a placeholder BT2 puts the
   deviation tens of kelvin off. Trims, the indoor cap and `room_error` stay on
   the configured sensor: those describe the house.
+- The indoor cap averages the room error over **24 h**, so two things bound it:
+  a **setpoint change clears the window** (averaging across it judges the house
+  by a target it no longer has) and a **cold house follows the current
+  reading** rather than the mean, because the protective floor may not wait a
+  day. The dump carries `indoor_margin_now_c` / `indoor_margin_mean_c` beside
+  `indoor_margin_c`, so a lagging cap is distinguishable from a biased one.
 - The solar aperture comes from the **day-block energy balance**, never from
   heating hours (the sunny hours are exactly the ones the pump's room term has
   switched off). An ungated window means **no** term, never a preserved older

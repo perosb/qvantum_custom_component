@@ -774,8 +774,20 @@ only act while the curve is active. Enable them with
   indoor reading** to act at all: it is fed from the room error and keeps 24 h
   of samples, so without an indoor sensor (`sensor_mode` DISABLED / BT3 / AUX)
   it is inert and nothing brakes the curve in a warm house. The diagnostics
-  report `indoor_cap_armed` (and `indoor_margin_c`) so that state is visible
-  rather than inferred from a warm room.
+  report `indoor_cap_armed`, `indoor_margin_c` and its two inputs
+  `indoor_margin_now_c` / `indoor_margin_mean_c` so that state is visible rather
+  than inferred from a warm room.
+
+  Two rules keep the window honest, and both were added after a measurement
+  (2026-11-23) rather than in advance: a **setpoint change clears the window**,
+  because averaging across it judges the house by a target it no longer has —
+  raising the target 20.0 → 20.5 left the cap reading +0.35 K warm while the
+  house was 0.4 K cold — and a **cold house follows the current reading**, not
+  the mean, because refusing to cut heat from a house already below target is
+  the cap's protective job and a day of smoothing delays it by a day. The warm
+  side keeps the mean: one warm afternoon must not veto the curve. The first
+  rule mirrors `active_since_ts` in the room-gain fit, which refuses to pool
+  hours across a table change for the same reason.
 
 ### Solar model
 
@@ -922,12 +934,18 @@ the cap, and `capped_by_indoor` says whether that gap is live.
 
 `diagnostics.curve` mirrors the `CurveSnapshot`/`CurveResult` state, so a new
 snapshot or persisted field has to be added there in the same PR — a field
-missing from the dump cannot be read from a user's report. It carries
+missing from the dump cannot be read from a user's report. That rule is now a
+test, not a sentence: `tests/test_curve_coordinator.py` compares the keys of
+`_state_payload()` against the dump, so a persisted field fails until it is
+either dumped (under its own name or via the documented map) or excluded with a
+stated reason. It carries
 `write_scope` (the knots of the last active cycle), `forecast_ok`, `forecast_reused` and `forecast_now_c` (the forecast hour's air
 temperature — `outdoor_c` beside it is the **term** in kelvin, clamped ±1.0, and
 comparing the two is a category error), `forecast_wind_ms`/`forecast_wind_available`, the load term's
 `load_power_mean_w`/`load_power_coverage_hours`, `indoor_cap_armed` /
-`indoor_margin_c`, `bt2_detected`, `pump_room_c`/`pump_room_source`, the readiness
+`indoor_margin_c` (with its two inputs), `bt2_detected`, `pump_room_c`/`pump_room_source`,
+`terms` (which optional terms are on), `cop_reference`/`cop_samples` (the COP
+feedback's learned reference and the evidence behind each bucket) and the readiness
 gates and the whole model, where `model_daily` holds both the three-column fit
 and the four-column one (`a_w_per_k_4col`, `b_m2_4col`) beside the wind column.
 The trim layer travels too: `trim_evidence` (hours behind each point's trim),

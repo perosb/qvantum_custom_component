@@ -1,29 +1,33 @@
 """Constants for the Qvantum Heat Pump Integration."""
 
 from enum import IntEnum
+from typing import TYPE_CHECKING
 
 from homeassistant.exceptions import HomeAssistantError
 
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+
 from .client.constants import (
-    BASE_SYSTEM_POWER_W,
-    HEATING_CURVE_HTTP_KEYS,
-    DHW_MODE_ECO,
-    DHW_MODE_EXTRA,
-    DHW_MODE_NORMAL,
-    DHW_MODE_SMART,
-    FAN_SPEED_STATE_EXTRA,
-    FAN_SPEED_STATE_NORMAL,
-    FAN_SPEED_STATE_OFF,
-    FAN_SPEED_VALUE_EXTRA,
-    FAN_SPEED_VALUE_NORMAL,
-    FAN_SPEED_VALUE_OFF,
-    RELAY_HEAT_L1_POWER_W,
-    RELAY_HEAT_L2_POWER_W,
-    RELAY_HEAT_L3_POWER_W,
-    RELAY_STAGE_POWER_MAP,
-    SETTING_UPDATE_APPLIED,
-    TAP_WATER_CAPACITY_MAPPINGS,
-    TAP_WATER_CAPACITY_START_STOP,
+    BASE_SYSTEM_POWER_W as BASE_SYSTEM_POWER_W,
+    DHW_MODE_ECO as DHW_MODE_ECO,
+    DHW_MODE_EXTRA as DHW_MODE_EXTRA,
+    DHW_MODE_NORMAL as DHW_MODE_NORMAL,
+    DHW_MODE_SMART as DHW_MODE_SMART,
+    FAN_SPEED_STATE_EXTRA as FAN_SPEED_STATE_EXTRA,
+    FAN_SPEED_STATE_NORMAL as FAN_SPEED_STATE_NORMAL,
+    FAN_SPEED_STATE_OFF as FAN_SPEED_STATE_OFF,
+    FAN_SPEED_VALUE_EXTRA as FAN_SPEED_VALUE_EXTRA,
+    FAN_SPEED_VALUE_NORMAL as FAN_SPEED_VALUE_NORMAL,
+    FAN_SPEED_VALUE_OFF as FAN_SPEED_VALUE_OFF,
+    HEATING_CURVE_HTTP_KEYS as HEATING_CURVE_HTTP_KEYS,
+    RELAY_HEAT_L1_POWER_W as RELAY_HEAT_L1_POWER_W,
+    RELAY_HEAT_L2_POWER_W as RELAY_HEAT_L2_POWER_W,
+    RELAY_HEAT_L3_POWER_W as RELAY_HEAT_L3_POWER_W,
+    RELAY_STAGE_POWER_MAP as RELAY_STAGE_POWER_MAP,
+    SETTING_UPDATE_APPLIED as SETTING_UPDATE_APPLIED,
+    TAP_WATER_CAPACITY_MAPPINGS as TAP_WATER_CAPACITY_MAPPINGS,
+    TAP_WATER_CAPACITY_START_STOP as TAP_WATER_CAPACITY_START_STOP,
 )
 
 DOMAIN = "qvantum"
@@ -184,6 +188,21 @@ HTTP_CLOUD_LOOKUP_TIMEOUT = 15
 MODBUS_SW_VERSION_REFRESH_INTERVAL = 3600
 
 # Metrics available in both HTTP and Modbus modes
+#: The picpin relay status bits, in register order. Both the poll's metric list
+#: and the binary sensors read this, so a relay added to one is never missing
+#: from the other.
+PICPIN_RELAY_KEYS: tuple[str, ...] = (
+    "picpin_relay_heat_l1",
+    "picpin_relay_heat_l2",
+    "picpin_relay_heat_l3",
+    "picpin_relay_gp10",
+    "picpin_relay_qm10",
+    "picpin_relay_qn8_1",
+    "picpin_relay_qn8_2",
+    "picpin_relay_gp3",
+    "picpin_relay_ha12",
+)
+
 DEFAULT_ENABLED_METRICS = [
     "bf1_l_min",
     "bt1",
@@ -211,15 +230,7 @@ DEFAULT_ENABLED_METRICS = [
     "gp1_speed",
     "gp2_speed",
     "hp_status",
-    "picpin_relay_heat_l1",
-    "picpin_relay_heat_l2",
-    "picpin_relay_heat_l3",
-    "picpin_relay_gp10",
-    "picpin_relay_qm10",
-    "picpin_relay_qn8_1",
-    "picpin_relay_qn8_2",
-    "picpin_relay_gp3",
-    "picpin_relay_ha12",
+    *PICPIN_RELAY_KEYS,
     "qn8position",
     "compressorenergy",
     "additionalenergy",
@@ -597,15 +608,7 @@ DHW_EMA_ALPHA = (
 # Binary sensor names
 BINARY_SENSOR_NAMES = [
     "cooling_enabled",
-    "picpin_relay_heat_l1",
-    "picpin_relay_heat_l2",
-    "picpin_relay_heat_l3",
-    "picpin_relay_gp10",
-    "picpin_relay_qm10",
-    "picpin_relay_qn8_1",
-    "picpin_relay_qn8_2",
-    "picpin_relay_gp3",
-    "picpin_relay_ha12",
+    *PICPIN_RELAY_KEYS,
     "dhwdemand",
     "heatingdemand",
     "coolingdemand",
@@ -654,3 +657,32 @@ def default_metric_creates_entity(metric: str) -> bool:
     if metric in EXCLUDED_METRIC_NAMES:
         return True
     return not any(pattern in metric for pattern in EXCLUDED_METRIC_PATTERNS)
+
+
+def modbus_link_settings(config_entry: ConfigEntry) -> tuple[bool, str, int, int]:
+    """Return (enabled, host, port, unit_id) from entry options/data."""
+    enabled = bool(
+        config_entry.options.get(
+            CONF_MODBUS_TCP,
+            config_entry.data.get(CONF_MODBUS_TCP, False),
+        )
+    )
+    host = str(
+        config_entry.options.get(
+            CONF_MODBUS_HOST,
+            config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
+        )
+    )
+    port = int(
+        config_entry.options.get(
+            CONF_MODBUS_PORT,
+            config_entry.data.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
+        )
+    )
+    unit_id = int(
+        config_entry.options.get(
+            CONF_MODBUS_UNIT_ID,
+            config_entry.data.get(CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID),
+        )
+    )
+    return enabled, host, port, unit_id

@@ -12,10 +12,8 @@ import pytest
 from custom_components.qvantum import _async_mqtt_client
 from custom_components.qvantum.client.mqtt import QvantumMqttClient
 from custom_components.qvantum.config_flow import QvantumConfigFlow
-from custom_components.qvantum.coordinator import resolve_transport
 from custom_components.qvantum.const import (
     CONF_MODBUS_TCP,
-    CONF_TRANSPORT,
     CONF_MQTT_SERIAL,
     CONF_MQTT_TOPIC_PREFIX,
     CONF_MQTT_WRITE,
@@ -24,6 +22,7 @@ from custom_components.qvantum.const import (
     TRANSPORT_MODBUS,
     TRANSPORT_MQTT,
 )
+from custom_components.qvantum.coordinator import resolve_transport
 
 
 def _entry(data=None, options=None):

@@ -1,7 +1,7 @@
 """Tests for Cloud maintenance and elevated-access operations."""
 
 import datetime
-from datetime import timedelta, timezone
+from datetime import timedelta
 
 import pytest
 
@@ -26,7 +26,7 @@ class TestCloudMaintenanceAccess:
     @pytest.mark.asyncio
     async def test_elevate_access_expires_soon(self, authenticated_api):
         """Access expiring within a day requires no re-elevation."""
-        tomorrow = datetime.datetime.now(timezone.utc) + timedelta(hours=12)
+        tomorrow = datetime.datetime.now(datetime.UTC) + timedelta(hours=12)
         expires_at_str = tomorrow.isoformat().replace("+00:00", "Z")
         access_data = {"writeAccessLevel": 15, "expiresAt": expires_at_str}
         cm, _ = authenticated_api._session.make_cm_response(
@@ -42,7 +42,7 @@ class TestCloudMaintenanceAccess:
     @pytest.mark.asyncio
     async def test_elevate_access_expires_later(self, authenticated_api):
         """Access expiring later is renewed through the Cloud workflow."""
-        future = datetime.datetime.now(timezone.utc) + timedelta(days=2)
+        future = datetime.datetime.now(datetime.UTC) + timedelta(days=2)
         expires_at_str = future.isoformat().replace("+00:00", "Z")
         initial_access_data = {"writeAccessLevel": 15, "expiresAt": expires_at_str}
         generate_data = {"accessCode": "12345"}

@@ -2,7 +2,10 @@
 
 from enum import IntFlag
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+
+from tests.conftest import make_client_mock
 
 
 # Create mock base classes that don't have metaclass conflicts
@@ -50,11 +53,11 @@ with patch(
                         ):
                             from homeassistant.helpers.device_registry import DeviceInfo
 
+                            from custom_components.qvantum import RuntimeData
                             from custom_components.qvantum.fan import (
                                 QvantumFanEntity,
                                 async_setup_entry,
                             )
-                            from custom_components.qvantum import RuntimeData
 
 
 @pytest.fixture
@@ -68,7 +71,7 @@ def mock_coordinator():
             "fanspeedselector": FAN_SPEED_STATE_NORMAL,
         },
     }
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 
@@ -304,7 +307,7 @@ def _spec_coordinator(write_level: int):
     }
     coordinator.modbus_enabled = False
     coordinator.last_update_success = True
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.config_entry = MagicMock()
     maintenance = MagicMock()
     maintenance.data = {"access_level": {"writeAccessLevel": write_level}}
@@ -355,7 +358,7 @@ def _modbus_no_write_coordinator():
     }
     coordinator.modbus_enabled = True
     coordinator.last_update_success = True
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.config_entry = MagicMock()
     coordinator.config_entry.options = {}
     coordinator.config_entry.data = {}

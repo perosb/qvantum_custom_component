@@ -2,23 +2,26 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .coordinator import QvantumDataUpdateCoordinator
+import traceback
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .client.cloud import QvantumCloudClient
-from .client.exceptions import AuthError as APIAuthError
-from .client.exceptions import RateLimitError as APIRateLimitError
+from .client.exceptions import (
+    AuthError as APIAuthError,
+    RateLimitError as APIRateLimitError,
+)
 from .const import DOMAIN, FIRMWARE_KEYS
 from .coordinator import is_cloud
-import traceback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +33,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
         self,
         hass: HomeAssistant,
         config_entry: ConfigEntry,
-        main_coordinator: "QvantumDataUpdateCoordinator",
+        main_coordinator: QvantumDataUpdateCoordinator,
     ) -> None:
         """Initialize firmware coordinator."""
         self.client = main_coordinator.client
@@ -130,7 +133,7 @@ class QvantumMaintenanceCoordinator(DataUpdateCoordinator):
                 "firmware_versions": current_versions,
                 "access_level": access_level,
                 "firmware_changed": firmware_changed,
-                "last_check": datetime.now(timezone.utc)
+                "last_check": datetime.now(UTC)
                 .isoformat()
                 .replace("+00:00", "Z"),
             }

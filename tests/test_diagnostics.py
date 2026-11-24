@@ -3,20 +3,23 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from collections import deque
+from dataclasses import replace
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from homeassistant.util import dt as dt_util
 
-from custom_components.qvantum.heating_curve import ActiveRoomGain
 from custom_components.qvantum.curve_coordinator import CurveSnapshot
 from custom_components.qvantum.diagnostics import (
     TO_REDACT,
+    _efficiency_diagnostics,
     async_get_config_entry_diagnostics,
 )
-from homeassistant.util import dt as dt_util
-
+from custom_components.qvantum.efficiency_coordinator import EfficiencySnapshot
+from custom_components.qvantum.heating_curve import ActiveRoomGain
 from custom_components.qvantum.open_meteo import HourlyWeather, WeatherForecast, hour_ts
 from custom_components.qvantum.plant_analytics import DhwMeterWindow
 from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
@@ -313,12 +316,12 @@ async def test_cop_diagnostics_reports_held_figures_and_the_open_charge(hass):
     coordinator = _coordinator()
     coordinator._cop_last = {"cop_heating": 3.4, "cop_dhw": 1.0}
     coordinator._cop_last_times = {
-        "cop_heating": datetime(2026, 10, 18, 8, 0, tzinfo=timezone.utc),
-        "cop_dhw": datetime(2026, 10, 18, 9, 0, tzinfo=timezone.utc),
+        "cop_heating": datetime(2026, 10, 18, 8, 0, tzinfo=UTC),
+        "cop_dhw": datetime(2026, 10, 18, 9, 0, tzinfo=UTC),
     }
     coordinator._dhw_tank_liters = 143.2
     coordinator._dhw_charge = SimpleNamespace(
-        started=datetime(2026, 10, 18, 9, 3, tzinfo=timezone.utc),
+        started=datetime(2026, 10, 18, 9, 3, tzinfo=UTC),
         start_tank=57.3,
         last_tank=64.1,
         draw_kwh=0.2,
@@ -832,3 +835,101 @@ async def test_curve_diagnostics_tolerates_malformed_state(hass):
     assert curve_result["load_power_coverage_hours"] is None
     assert curve_result["write_scope"] == []
     json.dumps(result)
+
+
+def test_the_efficiency_dump_carries_every_exported_figure() -> None:
+    """Every figure the summary exports must be readable from a dump.
+
+    The export and the dump are two whitelists over the same snapshot, and they
+    had already drifted: the EU label's unit and class were added to the export
+    and never reached the dump, so a report could not answer "why is my class
+    A+?". A new export field therefore fails here until the dump carries it.
+    """
+    from custom_components.qvantum.summary import (
+        _SNAPSHOT_ATTRIBUTE,
+        FITTED_EFFICIENCY_KEYS,
+    )
+
+    snapshot = EfficiencySnapshot(
+        scop_total=2.84,
+        scop_total_90d=2.55,
+        heat_loss_w_per_k=100.5,
+        coverage_days=29.9,
+    )
+    block = _efficiency_diagnostics(SimpleNamespace(data=snapshot))
+    assert block is not None
+
+    missing = [
+        key
+        for key in FITTED_EFFICIENCY_KEYS
+        if _SNAPSHOT_ATTRIBUTE.get(key, key) not in block
+    ]
+    assert missing == []
+
+
+def test_the_efficiency_dump_derives_the_same_eu_label_as_the_export() -> None:
+    from custom_components.qvantum.summary import fitted_summary
+
+    snapshot = EfficiencySnapshot(scop_total=2.84, scop_total_90d=2.55)
+    block = _efficiency_diagnostics(SimpleNamespace(data=snapshot))
+    exported = fitted_summary(snapshot)
+
+    assert block is not None
+    for key in ("eta_s_percent", "eu_class", "eta_s_percent_90d", "eu_class_90d"):
+        assert block[key] == exported[key]
+    assert block["eu_class"] == "A+"
+
+
+def test_the_curve_dump_shows_both_inputs_of_the_indoor_cap() -> None:
+    """A lagging cap must be distinguishable from a biased one.
+
+    `indoor_margin_c` alone cannot say why the cap reads warm while the house is
+    cold; the current error and the 24 h mean are what separate the two.
+    """
+    from custom_components.qvantum.diagnostics import _curve_diagnostics
+
+    coordinator = _curve_coordinator()
+    coordinator.data = replace(
+        coordinator.data,
+        indoor_margin_c=-0.4,
+        indoor_margin_now_c=-0.4,
+        indoor_margin_mean_c=0.35,
+        indoor_cap_armed=True,
+    )
+    block = _curve_diagnostics(coordinator)
+
+    assert block is not None
+    assert block["indoor_margin_c"] == -0.4
+    assert block["indoor_margin_now_c"] == -0.4
+    assert block["indoor_margin_mean_c"] == 0.35
+
+
+def test_the_curve_dump_carries_the_setpoint_the_margin_window_belongs_to() -> None:
+    """The window is cleared on a setpoint change, so the regime must be visible."""
+    from custom_components.qvantum.diagnostics import _curve_diagnostics
+
+    coordinator = _curve_coordinator()
+    coordinator._indoor_margins = deque([(1_770_000_000.0, 0.4)])
+    coordinator._indoor_margins_target = 20.5
+
+    block = _curve_diagnostics(coordinator)
+
+    assert block is not None
+    assert block["indoor_margins_target"] == 20.5
+
+
+
+def test_the_efficiency_dump_carries_the_two_halves_of_the_meter_warning() -> None:
+    """The level carries a structural bias; the halves say why the warning fired."""
+    from custom_components.qvantum.diagnostics import _efficiency_diagnostics
+
+    snapshot = EfficiencySnapshot(
+        dhw_heat_meter_deviation=-23.1,
+        dhw_heat_meter_deviation_recent=-5.0,
+        dhw_heat_meter_deviation_prior=-23.1,
+    )
+    block = _efficiency_diagnostics(SimpleNamespace(data=snapshot))
+
+    assert block is not None
+    assert block["dhw_heat_meter_deviation_recent"] == -5.0
+    assert block["dhw_heat_meter_deviation_prior"] == -23.1

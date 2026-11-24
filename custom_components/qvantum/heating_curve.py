@@ -37,10 +37,12 @@ returns the seven supply temperatures plus the term breakdown.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
+from typing import TypeGuard
 
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
+from .numeric import median
 from .solar_gain import (
     SolarDailyModel,
     SolarModel,
@@ -299,7 +301,7 @@ def lift_baseline_floor(
     low, _ = effective_supply_bounds(min_supply_c, None)
     return {
         key: max(supply, low)
-        for key, (_, supply) in zip(CURVE_KEYS, points)
+        for key, (_, supply) in zip(CURVE_KEYS, points, strict=True)
     }
 
 
@@ -599,15 +601,6 @@ def load_adjustment_c(
     return -LOAD_MAX_C * _clamp(shortfall / LOAD_SPAN, 0.0, 1.0)
 
 
-def _median(values: Sequence[float]) -> float:
-    ordered = sorted(values)
-    n = len(ordered)
-    mid = n // 2
-    if n % 2:
-        return ordered[mid]
-    return 0.5 * (ordered[mid - 1] + ordered[mid])
-
-
 def _fit_line(x: Sequence[float], y: Sequence[float]) -> tuple[float, float]:
     """Ordinary least squares ``y ≈ slope·x + intercept``."""
     n = len(x)
@@ -616,7 +609,7 @@ def _fit_line(x: Sequence[float], y: Sequence[float]) -> tuple[float, float]:
     sxx = sum((xi - mean_x) ** 2 for xi in x)
     if sxx <= 1e-12:
         return 0.0, mean_y
-    sxy = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(x, y))
+    sxy = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(x, y, strict=True))
     slope = sxy / sxx
     return slope, mean_y - slope * mean_x
 
@@ -669,7 +662,7 @@ def corrected_baseline(
         return None
     bucket_x = sorted(buckets)
     slope, intercept = _fit_line(
-        [float(x) for x in bucket_x], [_median(buckets[x]) for x in bucket_x]
+        [float(x) for x in bucket_x], [median(buckets[x]) for x in bucket_x]
     )
 
     correction = {
@@ -683,10 +676,10 @@ def corrected_baseline(
 
     raw = {
         key: supply + correction[key]
-        for key, (_, supply) in zip(CURVE_KEYS, base)
+        for key, (_, supply) in zip(CURVE_KEYS, base, strict=True)
     }
     repaired = normalize_baseline(raw)
-    return {key: supply for key, (_, supply) in zip(CURVE_KEYS, repaired)}
+    return {key: supply for key, (_, supply) in zip(CURVE_KEYS, repaired, strict=True)}
 
 
 def room_compensation_gain(
@@ -736,15 +729,15 @@ def room_compensation_gain(
     s_ee = sum((value - mean_error) ** 2 for value in errors)
     s_oe = sum(
         (outdoor - mean_outdoor) * (error - mean_error)
-        for outdoor, error in zip(outdoors, errors)
+        for outdoor, error in zip(outdoors, errors, strict=True)
     )
     s_or = sum(
         (outdoor - mean_outdoor) * (residual - mean_residual)
-        for outdoor, residual in zip(outdoors, residuals)
+        for outdoor, residual in zip(outdoors, residuals, strict=True)
     )
     s_er = sum(
         (error - mean_error) * (residual - mean_residual)
-        for error, residual in zip(errors, residuals)
+        for error, residual in zip(errors, residuals, strict=True)
     )
     determinant = s_oo * s_ee - s_oe * s_oe
     if abs(determinant) <= 1e-12:
@@ -837,7 +830,7 @@ def _invert(matrix: Sequence[Sequence[float]]) -> list[list[float]] | None:
             factor = rows[other][column]
             rows[other] = [
                 value - factor * base
-                for value, base in zip(rows[other], rows[column])
+                for value, base in zip(rows[other], rows[column], strict=True)
             ]
     return [row[size:] for row in rows]
 
@@ -992,10 +985,10 @@ def room_gain_from_active_hours(
             columns.append(ts)
         n_columns = len(columns)
         matrix = [
-            [sum(a * b for a, b in zip(columns[i], columns[j])) for j in range(n_columns)]
+            [sum(a * b for a, b in zip(columns[i], columns[j], strict=True)) for j in range(n_columns)]
             for i in range(n_columns)
         ]
-        vector = [sum(a * y for a, y in zip(columns[i], ys)) for i in range(n_columns)]
+        vector = [sum(a * y for a, y in zip(columns[i], ys, strict=True)) for i in range(n_columns)]
         beta = _solve_normal_equations(matrix, vector)
         if beta is None:
             # The columns move together inside the buckets, so no slope is
@@ -1005,7 +998,7 @@ def room_gain_from_active_hours(
         nuisance = beta[1] if n_columns > 1 and columns[1] is zs else None
         drift = beta[-1] if timed and columns[-1] is ts else None
         residual = [
-            y - sum(b * column[index] for b, column in zip(beta, columns))
+            y - sum(b * column[index] for b, column in zip(beta, columns, strict=True))
             for index, y in enumerate(ys)
         ]
         variance = sum(value * value for value in residual) / max(
@@ -1136,8 +1129,13 @@ BT2_MAX_PLAUSIBLE_C = 45.0
 BT2_MAX_DIVERGENCE_C = 10.0
 
 
-def _room_reading_is_plausible(value: object) -> bool:
-    """True for a number that could be an indoor temperature."""
+def _room_reading_is_plausible(value: object) -> TypeGuard[float]:
+    """True for a number that could be an indoor temperature.
+
+    A ``TypeGuard`` rather than a plain ``bool``: callers rely on the guard to
+    make the value usable as a float, and saying so lets the checker see the
+    invariant instead of re-asserting it at every call site.
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
     return BT2_MIN_PLAUSIBLE_C <= float(value) <= BT2_MAX_PLAUSIBLE_C
@@ -1220,7 +1218,9 @@ def pump_room_reading(
             float(bt2_c) if usable and bt2_c is not None else None,
             "bt2" if usable else "none",
         )
-    elif usable and external_mode:
+    elif usable and external_mode and bt2_c is not None:
+        # `usable` already implies a plausible BT2 reading; the explicit test
+        # states the invariant the blend depends on.
         reading = PumpRoomReading(
             (float(configured_c) + float(bt2_c)) / 2.0, "blended"
         )
@@ -1523,7 +1523,7 @@ def compute_curve(
     supplies: list[tuple[str, float]] = []
     clamped_points: list[str] = []
     floor_pinned_points: list[str] = []
-    for key, (_, supply) in zip(CURVE_KEYS, points):
+    for key, (_, supply) in zip(CURVE_KEYS, points, strict=True):
         trim = 0.0
         if point_trims is not None:
             candidate = float(point_trims.get(key, 0.0))

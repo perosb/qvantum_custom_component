@@ -3,6 +3,8 @@
 import ast
 from pathlib import Path
 
+from custom_components.qvantum import client as qvantum_client
+from custom_components.qvantum.client import constants as client_constants
 from custom_components.qvantum.client.exceptions import (
     APIAuthError,
     APIConnectionError,
@@ -19,9 +21,6 @@ from custom_components.qvantum.const import (
     SETTING_UPDATE_APPLIED,
     TAP_WATER_CAPACITY_MAPPINGS,
 )
-from custom_components.qvantum import client as qvantum_client
-from custom_components.qvantum.client import constants as client_constants
-
 
 CLIENT_ROOT = (
     Path(__file__).resolve().parents[1] / "custom_components" / "qvantum" / "client"
@@ -150,3 +149,49 @@ def test_result_applied_rejects_failure_shapes():
     assert qvantum_client.result_applied({}) is False
     assert qvantum_client.result_applied({"status": "FAILED"}) is False
     assert qvantum_client.result_applied({"success": True}) is False
+
+
+def test_every_client_error_shares_one_base() -> None:
+    """`except QvantumError` must catch the client's whole vocabulary."""
+    from custom_components.qvantum.client.exceptions import (
+        AuthError,
+        QvantumError,
+        RateLimitError,
+        TransportError,
+    )
+
+    for error in (AuthError, TransportError, RateLimitError):
+        assert issubclass(error, QvantumError)
+
+
+def test_the_error_message_keeps_its_shape() -> None:
+    from custom_components.qvantum.client.exceptions import (
+        AuthError,
+        RateLimitError,
+        TransportError,
+    )
+
+    assert str(AuthError()) == "Authentication failed"
+    assert str(AuthError(401)) == "Authentication failed: 401"
+    assert str(AuthError(None, "token refresh failed")) == "token refresh failed"
+    assert str(TransportError()) == "API request failed"
+    assert str(RateLimitError(429, retry_after=2.0)) == "Rate limit exceeded: 429"
+    assert RateLimitError(429, retry_after=2.0).retry_after == 2.0
+
+
+def test_the_relay_keys_are_shared_between_the_poll_and_the_sensors() -> None:
+    """A relay added to one list must not be missing from the other."""
+    from custom_components.qvantum.binary_sensor import _DIAGNOSTIC_BINARY_SENSORS
+    from custom_components.qvantum.const import (
+        BINARY_SENSOR_NAMES,
+        DEFAULT_ENABLED_METRICS,
+        PICPIN_RELAY_KEYS,
+    )
+
+    for key in PICPIN_RELAY_KEYS:
+        assert key in DEFAULT_ENABLED_METRICS
+        assert key in BINARY_SENSOR_NAMES
+        assert key in _DIAGNOSTIC_BINARY_SENSORS
+    # The pump bit is Modbus-only, so it is a sensor but not a fetched metric.
+    assert "picpin_relay_pump" not in PICPIN_RELAY_KEYS
+    assert "picpin_relay_pump" in _DIAGNOSTIC_BINARY_SENSORS

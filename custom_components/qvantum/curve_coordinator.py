@@ -18,11 +18,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-import time
 from collections import deque
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Mapping
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
@@ -34,9 +34,8 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-from .client.models import result_applied
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
-from .repairs import CURVE_READY_PREFIX
+from .client.models import result_applied
 from .const import (
     DOMAIN,
     HP_STATUS_HEATING,
@@ -50,13 +49,14 @@ from .coordinator import (
     write_access,
 )
 from .heating_curve import (
-    CURVE_KEYS,
     MAX_SUPPLY_C,
     MIN_SUPPLY_C,
     ROOM_GAIN_MAX_C,
     TOTAL_MAX_C,
     TRIM_MAX_C,
+    ActiveRoomGain,
     DayPhase,
+    PumpRoomReading,
     compute_curve,
     cop_feedback_adjustment_c,
     corrected_baseline,
@@ -66,8 +66,6 @@ from .heating_curve import (
     normalize_baseline,
     points_in_reach,
     precharge_adjustment_c,
-    ActiveRoomGain,
-    PumpRoomReading,
     pump_room_reading,
     room_compensation_gain,
     room_corrected_deviation,
@@ -75,6 +73,7 @@ from .heating_curve import (
     trim_evidence_hours,
     trim_residuals,
 )
+from .numeric import finite
 from .open_meteo import (
     FORECAST_REUSE_HOURS,
     OpenMeteoError,
@@ -82,6 +81,7 @@ from .open_meteo import (
     fetch_forecast,
     fetch_weather_history,
 )
+from .repairs import CURVE_READY_PREFIX
 from .solar_gain import (
     MIN_SAMPLE_Q_W,
     SolarDailyModel,
@@ -209,7 +209,7 @@ async def async_stored_curve_mode(
         data = await store.async_load()
     except asyncio.CancelledError:
         raise
-    except Exception:  # noqa: BLE001 — best effort
+    except Exception:
         return None
     if not isinstance(data, dict):
         return None
@@ -320,11 +320,14 @@ class CurveSnapshot:
     #: Wind's contribution to the shared adjustment, 0 whenever the term is off
     #: or the model's wind column failed its gates.
     wind_c: float = 0.0
-    #: The air-side margin the indoor cap acts on (mean room error over the
-    #: last 24 h) and whether it exists at all: without a fresh indoor reading
-    #: the cap is inert, so a warm house cannot veto a raise and nothing brakes
-    #: the curve when the house is warm.
+    #: The air-side margin the indoor cap acted on, and whether it exists at
+    #: all: without a fresh indoor reading the cap is inert, so a warm house
+    #: cannot veto a raise and nothing brakes the curve when the house is warm.
+    #: ``_now_c`` is this cycle's room error and ``_mean_c`` the 24 h mean
+    #: within the current setpoint regime; a cold house acts on the former.
     indoor_margin_c: float | None = None
+    indoor_margin_now_c: float | None = None
+    indoor_margin_mean_c: float | None = None
     indoor_cap_armed: bool = False
 
 
@@ -467,7 +470,7 @@ def readiness_window(now_ts: int, tz: ZoneInfo) -> tuple[float, float]:
 
 def room_error_summary(
     hourly_errors: Mapping[int, float], now_ts: int, tz: ZoneInfo
-) -> "RoomTracking | None":
+) -> RoomTracking | None:
     """Median and p90 of the hourly ``indoor − target`` over the window.
 
     Readiness asks whether our baseline still matches the pump, which becomes
@@ -644,15 +647,6 @@ def _daily_from_state(state: Any) -> SolarDailyModel | None:
     if not isinstance(state, dict):
         return None
 
-    def optional(raw: Any) -> float | None:
-        if raw is None or isinstance(raw, bool):
-            return None
-        try:
-            value = float(raw)
-        except (TypeError, ValueError):
-            return None
-        return value if math.isfinite(value) else None
-
     try:
         return SolarDailyModel(
             a_w_per_k=float(state["a"]),
@@ -661,27 +655,27 @@ def _daily_from_state(state: Any) -> SolarDailyModel | None:
             trust=float(state.get("trust", 0.0)),
             r2=float(state.get("r2", 0.0)),
             n_days=int(state.get("n_days", 0)),
-            b_std_err=optional(state.get("b_std_err")),
-            t_stat=optional(state.get("t_stat")),
-            b_first_half_m2=optional(state.get("b_first_half")),
-            b_second_half_m2=optional(state.get("b_second_half")),
-            b_jackknife_min_m2=optional(state.get("b_jackknife_min")),
-            b_jackknife_max_m2=optional(state.get("b_jackknife_max")),
+            b_std_err=finite(state.get("b_std_err")),
+            t_stat=finite(state.get("t_stat")),
+            b_first_half_m2=finite(state.get("b_first_half")),
+            b_second_half_m2=finite(state.get("b_second_half")),
+            b_jackknife_min_m2=finite(state.get("b_jackknife_min")),
+            b_jackknife_max_m2=finite(state.get("b_jackknife_max")),
             valid=bool(state.get("valid", False)),
             notes=str(state.get("notes", "")),
-            w_per_ms=optional(state.get("w")),
-            w_std_err=optional(state.get("w_std_err")),
-            w_t_stat=optional(state.get("w_t_stat")),
+            w_per_ms=finite(state.get("w")),
+            w_std_err=finite(state.get("w_std_err")),
+            w_t_stat=finite(state.get("w_t_stat")),
             wind_hours=int(state.get("wind_hours") or 0),
             wind_cold_hours=int(state.get("wind_cold_hours") or 0),
             wind_evidence_days=int(state.get("wind_evidence_days") or 0),
-            wind_vif=optional(state.get("wind_vif")),
+            wind_vif=finite(state.get("wind_vif")),
             wind_valid=bool(state.get("wind_valid", False)),
             wind_notes=str(state.get("wind_notes", "")),
-            a_w_per_k_4col=optional(state.get("a_4col")),
-            b_m2_4col=optional(state.get("b_4col")),
-            w_first_half_ms=optional(state.get("w_first_half")),
-            w_second_half_ms=optional(state.get("w_second_half")),
+            a_w_per_k_4col=finite(state.get("a_4col")),
+            b_m2_4col=finite(state.get("b_4col")),
+            w_first_half_ms=finite(state.get("w_first_half")),
+            w_second_half_ms=finite(state.get("w_second_half")),
         )
     except (KeyError, TypeError, ValueError):
         return None
@@ -710,15 +704,6 @@ def _active_gain_from_state(state: Any) -> ActiveRoomGain | None:
     if not isinstance(state, dict):
         return None
 
-    def optional(raw: Any) -> float | None:
-        if raw is None or isinstance(raw, bool):
-            return None
-        try:
-            value = float(raw)
-        except (TypeError, ValueError):
-            return None
-        return value if math.isfinite(value) else None
-
     try:
         return ActiveRoomGain(
             gain_c_per_c=float(state["gain"]),
@@ -726,11 +711,11 @@ def _active_gain_from_state(state: Any) -> ActiveRoomGain | None:
             hours=int(state.get("hours", 0)),
             buckets=int(state.get("buckets", 0)),
             span_c=float(state.get("span", 0.0)),
-            std_err_c_per_c=optional(state.get("std_err")),
-            r2=optional(state.get("r2")),
-            residual_std_c=optional(state.get("residual")),
-            leave_one_out_c_per_c=optional(state.get("loo")),
-            outdoor_slope_c_per_c=optional(state.get("outdoor_slope")),
+            std_err_c_per_c=finite(state.get("std_err")),
+            r2=finite(state.get("r2")),
+            residual_std_c=finite(state.get("residual")),
+            leave_one_out_c_per_c=finite(state.get("loo")),
+            outdoor_slope_c_per_c=finite(state.get("outdoor_slope")),
             valid=bool(state.get("valid", False)),
             notes=str(state.get("notes", "")),
         )
@@ -844,6 +829,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._indoor_margins: deque[tuple[float, float]] = deque(
             maxlen=INDOOR_MARGIN_CYCLES
         )
+        #: The setpoint the samples above belong to. A new target is a new
+        #: regime, and pooling across it judges the house by a setpoint it no
+        #: longer has.
+        self._indoor_margins_target: float | None = None
+        #: The two inputs the margin is chosen from, kept apart so a report can
+        #: show which one the cap acted on.
+        self._indoor_margin_now: float | None = None
+        self._indoor_margin_mean: float | None = None
         #: Knots of the last active write cycle, for the diagnostics dump: it
         #: explains why a knot the dump shows can be older than the computed one.
         self._write_scope: tuple[str, ...] = ()
@@ -1082,6 +1075,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             # moment to measure again — a persisted stamp made a fixed build
             # wait up to six hours before its first attempt.
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
+            "indoor_margins_target": getattr(self, "_indoor_margins_target", None),
             "mode": self._mode,
             "revert_pending": self._revert_pending,
             "counters": self._counters,
@@ -1305,6 +1299,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if fitted_source in INDOOR_METRIC_KEYS:
             self._room_gain_fitted_source = str(fitted_source)
         self._room_gain_active = _active_gain_from_state(data.get("room_gain_active"))
+        margins_target = data.get("indoor_margins_target")
+        if isinstance(margins_target, (int, float)) and not isinstance(
+            margins_target, bool
+        ):
+            self._indoor_margins_target = float(margins_target)
         margins = data.get("indoor_margins")
         if isinstance(margins, list):
             for item in margins:
@@ -1443,7 +1442,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             response = await awaitable
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — transport failures revert
+        except Exception as err:
             _LOGGER.warning("Curve write %s failed: %s", label, err)
             await self._async_revert(
                 f"write failed ({label})", code="write_failed"
@@ -1480,7 +1479,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             live = await self._async_read_pump_settings()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — fall back to the poll cache
+        except Exception as err:
             _LOGGER.debug("Could not read the live curve type: %s", err)
             live = self._main_values()
         if live.get("curve_type_heating") != HeatingCurveType.AUTO:
@@ -1525,7 +1524,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             readback = await self._async_read_pump_settings()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — verification is mandatory
+        except Exception as err:
             await self._async_revert(
                 "curve points could not be verified", code="points_unverified"
             )
@@ -1624,7 +1623,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     self._revert_pending = True
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001 — connection may be gone
+            except Exception:
                 self._revert_pending = True
         elif was_active:
             self._revert_pending = True
@@ -1644,7 +1643,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             )
         except asyncio.CancelledError:
             raise
-        except Exception:  # noqa: BLE001 — retry next cycle
+        except Exception:
             return
         if result_applied(response):
             self._revert_pending = False
@@ -1811,7 +1810,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return await self._async_compute_snapshot()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — coordinator must stay alive
+        except Exception as err:
             _LOGGER.warning("Curve update failed: %s", err)
             return self.data or self._empty_snapshot()
 
@@ -2035,7 +2034,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             )
             ghi = history.ghi_by_hour
             maps = await self._async_hourly_maps()
-        except Exception as err:  # noqa: BLE001 — calibration is best effort
+        except Exception as err:
             _LOGGER.debug("Solar calibration unavailable: %s", err)
             self._last_calibration_ok = False
             await self._async_persist()
@@ -2285,7 +2284,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             statistic_ids.add(power_id)
         start = dt_util.utcnow() - timedelta(days=BASELINE_LEARN_DAYS)
         if since_ts is not None:
-            start = max(start, datetime.fromtimestamp(since_ts, tz=timezone.utc))
+            start = max(start, datetime.fromtimestamp(since_ts, tz=UTC))
         rows = await self._async_statistics(statistic_ids, start)
 
         def _series(entity_id: str) -> dict[int, float]:
@@ -2490,7 +2489,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             estimate = await self._async_room_gain_from_active()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — measurement is best effort
+        except Exception as err:
             _LOGGER.debug("Active-hour room-gain measurement unavailable: %s", err)
             return
         if estimate is not None:
@@ -2541,7 +2540,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         start = dt_util.utcnow() - timedelta(days=BASELINE_LEARN_DAYS)
         if self._last_active_ts is not None:
             start = max(
-                start, datetime.fromtimestamp(self._last_active_ts, tz=timezone.utc)
+                start, datetime.fromtimestamp(self._last_active_ts, tz=UTC)
             )
         rows = await self._async_statistics(statistic_ids, start)
 
@@ -2590,7 +2589,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             )
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — correction is best effort
+        except Exception as err:
             _LOGGER.debug("Baseline learning unavailable: %s", err)
             return
         if not observations:
@@ -2635,7 +2634,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             identified = await self._async_room_gain()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — identification is best effort
+        except Exception as err:
             _LOGGER.debug("Room-compensation gain unavailable: %s", err)
             return
         if identified is None:
@@ -2737,7 +2736,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             observations = await self._async_trim_observations()
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001 — trims are best effort
+        except Exception as err:
             _LOGGER.debug("Trim update unavailable: %s", err)
             return
         if not observations:
@@ -2794,7 +2793,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         """
         if not self.active:
             return
-        today = datetime.fromtimestamp(now_ts, timezone.utc).date().isoformat()
+        today = datetime.fromtimestamp(now_ts, UTC).date().isoformat()
         changed = False
         for points, days_field in (
             (clamped_points, "clamped_days"),
@@ -2931,7 +2930,41 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return None
         return indoor - float(target)
 
-    def _push_indoor_margin(self, values: Mapping[str, Any], now_ts: float) -> float | None:
+    def _push_indoor_margin(
+        self, values: Mapping[str, Any], now_ts: float
+    ) -> float | None:
+        """Room error the indoor cap acts on, or ``None`` when unknown.
+
+        The cap smooths: one warm afternoon must not veto the curve, so the
+        input is the mean of the last 24 h. Two things that mean cannot do, and
+        this method does:
+
+        - **A new setpoint is a new regime.** Averaging across it judges the
+          house by a target it no longer has — measured on a live install
+          (2026-11-23), a 20.0 -> 20.5 step left the cap reading +0.35 K warm
+          while the house was 0.4 K cold. The window is cleared on a change,
+          the same rule the room-gain fit follows with ``active_since_ts``.
+        - **A cold house must not wait for the average.** Refusing to cut heat
+          from a house already below target is the cap's protective job, and a
+          day of smoothing delays it by a day. The cold side follows the
+          current reading; the warm side keeps the mean.
+        """
+        target = values.get("indoor_temperature_target")
+        target_c = (
+            float(target)
+            if isinstance(target, (int, float)) and not isinstance(target, bool)
+            else None
+        )
+        # A momentarily missing target must not wipe the window.
+        # ``getattr`` because the test harness builds a coordinator without
+        # ``__init__``; the attribute is created there and always settable here.
+        previous_target = getattr(self, "_indoor_margins_target", None)
+        if target_c is not None and previous_target is not None:
+            if target_c != previous_target:
+                self._indoor_margins.clear()
+        if target_c is not None:
+            self._indoor_margins_target = target_c
+
         error = self._room_error(values)
         if error is not None:
             self._indoor_margins.append((now_ts, error))
@@ -2940,9 +2973,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             for ts, margin in self._indoor_margins
             if now_ts - ts <= 24 * 3600.0
         ]
+        self._indoor_margin_now = error
         if not recent:
+            self._indoor_margin_mean = None
             return None
-        return sum(recent) / len(recent)
+        mean = sum(recent) / len(recent)
+        self._indoor_margin_mean = mean
+        if error is not None and error < 0.0 and error < mean:
+            return error
+        return mean
 
     def _push_power(self, values: Mapping[str, Any]) -> float | None:
         """Mean space-heating output over the load term's cycle window.
@@ -3057,7 +3096,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             next_sunrise = get_astral_event_date(
                 self.hass, SUN_EVENT_SUNRISE, today + timedelta(days=1)
             )
-        except Exception:  # noqa: BLE001 — no location/astral data
+        except Exception:
             return None
         dates = (sunrise, sunset, previous_sunset, next_sunrise)
         if any(value is None for value in dates):
@@ -3260,6 +3299,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             room_error_samples=0 if room is None else room.samples,
             room_error_source=room_source,
             indoor_margin_c=indoor_margin,
+            indoor_margin_now_c=getattr(self, "_indoor_margin_now", None),
+            indoor_margin_mean_c=getattr(self, "_indoor_margin_mean", None),
             indoor_cap_armed=indoor_margin is not None,
             pump_room_c=self._pump_room_value(values),
             pump_room_source=self._pump_room_source(values),

@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.const import (
     CONF_CONDITION,
     CONF_DEVICE_ID,

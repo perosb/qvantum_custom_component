@@ -2,8 +2,9 @@
 
 import json
 import os
-import sys
 import re
+import sys
+
 
 def update_manifest():
     """Update the manifest file."""
@@ -31,7 +32,7 @@ def update_manifest():
     pattern = r'^VERSION\s*=\s*"\d+\.\d+\.\d+"'
     replacement = f'VERSION = "{version}"'
 
-    with open(f"{os.getcwd()}/{manifest_path}/const.py",'r') as file:
+    with open(f"{os.getcwd()}/{manifest_path}/const.py") as file:
         filedata = file.read()
         filedata = re.sub(pattern, replacement, filedata, flags=re.MULTILINE)
     with open(f"{os.getcwd()}/{manifest_path}/const.py",'w') as file:

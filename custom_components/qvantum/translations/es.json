@@ -828,6 +828,9 @@
       },
       "curve_30": {
         "name": "Curva de calefacción 1: 30°C"
+      },
+      "dhw_start_extra": {
+        "name": "Temperatura de inicio ACS extra"
       }
     },
     "climate": {

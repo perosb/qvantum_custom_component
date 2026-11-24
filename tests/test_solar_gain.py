@@ -10,10 +10,15 @@ from pathlib import Path
 
 import pytest
 
+from custom_components.qvantum.numeric import median
 from custom_components.qvantum.solar_gain import (
+    DAILY_MIN_COLD_WIND_DAYS,
+    DAILY_MIN_COLD_WIND_HOURS,
+    DAILY_MIN_COLD_WIND_HOURS_PER_DAY,
     DAILY_MIN_DAYS,
     DAILY_MIN_R2,
     DAILY_MIN_T_STAT,
+    DAILY_MIN_WIND_T_STAT,
     MIN_FIT_ROWS,
     MIN_SAMPLE_Q_W,
     OPAQUE_GHI_MAX_WM2,
@@ -21,11 +26,7 @@ from custom_components.qvantum.solar_gain import (
     SolarDay,
     SolarModel,
     SolarSample,
-    DAILY_MIN_COLD_WIND_DAYS,
-    DAILY_MIN_COLD_WIND_HOURS,
-    DAILY_MIN_COLD_WIND_HOURS_PER_DAY,
-    DAILY_MIN_WIND_T_STAT,
-    _median,
+    _fit_wind_coefficient,
     _ols_three,
     _recency_weights,
     _robust_weights_line,
@@ -34,7 +35,6 @@ from custom_components.qvantum.solar_gain import (
     aggregate_days,
     build_samples,
     effective_solar_model,
-    _fit_wind_coefficient,
     fit_daily_solar_model,
     fit_solar_model,
     smooth_ghi,
@@ -357,8 +357,8 @@ def test_trust_from_t_stat_is_bounded_and_monotonic() -> None:
 
 
 def test_median_and_recency_helpers() -> None:
-    assert _median([3.0, 1.0, 2.0]) == 2.0
-    assert _median([4.0, 1.0, 3.0, 2.0]) == 2.5
+    assert median([3.0, 1.0, 2.0]) == 2.0
+    assert median([4.0, 1.0, 3.0, 2.0]) == 2.5
 
     samples = [
         SolarSample(hour_ts=NOW, delta_t_k=20.0, ghi_wm2=0.0, q_heat_w=3500.0),

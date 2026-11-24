@@ -118,7 +118,7 @@ class QvantumMqttClient:
         if wait_for_state:
             try:
                 await asyncio.wait_for(self._first_state.wait(), timeout)
-            except asyncio.TimeoutError as err:
+            except TimeoutError as err:
                 raise TransportError(
                     f"No MQTT state on {topics.state_topic(self._prefix, self._serial)} "
                     f"within {timeout}s"
@@ -325,7 +325,7 @@ class QvantumMqttClient:
             )
             try:
                 response = await asyncio.wait_for(self._pending, self._timeout)
-            except asyncio.TimeoutError as err:
+            except TimeoutError as err:
                 raise TransportError(
                     f"No MQTT response for {label} within {self._timeout}s"
                 ) from err

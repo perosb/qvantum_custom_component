@@ -9,7 +9,10 @@ the pair is not in the table, and what the one repair issue means.
 
 `TAP_WATER_CAPACITY_MAPPINGS` in `client/constants.py` maps a level to a
 `(start, stop)` pair; `TAP_WATER_CAPACITY_START_STOP` is its inverse and is what
-both transports and the entity use instead of rebuilding it.
+both transports and the entity use instead of rebuilding it. The write path goes
+through `tap_water_capacity_pair()`, which raises rather than rounding: a level
+the table does not carry is a programming error here, not a value to snap to the
+nearest one.
 
 There is **no holding register that carries the level**. In Modbus mode the level
 is therefore *derived* from the pair, and the pump can move the pair on its own:

@@ -7,7 +7,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -18,8 +17,8 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_SCAN_INTERVAL,
     CONF_USERNAME,
+    __version__ as ha_version,
 )
-from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import (
@@ -30,22 +29,11 @@ from homeassistant.helpers.selector import (
 from .client.cloud import QvantumCloudClient
 from .client.exceptions import APIAuthError, APIConnectionError, APIRateLimitError
 from .client.modbus.device import IdentityProbeError, async_probe_identity
-from .telemetry import CONSENT_GRANTED, async_load_state, async_set_consent
 from .const import (
     CONF_CURVE_COP,
     CONF_CURVE_PRECHARGE,
     CONF_CURVE_SOLAR,
     CONF_CURVE_WIND,
-    DEFAULT_MODBUS_HOST,
-    DEFAULT_MODBUS_PORT,
-    DEFAULT_MODBUS_SCAN_INTERVAL,
-    DEFAULT_MODBUS_UNIT_ID,
-    DEFAULT_SCAN_INTERVAL,
-    DOMAIN,
-    MIN_MODBUS_SCAN_INTERVAL,
-    MIN_SCAN_INTERVAL,
-    VERSION,
-    CONFIG_VERSION,
     CONF_EXTERNAL_ROOM_TEMP_ENTITY,
     CONF_MODBUS_HOST,
     CONF_MODBUS_PORT,
@@ -53,17 +41,28 @@ from .const import (
     CONF_MODBUS_TCP,
     CONF_MODBUS_UNIT_ID,
     CONF_MODBUS_WRITE,
-    CONF_TELEMETRY,
     CONF_MQTT_SERIAL,
-    CONF_TRANSPORT,
     CONF_MQTT_TOPIC_PREFIX,
     CONF_MQTT_WRITE,
+    CONF_TELEMETRY,
+    CONF_TRANSPORT,
+    CONFIG_VERSION,
+    DEFAULT_MODBUS_HOST,
+    DEFAULT_MODBUS_PORT,
+    DEFAULT_MODBUS_SCAN_INTERVAL,
+    DEFAULT_MODBUS_UNIT_ID,
     DEFAULT_MQTT_TOPIC_PREFIX,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    MIN_MODBUS_SCAN_INTERVAL,
+    MIN_SCAN_INTERVAL,
     TRANSPORT_MODBUS,
     TRANSPORT_MQTT,
+    VERSION,
+    modbus_link_settings,
 )
-
 from .coordinator import resolve_transport
+from .telemetry import CONSENT_GRANTED, async_load_state, async_set_consent
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -533,24 +532,8 @@ class QvantumConfigFlow(ConfigFlow, domain=DOMAIN):
         """Reconfigure using local Modbus TCP."""
         errors: dict[str, str] = {}
         config_entry = self._reconfigure_entry()
-        host = _normalize_modbus_host(
-            config_entry.options.get(
-                CONF_MODBUS_HOST,
-                config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
-            )
-        )
-        port = int(
-            config_entry.options.get(
-                CONF_MODBUS_PORT,
-                config_entry.data.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
-            )
-        )
-        unit_id = int(
-            config_entry.options.get(
-                CONF_MODBUS_UNIT_ID,
-                config_entry.data.get(CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID),
-            )
-        )
+        _, host, port, unit_id = modbus_link_settings(config_entry)
+        host = _normalize_modbus_host(host)
         interval = _normalize_modbus_scan_interval(
             config_entry.options.get(
                 CONF_MODBUS_SCAN_INTERVAL, DEFAULT_MODBUS_SCAN_INTERVAL

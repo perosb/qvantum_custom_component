@@ -184,6 +184,7 @@ class QvantumAccessMixin:
 # Metrics whose entity implementations write via Modbus holding registers.
 # HTTP-backed controls must not become writable just because Modbus TCP is on.
 _LOCAL_MODBUS_WRITE_METRICS = {
+    "dhw_start_extra",
     "dhw_stop_extra",
     "room_temp_external",
     "use_operation_sensor",

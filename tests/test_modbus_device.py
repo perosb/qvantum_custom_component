@@ -4,11 +4,15 @@ import pytest
 from modbus_connection.exceptions import IllegalDataAddressError
 from modbus_connection.mock import MockModbusConnection
 
-from custom_components.qvantum.const import (
-    BINARY_SENSOR_NAMES,
-    DEFAULT_ENABLED_MODBUS_METRICS,
-    MODBUS_ONLY_BINARY_SENSORS,
-    REQUIRED_MODBUS_METRICS,
+from custom_components.qvantum.client.modbus.device import (
+    IdentityProbeError,
+    QvantumModbusDevice,
+    async_probe_identity,
+    build_metrics_payload,
+    build_settings_payload,
+    component_values,
+    holding_field_for_metric,
+    metric_range,
 )
 from custom_components.qvantum.client.modbus.maps import (
     HEATING_CURVE_OUTDOOR_TEMPS,
@@ -21,21 +25,17 @@ from custom_components.qvantum.client.modbus.maps import (
     RELAY_BIT_MAP,
     heating_curve_points,
 )
-from custom_components.qvantum.client.modbus.device import (
-    IdentityProbeError,
-    QvantumModbusDevice,
-    async_probe_identity,
-    build_metrics_payload,
-    build_settings_payload,
-    component_values,
-    holding_field_for_metric,
-    metric_range,
-)
 from custom_components.qvantum.client.modbus.model import (
     QvantumCompressorUnits,
     QvantumIdentity,
     QvantumInputs,
     QvantumSettings,
+)
+from custom_components.qvantum.const import (
+    BINARY_SENSOR_NAMES,
+    DEFAULT_ENABLED_MODBUS_METRICS,
+    MODBUS_ONLY_BINARY_SENSORS,
+    REQUIRED_MODBUS_METRICS,
 )
 
 
@@ -499,12 +499,14 @@ class TestComponentDecode:
         _, unit, device = _device()
         await device.write_metric("room_comp_factor", 1.5)
         await device.write_metric("room_temp_external", 21.5)
+        await device.write_metric("dhw_start_extra", 70)
         await device.write_metric("dhw_stop_extra", 75)
         await device.write_metric("stop_heating", -15)
         await device.write_metric("curve_minus_30", 48)
 
         assert unit.holding[13] == 15
         assert unit.holding[14] == 215
+        assert unit.holding[58] == 70
         assert unit.holding[59] == 75
         assert unit.holding[18] == 0xFFF1  # int16 -15
         assert unit.holding[24] == 48
@@ -523,6 +525,7 @@ class TestComponentDecode:
             ("room_comp_factor", 2.5),
             ("indoor_temperature_offset", 10),
             ("room_temp_external", -6),
+            ("dhw_start_extra", 19),
             ("dhw_stop_extra", 19),
             ("curve_minus_30", 81),
         ],
@@ -748,6 +751,7 @@ class TestPayloadAdapter:
 
     def test_holding_field_for_http_alias(self):
         assert holding_field_for_metric("room_comp_factor") == "room_compensation"
+        assert holding_field_for_metric("dhw_start_extra") == "dhw_start_extra"
         assert holding_field_for_metric("dhw_stop_extra") == "dhw_stop_extra"
         assert holding_field_for_metric("stop_heating") == "stop_heating"
         assert holding_field_for_metric("curve_type_heating") == "curve_type_heating"

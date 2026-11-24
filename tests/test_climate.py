@@ -2,7 +2,10 @@
 
 from enum import IntFlag
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+
+from tests.conftest import make_client_mock
 
 
 # Create mock base classes that don't have metaclass conflicts
@@ -72,7 +75,6 @@ with patch(
                             from custom_components.qvantum.const import (
                                 SENSOR_MODE_HTTP_BT2,
                                 SENSOR_MODE_HTTP_EXT_ROOM_SENSOR,
-                                SETTING_UPDATE_APPLIED,
                                 SensorMode,
                             )
 
@@ -91,7 +93,7 @@ def mock_coordinator():
             "sensor_mode": SENSOR_MODE_HTTP_BT2,
         },
     }
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 
@@ -477,7 +479,7 @@ def _spec_coordinator(write_level: int):
     }
     coordinator.modbus_enabled = False
     coordinator.last_update_success = True
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.config_entry = MagicMock()
     maintenance = MagicMock()
     maintenance.data = {"access_level": {"writeAccessLevel": write_level}}
@@ -530,7 +532,7 @@ def _modbus_no_write_coordinator():
     }
     coordinator.modbus_enabled = True
     coordinator.last_update_success = True
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock(modbus=True)
     coordinator.config_entry = MagicMock()
     coordinator.config_entry.options = {}
     coordinator.config_entry.data = {}

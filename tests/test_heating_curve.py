@@ -5,47 +5,47 @@ from __future__ import annotations
 import pytest
 
 from custom_components.qvantum.heating_curve import (
-    room_gain_from_active_hours,
-    ActiveRoomGain,
     BASELINE_MAX_CORRECTION_C,
     BASELINE_MIN_CORRECTION_C,
     COP_FEEDBACK_MAX_C,
+    CURVE_KEYS,
     INDOOR_CAP_C,
     LOAD_MAX_C,
     MAX_SUPPLY_C,
     MIN_SUPPLY_C,
     NIGHT_DAY_MAX_C,
     OUTDOOR_MAX_C,
-    REACH_MARGIN_KNOTS,
     PRECHARGE_MAX_C,
+    REACH_MARGIN_KNOTS,
     ROOM_GAIN_MAX_C,
     ROOM_GAIN_MIN_SAMPLES,
     ROOM_GAIN_MIN_SPAN_C,
     SOLAR_MAX_C,
     TOTAL_MAX_C,
-    WIND_MAX_C,
     TRIM_MAX_C,
+    WIND_MAX_C,
+    ActiveRoomGain,
     CurveResult,
     DayPhase,
     PumpRoomReading,
-    CURVE_KEYS,
     compute_curve,
     cop_feedback_adjustment_c,
-    points_in_reach,
     corrected_baseline,
     curve_slope,
     diurnal_swing_c,
     effective_supply_bounds,
     interpolate_supply,
-    load_adjustment_c,
     lift_baseline_floor,
+    load_adjustment_c,
     night_day_adjustment_c,
     normalize_baseline,
     outdoor_adjustment_c,
+    points_in_reach,
     precharge_adjustment_c,
-    room_compensation_gain,
     pump_room_reading,
+    room_compensation_gain,
     room_corrected_deviation,
+    room_gain_from_active_hours,
     smooth_wind,
     solar_adjustment_c,
     trim_evidence_hours,
@@ -336,7 +336,7 @@ def test_compute_curve_applies_cop_feedback_before_caps() -> None:
     assert reduced.adjustment_c == pytest.approx(-1.0)
     assert all(
         reduced_point[1] == pytest.approx(base_point[1] - 1.0)
-        for reduced_point, base_point in zip(reduced.points, base.points)
+        for reduced_point, base_point in zip(reduced.points, base.points, strict=True)
     )
 
 
@@ -382,7 +382,7 @@ def test_compute_curve_applies_precharge_before_caps() -> None:
     assert raised.adjustment_c == pytest.approx(1.0)
     assert all(
         raised_point[1] == pytest.approx(base_point[1] + 1.0)
-        for raised_point, base_point in zip(raised.points, base.points)
+        for raised_point, base_point in zip(raised.points, base.points, strict=True)
     )
 
 
@@ -1202,7 +1202,7 @@ def test_active_room_gain_absorbs_the_shape_inside_a_bucket() -> None:
         )
     xs = [x for x, _ in centred]
     ys = [y for _, y in centred]
-    biased = -sum(x * y for x, y in zip(xs, ys)) / sum(x * x for x in xs)
+    biased = -sum(x * y for x, y in zip(xs, ys, strict=True)) / sum(x * x for x in xs)
     assert abs(biased - 5.0) > 0.3
 
 

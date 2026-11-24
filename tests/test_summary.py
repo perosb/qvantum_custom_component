@@ -8,27 +8,27 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from homeassistant.util import dt as dt_util
 from aiohttp.test_utils import make_mocked_request
+from homeassistant.util import dt as dt_util
 
+from custom_components.qvantum.client.modbus.maps import MODBUS_HOLDING_TO_SETTINGS_MAP
 from custom_components.qvantum.const import DOMAIN
 from custom_components.qvantum.curve_coordinator import CURVE_KEYS
 from custom_components.qvantum.heating_curve import ActiveRoomGain
-from custom_components.qvantum.client.modbus.maps import MODBUS_HOLDING_TO_SETTINGS_MAP
 from custom_components.qvantum.summary import (
     FITTED_EFFICIENCY_KEYS,
-    REVERT_REASONS,
     PLANT_KEYS,
-    QvantumSummaryView,
+    REVERT_REASONS,
     SUMMARY_FILENAME,
     SUMMARY_SCHEMA_VERSION,
     SUMMARY_URL,
+    QvantumSummaryView,
+    SensorMode,
     build_summary,
     counters_summary as summary_counters_summary,
-    device_metadata,
     curve_summary,
+    device_metadata,
     device_summary,
-    SensorMode,
     fitted_summary,
     plant_summary,
 )

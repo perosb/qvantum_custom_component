@@ -18,7 +18,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .open_meteo import hour_ts as weather_hour_ts
-from .plant_analytics import HeatingPowerWindow
+from .plant_analytics import HeatingPowerWindow, eu_label
 
 # Keys that must never leave the instance. ``async_redact_data`` applies these
 # recursively, so they cover config-entry data as well as nested client state.
@@ -218,7 +218,7 @@ def _dhw_meter_diagnostics(window: Any) -> dict[str, Any]:
     """
     try:
         estimated, metered, draw_hours = window.totals(dt_util.utcnow().timestamp())
-    except Exception:  # noqa: BLE001 — a dump must never fail on this
+    except Exception:
         return {"error": "unavailable"}
     return {
         "buckets": len(getattr(window, "buckets", {}) or {}),
@@ -246,6 +246,10 @@ _EFFICIENCY_FIELDS = (
     "dhw_standing_loss",
     "dhw_standing_episodes",
     "dhw_standing_hours",
+    # The DHW-meter comparison: the level carries a structural bias, so the
+    # dump also carries the two halves the warning compares.
+    "dhw_heat_meter_deviation_recent",
+    "dhw_heat_meter_deviation_prior",
     "compressor_starts_per_hour",
     "compressor_run_hours_24h",
     "compressor_duty_cycle",
@@ -274,6 +278,13 @@ def _efficiency_diagnostics(coordinator: Any) -> dict[str, Any] | None:
     block: dict[str, Any] = {
         field: getattr(snapshot, field, None) for field in _EFFICIENCY_FIELDS
     }
+    # The EU label's unit and class are derived from the SCOP, not stored, so
+    # they have no snapshot field to read: a report that cannot show them
+    # cannot answer "why is my class A+?" — and the export carries them.
+    for suffix, scop_field in (("", "scop_total"), ("_90d", "scop_total_90d")):
+        eta_s, eu_class = eu_label(getattr(snapshot, scop_field, None))
+        block[f"eta_s_percent{suffix}"] = eta_s
+        block[f"eu_class{suffix}"] = eu_class
     block["updated_at"] = getattr(snapshot, "updated_at", None)
     components = getattr(snapshot, "efficiency_health_components", None)
     if isinstance(components, dict):
@@ -587,6 +598,11 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         # The cap needs a fresh indoor reading: without one it is inert and the
         # curve has no warm-house brake, which a support dump should show.
         "indoor_margin_c": getattr(snapshot, "indoor_margin_c", None),
+        # The two inputs the margin is chosen from: a cold house acts on the
+        # current reading, a warm one on the 24 h mean within the setpoint
+        # regime. Without both, a lagging cap looks like a biased one.
+        "indoor_margin_now_c": getattr(snapshot, "indoor_margin_now_c", None),
+        "indoor_margin_mean_c": getattr(snapshot, "indoor_margin_mean_c", None),
         "indoor_cap_armed": getattr(snapshot, "indoor_cap_armed", None),
         # Which room value the removed room term used: the firmware blends the
         # external sensor with BT2 in the external mode, so a dump that only
@@ -698,6 +714,10 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
             for ts, margin in (margins or [])
             if isinstance(ts, (int, float)) and isinstance(margin, (int, float))
         ],
+        # The setpoint the samples above belong to: the window is cleared when
+        # it changes, so without it a dump cannot tell a regime change from a
+        # cap that simply drifted.
+        "indoor_margins_target": getattr(coordinator, "_indoor_margins_target", None),
         "load_power_mean_w": live.get("heating_power_mean_w"),
         "load_power_coverage_hours": coverage_hours,
         # Knots of the last active write cycle: a dump must distinguish a knot
@@ -708,6 +728,26 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
             for key in (getattr(coordinator, "_write_scope", ()) or ())
             if isinstance(key, str)
         ],
+        # Which optional terms are on. A term that did nothing is either off,
+        # switched on but gated by its own evidence, or on and contributing
+        # nothing — three answers a report cannot separate from the figures.
+        "terms": {
+            str(key): bool(value)
+            for key, value in (getattr(coordinator, "terms", None) or {}).items()
+        },
+        # The learned COP reference the feedback term compares against, and the
+        # samples behind each bucket: a term that stays silent while the
+        # reference is empty looks identical to one that was switched off.
+        "cop_reference": {
+            str(bucket): value
+            for bucket, value in (getattr(coordinator, "_cop_reference", None) or {}).items()
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        },
+        "cop_samples": {
+            str(bucket): count
+            for bucket, count in (getattr(coordinator, "_cop_samples", None) or {}).items()
+            if isinstance(count, int) and not isinstance(count, bool)
+        },
     }
 
 

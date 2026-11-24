@@ -790,6 +790,9 @@
       "fan_speed_2": {
         "name": "Min fläkthastighet för kompressor"
       },
+      "dhw_start_extra": {
+        "name": "Extra varmvatten starttemperatur"
+      },
       "dhw_stop_extra": {
         "name": "Extra varmvatten stopptemperatur"
       },

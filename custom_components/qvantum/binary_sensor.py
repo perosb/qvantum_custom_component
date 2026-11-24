@@ -12,17 +12,17 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import MyConfigEntry
 from .const import (
     BINARY_SENSOR_NAMES,
     DEFAULT_DISABLED_HTTP_METRICS,
     DEFAULT_DISABLED_MODBUS_METRICS,
     MODBUS_ONLY_BINARY_SENSORS,
+    PICPIN_RELAY_KEYS,
 )
-from . import MyConfigEntry
-from .coordinator import QvantumDataUpdateCoordinator
+from .coordinator import QvantumDataUpdateCoordinator, is_full_payload
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .entity import QvantumEntity, finalize_platform_setup, resolve_device_id
-from .coordinator import is_full_payload
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,16 +61,9 @@ _DIAGNOSTIC_BINARY_SENSORS = frozenset(
         # Per-compressor-unit pump status (QG only)
         "ep10_brine_pump",
         "ep11_brine_pump",
-        # All picpin relay status bits (HTTP + Modbus-only pump)
-        "picpin_relay_heat_l1",
-        "picpin_relay_heat_l2",
-        "picpin_relay_heat_l3",
-        "picpin_relay_gp10",
-        "picpin_relay_qm10",
-        "picpin_relay_qn8_1",
-        "picpin_relay_qn8_2",
-        "picpin_relay_gp3",
-        "picpin_relay_ha12",
+        # All picpin relay status bits (HTTP + Modbus-only pump). The pump bit is
+        # Modbus-only, so it is not in the poll's shared list.
+        *PICPIN_RELAY_KEYS,
         "picpin_relay_pump",
     }
 )

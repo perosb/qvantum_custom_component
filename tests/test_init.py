@@ -3,34 +3,39 @@
 import sys
 import types
 from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, call, patch
+
+import custom_components.qvantum as qvantum_module
 
 # Import real functions before mocking
 from custom_components.qvantum import (
-    async_setup_entry,
-    async_setup,
-    async_unload_entry,
-    async_remove_entry,
-    async_remove_config_entry_device,
-    async_migrate_entry,
+    _CARD_URL_PATH,
     PLATFORMS,
-    _async_update_listener,
     _async_modbus_unit,
+    _async_sync_extra_hot_water_service,
     _async_temporary_modbus_unit,
+    _async_update_listener,
     _coordinator_device,
-    _has_required_device,
     _device_sw_version,
     _firmware_triple,
-    _modbus_link_settings,
-    _async_sync_extra_hot_water_service,
-    _CARD_URL_PATH,
+    _has_required_device,
+    async_migrate_entry,
+    async_remove_config_entry_device,
+    async_remove_entry,
+    async_setup,
+    async_setup_entry,
+    async_unload_entry,
 )
-import custom_components.qvantum as qvantum_module
+from custom_components.qvantum.const import modbus_link_settings
 
 # Mock HA imports after importing real functions
 # sys.modules['custom_components.qvantum'] = MagicMock()
+
+
+#: Sentinel for "the caller did not pass a unit".
+_UNSET = object()
 
 
 class TestCardAssetSetup:
@@ -97,7 +102,7 @@ class TestSetupDeviceRequirements:
             "modbus_unit_id": 7,
         }
         entry.data = {}
-        assert _modbus_link_settings(entry) == (True, "hp.local", 1502, 7)
+        assert modbus_link_settings(entry) == (True, "hp.local", 1502, 7)
 
     @pytest.mark.asyncio
     async def test_sync_extra_hot_water_registers_for_cloud_entry(self, hass):
@@ -1464,7 +1469,7 @@ class TestCurveRevertOnRemove:
         return mock_config_entry
 
     @staticmethod
-    def _unit_context(*, unit=object(), error=None):
+    def _unit_context(*, unit=_UNSET, error=None):
         """Stand-in for _async_temporary_modbus_unit's async context manager."""
 
         @asynccontextmanager
@@ -1480,7 +1485,7 @@ class TestCurveRevertOnRemove:
         cls,
         *,
         stored_mode="active",
-        unit=object(),
+        unit=_UNSET,
         error=None,
         write=None,
     ):
@@ -1570,7 +1575,7 @@ class TestTemporaryModbusUnit:
     async def test_yields_none_without_modbus(self):
         entry = MagicMock()
         with patch(
-            "custom_components.qvantum._modbus_link_settings",
+            "custom_components.qvantum.modbus_link_settings",
             return_value=(False, "host", 502, 1),
         ):
             async with _async_temporary_modbus_unit(MagicMock(), entry) as unit:
@@ -1591,7 +1596,7 @@ class TestTemporaryModbusUnit:
         monkeypatch.setitem(sys.modules, "homeassistant.components.modbus", modbus)
 
         with patch(
-            "custom_components.qvantum._modbus_link_settings",
+            "custom_components.qvantum.modbus_link_settings",
             return_value=(True, "host", 502, 1),
         ):
             async with _async_temporary_modbus_unit(MagicMock(), entry) as unit:
@@ -1606,7 +1611,7 @@ class TestCurveHandBackWithLiveCoordinator:
     """A loaded entry must revert through its own coordinator, not a second client."""
 
     @staticmethod
-    def _unit_context(*, unit=object()):
+    def _unit_context(*, unit=_UNSET):
         @asynccontextmanager
         async def context(_hass, _entry):
             yield unit
@@ -1670,9 +1675,9 @@ class TestCurveHandBackWithLiveCoordinator:
         self, hass, mock_config_entry
     ):
         """Unload closes the client but leaves runtime_data behind."""
-        from custom_components.qvantum import _async_hand_back_curve
-        from custom_components.qvantum.const import DOMAIN
         from homeassistant.config_entries import ConfigEntryState
+
+        from custom_components.qvantum import _async_hand_back_curve
 
         entry, curve = self._entry(mock_config_entry, active=True)
         entry.state = ConfigEntryState.NOT_LOADED

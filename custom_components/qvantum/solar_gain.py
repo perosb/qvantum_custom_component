@@ -45,8 +45,11 @@ and never to zero unless that fit is unusable too.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
+from typing import Any
+
+from .numeric import median
 
 #: Recency half-life for the exponential weights (effective memory ≈ 60 days).
 HALF_LIFE_DAYS: float = 30.0
@@ -261,16 +264,6 @@ def smooth_ghi(
     return total / total_w
 
 
-def _median(values: Sequence[float]) -> float:
-    """Median of a non-empty sequence."""
-    ordered = sorted(values)
-    n = len(ordered)
-    mid = n // 2
-    if n % 2:
-        return ordered[mid]
-    return 0.5 * (ordered[mid - 1] + ordered[mid])
-
-
 def _recency_weights(
     samples: Sequence[SolarSample], now_ts: int, half_life_days: float
 ) -> list[float]:
@@ -288,7 +281,7 @@ def _weighted_line(
 ) -> tuple[float, float]:
     """Weighted least squares ``y ≈ a·x + c``."""
     sw = swx = swy = swxx = swxy = 0.0
-    for xi, yi, wi in zip(x, y, w):
+    for xi, yi, wi in zip(x, y, w, strict=True):
         sw += wi
         swx += wi * xi
         swy += wi * yi
@@ -308,9 +301,9 @@ def _robust_weights_line(
     x: Sequence[float], y: Sequence[float], w: Sequence[float], a: float, c: float
 ) -> list[float]:
     """One Huber pass on studentised residuals of ``y ≈ a·x + c``."""
-    residuals = [yi - (a * xi + c) for xi, yi in zip(x, y)]
-    center = _median(residuals)
-    scale = MAD_SCALE * _median([abs(r - center) for r in residuals])
+    residuals = [yi - (a * xi + c) for xi, yi in zip(x, y, strict=True)]
+    center = median(residuals)
+    scale = MAD_SCALE * median([abs(r - center) for r in residuals])
     if scale < 1e-9:
         mean = sum(residuals) / len(residuals)
         scale = math.sqrt(sum((r - mean) ** 2 for r in residuals) / len(residuals))
@@ -318,14 +311,14 @@ def _robust_weights_line(
         return list(w)
 
     sw = swx = swxx = 0.0
-    for xi, wi in zip(x, w):
+    for xi, wi in zip(x, w, strict=True):
         sw += wi
         swx += wi * xi
         swxx += wi * xi * xi
     det = swxx * sw - swx * swx
 
     robust: list[float] = []
-    for xi, residual, wi in zip(x, residuals, w):
+    for xi, residual, wi in zip(x, residuals, w, strict=True):
         leverage = wi * (swxx - 2.0 * swx * xi + sw * xi * xi) / det
         leverage = min(max(leverage, 0.0), 0.999)
         student = residual / (scale * math.sqrt(1.0 - leverage))
@@ -343,18 +336,18 @@ def _robust_weights_solar(
     b: float,
 ) -> list[float]:
     """One Huber pass for the through-origin residual fit."""
-    e = [ri - b * ii for ii, ri in zip(i_vals, residual)]
-    center = _median(e)
-    scale = MAD_SCALE * _median([abs(ei - center) for ei in e])
+    e = [ri - b * ii for ii, ri in zip(i_vals, residual, strict=True)]
+    center = median(e)
+    scale = MAD_SCALE * median([abs(ei - center) for ei in e])
     if scale < 1e-9:
         mean = sum(e) / len(e)
         scale = math.sqrt(sum((ei - mean) ** 2 for ei in e) / len(e))
     if scale < 1e-9:
         return list(w)
 
-    sxx = sum(wi * ii * ii for wi, ii in zip(w, i_vals))
+    sxx = sum(wi * ii * ii for wi, ii in zip(w, i_vals, strict=True))
     out: list[float] = []
-    for ii, ei, wi in zip(i_vals, e, w):
+    for ii, ei, wi in zip(i_vals, e, w, strict=True):
         leverage = min(max(wi * ii * ii / sxx, 0.0), 0.999)
         student = ei / (scale * math.sqrt(1.0 - leverage))
         if abs(student) <= ROBUST_CUTOFF:
@@ -368,9 +361,9 @@ def _weighted_r2(
     y: Sequence[float], pred: Sequence[float], w: Sequence[float]
 ) -> float:
     sw = sum(w)
-    y_mean = sum(wi * yi for yi, wi in zip(y, w)) / sw
-    ss_tot = sum(wi * (yi - y_mean) ** 2 for yi, wi in zip(y, w))
-    ss_res = sum(wi * (yi - pi) ** 2 for yi, pi, wi in zip(y, pred, w))
+    y_mean = sum(wi * yi for yi, wi in zip(y, w, strict=True)) / sw
+    ss_tot = sum(wi * (yi - y_mean) ** 2 for yi, wi in zip(y, w, strict=True))
+    ss_res = sum(wi * (yi - pi) ** 2 for yi, pi, wi in zip(y, pred, w, strict=True))
     if ss_tot < 1e-9:
         return 0.0
     return 1.0 - ss_res / ss_tot
@@ -391,8 +384,8 @@ def _through_origin_std_err(
     b: float,
 ) -> float:
     """Standard error of the through-origin slope (n ≥ 3, Σw·I² > 0)."""
-    sxx = sum(wi * ii * ii for wi, ii in zip(w, i_vals))
-    ss_res = sum(wi * (ri - b * ii) ** 2 for wi, ii, ri in zip(w, i_vals, residual))
+    sxx = sum(wi * ii * ii for wi, ii in zip(w, i_vals, strict=True))
+    ss_res = sum(wi * (ri - b * ii) ** 2 for wi, ii, ri in zip(w, i_vals, residual, strict=True))
     sigma2 = ss_res / (len(i_vals) - 1)
     return math.sqrt(sigma2 / sxx)
 
@@ -433,7 +426,9 @@ def fit_solar_model(
     opaque = [s for s in samples if s.ghi_wm2 < OPAQUE_GHI_MAX_WM2]
     solar = [s for s in samples if s.ghi_wm2 >= OPAQUE_GHI_MAX_WM2]
     n_opaque, n_solar = len(opaque), len(solar)
-    empty = dict(
+    # A dataclass, not a dict: `SolarModel(**empty)` cannot be checked, and the
+    # fields it carries are the model's whole contract.
+    empty = SolarModel(
         a_w_per_k=0.0,
         b_m2=0.0,
         c_w=0.0,
@@ -447,7 +442,7 @@ def fit_solar_model(
     )
 
     if n_opaque < MIN_FIT_ROWS:
-        return SolarModel(**empty, notes=f"opaque rows {n_opaque} < {MIN_FIT_ROWS}")
+        return replace(empty, notes=f"opaque rows {n_opaque} < {MIN_FIT_ROWS}")
 
     x_opaque = [s.delta_t_k for s in opaque]
     y_opaque = [s.q_heat_w for s in opaque]
@@ -457,11 +452,11 @@ def fit_solar_model(
         robust_w = _robust_weights_line(x_opaque, y_opaque, w_opaque, a, c)
         a, c = _weighted_line(x_opaque, y_opaque, robust_w)
     except ValueError as err:
-        return SolarModel(**empty, notes=f"opaque fit failed: {err}")
+        return replace(empty, notes=f"opaque fit failed: {err}")
     if a <= 0.0:
-        return SolarModel(**{**empty, "a_w_per_k": a, "c_w": c}, notes="a ≤ 0")
+        return replace(empty, a_w_per_k=a, c_w=c, notes="a ≤ 0")
     if not (math.isfinite(a) and math.isfinite(c)):
-        return SolarModel(**empty, notes="non-finite fit")
+        return replace(empty, notes="non-finite fit")
 
     pred_opaque = [a * xi + c for xi in x_opaque]
     r2_opaque = _weighted_r2(y_opaque, pred_opaque, robust_w)
@@ -477,9 +472,9 @@ def fit_solar_model(
 
         def _fit_b(weights: Sequence[float]) -> float:
             cross = sum(
-                wi * ii * ri for wi, ii, ri in zip(weights, i_vals, residual)
+                wi * ii * ri for wi, ii, ri in zip(weights, i_vals, residual, strict=True)
             )
-            weight_ii = sum(wi * ii * ii for wi, ii in zip(weights, i_vals))
+            weight_ii = sum(wi * ii * ii for wi, ii in zip(weights, i_vals, strict=True))
             return max(0.0, cross / weight_ii)
 
         b = _fit_b(w_solar)
@@ -717,7 +712,7 @@ def _invert_square(matrix: Sequence[Sequence[float]]) -> list[list[float]]:
             factor = aug[row][col]
             if factor:
                 aug[row] = [
-                    value - factor * base for value, base in zip(aug[row], aug[col])
+                    value - factor * base for value, base in zip(aug[row], aug[col], strict=True)
                 ]
     return [row[size:] for row in aug]
 
@@ -740,10 +735,10 @@ def _ols_columns(
     if n < k + 1:
         raise ValueError("too few rows")
     xtx = [
-        [sum(a * b for a, b in zip(columns[i], columns[j])) for j in range(k)]
+        [sum(a * b for a, b in zip(columns[i], columns[j], strict=True)) for j in range(k)]
         for i in range(k)
     ]
-    xty = [sum(a * b for a, b in zip(columns[i], targets)) for i in range(k)]
+    xty = [sum(a * b for a, b in zip(columns[i], targets, strict=True)) for i in range(k)]
     inverse = _invert_square(xtx)
     beta = tuple(
         sum(inverse[i][j] * xty[j] for j in range(k)) for i in range(k)
@@ -773,7 +768,7 @@ def _ols_three(
 ) -> tuple[tuple[float, float, float], tuple[float, float, float], float]:
     """Three-regressor case of :func:`_ols_columns`."""
     beta, stderr, r2 = _ols_columns((x1, x2, x3), y)
-    return (beta[0], beta[1], beta[2]), (stderr[0], stderr[1], stderr[2]), r2  # type: ignore[return-value]
+    return (beta[0], beta[1], beta[2]), (stderr[0], stderr[1], stderr[2]), r2
 
 
 def _fit_daily_rows(
@@ -971,10 +966,15 @@ def _fit_wind_coefficient(
 
     # No single day may carry the wind estimate either.
     jackknife: list[float] = []
+    # ``Sequence`` has no ``__add__``: slice a list once rather than relying on
+    # whatever the caller passed (a tuple would work, a range would not).
+    remaining_days = list(days)
     for index in range(n_days):
         try:
             jackknife.append(
-                _fit_daily_wind_rows(days[:index] + days[index + 1 :])[3]
+                _fit_daily_wind_rows(
+                    remaining_days[:index] + remaining_days[index + 1 :]
+                )[3]
             )
         except ValueError:
             jackknife.append(float("nan"))

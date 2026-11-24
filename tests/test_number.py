@@ -1,7 +1,10 @@
 """Tests for Qvantum number entities."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+
+from tests.conftest import make_client_mock
 
 
 # Create mock base classes that don't have metaclass conflicts
@@ -19,15 +22,15 @@ with patch(
     "homeassistant.helpers.update_coordinator.CoordinatorEntity", MockCoordinatorEntity
 ):
     with patch("homeassistant.components.number.NumberEntity", MockNumberEntity):
-        from homeassistant.helpers.device_registry import DeviceInfo
-        from homeassistant.const import UnitOfTemperature
         from homeassistant.components.number import NumberDeviceClass
+        from homeassistant.const import UnitOfTemperature
+        from homeassistant.helpers.device_registry import DeviceInfo
 
+        from custom_components.qvantum.const import HeatingCurveType, SensorMode
         from custom_components.qvantum.number import (
             QvantumNumberEntity,
             async_setup_entry,
         )
-        from custom_components.qvantum.const import HeatingCurveType, SensorMode
 
 
 @pytest.fixture
@@ -47,7 +50,7 @@ def mock_coordinator():
             "fan_speed_2": 25,
         },
     }
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.async_set_updated_data = MagicMock()
     coordinator.async_refresh = AsyncMock()
 
@@ -220,8 +223,7 @@ class TestQvantumNumberEntity:
 
     def test_state_with_mapping_capacity_1(self, mock_device):
         """Test getting entity state when stop/start match capacity 1 mapping."""
-        from unittest.mock import Mock
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, Mock
 
         coordinator = Mock()
         coordinator.data = {
@@ -241,8 +243,7 @@ class TestQvantumNumberEntity:
 
     def test_state_with_mapping_capacity_6(self, mock_device):
         """Test getting entity state when stop/start match capacity 6 mapping."""
-        from unittest.mock import Mock
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, Mock
 
         coordinator = Mock()
         coordinator.data = {
@@ -266,8 +267,7 @@ class TestQvantumNumberEntity:
         Issue #421: 55/65 was shown as 2 (nearest stop 62) while the app and
         the pump showed 5. A plausible wrong number is worse than nothing.
         """
-        from unittest.mock import Mock
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, Mock
 
         coordinator = Mock()
         coordinator.data = {
@@ -287,8 +287,7 @@ class TestQvantumNumberEntity:
 
     def test_state_with_none_stop(self, mock_device):
         """Test getting entity state when tap_water_stop is None."""
-        from unittest.mock import Mock
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, Mock
 
         coordinator = Mock()
         coordinator.data = {
@@ -308,8 +307,7 @@ class TestQvantumNumberEntity:
 
     def test_state_with_none_start(self, mock_device):
         """Test getting entity state when tap_water_start is None."""
-        from unittest.mock import Mock
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, Mock
 
         coordinator = Mock()
         coordinator.data = {
@@ -833,6 +831,50 @@ class TestQvantumNumberEntity:
         )
         assert entity._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
         assert entity._attr_device_class == NumberDeviceClass.TEMPERATURE
+
+    @pytest.mark.asyncio
+    async def test_async_set_native_value_dhw_start_extra(
+        self, mock_coordinator, mock_device
+    ):
+        """Test setting dhw_start_extra writes via Modbus holding register."""
+        mock_coordinator.data["values"]["dhw_start_extra"] = 60
+        mock_coordinator.config_entry.options = {
+            "modbus_write": True,
+            "modbus_tcp": True,
+        }
+        entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_start_extra", 20, 80, 1, mock_device
+        )
+
+        mock_coordinator.async_write_metric = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+        mock_coordinator.client.update_setting = AsyncMock(
+            return_value={"status": "APPLIED"}
+        )
+
+        await entity.async_set_native_value(70.0)
+
+        mock_coordinator.async_write_metric.assert_called_once_with(
+            "test_device_123", "dhw_start_extra", 70
+        )
+        mock_coordinator.client.update_setting.assert_not_called()
+        assert mock_coordinator.data["values"]["dhw_start_extra"] == 70
+
+    def test_dhw_extra_start_stop_bounds(self, mock_coordinator, mock_device):
+        """Test dynamic bounds between dhw_start_extra and dhw_stop_extra."""
+        mock_coordinator.data["values"]["dhw_start_extra"] = 65
+        mock_coordinator.data["values"]["dhw_stop_extra"] = 75
+
+        start_entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_start_extra", 20, 80, 1, mock_device
+        )
+        stop_entity = QvantumNumberEntity(
+            mock_coordinator, "dhw_stop_extra", 60, 80, 5, mock_device
+        )
+
+        assert start_entity.native_max_value == 74
+        assert stop_entity.native_min_value == 70
 
 
 class TestNumberSetup:
@@ -1373,6 +1415,7 @@ class TestNumberAvailabilityAndWriteGuard:
     async def test_set_native_value_requires_write_access(self, mock_device):
         """A service call cannot bypass the write-access check."""
         from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.qvantum.coordinator import QvantumDataUpdateCoordinator
 
         coordinator = MagicMock(spec=QvantumDataUpdateCoordinator)
@@ -1384,7 +1427,7 @@ class TestNumberAvailabilityAndWriteGuard:
         }
         coordinator.modbus_enabled = False
         coordinator.last_update_success = True
-        coordinator.client = MagicMock()
+        coordinator.client = make_client_mock()
         coordinator.config_entry = MagicMock()
         maintenance = MagicMock()
         maintenance.data = {"access_level": {"writeAccessLevel": 10}}

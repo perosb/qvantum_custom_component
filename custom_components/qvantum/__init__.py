@@ -3,76 +3,74 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
 import inspect
 import logging
+from collections.abc import Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
+from homeassistant.components.persistent_notification import async_dismiss
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.const import Platform
-from homeassistant.core import callback
-from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION
-from homeassistant.core import HomeAssistant
+from homeassistant.const import (
+    CONF_PASSWORD,
+    CONF_USERNAME,
+    MAJOR_VERSION,
+    MINOR_VERSION,
+    PATCH_VERSION,
+    Platform,
+)
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
     ConfigEntryError,
     ConfigEntryNotReady,
     HomeAssistantError,
 )
-from homeassistant.helpers.device_registry import DeviceEntry
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceEntry, DeviceInfo
 from homeassistant.helpers.entity_registry import (
     async_entries_for_config_entry,
     async_get as async_get_entity_registry,
     async_migrate_entries,
 )
-from homeassistant.components.persistent_notification import async_dismiss
-
-
-from homeassistant.const import (
-    CONF_PASSWORD,
-    CONF_USERNAME,
-)
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client.cloud import QvantumCloudClient
-from .client.mqtt import QvantumMqttClient
-from .client.models import result_applied
 from .client.constants import DHW_MODE_NORMAL
 from .client.modbus import QvantumModbusClient
+from .client.models import result_applied
+from .client.mqtt import QvantumMqttClient
 from .const import (
-    DOMAIN,
-    VERSION,
-    CONFIG_VERSION,
-    FIRMWARE_KEYS,
-    HeatingCurveType,
-    CONF_MODBUS_TCP,
     CONF_MODBUS_WRITE,
-    CONF_MODBUS_HOST,
-    CONF_MODBUS_PORT,
-    CONF_MODBUS_UNIT_ID,
-    DEFAULT_MODBUS_HOST,
-    DEFAULT_MODBUS_PORT,
-    DEFAULT_MODBUS_UNIT_ID,
-    HTTP_CLOUD_LOOKUP_TIMEOUT,
     CONF_MQTT_SERIAL,
     CONF_MQTT_TOPIC_PREFIX,
     CONF_MQTT_WRITE,
+    CONFIG_VERSION,
+    DEFAULT_MODBUS_HOST,
+    DEFAULT_MODBUS_PORT,
+    DEFAULT_MODBUS_UNIT_ID,
     DEFAULT_MQTT_TOPIC_PREFIX,
+    DOMAIN,
+    FIRMWARE_KEYS,
+    HTTP_CLOUD_LOOKUP_TIMEOUT,
     TRANSPORT_CLOUD,
     TRANSPORT_MODBUS,
     TRANSPORT_MQTT,
+    VERSION,
+    HeatingCurveType,
+    modbus_link_settings,
 )
 from .coordinator import QvantumDataUpdateCoordinator, resolve_transport
 from .curve_coordinator import QvantumCurveCoordinator, async_stored_curve_mode
-from .telemetry import async_forget as async_forget_telemetry_state
-from .telemetry import async_maybe_prompt, async_schedule_uploads
 from .efficiency_coordinator import QvantumEfficiencyCoordinator
 from .extra_dhw import ExtraDhwTimer
 from .maintenance_coordinator import QvantumMaintenanceCoordinator
 from .services import async_setup_services
 from .summary import QvantumSummaryView
+from .telemetry import (
+    async_forget as async_forget_telemetry_state,
+    async_maybe_prompt,
+    async_schedule_uploads,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -117,7 +115,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         try:
             hass.http.register_view(QvantumSummaryView())
             _SUMMARY_VIEW_REGISTERED = True
-        except Exception as err:  # noqa: BLE001 — never block setup on a view
+        except Exception as err:
             _LOGGER.debug("Could not register the Qvantum summary view: %s", err)
     if _CARD_REGISTERED:
         return True
@@ -132,7 +130,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             [StaticPathConfig(_CARD_URL_PATH, str(card_path), False)]
         )
         _CARD_REGISTERED = True
-    except Exception as err:  # noqa: BLE001 — never block setup on asset errors
+    except Exception as err:
         _LOGGER.debug("Could not register Qvantum curve card asset: %s", err)
     return True
 
@@ -149,22 +147,14 @@ async def _async_mqtt_client(
             "MQTT transport"
         )
 
-    prefix = str(
-        config_entry.options.get(
-            CONF_MQTT_TOPIC_PREFIX,
-            config_entry.data.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+    def _option(name: str, default: object) -> object:
+        return config_entry.options.get(
+            name, config_entry.data.get(name, default)
         )
-    )
-    serial = str(
-        config_entry.options.get(
-            CONF_MQTT_SERIAL, config_entry.data.get(CONF_MQTT_SERIAL, "")
-        )
-    )
-    writable = bool(
-        config_entry.options.get(
-            CONF_MQTT_WRITE, config_entry.data.get(CONF_MQTT_WRITE, False)
-        )
-    )
+
+    prefix = str(_option(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX))
+    serial = str(_option(CONF_MQTT_SERIAL, ""))
+    writable = bool(_option(CONF_MQTT_WRITE, False))
 
     async def _subscribe(topic: str, callback) -> Callable[[], None]:
         def _on_message(message) -> None:
@@ -187,35 +177,6 @@ async def _async_mqtt_client(
     )
     await client.async_start()
     return client
-
-
-def _modbus_link_settings(config_entry: ConfigEntry) -> tuple[bool, str, int, int]:
-    """Return (enabled, host, port, unit_id) from entry options/data."""
-    enabled = bool(
-        config_entry.options.get(
-            CONF_MODBUS_TCP,
-            config_entry.data.get(CONF_MODBUS_TCP, False),
-        )
-    )
-    host = str(
-        config_entry.options.get(
-            CONF_MODBUS_HOST,
-            config_entry.data.get(CONF_MODBUS_HOST, DEFAULT_MODBUS_HOST),
-        )
-    )
-    port = int(
-        config_entry.options.get(
-            CONF_MODBUS_PORT,
-            config_entry.data.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
-        )
-    )
-    unit_id = int(
-        config_entry.options.get(
-            CONF_MODBUS_UNIT_ID,
-            config_entry.data.get(CONF_MODBUS_UNIT_ID, DEFAULT_MODBUS_UNIT_ID),
-        )
-    )
-    return enabled, host, port, unit_id
 
 
 def _qvantum_entry_is_active(entry: ConfigEntry) -> bool:
@@ -276,7 +237,7 @@ def _modbus_write_enabled(config_entry: ConfigEntry) -> bool:
 
 def _async_modbus_unit(hass: HomeAssistant, config_entry: ConfigEntry):
     """Borrow a unit from the shared Home Assistant Modbus connection."""
-    enabled, host, port, unit_id = _modbus_link_settings(config_entry)
+    enabled, host, port, unit_id = modbus_link_settings(config_entry)
     if not enabled:
         return None
     from homeassistant.components.modbus import async_get_unit
@@ -300,7 +261,7 @@ async def _async_temporary_modbus_unit(hass: HomeAssistant, config_entry: Config
     owner. The temporary unit is opened and closed here instead, and yields
     ``None`` when the entry is not on Modbus.
     """
-    enabled, host, port, unit_id = _modbus_link_settings(config_entry)
+    enabled, host, port, unit_id = modbus_link_settings(config_entry)
     if not enabled:
         yield None
         return
@@ -378,7 +339,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
 
     user_agent = f"Home Assistant/{MAJOR_VERSION}.{MINOR_VERSION}.{PATCH_VERSION} Qvantum/{VERSION}"
 
-    modbus_enabled, modbus_host, modbus_port, modbus_unit_id = _modbus_link_settings(
+    modbus_enabled, modbus_host, modbus_port, modbus_unit_id = modbus_link_settings(
         config_entry
     )
     # One source of truth: the resolver answers which transport the entry is,
@@ -386,7 +347,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     # port and unit, which only a Modbus entry has.
     transport = resolve_transport(config_entry)
     modbus_enabled = transport == TRANSPORT_MODBUS
-    if modbus_enabled or transport == TRANSPORT_MQTT:
+    if modbus_enabled:
         username = None
         password = None
     else:
@@ -410,8 +371,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
         ) from err
 
     extra_dhw: ExtraDhwTimer | None = None
-    if modbus_enabled:
-        client: QvantumCloudClient | QvantumModbusClient = QvantumModbusClient(
+    if transport == TRANSPORT_MQTT:
+        client: QvantumCloudClient | QvantumModbusClient | QvantumMqttClient = (
+            await _async_mqtt_client(hass, config_entry)
+        )
+    elif modbus_enabled:
+        client: QvantumCloudClient | QvantumModbusClient | QvantumMqttClient = QvantumModbusClient(
             modbus_unit,
             writable=_modbus_write_enabled(config_entry),
         )
@@ -435,9 +400,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
             user_agent=user_agent,
             session=async_get_clientsession(hass),
         )
-
-    if transport == TRANSPORT_MQTT:
-        client = await _async_mqtt_client(hass, config_entry)
 
     coordinator = QvantumDataUpdateCoordinator(
         hass, config_entry, client=client, extra_dhw=extra_dhw
@@ -504,7 +466,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
                 maintenance_coordinator.async_config_entry_first_refresh(),
                 timeout=HTTP_CLOUD_LOOKUP_TIMEOUT,
             )
-        except (ConfigEntryNotReady, asyncio.TimeoutError) as err:
+        except (TimeoutError, ConfigEntryNotReady) as err:
             if isinstance(err, asyncio.TimeoutError):
                 raise ConfigEntryNotReady(
                     "Firmware/access check timed out"
@@ -536,26 +498,17 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     )
     try:
         await efficiency_coordinator.async_restore()
-    except Exception as err:  # noqa: BLE001 — a blank EMA is not a setup error
+    except Exception as err:
         _LOGGER.debug("Efficiency state restore failed: %s", err)
     try:
         await efficiency_coordinator.async_refresh()
     except asyncio.CancelledError:
         raise
-    except Exception as err:  # noqa: BLE001 — analytics must not block setup
+    except Exception as err:
         _LOGGER.debug("Efficiency coordinator first refresh failed: %s", err)
 
     remove_listener = config_entry.add_update_listener(_async_update_listener)
     config_entry.async_on_unload(remove_listener)
-
-    if isinstance(client, QvantumMqttClient):
-        # Push transport: a new snapshot asks the coordinator for a refresh, so
-        # derived metrics and entity updates keep going through one path.
-        remove_push = client.add_listener(
-            lambda: hass.async_create_task(coordinator.async_request_refresh())
-        )
-        config_entry.async_on_unload(remove_push)
-        config_entry.async_on_unload(client.close)
 
     config_entry.runtime_data = RuntimeData(
         coordinator,
@@ -584,13 +537,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     # Best effort: a telemetry prompt must never block setup.
     try:
         await async_maybe_prompt(hass, config_entry.entry_id)
-    except Exception as err:  # noqa: BLE001 — optional surface
+    except Exception as err:
         _LOGGER.debug("Telemetry prompt unavailable: %s", err)
     try:
         config_entry.async_on_unload(
             await async_schedule_uploads(hass, config_entry.entry_id)
         )
-    except Exception as err:  # noqa: BLE001 — a timer must not block setup
+    except Exception as err:
         _LOGGER.debug("Could not schedule summary uploads: %s", err)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
@@ -601,7 +554,7 @@ def _modbus_transport_changed(
     config_entry: ConfigEntry, runtime: RuntimeData
 ) -> bool:
     """Return True when Modbus enablement or host requires a full reload."""
-    new_enabled, new_host, new_port, new_unit_id = _modbus_link_settings(config_entry)
+    new_enabled, new_host, new_port, new_unit_id = modbus_link_settings(config_entry)
 
     if new_enabled != bool(runtime.coordinator.modbus_enabled):
         return True
@@ -979,7 +932,7 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     # Nothing left to relate consent to once the entry is gone.
     try:
         await async_forget_telemetry_state(hass, config_entry.entry_id)
-    except Exception as err:  # noqa: BLE001 — removal is best effort
+    except Exception as err:
         _LOGGER.debug("Could not drop telemetry state: %s", err)
     await _async_hand_back_curve(hass, config_entry, reason="removing")
 
@@ -1019,7 +972,7 @@ async def _async_hand_back_curve_cloud(
         )
     except asyncio.CancelledError:
         raise
-    except Exception as err:  # noqa: BLE001 — best effort
+    except Exception as err:
         _LOGGER.warning(
             "Could not revert the adaptive curve while %s %s: %s",
             reason,
@@ -1030,7 +983,7 @@ async def _async_hand_back_curve_cloud(
     finally:
         try:
             await client.close()
-        except Exception:  # noqa: BLE001 — never fail the caller on cleanup
+        except Exception:
             _LOGGER.debug("Could not close the cloud client", exc_info=True)
     if not result_applied(response):
         _LOGGER.warning(
@@ -1088,7 +1041,7 @@ async def _async_hand_back_curve(
             # already inactive: an earlier Auto write may have failed, leaving
             # the pump on our table with nothing to retry it after the handover.
             await curve.async_set_control_mode("shadow")
-        except Exception as err:  # noqa: BLE001 — best effort
+        except Exception as err:
             _LOGGER.warning(
                 "Could not revert the adaptive curve while %s %s: %s",
                 reason,
@@ -1136,7 +1089,7 @@ async def _async_hand_back_curve(
         return True
     except asyncio.CancelledError:
         raise
-    except Exception as err:  # noqa: BLE001 — best effort
+    except Exception as err:
         _LOGGER.warning(
             "Could not revert the adaptive curve while %s %s: %s",
             reason,

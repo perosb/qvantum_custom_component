@@ -1,12 +1,14 @@
 """Tests for Qvantum button entities."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from homeassistant.const import EntityCategory
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from custom_components.qvantum.button import QvantumButtonEntity, async_setup_entry
 from custom_components.qvantum import RuntimeData
+from custom_components.qvantum.button import QvantumButtonEntity, async_setup_entry
+from tests.conftest import make_client_mock
 
 
 @pytest.fixture
@@ -22,7 +24,7 @@ def mock_coordinator():
     }
     coordinator.async_refresh = AsyncMock()
     coordinator.async_set_updated_data = AsyncMock()
-    coordinator.client = MagicMock()
+    coordinator.client = make_client_mock()
     coordinator.async_set_extra_tap_water = AsyncMock(return_value={"status": "APPLIED"})
     coordinator.async_elevate_access = AsyncMock(return_value={"writeAccessLevel": 30})
     coordinator.modbus_enabled = False
@@ -189,7 +191,7 @@ class TestQvantumButtonEntity:
             "device": {"id": "test_device_123"},
             "values": {},
         }
-        coordinator.client = MagicMock()
+        coordinator.client = make_client_mock()
         coordinator.async_set_extra_tap_water = AsyncMock()
         button = QvantumButtonEntity(
             coordinator, "extra_tap_water_60min", mock_device

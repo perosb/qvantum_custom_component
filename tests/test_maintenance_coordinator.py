@@ -1,9 +1,10 @@
 """Tests for Qvantum maintenance coordinator."""
 
-import pytest
-import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+import pytest_asyncio
+from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from custom_components.qvantum.client.exceptions import APIAuthError
 from custom_components.qvantum.maintenance_coordinator import (
@@ -51,7 +52,6 @@ class TestQvantumMaintenanceCoordinator:
     ):
         """Create maintenance coordinator instance."""
         # Set up hass.data with API instance
-        from custom_components.qvantum.const import DOMAIN
 
         mock_api = make_client_mock()
         mock_main_coordinator.client = mock_api
@@ -69,7 +69,6 @@ class TestQvantumMaintenanceCoordinator:
         self, hass, mock_config_entry, mock_main_coordinator
     ):
         """Parent DataUpdateCoordinator must receive config_entry explicitly."""
-        from custom_components.qvantum.const import DOMAIN
 
         mock_main_coordinator.client = make_client_mock()
         coordinator = QvantumMaintenanceCoordinator(
@@ -229,10 +228,10 @@ class TestQvantumMaintenanceCoordinator:
     ):
         """Test firmware check with API authentication error."""
         maintenance_coordinator.client.get_device_metadata = AsyncMock(
-            side_effect=Exception("API Error")
+            side_effect=APIAuthError("API Error")
         )
 
-        with pytest.raises(Exception):
+        with pytest.raises(ConfigEntryAuthFailed):
             await maintenance_coordinator.async_check_firmware_updates()
 
     @pytest.mark.asyncio
@@ -310,7 +309,9 @@ class TestQvantumMaintenanceCoordinator:
     ):
         """HTTP 429 becomes a clean UpdateFailed warning, not an unexpected error."""
         import logging
+
         from homeassistant.helpers.update_coordinator import UpdateFailed
+
         from custom_components.qvantum.client.exceptions import APIRateLimitError
 
         mock_main_coordinator.modbus_enabled = False

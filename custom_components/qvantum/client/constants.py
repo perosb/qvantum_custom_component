@@ -39,6 +39,21 @@ TAP_WATER_CAPACITY_START_STOP = {
     level: pair for pair, level in TAP_WATER_CAPACITY_MAPPINGS.items()
 }
 
+
+def tap_water_capacity_pair(capacity: int) -> tuple[int, int]:
+    """``(start, stop)`` for a tap-water capacity level.
+
+    Both transports map a level to the same start/stop pair, so the check lives
+    here rather than in each client: a level the table does not carry must never
+    be rounded to a nearest one.
+    """
+    if capacity not in TAP_WATER_CAPACITY_START_STOP:
+        raise ValueError(
+            f"Unsupported tap water capacity {capacity}; expected one of "
+            f"{sorted(TAP_WATER_CAPACITY_START_STOP)}"
+        )
+    return TAP_WATER_CAPACITY_START_STOP[capacity]
+
 # Relay power constants (watts) used to compute total power from relay stages.
 # The base system power is an estimate of the constant power draw of the heat
 # pump when no relays are active (circulation pumps, controls, auxiliaries).

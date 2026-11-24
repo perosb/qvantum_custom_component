@@ -7,8 +7,10 @@ import logging
 import math
 import time
 from collections import deque
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any, Callable, Optional
+from typing import Any
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_SCAN_INTERVAL,
@@ -16,66 +18,68 @@ from homeassistant.const import (
 )
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    issue_registry as ir,
+)
 from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
 from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .calculations import DhwCharge, QvantumCalculationsMixin
 from .client.cloud import QvantumCloudClient
+from .client.constants import alias_heating_curve_settings
 from .client.exceptions import (
     AuthError as APIAuthError,
     RateLimitError as APIRateLimitError,
     TransportError as APIConnectionError,
 )
-from .client.models import result_applied
 from .client.modbus import QvantumModbusClient, metric_range
+from .client.models import result_applied
 from .client.protocol import (
     QvantumCloudClientProtocol,
     QvantumModbusClientProtocol,
 )
-from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
-from .calculations import DhwCharge, QvantumCalculationsMixin
-from .plant_analytics import DhwMeterWindow, HeatingPowerWindow
-from .client.constants import alias_heating_curve_settings
 from .const import (
-    DEFAULT_DISABLED_HTTP_METRICS,
-    DEFAULT_DISABLED_MODBUS_METRICS,
-    DEFAULT_MODBUS_SCAN_INTERVAL,
-    DEFAULT_SCAN_INTERVAL,
-    DHW_MODE_EXTRA,
-    DHW_MODE_NORMAL,
-    DOMAIN,
-    FIRMWARE_KEYS,
-    HP_STATUS_COOLING,
-    HP_STATUS_DEFROSTING,
-    HP_STATUS_HEATING,
-    HP_STATUS_HOT_WATER,
-    MIN_MODBUS_SCAN_INTERVAL,
-    DEFAULT_ENABLED_HTTP_METRICS,
-    DEFAULT_ENABLED_MODBUS_METRICS,
-    MODBUS_SW_VERSION_REFRESH_INTERVAL,
-    REQUIRED_METRICS,
-    REQUIRED_MODBUS_METRICS,
     CONF_EXTERNAL_ROOM_TEMP_ENTITY,
     CONF_MODBUS_SCAN_INTERVAL,
     CONF_MODBUS_TCP,
     CONF_MQTT_SERIAL,
     CONF_TRANSPORT,
+    DEFAULT_DISABLED_HTTP_METRICS,
+    DEFAULT_DISABLED_MODBUS_METRICS,
+    DEFAULT_ENABLED_HTTP_METRICS,
+    DEFAULT_ENABLED_MODBUS_METRICS,
+    DEFAULT_MODBUS_SCAN_INTERVAL,
+    DEFAULT_SCAN_INTERVAL,
+    DHW_MODE_EXTRA,
+    DHW_MODE_NORMAL,
+    DOMAIN,
+    EXTERNAL_ROOM_TEMP_EMA_TAU,
+    EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL,
+    FIRMWARE_KEYS,
+    HP_STATUS_COOLING,
+    HP_STATUS_DEFROSTING,
+    HP_STATUS_HEATING,
+    HP_STATUS_HOT_WATER,
+    HTTP_CLOUD_LOOKUP_TIMEOUT,
+    MIN_MODBUS_SCAN_INTERVAL,
+    MODBUS_SW_VERSION_REFRESH_INTERVAL,
+    REQUIRED_METRICS,
+    REQUIRED_MODBUS_METRICS,
+    TAP_WATER_CAPACITY_MAPPINGS,
     TRANSPORT_CLOUD,
     TRANSPORT_MODBUS,
     TRANSPORT_MQTT,
-    EXTERNAL_ROOM_TEMP_EMA_TAU,
-    EXTERNAL_ROOM_TEMP_MAX_FEED_INTERVAL,
-    HTTP_CLOUD_LOOKUP_TIMEOUT,
-    TAP_WATER_CAPACITY_MAPPINGS,
     default_metric_creates_entity,
     nearest_tap_water_capacity_level,
 )
+from .extra_dhw import ExtraDhwTimer, async_apply_extra_tap_water
+from .plant_analytics import DhwMeterWindow, HeatingPowerWindow
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,12 +112,12 @@ _COMPRESSOR_TO_HP_STATUS_MAP = {
 
 
 async def handle_setting_update_response(
-    api_response: Optional[dict[str, Any]],
+    api_response: dict[str, Any] | None,
     coordinator: QvantumDataUpdateCoordinator,
-    data_section: Optional[str],
-    key: Optional[str],
+    data_section: str | None,
+    key: str | None,
     value: Any,
-    extra_updates: Optional[dict[str, Any]] = None,
+    extra_updates: dict[str, Any] | None = None,
 ) -> bool:
     """Handle API response for setting updates and update coordinator data if successful."""
     if result_applied(api_response) and data_section and key is not None:
@@ -138,10 +142,10 @@ async def handle_setting_update_response(
 async def async_apply_setting(
     coordinator: QvantumDataUpdateCoordinator,
     *,
-    response: Optional[dict[str, Any]],
+    response: dict[str, Any] | None,
     key: str,
     value: Any,
-    extra_updates: Optional[dict[str, Any]] = None,
+    extra_updates: dict[str, Any] | None = None,
 ) -> bool:
     """Optimistically apply a confirmed setting write to coordinator data.
 
@@ -182,7 +186,9 @@ def _firmware_metadata_from_sw_version(sw_version: str | None) -> dict:
         return {}
     parts = str(sw_version).split("/")
     metadata = {}
-    for key, part in zip(FIRMWARE_KEYS, parts):
+    # A short or long version string is the pump's business, not an error:
+    # pair what is there and let the missing keys stay unset.
+    for key, part in zip(FIRMWARE_KEYS, parts, strict=False):
         if not part or part == "None":
             continue
         metadata[key] = part
@@ -1735,7 +1741,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 err,
             )
             raise UpdateFailed(f"Rate limit exceeded: {err}") from err
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             _LOGGER.error(
                 "Timeout fetching data for device %s",
                 self._logged_device_id(),

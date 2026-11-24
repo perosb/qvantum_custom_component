@@ -16,6 +16,7 @@ from homeassistant.const import (
     CONF_TYPE,
 )
 
+from custom_components.qvantum import device_condition, device_trigger
 from custom_components.qvantum.const import (
     DHW_MIN_SHOWER_FLOW_LPM,
     DHW_TANK_LOW_SHOWERS,
@@ -37,7 +38,6 @@ from custom_components.qvantum.device_automation_helpers import (
     filter_below_hours,
     metric_from_unique_id,
 )
-from custom_components.qvantum import device_condition, device_trigger
 
 
 def _entry(*, unique_id: str, domain: str, entry_id: str = "uuid-1") -> SimpleNamespace:

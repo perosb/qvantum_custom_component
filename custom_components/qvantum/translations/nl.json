@@ -828,6 +828,9 @@
       },
       "curve_30": {
         "name": "Stooklijn 1: 30°C"
+      },
+      "dhw_start_extra": {
+        "name": "Extra warmwater starttemperatuur"
       }
     },
     "climate": {

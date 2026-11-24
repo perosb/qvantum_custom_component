@@ -13,11 +13,11 @@ write to the heat pump.
 
 from __future__ import annotations
 
-import asyncio
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Mapping
+from typing import Any
 from urllib.parse import urlencode
 
 import aiohttp
@@ -180,7 +180,9 @@ def parse_forecast(payload: Any) -> WeatherForecast:
     winds = _series(hourly, "wind_speed_10m")
     points: dict[int, HourlyWeather] = {}
     for index, (ts_raw, temperature, ghi) in enumerate(
-        zip(times, temperatures, irradiances)
+        # A field the provider omits arrives as `[]`; pair what is there
+        # rather than failing the whole forecast over one missing column.
+        zip(times, temperatures, irradiances, strict=False)
     ):
         if ts_raw is None or temperature is None or ghi is None:
             continue
@@ -252,7 +254,8 @@ def _parse_series(hourly: Mapping[str, Any], key: str) -> dict[int, float]:
     times = _series(hourly, "time")
     values = _series(hourly, key)
     series: dict[int, float] = {}
-    for ts_raw, value in zip(times, values):
+    # Same tolerance as above: a missing column yields no points.
+    for ts_raw, value in zip(times, values, strict=False):
         if ts_raw is None or value is None:
             continue
         ts = _safe_hour_ts(ts_raw)
@@ -287,7 +290,7 @@ async def _get_json(
         async with session.get(url, timeout=timeout) as response:
             response.raise_for_status()
             payload = await response.json()
-    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
+    except (TimeoutError, aiohttp.ClientError, ValueError) as err:
         raise OpenMeteoError(f"request failed: {err.__class__.__name__}: {err}") from err
     if not isinstance(payload, dict):
         raise OpenMeteoError("unexpected payload type")

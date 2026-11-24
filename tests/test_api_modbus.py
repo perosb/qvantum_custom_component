@@ -5,6 +5,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from custom_components.qvantum.client.constants import (
+    TAP_WATER_CAPACITY_START_STOP,
+    tap_water_capacity_pair,
+)
 from custom_components.qvantum.client.exceptions import APIConnectionError
 from tests.test_api import QvantumAPI, attach_mock_modbus
 
@@ -537,3 +541,14 @@ class TestWriteHoldingRegister:
 
         assert result == {"status": "APPLIED"}
         assert device.unit.holding[24] == 48
+
+
+@pytest.mark.parametrize("capacity", sorted(TAP_WATER_CAPACITY_START_STOP))
+def test_both_transports_map_a_capacity_to_the_same_pair(capacity: int) -> None:
+    """The pair is the truth for both transports, so it is translated once."""
+    assert tap_water_capacity_pair(capacity) == TAP_WATER_CAPACITY_START_STOP[capacity]
+
+
+def test_a_capacity_outside_the_table_is_rejected_not_rounded() -> None:
+    with pytest.raises(ValueError, match="Unsupported tap water capacity"):
+        tap_water_capacity_pair(99)
