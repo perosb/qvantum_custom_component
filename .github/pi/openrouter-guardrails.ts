@@ -6,7 +6,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 // the chat-completions body (removed from ChatRequest; silently ignored), so
 // inlining is the only reliable way to apply the preset's routing rules.
 // Override locally with OPENROUTER_PRESET, or set it empty to disable.
-const DEFAULT_OPENROUTER_PRESET = "perosb";
+const DEFAULT_OPENROUTER_PRESET = "review";
 
 // OpenRouter's advertised max_completion_tokens assumes a provider with the
 // full advertised context (often 1M). Clamp the outgoing request; override via
