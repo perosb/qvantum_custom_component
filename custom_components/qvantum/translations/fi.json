@@ -277,6 +277,12 @@
       "dhwenergy": {
         "name": "Käyttöveden energia"
       },
+      "dhw_charge_electrical_energy": {
+        "name": "Säiliön latauksen sähkö"
+      },
+      "dhw_charge_element_energy": {
+        "name": "Säiliön lataus, sähkövastus"
+      },
       "inputcurrent1": {
         "name": "Tulovirta L1"
       },

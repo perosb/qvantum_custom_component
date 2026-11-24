@@ -277,6 +277,12 @@
       "dhwenergy": {
         "name": "Warmwasserenergie"
       },
+      "dhw_charge_electrical_energy": {
+        "name": "Strom für Speicherladung"
+      },
+      "dhw_charge_element_energy": {
+        "name": "Speicherladung, Heizstab"
+      },
       "inputcurrent1": {
         "name": "Eingangsstrom L1"
       },

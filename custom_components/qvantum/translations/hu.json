@@ -277,6 +277,12 @@
       "dhwenergy": {
         "name": "HMV energia"
       },
+      "dhw_charge_electrical_energy": {
+        "name": "Tartálytöltés villamos energia"
+      },
+      "dhw_charge_element_energy": {
+        "name": "Tartálytöltés, fűtőbetét"
+      },
       "inputcurrent1": {
         "name": "Bemeneti áram L1"
       },

@@ -277,6 +277,12 @@
       "dhwenergy": {
         "name": "Energía de ACS"
       },
+      "dhw_charge_electrical_energy": {
+        "name": "Electricidad de carga del depósito"
+      },
+      "dhw_charge_element_energy": {
+        "name": "Carga del depósito, resistencia"
+      },
       "inputcurrent1": {
         "name": "Corriente de entrada L1"
       },
