@@ -117,9 +117,9 @@ figure distinguish 1.7 from 2.5. There is deliberately no higher floor: at
 one, where the pump's electrical input runs 0.9–1.4 kWh/h.
 
 **Raising the floors does not make the figure correct.** `heatingenergy` reads
-below the pump's own compressor input (see *the DHW heat-meter comparison* and
-`qe-architecture.md` §11), so the level carries a bias that no window setting
-fixes — the sensor is a **trend** instrument until that is explained.
+below the pump's own compressor input, so the level carries a bias that no window
+setting fixes — the sensor is a **trend** instrument until that is explained.
+See *the tank as a calorimeter* below for the measurement.
 
 The thermal half was added after a night hour on a live QE-6 spent the
 compressor's work on a 61.7 °C buffer while the delivered-heat counter stood
@@ -143,6 +143,45 @@ electrical side was checked instead: the integral of `powertotal` matched
 `compressorenergy + additionalenergy` within 0.1–0.2 kWh every hour (04:00:
 1.63 kWh measured against 1.50 kWh counted), which puts the quantisation of three
 0.1 kWh counters and an assumed tank volume on the same order as what is left.
+
+## The tank as a calorimeter
+
+`heatingenergy` is not a validated heat meter. Its reading can be checked against
+the buffer tank, which is a calorimeter: energy in is `ΔBT30 · V · c`, the volume
+is identified at **177.9 L** from an element-only charge (1.60 kWh, measured two
+independent ways, 0.6 % apart), and the electricity that produced the rise is on
+`compressorenergy` + `additionalenergy`. What the electricity does not explain
+came from the exhaust air, which yields an implied airflow from `BT14 − BT15` —
+an independent check that the balance is real rather than arithmetic.
+
+**Measured on 2026-11-24** (outdoor −1.2 °C, a full charge after a draw, one
+defrost inside the window split out):
+
+| Window | BT30 | Tank | Electrical | Air | Implied airflow | COP |
+|---|---|---:|---:|---:|---:|---:|
+| pre-defrost, 0.63 h | 39.5 → 47.5 °C | 1.61 kWh | 0.80 kWh | 0.81 kWh | 167 m³/h | 2.01 |
+| post-defrost, 0.83 h | 48 → 59 °C | 2.30 kWh | 1.10 kWh | 1.20 kWh | 191 m³/h | 2.09 |
+
+That is **2.56 kW thermal from 1.27 kW electrical**, where `heatingenergy`
+implied 1.5–1.8 kW for comparable windows — the counter reads **30–40 % low**.
+The airflow is what corroborates it: 167–191 m³/h against a designed ventilation
+of roughly 190 m³/h for the house. A number that falls out of an energy balance
+and lands on an independently known quantity is a measurement; one that merely
+looks plausible is not.
+
+**Two limits on this figure.** It is **one operating point**, so it establishes
+the direction and rough size of the bias, not a calibration — a cold-weather
+repeat is what would let the level be trusted. And 2.0 is the *hard* case: a
+62 °C charge forces condensing near 65 °C, whereas space heating runs at 35–40 °C
+supply and should score **higher**, while `cop_heating` reports 1.5–2.1.
+
+**How a window has to be cut** if this is repeated. It opens when the tank
+bottoms out, not when the draw counter's last step arrives — the tank keeps
+mixing, and booking that tail books a deficit. It closes at the first
+`heatingenergy` step, which is where DHW priority releases. It is void if a
+second draw, a defrost, a heating step or an open addition shunt lands inside:
+`defrost_count` supplies the timestamps, and the counter is what makes an hour
+comparable at all.
 
 ## The electrical split
 
