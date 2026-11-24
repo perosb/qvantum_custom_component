@@ -28,7 +28,7 @@ from ..constants import (
 )
 from ..exceptions import TransportError
 from ..models import MetricsPayload, SettingsPayload
-from . import topics
+from . import inventory, topics
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +38,45 @@ DEFAULT_RESPONSE_TIMEOUT = 5.0
 SubscribeCallback = Callable[[str], Awaitable[Callable[[], None]]]
 PublishCallback = Callable[..., Awaitable[None]]
 MessageCallback = Callable[[str], None]
+
+
+def _split_payload(
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Split an envelope payload into ``(metrics, settings)``.
+
+    Two shapes are accepted, because the firmware and this POC's stand-in differ:
+
+    - the snapshot form — ``{"metrics": {...}, "settings": {...}}`` — which the
+      simulator publishes and which carries the canonical keys already;
+    - the firmware's **telemetry form**, a flat document of named items. Its item
+      names are mapped through :mod:`inventory`, and anything the map does not
+      know passes through unchanged so a new firmware item needs no release here.
+
+    A payload that is neither returns ``(None, None)`` and is ignored, rather
+    than being written into the cache as if it were a reading.
+    """
+    metrics = payload.get("metrics")
+    settings = payload.get("settings")
+    if isinstance(metrics, dict) or isinstance(settings, dict):
+        return (
+            metrics if isinstance(metrics, dict) else None,
+            settings if isinstance(settings, dict) else None,
+        )
+    items = payload.get("items")
+    flat = items if isinstance(items, dict) else payload
+    if not flat or not all(isinstance(key, str) for key in flat):
+        return None, None
+    if isinstance(items, dict):
+        return {inventory.canonical_key(k): v for k, v in items.items()}, None
+    # A flat telemetry document: every value must look like a reading, or this
+    # is not a payload we understand.
+    if not all(
+        isinstance(value, (int, float, str, bool)) or value is None
+        for value in flat.values()
+    ):
+        return None, None
+    return {inventory.canonical_key(k): v for k, v in flat.items()}, None
 
 
 class QvantumMqttClient:
@@ -156,9 +195,8 @@ class QvantumMqttClient:
         if payload is None:
             _LOGGER.debug("Ignoring malformed MQTT state payload")
             return
+        metrics, settings = _split_payload(payload)
         changed = False
-        metrics = payload.get("metrics")
-        settings = payload.get("settings")
         if isinstance(metrics, dict) and metrics != self._metrics:
             self._metrics = metrics
             changed = True

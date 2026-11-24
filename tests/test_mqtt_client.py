@@ -539,3 +539,54 @@ async def test_a_write_while_offline_fails_fast():
     assert elapsed < 1.0  # not the 5 s response timeout
     # Nothing was published: the command never left.
     assert broker.published[-1][0] == availability_topic(PREFIX, SERIAL)
+
+
+def test_a_flat_telemetry_document_is_read_as_metrics() -> None:
+    """The 1.13.0 firmware publishes named items, not this POC's snapshot shape."""
+    client = _client(FakeBroker())
+    client._handle_state(
+        '{"hpid":"S1","p":{"bt11":39.0,"compressor_power":1328,'
+        '"compressor_energy_kwh":6394.6,"qn8_position":0}}'
+    )
+
+    metrics = client._metrics
+    # Register names pass through; the firmware's own names are mapped.
+    assert metrics["bt11"] == 39.0
+    assert metrics["compressor_power"] == 1328
+    assert metrics["compressorenergy"] == 6394.6
+    assert metrics["qn8position"] == 0
+
+
+def test_an_unknown_telemetry_item_passes_through() -> None:
+    """A firmware that adds an item must not need a client release."""
+    client = _client(FakeBroker())
+    client._handle_state('{"hpid":"S1","p":{"brand_new_reading":12.5}}')
+
+    assert client._metrics["brand_new_reading"] == 12.5
+
+
+def test_a_document_that_is_neither_shape_is_ignored() -> None:
+    client = _client(FakeBroker())
+    client._handle_state('{"hpid":"S1","p":{"nested":{"deep":1}}}')
+
+    assert client._metrics == {}
+
+
+def test_the_inventory_maps_the_firmware_item_names() -> None:
+    """Item names read out of the 1.13.0 image, not guessed."""
+    from custom_components.qvantum.client.mqtt.inventory import (
+        TELEMETRY_ITEM_KEYS,
+        canonical_key,
+    )
+
+    # Not the canonical names: the feed says *_energy_kwh and qn8_position.
+    assert canonical_key("compressor_energy_kwh") == "compressorenergy"
+    assert canonical_key("additional_energy_kwh") == "additionalenergy"
+    assert canonical_key("qn8_position") == "qn8position"
+    assert canonical_key("calculated_heating_supply_temperature") == "cal_heat_temp"
+    # Register names are already canonical and absent from the map by design.
+    assert "bt11" not in TELEMETRY_ITEM_KEYS
+    assert canonical_key("bt11") == "bt11"
+    # The per-unit QG set is generated for both modules.
+    assert len(TELEMETRY_ITEM_KEYS) == 30
+    assert canonical_key("qg2_compressor_speed_rps") == "qg2_compressor_rpm"

@@ -175,3 +175,41 @@ settings rather than only commands. `send_command` is shaped from the display's
 own command set (`read_all_setpoints`, `set_setpoint`,
 `limit_max_compressor_speed`), so it can adopt their format without a redesign —
 but until they answer, this is a transport looking for a pump.
+
+## The 1.13.0 build: a telemetry feed, and what it changes here
+
+Firmware `QEWTTRV1_1130-898953566` (2026-11-24) replaced the display's MQTT
+client from a command proxy into a three-part API. Its configuration document is
+`{connection, telemetry, command}`:
+
+- `connection` — `enabled`, `host`, `port`, `tls`, and `auth_type`
+  (`username` with `username`/`password`, or `cert` with a client certificate);
+- **`telemetry`** — `enabled`, `frequency` (seconds, **minimum 5**) and `items`
+  (`"default"` or an explicit list). It publishes on a topic under the prefix
+  **`qvantum/`**, and `get_telemetry_inventory` returns the catalogue.
+- `command` — allowlisted commands with `heatpump_command_id`, version 1 and an
+  `arguments` object; responses carry a `status_code`.
+
+The catalogue is a list of **named items**, not the whole snapshot this POC's
+stand-in publishes. Its names: `bt1`–`bt34` by
+their register names, `gp1_speed`/`gp2_speed`, the DHW flow, `powertotal`,
+`compressor_power`, `compressor_energy_kwh`, `additional_energy_kwh`,
+`calculated_heating_supply_temperature`, `fan_control_voltage`, the heater relays
+and `qm10_relay`/`qn8_position`, plus the `qg1_*`/`qg2_*` per-unit set.
+
+`client/mqtt/inventory.py` maps the items whose names are **not** the canonical
+ones (`compressor_energy_kwh` → `compressorenergy`,
+`qn8_position` → `qn8position`, …) and passes anything it does not know straight
+through, so a firmware that adds an item needs no release here. The client
+accepts both payload shapes: this POC's `{"metrics", "settings"}` snapshot and
+the firmware's flat item document.
+
+**What the feed does not carry: a thermal power or a COP.** It repeats
+`compressor_power` (input 94, validated against a whole-house meter at a 0.95
+ratio over 135 defrosts) but there is no heating-output item, so the
+heating-energy question — the counter reads below the compressor's own input —
+is untouched by this transport.
+
+Still blocked: QT (Qvantum's own) configuration cannot be read or written
+through the third-party MQTT API, advanced settings need `AL30`/`AL20` with a
+service-access token, and some commands require `developer_mode`.
