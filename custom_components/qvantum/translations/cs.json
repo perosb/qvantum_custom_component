@@ -772,6 +772,9 @@
       },
       "cooling_offset_total": {
         "name": "Celkový posun chladicí křivky"
+      },
+      "defrost_count": {
+        "name": "Počet odmrazování"
       }
     },
     "number": {

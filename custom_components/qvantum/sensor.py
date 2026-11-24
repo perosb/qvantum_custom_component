@@ -104,6 +104,10 @@ _UPPERCASE_SENSORS = frozenset({"price_region"})
 _DHW_CHARGE_KEYS = frozenset(
     {"dhw_charge_electrical_energy", "dhw_charge_element_energy"}
 )
+#: Defrosts completed, counted on the falling edge of the pump's flag (input 67).
+#: Derived and created explicitly: the flag is a binary_sensor with no
+#: long-term statistics, so this counter is the only durable record.
+_DEFROST_COUNT_KEY = "defrost_count"
 
 _DIAGNOSTIC_SENSORS = frozenset(
     {
@@ -118,6 +122,8 @@ _DIAGNOSTIC_SENSORS = frozenset(
         # Charging the tank is machine-internal accounting the pump has no meter
         # for; it explains a COP rather than reporting a comfort value.
         *_DHW_CHARGE_KEYS,
+        # A lifetime cycle count, beside compressor_starts for the same reason.
+        _DEFROST_COUNT_KEY,
         # Per-compressor-unit QG block (input 119-148): one refrigerant circuit
         # per unit, so these are machine-internal even though the legacy
         # averaged bt10/bt13/... are listed below for the same reason.
@@ -489,6 +495,11 @@ async def async_setup_entry(
         sensors.append(
             _get_sensor_type(charge_key)(coordinator, charge_key, device, True)
         )
+    sensors.append(
+        _get_sensor_type(_DEFROST_COUNT_KEY)(
+            coordinator, _DEFROST_COUNT_KEY, device, True
+        )
+    )
     if coordinator.modbus_enabled:
         # Local Modbus: display firmware from input registers 191-193 and the
         # custom heating-curve shadow sensors (no cloud equivalent).
@@ -606,6 +617,7 @@ async def async_setup_entry(
         _HEATING_POWER_KEY,
         *_COP_SENSOR_KEYS,
         *_DHW_CHARGE_KEYS,
+        _DEFROST_COUNT_KEY,
     }
 
     # Rolling efficiency figures come from the efficiency coordinator. Created
@@ -710,8 +722,10 @@ class QvantumBaseSensorEntity(QvantumEntity, SensorEntity):
             self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
             self._attr_device_class = SensorDeviceClass.DURATION
             self._attr_suggested_display_precision = 0
-        elif metric_key == "compressor_starts":
+        elif metric_key == "compressor_starts" or metric_key == _DEFROST_COUNT_KEY:
             self._attr_suggested_display_precision = 0
+            if metric_key == _DEFROST_COUNT_KEY:
+                self._attr_state_class = SensorStateClass.TOTAL_INCREASING
         elif metric_key == "active_alarms":
             self._attr_state_class = SensorStateClass.MEASUREMENT
             self._attr_suggested_display_precision = 0

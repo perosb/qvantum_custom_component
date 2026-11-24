@@ -772,6 +772,9 @@
       },
       "cooling_offset_total": {
         "name": "Jäähdytyskäyrän kokonaispoikkeama"
+      },
+      "defrost_count": {
+        "name": "Sulatuskerrat"
       }
     },
     "number": {

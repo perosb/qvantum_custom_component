@@ -366,6 +366,17 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # at zero reads as a counter reset in the statistics.
         self._dhw_charge_electrical_kwh = 0.0
         self._dhw_charge_element_kwh = 0.0
+        # Defrosts completed since this counter was created, counted on the
+        # falling edge of input 67. The pump reports no defrost counter, and the
+        # flag is a binary_sensor without long-term statistics, so before this
+        # the count existed only while raw states were retained (~10 days) —
+        # which is why a past winter's defrosts could not be recovered: two
+        # frozen-hour proxies calibrated against 11 days of truth found 15 of
+        # 264. Persisted for the same reason as the charge counters.
+        self._defrost_count = 0
+        # Last observed state of the flag. None means "no reading since the last
+        # gap", so a value that reappears does not count a defrost it cannot see.
+        self._defrost_flag_last: bool | None = None
         # The open DHW charge segment (baseline tank, accumulated draw and
         # electrical input), or None when no charge is running.
         self._dhw_charge: DhwCharge | None = None
@@ -631,6 +642,9 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         element = self._coerce_store_number(data.get("dhw_charge_element_energy"))
         if element is not None and element >= 0.0:
             self._dhw_charge_element_kwh = element
+        defrosts = self._coerce_store_number(data.get("defrost_count"))
+        if defrosts is not None and defrosts >= 0.0:
+            self._defrost_count = int(defrosts)
         if self._cop_last:
             _LOGGER.debug("Restored COP snapshot: %s", self._cop_last)
 
@@ -912,6 +926,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 self._dhw_charge_electrical_kwh, 3
             ),
             "dhw_charge_element_energy": round(self._dhw_charge_element_kwh, 3),
+            "defrost_count": self._defrost_count,
         }
         try:
             await self._cop_store.async_save(payload)
@@ -936,6 +951,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             self._dhw_meter.signature(),
             round(self._dhw_charge_electrical_kwh, 3),
             round(self._dhw_charge_element_kwh, 3),
+            self._defrost_count,
         )
 
     def _cop_time_iso(self, key: str) -> str | None:
@@ -967,6 +983,33 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         delivers the element's heat to the heating circuit instead.
         """
         return self._dhw_charge_element_kwh
+
+    def defrost_count(self) -> int:
+        """Defrosts completed since this counter was created."""
+        return self._defrost_count
+
+    def _count_defrosts(self, values: dict) -> None:
+        """Count completed defrosts and publish the total into the payload.
+
+        Input 67 is a **flag, not a countdown**: the pump raises it when it
+        requests a defrost and clears it when the cycle ends, measured `on` for
+        exactly five minutes every ~50. The falling edge is therefore one
+        defrost. A poll that carries no flag is not evidence of a defrost
+        ending, so the last state is forgotten rather than compared — a gap
+        must not manufacture a count.
+        """
+        raw = values.get("time_to_defrost")
+        try:
+            flag = None if raw is None else bool(float(raw) > 0.0)
+        except (TypeError, ValueError):
+            flag = None
+        if flag is None:
+            self._defrost_flag_last = None
+            return
+        if self._defrost_flag_last and not flag:
+            self._defrost_count += 1
+        self._defrost_flag_last = flag
+        values["defrost_count"] = self._defrost_count
 
     def dhw_charge_open(self) -> bool:
         """Return whether a DHW charge segment is currently being measured."""
@@ -1619,6 +1662,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
                 await self._sync_modbus_extra_dhw_timer(values, poll_started=poll_started)
                 await self._refresh_modbus_sw_version()
 
+            self._count_defrosts(values)
             self._derive_tap_water_capacity(values)
             self._async_sync_tap_water_capacity_issue()
             self._calculate_cop(values)

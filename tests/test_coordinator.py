@@ -2646,6 +2646,28 @@ class TestCopPersistence:
             assert coordinator._cop_last_times == {}
 
     @pytest.mark.asyncio
+    @pytest.mark.asyncio
+    async def test_restore_keeps_the_defrost_count(self):
+        """A lifetime count must survive a restart, or it reads as a reset."""
+        coordinator = self._make_coordinator()
+        stored = {"defrost_count": 412}
+        with patch.object(coordinator._cop_store, "async_load", return_value=stored):
+            await coordinator.async_restore_cop_state()
+
+        assert coordinator.defrost_count() == 412
+
+    @pytest.mark.asyncio
+    async def test_restore_rejects_a_bogus_defrost_count(self):
+        coordinator = self._make_coordinator()
+        for stored in ({"defrost_count": -4}, {"defrost_count": "many"}):
+            coordinator._defrost_count = 7
+            with patch.object(
+                coordinator._cop_store, "async_load", return_value=stored
+            ):
+                await coordinator.async_restore_cop_state()
+            assert coordinator.defrost_count() == 7
+
+    @pytest.mark.asyncio
     async def test_restore_keeps_the_charge_counters(self):
         """A running total must survive a restart; zero is a valid stored value."""
         coordinator = self._make_coordinator()
@@ -2779,6 +2801,7 @@ class TestCopPersistence:
                 "dhw_meter": [],
                 "dhw_charge_electrical_energy": 0.0,
                 "dhw_charge_element_energy": 0.0,
+                "defrost_count": 0,
             }
         )
 
@@ -6127,3 +6150,51 @@ class TestCloudWriteAccess:
         assert write_access(coord) is True
         coord.client.writable = False
         assert write_access(coord) is False
+
+
+class TestDefrostCount:
+    """Defrosts are counted on the falling edge of the pump's flag.
+
+    Input 67 is a flag, not a countdown: the pump raises it when it requests a
+    defrost and clears it when the cycle ends (measured `on` for exactly five
+    minutes every ~50). The count exists because the flag is a binary_sensor
+    with no long-term statistics, so raw states — and with them any past winter's
+    defrosts — are purged after ~10 days.
+    """
+
+    def test_the_falling_edge_counts_once(self):
+        coordinator = TestCopPersistence()._make_coordinator()
+        for flag in (0, 0):
+            coordinator._count_defrosts({"time_to_defrost": flag})
+        assert coordinator.defrost_count() == 0
+
+        coordinator._count_defrosts({"time_to_defrost": 1})
+        assert coordinator.defrost_count() == 0
+
+        coordinator._count_defrosts({"time_to_defrost": 0})
+        assert coordinator.defrost_count() == 1
+
+        # A flag that stays clear is one defrost, not one per poll.
+        for _ in range(5):
+            coordinator._count_defrosts({"time_to_defrost": 0})
+        assert coordinator.defrost_count() == 1
+
+    def test_a_missing_flag_does_not_manufacture_a_count(self):
+        """A gap is not evidence of a defrost ending."""
+        coordinator = TestCopPersistence()._make_coordinator()
+        coordinator._count_defrosts({"time_to_defrost": 1})
+        coordinator._count_defrosts({})
+        coordinator._count_defrosts({"time_to_defrost": 0})
+
+        assert coordinator.defrost_count() == 0
+
+    def test_the_total_reaches_the_payload(self):
+        """A total_increasing sensor reads its value from `values`."""
+        coordinator = TestCopPersistence()._make_coordinator()
+        values = {"time_to_defrost": 1}
+        coordinator._count_defrosts(values)
+        values["time_to_defrost"] = 0
+        coordinator._count_defrosts(values)
+
+        assert values["defrost_count"] == 1
+        assert coordinator.defrost_count() == 1

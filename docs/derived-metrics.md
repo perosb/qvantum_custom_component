@@ -253,6 +253,40 @@ Two invariants that are easy to break in review:
 A counter reset drops the window and the open charge; a charge older than
 `DHW_CHARGE_MAX_SECONDS` restarts its baseline.
 
+## The defrost count
+
+`defrost_count` counts **completed defrosts** on the falling edge of the pump's
+flag (input 67). The flag is not a countdown: the pump raises it when it
+requests a defrost and clears it when the cycle ends — measured `on` for exactly
+five minutes every ~50, 7 cycles in 6 h on a live QE-6 — so one `on → off`
+transition is one defrost.
+
+**Why a counter is needed at all.** The flag is exposed as a `binary_sensor`,
+which records no long-term statistics, and raw states are purged after ~10 days.
+Any past window's defrost count is therefore unrecoverable, and the two proxies
+tried for it failed badly: hourly `bt15` maximum above 5 °C and a `bt15` sawtooth
+of more than 3 K with the compressor running, calibrated against 11 days of
+truth (264 defrosts), found **15 of 264 (6 %)**.
+
+**How to read it.** It is `total_increasing`, persisted in the COP store and
+restored on start, so its **hourly statistics delta is the defrosts per hour** —
+which is what makes an hour comparable: a window containing a defrost is not
+comparable with one that does not.
+
+Two limits worth knowing:
+
+- **A poll that carries no flag is not a defrost ending.** The last state is
+  forgotten rather than compared, so a gap cannot manufacture a count. On a
+  transport whose payload has no `time_to_defrost`, the counter simply never
+  advances.
+- **A cleared request counts, whether or not the pump then ran a cycle.** Input
+  67 says "the pump wants a defrost"; a request raised and withdrawn without a
+  cycle would still add one. It is a cycle *request* count, and the measured
+  cadence matches the observed 4–5 minute stops.
+
+The counter is a diagnostic entity created explicitly, so it is in no
+`DEFAULT_ENABLED_*` list and in `special_sensor_keys`.
+
 ## The DHW charging counters
 
 The pump has **no meter for charging the tank**. `dhwenergy` meters the *draw* on

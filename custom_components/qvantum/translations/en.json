@@ -772,6 +772,9 @@
       },
       "cooling_offset_total": {
         "name": "Total cooling curve offset"
+      },
+      "defrost_count": {
+        "name": "Defrost count"
       }
     },
     "number": {
