@@ -525,6 +525,14 @@ class QvantumCalculationsMixin:
                 self._accumulate_dhw_charge_energy(
                     interval_dhw, interval_dhw_compressor, values
                 )
+                # The counters live on the coordinator, but an energy sensor
+                # reads its value from the poll payload — publishing them here
+                # is what makes the entities report anything at all (the same
+                # pattern as `heating_power_mean_w`).
+                values["dhw_charge_electrical_energy"] = (
+                    self._dhw_charge_electrical_kwh
+                )
+                values["dhw_charge_element_energy"] = self._dhw_charge_element_kwh
 
         # The counters are read as floats, so a sum can land a hair below its
         # nominal value (0.2 -> 0.19999999999999574). Rounding below the

@@ -1077,3 +1077,19 @@ class TestDhwChargeCounters:
 
         # The same interval must not be added again by the re-walk.
         assert calculator._dhw_charge_electrical_kwh == pytest.approx(first)
+
+
+def test_the_charge_counters_reach_the_poll_payload():
+    """An energy sensor reads its value from `values`, not from the coordinator.
+
+    The counters are accumulated on the coordinator, so without this the two
+    entities would report `unknown` forever and record no statistics.
+    """
+    calculator = _Calculator()
+    values = _values(bt30=50.0)
+    calculator._calculate_cop(values)
+    values = _values(hp_status=HP_STATUS_HOT_WATER, compressorenergy=40.7, bt30=53.0)
+    calculator._calculate_cop(values)
+
+    assert values["dhw_charge_electrical_energy"] == pytest.approx(0.7)
+    assert values["dhw_charge_element_energy"] == pytest.approx(0.0)
