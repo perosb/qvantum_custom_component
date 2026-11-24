@@ -37,17 +37,28 @@ RESISTIVE_COP_CEILING = 1.0
 #: and a one-step ratio would be a quantisation artefact.
 COP_WINDOW_SECONDS = 3600.0
 
-#: Minimum electrical input in the window before the ratio is a measurement.
-#: Two counter steps are enough to get past the 0.1 kWh quantisation; the
-#: window keeps growing until the full COP_WINDOW_SECONDS is reached.
-COP_MIN_ELECTRICAL_KWH = 0.2
+#: Minimum electrical input before a **DHW charge** is given a ratio. A charge
+#: accumulates over its whole segment, so a short element top-up is a real
+#: measurement at two counter steps; this floor only keeps an empty segment out.
+DHW_CHARGE_MIN_ELECTRICAL_KWH = 0.2
 
-#: Minimum *delivered* heat in the window, the symmetric half of the gate
+#: Minimum electrical input in the **heating window** before its ratio is a
+#: measurement. A ratio of two counters quantised to 0.1 kWh carries a relative
+#: error of roughly ``0.1 / E + 0.1 / T``, so the floors set how coarse the
+#: published figure is: 0.2 kWh each gives ±100 % and makes exactly 1.0 the
+#: smallest reachable value, 1.0 kWh each gives ±20 %.
+#:
+#: Measured over ten days on a live QE-6: **15 % of 9 634** ``cop_heating``
+#: values were exact integers and **42 %** sat on the 0.1 grid — the signature
+#: of a small denominator, not of a pump at COP 1.0. The window keeps growing
+#: until it reaches this floor or the full COP_WINDOW_SECONDS, whichever first.
+COP_MIN_HEATING_ELECTRICAL_KWH = 1.0
+
+#: Minimum *delivered* heat in the window, the symmetric half of the floor
 #: above. Without it a window whose electrical input is real but whose
 #: ``heatingenergy`` counter never stepped publishes a ratio of 0 — measured as
 #: a night hour at a 61.7 °C buffer, where the compressor's work went into the
-#: tank and the delivered-heat counter stood still. Two steps, like the
-#: electrical floor: a smaller figure is quantisation, not a level.
+#: tank and the delivered-heat counter stood still.
 #:
 #: This deliberately does *not* suppress an hour that delivered 0.7 kWh of heat
 #: from 1.5 kWh of electricity (a measured 0.47). That is a real figure for a
@@ -55,7 +66,7 @@ COP_MIN_ELECTRICAL_KWH = 0.2
 #: −7.5 °C — and hiding it would be the wrong correction. Defrost is *not* part
 #: of it: the same window ran 15 defrosts at 8 % duty spread evenly across the
 #: hours that scored 3.1–4.1 as well.
-COP_MIN_THERMAL_KWH = 0.2
+COP_MIN_THERMAL_KWH = 1.0
 
 
 def energy_delta(previous: object, current: object) -> float | None:
