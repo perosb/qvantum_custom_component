@@ -47,9 +47,10 @@ from .dhw_loss import (
     shunt_blends_into_heating,
 )
 from .efficiency import (
-    COP_MIN_ELECTRICAL_KWH,
+    COP_MIN_HEATING_ELECTRICAL_KWH,
     COP_MIN_THERMAL_KWH,
     COP_WINDOW_SECONDS,
+    DHW_CHARGE_MIN_ELECTRICAL_KWH,
     cap_dhw_ratio,
     cop_ratio,
     energy_delta,
@@ -541,7 +542,7 @@ class QvantumCalculationsMixin:
         heating_electrical = round(heating_electrical, 6)
 
         if (
-            heating_electrical >= COP_MIN_ELECTRICAL_KWH
+            heating_electrical >= COP_MIN_HEATING_ELECTRICAL_KWH
             and heating_thermal >= COP_MIN_THERMAL_KWH
         ):
             heating_ratio = cop_ratio(heating_thermal, heating_electrical)
@@ -725,7 +726,7 @@ class QvantumCalculationsMixin:
         if tank_temp is None or charge.start_tank is None:
             return
         electrical = round(charge.electrical_kwh, 6)
-        if electrical < COP_MIN_ELECTRICAL_KWH:
+        if electrical < DHW_CHARGE_MIN_ELECTRICAL_KWH:
             return
         # Production recovered from the tank balance: what was drawn since the
         # charge started plus what stayed in (or came out of) the tank.

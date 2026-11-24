@@ -310,18 +310,26 @@ class TestCalculateCop:
 
         assert values["cop_heating"] is None
 
-    def test_window_accumulates_until_electrical_is_measurable(self):
+    def test_window_grows_until_both_floors_are_met(self):
+        """A small denominator is quantisation, so the window keeps growing."""
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         first = _values(heatingenergy=100.1, compressorenergy=40.1)
         calculator._calculate_cop(first)
         assert first["cop_heating"] is None
 
-        values = _values(heatingenergy=100.6, compressorenergy=40.2)
+        # 0.6 kWh of heat from 0.2 kWh of electricity is a real ratio, but the
+        # electricity is two counter steps: published as 3.0 it would carry a
+        # ±50 % error on its denominator.
+        middle = _values(heatingenergy=100.6, compressorenergy=40.2)
+        calculator._calculate_cop(middle)
+        assert middle["cop_heating"] is None
+
+        values = _values(heatingenergy=102.0, compressorenergy=41.0)
         calculator._calculate_cop(values)
 
-        # Two compressor steps (0.2 kWh) against 0.6 kWh of heating energy.
-        assert values["cop_heating"] == pytest.approx(3.0)
+        # 2.0 kWh of heat from 1.0 kWh of electricity clears both floors.
+        assert values["cop_heating"] == pytest.approx(2.0)
 
     def test_no_delivered_heat_holds_the_last_ratio(self):
         """Electrical input without a heat step must not publish a 0.
@@ -351,7 +359,9 @@ class TestCalculateCop:
         """
         calculator = _Calculator()
         calculator._calculate_cop(_values())
-        values = _values(heatingenergy=100.7, compressorenergy=41.5)
+        # The same ratio over a window that clears both length floors: 1.4 kWh
+        # of heat from 3.0 kWh of electricity.
+        values = _values(heatingenergy=101.4, compressorenergy=43.0)
 
         calculator._calculate_cop(values)
 
@@ -426,17 +436,17 @@ class TestCalculateCop:
         # A DHW charge: electrical advances, but no space-heating output.
         charging = _values(
             heatingenergy=100.0,
-            compressorenergy=40.3,
+            compressorenergy=40.5,
             hp_status=HP_STATUS_HOT_WATER,
         )
         calculator._calculate_cop(charging)
         assert charging["cop_heating"] is None
 
-        values = _values(heatingenergy=100.6, compressorenergy=40.5)
+        values = _values(heatingenergy=102.0, compressorenergy=41.5)
         calculator._calculate_cop(values)
 
-        # Only the heating interval counts: 0.6 / 0.2, not 0.6 / 0.5.
-        assert values["cop_heating"] == pytest.approx(3.0)
+        # Only the heating interval counts: 2.0 / 1.0, not 2.0 / 1.5.
+        assert values["cop_heating"] == pytest.approx(2.0)
 
     def test_aux_only_tank_charge_publishes_a_dhw_cop(self):
         """Compressor stopped, element charging the tank, pump reporting idle."""
@@ -476,8 +486,8 @@ class TestCalculateCop:
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         values = _values(
-            heatingenergy=100.6,
-            compressorenergy=40.2,
+            heatingenergy=102.0,
+            compressorenergy=41.0,
             additionalenergy=10.4,
             dhwdemand=1,
             bt30=51.0,
@@ -485,23 +495,24 @@ class TestCalculateCop:
 
         calculator._calculate_cop(values)
 
-        # 0.6 kWh of house heat against the compressor's 0.2 kWh, not 0.6 kWh.
-        assert values["cop_heating"] == pytest.approx(3.0)
+        # 2.0 kWh of house heat against the compressor's 1.0 kWh, not 1.4.
+        assert values["cop_heating"] == pytest.approx(2.0)
         assert values["cop_dhw"] == pytest.approx(0.509, abs=1e-3)
 
     def test_auxiliary_heat_flagged_for_heating_is_not_dhw(self):
         calculator = _Calculator()
         calculator._calculate_cop(_values())
         values = _values(
-            heatingenergy=100.6,
-            compressorenergy=40.1,
-            additionalenergy=10.4,
+            heatingenergy=103.0,
+            compressorenergy=41.0,
+            additionalenergy=11.5,
             dhwdemand=1,
             additiondemand=1,
         )
 
         calculator._calculate_cop(values)
 
+        # 3.0 kWh of heat against 1.0 + 1.5 kWh of electrical input.
         assert values["cop_heating"] == pytest.approx(1.2)
         assert values["cop_dhw"] is None
 
@@ -513,9 +524,9 @@ class TestCalculateCop:
         baseline.pop("additiondemand")
         calculator._calculate_cop(baseline)
         values = _values(
-            heatingenergy=100.6,
-            compressorenergy=40.1,
-            additionalenergy=10.4,
+            heatingenergy=103.0,
+            compressorenergy=41.0,
+            additionalenergy=11.5,
         )
         values.pop("dhwdemand")
         values.pop("additiondemand")
@@ -940,18 +951,18 @@ class TestCalculateCop:
             return_value=t1,
         ):
             calculator._calculate_cop(
-                _values(heatingenergy=100.1, compressorenergy=40.0)
+                _values(heatingenergy=100.4, compressorenergy=40.0)
             )
 
-        values = _values(heatingenergy=101.1, compressorenergy=40.3)
+        values = _values(heatingenergy=104.4, compressorenergy=41.2)
         with patch(
             "custom_components.qvantum.calculations.dt_util.utcnow",
             return_value=t2,
         ):
             calculator._calculate_cop(values)
 
-        # Baseline is the t1 sample (+1.0 kWh heating, +0.3 kWh compressor),
-        # not the t0 seed (+1.1 / +0.3).
+        # Baseline is the t1 sample (+4.0 kWh heating, +1.2 kWh compressor),
+        # not the t0 seed (+4.4 / +1.2).
         assert values["cop_heating"] == pytest.approx(10 / 3)
 
     def test_keeps_the_previous_sample_when_polls_exceed_the_window(self):
@@ -1093,3 +1104,23 @@ def test_the_charge_counters_reach_the_poll_payload():
 
     assert values["dhw_charge_electrical_energy"] == pytest.approx(0.7)
     assert values["dhw_charge_element_energy"] == pytest.approx(0.0)
+
+
+def test_a_two_step_electrical_window_publishes_nothing():
+    """The floors are a quantisation bound, and they are per side.
+
+    0.2 kWh of each is ±100 % on a 0.1 kWh counter, and exactly 1.0 is the
+    smallest value it can produce. One side clearing its floor is not enough.
+    """
+    calculator = _Calculator()
+    calculator._calculate_cop(_values())
+
+    # Enough heat, too little electricity.
+    values = _values(heatingenergy=105.0, compressorenergy=40.2)
+    calculator._calculate_cop(values)
+    assert values["cop_heating"] is None
+
+    # Enough electricity, too little heat.
+    values = _values(heatingenergy=100.2, compressorenergy=43.0)
+    calculator._calculate_cop(values)
+    assert values["cop_heating"] is None

@@ -100,18 +100,40 @@ Both are documented with their measurements in
 ## The heating COP window
 
 `cop_heating` is one rolling hour (`COP_WINDOW_SECONDS`) of counter deltas, and it
-publishes only when the window holds **both** measurable electricity
-(`COP_MIN_ELECTRICAL_KWH` 0.2 kWh, two 0.1 kWh steps) and measurable delivered
-heat (`COP_MIN_THERMAL_KWH`, the same two steps). The thermal half was added
-after a night hour on a live QE-6 spent the compressor's work on a 61.7 °C buffer
-while the delivered-heat counter stood still: 0.3 kWh of electricity against
-0.0 kWh of heat published as a ratio of 0.
+publishes only when the window holds **both** 1.0 kWh of electrical input
+(`COP_MIN_HEATING_ELECTRICAL_KWH`) and 1.0 kWh of delivered heat
+(`COP_MIN_THERMAL_KWH`).
 
-The floor is deliberately at two counter steps, not at a "plausible" level. The
-same night produced an hour of 0.7 kWh of heat from 1.5 kWh of electricity —
-COP 0.47 — which is a **real** figure for the regime described above: a 70 K lift
-into a 61.7 °C buffer with the evaporator at −7.5 °C. Suppressing that would hide
-the one thing the sensor exists to show.
+**The floors are set by quantisation, not by a "plausible" level.** Both counters
+step in 0.1 kWh, so a ratio of the two carries a relative error of roughly
+`0.1 / E + 0.1 / T`. At the two-step floors the sensor carried earlier (0.2 kWh
+each) that is **±100 %**, and exactly 1.0 is the smallest value it can reach
+(0.2 / 0.2). Measured over ten days on a live QE-6: **15 % of 9 634**
+`cop_heating` values were exact integers and **42 %** sat on the 0.1 kWh grid —
+the signature of a small denominator, and what made a one-hour drop look like a
+fault on a dashboard. At 1.0 kWh each the same bound is ±20 %, which lets the
+figure distinguish 1.7 from 2.5. There is deliberately no higher floor: at
+2.0 kWh most night hours would fall out and the sensor would become a daytime
+one, where the pump's electrical input runs 0.9–1.4 kWh/h.
+
+**Raising the floors does not make the figure correct.** `heatingenergy` reads
+below the pump's own compressor input (see *the DHW heat-meter comparison* and
+`qe-architecture.md` §11), so the level carries a bias that no window setting
+fixes — the sensor is a **trend** instrument until that is explained.
+
+The thermal half was added after a night hour on a live QE-6 spent the
+compressor's work on a 61.7 °C buffer while the delivered-heat counter stood
+still: an hour that would otherwise publish a ratio of 0. The same night
+produced an hour of 1.4 kWh of heat from 3.0 kWh of electricity — COP 0.47 — which
+is a **real** figure for the regime described above: a 70 K lift into a 61.7 °C
+buffer with the evaporator at −7.5 °C. Suppressing that would hide the one thing
+the sensor exists to show, which is why the floor is a quantisation bound and
+not a quality judgement.
+
+The **DHW charge** keeps its own, lower floor (`DHW_CHARGE_MIN_ELECTRICAL_KWH`
+0.2): a charge accumulates over its whole segment, so a short element top-up is
+a real measurement at two counter steps, and the two gates answer different
+questions.
 
 Defrost is **not** part of that explanation, although it looks like it. The same
 window ran 15 defrosts of exactly 5 minutes each — every 50 minutes, 8 % duty —
