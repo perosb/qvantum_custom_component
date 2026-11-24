@@ -231,6 +231,49 @@ Two invariants that are easy to break in review:
 A counter reset drops the window and the open charge; a charge older than
 `DHW_CHARGE_MAX_SECONDS` restarts its baseline.
 
+## The DHW charging counters
+
+The pump has **no meter for charging the tank**. `dhwenergy` meters the *draw* on
+the secondary side (BT33 → BT34 × BF1), so it reads **0.00 kWh while a charge
+runs** — that is the design, not a missing counter ([qe-architecture §11](qe-architecture.md#11-what-the-temperatures-mean)).
+The compressor's charging work therefore lands in `compressorenergy` alone, and
+a naive `heatingenergy / compressorenergy` ratio collapses below 1 for exactly
+those hours. Measured 2026-11-24 03:00–06:00: BT30 rose 53.7 → 63.5 °C while the
+two counters reported 0.8 / 0.5 / 0.8 kWh of heat against 1.4 / 1.2 / 1.4 kWh of
+compressor work, and the ratio returned to 2.4–2.7 the moment the charge ended.
+
+Two sensors make that electricity visible:
+
+| Sensor | What it sums |
+|---|---|
+| `dhw_charge_electrical_energy` | every kWh the electrical split **attributed to hot water** — compressor and element together |
+| `dhw_charge_element_energy` | the **element's** share of that, and only while the addition shunt is closed |
+
+Both are `total_increasing` kWh counters, persisted in the COP store and restored
+on start: a counter that restarts at zero is read as a reset in the statistics.
+They are **diagnostic** entities and derived keys, so they are created explicitly
+and are deliberately absent from every `DEFAULT_ENABLED_*` list.
+
+**One classifier, two questions.** Both read `_split_electrical_input`, the same
+function the COP ratios use — a second mode test keyed on `hp_status` would be a
+copy that drifts from the ratios it is supposed to explain. Only the newest
+interval is booked, because the COP window is re-walked on every poll.
+
+**Why the element counter is gated on the shunt.** `qn8position` open means the
+addition shunt blends tank water into the heating circuit, so the element's heat
+is delivered to the house and belongs to the heating ratio. The electrical
+counter still books the kWh (the electricity was consumed either way); the
+element counter does not, because it claims the heat stayed in the tank. The
+gate is `shunt_blends_into_heating` — one spelling of the rule, shared with
+`element_only_tank_balance`. A missing `qn8position` is not evidence of heat
+flow, so an install without it behaves as before.
+
+**Not in the summary export, on purpose.** Both figures are lifetime totals with
+no window of their own, so a cross-install comparison would compare counters of
+different ages — the reason `compressorenergy` is not pooled either. They are in
+the config-entry diagnostics (`cop.charge_electrical_kwh` /
+`cop.charge_element_kwh`) and as entities, where a dump is taken at one instant.
+
 ## `dhw_standing_loss`
 
 An EMA persisted in `qvantum.efficiency.<entry_id>` and restored before the first

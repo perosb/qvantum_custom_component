@@ -357,6 +357,15 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # out of both COP ratios, so it is counted here to be visible in a
         # support dump instead of vanishing.
         self._cop_unattributed_kwh = 0.0
+        # Electrical input the mode split attributed to hot water since this
+        # counter was created, and the element's share of it. The pump has no
+        # meter for charging the tank — ``dhwenergy`` meters the *draw* on the
+        # secondary side, so it reads zero while a charge runs — which left the
+        # charging electricity invisible in both the heating and the DHW
+        # figure. Persisted, because a ``total_increasing`` sensor that restarts
+        # at zero reads as a counter reset in the statistics.
+        self._dhw_charge_electrical_kwh = 0.0
+        self._dhw_charge_element_kwh = 0.0
         # The open DHW charge segment (baseline tank, accumulated draw and
         # electrical input), or None when no charge is running.
         self._dhw_charge: DhwCharge | None = None
@@ -612,6 +621,16 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             data.get("dhw_tank_liters"), positive=True
         )
         self._dhw_meter = DhwMeterWindow.from_list(data.get("dhw_meter"))
+        # A counter, so zero is a legitimate stored value: only a value that is
+        # not a finite number is rejected, and the running total is kept.
+        electrical = self._coerce_store_number(
+            data.get("dhw_charge_electrical_energy")
+        )
+        if electrical is not None and electrical >= 0.0:
+            self._dhw_charge_electrical_kwh = electrical
+        element = self._coerce_store_number(data.get("dhw_charge_element_energy"))
+        if element is not None and element >= 0.0:
+            self._dhw_charge_element_kwh = element
         if self._cop_last:
             _LOGGER.debug("Restored COP snapshot: %s", self._cop_last)
 
@@ -872,6 +891,7 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         if self._last_persisted_cop_state is None and not (
             self._dhw_tank_liters is not None
             or self._dhw_meter.buckets
+            or self._dhw_charge_electrical_kwh > 0.0
             or any(self._cop_last.get(key) is not None for key in _COP_KEYS)
         ):
             # Nothing has been computed yet; do not write an empty snapshot on
@@ -888,6 +908,10 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             "cop_dhw_updated_at": self._cop_time_iso("cop_dhw"),
             "dhw_tank_liters": self._dhw_tank_liters,
             "dhw_meter": self._dhw_meter.as_list(),
+            "dhw_charge_electrical_energy": round(
+                self._dhw_charge_electrical_kwh, 3
+            ),
+            "dhw_charge_element_energy": round(self._dhw_charge_element_kwh, 3),
         }
         try:
             await self._cop_store.async_save(payload)
@@ -910,6 +934,8 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             self._cop_time_iso("cop_dhw"),
             None if self._dhw_tank_liters is None else round(self._dhw_tank_liters, 1),
             self._dhw_meter.signature(),
+            round(self._dhw_charge_electrical_kwh, 3),
+            round(self._dhw_charge_element_kwh, 3),
         )
 
     def _cop_time_iso(self, key: str) -> str | None:
@@ -929,6 +955,18 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
     def dhw_tank_liters(self) -> float | None:
         """Return the effective DHW tank volume, once a charge identified it."""
         return self._dhw_tank_liters
+
+    def dhw_charge_electrical_energy(self) -> float:
+        """Electrical input attributed to charging the tank, in kWh."""
+        return self._dhw_charge_electrical_kwh
+
+    def dhw_charge_element_energy(self) -> float:
+        """The element's share of that charging input, in kWh.
+
+        Counted only while the addition shunt is closed, because an open shunt
+        delivers the element's heat to the heating circuit instead.
+        """
+        return self._dhw_charge_element_kwh
 
     def dhw_charge_open(self) -> bool:
         """Return whether a DHW charge segment is currently being measured."""

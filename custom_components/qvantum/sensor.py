@@ -95,6 +95,16 @@ _UPPERCASE_SENSORS = frozenset({"price_region"})
 #: Diagnostics. Primary temperatures (outdoor/indoor/tank/flow), the energy
 #: counters, the tap-water comfort figures and the derived COP/efficiency
 #: headlines stay in the main UI.
+#: Electrical input attributed to charging the tank, and the element's share of
+#: it. Derived on both transports from the counters the COP split already reads
+#: (``calculations._split_electrical_input``), so they are created explicitly
+#: rather than fetched — a derived key must never enter ``DEFAULT_ENABLED_*``.
+#: Both names carry ``energy``, so ``_get_sensor_type`` gives them the kWh /
+#: TOTAL_INCREASING energy class without another branch.
+_DHW_CHARGE_KEYS = frozenset(
+    {"dhw_charge_electrical_energy", "dhw_charge_element_energy"}
+)
+
 _DIAGNOSTIC_SENSORS = frozenset(
     {
         # Lifetime counters and countdowns
@@ -105,6 +115,9 @@ _DIAGNOSTIC_SENSORS = frozenset(
         "ventilation_fan_run_time",
         "active_alarms",
         *_ALARM_CODE_SENSORS,
+        # Charging the tank is machine-internal accounting the pump has no meter
+        # for; it explains a COP rather than reporting a comfort value.
+        *_DHW_CHARGE_KEYS,
         # Per-compressor-unit QG block (input 119-148): one refrigerant circuit
         # per unit, so these are machine-internal even though the legacy
         # averaged bt10/bt13/... are listed below for the same reason.
@@ -472,6 +485,10 @@ async def async_setup_entry(
             coordinator, _HEATING_POWER_KEY, device, True
         )
     )
+    for charge_key in sorted(_DHW_CHARGE_KEYS):
+        sensors.append(
+            _get_sensor_type(charge_key)(coordinator, charge_key, device, True)
+        )
     if coordinator.modbus_enabled:
         # Local Modbus: display firmware from input registers 191-193 and the
         # custom heating-curve shadow sensors (no cloud equivalent).
@@ -588,6 +605,7 @@ async def async_setup_entry(
         "tap_stop",
         _HEATING_POWER_KEY,
         *_COP_SENSOR_KEYS,
+        *_DHW_CHARGE_KEYS,
     }
 
     # Rolling efficiency figures come from the efficiency coordinator. Created

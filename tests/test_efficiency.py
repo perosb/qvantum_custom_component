@@ -50,6 +50,8 @@ class _Calculator(QvantumCalculationsMixin):
         ] = deque()
         self._cop_last: dict[str, float | None] = {}
         self._cop_unattributed_kwh = 0.0
+        self._dhw_charge_electrical_kwh = 0.0
+        self._dhw_charge_element_kwh = 0.0
         self._cop_last_times: dict[str, datetime] = {}
         self._dhw_charge = None
         self._dhw_tank_liters: float | None = None
@@ -1000,3 +1002,78 @@ class TestCalculateCop:
 
         assert "cop_heating" not in values
         assert calculator._last_cop_energies == baseline
+
+
+class TestDhwChargeCounters:
+    """The charging electricity the pump has no meter for.
+
+    ``dhwenergy`` meters the draw on the secondary side, so it reads zero while
+    the tank charges and the compressor's work lands in `compressorenergy`
+    alone. These counters book it from the same attribution the COP ratios use.
+    """
+
+    def test_hot_water_mode_books_the_whole_interval(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        calculator._calculate_cop(
+            _values(
+                hp_status=HP_STATUS_HOT_WATER,
+                compressorenergy=40.7,
+                additionalenergy=10.0,
+                bt30=53.0,
+            )
+        )
+
+        assert calculator._dhw_charge_electrical_kwh == pytest.approx(0.7)
+        assert calculator._dhw_charge_element_kwh == pytest.approx(0.0)
+
+    def test_element_energy_while_idle_is_charged(self):
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        calculator._calculate_cop(
+            _values(
+                hp_status=HP_STATUS_IDLE,
+                dhwdemand=1,
+                compressorenergy=40.0,
+                additionalenergy=11.0,
+                bt30=52.0,
+            )
+        )
+
+        assert calculator._dhw_charge_electrical_kwh == pytest.approx(1.0)
+        assert calculator._dhw_charge_element_kwh == pytest.approx(1.0)
+
+    def test_an_open_shunt_keeps_the_element_in_heating(self):
+        """An open addition shunt sends the element's heat to the circuit.
+
+        The electricity is still attributed to hot water by the demand flags, so
+        the electrical counter books it; only the element counter is gated on
+        the shunt, because that is the one claiming the heat stayed in the tank.
+        """
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        calculator._calculate_cop(
+            _values(
+                hp_status=HP_STATUS_IDLE,
+                dhwdemand=1,
+                additionalenergy=11.0,
+                qn8position=7,
+                bt30=52.0,
+            )
+        )
+
+        assert calculator._dhw_charge_electrical_kwh == pytest.approx(1.0)
+        assert calculator._dhw_charge_element_kwh == pytest.approx(0.0)
+
+    def test_an_interval_is_counted_once_per_poll(self):
+        """The window is re-walked every poll; only the closed interval is new."""
+        calculator = _Calculator()
+        calculator._calculate_cop(_values(bt30=50.0))
+        calculator._calculate_cop(_values(hp_status=HP_STATUS_HOT_WATER,
+                                          compressorenergy=40.5, bt30=52.0))
+        first = calculator._dhw_charge_electrical_kwh
+        calculator._calculate_cop(_values(hp_status=HP_STATUS_HOT_WATER,
+                                          compressorenergy=40.5, bt30=52.2))
+
+        # The same interval must not be added again by the re-walk.
+        assert calculator._dhw_charge_electrical_kwh == pytest.approx(first)

@@ -580,11 +580,18 @@ review has to catch:
 
 - Never add a derived key (`cop_*`, `scop_total`, `aux_heat_share`,
   `efficiency_health`, `tap_water_cap`/`tap_water_minutes`, `dhw_meter_*`,
-  `heating_power_mean_w`) to `DEFAULT_ENABLED_*` /
+  `dhw_charge_*`, `heating_power_mean_w`) to `DEFAULT_ENABLED_*` /
   `DEFAULT_DISABLED_*`: those lists are also the fetch universe, so the client
   would request a metric the API does not return. Create the entity explicitly
   in its platform and list the key in `special_sensor_keys`, so registry cleanup
   keeps it.
+- **A counter's meaning is its doc section, not what it did in the window you
+  looked at.** `dhwenergy` is a *draw* meter (BT33 → BT34 × BF1) and reads 0
+  while the tank charges — that is the design (`docs/qe-architecture.md` §11),
+  not a missing counter. The charge work is attributed from
+  `compressor_energy` by `_split_electrical_input` and published as
+  `dhw_charge_electrical_energy` / `dhw_charge_element_energy`; read
+  `docs/derived-metrics.md` before explaining a figure that looks wrong.
 - **The element is attributed by `additiondhwdemand`**, its own DHW flag — not by
   the demand flags, which have almost always cleared by the time a coarse counter
   steps. Energy that still cannot be attributed is counted in
