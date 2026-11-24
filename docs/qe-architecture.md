@@ -680,6 +680,7 @@ Each step can lose information:
 | "The 175 L tank is a hot-water tank." | It is a buffer tank for heating water; DHW is through-flow. | Otherwise one assumes the tank can be drained like a DHW tank and that legionella is relevant. |
 | "The compressor heats the tap water directly." | The compressor charges the buffer tank; the plate heat exchanger transfers heat to the tap water. | Explains why draw power can exceed compressor power. |
 | "`dhwenergy` is the compressor's DHW production." | It is the draw meter on the secondary side. | Gives wrong COP and wrong energy balance if used as production. |
+| "`heatingenergy` is a validated heat meter." | It is a counter whose level reads **30–40 % below** a tank-balance measurement (2.56 kW thermal from 1.27 kW electrical, measured 2026-11-24 at −1.2 °C; see `derived-metrics.md`, *the tank as a calorimeter*). | Every COP and SCOP built on it is a **trend**, not a level. |
 | "`dhwpower` × time is the draw energy." | `dhwpower` is instantaneous power from `BF1 × ΔT`; it reads ~5 % above the meter because the meter cannot resolve short draws. | Use `dhwenergy` for energy, `dhwpower` for power. |
 | "A 6 kW heat pump cannot deliver 15 kW DHW." | It can deliver 10–20 kW briefly from the tank; the compressor recharges afterwards. | Explains why a small pump can serve a shower. |
 | "BT30 is the tap-water temperature." | BT30 is one point in the buffer tank. | Stratification means the top can be much hotter. |
