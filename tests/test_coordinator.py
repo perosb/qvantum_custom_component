@@ -6313,7 +6313,7 @@ class TestAirDeltaMean:
         # 34 K while running, 0 K while idle: the cycle mean is 17.
         assert values["air_delta_mean_k"] == pytest.approx(17.0, rel=0.02)
 
-    def test_a_ground_source_payload_books_nothing(self):
+    def test_a_modbus_ground_source_payload_books_nothing(self):
         """BT14/BT15 are ground-source water there, so the drop means nothing."""
         coordinator = self._make_coordinator()
         start = dt_util.utcnow()
@@ -6331,3 +6331,35 @@ class TestAirDeltaMean:
             )
 
         assert "air_delta_mean_k" not in values
+
+    def test_a_cloud_ground_source_payload_books_nothing(self):
+        """The unit block is Modbus-only, so the cloud needs the model.
+
+        On a cloud QG the `ep10_*` keys never appear, and a guard that checked
+        only them would book water temperatures as an air-side drop.
+        """
+        coordinator = self._make_coordinator()
+        coordinator._device = {"model": "QG-14"}
+        start = dt_util.utcnow()
+        for step in range(0, 40):
+            values = self._poll(
+                coordinator,
+                {"hp_status": 3, "heatingpower": 2000.0, "bt14": 4.5, "bt15": 1.2},
+                start + timedelta(seconds=60 * step),
+            )
+
+        assert "air_delta_mean_k" not in values
+
+    def test_a_cloud_air_source_payload_still_books(self):
+        """An air-source model must not be silenced by the new gate."""
+        coordinator = self._make_coordinator()
+        coordinator._device = {"model": "QE-6"}
+        start = dt_util.utcnow()
+        for step in range(0, 40):
+            values = self._poll(
+                coordinator,
+                {"hp_status": 3, "heatingpower": 2000.0, "bt14": 21.0, "bt15": -13.0},
+                start + timedelta(seconds=60 * step),
+            )
+
+        assert values["air_delta_mean_k"] == pytest.approx(34.0, rel=0.05)

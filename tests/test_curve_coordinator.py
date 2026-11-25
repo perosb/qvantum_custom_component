@@ -4779,3 +4779,11 @@ async def test_the_electrical_mean_rejects_a_non_reading() -> None:
 
     assert coordinator.load_power_mean_electrical_w is None
     assert make_coordinator(values={}).load_power_mean_electrical_w is None
+
+
+async def test_the_air_delta_is_exported_from_the_same_poll() -> None:
+    """The air-side drop rides beside the load means, from the same values."""
+    coordinator = make_coordinator(values={"air_delta_mean_k": 27.3})
+
+    assert coordinator.air_delta_mean_k == pytest.approx(27.3)
+    assert make_coordinator(values={}).air_delta_mean_k is None

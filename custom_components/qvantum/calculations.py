@@ -125,6 +125,24 @@ def _heating_power_ceiling(values: Mapping[str, Any]) -> float | None:
     return float(power) * HEATING_POWER_COP_CEILING
 
 
+def _ground_source_family(
+    values: Mapping[str, Any], device: object = None
+) -> bool:
+    """Whether this poll comes from the ground-source family (QG).
+
+    Two identifiers, because neither transport carries both: the
+    per-compressor-unit block (``ep10_*``/``ep11_*``) exists only on Modbus, and
+    ``device.model`` only on the cloud, where the API reports it while Modbus
+    probes nothing of the kind. A guard that checked one of them would be silent
+    on the other transport — and on a cloud QG it would book water temperatures
+    as an air-side drop.
+    """
+    if any(str(key).startswith(("ep10_", "ep11_")) for key in values):
+        return True
+    model = device.get("model") if isinstance(device, Mapping) else None
+    return isinstance(model, str) and model.strip().upper().startswith("QG")
+
+
 def _split_electrical_input(
     *,
     hp_status: object,
@@ -350,9 +368,9 @@ class QvantumCalculationsMixin:
             values["compressor_power_mean_w"] = round(electrical_mean, 1)
         # The air-side drop over the same intervals. BT14/BT15 are evaporator
         # **air** on QE/QA+QH and ground-source **water** on QG, where the figure
-        # would mean nothing; the per-compressor-unit block identifies that
-        # family, so the mean is simply not booked there.
-        if not any(key.startswith(("ep10_", "ep11_")) for key in values):
+        # would mean nothing; `_ground_source_family` identifies that family on
+        # either transport, so the mean is simply not booked there.
+        if not _ground_source_family(values, getattr(self, "_device", None)):
             air_in = finite(values.get("bt14"))
             air_out = finite(values.get("bt15"))
             self._air_delta_mean.add(

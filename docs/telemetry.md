@@ -140,8 +140,9 @@ regenerated in the same PR.
 contribution `(P_thermal − P_elec) / P_elec` — the figure that separates a pump
 starved of air (blocked filter, low fan, a ducted installation) from a house that
 is simply hard to heat, and it needs **no assumed airflow**. It is withheld on the
-ground-source family, where `BT14`/`BT15` are water rather than air; the
-per-compressor-unit block identifies that family.
+ground-source family, where `BT14`/`BT15` are water rather than air — identified
+by the per-compressor-unit block on Modbus and by `device.model` (`QG…`) on the
+cloud, because neither transport carries both.
 
 `plant` also carries the ventilation side: `fan_speed_2` (holding 69,
 `fan_speed_reduced` — the register the firmware actually uses as its base in
