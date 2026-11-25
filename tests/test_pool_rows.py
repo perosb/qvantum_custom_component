@@ -112,10 +112,7 @@ def test_a_string_setting_survives_the_plant_coercion():
     """
     from custom_components.qvantum.summary import plant_summary
 
-    plant = plant_summary(
-        {"fan_speed_2": 65, "fan_normal": 60, "fanspeedselector": "normal"}
-    )
+    plant = plant_summary({"fan_speed_2": 65, "fanspeedselector": "normal"})
 
     assert plant["fan_speed_2"] == 65
-    assert plant["fan_normal"] == 60
     assert plant["fanspeedselector"] == "normal"

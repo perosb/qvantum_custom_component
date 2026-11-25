@@ -173,14 +173,13 @@ _ENTITY_PREFIXES = (
 #: under-reading the author's pump, or the fleet's? Without it, `load_c: 0` reads
 #: identically on a healthy counter and on a biased one. Additive; no existing
 #: field changes meaning.
-#: v19 also carries `plant.fan_speed_2`, `plant.fan_normal` and
-#: `plant.fanspeedselector`. They were added **without a bump** because no release
-#: had carried 19 yet — the rule is "edit an unshipped version in place, bump a
-#: shipped one", not "bump on every commit". `fan_speed_2` is the register the
-#: firmware actually uses as its base in `normal` mode (measured 2026-11-24:
-#: 65 -> 75 changed `fanrpm` by exactly 15.4 % while `fan_normal` sat at 60), so
-#: the pair is what lets the pool weight a SCOP against the ventilation a pump
-#: really runs at.
+#: v19 also carries `plant.fan_speed_2` and `plant.fanspeedselector`. They joined
+#: **without a bump** because no release had carried 19 yet — the rule is "edit an
+#: unshipped version in place, bump a shipped one", not "bump on every commit".
+#: `fan_speed_2` is the register the firmware actually uses as its base in
+#: `normal` mode (measured 2026-11-24: 65 -> 75 changed `fanrpm` by exactly
+#: 15.4 %), and the mode is what says whether that number was in force. Together
+#: they let the pool weight a SCOP against the ventilation a pump really runs at.
 SUMMARY_SCHEMA_VERSION = 19
 
 #: Plant settings that describe the control loops. Everything else in the
@@ -199,13 +198,14 @@ PLANT_KEYS: tuple[str, ...] = (
     "tap_water_stop",
     "max_heating_supply",
     "stop_heating",
-    # The ventilation side. `fan_speed_2` is the raw holding 69 (`fan_speed_reduced`)
-    # and is the base the firmware actually uses in `normal` mode — measured
-    # 2026-11-24: 65 -> 75 moved `fanrpm` by exactly 15.4 %, while `fan_normal`
-    # (holding 70) stayed at 60 and describes nothing. Pooled against `scop_total`
-    # it is the one air-side question a single installation cannot answer.
+    # The ventilation side, and only what is verified: `fan_speed_2` is holding 69
+    # (`fan_speed_reduced`), the base the firmware actually uses in `normal` mode
+    # — measured 2026-11-24: 65 -> 75 moved `fanrpm` by exactly 15.4 %. The mode
+    # travels beside it because the number means nothing without knowing which one
+    # is in force. `fan_normal` (holding 70) is deliberately **not** exported: it
+    # stayed at 60 while the fan ran at 75, so its meaning in `extra` mode is
+    # unverified, and a field nobody can interpret is worse than an absent one.
     "fan_speed_2",
-    "fan_normal",
     "fanspeedselector",
 )
 

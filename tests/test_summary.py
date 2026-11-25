@@ -47,7 +47,6 @@ VALUES = {
     "max_heating_supply": 65,
     "stop_heating": 17,
     "fan_speed_2": 65,
-    "fan_normal": 60,
     "fanspeedselector": "normal",
     "room_temp_external": 19.8,
     "bt2": 20.5,

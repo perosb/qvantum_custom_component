@@ -592,11 +592,15 @@ git show <tag>:custom_components/qvantum/summary.py | grep SUMMARY_SCHEMA_VERSIO
   no user ever uploaded.
 - A value a **release** has carried is **bumped**. A *pre-release counts* — its
   users upload rows the moment it is installed.
-- Every version a release carries gets a row in `tests/data/pool_rows.json`;
-  `tests/test_pool_rows.py` fails CI without one, and the row must be regenerated
-  whenever the shape changes. Regenerating the current row is part of the same
-  PR. Versions that only ever lived in `main` (15, 17) get **none** — no row
-  exists to describe, and inventing one would be a shape nobody uploaded.
+- **CI enforces the current version, and only that**: `tests/test_pool_rows.py`
+  fails unless `tests/data/pool_rows.json` has a row for
+  `SUMMARY_SCHEMA_VERSION`, and compares that row block by block against the live
+  export. Regenerating it is part of the same PR as the schema change.
+- **Add a row for the version a release carries, when you bump.** The file holds
+  one row per *interesting* generation (8, 13, 14, 16, 19), not every one that
+  ever shipped — 5, 7, 9, 10, 11 and the v18 pre-release have none, and backfilling
+  them would mean writing shapes nobody uploaded. That is a deliberate gap, not a
+  to-do.
 - Check the tag, not `manifest.json`: a pre-release does not bump the manifest, so
   it says the last *stable* version while a newer pre-release is in users' hands.
 

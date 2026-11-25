@@ -331,7 +331,6 @@
   "integration_version": "2026.10.4",
   "plant": {
    "curve_type_heating": 1,
-   "fan_normal": 60,
    "fan_speed_2": 65,
    "fanspeedselector": "normal",
    "indoor_temperature_offset": null,

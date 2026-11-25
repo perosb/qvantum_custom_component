@@ -75,10 +75,17 @@ why; a test pins the floor so a silent revert cannot pass.
 two meanings out of one pool key, so a version that no release has carried has no
 rows to protect: further schema-shaped changes on `main` before the next release
 edit the current number in place and append to its comment instead of bumping
-again. Check the released `manifest.json` (or the latest tag) before deciding —
-2026.11.2 is the newest stable release and carries **v10**, so **v11** is the first
-number that needs a row of its own (and v11 therefore may not fold further changes
-once it ships; before that, edit it in place as usual). v9 added
+again. Decide from the **tags**, not `manifest.json` — a pre-release does not bump
+the manifest, so it names the last stable version while a newer pre-release is
+already in users' hands:
+
+```bash
+git tag --sort=-creatordate | head -3
+git show <tag>:custom_components/qvantum/summary.py | grep SUMMARY_SCHEMA_VERSION
+```
+
+A **pre-release counts as shipped**, because its users upload rows the moment it
+is installed. v9 added
 `daily_wind_evidence_days` beside `daily_wind_cold_hours`: the wind gate wants
 cold+windy hours **and** the days carrying them, and a row reporting only the
 hours cannot separate "200 h on four days" (refused) from a window with no
@@ -130,10 +137,12 @@ regenerated in the same PR.
 
 `plant` also carries the ventilation side: `fan_speed_2` (holding 69,
 `fan_speed_reduced` — the register the firmware actually uses as its base in
-`normal` mode), `fan_normal` (holding 70, which stayed at 60 while the fan ran at
-75, so it describes nothing) and `fanspeedselector`. Pooled against
-`fitted.scop_total` they answer the air-side question a single installation
-cannot: does a pump's SCOP depend on the ventilation it runs at?
+`normal` mode) and `fanspeedselector`, which says whether that number was in
+force. Pooled against `fitted.scop_total` they answer the air-side question a
+single installation cannot: does a pump's SCOP depend on the ventilation it runs
+at? `fan_normal` (holding 70) is deliberately **not** exported — it stayed at 60
+while the fan ran at 75, so its meaning in `extra` mode is unverified, and the
+pool question can be asked of `normal` rows alone.
 
 ### Fixtures move with the schema
 
