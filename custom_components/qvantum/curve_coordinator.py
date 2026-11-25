@@ -1861,6 +1861,19 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return float(value)
 
     @property
+    def load_power_mean_electrical_w(self) -> float | None:
+        """The compressor's input mean over the same window as the load mean.
+
+        The load term refuses a thermal figure below 1.5× this, because no
+        running heat pump sits there — so a pooled row needs both numbers to show
+        whether the guard is silent on a healthy counter or on a biased one.
+        """
+        value = self._main_values().get("compressor_power_mean_w")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return float(value)
+
+    @property
     def load_power_coverage_hours(self) -> float | None:
         """How much of the load mean's window is actually observed.
 
