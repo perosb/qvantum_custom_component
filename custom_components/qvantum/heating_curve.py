@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from typing import TypeGuard
 
 from .client.modbus.maps import HEATING_CURVE_OUTDOOR_TEMPS
-from .numeric import median
+from .numeric import finite, median
 from .solar_gain import (
     SolarDailyModel,
     SolarModel,
@@ -94,6 +94,13 @@ WIND_SMOOTH_HOURS: int = 3
 
 #: Load term clamp (only ever reduces the curve).
 LOAD_MAX_C = 0.5
+#: A heat pump cannot sustain a thermal-to-electrical ratio below this while it
+#: heats. Under it, the figure the term reads is not a thermal measurement — on a
+#: live QE-6 on 2026-11-25 the ``heatingpower`` mean was **1348 W against 1386 W**
+#: of compressor input (a ratio of 0.97) at 4240 rpm, where the air-side balance
+#: put the real output near 3 kW. Without the guard the term read that as the
+#: pump coasting and took 0.3–0.5 K off the supply of a house already 0.4 K cold.
+LOAD_MIN_THERMAL_TO_ELECTRICAL = 1.5
 #: Measured/predicted shortfall that reaches the full load reduction.
 LOAD_SPAN = 0.5
 #: Predicted demand must exceed this multiple of the identified heat-loss
@@ -575,6 +582,7 @@ def load_adjustment_c(
     ghi_by_hour: Mapping[int, float],
     now_ts: int,
     daily: SolarDailyModel | None = None,
+    compressor_power_w: float | None = None,
 ) -> float:
     """One-sided reduction when the pump coasts below the model demand.
 
@@ -588,6 +596,17 @@ def load_adjustment_c(
         return 0.0
     if indoor_target_c is None or outdoor_c is None:
         return 0.0
+    # The term's premise is a pump that *deliberately* delivers less than the
+    # model asks. A thermal figure below LOAD_MIN_THERMAL_TO_ELECTRICAL of the
+    # compressor's input breaks that premise physically: a running heat pump
+    # cannot be there, so the figure is the counter, not a level. A missing
+    # electrical reading is not evidence either way, so the term keeps working
+    # where it always did.
+    electrical = finite(compressor_power_w)
+    if electrical is not None and electrical > 0.0:
+        thermal = finite(q_actual_w)
+        if thermal is None or thermal < LOAD_MIN_THERMAL_TO_ELECTRICAL * electrical:
+            return 0.0
     expected_w = (
         model.a_w_per_k * (indoor_target_c - outdoor_c)
         + model.c_w
@@ -1433,6 +1452,7 @@ def compute_curve(
     indoor_margin_c: float | None = None,
     indoor_target_c: float | None = None,
     q_actual_w: float | None = None,
+    compressor_power_w: float | None = None,
     outdoor_horizon_hours: int = DEFAULT_OUTDOOR_HORIZON_H,
     point_trims: Mapping[str, float] | None = None,
     min_supply_c: float | None = None,
@@ -1498,6 +1518,7 @@ def compute_curve(
         ghi_by_hour,
         now_ts,
         daily_model,
+        compressor_power_w,
     )
 
     total = _clamp(

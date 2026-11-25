@@ -245,6 +245,17 @@ intervals nothing is published and the term stays inert, so a fresh start (or a
 restart) cannot act on one sample. The window is not persisted across restarts:
 the gate is waited out instead of booking hours no poll observed.
 
+**The term refuses a figure that is physically impossible.** Its premise is a
+pump that *deliberately* delivers less than the model asks; a thermal reading
+below **1.5×** the compressor's own electrical input breaks that premise, because
+no running heat pump sits there. Measured 2026-11-25: the `heatingpower` mean was
+**1348 W against 1386 W** of compressor input at 4240 rpm, while the air-side
+balance put the real output near **3 kW** — the term read the counter's bias as a
+coasting pump and took 0.3–0.5 K off the supply of a house already 0.4 K cold.
+The guard uses `compressor_power` (input 93, validated at a 0.95 ratio against a
+whole-house meter), and a transport without that reading leaves the term exactly
+as it was: absence is not evidence.
+
 The frozen baseline is the app's seven-point table, but that table is only a
 side dump: on Auto the firmware follows holding 23, so it can diverge from what
 the pump actually delivers. While the pump is on Auto the coordinator corrects
