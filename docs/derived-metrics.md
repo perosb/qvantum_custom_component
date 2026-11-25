@@ -116,10 +116,11 @@ figure distinguish 1.7 from 2.5. There is deliberately no higher floor: at
 2.0 kWh most night hours would fall out and the sensor would become a daytime
 one, where the pump's electrical input runs 0.9–1.4 kWh/h.
 
-**Raising the floors does not make the figure correct.** `heatingenergy` reads
-below the pump's own compressor input, so the level carries a bias that no window
-setting fixes — the sensor is a **trend** instrument until that is explained.
-See *the tank as a calorimeter* below for the measurement.
+**Raising the floors does not make the figure correct.** The floors bound one
+error (quantisation); they say nothing about the level. A single reading swings
+between 0.4 and 3.4 kW on an unchanged pump, while the **hour mean** lands within
+10–20 % of an independent tank-and-air balance — see *the tank as a calorimeter*
+below for the measurements.
 
 The thermal half was added after a night hour on a live QE-6 spent the
 compressor's work on a 61.7 °C buffer while the delivered-heat counter stood
