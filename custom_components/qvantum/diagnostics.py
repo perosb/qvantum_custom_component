@@ -733,6 +733,9 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         # cap that simply drifted.
         "indoor_margins_target": getattr(coordinator, "_indoor_margins_target", None),
         "load_power_mean_w": live.get("heating_power_mean_w"),
+        # The electrical mean the implausibility guard compares against; without
+        # it a withheld `load_c` is indistinguishable from an observed balance.
+        "load_power_mean_electrical_w": live.get("compressor_power_mean_w"),
         "load_power_coverage_hours": coverage_hours,
         # Knots of the last active write cycle: a dump must distinguish a knot
         # the forecast cannot reach (the pump keeps an older value) from one the

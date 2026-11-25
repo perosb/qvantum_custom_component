@@ -252,9 +252,13 @@ no running heat pump sits there. Measured 2026-11-25: the `heatingpower` mean wa
 **1348 W against 1386 W** of compressor input at 4240 rpm, while the air-side
 balance put the real output near **3 kW** — the term read the counter's bias as a
 coasting pump and took 0.3–0.5 K off the supply of a house already 0.4 K cold.
-The guard uses `compressor_power` (input 93, validated at a 0.95 ratio against a
-whole-house meter), and a transport without that reading leaves the term exactly
-as it was: absence is not evidence.
+The guard compares **mean with mean**: `heating_power_mean_w` against a
+`compressor_power_mean_w` accumulated over the same window and the same counted
+intervals (`compressor_power`, input 93, validated at a 0.95 ratio against a
+whole-house meter). Against an *instantaneous* reading a cycling pump looks like
+it sits at a fraction of its own input — which is why the two sides share one
+population rather than one mean and one sample. A transport without the reading
+leaves the term exactly as it was: absence is not evidence.
 
 The frozen baseline is the app's seven-point table, but that table is only a
 side dump: on Auto the firmware follows holding 23, so it can diverge from what

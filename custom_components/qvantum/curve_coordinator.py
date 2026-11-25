@@ -3174,7 +3174,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 indoor_margin_c=indoor_margin,
                 indoor_target_c=indoor_target,
                 q_actual_w=q_actual,
-                compressor_power_w=values.get("compressor_power"),
+                compressor_power_w=values.get("compressor_power_mean_w"),
                 point_trims=self._trims if self.active else None,
                 min_supply_c=low,
                 max_supply_c=high,
