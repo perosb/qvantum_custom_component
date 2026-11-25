@@ -116,10 +116,11 @@ figure distinguish 1.7 from 2.5. There is deliberately no higher floor: at
 2.0 kWh most night hours would fall out and the sensor would become a daytime
 one, where the pump's electrical input runs 0.9–1.4 kWh/h.
 
-**Raising the floors does not make the figure correct.** `heatingenergy` reads
-below the pump's own compressor input, so the level carries a bias that no window
-setting fixes — the sensor is a **trend** instrument until that is explained.
-See *the tank as a calorimeter* below for the measurement.
+**Raising the floors does not make the figure correct.** The floors bound one
+error (quantisation); they say nothing about the level. A single reading swings
+between 0.4 and 3.4 kW on an unchanged pump, while the **hour mean** lands within
+10–20 % of an independent tank-and-air balance — see *the tank as a calorimeter*
+below for the measurements.
 
 The thermal half was added after a night hour on a live QE-6 spent the
 compressor's work on a 61.7 °C buffer while the delivered-heat counter stood
@@ -162,18 +163,35 @@ defrost inside the window split out):
 | pre-defrost, 0.63 h | 39.5 → 47.5 °C | 1.61 kWh | 0.80 kWh | 0.81 kWh | 167 m³/h | 2.01 |
 | post-defrost, 0.83 h | 48 → 59 °C | 2.30 kWh | 1.10 kWh | 1.20 kWh | 191 m³/h | 2.09 |
 
-That is **2.56 kW thermal from 1.27 kW electrical**, where `heatingenergy`
-implied 1.5–1.8 kW for comparable windows — the counter reads **30–40 % low**.
-The airflow is what corroborates it: 167–191 m³/h against a designed ventilation
-of roughly 190 m³/h for the house. A number that falls out of an energy balance
-and lands on an independently known quantity is a measurement; one that merely
-looks plausible is not.
+That is **2.56 kW thermal from 1.27 kW electrical**. The airflow is what
+corroborates it: 167–191 m³/h against a designed ventilation of roughly 190 m³/h
+for the house. A number that falls out of an energy balance and lands on an
+independently known quantity is a measurement; one that merely looks plausible is
+not.
 
-**Two limits on this figure.** It is **one operating point**, so it establishes
-the direction and rough size of the bias, not a calibration — a cold-weather
-repeat is what would let the level be trusted. And 2.0 is the *hard* case: a
-62 °C charge forces condensing near 65 °C, whereas space heating runs at 35–40 °C
-supply and should score **higher**, while `cop_heating` reports 1.5–2.1.
+**A charge window cannot judge the counter.** During a charge the compressor's
+work goes into the tank, so `heatingenergy` stays near zero *by design* — reading
+that as an under-reading is the same mistake as reading `dhwenergy` as missing
+during a charge. Compare the counter with the balance over a **heating** window
+instead.
+
+**What the counter actually does, measured 2026-11-25 over heating windows:**
+
+| Window | `heatingenergy` | Electrical | Ratio | Physical (el + air) | Counter/physical |
+|---|---:|---:|---:|---:|---:|
+| 60 min | 2.20 kWh | 0.80 kWh | 2.75 | 2.49 kW | 88 % |
+| 42 min | 1.50 | 0.60 | 2.50 | 2.59 kW | 83 % |
+| 30 min | 1.00 | 0.40 | 2.50 | 2.48 kW | 81 % |
+
+So the **mean** is within 10–20 % of an independent balance — inside the
+uncertainty of the assumed airflow — while a **single reading** is not: the
+counter steps 0.1 kWh at a time, so the derived power swings between 0.4 and
+3.4 kW within minutes on an unchanged pump. Read means; never read an instant.
+
+**One limit on the tank figure.** It is **one operating point**, at the *hard*
+end: a 62 °C charge forces condensing near 65 °C, whereas space heating runs at
+35–40 °C supply and scores higher (2.27–2.75 measured). A cold-weather repeat is
+what would make it two points rather than one.
 
 **How a window has to be cut** if this is repeated. It opens when the tank
 bottoms out, not when the draw counter's last step arrives — the tank keeps

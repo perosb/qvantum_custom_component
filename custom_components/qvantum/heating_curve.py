@@ -95,11 +95,11 @@ WIND_SMOOTH_HOURS: int = 3
 #: Load term clamp (only ever reduces the curve).
 LOAD_MAX_C = 0.5
 #: A heat pump cannot sustain a thermal-to-electrical ratio below this while it
-#: heats. Under it, the figure the term reads is not a thermal measurement — on a
-#: live QE-6 on 2026-11-25 the ``heatingpower`` mean was **1348 W against 1386 W**
-#: of compressor input (a ratio of 0.97) at 4240 rpm, where the air-side balance
-#: put the real output near 3 kW. Without the guard the term read that as the
-#: pump coasting and took 0.3–0.5 K off the supply of a house already 0.4 K cold.
+#: heats, so a figure under it is a mis-measurement rather than a coasting pump.
+#: A **physical** bound, not a measured threshold: on a live QE-6 the two means
+#: settle at 2.27 (2022 W thermal against 892 W electrical), well clear of it.
+#: Comparing a mean with an instantaneous reading is what makes a cycling pump
+#: look like it sits under the bound, which is why both sides share one window.
 LOAD_MIN_THERMAL_TO_ELECTRICAL = 1.5
 #: Measured/predicted shortfall that reaches the full load reduction.
 LOAD_SPAN = 0.5

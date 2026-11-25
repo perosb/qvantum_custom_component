@@ -133,11 +133,11 @@ pool script has to read them too.
 v19 adds `curve.load_power_mean_w`, `curve.load_power_mean_electrical_w` and
 `curve.load_power_coverage_hours` — both sides of the adaptive curve's load term.
 The term refuses a thermal mean below 1.5× the compressor's own input, because no
-running heat pump sits there (measured on one installation: 1348 W of "heat"
-against 1386 W of input, where the air-side balance put the real output near
-3 kW). One installation can say the guard is needed; only the pool can say whether
-the counter's under-reading is that pump or the **fleet**, which decides between
-repairing the term and guarding it. Without the pair, `load_c: 0` reads
+running heat pump sits there — a physical bound, not a measured threshold. The
+pair is exported because one installation can show the guard is well-formed while
+only the pool can show whether the ratio sits near that bound across the
+**fleet**; mean against mean it measured **2.27** (2022 W thermal, 892 W
+electrical) on one installation, comfortably clear of it. Without the pair, `load_c: 0` reads
 identically on a healthy counter and on a biased one. Additive.
 
 v18 adds `fitted.eta_s_percent` / `fitted.eu_class` and their `_90d` twins: the
