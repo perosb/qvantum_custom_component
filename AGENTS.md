@@ -443,6 +443,11 @@ enough. Verify in a `/tmp` worktree (see *Git*).
   deprecated `via_device` in `DeviceInfo` — both are per-entry now, see
   *Client vs Home Assistant*.
 - Missing translations/tests, or coverage below **92%**.
+- **A change that only holds for the author's pump**: a threshold taken from one
+  machine's measurements, a constant valid at one fan speed or tank size, a
+  sensor's meaning assumed to be the same across QE/QA+QH/QG, or a term that
+  fires without evidence that travels. Name the installation the number came
+  from and what makes it general.
 
 ## Tests
 
@@ -728,6 +733,18 @@ The rules that must not drift:
   moving either sends the curve features back to BT2.
 
 ## Product constraints
+
+**It is not one installation.** This integration has many users on QE, QA+QH and
+QG, on cloud and Modbus, in eleven languages, with their own curves, tank sizes,
+ventilation rates and house losses. Anything tuned to the owner's pump is a bug
+for everyone else: a threshold derived from one machine's numbers, a constant
+that only holds at one fan speed, a term that assumes one family's sensor
+semantics, or a fix that works because *this* house has a certain floor area.
+State the physical bound rather than the observed value, gate on evidence that
+travels (a datasheet range, a ratio that cannot occur, a register that is present
+or absent) and let a transport or product that lacks the input keep its previous
+behaviour — absence is not evidence. A review asks "what does this do on a pump
+this author has never seen?" before it asks "does it work here?"
 
 - `single_config_entry`: one instance; switch cloud ↔ Modbus via reconfigure.
 - Modbus writes opt-in (`CONF_MODBUS_WRITE`) — never default on.

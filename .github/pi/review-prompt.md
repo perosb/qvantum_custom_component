@@ -43,6 +43,15 @@ severity. Skip style, naming, coverage and other low/medium nits — the
 repository already has review automation for those. Max substance:
 correctness. Do not invent nits. Specifically watch for:
 
+- **A change that only holds for the author's pump.** This integration has many
+  users on QE, QA+QH and QG, on cloud and Modbus, with their own curves, tank
+  sizes, ventilation rates and house losses. A threshold taken from one machine's
+  measurements, a constant valid at one fan speed, a sensor whose meaning differs
+  between families (`BT14`/`BT15` are evaporator **air** on QE but ground-source
+  **water** on QG), or a term that fires without evidence that travels is a bug
+  for everyone else. Ask what the change does on a pump the author has never
+  seen; where a number is unavoidable, say which installation it came from and
+  what makes it general.
 - Wrong Modbus register, or holding vs input mix-up.
 - Cloud-only entities/features created in Modbus mode, or the reverse.
 - `client/` importing Home Assistant, or HA code using `isinstance` on transport.
