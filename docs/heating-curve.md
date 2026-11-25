@@ -957,7 +957,7 @@ stated reason. It carries
 `write_scope` (the knots of the last active cycle), `forecast_ok`, `forecast_reused` and `forecast_now_c` (the forecast hour's air
 temperature — `outdoor_c` beside it is the **term** in kelvin, clamped ±1.0, and
 comparing the two is a category error), `forecast_wind_ms`/`forecast_wind_available`, the load term's
-`load_power_mean_w`/`load_power_coverage_hours`, `indoor_cap_armed` /
+`load_power_mean_w`/`load_power_mean_electrical_w`/`load_power_coverage_hours`, `indoor_cap_armed` /
 `indoor_margin_c` (with its two inputs), `bt2_detected`, `pump_room_c`/`pump_room_source`,
 `terms` (which optional terms are on), `cop_reference`/`cop_samples` (the COP
 feedback's learned reference and the evidence behind each bucket) and the readiness
