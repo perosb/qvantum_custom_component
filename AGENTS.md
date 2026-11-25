@@ -571,6 +571,13 @@ explicitly, coerced to numbers/booleans/short enums, and the `counters` block is
 counts, never a log of when. `tests/test_summary.py` asserts it carries no entity
 ids or names.
 
+`tests/data/pool_rows.json` holds one row per pool generation and
+`tests/test_pool_rows.py` compares the current one against the live export **block
+by block**, so a bump without a fixture row fails CI. Older rows keep their
+pseudonyms stripped (`install_token`, `key`, `generated_on`); the current one is
+built from the suite itself, so it carries no user data. A block that did not
+exist yet is `null` there, and the parser treats missing as missing, not as
+malformed — the same rule the pool script follows.
 `SUMMARY_SCHEMA_VERSION` moves for a new field, a removed field **and a field
 whose meaning changed** — bump it in the same PR as the semantic change, and
 check the released `manifest.json` first: a version no release has carried is
