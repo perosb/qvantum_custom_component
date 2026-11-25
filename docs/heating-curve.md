@@ -248,17 +248,22 @@ the gate is waited out instead of booking hours no poll observed.
 **The term refuses a figure that is physically impossible.** Its premise is a
 pump that *deliberately* delivers less than the model asks; a thermal reading
 below **1.5×** the compressor's own electrical input breaks that premise, because
-no running heat pump sits there. Measured 2026-11-25: the `heatingpower` mean was
-**1348 W against 1386 W** of compressor input at 4240 rpm, while the air-side
-balance put the real output near **3 kW** — the term read the counter's bias as a
-coasting pump and took 0.3–0.5 K off the supply of a house already 0.4 K cold.
+no running heat pump sits there. The bound is a physical one, not a measured
+threshold: a heat pump whose output is under its own input is not coasting, it is
+being mis-measured.
+
 The guard compares **mean with mean**: `heating_power_mean_w` against a
 `compressor_power_mean_w` accumulated over the same window and the same counted
 intervals (`compressor_power`, input 93, validated at a 0.95 ratio against a
-whole-house meter). Against an *instantaneous* reading a cycling pump looks like
-it sits at a fraction of its own input — which is why the two sides share one
-population rather than one mean and one sample. A transport without the reading
-leaves the term exactly as it was: absence is not evidence.
+whole-house meter). This is not a detail — mixing a mean with an instantaneous
+reading makes a cycling pump look like it sits at a fraction of its own input.
+Measured 2026-11-25 before the correction: 1348 W of thermal mean against 1386 W
+of *instantaneous* input, a ratio of 0.97 and a shortfall of 0.29 K. The same
+pump, compared mean against mean, settles at **2.27** (2022 W against 892 W) and
+the term is correctly inert.
+
+A transport without the reading leaves the term exactly as it was: absence is not
+evidence.
 
 The frozen baseline is the app's seven-point table, but that table is only a
 side dump: on Auto the firmware follows holding 23, so it can diverge from what
