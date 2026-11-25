@@ -880,7 +880,9 @@ class TestQvantumCurveSensors:
             "wind_required_days": 10,
             "capped_by_indoor": False,
             "load_power_mean_w": None,
+            "load_power_mean_electrical_w": None,
             "load_power_coverage_hours": None,
+            "air_delta_mean_k": None,
             "trims": {},
             "clamped": False,
             "clamped_points": [],
@@ -2914,3 +2916,29 @@ class TestQvantumSolarDailyModelSensor:
         assert entity.native_value is None
         assert entity.available is False
         assert entity.extra_state_attributes is None
+
+
+class TestCapWindowAttributes:
+    """The cap averages the room error over 24 h, so one number hides two states.
+
+    A cap that lags a rising house and a cap that is biased look identical
+    through `indoor_margin_c` alone; the current reading beside the window mean
+    is what tells them apart (the distinction #555 introduced).
+    """
+
+    def test_the_deviation_sensor_carries_both_sides_of_the_window(
+        self, mock_device
+    ) -> None:
+        coordinator = _curve_coordinator(
+            _curve_snapshot(indoor_margin_c=-0.3, indoor_margin_now_c=-0.2,
+                            indoor_margin_mean_c=-0.35)
+        )
+        entity = QvantumCurveDeviationSensor(
+            coordinator, "adaptive_curve_deviation", mock_device
+        )
+
+        attrs = entity.extra_state_attributes
+
+        assert attrs["indoor_margin_c"] == pytest.approx(-0.3)
+        assert attrs["indoor_margin_now_c"] == pytest.approx(-0.2)
+        assert attrs["indoor_margin_mean_c"] == pytest.approx(-0.35)

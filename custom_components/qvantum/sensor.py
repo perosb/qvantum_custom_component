@@ -1148,7 +1148,17 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
             # filling after a restart, and without the coverage they look the
             # same (the mean is gated on 30 minutes of evidence).
             "load_power_mean_w": self.coordinator.load_power_mean_w,
+            # The other side of the same window. The term refuses a thermal mean
+            # below 1.5x this, so without it a `load_c` of 0 reads the same on a
+            # withheld term and on an observed balance.
+            "load_power_mean_electrical_w": (
+                self.coordinator.load_power_mean_electrical_w
+            ),
             "load_power_coverage_hours": self.coordinator.load_power_coverage_hours,
+            # The air side over the same window: with the pair above it makes
+            # `(P_thermal - P_elec) / P_elec` readable, which is what separates
+            # a pump short of air from a house that is hard to heat.
+            "air_delta_mean_k": self.coordinator.air_delta_mean_k,
             "trims": dict(snapshot.trims),
             "clamped": snapshot.clamped,
             "clamped_points": list(snapshot.clamped_points),
@@ -1199,6 +1209,11 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             # means a warm house cannot veto a raise (no indoor sensor).
             "indoor_cap_armed": snapshot.indoor_cap_armed,
             "indoor_margin_c": snapshot.indoor_margin_c,
+            # The cap averages the room error over 24 h, so a lagging cap and a
+            # biased one look identical through `indoor_margin_c` alone: the
+            # current reading beside the mean is what tells them apart.
+            "indoor_margin_now_c": snapshot.indoor_margin_now_c,
+            "indoor_margin_mean_c": snapshot.indoor_margin_mean_c,
             # In the external mode the pump blends the external value with its
             # own BT2 for the room term, so this is the input the removed term
             # used — not the configured sensor's reading.
