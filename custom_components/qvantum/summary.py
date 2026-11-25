@@ -180,6 +180,9 @@ _ENTITY_PREFIXES = (
 #: `normal` mode (measured 2026-11-24: 65 -> 75 changed `fanrpm` by exactly
 #: 15.4 %), and the mode is what says whether that number was in force. Together
 #: they let the pool weight a SCOP against the ventilation a pump really runs at.
+#: v19 also carries `curve.air_delta_mean_k`: the evaporator's air-side drop over
+#: the load window, which with the two power means gives the air-side contribution
+#: `(P_thermal − P_elec) / P_elec` per installation — no assumed flow needed.
 SUMMARY_SCHEMA_VERSION = 19
 
 #: Plant settings that describe the control loops. Everything else in the
@@ -508,6 +511,13 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "load_power_coverage_hours": _number(
             getattr(coordinator, "load_power_coverage_hours", None)
         ),
+        # The air side's temperature drop over the same window. With the two
+        # means it gives `(P_thermal − P_elec) / P_elec` — the air-side
+        # contribution per unit of compressor work — which is the one figure that
+        # separates "this pump is starved of air" from "this house is hard to
+        # heat", and it needs no assumed flow. Withheld on the ground-source
+        # family, where BT14/BT15 are water rather than air.
+        "air_delta_mean_k": _number(getattr(coordinator, "air_delta_mean_k", None)),
         "solar_a_w_per_k": _number(getattr(model, "a_w_per_k", None)),
         "solar_b_m2": _number(getattr(model, "b_m2", None)),
         "solar_trust": _number(getattr(model, "trust", None)),

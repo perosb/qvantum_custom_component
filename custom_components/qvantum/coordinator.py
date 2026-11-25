@@ -394,6 +394,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # cycling pump looks like it sits at a fraction of its own input, which is
         # exactly the state the guard must not mistake for a bad counter.
         self._compressor_power_mean = HeatingPowerWindow()
+        # The evaporator's air-side temperature drop, over the same intervals:
+        # with the two power means it makes the air-side contribution
+        # `(P_thermal − P_elec) / P_elec` computable per installation, which is
+        # the only way to spot a pump that is starved of air from a pool row.
+        self._air_delta_mean = HeatingPowerWindow()
         # Effective tank volume identified from element-only charges; None until
         # one has been measured, and persisted with the COP snapshot.
         self._dhw_tank_liters: float | None = None

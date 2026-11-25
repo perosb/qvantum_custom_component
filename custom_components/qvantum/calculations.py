@@ -55,6 +55,7 @@ from .efficiency import (
     cop_ratio,
     energy_delta,
 )
+from .numeric import finite
 from .plant_analytics import dhw_heat_meter_power_w
 
 _LOGGER = logging.getLogger(__name__)
@@ -122,6 +123,24 @@ def _heating_power_ceiling(values: Mapping[str, Any]) -> float | None:
     if power <= 0:
         return None
     return float(power) * HEATING_POWER_COP_CEILING
+
+
+def _ground_source_family(
+    values: Mapping[str, Any], device: object = None
+) -> bool:
+    """Whether this poll comes from the ground-source family (QG).
+
+    Two identifiers, because neither transport carries both: the
+    per-compressor-unit block (``ep10_*``/``ep11_*``) exists only on Modbus, and
+    ``device.model`` only on the cloud, where the API reports it while Modbus
+    probes nothing of the kind. A guard that checked one of them would be silent
+    on the other transport — and on a cloud QG it would book water temperatures
+    as an air-side drop.
+    """
+    if any(str(key).startswith(("ep10_", "ep11_")) for key in values):
+        return True
+    model = device.get("model") if isinstance(device, Mapping) else None
+    return isinstance(model, str) and model.strip().upper().startswith("QG")
 
 
 def _split_electrical_input(
@@ -347,6 +366,24 @@ class QvantumCalculationsMixin:
         electrical_mean = self._compressor_power_mean.mean_w(now_ts)
         if electrical_mean is not None:
             values["compressor_power_mean_w"] = round(electrical_mean, 1)
+        # The air-side drop over the same intervals. BT14/BT15 are evaporator
+        # **air** on QE/QA+QH and ground-source **water** on QG, where the figure
+        # would mean nothing; `_ground_source_family` identifies that family on
+        # either transport, so the mean is simply not booked there.
+        if not _ground_source_family(values, getattr(self, "_device", None)):
+            air_in = finite(values.get("bt14"))
+            air_out = finite(values.get("bt15"))
+            self._air_delta_mean.add(
+                now_ts=now_ts,
+                power_w=(air_in - air_out)
+                if air_in is not None and air_out is not None
+                else None,
+                counted=status in (HP_STATUS_HEATING, HP_STATUS_IDLE)
+                and not _flag(values.get("additiondemand")),
+            )
+            air_mean = self._air_delta_mean.mean_w(now_ts)
+            if air_mean is not None:
+                values["air_delta_mean_k"] = round(air_mean, 1)
 
     def _calculate_dhw_power(self, values: dict) -> None:
         """Publish dhwpower (W) as the instantaneous draw power.

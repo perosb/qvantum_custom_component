@@ -201,6 +201,27 @@ second draw, a defrost, a heating step or an open addition shunt lands inside:
 `defrost_count` supplies the timestamps, and the counter is what makes an hour
 comparable at all.
 
+## `air_delta_mean_k` — how hard the air side is working
+
+`BT14 − BT15` is the evaporator's air-side drop. Over the same intervals as the
+load term's two power means it gives the air-side contribution:
+
+```
+Q_air / P_elec = (P_thermal − P_elec) / P_elec
+```
+
+A pump starved of air — a blocked filter, a low fan setting, a ducted
+installation — has to pull a **larger drop** out of the air it gets, so it shows a
+low air-side contribution per unit of compressor work. Measured on the owner's
+QE-6: 26–33 K at 0.9–1.4 kW of input, i.e. roughly **0.8–1.1** kW from the air per
+kW of electricity.
+
+Two limits. The mean is accumulated over the load term's counted intervals only —
+heating and idle, with DHW, defrost and element-demanded polls excluded — so it
+describes steady heating and not the cycles that do something else. And it is
+**not booked on the ground-source family**, where those two sensors are water
+temperatures.
+
 ## The electrical split
 
 The counters (`compressorenergy` + `additionalenergy`) are **shared between
