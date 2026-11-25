@@ -4754,3 +4754,28 @@ def test_every_persisted_curve_field_reaches_the_dump() -> None:
         and key not in DELIBERATELY_NOT_DUMPED
     }
     assert missing == set()
+
+
+async def test_the_electrical_mean_mirrors_the_thermal_one() -> None:
+    """Both properties read the same poll, so the export and the guard agree.
+
+    The load term compares the two, so a row that carried one of them would be
+    unreadable: `load_c: 0` on a healthy counter and on a biased one would look
+    the same.
+    """
+    coordinator = make_coordinator(
+        values={
+            "heating_power_mean_w": 1348.6,
+            "compressor_power_mean_w": 1386.0,
+        }
+    )
+
+    assert coordinator.load_power_mean_w == pytest.approx(1348.6)
+    assert coordinator.load_power_mean_electrical_w == pytest.approx(1386.0)
+
+
+async def test_the_electrical_mean_rejects_a_non_reading() -> None:
+    coordinator = make_coordinator(values={"compressor_power_mean_w": True})
+
+    assert coordinator.load_power_mean_electrical_w is None
+    assert make_coordinator(values={}).load_power_mean_electrical_w is None
