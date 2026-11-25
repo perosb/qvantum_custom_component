@@ -104,6 +104,12 @@ def curve_coordinator(**overrides):
             wind_valid=True,
         ),
         "_baseline": dict.fromkeys(CURVE_KEYS, 20.0),
+        # The load term's inputs, which the export reads as properties: both
+        # power means, the coverage behind them, and the air-side drop.
+        "load_power_mean_w": 2021.8,
+        "load_power_mean_electrical_w": 891.7,
+        "load_power_coverage_hours": 0.7,
+        "air_delta_mean_k": 27.3,
     }
     values.update(overrides)
     return SimpleNamespace(**values)

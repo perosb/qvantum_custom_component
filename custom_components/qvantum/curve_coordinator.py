@@ -1874,6 +1874,21 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         return float(value)
 
     @property
+    def air_delta_mean_k(self) -> float | None:
+        """The evaporator's air-side temperature drop, over the load window.
+
+        With both power means it makes the air-side contribution
+        `(P_thermal − P_elec) / P_elec` computable from a pooled row, which is
+        how a pump starved of air — a blocked filter, a low fan setting, a
+        ducted installation — shows up across installations instead of only
+        looking plausible on one.
+        """
+        value = self._main_values().get("air_delta_mean_k")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return float(value)
+
+    @property
     def load_power_coverage_hours(self) -> float | None:
         """How much of the load mean's window is actually observed.
 

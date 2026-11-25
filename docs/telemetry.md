@@ -135,6 +135,14 @@ release behind it (stable carried 16, the pre-release 18), so the fan settings
 below joined v19 rather than becoming a v20 — and the fixture row was
 regenerated in the same PR.
 
+`curve.air_delta_mean_k` is the evaporator's air-side temperature drop over the
+**same window** as the two load-term means, so a row yields the air-side
+contribution `(P_thermal − P_elec) / P_elec` — the figure that separates a pump
+starved of air (blocked filter, low fan, a ducted installation) from a house that
+is simply hard to heat, and it needs **no assumed airflow**. It is withheld on the
+ground-source family, where `BT14`/`BT15` are water rather than air; the
+per-compressor-unit block identifies that family.
+
 `plant` also carries the ventilation side: `fan_speed_2` (holding 69,
 `fan_speed_reduced` — the register the firmware actually uses as its base in
 `normal` mode) and `fanspeedselector`, which says whether that number was in
