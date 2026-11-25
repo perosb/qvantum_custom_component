@@ -6198,3 +6198,71 @@ class TestDefrostCount:
 
         assert values["defrost_count"] == 1
         assert coordinator.defrost_count() == 1
+
+
+class TestCompressorPowerMean:
+    """The electrical mean the load term's plausibility guard compares against.
+
+    The guard asks whether the thermal mean is plausible against the compressor's
+    input. Against an *instantaneous* reading a cycling pump looks like it sits at
+    a fraction of its own input, which is the state the guard must not mistake for
+    a bad counter — so both sides are means over the same intervals.
+    """
+
+    @staticmethod
+    def _make_coordinator():
+        return TestCopPersistence()._make_coordinator()
+
+    @staticmethod
+    def _poll(coordinator, values, when):
+        with patch(
+            "custom_components.qvantum.calculations.dt_util.utcnow",
+            return_value=when,
+        ):
+            coordinator._calculate_heating_power_mean(values)
+        return values
+
+    def test_the_electrical_mean_spans_the_same_cycle(self):
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        self._poll(
+            coordinator,
+            {"hp_status": 3, "heatingpower": 4000.0, "compressor_power": 1400.0},
+            start,
+        )
+        # 30 min running at 1400 W input...
+        for step in range(1, 31):
+            self._poll(
+                coordinator,
+                {
+                    "hp_status": 3,
+                    "heatingpower": 4000.0,
+                    "compressor_power": 1400.0,
+                },
+                start + timedelta(seconds=60 * step),
+            )
+        # ...then 30 min idle. Both means are halved by the same cycle.
+        for step in range(31, 62):
+            values = self._poll(
+                coordinator,
+                {"hp_status": 0, "heatingpower": 0.0, "compressor_power": 0.0},
+                start + timedelta(seconds=60 * step),
+            )
+
+        assert values["heating_power_mean_w"] == pytest.approx(2000.0, rel=0.02)
+        assert values["compressor_power_mean_w"] == pytest.approx(700.0, rel=0.02)
+
+    def test_a_transport_without_the_reading_publishes_nothing(self):
+        coordinator = self._make_coordinator()
+        start = dt_util.utcnow()
+        for step in range(0, 31):
+            self._poll(
+                coordinator, {"hp_status": 3, "heatingpower": 4000.0},
+                start + timedelta(minutes=step),
+            )
+        values = self._poll(
+            coordinator, {"hp_status": 3, "heatingpower": 4000.0},
+            start + timedelta(minutes=61),
+        )
+
+        assert "compressor_power_mean_w" not in values

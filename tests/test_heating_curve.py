@@ -1483,3 +1483,44 @@ class TestPointsInReach:
 
     def test_fewer_margins_shrink_the_scope(self):
         assert points_in_reach({0: 3.4}, margin_knots=0)[-1] == "curve_0"
+
+
+def test_load_adjustment_refuses_a_thermal_figure_below_the_compressor_input() -> None:
+    """A running heat pump cannot sit at a thermal/electrical ratio near 1.
+
+    Measured 2026-11-25: the `heatingpower` 30-minute mean was 1348 W against
+    1386 W of compressor input at 4240 rpm, while the air-side balance put the
+    real output near 3 kW. The term read that as a coasting pump and took 0.3 K
+    off a house already 0.4 K cold, so the figure is the counter, not a level.
+    """
+    model = make_model()
+
+    # 1349 W of "heat" on 1386 W of electricity: not a measurement.
+    assert (
+        load_adjustment_c(
+            model, 1349.0, 21.0, 0.0, {}, BASE_HOUR, compressor_power_w=1386.0
+        )
+        == 0.0
+    )
+    # A plausible output above the ratio floor reduces, as before: 2300 W is
+    # 1.77 × the 1300 W input, and the shortfall against 3681 W is 0.375.
+    assert load_adjustment_c(
+        model, 2300.0, 21.0, 0.0, {}, BASE_HOUR, compressor_power_w=1300.0
+    ) == pytest.approx(-0.3752, abs=1e-3)
+
+
+def test_a_missing_compressor_reading_leaves_the_load_term_as_it_was() -> None:
+    """Absence is not evidence: a transport without the input behaves as before."""
+    model = make_model()
+    expected = 161.0 * 21.0 + 300.0
+
+    for reading in (None, 0.0, "nonsense"):
+        assert load_adjustment_c(
+            model,
+            expected * 0.5,
+            21.0,
+            0.0,
+            {},
+            BASE_HOUR,
+            compressor_power_w=reading,
+        ) == pytest.approx(-LOAD_MAX_C)

@@ -389,6 +389,11 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # persisted: the coverage gate then waits out a restart instead of
         # booking hours no poll observed.
         self._heating_power_mean = HeatingPowerWindow()
+        # The same window, for the compressor's electrical input. The load term's
+        # guard compares a mean with a mean: against an instantaneous reading a
+        # cycling pump looks like it sits at a fraction of its own input, which is
+        # exactly the state the guard must not mistake for a bad counter.
+        self._compressor_power_mean = HeatingPowerWindow()
         # Effective tank volume identified from element-only charges; None until
         # one has been measured, and persisted with the COP snapshot.
         self._dhw_tank_liters: float | None = None

@@ -333,6 +333,20 @@ class QvantumCalculationsMixin:
         mean = self._heating_power_mean.mean_w(now_ts)
         if mean is not None:
             values["heating_power_mean_w"] = round(mean, 1)
+        # The same intervals, the same weighting, for the electrical side. The
+        # guard against an implausible thermal reading compares like with like:
+        # a mean against an instantaneous value would read a cycling pump as one
+        # that sits far below its own input. Booked only where the interval was
+        # evidence for the thermal figure, so both means describe one population.
+        self._compressor_power_mean.add(
+            now_ts=now_ts,
+            power_w=values.get("compressor_power"),
+            counted=status in (HP_STATUS_HEATING, HP_STATUS_IDLE)
+            and not _flag(values.get("additiondemand")),
+        )
+        electrical_mean = self._compressor_power_mean.mean_w(now_ts)
+        if electrical_mean is not None:
+            values["compressor_power_mean_w"] = round(electrical_mean, 1)
 
     def _calculate_dhw_power(self, values: dict) -> None:
         """Publish dhwpower (W) as the instantaneous draw power.
