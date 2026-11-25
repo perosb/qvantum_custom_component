@@ -508,7 +508,8 @@ Entities:
   evidence counts `wind_cold_hours` / `wind_required_cold_hours` and
   `wind_evidence_days` / `wind_required_days`, `trims`,
   `clamped`, `clamped_points` and `floor_pinned_points` attributes, plus the
-  load term's own inputs `load_power_mean_w` and `load_power_coverage_hours`.
+  load term's own inputs `load_power_mean_w`, `load_power_mean_electrical_w`,
+  `air_delta_mean_k` and `load_power_coverage_hours`.
   Those two are the only part of `load_c` a reader cannot infer from the term:
   the mean refuses to publish below 30 minutes of observed evidence, so a
   `load_c` of `0.0` is either an observed balance or a window still filling
@@ -535,6 +536,11 @@ Entities:
   `pump_room_source` says which input produced it (`blended`, `configured`,
   `bt2` or `none`), so a figure built without the blend (an unconnected BT2
   reports −30 °C) is recognisable in the same attributes.
+  The indoor cap's three margins travel too: `indoor_margin_c` (the value the cap
+  acts on), `indoor_margin_now_c` (the current reading) and
+  `indoor_margin_mean_c` (the 24 h window mean). One number cannot separate a cap
+  that **lags** a house that is warming from a cap that is **biased** — the two
+  need opposite answers — so all three are published together.
   The `ready`/`blocker` attributes describe the baseline-vs-pump window, not
   this sensor's own value. Diagnostic entity, enabled by default.
   A failed forecast refetch does not immediately turn `blocker` into
