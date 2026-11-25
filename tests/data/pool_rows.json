@@ -49,6 +49,56 @@
   "transport": "cloud",
   "verdicts": {}
  },
+ "14": {
+  "climate": {
+   "heating_hours": null,
+   "outdoor_max_c": null,
+   "outdoor_min_c": null
+  },
+  "counters": null,
+  "curve": null,
+  "device": {
+   "firmware": "1.12.8",
+   "hardware": null,
+   "manufacturer": "Qvantum",
+   "model": "QA-15"
+  },
+  "fitted": {
+   "aux_heat_share": null,
+   "building_coverage_days": 29.958,
+   "compressor_duty_cycle": null,
+   "compressor_run_hours_24h": null,
+   "compressor_starts_per_hour": null,
+   "dhw_standing_loss": 3.783,
+   "efficiency_health_coverage": 0.0,
+   "efficiency_health_grade": null,
+   "efficiency_health_score": null,
+   "heat_loss_w_per_k": 268.16,
+   "heating_degree_hours": 4224.285,
+   "scop_coverage_days": 29.958,
+   "scop_total": null,
+   "scop_total_90d": 2.651,
+   "thermal_episodes": 0,
+   "thermal_gain_k_per_h": null,
+   "thermal_mass_kwh_per_k": null,
+   "thermal_time_constant": null,
+   "weather_normalized_heating": 12.58
+  },
+  "integration_version": "2026.11.8",
+  "plant": {
+   "curve_type_heating": 0,
+   "indoor_temperature_offset": 0,
+   "max_heating_supply": null,
+   "room_comp_factor": 1.5,
+   "sensor_mode": 1,
+   "stop_heating": 17,
+   "tap_water_start": 52,
+   "tap_water_stop": 62
+  },
+  "schema_version": 14,
+  "transport": "cloud",
+  "verdicts": {}
+ },
  "16": {
   "climate": {
    "heating_hours": 141,
@@ -189,7 +239,7 @@
    },
    "reverts": 0,
    "since": "2026-11-18",
-   "trim_updates": 12
+   "trim_updates": 14
   },
   "curve": {
    "active": true,
@@ -281,6 +331,8 @@
   "integration_version": "2026.10.4",
   "plant": {
    "curve_type_heating": 1,
+   "fan_speed_2": 65,
+   "fanspeedselector": "normal",
    "indoor_temperature_offset": null,
    "max_heating_supply": 65,
    "room_comp_factor": 5.0,

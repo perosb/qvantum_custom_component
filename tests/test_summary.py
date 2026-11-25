@@ -46,6 +46,8 @@ VALUES = {
     "tap_water_stop": 50,
     "max_heating_supply": 65,
     "stop_heating": 17,
+    "fan_speed_2": 65,
+    "fanspeedselector": "normal",
     "room_temp_external": 19.8,
     "bt2": 20.5,
     "external_room_temp_entity": "sensor.inomhustemperatur",

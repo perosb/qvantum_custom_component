@@ -101,3 +101,18 @@ def test_a_row_carries_no_installation_identifier():
     for version, row in _rows().items():
         for field in ("install_token", "key", "generated_on"):
             assert field not in row, f"v{version} still carries {field}"
+
+
+def test_a_string_setting_survives_the_plant_coercion():
+    """`fanspeedselector` is an enum, and `_number` would export it as null.
+
+    The same defect shipped once already: `sensor_mode` arrives from the cloud as
+    a name, and a numeric-only coercion dropped it, so every cloud row carried
+    null. A plant field whose value is a short string needs its own branch.
+    """
+    from custom_components.qvantum.summary import plant_summary
+
+    plant = plant_summary({"fan_speed_2": 65, "fanspeedselector": "normal"})
+
+    assert plant["fan_speed_2"] == 65
+    assert plant["fanspeedselector"] == "normal"
