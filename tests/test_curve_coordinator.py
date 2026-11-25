@@ -195,6 +195,9 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._room_gain_fitted = None
     coordinator._room_gain_active = None
     coordinator._room_gain_active_ts = None
+    coordinator._room_gain_active_attempt = None
+    coordinator._room_gain_factor_last = None
+    coordinator._room_gain_factor_since_ts = None
     coordinator._room_gain_fitted_source = None
     coordinator._clamped_state = False
     coordinator._forecast = None
@@ -4248,6 +4251,7 @@ async def test_the_active_gain_round_trips_through_the_store() -> None:
                 "r2": 0.88,
                 "residual": 0.15,
                 "loo": 2.47,
+                "measured_at": 1_760_000_000.0,
                 "valid": False,
                 "notes": "one hour carries the estimate",
             },
@@ -4268,9 +4272,12 @@ async def test_the_active_gain_round_trips_through_the_store() -> None:
     # The attempt stamp is not persisted: a reload measures again at once
     # rather than waiting out the throttle with a stamp from the previous run.
     assert coordinator._room_gain_active_ts is None
-    assert coordinator._state_payload()["room_gain_active"]["gain"] == pytest.approx(
-        4.33
-    )
+    payload = coordinator._state_payload()["room_gain_active"]
+    assert payload["gain"] == pytest.approx(4.33)
+    # …but the *measurement's* date is, so the figure stays datable across a
+    # restart.
+    assert payload["measured_at"] == 1_760_000_000.0
+    assert estimate.measured_at == 1_760_000_000.0
 
 
 async def test_the_active_gain_fetches_a_full_window_for_the_picker() -> None:
@@ -4735,6 +4742,9 @@ def test_every_persisted_curve_field_reaches_the_dump() -> None:
     RENAMED = {
         "active_since_ts": "timestamps",
         "last_active_ts": "timestamps",
+        # The second floor of the same window: a change in the pump's own room
+        # term restarts the measurement, so it belongs beside the first.
+        "room_gain_factor_since_ts": "timestamps",
         "daily_model": "model_daily",
     }
     #: Persisted for the restore path only, never for a reader: the stamp form
@@ -4787,3 +4797,286 @@ async def test_the_air_delta_is_exported_from_the_same_poll() -> None:
 
     assert coordinator.air_delta_mean_k == pytest.approx(27.3)
     assert make_coordinator(values={}).air_delta_mean_k is None
+
+
+async def test_the_active_gain_is_dated_when_it_is_measured() -> None:
+    """An undated estimate cannot be told from a fresh one.
+
+    Measured 2026-11-25: a valid estimate survives failed refreshes on purpose,
+    so a five-day-old 4.62 ± 0.24 was read as "the pump ignored the room-term
+    write". The stamp is the moment the fit ran, not the moment a refresh was
+    attempted (that one is `_room_gain_active_ts`, and is deliberately not
+    persisted).
+    """
+    hours, rows = active_gain_hours()
+    coordinator = make_coordinator(values={**VALUES, "sensor_mode": 4}, settings=SETTINGS)
+    coordinator._active_since_ts = hours[0]
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "heatingpower": "sensor.q",
+            "bt2": "sensor.i",
+        }
+    )
+    coordinator._async_statistics = AsyncMock(return_value=rows)
+
+    estimate = await coordinator._async_room_gain_from_active(1_760_000_000.0)
+
+    assert estimate is not None
+    assert estimate.measured_at == 1_760_000_000.0
+
+
+async def test_the_active_gain_ignores_hours_before_the_factor_floor() -> None:
+    """A change in the pump's own room term starts the window over.
+
+    Hours measured under factor 5 and hours under factor 2 are not comparable;
+    pooled they measure an average of two regimes (measured 2026-11-25 on a
+    5 -> 2 change: 4.22 ± 0.56 before, 1.50 ± 0.22 after).
+    """
+    hours, rows = active_gain_hours()
+    coordinator = make_coordinator(values={**VALUES, "sensor_mode": 4}, settings=SETTINGS)
+    coordinator._active_since_ts = hours[0]
+    coordinator._room_gain_factor_since_ts = hours[-2]  # later than the segment
+    coordinator._resolve_statistic_ids = MagicMock(
+        return_value={
+            "bt1": "sensor.t",
+            "cal_heat_temp": "sensor.s",
+            "heatingpower": "sensor.q",
+            "bt2": "sensor.i",
+        }
+    )
+    coordinator._async_statistics = AsyncMock(return_value=rows)
+
+    estimate = await coordinator._async_room_gain_from_active()
+
+    assert estimate is not None
+    assert estimate.hours == 2
+
+
+async def test_a_room_factor_change_restarts_the_active_measurement() -> None:
+    """The flag: a changed factor drops the estimate and re-stamps the floor."""
+    coordinator = make_coordinator(
+        values={**VALUES, "sensor_mode": 4}, settings={**SETTINGS, "room_comp_factor": 5.0}
+    )
+    coordinator._room_gain = 5.0
+    coordinator._room_gain_from_factor = True
+    coordinator._room_gain_factor_last = 5.0
+    coordinator._room_gain_factor_since_ts = 1_700_000_000.0
+    coordinator._room_gain_active = ActiveRoomGain(
+        gain_c_per_c=4.62, hours=165, buckets=5, span_c=0.78,
+        measured_at=1_700_000_000.0, valid=True,
+    )
+    coordinator._room_gain_active_ts = 1_799_000_000.0
+    coordinator._main.data["values"]["room_comp_factor"] = 2.0
+
+    await coordinator._async_sync_room_gain(
+        coordinator._main.data["values"], 1_799_100_000.0
+    )
+
+    assert coordinator._room_gain_active is None
+    assert coordinator._room_gain_active_attempt is None
+    assert coordinator._room_gain_factor_since_ts == 1_799_100_000.0
+    # The refresh throttle is released: waiting up to 6 h right when the
+    # evidence restarts is the one moment it must not.
+    assert coordinator._room_gain_active_ts is None
+    assert coordinator._room_gain_factor_last == 2.0
+
+
+async def test_a_room_factor_outside_our_range_still_restarts_the_window() -> None:
+    """Detection reads the raw register, not the value we accept.
+
+    `_configured_room_gain` returns None both for "no reading" and for "outside
+    our interval", and the second is a real change: the applied gain switches
+    from the factor to the fitted fallback, so hours from the two regimes must
+    not be pooled.
+    """
+    coordinator = make_coordinator(
+        values={**VALUES, "sensor_mode": 4}, settings={**SETTINGS, "room_comp_factor": 5.0}
+    )
+    coordinator._room_gain_factor_last = 5.0
+    coordinator._room_gain_factor_since_ts = 1_700_000_000.0
+    coordinator._room_gain_active = ActiveRoomGain(
+        gain_c_per_c=4.62, hours=165, buckets=5, span_c=0.78,
+        measured_at=1_700_000_000.0, valid=True,
+    )
+    # Beyond the accepted range (`ROOM_GAIN_MAX_C`), so the gain it set is
+    # dropped and the applied gain falls back to the fitted one.
+    coordinator._main.data["values"]["room_comp_factor"] = 60.0
+
+    await coordinator._async_sync_room_gain(
+        coordinator._main.data["values"], 1_799_100_000.0
+    )
+
+    assert coordinator._room_gain_active is None
+    assert coordinator._room_gain_factor_since_ts == 1_799_100_000.0
+
+
+async def test_a_missing_factor_is_not_a_change() -> None:
+    """A register that flaps once must not empty the window."""
+    coordinator = make_coordinator(
+        values={**VALUES, "sensor_mode": 4}, settings={**SETTINGS, "room_comp_factor": 5.0}
+    )
+    coordinator._room_gain_factor_last = 5.0
+    coordinator._room_gain_factor_since_ts = 1_700_000_000.0
+    coordinator._room_gain_active = ActiveRoomGain(
+        gain_c_per_c=4.62, hours=165, buckets=5, span_c=0.78,
+        measured_at=1_700_000_000.0, valid=True,
+    )
+
+    values = dict(coordinator._main.data["values"])
+    values.pop("room_comp_factor")
+    await coordinator._async_sync_room_gain(values, 1_799_100_000.0)
+
+    assert coordinator._room_gain_active is not None
+    assert coordinator._room_gain_factor_since_ts == 1_700_000_000.0
+
+    # ...and the next usable reading of the same value is not a change either.
+    await coordinator._async_sync_room_gain(
+        {**values, "room_comp_factor": 5.0}, 1_799_200_000.0
+    )
+    assert coordinator._room_gain_active is not None
+    assert coordinator._room_gain_factor_since_ts == 1_700_000_000.0
+
+
+async def test_a_factor_change_while_down_is_caught_on_the_first_poll() -> None:
+    """A change made while Home Assistant was down has no poll to see it.
+
+    The store's `room_gain` *is* the pump's factor whenever it came from one, so
+    restoring it as the last-seen value makes the first poll compare against the
+    old factor instead of treating the new one as the first observation. The
+    floor becomes that first poll — the hours spent down cannot be dated.
+    """
+    store = FakeStore(
+        {
+            "room_gain": 5.0,
+            "room_gain_source": "room_temp_external",
+            "room_gain_from_factor": True,
+            "room_gain_active": {
+                "gain": 4.62, "source": "room_temp_external", "hours": 165,
+                "buckets": 5, "span": 0.78, "valid": True,
+                "measured_at": 1_700_000_000.0,
+            },
+        }
+    )
+    coordinator = make_coordinator(
+        values={**VALUES, "sensor_mode": 4}, settings={**SETTINGS, "room_comp_factor": 2.0},
+        store=store,
+    )
+    await coordinator.async_restore()
+
+    assert coordinator._room_gain_factor_last == pytest.approx(5.0)
+    assert coordinator._room_gain_active is not None
+
+    await coordinator._async_sync_room_gain(
+        coordinator._main.data["values"], 1_799_100_000.0
+    )
+
+    assert coordinator._room_gain_active is None
+    assert coordinator._room_gain_factor_since_ts == 1_799_100_000.0
+
+
+async def test_a_failed_attempt_is_kept_beside_the_valid_measurement() -> None:
+    """A real measurement survives a failed run; the reason survives too."""
+    coordinator = make_coordinator(values={**VALUES, "sensor_mode": 4}, settings=SETTINGS)
+    coordinator._mode = "active"
+    coordinator._active_since_ts = 1_700_000_000.0
+    coordinator._room_gain_active = ActiveRoomGain(
+        gain_c_per_c=4.62, hours=165, buckets=5, span_c=0.78,
+        measured_at=1_700_000_000.0, valid=True,
+    )
+    failed = ActiveRoomGain(
+        gain_c_per_c=0.0, hours=0, buckets=0, span_c=0.0,
+        measured_at=1_799_000_000.0, valid=False, notes="no indoor series",
+    )
+    coordinator._async_room_gain_from_active = AsyncMock(return_value=failed)
+
+    await coordinator._async_refresh_active_room_gain(1_799_000_000.0)
+
+    assert coordinator._room_gain_active is not None
+    assert coordinator._room_gain_active.gain_c_per_c == pytest.approx(4.62)
+    assert coordinator._room_gain_active_attempt is not None
+    assert coordinator._room_gain_active_attempt.notes == "no indoor series"
+    assert coordinator._room_gain_active_attempt.measured_at == 1_799_000_000.0
+
+
+async def test_the_snapshot_carries_the_measured_gain_and_its_age() -> None:
+    """The applied gain may be the pump's factor, so the measurement travels too.
+
+    A panel that saw only `room_gain_c` could not tell a stale measurement from
+    a changed setting. The age is whole hours: a decimal would rewrite the
+    attributes every cycle just to tick.
+    """
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._room_gain = 2.0
+    coordinator._room_gain_active = ActiveRoomGain(
+        gain_c_per_c=1.5, hours=85, buckets=3, span_c=0.6,
+        measured_at=1_799_000_000.0 - 25 * 3600.0, valid=True,
+    )
+
+    with patch(
+        "custom_components.qvantum.curve_coordinator.dt_util.utcnow",
+        return_value=datetime.fromtimestamp(1_799_000_000.0, tz=UTC),
+    ):
+        snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.room_gain_c == pytest.approx(2.0)
+    assert snapshot.room_gain_measured_c_per_c == pytest.approx(1.5)
+    assert snapshot.room_gain_measured_age_hours == 25
+
+
+async def test_an_invalid_estimate_publishes_no_measurement() -> None:
+    """An invalid estimate's gain is 0.0 by construction, not a slope."""
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._room_gain_active = ActiveRoomGain(
+        gain_c_per_c=0.0, hours=0, buckets=0, span_c=0.0,
+        measured_at=1_799_000_000.0, valid=False, notes="no indoor series",
+    )
+
+    with patch(
+        "custom_components.qvantum.curve_coordinator.dt_util.utcnow",
+        return_value=datetime.fromtimestamp(1_799_000_000.0, tz=UTC),
+    ):
+        snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.room_gain_measured_c_per_c is None
+    assert snapshot.room_gain_measured_age_hours is None
+
+
+async def test_an_undated_store_restores_as_undated() -> None:
+    """A store written before the field existed must not invent a date."""
+    store = FakeStore(
+        {
+            "room_gain_active": {
+                "gain": 4.62,
+                "source": "room_temp_external",
+                "hours": 165,
+                "buckets": 5,
+                "span": 0.78,
+                "valid": True,
+            },
+        }
+    )
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator._room_gain_active is not None
+    assert coordinator._room_gain_active.measured_at is None
+    assert coordinator._state_payload()["room_gain_active"]["measured_at"] is None
+    # A missing floor restores as absent rather than as "now".
+    assert coordinator._room_gain_factor_since_ts is None
+
+
+async def test_the_factor_floor_round_trips_through_the_store() -> None:
+    """The second floor is persisted, so the window survives a restart."""
+    store = FakeStore({"room_gain_factor_since_ts": 1_760_050_000.0})
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator._room_gain_factor_since_ts == 1_760_050_000.0
+    assert (
+        coordinator._state_payload()["room_gain_factor_since_ts"]
+        == 1_760_050_000.0
+    )

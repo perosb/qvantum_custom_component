@@ -2942,3 +2942,27 @@ class TestCapWindowAttributes:
         assert attrs["indoor_margin_c"] == pytest.approx(-0.3)
         assert attrs["indoor_margin_now_c"] == pytest.approx(-0.2)
         assert attrs["indoor_margin_mean_c"] == pytest.approx(-0.35)
+
+
+class TestMeasuredRoomGainAttributes:
+    """The applied gain may be the pump's factor, so the measurement travels too."""
+
+    def test_the_deviation_sensor_carries_the_measurement_and_its_age(
+        self, mock_device
+    ) -> None:
+        coordinator = _curve_coordinator(
+            _curve_snapshot(
+                room_gain_c=2.0,
+                room_gain_measured_c_per_c=1.5,
+                room_gain_measured_age_hours=20,
+            )
+        )
+        entity = QvantumCurveDeviationSensor(
+            coordinator, "adaptive_curve_deviation", mock_device
+        )
+
+        attrs = entity.extra_state_attributes
+
+        assert attrs["room_gain_c_per_c"] == pytest.approx(2.0)
+        assert attrs["room_gain_measured_c_per_c"] == pytest.approx(1.5)
+        assert attrs["room_gain_measured_age_hours"] == 20

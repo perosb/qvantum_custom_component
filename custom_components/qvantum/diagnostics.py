@@ -17,6 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
+from .heating_curve import measured_age_hours
 from .open_meteo import hour_ts as weather_hour_ts
 from .plant_analytics import HeatingPowerWindow, eu_label
 
@@ -62,6 +63,7 @@ _CURVE_TIMESTAMP_FIELDS = (
     "_last_active_ts",
     "_active_since_ts",
     "_room_gain_active_ts",
+    "_room_gain_factor_since_ts",
     "_last_trim_ts",
 )
 
@@ -436,12 +438,23 @@ def _curve_trim_seed_diagnostics(coordinator: Any) -> dict[str, Any] | None:
     }
 
 
-def _curve_active_gain_diagnostics(estimate: Any) -> dict[str, Any] | None:
-    """The room gain measured on active hours, with the evidence for it."""
+def _curve_active_gain_diagnostics(
+    estimate: Any, now_ts: float | None = None
+) -> dict[str, Any] | None:
+    """The room gain measured on active hours, with the evidence for it.
+
+    ``measured_at``/``age_hours`` date the figure. Without them a valid estimate
+    that survived several failed refreshes is indistinguishable from a fresh one
+    — measured 2026-11-25: a five-day-old 4.62 ± 0.24 was read as "the pump
+    ignored the room-term write".
+    """
     if estimate is None:
         return None
+    measured_at = getattr(estimate, "measured_at", None)
     return {
         "gain_c_per_c": getattr(estimate, "gain_c_per_c", None),
+        "measured_at": measured_at,
+        "age_hours": measured_age_hours(measured_at, now_ts),
         "source": getattr(estimate, "source", None),
         "hours": getattr(estimate, "hours", None),
         "buckets": getattr(estimate, "buckets", None),
@@ -464,6 +477,29 @@ def _curve_active_gain_diagnostics(estimate: Any) -> dict[str, Any] | None:
         "drift_c_per_day": getattr(estimate, "drift_c_per_day", None),
         "valid": getattr(estimate, "valid", None),
         "notes": getattr(estimate, "notes", None),
+    }
+
+
+def _curve_active_attempt_diagnostics(
+    estimate: Any, now_ts: float | None = None
+) -> dict[str, Any] | None:
+    """The latest attempt, kept even when it failed.
+
+    The valid measurement above survives failed runs on purpose, so "no new
+    number" and "why not" were previously indistinguishable: this block carries
+    the reason and when it was last tried. The failed gain itself is left out —
+    it is 0.0 by construction and would invite a misreading.
+    """
+    if estimate is None:
+        return None
+    measured_at = getattr(estimate, "measured_at", None)
+    return {
+        "valid": getattr(estimate, "valid", None),
+        "notes": getattr(estimate, "notes", None),
+        "hours": getattr(estimate, "hours", None),
+        "buckets": getattr(estimate, "buckets", None),
+        "measured_at": measured_at,
+        "age_hours": measured_age_hours(measured_at, now_ts),
     }
 
 
@@ -540,6 +576,9 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
     if coordinator is None:
         return None
 
+    # One clock for the whole dump: the ages below are read against the moment
+    # the dump was taken, not against whatever each consumer would compute.
+    now_ts = dt_util.utcnow().timestamp()
     snapshot = getattr(coordinator, "data", None)
     main_values = getattr(coordinator, "_main_values", None)
     live = main_values() if callable(main_values) else {}
@@ -675,7 +714,13 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         # only clean slope on an install that runs active permanently. An
         # invalid estimate is kept with its reason, so a dump explains itself.
         "room_gain_active": _curve_active_gain_diagnostics(
-            getattr(coordinator, "_room_gain_active", None)
+            getattr(coordinator, "_room_gain_active", None), now_ts
+        ),
+        # The most recent attempt, kept even when it failed: the valid estimate
+        # above survives failed runs, so this is what says "no new number, and
+        # why".
+        "room_gain_active_attempt": _curve_active_attempt_diagnostics(
+            getattr(coordinator, "_room_gain_active_attempt", None), now_ts
         ),
         "room_gain_from_factor": bool(
             getattr(coordinator, "_room_gain_from_factor", False)
