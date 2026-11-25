@@ -703,9 +703,9 @@ The rules that must not drift:
   `room_comp_factor`**: a changed factor drops the estimate and re-stamps
   `room_gain_factor_since_ts`. Detection reads the **raw** register, not the
   ranged value the gain is derived from, and a *missing* reading is not a change
-  — a register that flaps once must not empty the window. A stale number must not
-  be read as "the pump ignored the write": measured 2026-11-25, a five-day-old
-  4.62 sat beside an attempt made seconds earlier.
+  — a register that flaps once must not empty the window. A stale measurement
+  must never be read as "the pump ignored the write" (`docs/heating-curve.md`
+  carries the incident and its numbers).
 - The room term is removed **only on hours the pump followed our table**
   (`active_since_ts` → `last_active_ts`); on Auto hours the pump already holds it
   and the baseline was fitted to it, so correcting there double-counts. The gain
