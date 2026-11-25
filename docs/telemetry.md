@@ -115,6 +115,21 @@ fixes, and the reason only ever existed in the installation's own log. The codes
 are a fixed set (`REVERT_REASONS` in `const.py`), so the block stays counts and
 never a log, and an absent code is exported as zero rather than omitted.
 
+### Fixtures move with the schema
+
+`tests/data/pool_rows.json` holds one row per interesting generation — currently
+8, 13, 16 and 19 — and `tests/test_pool_rows.py` compares the current one against
+the live export block by block. **A bump therefore needs a fixture row**, and the
+test fails until it exists: two shapes wearing one version number is exactly what
+the pool cannot detect on its own, so the contract is enforced in CI instead.
+
+The older rows are real pool rows with the per-installation pseudonyms removed
+(`install_token`, `key`, `generated_on`); the current one is generated from the
+suite's own builder, so it carries no user data at all. A block that did not exist
+yet (`curve` and `counters` before v13/v15) is `null` in those rows, and the
+parser test treats missing as missing rather than malformed — which is how the
+pool script has to read them too.
+
 v19 adds `curve.load_power_mean_w`, `curve.load_power_mean_electrical_w` and
 `curve.load_power_coverage_hours` — both sides of the adaptive curve's load term.
 The term refuses a thermal mean below 1.5× the compressor's own input, because no
