@@ -579,10 +579,28 @@ built from the suite itself, so it carries no user data. A block that did not
 exist yet is `null` there, and the parser treats missing as missing, not as
 malformed — the same rule the pool script follows.
 `SUMMARY_SCHEMA_VERSION` moves for a new field, a removed field **and a field
-whose meaning changed** — bump it in the same PR as the semantic change, and
-check the released `manifest.json` first: a version no release has carried is
-edited in place instead of bumped. Details, the v6/v8 history and why:
-`docs/telemetry.md`.
+whose meaning changed** — in the same PR as the change. Whether it moves *at all*
+depends on what has **shipped**, and that is a two-step check, not a guess:
+
+```bash
+git tag --sort=-creatordate | head -3        # which tags exist
+git show <tag>:custom_components/qvantum/summary.py | grep SUMMARY_SCHEMA_VERSION
+```
+
+- A value **no release has carried** is edited **in place**: the constant stays
+  and the new fields join that version. Bumping there manufactures a generation
+  no user ever uploaded.
+- A value a **release** has carried is **bumped**. A *pre-release counts* — its
+  users upload rows the moment it is installed.
+- Every version a release carries gets a row in `tests/data/pool_rows.json`;
+  `tests/test_pool_rows.py` fails CI without one, and the row must be regenerated
+  whenever the shape changes. Regenerating the current row is part of the same
+  PR. Versions that only ever lived in `main` (15, 17) get **none** — no row
+  exists to describe, and inventing one would be a shape nobody uploaded.
+- Check the tag, not `manifest.json`: a pre-release does not bump the manifest, so
+  it says the last *stable* version while a newer pre-release is in users' hands.
+
+Details, the v6/v8 history and why: `docs/telemetry.md`.
 
 ## Derived metrics — power, COP, DHW
 

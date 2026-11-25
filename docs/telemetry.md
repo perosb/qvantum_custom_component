@@ -41,7 +41,7 @@ The complete field list:
 | section | fields |
 |---|---|
 | device | manufacturer, model, firmware (**the display component only** — the cloud also reports two component builds, `display/cc/inv`, and Modbus has no register for them, so the export keeps the part both transports produce; device metadata, never user data). `model` is empty on local Modbus: the pump reports serial and firmware only |
-| plant | `sensor_mode` (the register integer on both transports — the cloud's `bt2` / `ext_room_sensor` names are normalised in the export), `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, and the pump's own supply limits (read on both transports; the cloud's curated `/settings` list does not carry them, so the client fetches `min_supply`/`max_supply` with the metrics and aliases them) |
+| plant | `sensor_mode` (the register integer on both transports — the cloud's `bt2` / `ext_room_sensor` names are normalised in the export), `room_comp_factor`, curve type, `indoor_temperature_offset`, tap-water start/stop, `stop_heating`, the pump's own supply limits (read on both transports; the cloud's curated `/settings` list does not carry them, so the client fetches `min_supply`/`max_supply` with the metrics and aliases them), and the ventilation side — `fan_speed_2` (holding 69, the register the firmware actually uses as its base in `normal` mode), `fan_normal` (holding 70, which stayed at 60 while the fan ran at 75) and `fanspeedselector` |
 | climate | the outdoor span the installation has been observed in, heating hours |
 | curve | both sides of the load term's input (`load_power_mean_w`, `load_power_mean_electrical_w`) with the `load_power_coverage_hours` behind them — the term refuses a thermal mean below 1.5× the compressor's input, so the pair is what says whether it was silent on a healthy counter or on a biased one; the trim layer (`trim_max_abs_c` — how close the largest trim is to the cap — and `trim_cap_days`, how long the oldest capped one has been capped, a duration rather than the diagnostics' date), room gain grouped as `configured` / `applied` / `fitted`, with `window`, `valid`, `notes`, evidence hours, standard error (with `t`) and leave-one-out swing; readiness `median_abs_c` **and** the signed `median_c`, `p95_abs_c`, `window_hours` and the room error over the same window (`room_error_median_abs_c`, `room_error_p90_abs_c`) — plus the `blocker` that says whether the gate failed or was never assessed (while the curve writes the readiness figures are `null` and `blocker` is `active`, because the deviation is then our own trims); the solar model (`a`, `b`, trust, days — the hourly `b` keeps its value while `trust` is 0 when it misses the t ≥ 2.5 gate, so the pair is not a bug), the day-block model's evidence (`daily_solar_t_stat`, `daily_solar_r2`, `daily_solar_valid`, `daily_solar_notes`: which gate refused it) and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours *and days* behind it and whether its gates let it act) |
 | fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure, with `reference_delta_k`, `loss_w_per_k`, the newest window's evidence and the count it rests on — `dhw_standing_episodes`, `dhw_standing_hours`), cycling, SCOP over the 30-day window **and** over the 90-day one (`scop_total_90d` — the health grade reads the 30-day figure, so the longer window is what separates a shoulder-season row from a poor installation), auxiliary-heat share, health grade, and the **coverage** behind each window (`scop_coverage_days`, `scop_coverage_days_90d`, `building_coverage_days`) — without them a SCOP over seven scattered days reads exactly like one over thirty |
@@ -114,6 +114,26 @@ a table we computed wrong or a user switching control off — four different
 fixes, and the reason only ever existed in the installation's own log. The codes
 are a fixed set (`REVERT_REASONS` in `const.py`), so the block stays counts and
 never a log, and an absent code is exported as zero rather than omitted.
+
+### Bumping, or editing in place
+
+A version that **no release has carried** is edited in place — the new fields join
+it and the constant stays put. A version a release (stable **or pre-release**) has
+carried is bumped. The check is the tags, not `manifest.json`: a pre-release does
+not bump the manifest, so it names the last stable version while a newer
+pre-release is already in users' hands.
+
+Worked example: v19 was merged for the load-term means on 2026-11-25 with no
+release behind it (stable carried 16, the pre-release 18), so the fan settings
+below joined v19 rather than becoming a v20 — and the fixture row was
+regenerated in the same PR.
+
+`plant` also carries the ventilation side: `fan_speed_2` (holding 69,
+`fan_speed_reduced` — the register the firmware actually uses as its base in
+`normal` mode), `fan_normal` (holding 70, which stayed at 60 while the fan ran at
+75, so it describes nothing) and `fanspeedselector`. Pooled against
+`fitted.scop_total` they answer the air-side question a single installation
+cannot: does a pump's SCOP depend on the ventilation it runs at?
 
 ### Fixtures move with the schema
 
