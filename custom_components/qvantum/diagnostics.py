@@ -736,6 +736,10 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         # The electrical mean the implausibility guard compares against; without
         # it a withheld `load_c` is indistinguishable from an observed balance.
         "load_power_mean_electrical_w": live.get("compressor_power_mean_w"),
+        # The air side's drop over the same window. Beside the pair because the
+        # three together give `(P_thermal − P_elec) / P_elec`, and a support dump
+        # without it cannot say whether a pump is short of air.
+        "air_delta_mean_k": live.get("air_delta_mean_k"),
         "load_power_coverage_hours": coverage_hours,
         # Knots of the last active write cycle: a dump must distinguish a knot
         # the forecast cannot reach (the pump keeps an older value) from one the
