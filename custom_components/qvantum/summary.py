@@ -165,7 +165,15 @@ _ENTITY_PREFIXES = (
 #: coefficient is a blend with no window of its own, so a fresh installation and
 #: a mature one carried the same figure — the pool could compare the number but
 #: not weigh it. `thermal_episodes` already does this for the building fit.
-SUMMARY_SCHEMA_VERSION = 18
+#: 19: `curve.load_power_mean_w`, `curve.load_power_mean_electrical_w` and
+#: `curve.load_power_coverage_hours` — both sides of the adaptive curve's load
+#: term plus the coverage behind them. The term refuses a thermal mean below 1.5×
+#: the compressor's input (no running heat pump sits there), so the pair is what
+#: lets the pool answer the question one installation cannot: is the counter's
+#: under-reading the author's pump, or the fleet's? Without it, `load_c: 0` reads
+#: identically on a healthy counter and on a biased one. Additive; no existing
+#: field changes meaning.
+SUMMARY_SCHEMA_VERSION = 19
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -467,6 +475,18 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         # "the integrator converged at the cap" and "it is stuck against it".
         "trim_max_abs_c": _trim_max_abs(coordinator),
         "trim_cap_days": _trim_cap_days(coordinator),
+        # Both sides of the load term's input, because its guard refuses a
+        # thermal mean below 1.5× the compressor's — so a row shows whether the
+        # term was silent on a healthy counter or on a biased one. Without the
+        # pair, "load_c is 0" reads the same on an installation whose counter
+        # under-reads everywhere and on one where the pump genuinely coasts.
+        "load_power_mean_w": _number(getattr(coordinator, "load_power_mean_w", None)),
+        "load_power_mean_electrical_w": _number(
+            getattr(coordinator, "load_power_mean_electrical_w", None)
+        ),
+        "load_power_coverage_hours": _number(
+            getattr(coordinator, "load_power_coverage_hours", None)
+        ),
         "solar_a_w_per_k": _number(getattr(model, "a_w_per_k", None)),
         "solar_b_m2": _number(getattr(model, "b_m2", None)),
         "solar_trust": _number(getattr(model, "trust", None)),

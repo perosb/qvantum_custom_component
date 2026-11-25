@@ -771,3 +771,30 @@ def test_schema_version_bumped_for_the_wind_column():
     from custom_components.qvantum.summary import SUMMARY_SCHEMA_VERSION
 
     assert SUMMARY_SCHEMA_VERSION >= 8
+
+
+def test_the_curve_block_carries_both_sides_of_the_load_term() -> None:
+    """`load_c: 0` must not read the same on a healthy and a biased counter.
+
+    The load term refuses a thermal mean below 1.5× the compressor's input, so a
+    pooled row needs both means and the coverage behind them: the question the
+    pool answers is whether the counter under-reads on one pump or on the fleet.
+    """
+    coordinator = SimpleNamespace(
+        active=True,
+        data=None,
+        _model=None,
+        _daily_model=None,
+        _baseline=None,
+        _trims={},
+        _trim_cap_since={},
+        load_power_mean_w=1348.6,
+        load_power_mean_electrical_w=1386.0,
+        load_power_coverage_hours=2.2,
+    )
+
+    curve = curve_summary(coordinator)
+
+    assert curve["load_power_mean_w"] == 1348.6
+    assert curve["load_power_mean_electrical_w"] == 1386.0
+    assert curve["load_power_coverage_hours"] == 2.2
