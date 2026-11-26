@@ -1103,6 +1103,10 @@ class TestQvantumCurveSensors:
             "clamped_points": ["curve_minus_30"],
             "floor_pinned_points": [],
             "trim_evidence": {"curve_30": 12, "curve_0": 0},
+            # The indication beside the hours: without it a knot with 0 hours
+            # reads the same whether it is pinned or still being driven.
+            "trim_residual": {"curve_30": 0.25, "curve_0": 0.0},
+            "trim_residual_age_hours": 4,
         }
 
     def test_coverage_sensor_unavailable_without_observed_span(

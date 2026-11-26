@@ -1181,8 +1181,10 @@ use `/local/qvantum-curve-card.js` as the resource URL.
   behind each knot's trim, so "+3.8 K" is readable as 151 measured hours at
   0 °C beside a +0.5 K the line fit produced with none. A knot with 0 hours is
   not left at 0 — it keeps the correction it earned while the evidence existed —
-  so the footer pairs the hours with the **indicated** residual (`indicated_c`):
-  an indication of 0 beside a large trim means pinned, not being driven.
+  so the footer pairs the hours with the **indicated** residual (`indicated_c`),
+  rendered as `+1.99 K (0 h → +0.00 K)`: an indication of 0 beside a large trim
+  means pinned, not being driven. The arrow is the direction the damped step
+  pushes toward, not a prediction.
   *Indoor cap*: the 24-hour mean room error, shown while the cap is only
   **armed**; once it bites, the warn chip says so instead. The load chip shows
   its coverage in hours when the term is 0, because the mean is gated on 30

@@ -1282,6 +1282,11 @@ class QvantumCurveCoverageSensor(QvantumCurveSensorEntity):
             "clamped_points": list(snapshot.clamped_points),
             "floor_pinned_points": list(snapshot.floor_pinned_points),
             "trim_evidence": dict(snapshot.trim_evidence),
+            # Beside the hours: what the fit indicates *now*. A knot with 0
+            # hours keeps the trim it earned, so the hours alone cannot say
+            # whether it is pinned or still being driven.
+            "trim_residual": dict(snapshot.trim_residual),
+            "trim_residual_age_hours": snapshot.trim_residual_age_hours,
         }
 
 
