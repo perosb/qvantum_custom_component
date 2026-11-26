@@ -565,6 +565,7 @@ This explains why a 12–20 kW draw can last only minutes before the tank cools,
 ### 8.4 Other functions
 
 - **Smart DHW:** cloud-based control that can raise/lower the tank temperature according to electricity price; statuses are Unavailable/Standby/Raising/Lowering/Lowering long term/Paused. `[R]`
+- **Energy prices available** (input **166**, 0=No, 1=Yes in QSG EN 2613-A / D100041-C): whether the pump holds a SmartControl price list. Exposed as the diagnostic binary sensor `energy_prices_available` on Modbus. When Smart DHW Control Status (162) reads 0 "Unavailable" and the smart curve offset drops out, this register tells a missing price list apart from a SmartControl decision to stop lowering. `[R]`
 - **Bidding zone:** inputs **173–174** hold the electricity price region as a **char[4]**, big-endian, NUL-padded — a string, not a number. Read on a QE-6 2026-11-06: `29541/13056` = `b"se3\0"`. Switching the pump's region to SE4 changed **only** the second word, `13056 → 13312` = `b"4\0"`, so the field is the bidding zone and nothing else. `[L]`
 - **Input 165 is not the bidding zone**, despite QSG EN 2613-A labelling it "Electricity price region": it read `0` with both SE3 and SE4. The guide points at the wrong register; the integration reads 173/174 (`price_region`) and leaves 165 unmapped. `[L]`
 - Inputs 171, 172 and 175–179 read `0` on the same dump; nothing there is mapped. `[L]`

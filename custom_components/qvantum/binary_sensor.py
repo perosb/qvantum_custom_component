@@ -49,6 +49,7 @@ _DIAGNOSTIC_BINARY_SENSORS = frozenset(
         "additionreleased",
         "freeze_protection_active",
         "compressor_blocked",
+        "energy_prices_available",
         # Internal call-for-heat, mode and state flags
         "dhwdemand",
         "heatingdemand",

@@ -134,7 +134,7 @@ QvantumInputs = _component_from_map(
     },
     # Live probe: 0-104 answers; QGM1/QGM2 inputs 119-146 raise 0x04;
     # 150-174 answers (alarms 150-155, smart/wifi/cloud/vacation 161-170,
-    # bidding zone 173-174). Price registers 165-166 are still unread.
+    # bidding zone 173-174, energy prices available 166). Input 165 is unmapped.
     register_ranges=((0, 104), (150, 175)),
 )
 

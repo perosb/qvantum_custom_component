@@ -379,6 +379,7 @@ class TestComponentDecode:
         unit.input[89] = 876  # compressor starts
         unit.input[90] = 2100  # ventilation fan run time hours
         unit.input[91] = 120  # filter hours
+        unit.input[166] = 1  # energy prices available
         unit.input[168] = 1
         unit.input[169] = 0
         unit.input[170] = 1
@@ -386,6 +387,7 @@ class TestComponentDecode:
         await device.async_update_inputs()
         values = component_values(device.inputs)
 
+        assert values["energy_prices_available"] == 1
         assert values["unit_state"] == 1
         assert values["heatingreleased"] == 1
         assert values["coolingreleased"] == 0

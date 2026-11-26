@@ -212,6 +212,9 @@
       "vacation_mode": {
         "name": "Semesterläge"
       },
+      "energy_prices_available": {
+        "name": "Elpriser tillgängliga"
+      },
       "alarm_active": {
         "name": "Larm"
       },
