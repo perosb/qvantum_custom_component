@@ -696,8 +696,7 @@ heating hours behind them — because a marginal pass (median 1.44 against 1.5) 
 not the same decision as a comfortable one. The flow offers *activate* (the same
 call the switch makes) or *not now*; a decline is remembered until readiness
 lapses and returns, and the issue is only raised when the curve's transport can
-write (`writable`), since without it the switch is unavailable. `ready_issue_declined` in the
-diagnostics says which of the two happened. The issue carries a **Learn more**
+write (`writable`), since without it the switch is unavailable. `ready_issue_declined` says which of the two happened — in the diagnostics, and in the summary export beside `writable`, because a pooled `ready: true` row is three installations without it: one whose transport cannot write and was therefore never asked, one that declined, and one that was asked and has not answered yet. The two booleans are policy, not measurement, so they carry nothing about the installation. The issue carries a **Learn more**
 link, opened in a new window, to the README section that *describes* the curve —
 what it is, how it learns, what it writes and what it does not touch — because
 the feature is the integration's own and the explanation has to be ours. The
