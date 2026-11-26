@@ -169,6 +169,15 @@ TOTAL_MAX_C = 3.0
 #: in the margin's direction.
 INDOOR_CAP_C = 1.0
 
+#: An adjustment counts as clamped only when the clamp moves it by more than
+#: this. The band's edge is ``±(INDOOR_CAP_C + margin)`` and the total is a sum
+#: of seven floats, so the two land within a few ulp of each other whenever the
+#: total already sits on the edge — measured live 2026-11-26: total
+#: -0.9562499999999993 against an edge of -0.95625, i.e. 7e-16. Without the
+#: tolerance the cap reported itself binding without changing anything, and the
+#: trim loop pauses whenever it "binds".
+CAP_EPSILON_C = 1e-9
+
 
 @dataclass(frozen=True)
 class DayPhase:
@@ -191,6 +200,12 @@ class CurveResult:
     solar_c: float
     load_c: float
     capped_by_indoor: bool
+    #: The band the shared adjustment was tested against, ``None`` on the side
+    #: that did not apply this cycle. Published so a reader can tell a clamp
+    #: that bit from one that merely sat on the edge — and see *what* it was
+    #: clamped to, which the bool alone cannot say.
+    cap_floor_c: float | None = None
+    cap_ceiling_c: float | None = None
     trims: Mapping[str, float] = field(default_factory=dict)
     clamped: bool = False
     #: The points the pump's supply limits actually bit. ``clamped`` stays a
@@ -1466,6 +1481,35 @@ def precharge_adjustment_c(
     return max_raise_c * fraction
 
 
+def apply_indoor_cap(
+    total_c: float, indoor_margin_c: float | None
+) -> tuple[float, bool, float | None, float | None]:
+    """Clamp the shared adjustment toward the house, and say against what.
+
+    The margin's **sign** picks the side: a warm house (margin > 0) caps the
+    adjustment under a ceiling that shrinks as the house gets warmer, a cold one
+    (margin < 0) lifts it over a floor that rises. Exactly 0.0 is the middle —
+    neither side applies, and the house is exactly at its band's centre.
+
+    Returns ``(total, clamped, floor, ceiling)`` where the last two are the band
+    edges that applied this cycle (``None`` on the idle side) and ``clamped``
+    means the value actually **moved**: see ``CAP_EPSILON_C``.
+    """
+    if indoor_margin_c is None:
+        return total_c, False, None, None
+    if indoor_margin_c > 0.0:
+        ceiling = max(0.0, INDOOR_CAP_C - indoor_margin_c)
+        if total_c > ceiling + CAP_EPSILON_C:
+            return ceiling, True, None, ceiling
+        return total_c, False, None, ceiling
+    if indoor_margin_c < 0.0:
+        floor = -max(0.0, INDOOR_CAP_C + indoor_margin_c)
+        if total_c < floor - CAP_EPSILON_C:
+            return floor, True, floor, None
+        return total_c, False, floor, None
+    return total_c, False, None, None
+
+
 def compute_curve(
     *,
     baseline: Mapping[str, float],
@@ -1552,18 +1596,9 @@ def compute_curve(
         -TOTAL_MAX_C,
         TOTAL_MAX_C,
     )
-    capped_by_indoor = False
-    if indoor_margin_c is not None:
-        if indoor_margin_c > 0.0:
-            ceiling = max(0.0, INDOOR_CAP_C - indoor_margin_c)
-            if total > ceiling:
-                total = ceiling
-                capped_by_indoor = True
-        elif indoor_margin_c < 0.0:
-            floor = -max(0.0, INDOOR_CAP_C + indoor_margin_c)
-            if total < floor:
-                total = floor
-                capped_by_indoor = True
+    total, capped_by_indoor, cap_floor_c, cap_ceiling_c = apply_indoor_cap(
+        total, indoor_margin_c
+    )
 
     low, high = effective_supply_bounds(min_supply_c, max_supply_c)
     effective_trims: dict[str, float] = {}
@@ -1614,6 +1649,8 @@ def compute_curve(
         solar_c=solar_c,
         load_c=load_c,
         capped_by_indoor=capped_by_indoor,
+        cap_floor_c=cap_floor_c,
+        cap_ceiling_c=cap_ceiling_c,
         trims=effective_trims,
         clamped=bool(clamped_points),
         clamped_points=tuple(clamped_points),

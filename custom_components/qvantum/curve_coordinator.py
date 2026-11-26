@@ -348,6 +348,12 @@ class CurveSnapshot:
     indoor_margin_now_c: float | None = None
     indoor_margin_mean_c: float | None = None
     indoor_cap_armed: bool = False
+    #: The band the shared adjustment was tested against this cycle, ``None``
+    #: on the side that did not apply. Without them a dump says the cap "was
+    #: binding" but not at what — and a clamp that moved the adjustment by an ulp
+    #: is indistinguishable from one that moved it a kelvin.
+    indoor_cap_floor_c: float | None = None
+    indoor_cap_ceiling_c: float | None = None
 
 
 def freeze_baseline(settings: Mapping[str, Any]) -> dict[str, float] | None:
@@ -3509,6 +3515,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             indoor_margin_now_c=getattr(self, "_indoor_margin_now", None),
             indoor_margin_mean_c=getattr(self, "_indoor_margin_mean", None),
             indoor_cap_armed=indoor_margin is not None,
+            indoor_cap_floor_c=None if result is None else result.cap_floor_c,
+            indoor_cap_ceiling_c=(
+                None if result is None else result.cap_ceiling_c
+            ),
             pump_room_c=self._pump_room_value(values),
             pump_room_source=self._pump_room_source(values),
             model=self._model,

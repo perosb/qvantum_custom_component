@@ -7,6 +7,7 @@ import pytest
 from custom_components.qvantum.heating_curve import (
     BASELINE_MAX_CORRECTION_C,
     BASELINE_MIN_CORRECTION_C,
+    CAP_EPSILON_C,
     COP_FEEDBACK_MAX_C,
     CURVE_KEYS,
     INDOOR_CAP_C,
@@ -28,6 +29,7 @@ from custom_components.qvantum.heating_curve import (
     CurveResult,
     DayPhase,
     PumpRoomReading,
+    apply_indoor_cap,
     compute_curve,
     cop_feedback_adjustment_c,
     corrected_baseline,
@@ -951,6 +953,67 @@ def test_compute_curve_combines_terms_and_clamps_total() -> None:
     assert result.load_c == pytest.approx(-LOAD_MAX_C)
     assert result.adjustment_c == pytest.approx(-TOTAL_MAX_C)
     assert result.as_dict()["curve_minus_30"] == 57.0
+
+
+def test_an_ulp_over_the_band_edge_is_not_a_clamp() -> None:
+    """The live case, exactly: the total sits 7e-16 under its own floor.
+
+    Measured 2026-11-26: the margin was -0.04375 K (a 24 h mean), the floor
+    -0.95625, and the seven-term total -0.9562499999999993. The cap assigned
+    the floor — changing nothing at 15 decimal places — and reported itself
+    binding, which also paused the trim loop.
+    """
+    margin = -0.04375
+    floor = -max(0.0, INDOOR_CAP_C + margin)
+    total = floor - 7e-16
+
+    value, clamped, band_floor, band_ceiling = apply_indoor_cap(total, margin)
+
+    assert value == total
+    assert clamped is False
+    assert band_floor == pytest.approx(floor)
+    assert band_ceiling is None
+
+
+def test_the_band_is_published_even_when_it_does_not_bind() -> None:
+    """`capped_by_indoor` says "it moved"; the edges say "against what"."""
+    value, clamped, floor, ceiling = apply_indoor_cap(-0.4, -0.04375)
+
+    assert value == pytest.approx(-0.4)
+    assert clamped is False
+    # The edge applies even though the value sits inside it: a reader needs it
+    # to know how much room was left.
+    assert floor == pytest.approx(-0.95625)
+    assert ceiling is None
+
+    value, clamped, floor, ceiling = apply_indoor_cap(0.2, 0.25)
+    assert value == pytest.approx(0.2)
+    assert clamped is False
+    assert floor is None
+    assert ceiling == pytest.approx(0.75)
+
+
+def test_a_real_overshoot_still_clamps_and_flags() -> None:
+    value, clamped, floor, _ = apply_indoor_cap(-2.0, -0.25)
+
+    assert clamped is True
+    assert value == pytest.approx(-(INDOOR_CAP_C - 0.25))
+    assert floor == pytest.approx(value)
+    # Far outside the tolerance, so nothing about the epsilon weakens it.
+    assert value - (-2.0) > CAP_EPSILON_C
+
+
+def test_a_margin_of_exactly_zero_leaves_the_adjustment_alone() -> None:
+    """The middle of the band: neither side applies, so no edge is reported."""
+    assert apply_indoor_cap(-1.7, 0.0) == (-1.7, False, None, None)
+    # No indoor reading at all is the same answer, for a different reason.
+    assert apply_indoor_cap(-1.7, None) == (-1.7, False, None, None)
+
+
+def test_a_margin_past_the_full_veto_pins_the_band_to_zero() -> None:
+    """A house 1 K past target vetoes the direction entirely — the edge is 0."""
+    assert apply_indoor_cap(2.0, 1.4) == (0.0, True, None, 0.0)
+    assert apply_indoor_cap(-2.0, -1.4) == (0.0, True, 0.0, None)
 
 
 def test_compute_curve_indoor_margin_caps_adjustment() -> None:

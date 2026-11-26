@@ -718,6 +718,10 @@ The rules that must not drift:
   configured reading *is* BT2). Without the gates a placeholder BT2 puts the
   deviation tens of kelvin off. Trims, the indoor cap and `room_error` stay on
   the configured sensor: those describe the house.
+- `capped_by_indoor` means the adjustment **moved**, not that it touched the
+  band: the edge follows the 24 h mean and the total is a float sum, so a clamp
+  that changes 7e-16 must not report itself binding — it also pauses the trim
+  loop.
 - The indoor cap averages the room error over **24 h**, so two things bound it:
   a **setpoint change clears the window** (averaging across it judges the house
   by a target it no longer has) and a **cold house follows the current

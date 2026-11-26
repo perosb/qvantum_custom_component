@@ -1226,6 +1226,10 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             # current reading beside the mean is what tells them apart.
             "indoor_margin_now_c": snapshot.indoor_margin_now_c,
             "indoor_margin_mean_c": snapshot.indoor_margin_mean_c,
+            # The band the adjustment was tested against, so the panel can show
+            # "-0.96 of [-0.96, ...]" instead of only "the cap is binding".
+            "indoor_cap_floor_c": snapshot.indoor_cap_floor_c,
+            "indoor_cap_ceiling_c": snapshot.indoor_cap_ceiling_c,
             # In the external mode the pump blends the external value with its
             # own BT2 for the room term, so this is the input the removed term
             # used — not the configured sensor's reading.

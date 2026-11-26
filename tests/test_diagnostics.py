@@ -131,6 +131,8 @@ def _curve_coordinator() -> SimpleNamespace:
         room_error_source="room_temp_external",
         indoor_margin_c=0.4,
         indoor_cap_armed=True,
+        # A warm house (margin +0.4 K) is capped by a *ceiling*: 1.0 - 0.4.
+        indoor_cap_ceiling_c=0.6,
     )
     # Wind-bearing current hour plus an hour without a reading: the dump must
     # report the first and treat the second as "not measured", not as calm.
@@ -746,6 +748,10 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["room_gain_fitted_source"] == "room_temp_external"
     # Whether the warm-house brake can act at all.
     assert curve["indoor_cap_armed"] is True
+    # The band the adjustment was tested against: without it "the cap was
+    # binding" cannot be checked, and an ulp clamp reads like a real one.
+    assert curve["indoor_cap_ceiling_c"] == pytest.approx(0.6)
+    assert curve["indoor_cap_floor_c"] is None
     assert curve["indoor_margin_c"] == 0.4
     assert curve["timestamps"]["last_trim_ts"] == 1758794400.0
     assert curve["timestamps"]["last_active_ts"] is None
