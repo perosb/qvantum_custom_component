@@ -437,6 +437,12 @@ term.** Two defects of the same kind, both measured 2026-11-25:
   poll, because the restored `room_gain` *is* the factor whenever it came from
   one.
 
+The export carries the age as `curve.room_gain.fitted.age_hours`, a **duration**
+and not the epoch the diagnostics hold (the export never contains a timestamp
+finer than a date; `trim_cap_days` is the precedent). The pool's first question
+compares the configured factor with the measured slope, so an undated slope let it
+weigh a fresh setting against a five-day-old fit.
+
 The last attempt is kept as `room_gain_active_attempt` (`valid`, `notes`,
 `hours`, `buckets`, `measured_at`, `age_hours`, and deliberately not its gain —
 that is 0.0 by construction and would invite a misreading), so "no new number"
