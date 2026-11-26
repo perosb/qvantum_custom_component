@@ -37,6 +37,7 @@ from custom_components.qvantum.curve_coordinator import (
 )
 from custom_components.qvantum.heating_curve import (
     COP_FEEDBACK_MAX_C,
+    INDOOR_CAP_C,
     PRECHARGE_MAX_C,
     TOTAL_MAX_C,
     WIND_MAX_C,
@@ -1361,6 +1362,31 @@ async def test_update_trims_applies_damped_step() -> None:
         cc.TRIM_UPDATE_GAIN * 0.6
     )
     assert coordinator._last_trim_ts == 1_000_000.0
+
+
+async def test_an_ulp_band_edge_does_not_pause_the_trim_loop() -> None:
+    """The clamp that changes nothing must not stop the integrator.
+
+    `_async_update_trims` returns early while `capped_by_indoor` is set, because
+    a loop cannot integrate toward a target the cap refuses. A clamp that moved
+    the adjustment by 7e-16 is not a refusal — measured live 2026-11-26, when the
+    flag was set on every cold cycle and the trims silently stopped.
+    """
+    margin = -0.04375
+    floor = -max(0.0, INDOOR_CAP_C + margin)
+    result = replace(
+        make_result(), capped_by_indoor=False, adjustment_c=floor - 7e-16
+    )
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._mode = "active"
+    coordinator._last_trim_ts = None
+    coordinator._async_trim_observations = AsyncMock(return_value=_trim_hours(-1.0))
+
+    await coordinator._async_update_trims(result, 1_000_000.0)
+
+    coordinator._async_trim_observations.assert_awaited()
+    assert coordinator._trims
 
 
 async def test_update_trims_skips_inactive_capped_and_throttled() -> None:

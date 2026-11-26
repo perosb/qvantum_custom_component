@@ -649,6 +649,12 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "wind_c": getattr(snapshot, "wind_c", None),
         "load_c": getattr(snapshot, "load_c", None),
         "capped_by_indoor": getattr(snapshot, "capped_by_indoor", None),
+        # The band the adjustment was tested against, and the input it came
+        # from. "The cap was binding" without these cannot be checked: a clamp
+        # that moved the value by 7e-16 reported itself binding on a live
+        # install (2026-11-26) and paused the trim loop while changing nothing.
+        "indoor_cap_floor_c": getattr(snapshot, "indoor_cap_floor_c", None),
+        "indoor_cap_ceiling_c": getattr(snapshot, "indoor_cap_ceiling_c", None),
         # The cap needs a fresh indoor reading: without one it is inert and the
         # curve has no warm-house brake, which a support dump should show.
         "indoor_margin_c": getattr(snapshot, "indoor_margin_c", None),

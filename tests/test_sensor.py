@@ -707,6 +707,9 @@ def _curve_snapshot(**overrides) -> CurveSnapshot:
         trim_evidence={"curve_30": 12, "curve_0": 0},
         trim_residual={"curve_30": 0.25, "curve_0": 0.0},
         trim_residual_age_hours=4,
+        indoor_margin_c=-0.3,
+        indoor_cap_armed=True,
+        indoor_cap_floor_c=-0.7,
         extrapolated_points=("curve_30", "curve_minus_30"),
         model=SolarModel(
             a_w_per_k=161.0,
@@ -2953,6 +2956,24 @@ class TestCapWindowAttributes:
         assert attrs["indoor_margin_c"] == pytest.approx(-0.3)
         assert attrs["indoor_margin_now_c"] == pytest.approx(-0.2)
         assert attrs["indoor_margin_mean_c"] == pytest.approx(-0.35)
+
+    def test_the_band_the_cap_tested_against_travels_too(self, mock_device) -> None:
+        """``capped_by_indoor`` says "it moved"; these say "against what".
+
+        A live install reported the cap binding while the adjustment sat 7e-16
+        under its own edge (2026-11-26). The edge is what makes that checkable.
+        """
+        coordinator = _curve_coordinator(
+            _curve_snapshot(indoor_margin_c=-0.3, indoor_cap_floor_c=-0.7)
+        )
+        entity = QvantumCurveDeviationSensor(
+            coordinator, "adaptive_curve_deviation", mock_device
+        )
+
+        attrs = entity.extra_state_attributes
+
+        assert attrs["indoor_cap_floor_c"] == pytest.approx(-0.7)
+        assert attrs["indoor_cap_ceiling_c"] is None
 
 
 class TestMeasuredRoomGainAttributes:

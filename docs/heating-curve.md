@@ -622,7 +622,11 @@ Entities:
   acts on), `indoor_margin_now_c` (the current reading) and
   `indoor_margin_mean_c` (the 24 h window mean). One number cannot separate a cap
   that **lags** a house that is warming from a cap that is **biased** — the two
-  need opposite answers — so all three are published together.
+  need opposite answers — so all three are published together. Beside them the
+  **band** it was tested against: `indoor_cap_floor_c` on a cold house and
+  `indoor_cap_ceiling_c` on a warm one (`None` on the idle side). `capped_by_indoor`
+  says the adjustment was **moved**; the edge says against what, and it is the
+  only thing that separates a real clamp from one that sat on its own edge.
   The `ready`/`blocker` attributes describe the baseline-vs-pump window, not
   this sensor's own value. Diagnostic entity, enabled by default.
   A failed forecast refetch does not immediately turn `blocker` into
@@ -888,6 +892,20 @@ only act while the curve is active. Enable them with
   `indoor_margin_now_c` / `indoor_margin_mean_c` so that state is visible rather
   than inferred from a warm room.
 
+  The band is `±(INDOOR_CAP_C + margin)` and only one side applies per cycle:
+  a warm house caps the adjustment under a ceiling of `INDOOR_CAP_C − margin`,
+  a cold one lifts it over a floor of `−(INDOOR_CAP_C + margin)`, and a margin of
+  exactly 0.0 is the middle where neither applies. **`capped_by_indoor` means the
+  value moved**, not that it touched the edge: the edge follows the 24 h mean, so
+  an adjustment already clamped once sits *on* it next cycle, and the sum of
+  seven floats lands within a few ulp of the edge it is compared against.
+  Measured 2026-11-26: total `−0.9562499999999993` against a floor of `−0.95625`,
+  i.e. 7e-16 — the cap assigned the floor, changed nothing, reported itself
+  binding, and paused the trim loop (which stops while the cap binds, because a
+  loop cannot integrate toward a target the cap refuses). `CAP_EPSILON_C = 1e-9`
+  is the tolerance, and `indoor_cap_floor_c` / `indoor_cap_ceiling_c` are dumped
+  beside the flag so the edge can be checked instead of inferred.
+
   Two rules keep the window honest, and both were added after a measurement
   (2026-11-23) rather than in advance: a **setpoint change clears the window**,
   because averaging across it judges the house by a target it no longer has —
@@ -1055,7 +1073,8 @@ comparing the two is a category error), `forecast_wind_ms`/`forecast_wind_availa
 `load_power_mean_w`/`load_power_mean_electrical_w`/`load_power_coverage_hours`, the room term's
 `room_gain_active` (with `measured_at`/`age_hours`) and `room_gain_active_attempt` (the last
 failed run and why), `timestamps.room_gain_factor_since_ts` (the floor a factor change set),
-`indoor_cap_armed` / `indoor_margin_c` (with its two inputs), `bt2_detected`, `pump_room_c`/`pump_room_source`,
+`indoor_cap_armed` / `indoor_margin_c` (with its two inputs and the band
+`indoor_cap_floor_c` / `indoor_cap_ceiling_c`), `bt2_detected`, `pump_room_c`/`pump_room_source`,
 `terms` (which optional terms are on), `cop_reference`/`cop_samples` (the COP
 feedback's learned reference and the evidence behind each bucket) and the readiness
 gates and the whole model, where `model_daily` holds both the three-column fit
