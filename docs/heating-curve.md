@@ -451,6 +451,36 @@ and "why not" are different readings. The deviation sensor publishes the
 applied gain, which may simply be the pump's factor); whole hours because a
 decimal age would rewrite the entity's attributes every cycle just to tick.
 
+**A trim keeps its value when its evidence goes.** The step is
+`old + TRIM_UPDATE_GAIN × residual`, and a residual of 0 adds 0 — so a point whose
+outdoor range the weather has left keeps the correction it earned, and
+`evidence_hours = 0` on a point means *no new correction*, never *trim 0*.
+Measured 2026-11-26: a point sat at **99.6 % of `TRIM_MAX_C` with 0 evidence
+hours**, frozen for at least twelve hours while another point moved 0.6 K in one
+step. The two are only distinguishable if the *indicated* residual is reported
+beside the accumulated trim, so `trim_residual` (and its dated
+`trim_residual_age_hours`) travels with `trim_evidence` — in the dump, on the
+coverage sensor and on the point sensors (`indicated_c`). It is persisted for the
+same reason the evidence is: the cycle runs every `TRIM_REFRESH_HOURS`, and a
+field that only fills at the next cycle is empty for a day after every restart.
+
+The distinction between two kinds of "nothing" is deliberate. An empty
+observation list means the recorder gave us nothing to fit — the last indication
+stands and its age keeps growing, the rule the active-hour measurement follows.
+Enough observations that the fit refuses (fewer than two qualifying buckets) is a
+measurement that indicates nothing, and clears it.
+
+**The indicated residual is a line, not a bucket.** `trim_residuals` fits a
+straight line through the median of each qualifying outdoor bucket and evaluates
+it at **every** point, so a point 3–8 K outside the observed span gets an
+extrapolation — and `max_residual_c` (currently `TRIM_MAX_C`) then caps a single
+extrapolated residual at the same value as the accumulated trim. Measured
+2026-11-26: the qualifying buckets spanned **−7…+2 °C**, and a single update
+pushed the −10 point by 0.596 K, i.e. `0.3 × 1.99` — the residual had saturated
+its clamp. That is the mechanism behind an integrator that will not settle at the
+cold end, and it is why the mobility of a point far outside its support should be
+judged from `trim_residual` rather than from the accumulated trim.
+
 **A period's trims are kept when it ends.** A reversion clears them — they
 were learned against the baseline that was current then — but they carry the
 house's difference from the pitched curve, and the damping loop rebuilds that at
@@ -535,13 +565,16 @@ Entities:
 
 - `sensor.qvantum_adaptive_curve_01_30` … `sensor.qvantum_adaptive_curve_07_minus_30` —
   the computed shadow points, numbered 1–7 (+30 … −30) like the pump's own
-  curve numbers so they sort together, with `baseline`, `adjustment`, `trim`
-  `evidence_hours`, `extrapolated`, `clamped` and `floor_pinned` attributes.
-  `evidence_hours` is how many hours the trim window holds near that outdoor
-  temperature: **0 means the trim is 0 on purpose** — no evidence, no
-  correction — rather than because the curve is already right. `clamped` is a
-  bool for the card; `clamped_points` names the actionable knots and
-  `floor_pinned_points` the warm end the supply floor holds down.
+  curve numbers so they sort together, with `baseline`, `adjustment`, `trim`,
+  `evidence_hours`, `indicated_c`, `indicated_age_hours`, `extrapolated`,
+  `clamped` and `floor_pinned` attributes. `evidence_hours` is how many hours the
+  trim window holds near that outdoor temperature: **0 means the point gets no
+  new correction** — no evidence, no correction — and **not** that its trim is 0,
+  because the trims have no leak. `indicated_c` is the correction the fit
+  indicates right now, and the pair is what separates a trim pinned near the cap
+  from one still being driven. `clamped` is a bool for the card;
+  `clamped_points` names the actionable knots and `floor_pinned_points` the warm
+  end the supply floor holds down.
 - `sensor.qvantum_adaptive_curve_adjustment` — the shared adjustment, with
   `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `cop_c`, `precharge_c`,
   `wind_c`, `terms` (which of the four are switched on), `wind_valid`, the
@@ -634,9 +667,11 @@ Entities:
   Diagnostic entity, enabled by default.
 - `sensor.qvantum_adaptive_curve_coverage` — the per-point surface in one
   place: state is the number of extrapolated points, attributes carry the
-  observed outdoor span, `clamped_points`, `floor_pinned_points` and
-  `trim_evidence`. Deliberately **disabled by default**: the repair issue is the
-  notification and this is the detail.
+  observed outdoor span, `clamped_points`, `floor_pinned_points`, `trim_evidence`
+  and the trim fit's `trim_residual` with `trim_residual_age_hours`. The card
+  reads the trim layer from here rather than from the deviation sensor, which
+  does not carry it. Deliberately **disabled by default**: the repair issue is
+  the notification and this is the detail.
 - `switch.qvantum_adaptive_curve_control` — off = shadow, on = active writing.
   `qvantum.set_curve_control` with `mode: shadow|active` does the same from an
   automation.
@@ -1020,7 +1055,9 @@ failed run and why), `timestamps.room_gain_factor_since_ts` (the floor a factor 
 feedback's learned reference and the evidence behind each bucket) and the readiness
 gates and the whole model, where `model_daily` holds both the three-column fit
 and the four-column one (`a_w_per_k_4col`, `b_m2_4col`) beside the wind column.
-The trim layer travels too: `trim_evidence` (hours behind each point's trim),
+The trim layer travels too: `trim_evidence` (hours behind each point's trim, and
+`trim_residual` — the correction the fit indicates *now*, with
+`trim_residual_age_hours` and the stamp in `timestamps.trim_residual_ts`),
 `trim_cap_since` (when each trim reached `TRIM_MAX_C`, cleared when it leaves —
 the trims are attributes on the point sensors, which the recorder does not keep,
 so "how long has the cap been binding?" had no answer in the data and two
@@ -1144,8 +1181,12 @@ use `/local/qvantum-curve-card.js` as the resource URL.
 - **Footer** — three facts the term chips cannot carry. *Baseline learned*: the
   hours and outdoor span the baseline rests on. *Trim evidence*: the hours
   behind each knot's trim, so "+3.8 K" is readable as 151 measured hours at
-  0 °C beside a +0.5 K that the line fit produced with none — a knot with
-  0 hours keeps its trim at 0 on purpose rather than because the house is right.
+  0 °C beside a +0.5 K the line fit produced with none. A knot with 0 hours is
+  not left at 0 — it keeps the correction it earned while the evidence existed —
+  so the footer pairs the hours with the **indicated** residual (`indicated_c`),
+  rendered as `+1.99 K (0 h → +0.00 K)`: an indication of 0 beside a large trim
+  means pinned, not being driven. The arrow is the direction the damped step
+  pushes toward, not a prediction.
   *Indoor cap*: the 24-hour mean room error, shown while the cap is only
   **armed**; once it bites, the warn chip says so instead. The load chip shows
   its coverage in hours when the term is 0, because the mean is gated on 30

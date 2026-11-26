@@ -1066,9 +1066,14 @@ class QvantumCurvePointSensor(QvantumCurveSensorEntity):
             "baseline": snapshot.baseline.get(self._curve_key),
             "adjustment": snapshot.adjustment_c,
             "trim": snapshot.trims.get(self._curve_key, 0.0),
-            # 0 means the trim is deliberately 0: the window holds no evidence
-            # near this outdoor temperature.
+            # 0 means the point receives no *new* correction: the window holds
+            # no evidence near this outdoor temperature. It does not mean the
+            # accumulated trim above is 0 — the trims have no leak.
             "evidence_hours": snapshot.trim_evidence.get(self._curve_key, 0),
+            # The correction indicated right now, before the accumulation, so a
+            # trim sitting near the cap can be told from one still being driven.
+            "indicated_c": snapshot.trim_residual.get(self._curve_key),
+            "indicated_age_hours": snapshot.trim_residual_age_hours,
             # Outside the outdoor span the baseline was observed at, so the
             # supply is extrapolated from the cached table and readiness says
             # nothing about it yet.
@@ -1277,6 +1282,11 @@ class QvantumCurveCoverageSensor(QvantumCurveSensorEntity):
             "clamped_points": list(snapshot.clamped_points),
             "floor_pinned_points": list(snapshot.floor_pinned_points),
             "trim_evidence": dict(snapshot.trim_evidence),
+            # Beside the hours: what the fit indicates *now*. A knot with 0
+            # hours keeps the trim it earned, so the hours alone cannot say
+            # whether it is pinned or still being driven.
+            "trim_residual": dict(snapshot.trim_residual),
+            "trim_residual_age_hours": snapshot.trim_residual_age_hours,
         }
 
 

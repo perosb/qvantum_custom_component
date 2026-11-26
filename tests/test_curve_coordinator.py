@@ -1195,6 +1195,117 @@ async def test_trims_record_evidence_when_the_fit_is_empty() -> None:
     assert store.saved["trim_evidence"]["curve_0"] == 6
 
 
+async def test_a_trim_keeps_its_value_when_its_evidence_goes() -> None:
+    """The trims have no leak: no evidence means no *new* correction.
+
+    A live install read a point at 99.6 % of ``TRIM_MAX_C`` with 0 evidence
+    hours, and the dump could not say whether it was pinned or still being
+    driven. It was pinned by arithmetic: the fit indicates 0 there, so the
+    damped step is 0 and the accumulated value stays.
+    """
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._mode = "active"
+    coordinator._last_trim_ts = None
+    coordinator._async_trim_observations = AsyncMock(return_value=_trim_hours(-1.0))
+
+    await coordinator._async_update_trims(make_result(), 1_000_000.0)
+    kept = dict(coordinator._trims)
+    assert kept["curve_10"] > 0
+
+    # A week later the weather has not touched that point at all: the only
+    # buckets are -1 and +2 C, both further than 7.5 K from +10 C.
+    coordinator._async_trim_observations = AsyncMock(
+        return_value=[
+            (hour, -1.0, -1.0) for hour in range(6)
+        ]
+        + [(hour + 100, 2.0, -1.0) for hour in range(6)]
+    )
+    await coordinator._async_update_trims(make_result(), 1_000_000.0 + 7 * 86400.0)
+
+    assert coordinator._trims["curve_10"] == kept["curve_10"]
+    assert coordinator._trim_evidence["curve_10"] == 0
+    # The indication says 0 there, which is what "pinned" means.
+    assert coordinator._trim_residual["curve_10"] == pytest.approx(0.0)
+
+
+async def test_the_indicated_residual_is_recorded_with_its_age() -> None:
+    """What the fit indicates now, dated, so a stale one reads as stale."""
+    store = FakeStore()
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS, store=store)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._mode = "active"
+    coordinator._last_trim_ts = None
+    coordinator._async_trim_observations = AsyncMock(return_value=_trim_hours(-1.0))
+
+    await coordinator._async_update_trims(make_result(), 1_000_000.0)
+
+    assert coordinator._trim_residual == coordinator._trim_residual
+    assert coordinator._trim_residual["curve_10"] == pytest.approx(0.6)
+    assert coordinator._trim_residual_ts == 1_000_000.0
+    assert store.saved is not None
+    assert store.saved["trim_residual"]["curve_10"] == pytest.approx(0.6)
+    assert store.saved["trim_residual_ts"] == 1_000_000.0
+    # The step is the gain times the indication, which is what makes the
+    # indication the number worth publishing.
+    assert coordinator._trims["curve_10"] == pytest.approx(
+        cc.TRIM_UPDATE_GAIN * coordinator._trim_residual["curve_10"]
+    )
+
+
+async def test_an_unmeasurable_window_keeps_the_dated_indication() -> None:
+    """Two different "nothing": no measurement keeps it, no evidence clears it.
+
+    An empty observation list means the recorder gave us nothing to fit — the
+    last indication stands and its age keeps growing, which is the same rule the
+    active-hour measurement follows. Enough observations that the fit refuses
+    (fewer than two qualifying buckets) is a *measurement* that indicates
+    nothing, and clears it.
+    """
+    coordinator = make_coordinator(values=VALUES, settings=SETTINGS)
+    coordinator._baseline = dict(BASELINE)
+    coordinator._mode = "active"
+    coordinator._last_trim_ts = None
+    coordinator._trim_residual = {"curve_10": 0.6}
+    coordinator._trim_residual_ts = 900.0
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+
+    await coordinator._async_update_trims(make_result(), 1_000_000.0)
+
+    assert coordinator._trim_residual == {"curve_10": 0.6}
+    assert coordinator._trim_residual_ts == 900.0
+
+    # Enough observations, but all in one bucket: the fit refuses, and that is
+    # an answer rather than a silence.
+    coordinator._last_trim_ts = None
+    coordinator._async_trim_observations = AsyncMock(
+        return_value=[(hour, 5.0, -1.0) for hour in range(6)]
+    )
+    await coordinator._async_update_trims(make_result(), 1_000_000.0)
+
+    assert coordinator._trim_residual == {}
+    assert coordinator._trim_residual_ts == 1_000_000.0
+
+
+async def test_the_indication_round_trips_and_dies_with_the_trims() -> None:
+    """Restored so the field is not empty for a day, cleared when trims are."""
+    store = FakeStore(
+        {
+            "trim_residual": {"curve_10": 0.6, "curve_0": 0.1, "nope": 1.0},
+            "trim_residual_ts": 1_700_000_000.0,
+        }
+    )
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+    assert coordinator._trim_residual == {"curve_10": 0.6, "curve_0": 0.1}
+    assert coordinator._trim_residual_ts == 1_700_000_000.0
+
+    coordinator._reset_trims()
+    assert coordinator._trim_residual == {}
+    assert coordinator._trim_residual_ts is None
+
+
 async def test_trim_evidence_round_trips_through_the_store() -> None:
     store = FakeStore({"trim_evidence": {"curve_0": 9, "nope": 3, "curve_10": True}})
     coordinator = make_coordinator(store=store)
@@ -4745,6 +4856,9 @@ def test_every_persisted_curve_field_reaches_the_dump() -> None:
         # The second floor of the same window: a change in the pump's own room
         # term restarts the measurement, so it belongs beside the first.
         "room_gain_factor_since_ts": "timestamps",
+        # The indication's stamp: the age is the reader-facing field, the stamp
+        # is what the timestamps block carries for every dated field.
+        "trim_residual_ts": "timestamps",
         "daily_model": "model_daily",
     }
     #: Persisted for the restore path only, never for a reader: the stamp form

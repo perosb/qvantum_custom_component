@@ -466,8 +466,12 @@ class QvantumCurveCard extends HTMLElement {
         value: num(s?.state),
         baseline: num(attr(s, "baseline")),
         trim: num(attr(s, "trim")) ?? 0,
-        // Hours behind this knot's trim: 0 means the trim is 0 on purpose.
+        // Hours behind this knot's trim: 0 means the knot gets no *new*
+        // correction, not that its trim is 0 — the trims have no leak.
         evidence: num(attr(s, "evidence_hours")),
+        // What the fit indicates right now, so a knot resting on 0 hours can be
+        // read as pinned rather than as still being driven.
+        indicated: num(attr(s, "indicated_c")),
         // A knot outside the learned baseline span is the line fit's shape,
         // not a measurement — the distinction the chart cannot show by itself.
         extrapolated: attr(s, "extrapolated") === true,
@@ -991,13 +995,23 @@ class QvantumCurveCard extends HTMLElement {
     const evidence = model.trimEvidence;
     if (evidence && typeof evidence === "object") {
       const parts = model.allPoints
-        .filter((p) => (num(evidence[trimKey(p.outdoor)]) ?? 0) > 0 || p.trim)
-        .sort((a, b) => b.outdoor - a.outdoor)
-        .map(
+        .filter(
           (p) =>
-            `${fmt(p.outdoor, 0)} °C ${signed(p.trim ?? 0)} K ` +
-            `(${fmt(num(evidence[trimKey(p.outdoor)]) ?? 0, 0)} ${t.hours})`,
-        );
+            (num(evidence[trimKey(p.outdoor)]) ?? p.evidence ?? 0) > 0 ||
+            p.trim,
+        )
+        .sort((a, b) => b.outdoor - a.outdoor)
+        .map((p) => {
+          const hours = num(evidence[trimKey(p.outdoor)]) ?? p.evidence ?? 0;
+          // The arrow and the indicated residual are what make the hours
+          // readable: an indication of 0 beside a trim means the knot is
+          // pinned, not that the loop is still pushing it.
+          const indicated =
+            p.indicated === null || p.indicated === undefined
+              ? ""
+              : ` → ${signed(p.indicated)} K`;
+          return `${fmt(p.outdoor, 0)} °C ${signed(p.trim ?? 0)} K (${fmt(hours, 0)} ${t.hours}${indicated})`;
+        });
       if (parts.length)
         footer.push(
           `<span>${esc(t.trimPerKnot)}: ${parts.join(" · ")}</span>`,
