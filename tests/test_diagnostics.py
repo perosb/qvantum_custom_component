@@ -19,7 +19,7 @@ from custom_components.qvantum.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from custom_components.qvantum.efficiency_coordinator import EfficiencySnapshot
-from custom_components.qvantum.heating_curve import ActiveRoomGain
+from custom_components.qvantum.heating_curve import ActiveRoomGain, measured_age_hours
 from custom_components.qvantum.open_meteo import HourlyWeather, WeatherForecast, hour_ts
 from custom_components.qvantum.plant_analytics import DhwMeterWindow
 from custom_components.qvantum.solar_gain import SolarDailyModel, SolarModel
@@ -160,7 +160,13 @@ def _curve_coordinator() -> SimpleNamespace:
             "corrected": True,
         },
         _trims={"curve_30": 0.1},
-        _trim_evidence={"curve_30": 12, "curve_minus_30": 0},
+        _trim_evidence={
+            "curve_30": 12,
+            "curve_0": 166,
+            "curve_10": 0,
+            "curve_minus_10": 16,
+            "curve_minus_30": 0,
+        },
         _trim_seed={"curve_30": 1.4, "curve_0": 0.9},
         _trim_seed_baseline={
             "curve_30": 28.0,
@@ -208,6 +214,8 @@ def _curve_coordinator() -> SimpleNamespace:
             notes="no indoor series with enough history",
         ),
         _room_gain_factor_since_ts=1758794000.0,
+        _trim_residual={"curve_0": 0.42, "curve_10": 0.0, "curve_minus_10": 1.99},
+        _trim_residual_ts=1758794400.0 - 3 * 3600.0,
         _room_gain_fitted_source="room_temp_external",
         _active_since_ts=1758790800.0,
         _model=_solar_model(),
@@ -675,7 +683,8 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
         "days_clamped": 3,
         "days_extrapolated": 4,
     }
-    assert curve["trim_evidence"] == {"curve_30": 12, "curve_minus_30": 0}
+    assert curve["trim_evidence"]["curve_30"] == 12
+    assert curve["trim_evidence"]["curve_10"] == 0
     # The set the last active period ended with: a re-activation re-applies it
     # only while the baseline is unchanged, so the dump has to show both sides
     # and whether they still agree.
@@ -723,6 +732,17 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["room_gain_active_attempt"]["age_hours"] is not None
     assert "gain_c_per_c" not in curve["room_gain_active_attempt"]
     assert curve["timestamps"]["room_gain_factor_since_ts"] == 1758794000.0
+    # The indication beside the accumulated trims: a point at the cap with zero
+    # evidence hours and an indication of 0 is *pinned*, not still being driven.
+    assert curve["trim_residual"]["curve_minus_10"] == 1.99
+    assert curve["trim_residual"]["curve_10"] == 0.0
+    assert curve["trim_evidence"]["curve_10"] == 0
+    # The age is computed from the same clock the dump reads; the arithmetic
+    # itself is pinned in the heating-curve tests.
+    assert curve["trim_residual_age_hours"] == pytest.approx(
+        measured_age_hours(1758794400.0 - 3 * 3600.0, dt_util.utcnow().timestamp()),
+        abs=0.01,
+    )
     assert curve["room_gain_fitted_source"] == "room_temp_external"
     # Whether the warm-house brake can act at all.
     assert curve["indoor_cap_armed"] is True

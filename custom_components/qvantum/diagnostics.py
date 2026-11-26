@@ -65,6 +65,7 @@ _CURVE_TIMESTAMP_FIELDS = (
     "_room_gain_active_ts",
     "_room_gain_factor_since_ts",
     "_last_trim_ts",
+    "_trim_residual_ts",
 )
 
 
@@ -725,8 +726,18 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "room_gain_from_factor": bool(
             getattr(coordinator, "_room_gain_from_factor", False)
         ),
-        # Hours behind each point's trim; 0 means the trim is deliberately 0.
+        # Hours behind each point's trim. 0 means the point gets *no new*
+        # correction, not that its trim is 0 — the trims have no leak.
         "trim_evidence": dict(getattr(coordinator, "_trim_evidence", None) or {}),
+        # What the fit indicates right now, before the damped accumulation, and
+        # how old that indication is. The pair is the only thing that separates
+        # a trim pinned near the cap from one still being driven: a live install
+        # read a point at 99.6 % of `TRIM_MAX_C` with 0 evidence hours, and the
+        # dump could not say which it was.
+        "trim_residual": dict(getattr(coordinator, "_trim_residual", None) or {}),
+        "trim_residual_age_hours": measured_age_hours(
+            getattr(coordinator, "_trim_residual_ts", None), now_ts
+        ),
         # When each trim reached TRIM_MAX_C, cleared when it leaves. The trims
         # themselves are attributes on the point sensors, which the recorder
         # does not keep, so "how long has the cap been binding?" had no answer

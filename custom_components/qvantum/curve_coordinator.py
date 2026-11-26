@@ -299,9 +299,20 @@ class CurveSnapshot:
     #: zero can produce the same ``median_abs_c`` and need opposite answers, so
     #: the sign travels with it.
     median_c: float | None = None
-    #: Hours behind each point's trim; 0 means the trim is deliberately 0
-    #: because the window holds no evidence near that outdoor temperature.
+    #: Hours behind each point's trim. 0 means no observation near that outdoor
+    #: temperature qualifies, so the point receives **no new** correction — it
+    #: does *not* mean the accumulated trim is 0: the trims have no leak, so a
+    #: correction whose evidence has gone is kept.
     trim_evidence: Mapping[str, int] = field(default_factory=dict)
+    #: The correction the fit indicates **now** for each point, before the damped
+    #: accumulation — the number this cycle pushes the trim toward, 0 where the
+    #: point has no qualified evidence. Without it a trim pinned near the cap and
+    #: a trim still being driven read identically in a dump.
+    trim_residual: Mapping[str, float] = field(default_factory=dict)
+    #: Age of that indication in whole hours, so a stale one reads as stale: the
+    #: trim cycle runs every `TRIM_REFRESH_HOURS`, and a persisted indication
+    #: outlives the observations behind it.
+    trim_residual_age_hours: int | None = None
     #: Room temperature the pump's own room term is computed from (the mean of
     #: the external value and BT2 in the external mode), so a support dump can
     #: see which input the removed term used.
@@ -824,6 +835,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._ready_since_ts: float | None = None
         self._ready_issue_declined = False
         self._trim_evidence: dict[str, int] = {}
+        self._trim_residual: dict[str, float] = {}
+        self._trim_residual_ts: float | None = None
         self._last_trim_ts: float | None = None
         #: The trims of the last active period, kept across a reversion so the
         #: integrator does not have to rebuild the house's offset from zero.
@@ -1097,6 +1110,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 getattr(self, "_ready_issue_declined", False)
             ),
             "trim_evidence": dict(self._trim_evidence),
+            "trim_residual": dict(getattr(self, "_trim_residual", None) or {}),
+            "trim_residual_ts": getattr(self, "_trim_residual_ts", None),
             "trim_seed": (
                 {
                     "trims": dict(self._trim_seed),
@@ -1287,6 +1302,29 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             for key, hours in evidence.items():
                 if key in CURVE_KEYS and isinstance(hours, int) and not isinstance(hours, bool):
                     self._trim_evidence[key] = hours
+        # The last indicated residual and when it was computed. Restored rather
+        # than recomputed: the cycle is 24 h apart, so a visibility field that
+        # only fills at the next cycle would be empty for a day after every
+        # restart -- and the stamp is what keeps a restored indication from
+        # passing for a fresh one.
+        indicated = data.get("trim_residual")
+        if isinstance(indicated, dict):
+            if not isinstance(getattr(self, "_trim_residual", None), dict):
+                # Defensive, like the cap stamps: a restored state must not
+                # depend on ``__init__`` having run.
+                self._trim_residual = {}
+            for key, value in indicated.items():
+                if (
+                    key in CURVE_KEYS
+                    and isinstance(value, (int, float))
+                    and not isinstance(value, bool)
+                ):
+                    self._trim_residual[key] = float(value)
+        residual_ts = data.get("trim_residual_ts")
+        if isinstance(residual_ts, (int, float)) and not isinstance(
+            residual_ts, bool
+        ):
+            self._trim_residual_ts = float(residual_ts)
         seed = data.get("trim_seed")
         if isinstance(seed, dict):
             # The trims are a *partial* map (only the knots with evidence), so
@@ -2858,6 +2896,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         """
         self._trims = {}
         self._trim_cap_since = {}
+        self._trim_residual = {}
+        self._trim_residual_ts = None
 
     async def _async_update_trims(self, result: Any, now_ts: float) -> None:
         """Slowly fold indoor-error residuals into per-point trims.
@@ -2896,6 +2936,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         evidence_changed = evidence != self._trim_evidence
         self._trim_evidence = evidence
         residual = trim_residuals(self._baseline, observations, int(now_ts))
+        # Recorded before the early return: "not enough evidence" is itself the
+        # answer to "what is the fit indicating", and leaving the previous
+        # indication in place would say the opposite.
+        self._trim_residual = {} if residual is None else dict(residual)
+        self._trim_residual_ts = float(now_ts)
         if residual is None:
             if evidence_changed:
                 await self._async_persist()
@@ -3485,6 +3530,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 None if measured_age is None else int(measured_age)
             ),
             trim_evidence=dict(self._trim_evidence),
+            trim_residual=dict(getattr(self, "_trim_residual", None) or {}),
+            trim_residual_age_hours=(
+                None
+                if getattr(self, "_trim_residual_ts", None) is None
+                else int(measured_age_hours(self._trim_residual_ts, now_ts))
+            ),
             extrapolated_points=extrapolated,
             cop_c=0.0 if result is None else result.cop_c,
             precharge_c=0.0 if result is None else result.precharge_c,

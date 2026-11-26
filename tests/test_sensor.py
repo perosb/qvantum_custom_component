@@ -705,6 +705,8 @@ def _curve_snapshot(**overrides) -> CurveSnapshot:
         room_error_samples=72,
         room_error_source="room_temp_external",
         trim_evidence={"curve_30": 12, "curve_0": 0},
+        trim_residual={"curve_30": 0.25, "curve_0": 0.0},
+        trim_residual_age_hours=4,
         extrapolated_points=("curve_30", "curve_minus_30"),
         model=SolarModel(
             a_w_per_k=161.0,
@@ -774,6 +776,11 @@ class TestQvantumCurveSensors:
             "adjustment": 1.0,
             "trim": 0.0,
             "evidence_hours": 12,
+            # What the fit indicates now, and how old that indication is: the
+            # panel can then tell a trim sitting at the cap from one still
+            # being driven, which the accumulated value alone cannot.
+            "indicated_c": 0.25,
+            "indicated_age_hours": 4,
             "extrapolated": True,
             "clamped": False,
             "floor_pinned": False,

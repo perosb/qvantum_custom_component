@@ -1363,11 +1363,14 @@ def trim_evidence_hours(
 ) -> dict[str, int]:
     """Hours behind each curve point's trim, keyed like the seven points.
 
-    A point with 0 hours has no evidence: either no observations within
-    ``max_distance_c`` of it, or none in an outdoor bucket that reached
-    ``min_bucket_hours``. Its trim deliberately stays 0 rather than being
-    invented, so this answers "why are the trims empty?" straight from the
-    observations ``trim_residuals`` already consumes.
+    A point with 0 hours gets **no new** correction: either no observation lies
+    within ``max_distance_c`` of it, or none in an outdoor bucket that reached
+    ``min_bucket_hours``. It does *not* mean the accumulated trim is 0 — the
+    trims have no leak, so a correction learned while the evidence existed is
+    kept after the weather moves away from that point (measured on a live
+    install: a point at 99.6 % of ``TRIM_MAX_C`` with 0 evidence hours). What 0
+    hours rules out is only that the point is being *driven*; the indicated
+    residual beside the trims says which.
     """
     buckets: dict[int, int] = {}
     for _hour_ts, outdoor, _error in observations:
