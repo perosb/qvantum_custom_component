@@ -194,9 +194,20 @@ def _curve_coordinator() -> SimpleNamespace:
             r2=0.88,
             residual_std_c=0.15,
             leave_one_out_c_per_c=2.47,
+            measured_at=1758794400.0 - 30 * 3600.0,
             valid=False,
             notes="one hour carries the estimate",
         ),
+        _room_gain_active_attempt=ActiveRoomGain(
+            gain_c_per_c=0.0,
+            hours=0,
+            buckets=0,
+            span_c=0.0,
+            measured_at=1758794400.0 - 2 * 3600.0,
+            valid=False,
+            notes="no indoor series with enough history",
+        ),
+        _room_gain_factor_since_ts=1758794000.0,
         _room_gain_fitted_source="room_temp_external",
         _active_since_ts=1758790800.0,
         _model=_solar_model(),
@@ -702,6 +713,16 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
     assert curve["room_gain_active"]["std_err_c_per_c"] == 0.4
     assert curve["room_gain_active"]["t_stat"] == pytest.approx(4.33 / 0.4)
     assert curve["room_gain_active"]["source"] == "room_temp_external"
+    # The figure is dated, so a five-day-old measurement cannot pass for fresh —
+    # and the failed attempt's reason travels beside the surviving valid number.
+    assert curve["room_gain_active"]["measured_at"] == 1758794400.0 - 30 * 3600.0
+    assert curve["room_gain_active"]["age_hours"] is not None
+    assert curve["room_gain_active_attempt"]["notes"] == (
+        "no indoor series with enough history"
+    )
+    assert curve["room_gain_active_attempt"]["age_hours"] is not None
+    assert "gain_c_per_c" not in curve["room_gain_active_attempt"]
+    assert curve["timestamps"]["room_gain_factor_since_ts"] == 1758794000.0
     assert curve["room_gain_fitted_source"] == "room_temp_external"
     # Whether the warm-house brake can act at all.
     assert curve["indoor_cap_armed"] is True

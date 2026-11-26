@@ -37,6 +37,7 @@ from custom_components.qvantum.heating_curve import (
     interpolate_supply,
     lift_baseline_floor,
     load_adjustment_c,
+    measured_age_hours,
     night_day_adjustment_c,
     normalize_baseline,
     outdoor_adjustment_c,
@@ -1524,3 +1525,32 @@ def test_a_missing_compressor_reading_leaves_the_load_term_as_it_was() -> None:
             BASE_HOUR,
             compressor_power_w=reading,
         ) == pytest.approx(-LOAD_MAX_C)
+
+
+def test_a_pure_fit_carries_no_clock() -> None:
+    """`room_gain_from_active_hours` has no clock and must not grow one.
+
+    The coordinator stamps `measured_at`; a pure fit that invented a timestamp
+    would make every caller's date depend on when the function ran.
+    """
+    hours = [
+        (0.0, 30.0, -1.0, 0.0),
+        (0.0, 30.0, 1.0, 3600.0),
+        (-2.0, 31.0, -1.0, 7200.0),
+        (2.0, 31.0, 1.0, 10800.0),
+    ]
+
+    estimate = room_gain_from_active_hours(hours)
+
+    assert estimate.measured_at is None
+
+
+def test_measured_age_hours() -> None:
+    """An undated measurement has no age, and a future stamp reads 0."""
+    assert measured_age_hours(None, 1_000_000.0) is None
+    assert measured_age_hours("nonsense", 1_000_000.0) is None
+    assert measured_age_hours(1_000_000.0 - 5 * 86400, 1_000_000.0) == pytest.approx(
+        120.0
+    )
+    # A clock jump must not read as "very fresh" from the other side either.
+    assert measured_age_hours(1_000_000.0 + 3600, 1_000_000.0) == 0.0

@@ -47,6 +47,7 @@ from .const import (
     SensorMode,
 )
 from .coordinator import transport_kind
+from .heating_curve import measured_age_hours
 from .plant_analytics import eu_label
 from .statistics import INDOOR_METRIC_KEYS
 
@@ -183,7 +184,14 @@ _ENTITY_PREFIXES = (
 #: v19 also carries `curve.air_delta_mean_k`: the evaporator's air-side drop over
 #: the load window, which with the two power means gives the air-side contribution
 #: `(P_thermal − P_elec) / P_elec` per installation — no assumed flow needed.
-SUMMARY_SCHEMA_VERSION = 19
+#: 20: `curve.room_gain.fitted.age_hours` — how old the active-hour measurement
+#: is, as a **duration** and not the epoch the diagnostics carry (the export never
+#: contains a timestamp finer than a date; the precedent is `trim_cap_days`). It
+#: exists because the pool's identity check weighs a fresh *configured* factor
+#: against a *measured* slope, and that slope survives failed refits on purpose:
+#: before this field a five-day-old 4.62 was indistinguishable from a fresh one.
+#: Present in both branches (`null` on the Auto window). Additive.
+SUMMARY_SCHEMA_VERSION = 20
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -621,6 +629,16 @@ def room_gain_summary(coordinator: Any) -> dict[str, Any]:
             "leave_one_out_c_per_c": _number(
                 getattr(active, "leave_one_out_c_per_c", None)
             ),
+            # How old the measurement is, as a **duration** and not the epoch the
+            # diagnostics carry: the export never contains a timestamp finer than
+            # a date, and the precedent is `trim_cap_days`. Without it the pool's
+            # identity check weighs a fresh configured factor against a
+            # measurement that may be days old.
+            "age_hours": _number(
+                measured_age_hours(
+                    getattr(active, "measured_at", None), dt_util.utcnow().timestamp()
+                )
+            ),
         }
     else:
         fitted = {
@@ -632,6 +650,10 @@ def room_gain_summary(coordinator: Any) -> dict[str, Any]:
             "valid": getattr(coordinator, "_room_gain_fitted", None) is not None,
             "notes": "",
             "hours": None,
+            # No active-hour measurement exists, so there is no age to report —
+            # the key is present in both branches so a row's shape does not
+            # depend on which window was measured.
+            "age_hours": None,
             "buckets": None,
             "r2": None,
             "std_err_c_per_c": None,

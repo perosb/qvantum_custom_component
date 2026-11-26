@@ -411,6 +411,46 @@ slope lands on the trim drift (+0.09…+0.28 °C/day against ~0.13 measured). It
 reported as `drift_c_per_day` and never applied; rows without a timestamp
 contribute nothing to it.
 
+**The measurement is dated, and never spans a change in the pump's own room
+term.** Two defects of the same kind, both measured 2026-11-25:
+
+- `_async_refresh_active_room_gain` keeps the last **valid** estimate when a
+  refit fails, on purpose (a transient "not measurable" run must not erase a real
+  measurement). `_room_gain_active_ts` is stamped *before* the fit and is not
+  persisted, so the dump could show an attempt made seconds ago beside numbers
+  measured five days earlier: the live install read **4.622 ± 0.239**, and that
+  value was only reproducible by windows **ending 2026-11-20** — every run since
+  failed the R² gate (0.49–0.72 < 0.80). It was read as "the pump ignored the
+  `room_comp_factor` write". `ActiveRoomGain` therefore carries `measured_at`,
+  persisted with the estimate, and the dump publishes it with `age_hours`.
+- The window opened at `active_since_ts` only, so hours measured under one
+  `room_comp_factor` and hours under another were pooled. Refitted separately,
+  the same 7-day window reads **4.22 ± 0.56** before the 5 → 2 change
+  (2026-11-22) and **1.50 ± 0.22** after — the pump honoured the write, and only
+  the pooled window hid it. A changed factor now drops the estimate and re-stamps
+  `room_gain_factor_since_ts`, a second floor beside `active_since_ts`.
+  The detection reads the **raw register**, not the value the gain is derived
+  from: `_configured_room_gain` returns `None` both for "no reading" and for
+  "outside our interval", and the second is still a real change. A **missing**
+  reading is not a change, so a register that flaps once does not empty the
+  window. A change made while Home Assistant was down is caught on the first
+  poll, because the restored `room_gain` *is* the factor whenever it came from
+  one.
+
+The export carries the age as `curve.room_gain.fitted.age_hours`, a **duration**
+and not the epoch the diagnostics hold (the export never contains a timestamp
+finer than a date; `trim_cap_days` is the precedent). The pool's first question
+compares the configured factor with the measured slope, so an undated slope let it
+weigh a fresh setting against a five-day-old fit.
+
+The last attempt is kept as `room_gain_active_attempt` (`valid`, `notes`,
+`hours`, `buckets`, `measured_at`, `age_hours`, and deliberately not its gain —
+that is 0.0 by construction and would invite a misreading), so "no new number"
+and "why not" are different readings. The deviation sensor publishes the
+**measured** slope and its age in whole hours beside `room_gain_c_per_c` (the
+applied gain, which may simply be the pump's factor); whole hours because a
+decimal age would rewrite the entity's attributes every cycle just to tick.
+
 **A period's trims are kept when it ends.** A reversion clears them — they
 were learned against the baseline that was current then — but they carry the
 house's difference from the pitched curve, and the damping loop rebuilds that at
@@ -525,7 +565,11 @@ Entities:
   readiness window, `baseline_learned_hours`, `baseline_outdoor_min_c`,
   `baseline_outdoor_max_c` from the last baseline fit and `room_gain_c_per_c`
   (the pump's room-compensation gain — its own `room_comp_factor` when it
-  reports one — removed from the deviation while the pump follows our table).
+  reports one — removed from the deviation while the pump follows our table),
+  plus `room_gain_measured_c_per_c` and `room_gain_measured_age_hours`: the
+  **measured** slope and its age in whole hours, because the applied gain above
+  may simply be the factor and a reader needs to tell a stale measurement from a
+  changed setting.
   `extrapolated_points` lists the curve points outside that observed range:
   their supply comes from the cached table rather than from anything the pump
   was watched doing, so readiness says nothing about them yet. `pump_room_c` is
@@ -968,8 +1012,10 @@ stated reason. It carries
 `write_scope` (the knots of the last active cycle), `forecast_ok`, `forecast_reused` and `forecast_now_c` (the forecast hour's air
 temperature — `outdoor_c` beside it is the **term** in kelvin, clamped ±1.0, and
 comparing the two is a category error), `forecast_wind_ms`/`forecast_wind_available`, the load term's
-`load_power_mean_w`/`load_power_mean_electrical_w`/`load_power_coverage_hours`, `indoor_cap_armed` /
-`indoor_margin_c` (with its two inputs), `bt2_detected`, `pump_room_c`/`pump_room_source`,
+`load_power_mean_w`/`load_power_mean_electrical_w`/`load_power_coverage_hours`, the room term's
+`room_gain_active` (with `measured_at`/`age_hours`) and `room_gain_active_attempt` (the last
+failed run and why), `timestamps.room_gain_factor_since_ts` (the floor a factor change set),
+`indoor_cap_armed` / `indoor_margin_c` (with its two inputs), `bt2_detected`, `pump_room_c`/`pump_room_source`,
 `terms` (which optional terms are on), `cop_reference`/`cop_samples` (the COP
 feedback's learned reference and the evidence behind each bucket) and the readiness
 gates and the whole model, where `model_daily` holds both the three-column fit

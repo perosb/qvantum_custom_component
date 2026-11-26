@@ -620,6 +620,9 @@ def test_the_fitted_gain_is_null_until_a_fit_has_run() -> None:
     assert gain["fitted"]["source"] is None
     assert gain["fitted"]["window"] == "auto"
     assert gain["fitted"]["valid"] is False
+    # No active-hour measurement exists, so there is no age — the key is still
+    # present so a row's shape does not depend on which window was measured.
+    assert gain["fitted"]["age_hours"] is None
 
 
 def test_an_active_measurement_travels_with_its_evidence() -> None:
@@ -634,6 +637,9 @@ def test_an_active_measurement_travels_with_its_evidence() -> None:
         r2=0.88,
         residual_std_c=0.15,
         leave_one_out_c_per_c=2.47,
+        # Measured five days ago: the pool's identity check must be able to see
+        # that the configured factor it is compared with is much newer.
+        measured_at=dt_util.utcnow().timestamp() - 120 * 3600.0,
         valid=False,
         notes="one hour carries the estimate (leave-one-out 2.47 °C/°C > 0.50)",
     )
@@ -648,6 +654,8 @@ def test_an_active_measurement_travels_with_its_evidence() -> None:
     assert fitted["valid"] is False
     assert "leave-one-out" in fitted["notes"]
     assert fitted["hours"] == 18
+    # The age, as a duration: the export carries no timestamp finer than a date.
+    assert fitted["age_hours"] == pytest.approx(120.0, abs=1.0)
     assert fitted["buckets"] == 3
     assert fitted["r2"] == 0.88
     assert fitted["std_err_c_per_c"] == 0.40

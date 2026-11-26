@@ -798,6 +798,12 @@ class ActiveRoomGain:
     #: kelvin per day while the integrator is still moving) and is reported so a
     #: dump shows the absorption worked.
     drift_c_per_day: float | None = None
+    #: When the fit ran, in epoch seconds, or ``None`` when unknown. The pure fit
+    #: has no clock — the coordinator stamps this — and a value restored from a
+    #: store written before the field existed is ``None`` rather than a guess.
+    #: Without it a valid estimate survives failed attempts indefinitely and no
+    #: reader can tell a five-day-old number from a fresh one.
+    measured_at: float | None = None
     valid: bool = False
     notes: str = ""
 
@@ -807,6 +813,23 @@ class ActiveRoomGain:
         if not self.std_err_c_per_c:
             return None
         return self.gain_c_per_c / self.std_err_c_per_c
+
+
+def measured_age_hours(
+    measured_at: object, now_ts: object
+) -> float | None:
+    """Age of a measurement in hours, or ``None`` when it carries no date.
+
+    One spelling of the rule, shared by the snapshot, the diagnostics and the
+    export: three modules computing ``(now - measured_at) / 3600`` separately is
+    how they drift. A stamp in the future reads ``0.0`` — a clock jump is not
+    this helper's question, and a negative age would be read as "very fresh".
+    """
+    stamped = finite(measured_at)
+    now = finite(now_ts)
+    if stamped is None or now is None:
+        return None
+    return max(0.0, (now - stamped) / 3600.0)
 
 
 def _solve_normal_equations(

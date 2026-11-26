@@ -63,6 +63,7 @@ from .heating_curve import (
     effective_supply_bounds,
     interpolate_supply,
     lift_baseline_floor,
+    measured_age_hours,
     normalize_baseline,
     points_in_reach,
     precharge_adjustment_c,
@@ -285,6 +286,13 @@ class CurveSnapshot:
     baseline_outdoor_max_c: float | None = None
     #: Identified pump room-compensation gain (supply °C per °C room error).
     room_gain_c: float | None = None
+    #: The **measured** slope, when a valid active-hour estimate exists, and its
+    #: age in whole hours. The applied gain above may simply be the pump's
+    #: configured factor, so a panel showing only that could not tell a stale
+    #: measurement from a changed setting. Whole hours on purpose: a decimal age
+    #: would rewrite the entity's attributes every cycle just to tick.
+    room_gain_measured_c_per_c: float | None = None
+    room_gain_measured_age_hours: int | None = None
     #: 95th percentile of the readiness window (the gated upper bound).
     p95_abs_c: float | None = None
     #: Signed median of the same window. A constant offset and noise around
@@ -681,6 +689,22 @@ def _daily_from_state(state: Any) -> SolarDailyModel | None:
         return None
 
 
+def _changed_room_factor(
+    previous: float | None, current: float, *, seen_floor: bool
+) -> bool:
+    """Whether the pump's room term changed since the last usable reading.
+
+    Only transitions **between two usable values** count. A missing reading is
+    not a change: a register that flaps once would otherwise empty the window
+    and throw away a valid estimate. The first observation after a restart is
+    handled by the caller seeding ``previous`` from the persisted gain, so a
+    change made while Home Assistant was down is caught on the first poll.
+    """
+    if previous is None:
+        return seen_floor
+    return current != previous
+
+
 def _active_gain_to_state(estimate: ActiveRoomGain | None) -> dict[str, Any] | None:
     if estimate is None:
         return None
@@ -695,6 +719,10 @@ def _active_gain_to_state(estimate: ActiveRoomGain | None) -> dict[str, Any] | N
         "residual": estimate.residual_std_c,
         "loo": estimate.leave_one_out_c_per_c,
         "outdoor_slope": estimate.outdoor_slope_c_per_c,
+        # When the numbers were measured, not when the refresh was attempted:
+        # `_room_gain_active_ts` is the attempt stamp (and deliberately not
+        # persisted), so without this the dump cannot date the figure.
+        "measured_at": estimate.measured_at,
         "valid": estimate.valid,
         "notes": estimate.notes,
     }
@@ -716,6 +744,9 @@ def _active_gain_from_state(state: Any) -> ActiveRoomGain | None:
             residual_std_c=finite(state.get("residual")),
             leave_one_out_c_per_c=finite(state.get("loo")),
             outdoor_slope_c_per_c=finite(state.get("outdoor_slope")),
+            # A store written before the field existed restores as None, not as
+            # "measured now": an unknown date must stay unknown.
+            measured_at=finite(state.get("measured_at")),
             valid=bool(state.get("valid", False)),
             notes=str(state.get("notes", "")),
         )
@@ -814,6 +845,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         # only clean slope on an installation that runs active permanently.
         self._room_gain_active: ActiveRoomGain | None = None
         self._room_gain_active_ts: float | None = None
+        #: The most recent attempt, kept even when it is invalid: the valid
+        #: estimate above survives failed runs on purpose, so "no new number"
+        #: and "why" used to be indistinguishable in a dump.
+        self._room_gain_active_attempt: ActiveRoomGain | None = None
+        #: The pump's factor as last seen *raw* (before the range gate), and
+        #: when it changed. A change restarts the measurement window, because
+        #: hours measured under different factors must not be pooled.
+        self._room_gain_factor_last: float | None = None
+        self._room_gain_factor_since_ts: float | None = None
         # Whether ``_room_gain`` came from that factor: a factor that turns
         # unusable must drop the gain it set rather than leave it applied.
         self._room_gain_from_factor = False
@@ -1048,6 +1088,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             "calibration_ok": self._last_calibration_ok,
             "last_active_ts": self._last_active_ts,
             "active_since_ts": self._active_since_ts,
+            # The other floor of the active-hour window: a change in the pump's
+            # own room term starts it over, so hours from two regimes never mix.
+            "room_gain_factor_since_ts": self._room_gain_factor_since_ts,
             "trims": dict(self._trims),
             "trim_cap_since": dict(getattr(self, "_trim_cap_since", None) or {}),
             "ready_issue_declined": bool(
@@ -1211,6 +1254,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             active_since_ts, bool
         ):
             self._active_since_ts = float(active_since_ts)
+        factor_since_ts = data.get("room_gain_factor_since_ts")
+        if isinstance(factor_since_ts, (int, float)) and not isinstance(
+            factor_since_ts, bool
+        ):
+            self._room_gain_factor_since_ts = float(factor_since_ts)
         trims = data.get("trims")
         if isinstance(trims, dict):
             for key, value in trims.items():
@@ -1299,6 +1347,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if fitted_source in INDOOR_METRIC_KEYS:
             self._room_gain_fitted_source = str(fitted_source)
         self._room_gain_active = _active_gain_from_state(data.get("room_gain_active"))
+        # Seed the last-seen factor from the gain the store says was applied. The
+        # applied gain *is* the pump's factor whenever it came from one, so the
+        # first poll after a change made while we were down compares against the
+        # old value instead of treating the new one as the first observation.
+        if self._room_gain_from_factor and self._room_gain is not None:
+            self._room_gain_factor_last = self._room_gain
         margins_target = data.get("indoor_margins_target")
         if isinstance(margins_target, (int, float)) and not isinstance(
             margins_target, bool
@@ -2335,7 +2389,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             observations.append((outdoor[ts], supply[ts]))
         return observations
 
-    async def _async_sync_room_gain(self, values: Mapping[str, Any]) -> None:
+    async def _async_sync_room_gain(
+        self, values: Mapping[str, Any], now_ts: float | None = None
+    ) -> None:
         """Point the room correction at the pump's own factor when it has one.
 
         The firmware applies ``cal = table − factor · (room − target)``, so its
@@ -2343,7 +2399,45 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         (measured 2026-10-15: 5.0 configured, 5.08 fitted on active hours).
         Reading it beats fitting it: no window, no evidence gate, and it
         follows the pump when the setting changes.
+
+        A change **restarts the active-hour measurement**, because hours
+        measured under one factor and hours measured under another are not
+        comparable: pooled, they measure an average of two regimes (measured
+        2026-11-25 on a 5 -> 2 change: 4.22 ± 0.56 before, 1.50 ± 0.22 after).
+        The detection reads the **raw** register value, not the ranged one the
+        gain is derived from: ``_configured_room_gain`` returns ``None`` both for
+        "no reading" and for "outside our interval", and the second is a real
+        change that must still restart the window.
         """
+        stamp = now_ts if now_ts is not None else dt_util.utcnow().timestamp()
+        raw = values.get("room_comp_factor")
+        factor = (
+            float(raw)
+            if isinstance(raw, (int, float)) and not isinstance(raw, bool)
+            else None
+        )
+        if factor is not None and _changed_room_factor(
+            self._room_gain_factor_last,
+            factor,
+            seen_floor=self._room_gain_factor_since_ts is not None,
+        ):
+            # The pump's own room term moved (possibly while we were down): the
+            # old estimate measured a different factor.
+            self._room_gain_active = None
+            self._room_gain_active_attempt = None
+            self._room_gain_factor_since_ts = stamp
+            # Release the refresh throttle: waiting up to
+            # BASELINE_LEARN_REFRESH_HOURS right when the evidence restarts is
+            # the one moment it must not.
+            self._room_gain_active_ts = None
+            _LOGGER.info(
+                "Room-compensation factor changed to %.2f: the active-hour "
+                "measurement restarts",
+                factor,
+            )
+        if factor is not None:
+            self._room_gain_factor_last = factor
+
         configured = self._configured_room_gain(values)
         if configured is not None:
             await self._async_store_room_gain(
@@ -2431,7 +2525,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         _LOGGER.info("Room-compensation gain dropped: no usable pump factor")
         await self._async_persist()
 
-    async def _async_room_gain_from_active(self) -> ActiveRoomGain | None:
+    async def _async_room_gain_from_active(
+        self, now_ts: float | None = None
+    ) -> ActiveRoomGain | None:
         """Measure the room term on hours the pump followed **our** table.
 
         On Auto the pump's own control carries the room term, so a fit there
@@ -2444,6 +2540,19 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         """
         if self._active_since_ts is None:
             return None
+        measured_at = (
+            now_ts if now_ts is not None else dt_util.utcnow().timestamp()
+        )
+        # Two floors, and the later one wins: the active segment's start, and
+        # the moment the pump's own room term last changed. Hours measured under
+        # a different factor are not comparable, so pooling them would measure
+        # an average of two regimes.
+        floor_ts = self._active_since_ts
+        if (
+            self._room_gain_factor_since_ts is not None
+            and self._room_gain_factor_since_ts > floor_ts
+        ):
+            floor_ts = self._room_gain_factor_since_ts
 
         def cannot(notes: str) -> ActiveRoomGain:
             """An estimate-shaped answer for "not measurable", with the reason.
@@ -2453,7 +2562,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             measurement.
             """
             return ActiveRoomGain(
-                gain_c_per_c=0.0, hours=0, buckets=0, span_c=0.0, valid=False, notes=notes
+                gain_c_per_c=0.0,
+                hours=0,
+                buckets=0,
+                span_c=0.0,
+                measured_at=measured_at,
+                valid=False,
+                notes=notes,
             )
 
         resolved = self._resolve_statistic_ids()
@@ -2495,12 +2610,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         observations = [
             (outdoor[ts], supply[ts], indoor[ts] - target_c, ts)
             for ts in sorted(set(outdoor) & set(supply) & set(indoor))
-            if ts >= self._active_since_ts
+            if ts >= floor_ts
             and (not power_id or power.get(ts, 0.0) >= MIN_SAMPLE_Q_W)
         ]
         estimate = room_gain_from_active_hours(observations)
-        # Bind the measurement to the sensor it was taken against.
-        return replace(estimate, source=indoor_key)
+        # Bind the measurement to the sensor it was taken against, and date it:
+        # the pure fit has no clock, and an undated estimate that survives failed
+        # attempts is exactly how a five-day-old number was read as fresh.
+        return replace(estimate, source=indoor_key, measured_at=measured_at)
 
     async def _async_refresh_active_room_gain(self, now_ts: float) -> None:
         """Run the active-hour measurement at most every few hours."""
@@ -2514,13 +2631,17 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             return
         self._room_gain_active_ts = now_ts
         try:
-            estimate = await self._async_room_gain_from_active()
+            estimate = await self._async_room_gain_from_active(now_ts)
         except asyncio.CancelledError:
             raise
         except Exception as err:
             _LOGGER.debug("Active-hour room-gain measurement unavailable: %s", err)
             return
         if estimate is not None:
+            # Keep the attempt whatever it says: the valid estimate below
+            # survives failed runs on purpose, so without this "no new number"
+            # and "why" cannot be told apart in a support dump.
+            self._room_gain_active_attempt = estimate
             previous = self._room_gain_active
             if estimate.valid or previous is None or not previous.valid:
                 # A real measurement survives a transient "not measurable" run;
@@ -3149,7 +3270,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
 
         # The pump's own factor is the gain whenever it reports one; the fitted
         # fallback runs during baseline learning below.
-        await self._async_sync_room_gain(values)
+        await self._async_sync_room_gain(values, now_ts)
         # …and while the curve is active, measure the term on our own hours.
         await self._async_refresh_active_room_gain(now_ts)
 
@@ -3304,6 +3425,18 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         active_trims = (
             dict(result.trims) if self.active and result is not None else {}
         )
+        # Only a **valid** estimate is published as a measurement: an invalid one
+        # is "not measurable", and its gain is 0.0 by construction. Its reason
+        # travels in the diagnostics' attempt block instead.
+        measured = self._room_gain_active
+        if measured is not None and not measured.valid:
+            measured = None
+        measured_gain = None if measured is None else measured.gain_c_per_c
+        measured_age = (
+            None
+            if measured is None
+            else measured_age_hours(measured.measured_at, now_ts)
+        )
         snapshot = CurveSnapshot(
             shadow=shadow,
             points=points,
@@ -3347,6 +3480,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             baseline_outdoor_min_c=learned_min,
             baseline_outdoor_max_c=learned_max,
             room_gain_c=self._room_gain,
+            room_gain_measured_c_per_c=measured_gain,
+            room_gain_measured_age_hours=(
+                None if measured_age is None else int(measured_age)
+            ),
             trim_evidence=dict(self._trim_evidence),
             extrapolated_points=extrapolated,
             cop_c=0.0 if result is None else result.cop_c,

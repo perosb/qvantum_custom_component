@@ -1205,6 +1205,13 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             "baseline_outdoor_min_c": snapshot.baseline_outdoor_min_c,
             "baseline_outdoor_max_c": snapshot.baseline_outdoor_max_c,
             "room_gain_c_per_c": snapshot.room_gain_c,
+            # The *measured* slope beside the applied one, plus how old it is:
+            # the applied gain may simply be the pump's configured factor, so a
+            # card showing only that could not tell a stale measurement from a
+            # changed setting. Whole hours — a decimal age would rewrite the
+            # attributes every cycle just to tick.
+            "room_gain_measured_c_per_c": snapshot.room_gain_measured_c_per_c,
+            "room_gain_measured_age_hours": snapshot.room_gain_measured_age_hours,
             # The indoor cap needs a fresh indoor reading to act at all; False
             # means a warm house cannot veto a raise (no indoor sensor).
             "indoor_cap_armed": snapshot.indoor_cap_armed,
