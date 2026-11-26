@@ -667,9 +667,11 @@ Entities:
   Diagnostic entity, enabled by default.
 - `sensor.qvantum_adaptive_curve_coverage` — the per-point surface in one
   place: state is the number of extrapolated points, attributes carry the
-  observed outdoor span, `clamped_points`, `floor_pinned_points` and
-  `trim_evidence`. Deliberately **disabled by default**: the repair issue is the
-  notification and this is the detail.
+  observed outdoor span, `clamped_points`, `floor_pinned_points`, `trim_evidence`
+  and the trim fit's `trim_residual` with `trim_residual_age_hours`. The card
+  reads the trim layer from here rather than from the deviation sensor, which
+  does not carry it. Deliberately **disabled by default**: the repair issue is
+  the notification and this is the detail.
 - `switch.qvantum_adaptive_curve_control` — off = shadow, on = active writing.
   `qvantum.set_curve_control` with `mode: shadow|active` does the same from an
   automation.
