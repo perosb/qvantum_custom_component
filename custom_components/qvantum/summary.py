@@ -191,6 +191,16 @@ _ENTITY_PREFIXES = (
 #: against a *measured* slope, and that slope survives failed refits on purpose:
 #: before this field a five-day-old 4.62 was indistinguishable from a fresh one.
 #: Present in both branches (`null` on the Auto window). Additive.
+#: v20 also carries `curve.writable` and `curve.ready_issue_declined`: whether
+#: this transport may write the pump at all, and whether the user answered "not
+#: now" on the readiness invitation. `ready: true` in shadow was readable but
+#: not interpretable — the issue is only raised where the curve *can* write
+#: (`_async_ready_issue` returns early without write access, because the switch
+#: would be unavailable), so one boolean cannot tell "never asked" from "asked
+#: and declined" from "asked and waiting". Measured 2026-11-26: two
+#: installations had sat ready in shadow for one to two weeks and the export
+#: could not say which of the three they were. Additive; both are policy, not
+#: measurement, so nothing about the installation leaves with them.
 SUMMARY_SCHEMA_VERSION = 20
 
 #: Plant settings that describe the control loops. Everything else in the
@@ -484,6 +494,17 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "median_c": _number(getattr(snapshot, "median_c", None)),
         "p95_abs_c": _number(getattr(snapshot, "p95_abs_c", None)),
         "ready": bool(getattr(snapshot, "ready", False)),
+        # Whether the gate can be acted on at all, and whether the user already
+        # answered. The invitation is only raised where the curve can write, so
+        # a shadow installation that passes the gate is unaskable (no Modbus
+        # write option, a plain cloud account) or has answered — and "asked and
+        # waiting" is the third state. Without the pair, every ready-in-shadow
+        # row reads the same and a pool cannot tell a missing write option from
+        # a declined invitation.
+        "writable": bool(getattr(coordinator, "writable", False)),
+        "ready_issue_declined": bool(
+            getattr(coordinator, "_ready_issue_declined", False)
+        ),
         # Why the gate is not met (`window`, `median`, `max`, the missing
         # signal, or `active` = not assessed because the curve is writing) and
         # the window it was judged over. Without the blocker a row that failed

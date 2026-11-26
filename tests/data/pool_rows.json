@@ -396,6 +396,7 @@
    "median_c": -1.11,
    "p95_abs_c": 3.87,
    "ready": false,
+   "ready_issue_declined": false,
    "room_error_median_abs_c": 0.2,
    "room_error_p90_abs_c": 0.3,
    "room_gain": {
@@ -423,7 +424,8 @@
    "trim_cap_days": 0.0,
    "trim_max_abs_c": null,
    "wind_c": null,
-   "window_hours": 91.4
+   "window_hours": 91.4,
+   "writable": true
   },
   "device": {
    "firmware": "2026.10.4",

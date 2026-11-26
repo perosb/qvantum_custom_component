@@ -110,6 +110,10 @@ def curve_coordinator(**overrides):
         "load_power_mean_electrical_w": 891.7,
         "load_power_coverage_hours": 0.7,
         "air_delta_mean_k": 27.3,
+        # The readiness invitation's two preconditions: this stub's transport
+        # can write, and the user has not answered yet.
+        "writable": True,
+        "_ready_issue_declined": False,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -272,6 +276,26 @@ def test_the_curve_block_reports_how_long_the_cap_has_been_binding() -> None:
     # Nothing at the cap reads 0 rather than null: "not stuck" is a fact.
     coordinator._trim_cap_since = {}
     assert curve_summary(coordinator)["trim_cap_days"] == 0.0
+
+
+def test_the_ready_invitation_is_exported_with_whether_it_can_be_asked() -> None:
+    """`ready: true` in shadow is three different installations, not one.
+
+    The invitation is only raised where the curve can write, so a shadow install
+    that passes the gate is either unaskable (no Modbus write option, a plain
+    cloud account) or has answered — and "asked and waiting" is the third
+    state. Without the pair, the pool reads a missing write option as a declined
+    invitation.
+    """
+    unaskable = build(curve=curve_coordinator(writable=False))
+    assert unaskable["curve"]["writable"] is False
+    assert unaskable["curve"]["ready_issue_declined"] is False
+
+    declined = build(
+        curve=curve_coordinator(writable=True, _ready_issue_declined=True)
+    )
+    assert declined["curve"]["writable"] is True
+    assert declined["curve"]["ready_issue_declined"] is True
 
 
 def test_the_fitted_block_carries_the_coverage_behind_its_windows() -> None:
