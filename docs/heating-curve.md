@@ -464,7 +464,12 @@ coverage sensor and on the point sensors (`indicated_c`). It is persisted for th
 same reason the evidence is: the cycle runs every `TRIM_REFRESH_HOURS`, and a
 field that only fills at the next cycle is empty for a day after every restart.
 
-The distinction between two kinds of "nothing" is deliberate. An empty
+Three kinds of "nothing", and they read differently. A **null** indication means
+the trim cycle has not run since this version started, or it returned early — and
+the early returns are the ones to check first: the loop also stops while the
+**indoor cap** is binding or the shared adjustment is at `TOTAL_MAX_C`, and both
+are in the same dump (`capped_by_indoor`, `adjustment_c`) so a null is not a
+mystery. The other two follow. An empty
 observation list means the recorder gave us nothing to fit — the last indication
 stands and its age keeps growing, the rule the active-hour measurement follows.
 Enough observations that the fit refuses (fewer than two qualifying buckets) is a
