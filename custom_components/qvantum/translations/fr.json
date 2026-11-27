@@ -1001,7 +1001,8 @@
           "curve_solar_term": "Réduit le départ selon le gain solaire identifié ; identifié et mesuré, donc actif par défaut.",
           "curve_cop_feedback_term": "Réduit le départ tant que le COP mesuré reste sous sa référence apprise",
           "curve_precharge_term": "Augmente le départ avant un coup de froid prévu",
-          "curve_wind_term": "Augmente le départ tant qu'une sensibilité au vent identifiée signale une perte supplémentaire"
+          "curve_wind_term": "Augmente le départ tant qu'une sensibilité au vent identifiée signale une perte supplémentaire",
+          "curve_room_integral_term": "Réduit le départ tant que l'écart de pièce sur 24 h reste au-dessus de sa bande morte ; actif par défaut et ne peut que baisser la courbe."
         },
         "description": "Paramètres du mode de connexion actuel. Utilisez la reconfiguration pour basculer entre le cloud et Modbus.",
         "title": "Options"

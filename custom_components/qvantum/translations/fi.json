@@ -1001,7 +1001,8 @@
           "curve_solar_term": "Laskee menolämpöä tunnistetulla aurinkotuotolla; tunnistettu ja mitattu, siksi oletuksena päällä.",
           "curve_cop_feedback_term": "Laskee menolämpöä, kun mitattu COP on opitun viitearvon alapuolella",
           "curve_precharge_term": "Nostaa menolämpöä ennustetun kylmäjakson edellä",
-          "curve_wind_term": "Nostaa menolämpöä, kun tunnistettu tuuliherkkyys osoittaa lisähäviötä"
+          "curve_wind_term": "Nostaa menolämpöä, kun tunnistettu tuuliherkkyys osoittaa lisähäviötä",
+          "curve_room_integral_term": "Laskee menoveden lämpötilaa, kun 24 h huonevirhe on kuolleen alueen yläpuolella; oletuksena päällä ja voi vain laskea käyrää."
         },
         "description": "Nykyisen yhteystilan asetukset. Käytä uudelleenmääritystä vaihtaaksesi pilven ja Modbusin välillä.",
         "title": "Asetukset"

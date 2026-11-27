@@ -1001,7 +1001,8 @@
           "curve_solar_term": "Obniża zasilanie o zidentyfikowany zysk słoneczny; zidentyfikowany i zmierzony, dlatego domyślnie włączony.",
           "curve_cop_feedback_term": "Obniża zasilanie, gdy zmierzony COP jest poniżej wyuczonego odniesienia",
           "curve_precharge_term": "Podnosi zasilanie przed prognozowanym spadkiem temperatury",
-          "curve_wind_term": "Podnosi zasilanie, gdy zidentyfikowana wrażliwość na wiatr wskazuje dodatkowe straty"
+          "curve_wind_term": "Podnosi zasilanie, gdy zidentyfikowana wrażliwość na wiatr wskazuje dodatkowe straty",
+          "curve_room_integral_term": "Obniża temperaturę zasilania, dopóki 24-godzinny błąd pomieszczenia pozostaje powyżej martwej strefy; domyślnie włączona i może tylko obniżać krzywą."
         },
         "description": "Ustawienia bieżącego trybu połączenia. Użyj rekonfiguracji, aby przełączyć między chmurą a Modbusem.",
         "title": "Opcje"

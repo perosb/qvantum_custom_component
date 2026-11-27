@@ -1001,7 +1001,8 @@
           "curve_solar_term": "Reduce la impulsión según la ganancia solar identificada; identificado y medido, por eso activo por defecto.",
           "curve_cop_feedback_term": "Reduce la impulsión mientras el COP medido esté por debajo de su referencia aprendida",
           "curve_precharge_term": "Aumenta la impulsión ante una entrada de frío prevista",
-          "curve_wind_term": "Aumenta la impulsión mientras una sensibilidad al viento identificada indique pérdida adicional"
+          "curve_wind_term": "Aumenta la impulsión mientras una sensibilidad al viento identificada indique pérdida adicional",
+          "curve_room_integral_term": "Reduce la impulsión mientras el error de 24 h de la habitación supera su banda muerta; activo por defecto y solo puede bajar la curva."
         },
         "description": "Ajustes del modo de conexión actual. Usa reconfigurar para cambiar entre nube y Modbus.",
         "title": "Opciones"

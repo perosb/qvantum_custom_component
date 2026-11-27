@@ -1001,7 +1001,8 @@
           "curve_solar_term": "Verlaagt de aanvoer met de geïdentificeerde zonnewinst; geïdentificeerd en gemeten, daarom standaard aan.",
           "curve_cop_feedback_term": "Verlaagt de aanvoer zolang de gemeten COP onder zijn geleerde referentie ligt",
           "curve_precharge_term": "Verhoogt de aanvoer vóór een voorspelde koude-inval",
-          "curve_wind_term": "Verhoogt de aanvoer zolang een geïdentificeerde windgevoeligheid extra verlies meldt"
+          "curve_wind_term": "Verhoogt de aanvoer zolang een geïdentificeerde windgevoeligheid extra verlies meldt",
+          "curve_room_integral_term": "Verlaagt de aanvoertemperatuur zolang de 24-uurs ruimtefout boven zijn dode zone blijft; standaard aan en kan de curve alleen verlagen."
         },
         "description": "Instellingen voor de huidige verbindingsmodus. Gebruik herconfiguratie om te wisselen tussen cloud en Modbus.",
         "title": "Opties"

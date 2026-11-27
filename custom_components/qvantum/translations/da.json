@@ -1001,7 +1001,8 @@
           "curve_solar_term": "Sænker fremløbet med det identificerede soludbytte; identificeret og målt, derfor aktiv som standard.",
           "curve_cop_feedback_term": "Sænker fremløbet, mens den målte COP ligger under sin indlærte reference",
           "curve_precharge_term": "Hæver fremløbet forud for et varslet kuldetryk",
-          "curve_wind_term": "Hæver fremløbet, mens en identificeret vindfølsomhed viser ekstra tab"
+          "curve_wind_term": "Hæver fremløbet, mens en identificeret vindfølsomhed viser ekstra tab",
+          "curve_room_integral_term": "Sænker fremløbstemperaturen, mens 24-timers rumfejlen ligger over sit dødbånd; slået til som standard og sænker kun kurven."
         },
         "description": "Indstillinger for den aktuelle forbindelsestilstand. Brug genkonfiguration til at skifte mellem sky og Modbus.",
         "title": "Indstillinger"
