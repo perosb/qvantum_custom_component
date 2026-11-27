@@ -791,6 +791,38 @@ def test_daily_fit_rejects_an_absurd_aperture() -> None:
     assert "m² >" in model.notes
 
 
+def test_a_refused_aperture_still_reports_the_four_column_pair() -> None:
+    """A negative aperture must be examinable, and the wind fit runs too late.
+
+    The four-column fit is called only after every three-column gate passes, so
+    a refused aperture would otherwise never be asked whether wind carried its
+    sign. Measured on the pool 2026-11-27: 3 of 10 mature windows fitted -0.22,
+    -5.25 and -8.47 m², and none of them could say.
+    """
+    model = fit_daily_solar_model(_wind_days(b=-4.0, w=2.5))
+
+    assert not model.valid
+    assert "no positive aperture" in model.notes
+    assert model.b_m2 < 0.0
+    # Reported from the fourth column, never applied: `b` is still the refused
+    # three-column estimate.
+    assert model.b_m2_4col == pytest.approx(-4.0, abs=1.0)
+    assert model.a_w_per_k_4col is not None and model.a_w_per_k_4col > 0.0
+    assert effective_solar_model(None, model) == (0.0, 0.0)
+
+
+def test_a_refused_aperture_without_wind_reports_no_four_column_pair() -> None:
+    """"No wind was measured" is not "wind does not explain the sign"."""
+    rows = make_gated_rows(seed=3)
+    rows = [replace(row, q_heat_wh=-row.q_heat_wh) for row in rows]
+
+    model = fit_daily_solar_model(rows)
+
+    assert not model.valid
+    assert model.b_m2_4col is None
+    assert model.a_w_per_k_4col is None
+
+
 def test_daily_fit_rejects_a_window_that_explains_too_little() -> None:
     rows = make_gated_rows(
         sdt_range=(100.0, 300.0), ghi_range=(0.0, 20000.0), noise=6000.0, seed=5

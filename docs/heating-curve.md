@@ -1042,6 +1042,18 @@ When the day-block model is valid it is the one the term uses (its `b` and its
 still feeds the load term's demand estimate. Both are visible in diagnostics
 (`curve.model` and `curve.model_daily`) and on the solar-model sensor.
 
+An aperture refused on **sign or size** is also reported from the
+**four-column** fit (`a_w_per_k_4col` / `b_m2_4col`, exported as
+`daily_solar_a_w_per_k_4col` / `daily_solar_b_m2_4col`). The wind column is
+fitted only after every three-column gate passes, so without this the refused
+aperture cannot be examined at all — and a clear day is often a windy one, so
+the wind loss it carries is exactly what can push `b` below zero. Measured on
+the pool 2026-11-27: 3 of 10 mature windows fitted −0.22, −5.25 and −8.47 m² and
+none could say whether wind carried the sign. The pair is **reported, never
+applied**: `valid` stays false and the term still falls back to the hourly fit.
+A window without wind readings leaves it `null` — no wind was measured, which is
+not the same as wind not explaining it.
+
 The fallback is a **whole model, not a second opinion**: `effective_solar_model`
 returns the day-block pair `(b·trust, a)` when the day block is valid, otherwise
 the hourly pair, and the two are never mixed — an aperture is only meaningful

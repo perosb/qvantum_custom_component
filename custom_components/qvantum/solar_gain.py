@@ -597,7 +597,9 @@ class SolarDailyModel:
     wind_notes: str = ""
     #: What the four-column fit says about ``a``/``b``. Reported so a dump shows
     #: whether adding wind moved them — the gate that rejects a column which
-    #: merely absorbs ΔT or GHI.
+    #: merely absorbs ΔT or GHI — and, when the three-column aperture was refused
+    #: on sign or size, whether wind explains the wrong sign at all. Reported,
+    #: never applied: ``valid`` is what allows the term to act.
     a_w_per_k_4col: float | None = None
     b_m2_4col: float | None = None
 
@@ -817,6 +819,24 @@ def _fit_daily_wind_rows(
     se_w = stderr[3]
     t_w = None if se_w <= 1e-12 else w / se_w
     return a, -minus_b, intercept / float(DAILY_BLOCK_HOURS), w, se_w, t_w, r2
+
+
+def _four_column_pair(days: Sequence[SolarDay]) -> dict[str, float | None]:
+    """``a``/``b`` from the four-column fit, for diagnostics only.
+
+    Called where the three-column aperture was refused on sign or size, and
+    returned into ``a_w_per_k_4col``/``b_m2_4col`` — never into ``a_w_per_k``/
+    ``b_m2``. A window without wind readings has an all-zero interaction column,
+    which makes the design singular: the pair is then ``None``, because "no wind
+    was measured" is not "wind does not explain it".
+    """
+    try:
+        a4, b4, _c4, _w, _se_w, _t_w, _r2 = _fit_daily_wind_rows(days)
+    except ValueError:
+        return {"a_w_per_k_4col": None, "b_m2_4col": None}
+    if not (math.isfinite(a4) and math.isfinite(b4)):
+        return {"a_w_per_k_4col": None, "b_m2_4col": None}
+    return {"a_w_per_k_4col": a4, "b_m2_4col": b4}
 
 
 def _variance_inflation(
@@ -1055,6 +1075,17 @@ def fit_daily_solar_model(days: Sequence[SolarDay]) -> SolarDailyModel:
     }
     if a <= 0.0:
         return SolarDailyModel(**measured, notes="a ≤ 0")
+    if b <= 0.0 or b > DAILY_MAX_B_M2:
+        # The fourth column is the candidate explanation for an aperture with the
+        # wrong sign or size: a clear day is often a windy one, so the wind loss
+        # it carries can land on the GHI coefficient. It is reported here and
+        # nowhere else, because `_fit_wind_coefficient` runs only *after* this
+        # gate — so without this call a refused aperture can never be examined.
+        # Measured on the pool 2026-11-27: 3 of 10 mature windows fitted a
+        # negative aperture (-0.22, -5.25, -8.47 m²) and none of them could say
+        # whether wind explained the sign. Nothing is applied: `valid` stays
+        # False, so the term still cannot act.
+        measured = {**measured, **_four_column_pair(ordered)}
     if b <= 0.0:
         return SolarDailyModel(**measured, notes=f"no positive aperture (b={b:.3f} m²)")
     if b > DAILY_MAX_B_M2:

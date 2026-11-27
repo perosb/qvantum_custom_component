@@ -208,7 +208,13 @@ _ENTITY_PREFIXES = (
 #: `efficiency_health_grade`. Both exist so a row can answer *why* its figure is
 #: what it is: a SCOP of 1.13 beside a 17.8 % element share pins the compressor
 #: at 1.16, and a letter can only be re-scored at another weight when its
-#: components travel with it. Additive; no existing field changes meaning.
+#: components travel with it. And `curve.daily_solar_a_w_per_k_4col` /
+#: `daily_solar_b_m2_4col`: the four-column pair for a window whose three-column
+#: aperture was refused on sign or size. The wind fit runs only after that gate,
+#: so without the pair a negative `b` can never be examined — 3 of the pool's 10
+#: mature windows fitted -0.22, -5.25 and -8.47 m² on 2026-11-27. Reported, never
+#: applied: `daily_solar_valid` stays false. Additive; no existing field changes
+#: meaning.
 SUMMARY_SCHEMA_VERSION = 20
 
 #: Plant settings that describe the control loops. Everything else in the
@@ -585,6 +591,16 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "daily_solar_r2": _number(getattr(daily, "r2", None)),
         "daily_solar_valid": bool(getattr(daily, "valid", False)),
         "daily_solar_notes": _note(getattr(daily, "notes", None)),
+        # The four-column pair for a window whose three-column aperture was
+        # refused on sign or size. The wind fit runs only after that gate, so
+        # without these two a negative `b` cannot be examined at all — measured
+        # 2026-11-27: 3 of 10 mature pool windows fitted -0.22, -5.25 and
+        # -8.47 m², and none could say whether wind carried the sign. Reported,
+        # never applied: `daily_solar_valid` stays false.
+        "daily_solar_a_w_per_k_4col": _number(
+            getattr(daily, "a_w_per_k_4col", None)
+        ),
+        "daily_solar_b_m2_4col": _number(getattr(daily, "b_m2_4col", None)),
         # Wind column of the same day balance: the identified sensitivity (W/K
         # per m/s), whether it passed its gates, and the evidence behind it.
         # The pool question is "how often is a wind term identifiable at all",
