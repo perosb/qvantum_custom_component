@@ -257,6 +257,12 @@ class CurveSnapshot:
     outdoor_c: float
     night_day_c: float
     solar_c: float
+    #: The solar correction the model asked for before ``SOLAR_MAX_C``, and which
+    #: conversion produced it (``emitter`` or ``curve``). The clamp is the only
+    #: step between the model and the table, so the pair is what makes "the bound
+    #: is eating the term" a measurement rather than an inference.
+    solar_raw_c: float
+    solar_raw_source: str | None
     load_c: float
     capped_by_indoor: bool
     deviation_c: float | None
@@ -1921,6 +1927,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             outdoor_c=0.0,
             night_day_c=0.0,
             solar_c=0.0,
+            solar_raw_c=0.0,
+            solar_raw_source=None,
             load_c=0.0,
             capped_by_indoor=False,
             deviation_c=None,
@@ -3375,6 +3383,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 indoor_target_c=indoor_target,
                 q_actual_w=q_actual,
                 compressor_power_w=values.get("compressor_power_mean_w"),
+                # The emitter conversion needs the flow temperature the pump is
+                # aiming at and the room it is serving; both are readings, and
+                # either missing sends the term down its fitted-loss fallback.
+                supply_temperature_c=self._numeric(values.get("cal_heat_temp")),
+                room_temperature_c=self._pump_room_value(values),
                 point_trims=self._trims if self.active else None,
                 min_supply_c=low,
                 max_supply_c=high,
@@ -3496,6 +3509,8 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             outdoor_c=0.0 if result is None else result.outdoor_c,
             night_day_c=0.0 if result is None else result.night_day_c,
             solar_c=0.0 if result is None else result.solar_c,
+            solar_raw_c=0.0 if result is None else result.solar_raw_c,
+            solar_raw_source=None if result is None else result.solar_raw_source,
             load_c=0.0 if result is None else result.load_c,
             capped_by_indoor=False if result is None else result.capped_by_indoor,
             deviation_c=deviation,

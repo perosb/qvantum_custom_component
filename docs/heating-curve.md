@@ -219,7 +219,7 @@ points:
 |---|---|
 | outdoor | Open-Meteo hourly temperature trend over the next hours (never instantaneous BT1), damped |
 | night/day | local sunrise/sunset (Home Assistant location); amplitude is a fraction of the forecast's diurnal supply swing (curve slope × outdoor range), bounded |
-| solar | self-calibrating `a`/`b`/`trust` model from recorder statistics (`heatingpower`, indoor, outdoor) plus Open-Meteo GHI history, identified on **day blocks** (see [Solar model](#solar-model)); gain in W → °C through the local baseline slope |
+| solar | self-calibrating `a`/`b`/`trust` model from recorder statistics (`heatingpower`, indoor, outdoor) plus Open-Meteo GHI history, identified on **day blocks** (see [Solar model](#solar-model)); gain in W → °C through the **emitter's local derivative** when the live readings exist, else through the local baseline slope over the fitted loss coefficient |
 | load | one-sided reduction when the measured heating power (a 2 h mean over whole compressor cycles, idle time included) is below the model demand at the target indoor temperature |
 | optional | COP feedback, cold-snap pre-charge and/or wind, **off by default**; the solar term can be switched off — see [Optional terms](#optional-terms) |
 
@@ -581,7 +581,8 @@ Entities:
   `clamped_points` names the actionable knots and `floor_pinned_points` the warm
   end the supply floor holds down.
 - `sensor.qvantum_adaptive_curve_adjustment` — the shared adjustment, with
-  `outdoor_c`, `night_day_c`, `solar_c`, `load_c`, `cop_c`, `precharge_c`,
+  `outdoor_c`, `night_day_c`, `solar_c` (with `solar_raw_c` — the request before
+  `SOLAR_MAX_C` — and `solar_raw_source`, `emitter` or `curve`), `load_c`, `cop_c`, `precharge_c`,
   `wind_c`, `terms` (which of the four are switched on), `wind_valid`, the
   evidence counts `wind_cold_hours` / `wind_required_cold_hours` and
   `wind_evidence_days` / `wind_required_days`, `trims`,
@@ -976,8 +977,11 @@ wind_c = −slope · (w · v̄ · (indoor_target − outdoor)) / a     0 ≤ win
 
 with `v̄` the mean of the available hours in the next `WIND_SMOOTH_HOURS` (3) (a
 missing hour is skipped, never counted as calm), `a` the loss coefficient
-from the *same* day-block model (so the W → °C conversion is self-consistent,
-exactly as for solar) and `−slope` because extra loss raises the supply. It is
+from the *same* day-block model (so its W → °C conversion is self-consistent)
+and `−slope` because extra loss raises the supply. Wind keeps this `a`-based
+form: unlike the solar term — which now prefers the emitter's own derivative
+when the live readings exist — a wind loss is a property of the envelope, and
+the fitted `a` is what identifies it. It is
 one-sided and bounded, folded into the shared adjustment, and still subject to
 the indoor cap and the total clamp. A payload without wind, an invalid
 coefficient, or an indoor target at or below the outdoor temperature yields
@@ -1059,6 +1063,38 @@ the cap, and `capped_by_indoor` says whether that gap is live.
 
 ### Diagnostics and the snapshot
 
+**Two conversions from watts to supply degrees.** The aperture gives a gain `G`
+in W; how far the flow temperature must fall to remove it depends on the emitter,
+not on the curve:
+
+```
+emitter:  ΔT = −G / (n · Q / (T_supply − T_room))        n = SOLAR_EMITTER_EXPONENT (1.3)
+fallback: ΔT = curve_slope · G / a                       a = the fitted loss coefficient
+```
+
+The emitter path is tried first and needs the live thermal output `Q`
+(`heating_power_mean_w`), the flow temperature the pump is aiming at
+(`cal_heat_temp`) and the room it serves (`pump_room_c`, i.e. the pump's own
+blended reading, never the target). Absent, non-finite, `Q ≤ 0` or
+`T_supply ≤ T_room` falls back to the fitted form — absence is not evidence, and
+a thermal `Q` is never stood in for by the electrical input.
+
+Measured live 2026-11-26 (`b_eff` 1.1651 m², `a` 53.56 W/K, `Q` 2 000 W,
+`T_supply − T_room` 13.1 K): the emitter derivative is **198 W/K**, so a 250 W/m²
+gain of 291 W is **−1.47 K** — while the fallback asks **−4.94 K**, because
+`curve_slope · b_eff / a` is 0.0198 K per W/m² and therefore reaches
+`SOLAR_MAX_C` (2.0 K) already at **102 W/m²**. On real weather the fallback is
+saturated for the whole daylight period, which is why the term behaved as a
+switch rather than a proportional correction. Both numbers travel:
+`solar_raw_c` is the request before the clamp and `solar_raw_source` says which
+conversion made it — the two differ by ~3× on a bright hour, so a raw value
+without its source cannot be read.
+
+The clamp itself is unchanged: `SOLAR_MAX_C` bounds how far sunlight may pull the
+flow temperature down, and it is deliberately *not* re-derived here. The
+measurement that decides whether it should move is the distribution of
+`solar_raw_c` by irradiance after this change has run over real weather.
+
 `diagnostics.curve` mirrors the `CurveSnapshot`/`CurveResult` state, so a new
 snapshot or persisted field has to be added there in the same PR — a field
 missing from the dump cannot be read from a user's report. That rule is now a
@@ -1069,7 +1105,8 @@ stated reason. It carries
 `write_scope` (the knots of the last active cycle), `forecast_ok`, `forecast_reused` and `forecast_now_c` (the forecast hour's air
 temperature — `outdoor_c` beside it is the **term** in kelvin, clamped ±1.0, and
 comparing the two is a category error), `forecast_wind_ms`/`forecast_wind_available`, the load term's
-`load_power_mean_w`/`load_power_mean_electrical_w`/`load_power_coverage_hours`, the room term's
+`load_power_mean_w`/`load_power_mean_electrical_w`/`load_power_coverage_hours`, the solar term's
+`solar_raw_c`/`solar_raw_source` beside the applied `solar_c`, the room term's
 `room_gain_active` (with `measured_at`/`age_hours`) and `room_gain_active_attempt` (the last
 failed run and why), `timestamps.room_gain_factor_since_ts` (the floor a factor change set),
 `indoor_cap_armed` / `indoor_margin_c` (with its two inputs and the band

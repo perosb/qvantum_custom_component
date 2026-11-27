@@ -3066,7 +3066,58 @@ async def test_snapshot_applies_the_solar_term_only_when_enabled() -> None:
         on = await build(solar=True)._async_compute_snapshot()
 
     assert off.solar_c == 0.0
+    # Off means off on every surface: no request, and no conversion named.
+    assert off.solar_raw_c == 0.0
+    assert off.solar_raw_source is None
     assert on.solar_c < 0.0
+    assert on.solar_raw_c <= on.solar_c
+    assert on.solar_raw_source in ("emitter", "curve")
+
+
+async def test_the_emitter_conversion_reaches_the_snapshot() -> None:
+    """The coordinator plumbs Q, the flow temperature and the room into the term.
+
+    Not just the pure function: the values have to arrive. The payload carries
+    `heating_power_mean_w` (the 30-minute mean of the space-heating output),
+    `cal_heat_temp` and an indoor reading, so the term must use the emitter
+    derivative — the same hour interpreted through the fitted-loss fallback is
+    ~3x larger, which is the whole point of the change.
+    """
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}, live_curve_type=1
+    )
+    coordinator._baseline = dict(BASELINE)
+    coordinator._model = make_model(b_m2=1.1651, trust=1.0, a_w_per_k=53.5577)
+    coordinator._terms["solar"] = True
+    coordinator._mode = "active"
+    coordinator._active_since_ts = time.time() - 3600
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(
+        return_value=make_forecast(temperature=0.0, ghi=250.0)
+    )
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._daylight = MagicMock(return_value=None)
+    values = coordinator._main.data["values"]
+    values.update(
+        {
+            "heating_power_mean_w": 2000.0,
+            "cal_heat_temp": 34.1,
+            "bt2": 21.0,
+            "room_temp_external": 21.0,
+            "indoor_temperature_target": 20.3,
+        }
+    )
+
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.solar_raw_source == "emitter"
+    # 1.3 · 2000 / (34.1 − room) — the room is the pump's blended reading, so the
+    # assertion is on the derivative's shape, not on one hard-coded temperature.
+    assert snapshot.solar_raw_c < 0.0
+    assert snapshot.solar_raw_c > -3.0
+    assert snapshot.solar_c == max(snapshot.solar_raw_c, -2.0)
 
 
 async def test_snapshot_applies_the_wind_term_only_when_enabled() -> None:
@@ -3242,6 +3293,8 @@ def make_result(points=None) -> CurveResult:
         outdoor_c=0.0,
         night_day_c=0.0,
         solar_c=0.0,
+        solar_raw_c=0.0,
+        solar_raw_source=None,
         load_c=0.0,
         capped_by_indoor=False,
     )
@@ -3255,6 +3308,8 @@ def make_snapshot(points=None, **overrides) -> CurveSnapshot:
         outdoor_c=0.0,
         night_day_c=0.0,
         solar_c=0.0,
+        solar_raw_c=0.0,
+        solar_raw_source=None,
         load_c=0.0,
         capped_by_indoor=False,
         deviation_c=None,

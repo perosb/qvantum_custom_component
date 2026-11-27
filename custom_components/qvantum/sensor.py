@@ -1117,6 +1117,10 @@ class QvantumCurveAdjustmentSensor(QvantumCurveSensorEntity):
             "outdoor_c": snapshot.outdoor_c,
             "night_day_c": snapshot.night_day_c,
             "solar_c": snapshot.solar_c,
+            # What the model asked for before the bounded term, and which
+            # conversion produced it: the clamp is otherwise invisible.
+            "solar_raw_c": snapshot.solar_raw_c,
+            "solar_raw_source": snapshot.solar_raw_source,
             "load_c": snapshot.load_c,
             "cop_c": snapshot.cop_c,
             "precharge_c": snapshot.precharge_c,

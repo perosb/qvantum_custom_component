@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from custom_components.qvantum.heating_curve import (
@@ -21,6 +23,7 @@ from custom_components.qvantum.heating_curve import (
     ROOM_GAIN_MAX_C,
     ROOM_GAIN_MIN_SAMPLES,
     ROOM_GAIN_MIN_SPAN_C,
+    SOLAR_EMITTER_EXPONENT,
     SOLAR_MAX_C,
     TOTAL_MAX_C,
     TRIM_MAX_C,
@@ -51,6 +54,7 @@ from custom_components.qvantum.heating_curve import (
     room_gain_from_active_hours,
     smooth_wind,
     solar_adjustment_c,
+    solar_raw_adjustment_c,
     trim_evidence_hours,
     trim_residuals,
     wind_adjustment_c,
@@ -227,6 +231,152 @@ def test_night_day_adjustment_degenerate_spans() -> None:
     assert night_day_adjustment_c(DAY0, flat, amplitude_c=0.5) == 0.0
     assert night_day_adjustment_c(DAY0 + 3600, flat, amplitude_c=0.5) == 0.0
     assert night_day_adjustment_c(DAY0 - 3600, flat, amplitude_c=0.5) == 0.0
+
+
+def test_the_emitter_conversion_per_irradiance() -> None:
+    """The two conversions, and why the bound bites: watts → supply degrees.
+
+    Live 2026-11-26: `b_eff` 1.1651 m², a 53.56 W/K, curve slope 0.9, and an
+    emitter gain of 1.3·2000/13.1 ≈ 198 W/K. The old conversion asks for −4.89 K
+    at 250 W/m² — it reaches the 2 K bound already at 102 W/m², which is why the
+    term behaved as a switch — while the emitter asks for −1.47 K.
+    """
+    model = make_model(b=1.1651, trust=1.0, a=53.5577)
+    sky = ghi_flat(value=250.0)
+    # The live table (curve_10 37, curve_minus_10 46), not the flatter fixture:
+    # the 0.9 K/K slope is what turns 5.44 K of room-equivalent into 4.89 K.
+    live = {
+        "curve_30": 20.0,
+        "curve_20": 20.0,
+        "curve_10": 27.53,
+        "curve_0": 35.89,
+        "curve_minus_10": 45.72,
+        "curve_minus_20": 57.55,
+        "curve_minus_30": 59.38,
+    }
+    points = normalize_baseline(live)
+    # ``curve_slope`` is a central difference around the reference and negative
+    # (supply falls as outdoor rises), so the live table's 0.98 K/K between 0
+    # and −10 reads −0.91 here.
+    assert curve_slope(points, 0.0) == pytest.approx(-0.9095, abs=0.01)
+
+    legacy = solar_raw_adjustment_c(model, sky, BASE_HOUR, points, 0.0)
+    assert legacy == pytest.approx(-4.94, abs=0.02)
+
+    emitter = solar_raw_adjustment_c(
+        model,
+        sky,
+        BASE_HOUR,
+        normalize_baseline(BASELINE),
+        0.0,
+        q_actual_w=2000.0,
+        supply_temperature_c=34.1,
+        room_temperature_c=21.0,
+    )
+    assert emitter == pytest.approx(-1.47, abs=0.02)
+    # And the applied term is the clamped raw request, not a second scaling.
+    assert solar_adjustment_c(
+        model,
+        sky,
+        BASE_HOUR,
+        points,
+        0.0,
+        q_actual_w=2000.0,
+        supply_temperature_c=34.1,
+        room_temperature_c=21.0,
+    ) == pytest.approx(emitter)
+    # The bound is the only difference between them, and on this hour it bites
+    # the legacy path and not the emitter one.
+    assert legacy < -SOLAR_MAX_C < emitter
+
+
+def test_the_emitter_conversion_ignores_the_curve_and_the_fitted_a() -> None:
+    """A steeper curve, or another house's loss coefficient, gets no more sun.
+
+    Neither is a property of the emitter: the same 291 W must move the flow
+    temperature by the same amount on any installation whose emitter is the same.
+    """
+    sky = ghi_flat(value=250.0)
+    steeper = dict(BASELINE)
+    steeper["curve_0"] = 45.0
+    steeper["curve_minus_10"] = 60.0
+
+    def emitter(points, model) -> float:
+        return solar_raw_adjustment_c(
+            model,
+            sky,
+            BASE_HOUR,
+            points,
+            0.0,
+            q_actual_w=2000.0,
+            supply_temperature_c=34.1,
+            room_temperature_c=21.0,
+        )
+
+    reference = emitter(normalize_baseline(BASELINE), make_model(b=1.1651, trust=1.0, a=53.5577))
+    assert emitter(normalize_baseline(steeper), make_model(b=1.1651, trust=1.0, a=53.5577)) == (
+        pytest.approx(reference)
+    )
+    # A different fitted loss coefficient changes the legacy path only.
+    assert emitter(normalize_baseline(BASELINE), make_model(b=1.1651, trust=1.0, a=200.0)) == (
+        pytest.approx(reference)
+    )
+
+
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        {},
+        {"q_actual_w": 2000.0},
+        {"q_actual_w": 2000.0, "supply_temperature_c": 34.1},
+        {"supply_temperature_c": 34.1, "room_temperature_c": 21.0},
+        {"q_actual_w": 0.0, "supply_temperature_c": 34.1, "room_temperature_c": 21.0},
+        {"q_actual_w": -5.0, "supply_temperature_c": 34.1, "room_temperature_c": 21.0},
+        {"q_actual_w": 2000.0, "supply_temperature_c": 21.0, "room_temperature_c": 21.0},
+        {"q_actual_w": 2000.0, "supply_temperature_c": 19.0, "room_temperature_c": 21.0},
+        {"q_actual_w": math.nan, "supply_temperature_c": 34.1, "room_temperature_c": 21.0},
+        {"q_actual_w": 2000.0, "supply_temperature_c": math.inf, "room_temperature_c": 21.0},
+        {"q_actual_w": 2000.0, "supply_temperature_c": 34.1, "room_temperature_c": math.nan},
+        {"q_actual_w": True, "supply_temperature_c": 34.1, "room_temperature_c": 21.0},
+    ],
+)
+def test_unusable_emitter_inputs_fall_back_to_the_fitted_conversion(inputs) -> None:
+    """Absence is not evidence: an unusable reading gets the legacy form, not 0.
+
+    ``Q = 0`` is the pump coasting — no derivative, not an infinite one — and a
+    flow temperature at or below the room's has no derivative either. Every case
+    here must reproduce the fallback *exactly*, because a coordinator test that
+    happens to carry only two of the three inputs must keep its old numbers.
+    """
+    model = make_model(b=1.1651, trust=1.0, a=53.5577)
+    sky = ghi_flat(value=250.0)
+    points = normalize_baseline(BASELINE)
+    expected = solar_raw_adjustment_c(model, sky, BASE_HOUR, points, 0.0)
+
+    assert solar_raw_adjustment_c(
+        model, sky, BASE_HOUR, points, 0.0, **inputs
+    ) == pytest.approx(expected)
+
+
+def test_the_emitter_gain_is_the_local_derivative() -> None:
+    """`n · Q / (T_supply − T_room)`, and nothing else."""
+    model = make_model(b=1.1651, trust=1.0, a=53.5577)
+    sky = ghi_flat(value=250.0)
+    points = normalize_baseline(BASELINE)
+    gain = 1.1651 * 250.0
+
+    for q, supply, room in ((2000.0, 34.1, 21.0), (900.0, 40.0, 18.0)):
+        expected = -gain / (SOLAR_EMITTER_EXPONENT * q / (supply - room))
+        assert solar_raw_adjustment_c(
+            model,
+            sky,
+            BASE_HOUR,
+            points,
+            0.0,
+            q_actual_w=q,
+            supply_temperature_c=supply,
+            room_temperature_c=room,
+        ) == pytest.approx(expected)
 
 
 def test_solar_adjustment_scales_with_trust_and_caps() -> None:
@@ -1102,6 +1252,8 @@ def test_integer_points_round_half_up() -> None:
         outdoor_c=0.0,
         night_day_c=0.0,
         solar_c=0.0,
+        solar_raw_c=0.0,
+        solar_raw_source=None,
         load_c=0.0,
         capped_by_indoor=False,
     )
