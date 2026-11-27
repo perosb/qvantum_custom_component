@@ -104,6 +104,12 @@ MODBUS_INPUT_REGISTER_MAP = {
     "smart_dhw_control_status": (162, "uint16", 1.0),
     "enable_sc_dhw": (163, "uint16", 1.0),
     "enable_sc_sh": (164, "uint16", 1.0),
+    # QSG EN 2613-A / D100041-C "Energy Prices Available" (0=No, 1=Yes): whether
+    # the pump holds a price list for SmartControl. Smart DHW Control Status
+    # (162) reads 0 "Unavailable" when it does not, and the smart curve offset
+    # drops out with it, so the two together tell a missing price list apart
+    # from a SmartControl decision. Inside the 150-175 block already read.
+    "energy_prices_available": (166, "uint16", 1.0),
     "active_alarms": (150, "uint16", 1.0),
     "alarm_1_code": (151, "uint16", 1.0),
     "alarm_2_code": (152, "uint16", 1.0),

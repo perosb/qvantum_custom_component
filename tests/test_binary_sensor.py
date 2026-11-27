@@ -308,6 +308,7 @@ async def test_async_setup_entry_modbus_includes_pump_relay(
     mock_coordinator.modbus_enabled = True
     mock_coordinator.data["values"]["picpin_relay_pump"] = 1
     mock_coordinator.data["values"]["vacation_mode"] = 0
+    mock_coordinator.data["values"]["energy_prices_available"] = 0
 
     async_add_entities = MagicMock()
 
@@ -319,9 +320,17 @@ async def test_async_setup_entry_modbus_includes_pump_relay(
 
     try:
         await async_setup_entry(hass, mock_config_entry, async_add_entities)
-        keys = {entity._metric_key for entity in async_add_entities.call_args[0][0]}
+        entities = {
+            entity._metric_key: entity
+            for entity in async_add_entities.call_args[0][0]
+        }
+        keys = set(entities)
         assert "picpin_relay_pump" in keys
         assert "vacation_mode" in keys
+        assert "energy_prices_available" in keys
+        prices = entities["energy_prices_available"]
+        assert prices._attr_entity_category.name == "DIAGNOSTIC"
+        assert prices.is_on == 0
         assert "picpin_relay_gp10" in keys
         assert "picpin_relay_ha12" in keys
     finally:

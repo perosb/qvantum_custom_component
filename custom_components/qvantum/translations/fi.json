@@ -212,6 +212,9 @@
       "vacation_mode": {
         "name": "Lomatila"
       },
+      "energy_prices_available": {
+        "name": "Sähkön hinnat saatavilla"
+      },
       "alarm_active": {
         "name": "Hälytys"
       },

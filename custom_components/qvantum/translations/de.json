@@ -212,6 +212,9 @@
       "vacation_mode": {
         "name": "Urlaubsmodus"
       },
+      "energy_prices_available": {
+        "name": "Energiepreise verfügbar"
+      },
       "alarm_active": {
         "name": "Alarm"
       },

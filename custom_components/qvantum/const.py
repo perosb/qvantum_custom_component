@@ -621,6 +621,8 @@ BINARY_SENSOR_NAMES = [
 # picpin_relay_pump is bit 8 of input 33; HTTP has no equivalent metric.
 MODBUS_ONLY_BINARY_SENSORS = [
     "vacation_mode",
+    # Input 166: the pump holds a SmartControl price list.
+    "energy_prices_available",
     "picpin_relay_pump",
     "alarm_active",
     "ep10_brine_pump",

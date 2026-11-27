@@ -212,6 +212,9 @@
       "vacation_mode": {
         "name": "Szabadság üzemmód"
       },
+      "energy_prices_available": {
+        "name": "Energiaárak elérhetők"
+      },
       "alarm_active": {
         "name": "Riasztás"
       },

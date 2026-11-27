@@ -212,6 +212,9 @@
       "vacation_mode": {
         "name": "Ferietilstand"
       },
+      "energy_prices_available": {
+        "name": "Elpriser tilgængelige"
+      },
       "alarm_active": {
         "name": "Alarm"
       },

@@ -214,6 +214,7 @@ _ENTITY_ICONS: dict[str, str] = {
     "compressor_blocked": "mdi:cancel",
     "wifi_connected": "mdi:wifi",
     "cloud_connected": "mdi:cloud-check",
+    "energy_prices_available": "mdi:cash-clock",
     "compressor_blocked_sec": "mdi:timer-sand",
     "ventilation_filter_time_left": "mdi:air-filter",
     "ventilation_filter_due": "mdi:air-filter",
