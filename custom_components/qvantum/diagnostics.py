@@ -644,6 +644,11 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "outdoor_c": getattr(snapshot, "outdoor_c", None),
         "night_day_c": getattr(snapshot, "night_day_c", None),
         "solar_c": getattr(snapshot, "solar_c", None),
+        # Before the clamp, and which conversion produced it: the two ways of
+        # going from watts to supply degrees differ ~3× on a bright hour, so a
+        # raw value without its source cannot be read.
+        "solar_raw_c": getattr(snapshot, "solar_raw_c", None),
+        "solar_raw_source": getattr(snapshot, "solar_raw_source", None),
         # Wind's contribution: 0 whenever the optional term is off or the
         # model's wind column failed its gates, which a dump must show.
         "wind_c": getattr(snapshot, "wind_c", None),

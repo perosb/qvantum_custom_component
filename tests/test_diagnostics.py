@@ -103,6 +103,8 @@ def _curve_coordinator() -> SimpleNamespace:
         outdoor_c=0.4,
         night_day_c=0.3,
         solar_c=0.5,
+        solar_raw_c=-3.2,
+        solar_raw_source="curve",
         load_c=0.3,
         capped_by_indoor=False,
         deviation_c=0.2,

@@ -690,6 +690,10 @@ def _curve_snapshot(**overrides) -> CurveSnapshot:
         outdoor_c=0.3,
         night_day_c=0.2,
         solar_c=-0.4,
+        # Before the clamp, and which conversion produced it: the two differ
+        # ~3x on a bright hour, so the pair is what makes the bound readable.
+        solar_raw_c=-4.9,
+        solar_raw_source="curve",
         load_c=0.9,
         capped_by_indoor=False,
         deviation_c=0.5,
@@ -878,6 +882,8 @@ class TestQvantumCurveSensors:
             "outdoor_c": 0.3,
             "night_day_c": 0.2,
             "solar_c": -0.4,
+            "solar_raw_c": -4.9,
+            "solar_raw_source": "curve",
             "load_c": 0.9,
             "cop_c": 0.0,
             "precharge_c": 0.0,

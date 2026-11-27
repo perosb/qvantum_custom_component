@@ -165,6 +165,19 @@ COP_FEEDBACK_SPAN_RATIO = 0.2
 #: Hard clamp on the total adjustment.
 TOTAL_MAX_C = 3.0
 
+#: Which conversion produced the solar term. Published with it because the two
+#: differ by roughly a factor three on a bright hour, and the unclamped request
+#: is only interpretable together with the conversion that made it.
+SOLAR_CONVERSION_EMITTER = "emitter"
+SOLAR_CONVERSION_CURVE = "curve"
+
+#: Emitter exponent in ``Q ∝ (T_supply − T_room)^n``, used only to form the
+#: *local* derivative that turns a watt of solar gain into supply degrees. It is
+#: a property of the emitter, not of the house or of an installation's curve, so
+#: it travels between installations; 1.3 is the middle of the usual 1.1–1.4 for
+#: hydronic emitters, and the whole range moves the conversion by ±15 %.
+SOLAR_EMITTER_EXPONENT = 1.3
+
 #: Indoor margin (measured − target) at which its cap fully vetoes movement
 #: in the margin's direction.
 INDOOR_CAP_C = 1.0
@@ -198,6 +211,16 @@ class CurveResult:
     outdoor_c: float
     night_day_c: float
     solar_c: float
+    #: The solar correction the model asked for **before** ``SOLAR_MAX_C``. The
+    #: clamp is the last step before the table, so without this field a bound
+    #: request of −2.1 K and one of −15 K read identically — and whether the
+    #: bound is doing work cannot be measured.
+    solar_raw_c: float
+    #: Which conversion produced it: ``emitter`` (live thermal power and
+    #: temperatures) or ``curve`` (the fitted-loss fallback), ``None`` when the
+    #: term is off. The two differ by ~3× on a sunny hour, so a raw value
+    #: without this cannot be interpreted.
+    solar_raw_source: str | None
     load_c: float
     capped_by_indoor: bool
     #: The band the shared adjustment was tested against, ``None`` on the side
@@ -502,19 +525,67 @@ def solar_gain_w_now(
     return max(0.0, aperture * smooth_ghi(ghi_by_hour, now_ts))
 
 
-def solar_adjustment_c(
+def _emitter_gain_w_per_k(
+    q_actual_w: float | None,
+    supply_temperature_c: float | None,
+    room_temperature_c: float | None,
+) -> float | None:
+    """``n · Q / (T_supply − T_room)``, or ``None`` when it cannot be trusted.
+
+    Every rejection is a case where the division would report a number the data
+    does not support: a missing reading, a thermal input the payload does not
+    carry, the pump coasting (``Q = 0`` gives no derivative, not an infinite
+    one), or a flow temperature at or below the room's.
+    """
+    for value in (q_actual_w, supply_temperature_c, room_temperature_c):
+        if value is None or isinstance(value, bool):
+            return None
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            return None
+    assert q_actual_w is not None and supply_temperature_c is not None
+    assert room_temperature_c is not None
+    if q_actual_w <= 0.0:
+        return None
+    delta = supply_temperature_c - room_temperature_c
+    if delta <= 0.0:
+        return None
+    return SOLAR_EMITTER_EXPONENT * q_actual_w / delta
+
+
+def solar_raw_adjustment_c(
     model: SolarModel | None,
     ghi_by_hour: Mapping[int, float],
     now_ts: int,
     points: Sequence[tuple[float, float]],
     forecast_temperature_c: float | None,
     daily: SolarDailyModel | None = None,
+    *,
+    q_actual_w: float | None = None,
+    supply_temperature_c: float | None = None,
+    room_temperature_c: float | None = None,
 ) -> float:
-    """Solar gain in W → equivalent ΔT → supply degrees, damped by trust.
+    """The solar correction the model asks for, **before** ``SOLAR_MAX_C``.
 
-    The aperture and the loss coefficient are taken from the *same* model, so
-    the W → K conversion is self-consistent: a day-block ``b`` is divided by
-    the day-block ``a`` it was identified with.
+    Two conversions from the identified gain ``G`` in watts to supply degrees:
+
+    - **Emitter derivative**, when the live inputs are usable:
+      ``ΔT = −G / (n · Q / (T_supply − T_room))``. This is the physical one —
+      the house needs ``G`` less heat, and the emitter's local gain says how far
+      the flow temperature must fall to deliver that. Measured live 2026-11-26:
+      ``1.3 · 2000 W / 13.1 K ≈ 200 W/K``, so 291 W of gain (250 W/m²) is
+      **1.45 K**.
+    - **Curve slope over the fitted loss coefficient**, otherwise:
+      ``ΔT = curve_slope · G / a``. Kept as the fallback because it needs no
+      live reading at all — and it is why the term behaved as a switch rather
+      than a proportional correction: its 0.0196 K per W/m² reaches
+      ``SOLAR_MAX_C`` already at 102 W/m², where the emitter conversion gives
+      0.6 K.
+
+    The emitter path is deliberately independent of the curve slope and of the
+    fitted ``a``: neither is a property of the emitter, and a house with a
+    steeper curve does not receive more sunlight. Unusable inputs fall back
+    rather than guess — absence is not evidence, and a thermal ``Q`` must never
+    be stood in for by the electrical input.
     """
     aperture, loss_w_per_k = effective_solar_model(model, daily)
     if aperture <= 0.0 or loss_w_per_k <= 0.0:
@@ -522,9 +593,45 @@ def solar_adjustment_c(
     gain_w = solar_gain_w_now(model, daily, ghi_by_hour, now_ts)
     if gain_w <= 0.0:
         return 0.0
+    emitter_w_per_k = _emitter_gain_w_per_k(
+        q_actual_w, supply_temperature_c, room_temperature_c
+    )
+    if emitter_w_per_k is not None:
+        return -gain_w / emitter_w_per_k
     reference = 0.0 if forecast_temperature_c is None else forecast_temperature_c
     slope = curve_slope(points, reference)
-    raw = slope * (gain_w / loss_w_per_k)
+    return slope * (gain_w / loss_w_per_k)
+
+
+def solar_adjustment_c(
+    model: SolarModel | None,
+    ghi_by_hour: Mapping[int, float],
+    now_ts: int,
+    points: Sequence[tuple[float, float]],
+    forecast_temperature_c: float | None,
+    daily: SolarDailyModel | None = None,
+    *,
+    q_actual_w: float | None = None,
+    supply_temperature_c: float | None = None,
+    room_temperature_c: float | None = None,
+) -> float:
+    """The solar correction actually applied: the raw request, clamped.
+
+    The clamp is not a scaling — it bounds how far sunlight may pull the flow
+    temperature down. ``SOLAR_MAX_C`` is deliberately unchanged until the raw
+    request has been measured over real weather.
+    """
+    raw = solar_raw_adjustment_c(
+        model,
+        ghi_by_hour,
+        now_ts,
+        points,
+        forecast_temperature_c,
+        daily,
+        q_actual_w=q_actual_w,
+        supply_temperature_c=supply_temperature_c,
+        room_temperature_c=room_temperature_c,
+    )
     return _clamp(raw, -SOLAR_MAX_C, 0.0)
 
 
@@ -1532,6 +1639,8 @@ def compute_curve(
     wind_by_hour: Mapping[int, float] | None = None,
     wind_enabled: bool = False,
     solar_enabled: bool = True,
+    supply_temperature_c: float | None = None,
+    room_temperature_c: float | None = None,
 ) -> CurveResult:
     """Baseline + outdoor + night/day + solar + load → seven supply points.
 
@@ -1561,13 +1670,35 @@ def compute_curve(
     night_day_c = night_day_adjustment_c(
         now_ts, daylight, amplitude_c=night_amplitude_c
     )
-    solar_c = (
-        solar_adjustment_c(
-            model, ghi_by_hour, now_ts, points, forecast_now, daily_model
+    # The raw request is published beside the clamped one: the clamp is the only
+    # thing between the model and the table, so a reader has to be able to see
+    # how much of the term the bound is eating (`solar_raw_source` says which
+    # conversion produced it).
+    if solar_enabled:
+        solar_raw_c = solar_raw_adjustment_c(
+            model,
+            ghi_by_hour,
+            now_ts,
+            points,
+            forecast_now,
+            daily_model,
+            q_actual_w=q_actual_w,
+            supply_temperature_c=supply_temperature_c,
+            room_temperature_c=room_temperature_c,
         )
-        if solar_enabled
-        else 0.0
-    )
+        solar_c = _clamp(solar_raw_c, -SOLAR_MAX_C, 0.0)
+        solar_raw_source = (
+            SOLAR_CONVERSION_EMITTER
+            if _emitter_gain_w_per_k(
+                q_actual_w, supply_temperature_c, room_temperature_c
+            )
+            is not None
+            else SOLAR_CONVERSION_CURVE
+        )
+    else:
+        solar_raw_c = 0.0
+        solar_c = 0.0
+        solar_raw_source = None
     wind_c = (
         wind_adjustment_c(
             daily_model,
@@ -1648,6 +1779,8 @@ def compute_curve(
         night_day_c=night_day_c,
         solar_c=solar_c,
         load_c=load_c,
+        solar_raw_c=solar_raw_c,
+        solar_raw_source=solar_raw_source,
         capped_by_indoor=capped_by_indoor,
         cap_floor_c=cap_floor_c,
         cap_ceiling_c=cap_ceiling_c,
