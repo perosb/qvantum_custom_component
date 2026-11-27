@@ -1670,11 +1670,18 @@ def room_integral_step(
 
     Three properties are deliberate, and each is a way this could go wrong:
 
-    - **One-sided.** A warm house may lower the curve; a cold one may not raise
-      it — that is the indoor cap's floor and the trims' job, and two upward
-      integrators on one table would fight. The result is always ``≤ 0``.
+    - **The output is one-sided, the magnitude is not.** A warm house may lower
+      the curve; a cold one may not raise it — that is the indoor cap's floor and
+      the trims' job, and two upward integrators on one table would fight. So the
+      result is always ``≤ 0``. But the value itself must be able to **walk back
+      towards zero**: an integrator that can only grow is a ratchet, and once the
+      correction it accumulated is no longer needed — milder weather, a target
+      the user raised, or the trims absorbing the same error — it would keep
+      holding the house below its target with nothing to remove it. Within
+      ``[-max_c, 0.0]`` the step is therefore symmetric: a mean error below
+      ``-deadband_c`` walks the value up at the same rate.
     - **Dead-banded.** The error is a 24 h *mean*, so one warm afternoon cannot
-      reach the table; below ``deadband_c`` there is nothing to remove that is
+      reach the table; inside ``±deadband_c`` there is nothing to remove that is
       separable from the pump's own proportional band and sensor noise.
     - **Rate-limited and bounded.** ``gain`` scales the same way the trims are
       scaled (0.3), the daily walk is capped so no day can cross a knot's write
@@ -1687,7 +1694,8 @@ def room_integral_step(
     not evidence — the integral holds.
 
     Returns the new integral, clamped to ``[-max_c, 0.0]``. It never moves on
-    missing, non-finite or non-positive input.
+    missing, non-finite or non-positive input, and it can never become positive:
+    a cold house is left to the cap's floor and the trims.
     """
     held = _clamp(integral_c if math.isfinite(integral_c) else 0.0, -max_c, 0.0)
     error = None if mean_error_c is None else float(mean_error_c)
@@ -1703,12 +1711,16 @@ def room_integral_step(
         or hours <= 0.0
     ):
         return held
-    if error <= deadband_c:
+    if abs(error) <= deadband_c:
         return held
-    request_c = gain * conversion * (error - deadband_c)
+    # Warm walks the correction down, cold walks it back towards zero. Both use
+    # the same rate, so a target the house overshoots is corrected as fast as it
+    # was wound up, and the value can never stay behind as a permanent cut.
+    direction = -1.0 if error > 0.0 else 1.0
+    request_c = gain * conversion * (abs(error) - deadband_c)
     day_fraction = hours / 24.0
     step_c = min(request_c * day_fraction, max_step_per_day_c * day_fraction)
-    return _clamp(held - step_c, -max_c, 0.0)
+    return _clamp(held + direction * step_c, -max_c, 0.0)
 
 
 def compute_curve(

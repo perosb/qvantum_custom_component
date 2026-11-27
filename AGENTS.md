@@ -711,9 +711,12 @@ The rules that must not drift:
   is *identified/measured terms on, heuristic ones off*: a switch can only
   silence a valid model, never force an invalid one to act.
 - The **room-error integral** is the only term that reads the outcome, and its
-  invariants are load-bearing: one-sided (never raises — a cold house is the
-  cap's floor and the trims' job), dead-banded on the cap's 24 h mean, rate- and
-  bound-limited to the trims' own authority, added **before** `TOTAL_MAX_C` and
+  invariants are load-bearing: one-sided **output** (never raises — a cold house
+  is the cap's floor and the trims' job) with a **magnitude that unwinds** when
+  the mean error falls below the dead band, because an integrator that can only
+  grow leaves the house cold once its correction is no longer needed;
+  dead-banded on the cap's 24 h mean, rate- and bound-limited to the trims' own
+  authority, added **before** `TOTAL_MAX_C` and
   the indoor cap so the floor can lift it and the ceiling cannot veto it, reset
   (never seeded) on reversion, on the pump leaving User defined and on a setpoint
   change, and silent in shadow. Its catch-up after a restore is capped, because

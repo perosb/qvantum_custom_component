@@ -569,9 +569,14 @@ curve when the house is warm, and the trims read the pump's supply.
 `room_integral_step` is the missing integrator, and it is the only term in
 `compute_curve` that reads the house's **outcome**:
 
-- **one-sided**: a warm house may lower the curve, a cold one may not raise it —
-  that is the cap's floor and the trims' job, and two upward integrators on one
-  table would fight;
+- **one-sided output**: a warm house may lower the curve, a cold one may not
+  raise it — that is the cap's floor and the trims' job, and two upward
+  integrators on one table would fight. The **magnitude** still walks back
+  towards zero when the mean error sits below the dead band, at the rate it was
+  wound up: an integrator that can only grow is a ratchet, and once the
+  correction it accumulated is no longer needed (milder weather, a target the
+  user raised, or the trims absorbing the same error) it would hold the house
+  below its target with nothing left to remove it;
 - **dead-banded** at `ROOM_INTEGRAL_DEADBAND_C` (0.3 K): below it there is
   nothing separable from the pump's own proportional band and sensor noise;
 - **rate-limited** to `ROOM_INTEGRAL_MAX_STEP_PER_DAY_C` (0.5 K/day), so no day
@@ -581,7 +586,10 @@ curve when the house is warm, and the trims read the pump's supply.
 - fed by the cap's own 24 h mean within the current setpoint regime, and only
   with at least `ROOM_INTEGRAL_MIN_SAMPLES` samples behind it;
 - **one cycle behind** the table, like every other term, and it advances under
-  the control lock beside the trims.
+  the control lock beside the trims;
+- **symmetric in motion, one-sided in effect**: the same 0.3 K/day walks it down
+  while the house is warm and back up while it is cold, so it converges from
+  either side and can never end up as a permanent cut.
 
 It is added to the shared total **before** `TOTAL_MAX_C` and the indoor cap, for
 two reasons: the protective floor must be able to lift it (the floor raises the

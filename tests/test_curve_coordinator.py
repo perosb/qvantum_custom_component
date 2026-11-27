@@ -2367,6 +2367,37 @@ async def test_room_integral_holds_within_the_deadband_and_when_inactive() -> No
     assert coordinator._room_integral == 0.0
 
 
+async def test_room_integral_returns_to_zero_when_the_house_is_cold() -> None:
+    """A correction that is no longer needed must not stay as a permanent cut.
+
+    The loop is the point: while the house is warm the value walks down, and when
+    it overshoots — or the weather or the target moves — it walks back, because a
+    fixed negative supply correction would hold the house below its target with
+    nothing left to remove it.
+    """
+    coordinator, result = _warm_house_coordinator()
+    now = 1_760_000_000.0
+    cycle = 900.0
+
+    # Two warm days wind it to about -0.6 K.
+    coordinator._indoor_margin_mean = 0.8
+    for quarter in range(2 * 96):
+        await coordinator._async_update_room_integral(
+            result, now + quarter * cycle
+        )
+    wound = coordinator._room_integral
+    assert wound == pytest.approx(-0.6, abs=0.01)
+
+    # The house goes cold: the same mean error on the other side unwinds it.
+    coordinator._indoor_margin_mean = -0.8
+    for quarter in range(2 * 96):
+        await coordinator._async_update_room_integral(
+            result, now + (2 * 96 + quarter) * cycle
+        )
+
+    assert coordinator._room_integral == pytest.approx(0.0, abs=0.01)
+
+
 async def test_room_integral_freezes_when_the_cold_floor_or_bound_bites() -> None:
     """Heat protection and a saturated total both win over the integrator."""
     coordinator, _result = _warm_house_coordinator()
