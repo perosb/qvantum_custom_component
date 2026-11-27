@@ -206,6 +206,18 @@ class TestComputeSnapshot:
         assert snapshot.scop_total_90d == pytest.approx(3.0)
         assert snapshot.aux_heat_share == pytest.approx(0.4)
         assert snapshot.coverage_days == pytest.approx(10.0)
+        # The deltas travel with the ratio: they are the only way a reader can
+        # attribute a ratio that no heat pump can produce to the counter that
+        # made it (pool, 2026-11-27: SCOP 1.13 beside a 17.8 % element share).
+        assert snapshot.scop_heating_kwh == pytest.approx(200.0)
+        assert snapshot.scop_dhw_kwh == pytest.approx(100.0)
+        assert snapshot.scop_compressor_kwh == pytest.approx(60.0)
+        assert snapshot.scop_additional_kwh == pytest.approx(40.0)
+        assert (
+            snapshot.scop_heating_kwh + snapshot.scop_dhw_kwh
+        ) / (
+            snapshot.scop_compressor_kwh + snapshot.scop_additional_kwh
+        ) == pytest.approx(snapshot.scop_total)
         assert stats.await_args.kwargs["types"] == {"sum", "mean"}
 
     async def test_short_history_yields_no_values(self):
@@ -237,6 +249,10 @@ class TestComputeSnapshot:
         assert snapshot.scop_total is None
         assert snapshot.scop_total_90d is None
         assert snapshot.aux_heat_share is None
+        # The deltas are still what the window measured: the gate withholds the
+        # ratio, not the evidence, so a row can show *why* there is no figure.
+        assert snapshot.scop_heating_kwh == pytest.approx(20.0)
+        assert snapshot.scop_additional_kwh == pytest.approx(4.0)
 
     async def test_window_is_90_days_wide(self):
         coordinator = make_coordinator()

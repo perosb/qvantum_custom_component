@@ -47,8 +47,9 @@ from .const import (
     SensorMode,
 )
 from .coordinator import transport_kind
+from .efficiency import SCOP_DELTA_KEYS
 from .heating_curve import measured_age_hours
-from .plant_analytics import eu_label
+from .plant_analytics import HEALTH_COMPONENT_KEYS, eu_label
 from .statistics import INDOOR_METRIC_KEYS
 
 #: Where the summary can be downloaded while logged in. The browser session
@@ -201,6 +202,13 @@ _ENTITY_PREFIXES = (
 #: installations had sat ready in shadow for one to two weeks and the export
 #: could not say which of the three they were. Additive; both are policy, not
 #: measurement, so nothing about the installation leaves with them.
+#: v20 also carries `fitted.scop_heating_kwh` / `scop_dhw_kwh` /
+#: `scop_compressor_kwh` / `scop_additional_kwh` — the four counter deltas
+#: `scop_total` divides — and the three component scores behind
+#: `efficiency_health_grade`. Both exist so a row can answer *why* its figure is
+#: what it is: a SCOP of 1.13 beside a 17.8 % element share pins the compressor
+#: at 1.16, and a letter can only be re-scored at another weight when its
+#: components travel with it. Additive; no existing field changes meaning.
 SUMMARY_SCHEMA_VERSION = 20
 
 #: Plant settings that describe the control loops. Everything else in the
@@ -260,6 +268,12 @@ FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (
     # one, so a shoulder-season row and a poor installation look alike without
     # the longer window beside it.
     "scop_total_90d",
+    # The four counter deltas those ratios divide. A ratio is auditable only
+    # beside its inputs: one pool row published SCOP 1.13 with a 17.8 %
+    # auxiliary share, which pins the compressor's own COP at 1.16, and without
+    # the deltas a counter that stopped stepping is indistinguishable from a
+    # window the element really carried.
+    *SCOP_DELTA_KEYS,
     # The same two figures in the EU label's unit and class. A string field
     # (the class) beside numbers; the export coerces it as a short enum.
     "eta_s_percent",
@@ -270,6 +284,15 @@ FITTED_EFFICIENCY_KEYS: tuple[str, ...] = (
     "efficiency_health_grade",
     "efficiency_health_score",
     "efficiency_health_coverage",
+    # The three component scores the letter is the weighted mean of, expanded
+    # from ``efficiency_health_components``. The coverage says *how much* of the
+    # grade was available, never how it would read at another weight — and the
+    # weight (0.5 on a 30-day SCOP against a seasonal 2.0-5.0 range) is the open
+    # question: removing that component moved 18 of 29 installations up a letter
+    # when measured 2026-11-27.
+    "efficiency_health_scop_score",
+    "efficiency_health_aux_share_score",
+    "efficiency_health_cycling_score",
     # How much of each window was actually observed. A SCOP over 30 days and a
     # SCOP over seven scattered days read the same in a row without them, and
     # an installation that only runs while its owner tests produces the second
@@ -700,6 +723,10 @@ def fitted_summary(snapshot: Any) -> dict[str, Any]:
         eta_s, eu_class = eu_label(getattr(snapshot, scop_key, None))
         derived[f"eta_s_percent{suffix}"] = eta_s
         derived[f"eu_class{suffix}"] = _short_string(eu_class)
+    components = getattr(snapshot, "efficiency_health_components", None)
+    components = components if isinstance(components, Mapping) else {}
+    for key in HEALTH_COMPONENT_KEYS:
+        derived[f"efficiency_health_{key}_score"] = _number(components.get(key))
     return {
         key: (
             _short_string(getattr(snapshot, _SNAPSHOT_ATTRIBUTE.get(key, key), None))

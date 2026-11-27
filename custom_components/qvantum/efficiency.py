@@ -136,6 +136,30 @@ def aux_heat_share(additional_kwh: object, compressor_kwh: object) -> float | No
     return max(0.0, min(1.0, additional / total))
 
 
+#: The four counter deltas behind :func:`scop_from_counters` (the 30-day
+#: window; the 90-day figure is not split), as ``(snapshot/export field,
+#: counter key)``, in the order the ratio reads them.
+#:
+#: The ratio alone cannot be audited. Measured on the pool 2026-11-27: one row
+#: published SCOP 1.13 with a 17.8 % auxiliary share, which pins the compressor's
+#: own COP at ``(1.13 − 0.178) / (1 − 0.178) = 1.16`` — a figure no heat pump
+#: produces — and with only the two ratios there is no way to tell a
+#: ``heatingenergy`` counter that stopped stepping from a genuinely element-driven
+#: window. The names live here once because three consumers carry them (the
+#: snapshot, the summary export and the diagnostics dump), and a name that has to
+#: be spelled identically in three places is where ``coverage_days`` already ended
+#: up with two spellings.
+SCOP_DELTA_FIELDS: tuple[tuple[str, str], ...] = (
+    ("scop_heating_kwh", "heatingenergy"),
+    ("scop_dhw_kwh", "dhwenergy"),
+    ("scop_compressor_kwh", "compressorenergy"),
+    ("scop_additional_kwh", "additionalenergy"),
+)
+
+#: The field names alone, for the export and dump field lists.
+SCOP_DELTA_KEYS: tuple[str, ...] = tuple(field for field, _ in SCOP_DELTA_FIELDS)
+
+
 def scop_from_counters(
     heating_kwh: object,
     dhw_kwh: object,
@@ -148,6 +172,9 @@ def scop_from_counters(
     missing or there is no measurable thermal output/electrical input in the
     window; the counter split between modes is not available, so this is the
     system figure only.
+
+    Its inputs travel on the snapshot as :data:`SCOP_DELTA_FIELDS`: the ratio is
+    only interpretable beside the four numbers it divides.
     """
     heating = finite(heating_kwh)
     dhw = finite(dhw_kwh)

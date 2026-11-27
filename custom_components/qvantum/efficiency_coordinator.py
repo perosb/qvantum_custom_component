@@ -45,7 +45,11 @@ from .dhw_loss import (
     reference_loss_kwh_per_day,
     standing_loss_per_k,
 )
-from .efficiency import aux_heat_share, scop_from_counters
+from .efficiency import (
+    SCOP_DELTA_FIELDS,
+    aux_heat_share,
+    scop_from_counters,
+)
 from .numeric import finite
 from .open_meteo import (
     FORECAST_REUSE_HOURS,
@@ -175,6 +179,15 @@ class EfficiencySnapshot:
 
     scop_total: float | None = None
     scop_total_90d: float | None = None
+    #: The four counter deltas ``scop_total`` divides. Exported so a ratio
+    #: that no heat pump can produce can be attributed to the counter that made
+    #: it: without them a stalled ``heatingenergy`` and a window the element
+    #: really carried read identically. Present even below the coverage gate that
+    #: withholds ``scop_total`` — the window then measured too little, not zero.
+    scop_heating_kwh: float | None = None
+    scop_dhw_kwh: float | None = None
+    scop_compressor_kwh: float | None = None
+    scop_additional_kwh: float | None = None
     aux_heat_share: float | None = None
     heat_loss_w_per_k: float | None = None
     heating_degree_hours: float | None = None
@@ -751,9 +764,14 @@ class QvantumEfficiencyCoordinator(DataUpdateCoordinator[EfficiencySnapshot]):
             }
         )
 
+        delta_fields = {
+            field: short_deltas.get(counter) for field, counter in SCOP_DELTA_FIELDS
+        }
+
         return EfficiencySnapshot(
             scop_total=scop_total,
             scop_total_90d=scop_total_90d,
+            **delta_fields,
             aux_heat_share=aux_share,
             heat_loss_w_per_k=heat_loss_w_per_k,
             thermal_time_constant=thermal_time_constant,

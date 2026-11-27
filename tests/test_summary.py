@@ -132,6 +132,16 @@ def efficiency_snapshot():
         compressor_starts_per_hour=1.2,
         scop_total=2.66,
         scop_total_90d=2.81,
+        # The deltas the two SCOP figures divide, and the component scores the
+        # letter is the weighted mean of. Their sum recomputes the ratio; without
+        # them a row's SCOP cannot be attributed to the counter that made it.
+        scop_heating_kwh=412.6,
+        scop_dhw_kwh=88.1,
+        scop_compressor_kwh=176.4,
+        scop_additional_kwh=12.8,
+        # One component missing on purpose: coverage 0.8 is the available weight,
+        # and a missing score must export null rather than 0.0.
+        efficiency_health_components={"scop": 0.9, "cycling": 0.36},
         coverage_days=27.5,
         scop_coverage_days_90d=61.0,
         efficiency_health_grade="B",
@@ -317,6 +327,49 @@ def test_the_fitted_block_carries_the_coverage_behind_its_windows() -> None:
     assert fitted["building_coverage_days"] == 11.4
     # A snapshot without them still exports the keys, as null.
     assert fitted_summary(None)["scop_coverage_days"] is None
+
+
+def test_the_fitted_block_carries_the_counters_behind_the_scop() -> None:
+    """A ratio is auditable only beside the deltas it divides.
+
+    Measured on the pool 2026-11-27: a row published SCOP 1.13 with a 17.8 %
+    auxiliary share, which pins the compressor's own COP at 1.16 — a figure no
+    heat pump produces. With only the two ratios the row cannot say which of the
+    four counters produced it, and a ``heatingenergy`` counter that stopped
+    stepping looks exactly like a window the element really carried.
+    """
+    fitted = build()["fitted"]
+
+    assert fitted["scop_heating_kwh"] == 412.6
+    assert fitted["scop_dhw_kwh"] == 88.1
+    assert fitted["scop_compressor_kwh"] == 176.4
+    assert fitted["scop_additional_kwh"] == 12.8
+    recomputed = (412.6 + 88.1) / (176.4 + 12.8)
+    assert recomputed == pytest.approx(fitted["scop_total"], rel=0.01)
+
+
+def test_the_health_letter_travels_with_its_component_scores() -> None:
+    """The letter is a weighted mean, so the weight needs the parts.
+
+    The 0.5 weight on a 30-day SCOP scored against a seasonal range is the open
+    question; removing that component moved 18 of 29 installations up a letter
+    (pool, 2026-11-27). Re-scoring is only possible from rows that carry them.
+    """
+    fitted = build()["fitted"]
+
+    assert fitted["efficiency_health_scop_score"] == 0.9
+    assert fitted["efficiency_health_cycling_score"] == 0.36
+    # A component the grade could not score exports null, not 0.0: the missing
+    # share is renormalised away, and the two claims are not the same.
+    assert fitted["efficiency_health_aux_share_score"] is None
+
+
+def test_a_snapshot_without_component_scores_exports_them_as_null() -> None:
+    fitted = fitted_summary(SimpleNamespace(scop_total=2.66))
+
+    assert fitted["efficiency_health_scop_score"] is None
+    assert fitted["efficiency_health_aux_share_score"] is None
+    assert fitted["efficiency_health_cycling_score"] is None
 
 
 def test_a_cloud_sensor_mode_name_is_exported_as_the_register_value() -> None:
