@@ -538,6 +538,7 @@ def assess_readiness(
     signal: str | None = None,
     covered_hours: Iterable[int] | None = None,
     active: bool = False,
+    user_defined: bool = False,
 ) -> CurveReadiness:
     """Assess the readiness window over at least three full local days.
 
@@ -557,6 +558,20 @@ def assess_readiness(
     not a tail). The gate is a pre-activation question, so the trims never feed
     back into the baseline (`_async_learn_baseline` only runs on Auto) and it
     could not recover on its own.
+
+    ``user_defined`` means the pump runs a **user-defined** table while the
+    curve is not writing, and the gate is then not assessed either
+    (``blocker="user_defined"``, no numbers). The deviation is
+    ``our baseline − cal_heat_temp``, and ``cal_heat_temp`` then follows a table
+    the integration did not author — chosen in the pump, the app or a cloud
+    profile, or left there when control was switched off. That is not a quality
+    signal about the baseline, and it is also the one case where a passing
+    value would be harmful: the readiness invitation writes our table, so it
+    must never be raised from a comparison against somebody else's. Measured on
+    the pool 2026-11-27: three installations sat in this regime (two of them
+    never active at all) and all three failed the median gate — 3.20, 1.89 and
+    19.26 °C — where one of them had passed at 1.27 °C on its own Auto curve the
+    week before. The first value is the finding, the second is the regime.
     """
     if signal is not None:
         return CurveReadiness(False, signal, None, None, 0.0)
@@ -564,6 +579,11 @@ def assess_readiness(
         _, window_hours = readiness_window(now_ts, tz)
         return CurveReadiness(
             False, "active", None, None, round(window_hours, 1)
+        )
+    if user_defined:
+        _, window_hours = readiness_window(now_ts, tz)
+        return CurveReadiness(
+            False, "user_defined", None, None, round(window_hours, 1)
         )
 
     start, window_hours = readiness_window(now_ts, tz)
@@ -3421,7 +3441,15 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             if result is not None:
                 await self._async_update_trims(result, now_ts)
 
-        shadow = values.get("curve_type_heating") != HeatingCurveType.USER_DEFINED
+        # Two regimes hide behind "not active", and the readiness gate is valid in
+        # only one of them: the pump on its own Auto curve (our baseline is
+        # learnable and the deviation describes it) and the pump on a
+        # **user-defined** table we did not author (chosen in the app, the panel
+        # or a cloud profile, or left there when control was switched off).
+        pump_user_defined = (
+            values.get("curve_type_heating") == HeatingCurveType.USER_DEFINED
+        )
+        shadow = not pump_user_defined
         deviation = None
         if result is not None:
             measured_outdoor = values.get("bt1")
@@ -3467,6 +3495,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             signal=signal,
             covered_hours=covered_hours,
             active=self.active,
+            user_defined=pump_user_defined,
         )
         room_errors, room_source = await self._async_room_error_hours()
         room = room_error_summary(room_errors, int(now_ts), time_zone)

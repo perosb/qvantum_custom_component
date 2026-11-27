@@ -754,8 +754,19 @@ trims correct those points once the weather gets there, which is why a winter
 curve should be watched rather than assumed. The 95th percentile replaces an absolute maximum because single
 mode-switch hours are transients, not a curve error. The
 `blocker` attribute names a missing signal (`baseline`, `forecast`, `history`,
-`window`, `median`, `max`) or `active` — the gate was not assessed because the
-curve is writing. A transient forecast failure counts as missing only
+`window`, `median`, `max`) or one of the two regimes in which the gate is not
+assessed: `active` — the curve is writing — and `user_defined` — the pump runs a
+user-defined table we did not author. In the second the deviation is
+`our baseline − cal_heat_temp` where `cal_heat_temp` follows somebody else's
+curve (chosen in the app, the panel or a cloud profile, or left in the pump when
+control was switched off), so neither a pass nor a failure describes the
+baseline, and a pass must not raise the invitation: accepting it writes our
+table. Measured on the pool 2026-11-27: three installations sat there (two had
+never been active at all) and all three failed the median gate — 3.20, 1.89 and
+19.26 °C — while one of them had passed at 1.27 °C on its own Auto curve seven
+days earlier. The pump reports the regime as `curve_type_heating` 1
+(`HeatingCurveType.USER_DEFINED`); a shadow installation on Auto reports 0.
+A transient forecast failure counts as missing only
 when no payload covering the current hour is still cached, so a sporadic
 Open-Meteo 503 does not collapse the window. `ready` is a signal, not an
 activation. `ready` needs the recorder running with ≥ 90 % window coverage and
