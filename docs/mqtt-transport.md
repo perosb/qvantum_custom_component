@@ -172,13 +172,14 @@ interval to retry on its own. So working installations still run no timer —
 the timer is what happens *instead of* polling only when something is already
 broken.
 
-Not proven: that Qvantum's feed can replace our own snapshot. It publishes a
+Not proven: that the feed carries the **Modbus equivalents**. It publishes a
 named telemetry list to a configured broker and pushes the control parameters as
-an event, but it carries no thermal power and no COP (last section), and
+an event, and the working assumption is that the rest follows — `heatingenergy`
+above all, because the COP is derived from counters. Until `get_telemetry_inventory`
+shows them, read an absent item as "not in this build", not as "not planned".
 `send_command` is still shaped from the display's own command set
 (`read_all_setpoints`, `set_setpoint`, `limit_max_compressor_speed`) rather than
-from a response we have seen. Until that is answered this is a transport looking
-for a pump.
+from a response we have seen.
 
 ## The 1.13.0 builds: a telemetry feed, and what it changes here
 
@@ -220,11 +221,22 @@ straight through, so a firmware that adds an item needs no release here. The
 client accepts both payload shapes: this POC's `{"metrics", "settings"}` snapshot
 and the firmware's flat item document.
 
-**What the feed does not carry: a thermal power or a COP.** It repeats
+**What this build's feed does not carry: `heatingenergy`.** It repeats
 `compressor_power` (input 94, validated against a whole-house meter at a 0.95
-ratio over 135 defrosts) but there is no heating-output item, so the
-heating-energy question — the counter reads below the compressor's own input —
-is untouched by this transport.
+ratio over 135 defrosts) and, of the energy counters, only
+`compressor_energy_kwh` and `additional_energy_kwh`; there is no heating-water
+counter and no flow, so the heating-energy question — the counter reads below the
+compressor's own input — is untouched by the build we can read.
+
+**The working assumption closes that gap.** Everything the Modbus transport
+reads is expected to appear in the feed, `heatingenergy` included, so this
+transport is designed *for* the counters rather than around their absence:
+`heatingpower` is a counter rate and the COP is derived from counters, so both
+work unchanged the moment the counter is in the item list. Two consequences for
+whoever wires it up: `get_telemetry_inventory` has to be checked against the
+Modbus map rather than assumed, and `inventory.py` is where an item name becomes
+the key the coordinator reads (`heatingenergy` is already canonical, so it needs
+no entry).
 
 Still blocked: QT (Qvantum's own) configuration cannot be read or written
 through the third-party MQTT API, advanced settings need `AL30`/`AL20` with a
