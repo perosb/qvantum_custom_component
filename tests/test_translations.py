@@ -26,6 +26,33 @@ def _key_paths(node: object, prefix: str = "") -> set[str]:
     return paths
 
 
+def test_every_curve_term_switch_is_labelled_and_explained():
+    """A switch with no helper text is a switch nobody can act on.
+
+    The options dialog builds its curve-term switches from the `CONF_CURVE_*`
+    constants; the label lives in `options.step.init.data` and the sentence
+    under it in `data_description`. #587 added `curve_room_integral_term` with a
+    label and no description, and the locale-parity test below cannot see that —
+    it compares each locale against English, so a key missing from *all* of them
+    is consistent.
+
+    The constants are the source of truth, so a new switch fails here until both
+    strings exist.
+    """
+    from custom_components.qvantum import const
+
+    base = json.loads((TRANSLATIONS_DIR / "en.json").read_text(encoding="utf-8"))
+    step = base["options"]["step"]["init"]
+    switches = sorted(
+        value for name, value in vars(const).items() if name.startswith("CONF_CURVE_")
+    )
+
+    assert switches, "the CONF_CURVE_* constants disappeared"
+    for switch in switches:
+        assert switch in step["data"], f"{switch} has no label"
+        assert switch in step["data_description"], f"{switch} has no description"
+
+
 def test_translation_key_structure_matches_english():
     """Every locale must expose the same key structure as English.
 

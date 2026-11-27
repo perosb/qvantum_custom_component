@@ -1001,7 +1001,8 @@
           "curve_solar_term": "Snižuje výstupní teplotu o zjištěný solární zisk; zjištěno a změřeno, proto je ve výchozím stavu zapnuto.",
           "curve_cop_feedback_term": "Snižuje výstupní teplotu, dokud je měřené COP pod naučenou referencí",
           "curve_precharge_term": "Zvyšuje výstupní teplotu před předpovězeným ochlazením",
-          "curve_wind_term": "Zvyšuje výstupní teplotu, když zjištěná citlivost na vítr ukazuje dodatečné ztráty"
+          "curve_wind_term": "Zvyšuje výstupní teplotu, když zjištěná citlivost na vítr ukazuje dodatečné ztráty",
+          "curve_room_integral_term": "Snižuje teplotu přívodu, dokud chyba místnosti za 24 h zůstává nad mrtvým pásmem; ve výchozím nastavení zapnuto a křivku pouze snižuje."
         },
         "description": "Nastavení aktuálního režimu připojení. Pro přepnutí mezi cloudem a Modbusem použijte nové nastavení.",
         "title": "Možnosti"

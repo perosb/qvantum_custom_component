@@ -1001,7 +1001,8 @@
           "curve_solar_term": "Sänker framledningen med den identifierade solinstrålningen; identifierad och mätt, därför på som default.",
           "curve_cop_feedback_term": "Sänker framledningen när uppmätt COP ligger under sitt inlärda referensvärde",
           "curve_precharge_term": "Höjer framledningen inför ett prognosticerat köldryck",
-          "curve_wind_term": "Höjer framledningen när en identifierad vindkänslighet visar extra förlust"
+          "curve_wind_term": "Höjer framledningen när en identifierad vindkänslighet visar extra förlust",
+          "curve_room_integral_term": "Sänker framledningen medan 24 h-rumsfelet ligger över sitt dödband; på som standard och sänker bara kurvan."
         },
         "description": "Inställningar för aktuellt anslutningsläge. Använd omkonfiguration för att växla mellan moln och Modbus.",
         "title": "Alternativ"
