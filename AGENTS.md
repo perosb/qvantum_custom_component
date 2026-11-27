@@ -407,6 +407,15 @@ details — the rules below are what is easy to break:
   run (bumps the version on `main`, rebuilds the zip). **Actions → Release
   highlights → Run workflow** on the draft writes the overview, and nothing else,
   so the publish email carries it.
+- **Labels come from the PR title via `.github/workflows/pr-labels.yml`, which
+  must stay on `pull_request_target`** — a fork's `pull_request` run carries a
+  read-only token for issues/PRs (measured on #576, 2026-11-26: `addLabels` 403,
+  so the label had to be applied by hand), and since `release-drafter.yml`
+  filters on `include-labels`, an unlabelled PR drops out of the notes entirely.
+  The job reads the title from the event payload and labels; it **checks nothing
+  out, runs no file from the pull request and holds no secret**. Adding
+  `actions/checkout` or a secret there is what turns the trigger into
+  fork-controlled code execution.
 
 Regenerate one release with:
 

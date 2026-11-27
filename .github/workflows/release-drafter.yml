@@ -14,8 +14,6 @@ on:
       # A docs-only release-notes commit (pre-releases bump no manifest) must
       # not re-trigger the drafter and create another draft with the same PRs.
       - "docs/releases/**"
-  pull_request:
-    types: [opened, reopened, edited, synchronize]
 
 permissions:
   contents: read
@@ -34,7 +32,6 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Get next version
-        if: github.event_name != 'pull_request'
         uses: reecetech/version-increment@2024.10.1
         id: version
         with:
@@ -42,7 +39,6 @@ jobs:
           increment: patch
 
       - name: Run Release Drafter
-        if: github.event_name != 'pull_request'
         uses: release-drafter/release-drafter@v7.2.0
         with:
           tag: ${{ steps.version.outputs.version }}
@@ -50,34 +46,3 @@ jobs:
           include-pre-releases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Fork PRs get a read-only GITHUB_TOKEN for issues/PRs despite job write perms.
-      - name: Apply labels from PR title
-        if: >
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const title = context.payload.pull_request.title;
-            const number = context.payload.pull_request.number;
-            let label = null;
-            if (/^fix[\s(:]/i.test(title))   label = 'bug';
-            else if (/^feat[\s(:]/i.test(title)) label = 'enhancement';
-            else if (/^(chore|docs|refactor|test|ci)[\s(:]/i.test(title)) label = 'chore';
-            if (!label) return;
-            try {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: number,
-                labels: [label],
-              });
-            } catch (err) {
-              const status = err.status || err.response?.status;
-              if (status === 403) {
-                core.warning(`Skipping label '${label}' on PR #${number}: ${err.message}`);
-                return;
-              }
-              throw err;
-            }
