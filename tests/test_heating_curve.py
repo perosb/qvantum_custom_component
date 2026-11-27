@@ -517,12 +517,31 @@ def test_room_integral_step_scales_with_the_mean_error() -> None:
     assert cycle * 96 == pytest.approx(first)
 
 
-def test_room_integral_step_never_raises_a_cold_house() -> None:
-    """One-sided by construction: heat protection is the cap's floor, not this."""
+def test_room_integral_step_never_adds_heat_to_a_cold_house() -> None:
+    """The output is one-sided: heat protection is the cap's floor, not this."""
+    # At zero it cannot go positive, however cold the house is.
     assert room_integral_step(0.0, -1.0, gain_c_per_c=2.0, elapsed_hours=24.0) == 0.0
+    assert (
+        room_integral_step(0.0, -99.0, gain_c_per_c=25.0, elapsed_hours=24.0) == 0.0
+    )
+
+
+def test_room_integral_step_unwinds_when_the_house_is_cold() -> None:
+    """An integrator that can only grow is a ratchet, and a ratchet leaves the
+    house cold once the correction it accumulated is no longer needed — milder
+    weather, a raised target, or the trims absorbing the same error. So the
+    magnitude walks back at the rate it walked down, and stops at zero.
+    """
+    unwound = room_integral_step(-1.2, -0.8, gain_c_per_c=2.0, elapsed_hours=24.0)
+    assert unwound == pytest.approx(-0.9)
+
+    # Same rate both ways: 0.3 K per day at 0.8 K of error.
+    assert unwound - (-1.2) == pytest.approx(0.3)
+
+    # Inside the band it holds, so the two dead bands do not fight.
     assert room_integral_step(
-        -0.5, -1.0, gain_c_per_c=2.0, elapsed_hours=24.0
-    ) == pytest.approx(-0.5)
+        -0.9, -ROOM_INTEGRAL_DEADBAND_C, gain_c_per_c=2.0, elapsed_hours=24.0
+    ) == pytest.approx(-0.9)
 
 
 def test_room_integral_step_holds_inside_the_deadband() -> None:
