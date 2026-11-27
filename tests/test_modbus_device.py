@@ -33,6 +33,7 @@ from custom_components.qvantum.client.modbus.model import (
 )
 from custom_components.qvantum.const import (
     BINARY_SENSOR_NAMES,
+    DEFAULT_DISABLED_MODBUS_METRICS,
     DEFAULT_ENABLED_MODBUS_METRICS,
     MODBUS_ONLY_BINARY_SENSORS,
     REQUIRED_MODBUS_METRICS,
@@ -194,6 +195,33 @@ class TestRegisterMapAlignment:
             MODBUS_ONLY_BINARY_SENSORS
         )
         assert not {"ep10_brine_pump", "ep11_brine_pump"} & set(BINARY_SENSOR_NAMES)
+
+    def test_every_pollable_default_binary_sensor_is_in_the_fetch_universe(self):
+        """A binary sensor outside the fetch lists can never be created.
+
+        ``build_metrics_payload`` drops every key that the coordinator did not ask
+        for, and the binary-sensor platform skips an enabled-by-default key that is
+        absent from the payload. A key that is in neither ``DEFAULT_ENABLED_*`` nor
+        ``REQUIRED_*`` therefore sits in a loop with nothing in the log: not
+        fetched → not in ``values`` → no entity → not in the registry → not
+        fetched. Measured 2026-11-27 in 2026.11.14 with
+        ``energy_prices_available`` (input 166): the sensor never appeared, on a
+        pump that answered the whole 150-175 block.
+
+        Only keys that are actually input registers are checked: relay bits and
+        derived flags are computed, not polled.
+        """
+        fetch = set(DEFAULT_ENABLED_MODBUS_METRICS) | set(REQUIRED_MODBUS_METRICS)
+        exposed = set(BINARY_SENSOR_NAMES) | set(MODBUS_ONLY_BINARY_SENSORS)
+        missing = sorted(
+            key
+            for key in exposed
+            if key in MODBUS_INPUT_REGISTER_MAP
+            and key not in DEFAULT_DISABLED_MODBUS_METRICS
+            and key not in fetch
+        )
+
+        assert missing == []
 
     def test_all_relay_bits_are_binary_sensors(self):
         exposed = set(BINARY_SENSOR_NAMES) | set(MODBUS_ONLY_BINARY_SENSORS)
