@@ -271,6 +271,22 @@ parent's content is identical), push `--force-with-lease`, then
 second rewrites the first one's code — two review rounds over the same function
 cost more than one.
 
+### Unmerged work
+
+**`poc/mqtt-transport-v2` is an experiment, not a transport.** It proves that a
+third transport fits the architecture — `client/mqtt/` plus a branch in setup,
+config flow and the coordinator, and the two tools `tools/mqtt_pump_sim.py` and
+`tools/snapshot_from_diagnostics.py` — and nothing more. It is pushed, it is not
+`main`, and it is not a shipped feature: do not fold it into a `main` change, do
+not delete it, and do not mention it in release notes.
+
+Work on it by checking the branch out (a worktree, per above). Its own
+description is `docs/mqtt-transport.md` **on that branch**, not here; the older
+`poc/mqtt-transport-v2-backup-e894fa0` is the state before the rebuild. The
+branch's analysis sections were written against an earlier display build and
+have not been refreshed — re-read them against a current build before trusting a
+claim about what the pump publishes.
+
 ## Commits and PRs
 
 Title: `type(scope): Imperative subject`. Body = *why* when the subject is not
