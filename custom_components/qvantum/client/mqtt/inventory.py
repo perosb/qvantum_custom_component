@@ -35,6 +35,9 @@ TELEMETRY_ITEM_KEYS: dict[str, str] = {
     "heater_relay_l3": "picpin_relay_heat_l3",
     "qm10_relay": "picpin_relay_qm10",
     "qn8_position": "qn8position",
+    # Degree minutes: the register map's canonical key for input 34, which the
+    # firmware's telemetry calls ``dm``.
+    "dm": "degree_minute",
 }
 
 #: Per-compressor-unit items (QG only) map to the register names the same way.

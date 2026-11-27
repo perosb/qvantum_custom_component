@@ -584,9 +584,11 @@ def test_the_inventory_maps_the_firmware_item_names() -> None:
     assert canonical_key("additional_energy_kwh") == "additionalenergy"
     assert canonical_key("qn8_position") == "qn8position"
     assert canonical_key("calculated_heating_supply_temperature") == "cal_heat_temp"
+    # 1848e2e43 added degree minutes under the register name ``dm``.
+    assert canonical_key("dm") == "degree_minute"
     # Register names are already canonical and absent from the map by design.
     assert "bt11" not in TELEMETRY_ITEM_KEYS
     assert canonical_key("bt11") == "bt11"
     # The per-unit QG set is generated for both modules.
-    assert len(TELEMETRY_ITEM_KEYS) == 30
+    assert len(TELEMETRY_ITEM_KEYS) == 31
     assert canonical_key("qg2_compressor_speed_rps") == "qg2_compressor_rpm"

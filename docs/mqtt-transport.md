@@ -5,11 +5,13 @@ A third transport beside cloud HTTP and local Modbus, on the same
 transport cost, and does the existing architecture absorb it? ~640 lines of
 production code, and yes.
 
-**Not a shipped feature, and not on `main`.** Qvantum's own MQTT API in display
-1.13.0 is a command proxy: it accepts signed commands and forwards them to the
-cloud API, and publishes nothing but a test message. The protocol below is
-therefore **ours** — it assumes the pump carries metrics, settings and commands,
-which is what Qvantum's FAQ promises and what 1.13.0 does not yet do.
+**Not a shipped feature, and not on `main`.** The first 1.13.0 build of
+Qvantum's own MQTT API was a command proxy — signed commands forwarded to the
+cloud API, and a test message as its only publish. Later builds publish a
+telemetry feed (see the last section) and, since `1848e2e43`, the control
+parameters as an event. The protocol below is still **ours**: it assumes the
+pump carries the whole snapshot — metrics, settings and commands — which is what
+the feed does not do.
 
 ## Protocol
 
@@ -170,39 +172,53 @@ interval to retry on its own. So working installations still run no timer —
 the timer is what happens *instead of* polling only when something is already
 broken.
 
-Not proven: that Qvantum's MQTT publishes metrics at all, or that it carries
-settings rather than only commands. `send_command` is shaped from the display's
-own command set (`read_all_setpoints`, `set_setpoint`,
-`limit_max_compressor_speed`), so it can adopt their format without a redesign —
-but until they answer, this is a transport looking for a pump.
+Not proven: that Qvantum's feed can replace our own snapshot. It publishes a
+named telemetry list to a configured broker and pushes the control parameters as
+an event, but it carries no thermal power and no COP (last section), and
+`send_command` is still shaped from the display's own command set
+(`read_all_setpoints`, `set_setpoint`, `limit_max_compressor_speed`) rather than
+from a response we have seen. Until that is answered this is a transport looking
+for a pump.
 
-## The 1.13.0 build: a telemetry feed, and what it changes here
+## The 1.13.0 builds: a telemetry feed, and what it changes here
 
 Firmware `QEWTTRV1_1130-898953566` (2026-11-24) replaced the display's MQTT
-client from a command proxy into a three-part API. Its configuration document is
-`{connection, telemetry, command}`:
+client from a command proxy into a configured API; `QEWTTRV1_1130-1848e2e43`
+(2026-11-27) added a fourth section and the first push channel for settings. The
+configuration document is `{connection, telemetry, command, events}` — **all four
+objects are required**, and the three-object document of the earlier build is
+rejected:
 
 - `connection` — `enabled`, `host`, `port`, `tls`, and `auth_type`
   (`username` with `username`/`password`, or `cert` with a client certificate);
 - **`telemetry`** — `enabled`, `frequency` (seconds, **minimum 5**) and `items`
-  (`"default"` or an explicit list). It publishes on a topic under the prefix
-  **`qvantum/`**, and `get_telemetry_inventory` returns the catalogue.
+  (`"default"`, **`"all"`**, or an explicit list). It publishes on a topic under
+  the prefix **`qvantum/`**, and `get_telemetry_inventory` returns the catalogue.
 - `command` — allowlisted commands with `heatpump_command_id`, version 1 and an
-  `arguments` object; responses carry a `status_code`.
+  `arguments` object; responses carry a `status_code`. `enabled` is a required
+  boolean here, so commands are opt-in.
+- **`events`** — `enabled`, and its topics. `events/control_parameters` publishes
+  the control parameters — the same 49 names the parameters API reads
+  (`source_pump`, `desired_room_temp`, `curve_at_minus_30` … `smart_grid_enabled`)
+  — together with a `%Y-%m-%dT%H:%M:%SZ` timestamp and `uptime_us`.
 
 The catalogue is a list of **named items**, not the whole snapshot this POC's
-stand-in publishes. Its names: `bt1`–`bt34` by
-their register names, `gp1_speed`/`gp2_speed`, the DHW flow, `powertotal`,
-`compressor_power`, `compressor_energy_kwh`, `additional_energy_kwh`,
-`calculated_heating_supply_temperature`, `fan_control_voltage`, the heater relays
-and `qm10_relay`/`qn8_position`, plus the `qg1_*`/`qg2_*` per-unit set.
+stand-in publishes — 60 items in `1848e2e43`, six more than `898953566`. The
+additions are the ones a heat meter would want and the Modbus map does not have:
+`bt24` crank-case temperature, `bp1_pressure`/`bp2_pressure` (low- and high-side
+refrigerant pressure, unitless in the catalogue) and `compressor_current`, beside
+`bt12` (external heating supply) and `dm` (degree minutes). A renamed
+description is not a renamed item: `bt14`/`bt15` are now "heat-source
+inlet/outlet", the heater relays carry their wattage, and
+`compressormeasuredspeed` is documented as the **maximum** of two units rather
+than their sum.
 
 `client/mqtt/inventory.py` maps the items whose names are **not** the canonical
-ones (`compressor_energy_kwh` → `compressorenergy`,
-`qn8_position` → `qn8position`, …) and passes anything it does not know straight
-through, so a firmware that adds an item needs no release here. The client
-accepts both payload shapes: this POC's `{"metrics", "settings"}` snapshot and
-the firmware's flat item document.
+ones (`compressor_energy_kwh` → `compressorenergy`, `qn8_position` →
+`qn8position`, `dm` → `degree_minute`, …) and passes anything it does not know
+straight through, so a firmware that adds an item needs no release here. The
+client accepts both payload shapes: this POC's `{"metrics", "settings"}` snapshot
+and the firmware's flat item document.
 
 **What the feed does not carry: a thermal power or a COP.** It repeats
 `compressor_power` (input 94, validated against a whole-house meter at a 0.95
