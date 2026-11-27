@@ -989,7 +989,8 @@
           "curve_solar_term": "Solterm",
           "curve_cop_feedback_term": "COP-feedback-term",
           "curve_precharge_term": "Förladdningsterm",
-          "curve_wind_term": "Vindterm"
+          "curve_wind_term": "Vindterm",
+          "curve_room_integral_term": "Rumsfelets integral"
         },
         "data_description": {
           "modbus_scan_interval": "Hur ofta värmepumpen pollas via Modbus TCP. Lägre värden ger nästan realtidsnoggrannhet för flöde och volym. Minimum är 5 sekunder. Standard är 15 sekunder.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Solterm",
           "description": "Sänker framledningen med den identifierade solinstrålningen; identifierad och mätt, därför på som default."
+        },
+        "room_integral": {
+          "name": "Rumsfelets integral",
+          "description": "Sänker framledningen medan 24 h-rumsfelet ligger över sitt dödband; på som standard och kan bara sänka kurvan"
         }
       }
     },

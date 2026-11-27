@@ -553,6 +553,52 @@ that describe them. This is what keeps a
 mid-autumn activation working through winter: the part of the curve October
 could not observe is corrected by the weather the house actually sees.
 
+### Room-error integral
+
+The trims learn the *shape* of the table: they follow the pump's supply, so a
+constant offset between what the house needs and what the pump delivers is not
+something they can remove. The pump's own room compensation is **proportional**
+— it moves supply by `room_comp_factor` per kelvin of error and then stops — so
+a house under load settles a standing offset above its target. Measured
+2026-11-27 on a live install: room 21.1 °C against a 20.3 °C target, the pump's
+term at about −2.4 K (factor 2.0, reading its own blend of the probe and the
+configured sensor), the shared adjustment −1.01 K, and the offset stayed for as
+long as the load did. The indoor cap cannot help: it only forbids *raising* the
+curve when the house is warm, and the trims read the pump's supply.
+
+`room_integral_step` is the missing integrator, and it is the only term in
+`compute_curve` that reads the house's **outcome**:
+
+- **one-sided**: a warm house may lower the curve, a cold one may not raise it —
+  that is the cap's floor and the trims' job, and two upward integrators on one
+  table would fight;
+- **dead-banded** at `ROOM_INTEGRAL_DEADBAND_C` (0.3 K): below it there is
+  nothing separable from the pump's own proportional band and sensor noise;
+- **rate-limited** to `ROOM_INTEGRAL_MAX_STEP_PER_DAY_C` (0.5 K/day), so no day
+  can cross a knot's 0.75 K write dead band on its own;
+- **bounded** at `ROOM_INTEGRAL_MAX_C` (2 K), the same authority as
+  `TRIM_MAX_C`, so neither integrator can outvote the other;
+- fed by the cap's own 24 h mean within the current setpoint regime, and only
+  with at least `ROOM_INTEGRAL_MIN_SAMPLES` samples behind it;
+- **one cycle behind** the table, like every other term, and it advances under
+  the control lock beside the trims.
+
+It is added to the shared total **before** `TOTAL_MAX_C` and the indoor cap, for
+two reasons: the protective floor must be able to lift it (the floor raises the
+whole total, integral included), and the warm ceiling must never be able to
+block the one term that pushes down. A restored value may catch up at most
+`ROOM_INTEGRAL_MAX_CATCHUP_HOURS` (6 h), because an outage is not evidence of a
+house that stayed warm; the first cycle after a restore only stamps the clock.
+It resets — with no seed — on reversion, on the pump leaving User defined, and
+on a setpoint change: a value learnt against a target that has since been raised
+would keep pulling supply down right when more heat was asked for.
+
+**On by default**, like the solar term: its input is measured (the house's own
+error), the term can only silence itself, and without it the proportional loop's
+offset is never corrected. It stays switchable (`room_integral: false`) for a
+house where it does not settle; a value pinned at −2 K in the diagnostics is an
+over-gained integrator, not a warm house.
+
 Computed points are clamped to the pump's own min/max heating supply (holding
 19/20) when those are known, not just the register range 10–80 °C, so a point
 is never written above what the firmware will actually use. On the cloud those
@@ -877,9 +923,11 @@ the registers hold whole degrees:
 
 ### Optional terms
 
-Control-loop terms beyond the four forecast terms are **off by default** and
-only act while the curve is active. Enable them with
-`qvantum.set_curve_terms` (persisted in the curve Store):
+Control-loop terms beyond the four forecast terms only act while the curve is
+active, and are switched with `qvantum.set_curve_terms` (persisted in the curve
+Store). The **room-error integral** is on by default (its input is the measured
+room error; see *Room-error integral* above) and the rest are off, because they
+rest on models that are heuristic or identified per installation:
 
 - **COP feedback** (`cop_feedback: true`) reduces the shared adjustment, by
   at most 1 °C, when the instantaneous heating COP falls below a learned

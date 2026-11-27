@@ -563,6 +563,7 @@ class TestSetCurveTermsService:
             solar=None,
             cop_feedback=True,
             precharge=None,
+            room_integral=None,
             wind=None,
         )
         assert result == {
@@ -587,6 +588,7 @@ class TestSetCurveTermsService:
             solar=None,
             cop_feedback=None,
             precharge=None,
+            room_integral=None,
             wind=None,
         )
 
@@ -608,6 +610,7 @@ class TestSetCurveTermsService:
             solar=None,
             cop_feedback=None,
             precharge=True,
+            room_integral=None,
             wind=None,
         )
 

@@ -989,7 +989,8 @@
           "curve_solar_term": "Człon słoneczny",
           "curve_cop_feedback_term": "Sprzężenie COP",
           "curve_precharge_term": "Wstępne ładowanie",
-          "curve_wind_term": "Człon wiatrowy"
+          "curve_wind_term": "Człon wiatrowy",
+          "curve_room_integral_term": "Całka błędu pomieszczenia"
         },
         "data_description": {
           "modbus_scan_interval": "Jak często odpytywać pompę ciepła przez Modbus TCP. Niższe wartości dają prawie rzeczywistą dokładność przepływu i objętości. Minimum to 5 sekund. Domyślnie 15 sekund.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Człon słoneczny",
           "description": "Obniża zasilanie o zidentyfikowany zysk słoneczny; zidentyfikowany i zmierzony, dlatego domyślnie włączony."
+        },
+        "room_integral": {
+          "name": "Całka błędu pomieszczenia",
+          "description": "Obniża temperaturę zasilania, dopóki 24-godzinny błąd pomieszczenia pozostaje powyżej martwej strefy; domyślnie włączona i może tylko obniżać krzywą"
         }
       }
     },

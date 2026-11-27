@@ -707,9 +707,17 @@ back adjusted; `docs/heating-curve.md` is the full description
 The rules that must not drift:
 
 - Optional terms are **off by default** (COP feedback, pre-charge, wind); solar
-  is on because it is identified and measured on the owner's history. The rule is
-  *identified/measured terms on, heuristic ones off*: a switch can only silence a
-  valid model, never force an invalid one to act.
+  and the room-error integral are on because their inputs are measured. The rule
+  is *identified/measured terms on, heuristic ones off*: a switch can only
+  silence a valid model, never force an invalid one to act.
+- The **room-error integral** is the only term that reads the outcome, and its
+  invariants are load-bearing: one-sided (never raises — a cold house is the
+  cap's floor and the trims' job), dead-banded on the cap's 24 h mean, rate- and
+  bound-limited to the trims' own authority, added **before** `TOTAL_MAX_C` and
+  the indoor cap so the floor can lift it and the ceiling cannot veto it, reset
+  (never seeded) on reversion, on the pump leaving User defined and on a setpoint
+  change, and silent in shadow. Its catch-up after a restore is capped, because
+  an outage is not evidence.
 - `ready` compares the **learned baseline** to `cal_heat_temp` on heating hours,
   with the pump's room term removed: median ≤ 1.5 °C, p95 ≤ 3.0 °C, ≥ 3 days and
   ≥ 24 heating hours. A tighter median gate is unreachable by a ten-degree

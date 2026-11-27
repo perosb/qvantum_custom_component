@@ -110,6 +110,9 @@ def curve_coordinator(**overrides):
         "_baseline": dict.fromkeys(CURVE_KEYS, 20.0),
         # The load term's inputs, which the export reads as properties: both
         # power means, the coverage behind them, and the air-side drop.
+        # The room-error integral, one-sided and 0 in shadow. A value here so
+        # the v21 fixture row shows the field filled, not null.
+        "room_integral_c": -0.42,
         "load_power_mean_w": 2021.8,
         "load_power_mean_electrical_w": 891.7,
         "load_power_coverage_hours": 0.7,

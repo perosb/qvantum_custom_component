@@ -989,7 +989,8 @@
           "curve_solar_term": "Solar term",
           "curve_cop_feedback_term": "COP-feedback term",
           "curve_precharge_term": "Pre-charge term",
-          "curve_wind_term": "Wind term"
+          "curve_wind_term": "Wind term",
+          "curve_room_integral_term": "Room-error integral"
         },
         "data_description": {
           "modbus_scan_interval": "How often to poll the heat pump over Modbus TCP. Minimum is 5 seconds. Default is 15 seconds.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Solar term",
           "description": "Lowers the supply by the identified solar gain; identified and measured, so on by default."
+        },
+        "room_integral": {
+          "name": "Room-error integral",
+          "description": "Lower supply while the 24 h room error stays above its dead band; on by default, and it can only lower the curve"
         }
       }
     },

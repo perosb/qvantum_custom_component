@@ -887,6 +887,7 @@ class TestQvantumCurveSensors:
             "load_c": 0.9,
             "cop_c": 0.0,
             "precharge_c": 0.0,
+            "room_integral_c": 0.0,
             "wind_c": 0.0,
             "terms": {},
             "wind_valid": None,

@@ -67,6 +67,7 @@ _CURVE_TIMESTAMP_FIELDS = (
     "_room_gain_factor_since_ts",
     "_last_trim_ts",
     "_trim_residual_ts",
+    "_room_integral_ts",
 )
 
 
@@ -664,6 +665,15 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         # Wind's contribution: 0 whenever the optional term is off or the
         # model's wind column failed its gates, which a dump must show.
         "wind_c": getattr(snapshot, "wind_c", None),
+        # The room-error integral: the only term that reads the outcome. Its
+        # size over days says whether the proportional loop leaves an offset it
+        # has to carry, and a value pinned at -ROOM_INTEGRAL_MAX_C says the
+        # gain is too high — both invisible from the shared adjustment alone.
+        "room_integral_c": getattr(snapshot, "room_integral_c", None),
+        # The accumulator itself (the snapshot carries what this cycle used) and
+        # the sample count behind the mean it stepped on.
+        "room_integral": getattr(coordinator, "_room_integral", None),
+        "room_integral_samples": getattr(coordinator, "_indoor_margin_samples", None),
         "load_c": getattr(snapshot, "load_c", None),
         "capped_by_indoor": getattr(snapshot, "capped_by_indoor", None),
         # The band the adjustment was tested against, and the input it came

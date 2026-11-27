@@ -989,7 +989,8 @@
           "curve_solar_term": "Terme solaire",
           "curve_cop_feedback_term": "Retour COP",
           "curve_precharge_term": "Pré-charge",
-          "curve_wind_term": "Terme vent"
+          "curve_wind_term": "Terme vent",
+          "curve_room_integral_term": "Intégrale de l'écart de pièce"
         },
         "data_description": {
           "modbus_scan_interval": "Fréquence d'interrogation de la pompe à chaleur via Modbus TCP. Des valeurs plus basses offrent une précision quasi temps réel du débit et du volume. Minimum 5 secondes. Par défaut 15 secondes.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Terme solaire",
           "description": "Réduit le départ selon le gain solaire identifié ; identifié et mesuré, donc actif par défaut."
+        },
+        "room_integral": {
+          "name": "Intégrale de l'écart de pièce",
+          "description": "Réduit le départ tant que l'écart de pièce sur 24 h reste au-dessus de sa bande morte ; actif par défaut et ne peut que baisser la courbe"
         }
       }
     },
