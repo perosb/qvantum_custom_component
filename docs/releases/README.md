@@ -6,6 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
+| [2026.11.14](2026.11.14.md) | 2026-11-27 | Clearer heating adjustments and indoor limits |
 | [2026.11.13](2026.11.13.md) | 2026-11-25 | Understand efficiency scores and EU energy labels |
 | [2026.11.10](2026.11.10.md) | 2026-11-20 | Clearer adaptive heating-curve advice |
 | [2026.11.8](2026.11.8.md) | 2026-11-18 | Track how long heating adjustments have reached their limit |
