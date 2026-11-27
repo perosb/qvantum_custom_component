@@ -1550,6 +1550,43 @@ def test_assess_readiness_passes_signal_through() -> None:
     assert result.blocker == "forecast"
 
 
+def test_assess_readiness_is_not_assessed_on_a_user_defined_pump() -> None:
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=UTC).timestamp()
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=UTC).timestamp()
+    window = range(int(midnight), int(now), 3600)
+    # A deviation that passes the gate: on a user-defined pump it still means
+    # nothing, because `cal_heat_temp` follows a table we did not write.
+    passing = {ts: 0.25 for ts in window}
+
+    result = assess_readiness(passing, int(now), ZoneInfo("UTC"), user_defined=True)
+
+    assert not result.ready
+    assert result.blocker == "user_defined"
+    assert result.median_abs_c is None
+    assert result.p95_abs_c is None
+    assert result.window_hours == pytest.approx(84.0)
+
+
+def test_assess_readiness_prefers_active_and_signal_over_the_regime() -> None:
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=UTC).timestamp()
+    midnight = datetime(2026, 3, 7, 0, 0, tzinfo=UTC).timestamp()
+    passing = {ts: 0.25 for ts in range(int(midnight), int(now), 3600)}
+
+    # Active implies user-defined (we wrote the table), so the writing regime
+    # must win or an active install would report itself as somebody else's.
+    active = assess_readiness(
+        passing, int(now), ZoneInfo("UTC"), active=True, user_defined=True
+    )
+    assert active.blocker == "active"
+
+    # A missing signal means there is no window to judge at all; it stays the
+    # more actionable answer.
+    missing = assess_readiness(
+        passing, int(now), ZoneInfo("UTC"), signal="baseline", user_defined=True
+    )
+    assert missing.blocker == "baseline"
+
+
 def test_assess_readiness_requires_window_coverage() -> None:
     now = datetime(2026, 3, 10, 12, 0, tzinfo=UTC).timestamp()
     midnight = datetime(2026, 3, 7, 0, 0, tzinfo=UTC).timestamp()
@@ -1884,6 +1921,48 @@ async def test_snapshot_ready_with_model_and_window() -> None:
     assert snapshot.median_abs_c == pytest.approx(0.25)
     assert snapshot.p95_abs_c == pytest.approx(0.25)
     assert snapshot.model is not None
+
+
+async def test_snapshot_withholds_readiness_on_a_user_defined_pump() -> None:
+    """A pump on somebody else's table gets no verdict, and no invitation.
+
+    `plant.curve_type_heating` 1 while the curve is not writing means
+    `cal_heat_temp` follows a table the integration did not author — chosen in
+    the app, the panel or a cloud profile, or left there when control was
+    switched off. The deviation then measures the distance between two tables,
+    and the harmful direction is a *passing* value: the readiness invitation
+    writes our table, so it must never be raised from that comparison.
+
+    Measured on the pool 2026-11-27: three installations sat in this regime (two
+    never active at all) and all three failed the median gate — 3.20, 1.89 and
+    19.26 °C — while one of them had passed at 1.27 °C on its own Auto curve the
+    week before.
+    """
+    coordinator = make_coordinator(
+        values=VALUES, settings={**SETTINGS, "curve_type_heating": 1}
+    )
+    coordinator._baseline = dict(BASELINE)
+    coordinator._model = make_model()
+    coordinator._calibrated_at = "2026-03-01T00:00:00+00:00"
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._daylight = MagicMock(return_value=None)
+    now = time.time()
+    midnight = datetime.fromtimestamp(now, UTC).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    start = int((midnight - timedelta(days=3)).timestamp())
+    # A window that would pass the gate on an Auto pump.
+    window = {ts: 0.25 for ts in range(start, int(now), 3600)}
+    coordinator._async_readiness_hours = AsyncMock(return_value=(window, set(window)))
+
+    snapshot = await coordinator._async_compute_snapshot()
+
+    assert snapshot.blocker == "user_defined"
+    assert snapshot.ready is False
+    assert snapshot.median_abs_c is None
+    assert snapshot.p95_abs_c is None
+    assert snapshot.median_c is None
 
 
 async def test_snapshot_deviates_when_user_defined() -> None:

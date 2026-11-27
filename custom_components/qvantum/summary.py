@@ -215,6 +215,20 @@ _ENTITY_PREFIXES = (
 #: mature windows fitted -0.22, -5.25 and -8.47 m² on 2026-11-27. Reported, never
 #: applied: `daily_solar_valid` stays false. Additive; no existing field changes
 #: meaning.
+#: v20 also gains `curve.blocker` = `user_defined`, with the readiness figures
+#: **null** in that regime: `plant.curve_type_heating` is 1 (User defined) while
+#: the curve is not writing, so `cal_heat_temp` follows a table the integration
+#: did not author — chosen in the app, the panel or a cloud profile, or left there
+#: when control was switched off. The deviation is then
+#: `our baseline − somebody else's table`, which is not a quality signal about the
+#: baseline; measured on the pool 2026-11-27, three installations sat in the
+#: regime (two of them never active at all) and all three failed the median gate
+#: — 3.20, 1.89 and 19.26 °C — where one of them had passed at 1.27 °C on its own
+#: Auto curve seven days earlier. The null is also what keeps the readiness
+#: invitation away: it writes our table, so it must never be raised from a
+#: comparison against the user's own. No released build has carried v20 (the
+#: 2026.11.14 release was withdrawn), so this joins v20 in place like the fields
+#: above.
 SUMMARY_SCHEMA_VERSION = 20
 
 #: Plant settings that describe the control loops. Everything else in the
