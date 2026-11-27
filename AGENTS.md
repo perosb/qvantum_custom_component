@@ -519,10 +519,9 @@ both directions: `disable_entities_by_default` clears a stale
 not ask for, so a key that is enabled by default must be in them or it is never
 polled — and the binary-sensor platform skips an enabled-by-default key that is
 absent from the payload, which closes the loop silently (not fetched → no
-entity → not in the registry → not fetched). Measured 2026-11-27 in 2026.11.14:
-`energy_prices_available` (input 166) was added to `MODBUS_ONLY_BINARY_SENSORS`
-only and never appeared. `tests/test_modbus_device.py` pins the invariant for
-every pollable binary sensor. A disabled entity
+entity → not in the registry → not fetched). `tests/test_modbus_device.py` pins
+the invariant for every pollable binary sensor and carries the measurement
+behind it. A disabled entity
 records no statistics, so a metric some fit reads must not be moved into a
 disabled list.
 
