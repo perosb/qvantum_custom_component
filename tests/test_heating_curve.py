@@ -23,6 +23,9 @@ from custom_components.qvantum.heating_curve import (
     ROOM_GAIN_MAX_C,
     ROOM_GAIN_MIN_SAMPLES,
     ROOM_GAIN_MIN_SPAN_C,
+    ROOM_INTEGRAL_DEADBAND_C,
+    ROOM_INTEGRAL_MAX_C,
+    ROOM_INTEGRAL_MAX_STEP_PER_DAY_C,
     SOLAR_EMITTER_EXPONENT,
     SOLAR_MAX_C,
     TOTAL_MAX_C,
@@ -52,6 +55,7 @@ from custom_components.qvantum.heating_curve import (
     room_compensation_gain,
     room_corrected_deviation,
     room_gain_from_active_hours,
+    room_integral_step,
     smooth_wind,
     solar_adjustment_c,
     solar_raw_adjustment_c,
@@ -491,6 +495,138 @@ def test_compute_curve_applies_cop_feedback_before_caps() -> None:
         reduced_point[1] == pytest.approx(base_point[1] - 1.0)
         for reduced_point, base_point in zip(reduced.points, base.points, strict=True)
     )
+
+
+def test_room_integral_step_scales_with_the_mean_error() -> None:
+    """A day at +0.8 K with the pump's 2.0 gain walks 0.3 K of supply down.
+
+    Measured live 2026-11-27: room 21.1 °C against a 20.3 °C target, pump room
+    term about −2.4 K, our adjustment −1.01 K, and the house sat high for as
+    long as the load lasted. The step is `gain · gain_c_per_c · (error −
+    deadband) · hours/24`, so the same error converges over days instead of
+    over minutes.
+    """
+    first = room_integral_step(0.0, 0.8, gain_c_per_c=2.0, elapsed_hours=24.0)
+    second = room_integral_step(first, 0.8, gain_c_per_c=2.0, elapsed_hours=24.0)
+
+    assert first == pytest.approx(-0.3)
+    assert second == pytest.approx(-0.6)
+    # A 15-minute cycle moves a quarter of the daily amount, so the cadence
+    # cannot change the rate.
+    cycle = room_integral_step(0.0, 0.8, gain_c_per_c=2.0, elapsed_hours=0.25)
+    assert cycle * 96 == pytest.approx(first)
+
+
+def test_room_integral_step_never_raises_a_cold_house() -> None:
+    """One-sided by construction: heat protection is the cap's floor, not this."""
+    assert room_integral_step(0.0, -1.0, gain_c_per_c=2.0, elapsed_hours=24.0) == 0.0
+    assert room_integral_step(
+        -0.5, -1.0, gain_c_per_c=2.0, elapsed_hours=24.0
+    ) == pytest.approx(-0.5)
+
+
+def test_room_integral_step_holds_inside_the_deadband() -> None:
+    held = room_integral_step(
+        0.0, ROOM_INTEGRAL_DEADBAND_C, gain_c_per_c=2.0, elapsed_hours=24.0
+    )
+
+    assert held == 0.0
+
+
+def test_room_integral_step_is_rate_limited_and_bounded() -> None:
+    """No day may cross a knot's write dead band, and the authority is shared."""
+    day = room_integral_step(0.0, 50.0, gain_c_per_c=25.0, elapsed_hours=24.0)
+    assert day == pytest.approx(-ROOM_INTEGRAL_MAX_STEP_PER_DAY_C)
+
+    pinned = room_integral_step(
+        -(ROOM_INTEGRAL_MAX_C - 0.1), 50.0, gain_c_per_c=25.0, elapsed_hours=24.0
+    )
+    assert pinned == pytest.approx(-ROOM_INTEGRAL_MAX_C)
+
+    # A restored value is clamped on the way in, whatever the store held.
+    assert room_integral_step(
+        -99.0, 50.0, gain_c_per_c=25.0, elapsed_hours=24.0
+    ) == pytest.approx(-ROOM_INTEGRAL_MAX_C)
+
+
+def test_room_integral_step_holds_without_a_usable_gain() -> None:
+    """An unknown conversion is not evidence — the integral holds."""
+    for gain in (None, 0.0, -2.0, float("nan"), float("inf")):
+        assert (
+            room_integral_step(-0.4, 1.0, gain_c_per_c=gain, elapsed_hours=24.0)
+            == pytest.approx(-0.4)
+        )
+    for hours in (0.0, -1.0, float("nan")):
+        assert (
+            room_integral_step(-0.4, 1.0, gain_c_per_c=2.0, elapsed_hours=hours)
+            == pytest.approx(-0.4)
+        )
+    assert room_integral_step(-0.4, None, gain_c_per_c=2.0, elapsed_hours=24.0) == (
+        pytest.approx(-0.4)
+    )
+
+
+def test_compute_curve_applies_room_integral_before_the_caps() -> None:
+    base = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature={},
+        ghi_by_hour={},
+    )
+    lowered = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature={},
+        ghi_by_hour={},
+        room_integral_c=-1.0,
+    )
+
+    assert lowered.room_integral_c == -1.0
+    assert lowered.adjustment_c == pytest.approx(-1.0)
+    assert all(
+        reduced_point[1] == pytest.approx(base_point[1] - 1.0)
+        for reduced_point, base_point in zip(lowered.points, base.points, strict=True)
+    )
+
+
+def test_a_warm_ceiling_does_not_block_the_room_integral() -> None:
+    """The cap may only push down; it must never veto the term that pushes down."""
+    warm = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature={},
+        ghi_by_hour={},
+        room_integral_c=-1.0,
+        indoor_margin_c=0.8,
+    )
+
+    assert warm.room_integral_c == -1.0
+    assert warm.adjustment_c <= 0.0
+    # The ceiling it was tested against is published: 1.0 − 0.8.
+    assert warm.cap_ceiling_c == pytest.approx(INDOOR_CAP_C - 0.8)
+    assert warm.capped_by_indoor is False
+
+
+def test_a_cold_floor_lifts_the_room_integral() -> None:
+    """Heat protection wins: the floor raises the total, integral included.
+
+    A house 0.9 K *below* target allows at most ``-(INDOOR_CAP_C - 0.9)`` of
+    downward correction, so the integral can never deepen a cut the protective
+    floor already refused. It is tested through the total, which is why it is
+    added before the cap rather than after it.
+    """
+    cold = compute_curve(
+        baseline=BASELINE,
+        now_ts=BASE_HOUR,
+        forecast_temperature={},
+        ghi_by_hour={},
+        room_integral_c=-1.0,
+        indoor_margin_c=-0.9,
+    )
+
+    assert cold.adjustment_c == pytest.approx(-(INDOOR_CAP_C - 0.9))
+    assert cold.capped_by_indoor is True
+    assert cold.cap_floor_c == pytest.approx(-(INDOOR_CAP_C - 0.9))
 
 
 def test_precharge_raises_only_on_a_forecast_drop() -> None:

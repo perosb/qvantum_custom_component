@@ -989,7 +989,8 @@
           "curve_solar_term": "Solární člen",
           "curve_cop_feedback_term": "Zpětná vazba COP",
           "curve_precharge_term": "Předehřev",
-          "curve_wind_term": "Větrný člen"
+          "curve_wind_term": "Větrný člen",
+          "curve_room_integral_term": "Integrál odchylky místnosti"
         },
         "data_description": {
           "modbus_scan_interval": "Jak často dotazovat tepelné čerpadlo přes Modbus TCP. Nižší hodnoty poskytují téměř okamžitou přesnost průtoku a objemu. Minimum je 5 sekund. Výchozí je 15 sekund.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Solární člen",
           "description": "Snižuje výstupní teplotu o zjištěný solární zisk; zjištěno a změřeno, proto je ve výchozím stavu zapnuto."
+        },
+        "room_integral": {
+          "name": "Integrál odchylky místnosti",
+          "description": "Snižuje teplotu přívodu, dokud chyba místnosti za 24 h zůstává nad mrtvým pásmem; ve výchozím nastavení zapnuto a křivku pouze snižuje"
         }
       }
     },

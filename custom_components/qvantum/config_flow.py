@@ -32,6 +32,7 @@ from .client.modbus.device import IdentityProbeError, async_probe_identity
 from .const import (
     CONF_CURVE_COP,
     CONF_CURVE_PRECHARGE,
+    CONF_CURVE_ROOM_INTEGRAL,
     CONF_CURVE_SOLAR,
     CONF_CURVE_WIND,
     CONF_EXTERNAL_ROOM_TEMP_ENTITY,
@@ -556,6 +557,7 @@ def _curve_term_schema(curve) -> dict:
         CONF_CURVE_COP: bool(terms.get("cop_feedback", False)),
         CONF_CURVE_PRECHARGE: bool(terms.get("precharge", False)),
         CONF_CURVE_WIND: bool(terms.get("wind", False)),
+        CONF_CURVE_ROOM_INTEGRAL: bool(terms.get("room_integral", True)),
     }
     return {
         vol.Optional(field, default=value): bool for field, value in defaults.items()
@@ -602,7 +604,7 @@ class QvantumOptionsFlowHandler(OptionsFlow):
         return getattr(runtime, "curve_coordinator", None)
 
     async def _async_apply_curve_terms(self, user_input) -> None:
-        """Persist the four term switches the dialog submitted, if any."""
+        """Persist the term switches the dialog submitted, if any."""
         if not self._curve_enabled():
             return
         curve = self._curve_coordinator()
@@ -610,6 +612,7 @@ class QvantumOptionsFlowHandler(OptionsFlow):
             return
         names = {
             "solar": CONF_CURVE_SOLAR,
+            "room_integral": CONF_CURVE_ROOM_INTEGRAL,
             "cop_feedback": CONF_CURVE_COP,
             "precharge": CONF_CURVE_PRECHARGE,
             "wind": CONF_CURVE_WIND,

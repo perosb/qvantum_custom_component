@@ -989,7 +989,8 @@
           "curve_solar_term": "Zonterm",
           "curve_cop_feedback_term": "COP-terugkoppeling",
           "curve_precharge_term": "Voorverwarmen",
-          "curve_wind_term": "Windterm"
+          "curve_wind_term": "Windterm",
+          "curve_room_integral_term": "Ruimtefout-integraal"
         },
         "data_description": {
           "modbus_scan_interval": "Hoe vaak de warmtepomp via Modbus TCP wordt gepolld. Lagere waarden geven bijna realtime debiet- en volumenauwkeurigheid. Minimum is 5 seconden. Standaard is 15 seconden.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Zonterm",
           "description": "Verlaagt de aanvoer met de geïdentificeerde zonnewinst; geïdentificeerd en gemeten, daarom standaard aan."
+        },
+        "room_integral": {
+          "name": "Ruimtefout-integraal",
+          "description": "Verlaagt de aanvoertemperatuur zolang de 24-uurs ruimtefout boven zijn dode zone blijft; standaard aan en kan de curve alleen verlagen"
         }
       }
     },

@@ -989,7 +989,8 @@
           "curve_solar_term": "Término solar",
           "curve_cop_feedback_term": "Retroalimentación COP",
           "curve_precharge_term": "Precarga",
-          "curve_wind_term": "Término viento"
+          "curve_wind_term": "Término viento",
+          "curve_room_integral_term": "Integral del error de la habitación"
         },
         "data_description": {
           "modbus_scan_interval": "Con qué frecuencia se consulta la bomba de calor por Modbus TCP. Valores más bajos dan precisión casi en tiempo real de caudal y volumen. El mínimo es 5 segundos. El valor predeterminado es 15 segundos.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Término solar",
           "description": "Reduce la impulsión según la ganancia solar identificada; identificado y medido, por eso activo por defecto."
+        },
+        "room_integral": {
+          "name": "Integral del error de la habitación",
+          "description": "Reduce la impulsión mientras el error de 24 h de la habitación supera su banda muerta; activo por defecto y solo puede bajar la curva"
         }
       }
     },

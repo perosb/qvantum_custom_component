@@ -52,6 +52,9 @@ from .heating_curve import (
     MAX_SUPPLY_C,
     MIN_SUPPLY_C,
     ROOM_GAIN_MAX_C,
+    ROOM_INTEGRAL_MAX_C,
+    ROOM_INTEGRAL_MAX_CATCHUP_HOURS,
+    ROOM_INTEGRAL_MIN_SAMPLES,
     TOTAL_MAX_C,
     TRIM_MAX_C,
     ActiveRoomGain,
@@ -71,6 +74,7 @@ from .heating_curve import (
     room_compensation_gain,
     room_corrected_deviation,
     room_gain_from_active_hours,
+    room_integral_step,
     trim_evidence_hours,
     trim_residuals,
 )
@@ -342,6 +346,8 @@ class CurveSnapshot:
     room_error_source: str | None = None
     cop_c: float = 0.0
     precharge_c: float = 0.0
+    #: The room-error integral's contribution, ``≤ 0``; 0 in shadow.
+    room_integral_c: float = 0.0
     #: Wind's contribution to the shared adjustment, 0 whenever the term is off
     #: or the model's wind column failed its gates.
     wind_c: float = 0.0
@@ -922,6 +928,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         #: show which one the cap acted on.
         self._indoor_margin_now: float | None = None
         self._indoor_margin_mean: float | None = None
+        #: How many samples the 24 h mean above rests on — the integral's gate.
+        self._indoor_margin_samples = 0
+        #: The room-error integral, in supply degrees (``≤ 0``), and the stamp
+        #: the last step was taken at. It lives here rather than in the table so
+        #: a restart cannot replay days of integration: the catch-up is bounded.
+        self._room_integral = 0.0
+        self._room_integral_ts: float | None = None
         #: Knots of the last active write cycle, for the diagnostics dump: it
         #: explains why a knot the dump shows can be older than the computed one.
         self._write_scope: tuple[str, ...] = ()
@@ -950,6 +963,13 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             # and unproven terms below. Still switchable: a user may want the
             # curve without it, and an A/B is how they judge it on their house.
             "solar": True,
+            # Measured, not heuristic: the input is the house's own error, the
+            # term is one-sided, dead-banded and bounded, and without it the
+            # proportional room loop leaves a standing offset under load
+            # (measured 0.8 K at a 2.0 factor). On by default like the solar
+            # term, and switchable for the same reason: a switch can only
+            # silence a valid model, never force an invalid one to act.
+            "room_integral": True,
             "cop_feedback": False,
             "precharge": False,
             # Off by default like the other optional terms, and doubly gated:
@@ -1166,6 +1186,10 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             # wait up to six hours before its first attempt.
             "indoor_margins": [[ts, margin] for ts, margin in self._indoor_margins],
             "indoor_margins_target": getattr(self, "_indoor_margins_target", None),
+            # The integral and the stamp its next step is measured from. The
+            # catch-up after a restart is bounded by the caller, not here.
+            "room_integral": getattr(self, "_room_integral", 0.0),
+            "room_integral_ts": getattr(self, "_room_integral_ts", None),
             "mode": self._mode,
             "revert_pending": self._revert_pending,
             "counters": self._counters,
@@ -1423,6 +1447,12 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         # old value instead of treating the new one as the first observation.
         if self._room_gain_from_factor and self._room_gain is not None:
             self._room_gain_factor_last = self._room_gain
+        integral = data.get("room_integral")
+        if isinstance(integral, (int, float)) and not isinstance(integral, bool):
+            self._room_integral = max(-ROOM_INTEGRAL_MAX_C, min(0.0, float(integral)))
+        integral_ts = data.get("room_integral_ts")
+        if isinstance(integral_ts, (int, float)) and not isinstance(integral_ts, bool):
+            self._room_integral_ts = float(integral_ts)
         margins_target = data.get("indoor_margins_target")
         if isinstance(margins_target, (int, float)) and not isinstance(
             margins_target, bool
@@ -1465,7 +1495,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                     self._cop_samples[bucket] = max(0, int(value))
         terms = data.get("terms")
         if isinstance(terms, dict):
-            for key in ("solar", "cop_feedback", "precharge", "wind"):
+            for key in ("solar", "cop_feedback", "precharge", "wind", "room_integral"):
                 if key in terms:
                     self._terms[key] = bool(terms[key])
         if self.active and self._active_since_ts is None:
@@ -1484,15 +1514,19 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         cop_feedback: bool | None = None,
         precharge: bool | None = None,
         wind: bool | None = None,
+        room_integral: bool | None = None,
     ) -> None:
-        """Enable or disable the optional control-loop terms.
+        """Enable or disable the control-loop terms.
 
-        Persisted and off by default. The terms only change the computed
-        curve while active, so enabling one in shadow mode has no write
-        effect until the curve is activated.
+        Persisted; ``room_integral`` and ``solar`` are on by default because
+        their inputs are measured, the rest are off because they are not. The
+        terms only change the computed curve while active, so toggling one in
+        shadow mode has no write effect until the curve is activated.
         """
         if solar is not None:
             self._terms["solar"] = bool(solar)
+        if room_integral is not None:
+            self._terms["room_integral"] = bool(room_integral)
         if cop_feedback is not None:
             self._terms["cop_feedback"] = bool(cop_feedback)
         if precharge is not None:
@@ -1726,6 +1760,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             # comes back, so a moved curve cannot inherit a stale correction.
             self._remember_trim_seed()
             self._reset_trims()
+            self._reset_room_integral()
             self._last_trim_ts = None
         device_id = getattr(self._main, "device_id", None)
         client = getattr(self._main, "client", None)
@@ -1799,6 +1834,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             self._mark_active_ended()
             self._remember_trim_seed()
             self._reset_trims()
+            self._reset_room_integral()
             self._last_trim_ts = None
             await self._async_persist()
             self.async_update_listeners()
@@ -2933,6 +2969,91 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         self._trim_residual = {}
         self._trim_residual_ts = None
 
+    def _reset_room_integral(self) -> None:
+        """Drop the room-error integral.
+
+        Called from the same three regime boundaries as the trims — reversion,
+        the pump leaving our curve, and a setpoint change — and for the same
+        reason: the value was learnt against a target or a table that no longer
+        applies. There is deliberately **no seed**: unlike the trims, which take
+        weeks to rebuild (0.03-0.13 K/day), this one converges in days, and a
+        stale negative seed would fight the trim seed re-applied at activation.
+        """
+        self._room_integral = 0.0
+        self._room_integral_ts = None
+
+    async def _async_update_room_integral(self, result: Any, now_ts: float) -> None:
+        """Advance the room-error integral one bounded step.
+
+        The only term that reads the house's **outcome**; see
+        :func:`heating_curve.room_integral_step` for why it is one-sided,
+        dead-banded and rate-limited. It runs under the control lock beside the
+        trims, because a revert clears both and a step taken outside the lock
+        could resurrect the cleared value.
+
+        Every gate here is a way the step could be wrong rather than slow: a
+        mean over too few samples, a target that is missing (an error without a
+        reference is undefined), the room gain unknown (no conversion), the
+        cold floor acting this cycle (heat protection wins), and the total
+        adjustment already saturated (there is no headroom to steer).
+        """
+        if (
+            self._baseline is None
+            or not self.active
+            or result is None
+            or not self._terms.get("room_integral", True)
+        ):
+            return
+        if result.cap_floor_c is not None:
+            return
+        if abs(result.adjustment_c) >= TOTAL_MAX_C - 1e-9:
+            return
+        mean = self._indoor_margin_mean
+        if (
+            mean is None
+            or getattr(self, "_indoor_margins_target", None) is None
+            or getattr(self, "_indoor_margin_samples", 0) < ROOM_INTEGRAL_MIN_SAMPLES
+        ):
+            return
+        gain = self._room_gain
+        if (
+            gain is None
+            or not math.isfinite(gain)
+            or gain <= 0.0
+            or gain > ROOM_GAIN_MAX_C
+        ):
+            return
+        previous_ts = self._room_integral_ts
+        if previous_ts is None:
+            # First observation of this regime: stamp it and take no step. A
+            # restored integral is also limited to the catch-up window below,
+            # because an outage is not evidence of a house that stayed warm.
+            self._room_integral_ts = now_ts
+            await self._async_persist()
+            return
+        elapsed_hours = min(
+            max(0.0, (now_ts - previous_ts) / 3600.0),
+            ROOM_INTEGRAL_MAX_CATCHUP_HOURS,
+        )
+        updated = room_integral_step(
+            self._room_integral,
+            mean,
+            gain_c_per_c=gain,
+            elapsed_hours=elapsed_hours,
+        )
+        self._room_integral_ts = now_ts
+        if abs(updated - self._room_integral) <= 1e-9:
+            return
+        _LOGGER.debug(
+            "Room-error integral %.3f -> %.3f K (mean error %.2f K over %d samples)",
+            self._room_integral,
+            updated,
+            mean,
+            getattr(self, "_indoor_margin_samples", 0),
+        )
+        self._room_integral = updated
+        await self._async_persist()
+
     async def _async_update_trims(self, result: Any, now_ts: float) -> None:
         """Slowly fold indoor-error residuals into per-point trims.
 
@@ -3190,6 +3311,11 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
         if target_c is not None and previous_target is not None:
             if target_c != previous_target:
                 self._indoor_margins.clear()
+                # A new target is a new regime for the integral too, and here the
+                # cost of pooling is asymmetric: the term is one-sided downward,
+                # so a value learned against a *lower* target would keep pulling
+                # supply down right after the user asked for more heat.
+                self._reset_room_integral()
         if target_c is not None:
             self._indoor_margins_target = target_c
 
@@ -3202,6 +3328,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             if now_ts - ts <= 24 * 3600.0
         ]
         self._indoor_margin_now = error
+        self._indoor_margin_samples = len(recent)
         if not recent:
             self._indoor_margin_mean = None
             return None
@@ -3413,6 +3540,14 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
                 max_supply_c=high,
                 cop_c=cop_c,
                 precharge_c=precharge_c,
+                # One cycle behind, like every other term: the value the last
+                # cycle closed on is what the table is computed with, and the
+                # step below advances it for the next one.
+                room_integral_c=(
+                    self._room_integral
+                    if self.active and self._terms.get("room_integral", True)
+                    else 0.0
+                ),
                 wind_by_hour=(
                     self._forecast.wind_by_hour() if self._forecast is not None else {}
                 ),
@@ -3439,6 +3574,7 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             # Serialized with deactivation: a revert clears the trims, and an
             # update awaited outside this lock could resurrect them.
             if result is not None:
+                await self._async_update_room_integral(result, now_ts)
                 await self._async_update_trims(result, now_ts)
 
         # Two regimes hide behind "not active", and the readiness gate is valid in
@@ -3593,6 +3729,9 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
             extrapolated_points=extrapolated,
             cop_c=0.0 if result is None else result.cop_c,
             precharge_c=0.0 if result is None else result.precharge_c,
+            room_integral_c=(
+                0.0 if result is None else getattr(result, "room_integral_c", 0.0)
+            ),
             wind_c=0.0 if result is None else result.wind_c,
         )
         self._async_sync_ready_issue(snapshot, now_ts)

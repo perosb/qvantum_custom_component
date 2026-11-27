@@ -989,7 +989,8 @@
           "curve_solar_term": "Aurinkotermi",
           "curve_cop_feedback_term": "COP-palaute",
           "curve_precharge_term": "Esilämmitys",
-          "curve_wind_term": "Tuulitermi"
+          "curve_wind_term": "Tuulitermi",
+          "curve_room_integral_term": "Huonevirheen integraali"
         },
         "data_description": {
           "modbus_scan_interval": "Kuinka usein lämpöpumppua kysytään Modbus TCP:n kautta. Pienemmät arvot tarjoavat lähes reaaliaikaisen virta- ja tilavuustarkkuuden. Minimi on 5 sekuntia. Oletus on 15 sekuntia.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Aurinkotermi",
           "description": "Laskee menolämpöä tunnistetulla aurinkotuotolla; tunnistettu ja mitattu, siksi oletuksena päällä."
+        },
+        "room_integral": {
+          "name": "Huonevirheen integraali",
+          "description": "Laskee menoveden lämpötilaa, kun 24 h huonevirhe on kuolleen alueen yläpuolella; oletuksena päällä ja voi vain laskea käyrää"
         }
       }
     },

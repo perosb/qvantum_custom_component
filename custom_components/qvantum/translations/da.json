@@ -989,7 +989,8 @@
           "curve_solar_term": "Solterm",
           "curve_cop_feedback_term": "COP-feedback",
           "curve_precharge_term": "Foropladning",
-          "curve_wind_term": "Vindterm"
+          "curve_wind_term": "Vindterm",
+          "curve_room_integral_term": "Rumfejlsintegral"
         },
         "data_description": {
           "modbus_scan_interval": "Hvor ofte varmepumpen skal forespørges over Modbus TCP. Lavere værdier giver næsten realtidsnøjagtighed for flow og volumen. Minimum er 5 sekunder. Standard er 15 sekunder.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Solterm",
           "description": "Sænker fremløbet med det identificerede soludbytte; identificeret og målt, derfor aktiv som standard."
+        },
+        "room_integral": {
+          "name": "Rumfejlsintegral",
+          "description": "Sænker fremløbstemperaturen, mens 24-timers rumfejlen ligger over sit dødbånd; slået til som standard og kan kun sænke kurven"
         }
       }
     },

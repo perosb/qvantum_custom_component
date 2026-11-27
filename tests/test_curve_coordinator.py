@@ -39,10 +39,12 @@ from custom_components.qvantum.heating_curve import (
     COP_FEEDBACK_MAX_C,
     INDOOR_CAP_C,
     PRECHARGE_MAX_C,
+    ROOM_INTEGRAL_MAX_C,
     TOTAL_MAX_C,
     WIND_MAX_C,
     ActiveRoomGain,
     CurveResult,
+    compute_curve,
     interpolate_supply,
     normalize_baseline,
 )
@@ -206,6 +208,9 @@ def make_coordinator(*, values=None, settings=None, store=None):
     coordinator._forecast_ts = None
     coordinator._forecast_reused = False
     coordinator._indoor_margins = deque(maxlen=INDOOR_MARGIN_CYCLES)
+    coordinator._indoor_margin_samples = 0
+    coordinator._room_integral = 0.0
+    coordinator._room_integral_ts = None
     coordinator._mode = "shadow"
     coordinator._revert_pending = False
     coordinator._control_lock = asyncio.Lock()
@@ -2277,6 +2282,203 @@ async def test_push_power_is_none_without_window_evidence() -> None:
     assert coordinator._push_power({"hp_status": HP_STATUS_HEATING, "heatingpower": 4000.0}) is None
     assert coordinator._push_power({}) is None
     assert coordinator._push_power({"heating_power_mean_w": None}) is None
+
+
+def _warm_house_coordinator() -> tuple[object, CurveResult]:
+    """An active coordinator whose house sits 0.8 K above a 20.3 °C target."""
+    coordinator = make_coordinator()
+    coordinator._baseline = dict(BASELINE)
+    coordinator._mode = "active"
+    coordinator._room_gain = 2.0
+    coordinator._terms["room_integral"] = True
+    coordinator._indoor_margins_target = 20.3
+    coordinator._indoor_margin_mean = 0.8
+    coordinator._indoor_margin_samples = 96
+    result = compute_curve(
+        baseline=BASELINE,
+        now_ts=1_760_000_000,
+        forecast_temperature={},
+        ghi_by_hour={},
+        indoor_margin_c=0.8,
+    )
+    return coordinator, result
+
+
+async def test_room_integral_walks_a_warm_house_down_over_cycles() -> None:
+    """The one term that reads the outcome: four days, 0.3 K of supply each.
+
+    Measured live 2026-11-27: room 21.1 °C against a 20.3 °C target, the pump's
+    own proportional term at about −2.4 K, our shared adjustment −1.01 K, and
+    the house sat 0.8 K high for as long as the load lasted. Nothing else in
+    `compute_curve` reads the room, so without this sequence no number of cycles
+    lowers the table.
+    """
+    coordinator, result = _warm_house_coordinator()
+    now = 1_760_000_000.0
+    cycle = 900.0  # the curve's 15-minute cadence
+
+    # The first cycle only stamps the clock: no step without an interval.
+    await coordinator._async_update_room_integral(result, now)
+    assert coordinator._room_integral == 0.0
+
+    steps = []
+    for day in range(4):
+        for quarter in range(96):
+            ts = now + day * 86400.0 + (quarter + 1) * cycle
+            await coordinator._async_update_room_integral(result, ts)
+        steps.append(coordinator._room_integral)
+
+    # 0.3 K of supply per day at +0.8 K of error, and monotone between days.
+    assert steps[0] == pytest.approx(-0.3, abs=0.005)
+    assert steps[1] == pytest.approx(-0.6, abs=0.005)
+    assert steps[2] == pytest.approx(-0.9, abs=0.005)
+    assert steps[3] == pytest.approx(-1.2, abs=0.005)
+    assert all(
+        later <= earlier for earlier, later in zip(steps, steps[1:], strict=False)
+    )
+
+
+async def test_room_integral_holds_within_the_deadband_and_when_inactive() -> None:
+    coordinator, result = _warm_house_coordinator()
+    now = 1_760_000_000.0
+    coordinator._room_integral_ts = now
+
+    # Inside the dead band there is nothing separable from the pump's own band.
+    coordinator._indoor_margin_mean = 0.2
+    await coordinator._async_update_room_integral(result, now + 86400.0)
+    assert coordinator._room_integral == 0.0
+
+    # Too few samples: the 24 h mean is not a measurement yet.
+    coordinator._indoor_margin_mean = 0.8
+    coordinator._indoor_margin_samples = 8
+    await coordinator._async_update_room_integral(result, now + 86400.0)
+    assert coordinator._room_integral == 0.0
+
+    # Shadow never steps.
+    coordinator._indoor_margin_samples = 96
+    coordinator._mode = "shadow"
+    await coordinator._async_update_room_integral(result, now + 86400.0)
+    assert coordinator._room_integral == 0.0
+
+    # The term switched off is silence, not a reset.
+    coordinator._mode = "active"
+    coordinator._terms["room_integral"] = False
+    await coordinator._async_update_room_integral(result, now + 86400.0)
+    assert coordinator._room_integral == 0.0
+
+
+async def test_room_integral_freezes_when_the_cold_floor_or_bound_bites() -> None:
+    """Heat protection and a saturated total both win over the integrator."""
+    coordinator, _result = _warm_house_coordinator()
+    now = 1_760_000_000.0
+    coordinator._room_integral = -0.5
+    coordinator._room_integral_ts = now
+    cold = compute_curve(
+        baseline=BASELINE,
+        now_ts=1_760_000_000,
+        forecast_temperature={},
+        ghi_by_hour={},
+        indoor_margin_c=-0.9,
+    )
+    assert cold.cap_floor_c is not None
+
+    await coordinator._async_update_room_integral(cold, now + 86400.0)
+    assert coordinator._room_integral == pytest.approx(-0.5)
+
+    saturated = replace(_result, adjustment_c=TOTAL_MAX_C)
+    await coordinator._async_update_room_integral(saturated, now + 86400.0)
+    assert coordinator._room_integral == pytest.approx(-0.5)
+
+
+async def test_room_integral_resets_on_setpoint_change_and_revert() -> None:
+    coordinator, _result = _warm_house_coordinator()
+    now = 1_760_000_000.0
+    coordinator._room_integral = -1.2
+    coordinator._room_integral_ts = now
+    coordinator._indoor_margins.append((now, 0.8))
+
+    # A new target is a new regime: pooling would keep pulling down right after
+    # the user asked for more heat.
+    coordinator._push_indoor_margin(
+        {"bt2": 21.0, "indoor_temperature_target": 20.8}, now + 60.0
+    )
+    assert coordinator._room_integral == 0.0
+    assert coordinator._room_integral_ts is None
+
+    coordinator._room_integral = -1.2
+    await coordinator._async_revert("switched off", code="switched_off")
+    assert coordinator._room_integral == 0.0
+    assert coordinator._room_integral_ts is None
+
+
+def _active_with_integral(integral_c: float, *, term: bool = True):
+    """A writable, active coordinator whose 24 h window says +0.8 K warm."""
+    coordinator, _client = make_writable_coordinator(
+        settings={"curve_type_heating": 1}, live_curve_type=1
+    )
+    coordinator._mode = "active"
+    coordinator._room_gain = 2.0
+    coordinator._terms["room_integral"] = term
+    coordinator._room_integral = integral_c
+    coordinator._indoor_margins_target = VALUES["indoor_temperature_target"]
+    coordinator._async_calibrate = AsyncMock()
+    coordinator._async_fetch_forecast = AsyncMock(return_value=make_forecast())
+    coordinator._async_readiness_hours = AsyncMock(return_value=({}, set()))
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._async_trim_observations = AsyncMock(return_value=[])
+    coordinator._async_refresh_room_gain = AsyncMock()
+    coordinator._daylight = MagicMock(return_value=None)
+    now = time.time()
+    for quarter in range(96):
+        coordinator._indoor_margins.append((now - quarter * 900.0, 0.8))
+    return coordinator
+
+
+async def test_snapshot_publishes_the_room_integral_and_subtracts_it() -> None:
+    """The cycle must carry the term into the table and into the snapshot."""
+    with patch.object(cc.asyncio, "sleep", AsyncMock()):
+        coordinator = _active_with_integral(-0.8)
+        snapshot = await coordinator._async_compute_snapshot()
+
+        without = _active_with_integral(0.0, term=False)
+        baseline_snapshot = await without._async_compute_snapshot()
+
+    # The value the cycle computed with is published beside the adjustment it
+    # was folded into (one cycle behind, like every other term).
+    assert snapshot.room_integral_c == pytest.approx(-0.8)
+    assert baseline_snapshot.room_integral_c == 0.0
+    assert snapshot.adjustment_c == pytest.approx(
+        baseline_snapshot.adjustment_c - 0.8, abs=0.02
+    )
+
+
+async def test_room_integral_caps_the_catch_up_after_a_gap() -> None:
+    """An outage is not evidence: a restored stamp may span at most 6 h."""
+    coordinator, result = _warm_house_coordinator()
+    now = 1_760_000_000.0
+    coordinator._room_integral_ts = now
+
+    await coordinator._async_update_room_integral(result, now + 3 * 86400.0)
+
+    # 6 h at the measured rate, not 3 days of it.
+    assert coordinator._room_integral == pytest.approx(-0.075)
+    assert coordinator._room_integral_ts == now + 3 * 86400.0
+
+
+async def test_room_integral_round_trips_through_the_store() -> None:
+    store = FakeStore(
+        {"room_integral": -1.4, "room_integral_ts": 1_700_000_000.0}
+    )
+    coordinator = make_coordinator(store=store)
+
+    await coordinator.async_restore()
+
+    assert coordinator._room_integral == pytest.approx(-1.4)
+    assert coordinator._room_integral_ts == pytest.approx(1_700_000_000.0)
+    # A stored value outside the bound is clamped on the way in.
+    out_of_range = make_coordinator(store=FakeStore({"room_integral": -99.0}))
+    await out_of_range.async_restore()
+    assert out_of_range._room_integral == pytest.approx(-ROOM_INTEGRAL_MAX_C)
 
 
 async def test_push_indoor_margin_averages_window() -> None:
@@ -5019,6 +5221,9 @@ def test_every_persisted_curve_field_reaches_the_dump() -> None:
         # The indication's stamp: the age is the reader-facing field, the stamp
         # is what the timestamps block carries for every dated field.
         "trim_residual_ts": "timestamps",
+        # The integral's step stamp: the timestamps block carries it, and the
+        # value itself is dumped under its persisted name.
+        "room_integral_ts": "timestamps",
         "daily_model": "model_daily",
     }
     #: Persisted for the restore path only, never for a reader: the stamp form

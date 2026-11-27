@@ -989,7 +989,8 @@
           "curve_solar_term": "Napsugárzás-tag",
           "curve_cop_feedback_term": "COP-visszacsatolás",
           "curve_precharge_term": "Előfűtés",
-          "curve_wind_term": "Széltag"
+          "curve_wind_term": "Széltag",
+          "curve_room_integral_term": "Szobahiba-integrál"
         },
         "data_description": {
           "modbus_scan_interval": "Milyen gyakran kérdezze le a hőszivattyút Modbus TCP-n. Az alacsonyabb értékek közel valós idejű áramlás- és térfogatpontosságot adnak. Minimum 5 másodperc. Alapértelmezett 15 másodperc.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Napsugárzás-tag",
           "description": "Az azonosított napnyereséggel csökkenti az előremenőt; azonosított és mért, ezért alapértelmezés szerint be."
+        },
+        "room_integral": {
+          "name": "Szobahiba-integrál",
+          "description": "Csökkenti az előremenő hőmérsékletét, amíg a 24 órás szobahiba a holtsáv felett van; alapértelmezés szerint be, és a görbét csak csökkentheti"
         }
       }
     },

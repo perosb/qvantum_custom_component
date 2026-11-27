@@ -59,6 +59,7 @@ SET_CURVE_TERMS_SCHEMA = vol.Schema(
         vol.Optional("solar"): cv.boolean,
         vol.Optional("cop_feedback"): cv.boolean,
         vol.Optional("precharge"): cv.boolean,
+        vol.Optional("room_integral"): cv.boolean,
         vol.Optional("wind"): cv.boolean,
     }
 )
@@ -228,6 +229,7 @@ async def async_setup_services(hass: HomeAssistant):
                 solar=data.get("solar"),
                 cop_feedback=data.get("cop_feedback"),
                 precharge=data.get("precharge"),
+                room_integral=data.get("room_integral"),
                 wind=data.get("wind"),
             )
         except Exception as err:

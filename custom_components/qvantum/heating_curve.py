@@ -182,6 +182,32 @@ SOLAR_EMITTER_EXPONENT = 1.3
 #: in the margin's direction.
 INDOOR_CAP_C = 1.0
 
+#: Room-error integral: the one term that reads the **outcome** and removes the
+#: standing offset a proportional room term leaves behind. `room_comp_factor`
+#: moves supply by ~2 K per K of room error and then stops — it only removes the
+#: part of the error it can see, measured on the pump's own blend of the probe
+#: and the configured reading. Measured 2026-11-27 on a live install: room
+#: 21.1 °C against a 20.3 °C target, pump term ≈ −2.4 K, our adjustment −1.01 K,
+#: and the house sat 0.8 K high for as long as the load lasted. The integral is
+#: **one-sided** (it may only reduce supply; a cold house is the cap's floor and
+#: the trims' job), dead-banded, rate-limited and bounded — see
+#: :func:`room_integral_step`.
+ROOM_INTEGRAL_GAIN = 0.3
+#: Room error the integral ignores: below this the mean is noise plus the pump's
+#: own proportional band, and acting on it would chase the sensor.
+ROOM_INTEGRAL_DEADBAND_C = 0.3
+#: Authority, in supply degrees. Same as :data:`TRIM_MAX_C`: the two integrators
+#: share the table, so neither may outvote the other.
+ROOM_INTEGRAL_MAX_C = 2.0
+#: How far the integral may walk in 24 h, so no single day can cross a knot's
+#: 0.75 K write dead band on its own.
+ROOM_INTEGRAL_MAX_STEP_PER_DAY_C = 0.5
+#: A restored integral may catch up at most this far: an outage is not evidence.
+ROOM_INTEGRAL_MAX_CATCHUP_HOURS = 6.0
+#: Samples of the 24 h room-error window before a step is taken (half the window
+#: at a 15-minute cycle) — the mean is not a measurement until it is half seen.
+ROOM_INTEGRAL_MIN_SAMPLES = 32
+
 #: An adjustment counts as clamped only when the clamp moves it by more than
 #: this. The band's edge is ``±(INDOOR_CAP_C + margin)`` and the total is a sum
 #: of seven floats, so the two land within a few ulp of each other whenever the
@@ -244,6 +270,11 @@ class CurveResult:
     floor_pinned_points: tuple[str, ...] = ()
     cop_c: float = 0.0
     precharge_c: float = 0.0
+    #: The room-error integral's contribution, in supply degrees, always
+    #: ``≤ 0``. Published because it is the one term whose *size* over days says
+    #: whether the proportional loop is leaving an offset the integral has to
+    #: carry — and whether it is converging or pinned at the bound.
+    room_integral_c: float = 0.0
     #: Wind's extra envelope loss as supply degrees, one-sided (0…WIND_MAX_C),
     #: computed only while the optional term is enabled and the model's wind
     #: column passed its gates.
@@ -1617,6 +1648,69 @@ def apply_indoor_cap(
     return total_c, False, None, None
 
 
+def room_integral_step(
+    integral_c: float,
+    mean_error_c: float | None,
+    *,
+    gain_c_per_c: float | None,
+    elapsed_hours: float,
+    gain: float = ROOM_INTEGRAL_GAIN,
+    deadband_c: float = ROOM_INTEGRAL_DEADBAND_C,
+    max_c: float = ROOM_INTEGRAL_MAX_C,
+    max_step_per_day_c: float = ROOM_INTEGRAL_MAX_STEP_PER_DAY_C,
+) -> float:
+    """Advance the room-error integral by one step, in supply degrees.
+
+    The term exists because the pump's room compensation is **proportional**:
+    it moves supply by ``room_comp_factor`` per kelvin of error and then stops,
+    so a house under load settles a constant offset above its target. Measured
+    live 2026-11-27: room 21.1 °C against a 20.3 °C target, pump term ≈ −2.4 K,
+    our shared adjustment −1.01 K, and the offset stayed for as long as the
+    load did. No other term in :func:`compute_curve` reads the outcome.
+
+    Three properties are deliberate, and each is a way this could go wrong:
+
+    - **One-sided.** A warm house may lower the curve; a cold one may not raise
+      it — that is the indoor cap's floor and the trims' job, and two upward
+      integrators on one table would fight. The result is always ``≤ 0``.
+    - **Dead-banded.** The error is a 24 h *mean*, so one warm afternoon cannot
+      reach the table; below ``deadband_c`` there is nothing to remove that is
+      separable from the pump's own proportional band and sensor noise.
+    - **Rate-limited and bounded.** ``gain`` scales the same way the trims are
+      scaled (0.3), the daily walk is capped so no day can cross a knot's write
+      dead band, and the total authority is shared with :data:`TRIM_MAX_C`.
+
+    ``gain_c_per_c`` is the pump's applied room gain (supply kelvin per room
+    kelvin), not a fitted slope: it is the constant that makes a kelvin of room
+    error cost what it costs in supply on *this* pump. ``None`` or a
+    non-positive value means the gain is unknown, and an unknown conversion is
+    not evidence — the integral holds.
+
+    Returns the new integral, clamped to ``[-max_c, 0.0]``. It never moves on
+    missing, non-finite or non-positive input.
+    """
+    held = _clamp(integral_c if math.isfinite(integral_c) else 0.0, -max_c, 0.0)
+    error = None if mean_error_c is None else float(mean_error_c)
+    conversion = None if gain_c_per_c is None else float(gain_c_per_c)
+    hours = float(elapsed_hours)
+    if (
+        error is None
+        or not math.isfinite(error)
+        or conversion is None
+        or not math.isfinite(conversion)
+        or conversion <= 0.0
+        or not math.isfinite(hours)
+        or hours <= 0.0
+    ):
+        return held
+    if error <= deadband_c:
+        return held
+    request_c = gain * conversion * (error - deadband_c)
+    day_fraction = hours / 24.0
+    step_c = min(request_c * day_fraction, max_step_per_day_c * day_fraction)
+    return _clamp(held - step_c, -max_c, 0.0)
+
+
 def compute_curve(
     *,
     baseline: Mapping[str, float],
@@ -1636,6 +1730,7 @@ def compute_curve(
     max_supply_c: float | None = None,
     cop_c: float = 0.0,
     precharge_c: float = 0.0,
+    room_integral_c: float = 0.0,
     wind_by_hour: Mapping[int, float] | None = None,
     wind_enabled: bool = False,
     solar_enabled: bool = True,
@@ -1723,7 +1818,14 @@ def compute_curve(
     )
 
     total = _clamp(
-        outdoor_c + night_day_c + solar_c + load_c + cop_c + precharge_c + wind_c,
+        outdoor_c
+        + night_day_c
+        + solar_c
+        + load_c
+        + cop_c
+        + precharge_c
+        + wind_c
+        + room_integral_c,
         -TOTAL_MAX_C,
         TOTAL_MAX_C,
     )
@@ -1790,5 +1892,6 @@ def compute_curve(
         floor_pinned_points=tuple(floor_pinned_points),
         cop_c=cop_c,
         precharge_c=precharge_c,
+        room_integral_c=room_integral_c,
         wind_c=wind_c,
     )

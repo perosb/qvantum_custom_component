@@ -32,7 +32,8 @@ set_curve_terms:
   name: set_curve_terms
   description: >-
     Optional adaptive heating-curve control terms. Solar is on by default (it
-    lowers the supply by an identified solar gain); COP feedback, pre-charge
+    lowers the supply by an identified solar gain) and the room-error integral
+    (which walks a warm house back to its target); COP feedback, pre-charge
     and wind are off by default. COP feedback reduces the computed supply when
     the measured COP falls below its learned reference; pre-charge raises it
     ahead of a forecast cold snap; wind raises it while a wind sensitivity
@@ -56,6 +57,16 @@ set_curve_terms:
 
     precharge:
       description: Enable or disable the cold-snap pre-charge term
+      example: true
+      selector:
+        boolean:
+
+    room_integral:
+      description: >-
+        Enable or disable the room-error integral. On by default: it is the only
+        term that removes the standing offset a proportional room compensation
+        leaves, and it can only ever lower the curve. Off silences a house where
+        it does not settle.
       example: true
       selector:
         boolean:

@@ -143,6 +143,7 @@ CONF_TELEMETRY = "telemetry"
 CONF_CURVE_SOLAR = "curve_solar_term"
 CONF_CURVE_COP = "curve_cop_feedback_term"
 CONF_CURVE_PRECHARGE = "curve_precharge_term"
+CONF_CURVE_ROOM_INTEGRAL = "curve_room_integral_term"
 CONF_CURVE_WIND = "curve_wind_term"
 
 #: Stable codes for the curve's revert counter. The log keeps the human sentence

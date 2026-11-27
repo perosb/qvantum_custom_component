@@ -989,7 +989,8 @@
           "curve_solar_term": "Solarterm",
           "curve_cop_feedback_term": "COP-Rückmeldung",
           "curve_precharge_term": "Vorlade-Term",
-          "curve_wind_term": "Windterm"
+          "curve_wind_term": "Windterm",
+          "curve_room_integral_term": "Raumfehler-Integral"
         },
         "data_description": {
           "modbus_scan_interval": "Wie oft die Wärmepumpe über Modbus TCP abgefragt wird. Niedrigere Werte ermöglichen nahezu Echtzeit-Durchfluss- und Volumenmessung. Minimum sind 5 Sekunden. Standard sind 15 Sekunden.",
@@ -1051,6 +1052,10 @@
         "solar": {
           "name": "Solarterm",
           "description": "Senkt den Vorlauf um den identifizierten Solarertrag; identifiziert und gemessen, daher standardmäßig aktiv."
+        },
+        "room_integral": {
+          "name": "Raumfehler-Integral",
+          "description": "Senkt die Vorlauftemperatur, solange der 24-h-Raumfehler über seinem Totband liegt; standardmäßig an und senkt die Kurve nur"
         }
       }
     },

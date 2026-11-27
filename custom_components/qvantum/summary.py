@@ -226,10 +226,20 @@ _ENTITY_PREFIXES = (
 #: — 3.20, 1.89 and 19.26 °C — where one of them had passed at 1.27 °C on its own
 #: Auto curve seven days earlier. The null is also what keeps the readiness
 #: invitation away: it writes our table, so it must never be raised from a
-#: comparison against the user's own. No released build has carried v20 (the
-#: 2026.11.14 release was withdrawn), so this joins v20 in place like the fields
-#: above.
-SUMMARY_SCHEMA_VERSION = 20
+#: comparison against the user's own. v20 shipped in 2026.11.14; the earlier,
+#: withdrawn build that also carried 20 never uploaded a row, so the fields above
+#: could join it in place instead of starting a new generation.
+#: 21: `curve.room_integral_c`, the room-error integral's contribution to the
+#: shared adjustment (always `<= 0`, `0` in shadow). It is the one term that
+#: reads the house's **outcome**; the rest read weather, power and the pump.
+#: Measured 2026-11-27 on a live install: room 21.1 °C against a 20.3 °C target
+#: with the pump's own proportional term at about −2.4 K — a standing offset no
+#: existing term could remove, because the indoor cap only forbids raising and
+#: the trims learn the pump's *supply*, not the room. The field exists so the
+#: pool can answer how large an offset the proportional loop leaves on other
+#: installations, and whether the integral converges (a value pinned at −2 K is
+#: an over-gained integrator, not a warm house). Additive.
+SUMMARY_SCHEMA_VERSION = 21
 
 #: Plant settings that describe the control loops. Everything else in the
 #: payload is identified, not configured.
@@ -631,6 +641,11 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
         "daily_wind_vif": _number(getattr(daily, "wind_vif", None)),
         "daily_wind_valid": bool(getattr(daily, "wind_valid", False)),
         "wind_c": _number(getattr(snapshot, "wind_c", None)),
+        # The only term that reads the outcome, and the only one whose *size
+        # over days* is a verdict: it carries whatever offset the proportional
+        # room loop leaves, so a row shows both the cause (`room_error_*`) and
+        # the correction.
+        "room_integral_c": _number(getattr(snapshot, "room_integral_c", None)),
     }
 
 
