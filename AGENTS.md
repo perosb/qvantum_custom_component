@@ -514,7 +514,15 @@ access expiry, elevate-access) must not be created in Modbus mode.
 
 The `DEFAULT_ENABLED_*` / `DEFAULT_DISABLED_*` lists are the source of truth in
 both directions: `disable_entities_by_default` clears a stale
-`disabled_by=INTEGRATION`, but never a `disabled_by=USER`. A disabled entity
+`disabled_by=INTEGRATION`, but never a `disabled_by=USER`. They are also the
+**fetch universe**: `build_metrics_payload` drops every key the coordinator did
+not ask for, so a key that is enabled by default must be in them or it is never
+polled — and the binary-sensor platform skips an enabled-by-default key that is
+absent from the payload, which closes the loop silently (not fetched → no
+entity → not in the registry → not fetched). Measured 2026-11-27 in 2026.11.14:
+`energy_prices_available` (input 166) was added to `MODBUS_ONLY_BINARY_SENSORS`
+only and never appeared. `tests/test_modbus_device.py` pins the invariant for
+every pollable binary sensor. A disabled entity
 records no statistics, so a metric some fit reads must not be moved into a
 disabled list.
 

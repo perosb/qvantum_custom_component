@@ -255,6 +255,17 @@ DEFAULT_ENABLED_MODBUS_ONLY_METRICS = [
     # is HTTP-only. Input 165, which the register guide labels "Electricity
     # price region", read 0 with both SE3 and SE4.
     "price_region",
+    # Input 166 ("Energy Prices Available"): whether the pump holds a
+    # SmartControl price list. It must be in this list, not only in
+    # ``MODBUS_ONLY_BINARY_SENSORS``, because these lists are also the **fetch
+    # universe**: `build_metrics_payload` drops every key that is not in the
+    # metrics the coordinator asks for, and the binary-sensor platform skips an
+    # enabled-by-default key that is absent from the payload. Without this line
+    # the two rules close a loop with nothing in the log — not fetched, so not in
+    # the payload, so no entity, so not in the registry, so not fetched. Measured
+    # 2026-11-27 in 2026.11.14: the sensor never appeared, on a pump that answers
+    # the 150-175 block (its neighbour, Smart DHW Control Status at 162, did).
+    "energy_prices_available",
     "picpin_relay_pump",
     "freeze_protection_active",
     "compressor_blocked",
