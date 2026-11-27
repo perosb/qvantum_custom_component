@@ -17,9 +17,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
+from .efficiency import SCOP_DELTA_KEYS
 from .heating_curve import measured_age_hours
 from .open_meteo import hour_ts as weather_hour_ts
-from .plant_analytics import HeatingPowerWindow, eu_label
+from .plant_analytics import HEALTH_COMPONENT_KEYS, HeatingPowerWindow, eu_label
 
 # Keys that must never leave the instance. ``async_redact_data`` applies these
 # recursively, so they cover config-entry data as well as nested client state.
@@ -252,6 +253,10 @@ def _dhw_meter_diagnostics(window: Any) -> dict[str, Any]:
 _EFFICIENCY_FIELDS = (
     "scop_total",
     "scop_total_90d",
+    # The four deltas ``scop_total`` divides, so a report can say which counter
+    # produced a ratio no heat pump can (pool, 2026-11-27: SCOP 1.13 beside a
+    # 17.8 % element share pins the compressor at 1.16).
+    *SCOP_DELTA_KEYS,
     "aux_heat_share",
     "heat_loss_w_per_k",
     "heating_degree_hours",
@@ -304,7 +309,14 @@ def _efficiency_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         block[f"eu_class{suffix}"] = eu_class
     block["updated_at"] = getattr(snapshot, "updated_at", None)
     components = getattr(snapshot, "efficiency_health_components", None)
-    if isinstance(components, dict):
+    components = components if isinstance(components, dict) else {}
+    # The dict *and* the flat names the export uses: the dict is what the sensor
+    # attribute carries, the flat keys are what a report reads, and a component
+    # the grade could not score is null rather than 0.0 — the two are different
+    # claims about the same letter.
+    for key in HEALTH_COMPONENT_KEYS:
+        block[f"efficiency_health_{key}_score"] = components.get(key)
+    if components:
         block["efficiency_health_components"] = dict(components)
     return block
 

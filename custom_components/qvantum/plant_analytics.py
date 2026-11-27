@@ -25,6 +25,11 @@ DEFAULT_HEALTH_WEIGHTS: dict[str, float] = {
     "aux_share": 0.25,
     "cycling": 0.25,
 }
+#: The component keys, in weight order. A component added here appears in the
+#: summary export and the diagnostics dump as ``efficiency_health_<key>_score``,
+#: which is what lets the letter be re-scored at another weight from a pool row
+#: instead of by argument.
+HEALTH_COMPONENT_KEYS: tuple[str, ...] = tuple(DEFAULT_HEALTH_WEIGHTS)
 #: SCOP score: 2.0 -> 0.0, 5.0 -> 1.0.
 #:
 #: The range is the **seasonal** air-source one, while the figure scored is the
