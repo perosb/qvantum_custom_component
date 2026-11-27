@@ -1,0 +1,64 @@
+name: PR labels
+
+# Labels a pull request from its conventional-commit title, the label
+# `release-drafter.yml` groups the release notes by.
+#
+# `pull_request_target`, not `pull_request`, because a fork's `pull_request` run
+# gets a **read-only** `GITHUB_TOKEN` for issues and pull requests no matter what
+# the job declares under `permissions:`. `addLabels` answered 403 there, so the
+# step was guarded off forks and a fork PR stayed unlabelled — and an unlabelled
+# PR falls out of the release notes completely, since `release-drafter.yml`
+# filters on `include-labels`. Measured on #576 (fork, 2026-11-26): the label
+# had to be applied by hand before the PR reached the draft.
+#
+# The safety of `pull_request_target` here rests on this workflow doing exactly
+# one thing: reading the pull request's **title** from the event payload and
+# calling `addLabels`. It checks nothing out, executes no file from the
+# pull request and holds no secret. Do **not** add `actions/checkout`, a script
+# or a secret to it — running code from the pull request under this trigger is
+# what makes `pull_request_target` a vulnerability (the token it gets is
+# writable, and the fork's author controls the tree). `pull_request_target`
+# always runs the default branch's copy of this file, so a fork cannot change
+# what runs here.
+on:
+  pull_request_target:
+    types: [opened, reopened, edited, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  labels:
+    name: PR labels
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const title = context.payload.pull_request.title;
+            const number = context.payload.pull_request.number;
+            // `!` is part of a conventional breaking-change subject:
+            // `feat!:`, `fix(scope)!:` — the scope form already matches on `(`.
+            let label = null;
+            if (/^fix[\s(:!]/i.test(title))   label = 'bug';
+            else if (/^feat[\s(:!]/i.test(title)) label = 'enhancement';
+            else if (/^(chore|docs|refactor|test|ci)[\s(:!]/i.test(title)) label = 'chore';
+            if (!label) return;
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: number,
+                labels: [label],
+              });
+            } catch (err) {
+              const status = err.status || err.response?.status;
+              if (status === 403) {
+                core.warning(`Skipping label '${label}' on PR #${number}: ${err.message}`);
+                return;
+              }
+              throw err;
+            }
