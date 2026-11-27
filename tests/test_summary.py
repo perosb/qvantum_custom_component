@@ -100,6 +100,10 @@ def curve_coordinator(**overrides):
             notes="days=26 t=3.10 r2=0.910 jackknife=1.49-2.22",
             w_per_ms=2.4,
             w_t_stat=4.8,
+            # The four-column pair, which a window refused on sign or size also
+            # reports: the wind fit runs after the aperture gate.
+            a_w_per_k_4col=104.2,
+            b_m2_4col=1.61,
             wind_hours=612,
             wind_valid=True,
         ),
