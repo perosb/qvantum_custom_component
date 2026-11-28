@@ -574,9 +574,8 @@ something they can remove. The pump's own room compensation is **proportional**
 — it moves supply by `room_comp_factor` per kelvin of error and then stops — so
 a house under load settles a standing offset above its target. Measured
 2026-11-27 on a live install: room 21.1 °C against a 20.3 °C target, the pump's
-term at about −2.4 K (factor 2.0, reading its own blend of the probe and the
-configured sensor), the shared adjustment −1.01 K, and the offset stayed for as
-long as the load did. The indoor cap cannot help: it only forbids *raising* the
+term at about −2.4 K (factor 2.0, on the external reading it was fed), the
+shared adjustment −1.01 K, and the offset stayed for as long as the load did. The indoor cap cannot help: it only forbids *raising* the
 curve when the house is warm, and the trims read the pump's supply.
 
 `room_integral_step` is the missing integrator, and it is the only term in
