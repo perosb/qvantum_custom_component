@@ -1132,13 +1132,22 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         # write every poll and no error). The picker excludes our entities, but
         # an option set earlier, or through a service, must not loop either.
         if self._feeds_its_own_register(entity_id):
+            # Warn on the transition, not every tick, and keep the flag true only
+            # while the source really is ours: an option change applies in place
+            # without a reload, so a corrected source must clear it again.
+            if not self._external_room_feed_self_reference:
+                _LOGGER.warning(
+                    "External room temperature feed ignores %s: it is provided "
+                    "by this integration, so feeding it back would loop",
+                    entity_id,
+                )
             self._external_room_feed_self_reference = True
-            _LOGGER.warning(
-                "External room temperature feed ignores %s: it is provided by "
-                "this integration, so feeding it back would loop",
-                entity_id,
-            )
             return
+        if self._external_room_feed_self_reference:
+            _LOGGER.info(
+                "External room temperature feed resumed with %s", entity_id
+            )
+            self._external_room_feed_self_reference = False
 
         state = self.hass.states.get(entity_id)
         if state is None:

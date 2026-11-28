@@ -5743,6 +5743,13 @@ class TestExternalRoomTempFeed:
         coordinator.client.write_metric.assert_not_awaited()
         assert coordinator._external_room_feed_self_reference is True
 
+        # The option applies in place (no reload), so a corrected source must
+        # clear the flag again — otherwise the dump keeps claiming a loop.
+        coordinator.hass.data[er.DATA_REGISTRY].async_get.return_value = None
+        await coordinator._async_feed_external_room_temp()
+        coordinator.client.write_metric.assert_awaited()
+        assert coordinator._external_room_feed_self_reference is False
+
     @pytest.mark.asyncio
     async def test_writes_ema_smoothed_value(self):
         """First tick writes the raw value, later ticks move the EMA toward it."""
