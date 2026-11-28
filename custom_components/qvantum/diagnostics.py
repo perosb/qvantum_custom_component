@@ -367,6 +367,11 @@ def _coordinator_diagnostics(coordinator: Any) -> dict[str, Any]:
             "last_value": getattr(coordinator, "_external_room_last_value", None),
             "last_write": getattr(coordinator, "_external_room_last_write_ts", None),
             "write_errors": getattr(coordinator, "_external_room_write_errors", None),
+            # A source this integration provides would make the feed write its
+            # own register back; the feed refuses it, and this says so.
+            "self_reference": getattr(
+                coordinator, "_external_room_feed_self_reference", False
+            ),
         },
     }
 

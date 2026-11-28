@@ -464,6 +464,10 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._external_room_last_value: float | None = None
         self._external_room_last_write_ts: str | None = None
         self._external_room_write_errors: int = 0
+        #: True when the configured source is one of our own entities, i.e. the
+        #: feed would write its own register back. Surfaced in diagnostics so a
+        #: frozen register is explainable instead of mysterious.
+        self._external_room_feed_self_reference: bool = False
         self._external_room_feed_unsub: Callable[[], None] | None = None
 
         super().__init__(
@@ -1094,6 +1098,12 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
         self._external_room_feed_unsub = None
         unsub()
 
+    def _feeds_its_own_register(self, entity_id: str) -> bool:
+        """True when the feed's source is an entity this integration owns."""
+        registry = er.async_get(self.hass)
+        entry = registry.async_get(entity_id)
+        return entry is not None and entry.platform == DOMAIN
+
     async def _async_feed_external_room_temp(
         self, _now: datetime | None = None
     ) -> None:
@@ -1114,6 +1124,20 @@ class QvantumDataUpdateCoordinator(QvantumCalculationsMixin, DataUpdateCoordinat
             return
         entity_id = self.external_room_temp_entity_id
         if not entity_id or not self.client.writable:
+            return
+        # Feeding an entity this integration provides would write our own
+        # register back into itself: `qvantum_extern_rumstemperatur` mirrors
+        # holding 14, so the loop would hold the last value forever (measured
+        # 2026-11-28: frozen at 20.3 °C while the house mean was 20.7, a fresh
+        # write every poll and no error). The picker excludes our entities, but
+        # an option set earlier, or through a service, must not loop either.
+        if self._feeds_its_own_register(entity_id):
+            self._external_room_feed_self_reference = True
+            _LOGGER.warning(
+                "External room temperature feed ignores %s: it is provided by "
+                "this integration, so feeding it back would loop",
+                entity_id,
+            )
             return
 
         state = self.hass.states.get(entity_id)
