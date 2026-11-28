@@ -1165,8 +1165,9 @@ fallback: ΔT = curve_slope · G / a                       a = the fitted loss c
 
 The emitter path is tried first and needs the live thermal output `Q`
 (`heating_power_mean_w`), the flow temperature the pump is aiming at
-(`cal_heat_temp`) and the room it serves (`pump_room_c`, i.e. the pump's own
-blended reading, never the target). Absent, non-finite, `Q ≤ 0` or
+(`cal_heat_temp`) and the room it serves (`pump_room_c` — the configured
+reading the pump's term is computed from, never the target). Absent,
+non-finite, `Q ≤ 0` or
 `T_supply ≤ T_room` falls back to the fitted form — absence is not evidence, and
 a thermal `Q` is never stood in for by the electrical input.
 

@@ -739,11 +739,10 @@ The rules that must not drift:
   is the pump's own `room_comp_factor`, re-read every poll — never fitted over.
   The Auto-hour fit is the fallback for a missing factor and is diagnostics-only.
 - The room **value** the pump's term uses is the **configured** reading, with no
-  mean over anything: measured on 1.12.8 (2026-11-28) with a room step
-  (`gain · weight = 0.99` at a register gain of 1.0) and a target step
-  (`gain = register gain`), so the weight is 1. The older blend with BT2 came
-  from a different method on 1.11.x and is history, not a rule — do not re-add
-  it. BT2 stands in only when the configured reading is missing, gated on
+  mean over anything — measured with room and target steps on 1.12.8, see
+  `docs/heating-curve.md` for the numbers; the older blend with BT2 came from a
+  different method on 1.11.x and is history, not a rule — do not re-add it.
+  BT2 stands in only when the configured reading is missing, gated on
   `bt2_detected` = 1 and a plausible room value (a placeholder puts the deviation
   tens of kelvin off). Trims, the indoor cap and `room_error` stay on the
   configured sensor: those describe the house.
