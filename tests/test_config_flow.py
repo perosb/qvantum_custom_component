@@ -953,6 +953,35 @@ class TestQvantumOptionsFlow:
         assert _schema_defaults(result)["scan_interval"] == 60
 
     @pytest.mark.asyncio
+    async def test_the_external_room_picker_excludes_our_own_entities(self):
+        """Feeding our own register back is a loop, so it must not be offered.
+
+        `sensor.<area>_qvantum_extern_rumstemperatur` mirrors holding 14; picked
+        as the feed's source it writes its own last value forever (measured
+        2026-11-28: frozen at 20.3 °C while the house mean was 20.7). The pump's
+        own probes (BT2, BT4…) are excluded for the same reason in another form.
+        """
+        from unittest.mock import MagicMock, patch
+
+        from custom_components.qvantum.config_flow import _external_room_temp_selector
+
+        own = MagicMock(entity_id="sensor.extern_rumstemperatur", platform="qvantum")
+        foreign = MagicMock(entity_id="sensor.inomhustemperatur", platform="demo")
+        registry = MagicMock()
+        registry.entities = {entry.entity_id: entry for entry in (own, foreign)}
+
+        with patch(
+            "custom_components.qvantum.config_flow.er.async_get",
+            return_value=registry,
+        ):
+            selector = _external_room_temp_selector(MagicMock())
+
+        excluded = set(selector.config["exclude_entities"])
+        assert excluded == {"sensor.extern_rumstemperatur"}
+        assert "sensor" in selector.config["domain"]
+        assert "temperature" in selector.config["device_class"]
+
+    @pytest.mark.asyncio
     async def test_modbus_options_form_lists_external_room_temp_entity(self, hass):
         from custom_components.qvantum.config_flow import QvantumOptionsFlowHandler
 

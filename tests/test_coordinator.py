@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.const import CONF_SCAN_INTERVAL
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from custom_components.qvantum import coordinator as coordinator_module
@@ -5701,7 +5702,11 @@ class TestExternalRoomTempFeed:
             return_value=None,
         ):
             mock_hass = MagicMock()
-            mock_hass.data = {DOMAIN: MagicMock()}
+            # A real entity registry needs storage to construct; the feed only
+            # asks whether the source entity is ours, and by default it is not.
+            registry = MagicMock()
+            registry.async_get.return_value = None
+            mock_hass.data = {DOMAIN: MagicMock(), er.DATA_REGISTRY: registry}
             mock_config_entry = MagicMock()
             mock_config_entry.options = {CONF_MODBUS_TCP: True, **(options or {})}
             mock_config_entry.data = {}
@@ -5716,6 +5721,34 @@ class TestExternalRoomTempFeed:
         mock_hass.states.get.return_value = state
         coordinator.client.write_metric = AsyncMock(return_value={"status": "APPLIED"})
         return coordinator
+
+    @pytest.mark.asyncio
+    async def test_refuses_a_source_this_integration_provides(self):
+        """Feeding our own register back would freeze it at the last value.
+
+        Measured 2026-11-28: the picker was pointed at
+        `sensor.<area>_qvantum_extern_rumstemperatur`, which mirrors holding 14,
+        so the register sat at 20.3 °C while the house mean was 20.7 — a fresh
+        write every poll, no error, nothing moving.
+        """
+        coordinator = self._make_coordinator(
+            options={CONF_EXTERNAL_ROOM_TEMP_ENTITY: "sensor.qvantum_external"}
+        )
+        entry = MagicMock()
+        entry.platform = DOMAIN
+        coordinator.hass.data[er.DATA_REGISTRY].async_get.return_value = entry
+
+        await coordinator._async_feed_external_room_temp()
+
+        coordinator.client.write_metric.assert_not_awaited()
+        assert coordinator._external_room_feed_self_reference is True
+
+        # The option applies in place (no reload), so a corrected source must
+        # clear the flag again — otherwise the dump keeps claiming a loop.
+        coordinator.hass.data[er.DATA_REGISTRY].async_get.return_value = None
+        await coordinator._async_feed_external_room_temp()
+        coordinator.client.write_metric.assert_awaited()
+        assert coordinator._external_room_feed_self_reference is False
 
     @pytest.mark.asyncio
     async def test_writes_ema_smoothed_value(self):

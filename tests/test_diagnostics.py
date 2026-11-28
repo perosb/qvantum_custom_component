@@ -454,6 +454,9 @@ async def test_external_room_feed_state(hass):
         "last_value": 20.6,
         "last_write": "2026-10-05T19:00:00+00:00",
         "write_errors": 2,
+        # False unless the configured source is one of our own entities, which
+        # the feed refuses: writing the register back into itself would hold it.
+        "self_reference": False,
     }
     json.dumps(result)
 

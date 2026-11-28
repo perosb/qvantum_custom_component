@@ -745,7 +745,11 @@ The rules that must not drift:
   BT2 stands in only when the configured reading is missing, gated on
   `bt2_detected` = 1 and a plausible room value (a placeholder puts the deviation
   tens of kelvin off). Trims, the indoor cap and `room_error` stay on the
-  configured sensor: those describe the house.
+  configured sensor: those describe the house. The external feed's **source**
+  must be an entity this integration does not provide — the picker excludes them
+  and the feed refuses them (`external_room_feed.self_reference`) — because
+  `qvantum_extern_rumstemperatur` mirrors holding 14 and a self-reference holds
+  the register at its last value.
 - `capped_by_indoor` means the adjustment **moved**, not that it touched the
   band: the edge follows the 24 h mean and the total is a float sum, so a clamp
   that changes 7e-16 must not report itself binding — it also pauses the trim

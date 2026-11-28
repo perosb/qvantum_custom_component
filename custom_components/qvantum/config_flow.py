@@ -21,6 +21,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
@@ -108,10 +109,37 @@ def _normalize_modbus_host(value: Any) -> str:
     return host or DEFAULT_MODBUS_HOST
 
 
-def _external_room_temp_selector() -> EntitySelector:
-    """Single temperature-sensor picker for the external room temperature feed."""
+def _external_room_temp_selector(hass: HomeAssistant | None) -> EntitySelector:
+    """Single temperature-sensor picker for the external room temperature feed.
+
+    Everything this integration provides is excluded, and that is not cosmetic.
+    The feed writes whatever the picker points at into holding 14, and
+    `sensor.<area>_qvantum_extern_rumstemperatur` is that register read back — a
+    self-reference, so the loop writes its own last value forever (measured
+    2026-11-28: frozen at 20.3 °C while the house mean was 20.7, with a fresh
+    write every poll and no error). The pump's own probes (BT2, BT4, BT12…) are
+    excluded for the same reason in a different form: feeding the pump a
+    temperature it already reads adds nothing, and in the external mode it
+    hides which reading the room term is actually built from.
+    """
+    # ``hass`` is absent in the schema-shape tests, which build the flow without
+    # one; an empty exclusion list is the honest answer there, and the guard in
+    # the feed covers an option set through any other route.
+    own = (
+        [
+            entry.entity_id
+            for entry in er.async_get(hass).entities.values()
+            if entry.platform == DOMAIN
+        ]
+        if hass is not None
+        else []
+    )
     return EntitySelector(
-        EntitySelectorConfig(domain="sensor", device_class="temperature")
+        EntitySelectorConfig(
+            domain="sensor",
+            device_class="temperature",
+            exclude_entities=own,
+        )
     )
 
 
@@ -718,7 +746,7 @@ class QvantumOptionsFlowHandler(OptionsFlow):
                         CONF_TELEMETRY, default=telemetry_granted
                     ): bool,
                     vol.Optional(CONF_EXTERNAL_ROOM_TEMP_ENTITY): (
-                        _external_room_temp_selector()
+                        _external_room_temp_selector(self.hass)
                     ),
                     **_curve_term_schema(self._curve_coordinator()),
                 }

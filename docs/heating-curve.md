@@ -317,6 +317,18 @@ from the deviation, 0.8–1.1 K on the measured install at a gain of 2.0.
 The trims, the indoor cap and `room_error` stay on the configured sensor —
 those describe the house; this describes the pump's input.
 
+**The feed's source** is an HA sensor chosen in the options flow, and the picker
+excludes every entity this integration provides. That is not cosmetic:
+`qvantum_extern_rumstemperatur` mirrors holding 14, so picking it makes the feed
+read its own output and write it back — the register then holds its last value
+forever (measured 2026-11-28: frozen at 20.3 °C while the house mean was 20.7,
+with a fresh write every poll and no error). The pump's own probes (BT2, BT4,
+BT12…) are excluded for the same reason in another form: feeding the pump a
+temperature it already reads adds nothing, and in the external mode it hides
+which reading the room term is actually built from. The feed refuses such a
+source as well and reports `external_room_feed.self_reference` in the
+diagnostics, so an option set earlier, or through a service, cannot loop either.
+
 **Modes without an indoor sensor.** In `sensor_mode` DISABLED / BT3 / AUX there
 is no mode-specific indoor metric, so the configured reading falls back to BT2 —
 it is a probe the pump can read, and the correction is skipped only when BT2 is
