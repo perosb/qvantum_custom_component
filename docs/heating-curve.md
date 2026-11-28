@@ -284,19 +284,38 @@ coordinator subtracts `gain × (pump room − target)` from the deviation before
 it feeds the readiness window; without that, the shadow curve could never match
 a compensating pump closely enough to become `ready`.
 
-**Which room value.** In the external-sensor mode (`sensor_mode` = 4) the
-firmware does not use the external value on its own: it averages it with its own
-BT2. Measured on a QE-6, 2026-10-21, the implicit room value behind
-`cal_heat_temp` matched that mean with a median deviation of 0.10 °C, against
-0.32 °C for the external sensor alone and 0.30 °C for BT2. `pump_room_reading()`
-(`heating_curve.py`) reproduces it (mean in the external mode, the configured
-sensor everywhere else — the regime it was measured in), and `pump_room_c`
-publishes the value used.
-Removing a term built from one sensor while the pump built it from the mean
-leaves a constant `gain · (BT2 − configured) / 2` bias: 1.7 °C on that install,
-more than the readiness median gate, which is why the median sat at 2.17 °C with
-a raw 1.43 °C underneath. The trims, the indoor cap and `room_error` stay on the
-configured sensor — those describe the house, this describes the pump's input.
+**Which room value.** The pump's room term uses the **configured** reading —
+the external value we feed to holding 14 in the external-sensor mode
+(`sensor_mode` = 4), BT2 in the BT2 mode — and nothing else. `pump_room_reading()`
+(`heating_curve.py`) returns it and `pump_room_c` publishes it; BT2 only stands
+in when the configured reading is missing, and then only if the pump reports it
+as a probe.
+
+Measured on a QE-6 running **1.12.8** (2026-11-28) with two steps, because a
+room step alone only gives `gain · weight`:
+
+| step | what moved | result |
+|---|---|---|
+| room value 20.20 → 17.20 K (3.0 K, 100 samples, adjustment and outdoor flat) | `cal_heat_temp`, least squares over the ramp | **−0.990 ± 0.023 K/K** (t = −44) — `gain · weight` at a register gain of 1.0 |
+| target +2.0 K at a register gain of 2.0 | `cal_heat_temp` +3.85 K (4.0 expected; the 0.15 K outdoor drift across the window is ~0.1 K of the gap) | `gain = 2.0`: the register *is* the gain |
+
+The slope is the statistic, not the difference between two points: the endpoint
+ratio across the same window reads 1.10 K/K, because the table, the pump's own
+control and our adjustment all move between two samples taken half an hour
+apart. A least-squares fit through all 100 pairs cancels that drift and gives
+the same number every time it is re-run.
+
+Weight is therefore 1 — no mean with BT2. An earlier reading (QE-6,
+2026-10-21, firmware **1.11.x**, a regression of `cal` against three candidate
+room values over many hours: median deviation 0.10 °C for the mean of the
+external value and BT2, 0.32 °C for the external alone, 0.30 °C for BT2) found
+the opposite; the two are not comparable — different method, different firmware
+— and the step measurement on the current firmware wins. Assuming a mean where
+the pump used the external value removes `gain · (BT2 − external) / 2` too much
+from the deviation, 0.8–1.1 K on the measured install at a gain of 2.0.
+
+The trims, the indoor cap and `room_error` stay on the configured sensor —
+those describe the house; this describes the pump's input.
 
 **Modes without an indoor sensor.** In `sensor_mode` DISABLED / BT3 / AUX there
 is no mode-specific indoor metric, so the configured reading falls back to BT2 —
@@ -310,24 +329,22 @@ installations that do compensate. An **active-hour** fit on an installation in
 one of those modes is what would settle it, because there the table is ours and
 the room term is the only thing moving the supply inside an outdoor bucket.
 
-The blend is only used while BT2 is a probe the pump can read. An installation
-without an interior sensor keeps the firmware's placeholder there — a QE4 owner
-reported a fixed −30 °C (2026-10-23) — and the pump's own room value then comes
-from the external sensor alone. Averaging that placeholder in would put the
-removed term about 26 K off (`gain · 26 K` on the deviation, which is 13 K even
-at the minimum gain), so readiness could never pass. Three gates apply: the
-datasheet's `BT2 Detected` register (input 86: `0=No`, `1=Yes`,
-`2=Detecting` — read over Modbus only, and listed in `REQUIRED_MODBUS_METRICS`
-because no entity exposes it and the payload is filtered by enabled metrics)
-must report `1`; the value must be a room
-temperature (`BT2_MIN_PLAUSIBLE_C`/`BT2_MAX_PLAUSIBLE_C`, −10…45 °C) and within
-`BT2_MAX_DIVERGENCE_C` (10 K) of the configured reading (measured on a live QE-6
-over 30 days, the two sensors were 0.54 K apart at the median and 0.85 K at
-most, so the bound only catches a placeholder or a stuck probe); and the
-resulting value is checked again, because in the modes without an indoor sensor
-the configured reading falls back to BT2. Without a usable BT2 the configured
+BT2 is only a **fallback**, used when the configured reading is missing — not a
+second opinion averaged in. An installation without an interior probe keeps the
+firmware's placeholder there (a QE4 owner reported a fixed −30 °C,
+2026-10-23), and handing that to the correction would put the removed term about
+26 K off (`gain · 26 K` on the deviation, 13 K even at the minimum gain), so
+readiness could never pass. Two gates apply, because the fallback has no
+configured value to be compared against: the datasheet's `BT2 Detected` register
+(input 86: `0=No`, `1=Yes`, `2=Detecting` — read over Modbus only, and listed in
+`REQUIRED_MODBUS_METRICS` because no entity exposes it and the payload is
+filtered by enabled metrics) must report `1`, and the value must be a room
+temperature (`BT2_MIN_PLAUSIBLE_C`/`BT2_MAX_PLAUSIBLE_C`, −10…45 °C). The
+resulting value is checked again as well, because in the modes without an indoor
+sensor the configured reading falls back to BT2. Without a usable BT2 the configured
 sensor is used alone, or nothing at all — `pump_room_source` says which
-(`blended`, `configured`, `bt2` or `none`).
+(`configured`, `bt2` or `none`; `blended` only appears in rows from builds
+before 2026-11-28).
 
 **The gain is the pump's own setting.** `room_comp_factor` (holding 13, cloud
 setting of the same name) *is* that factor, so it is read rather than fitted:
@@ -561,9 +578,8 @@ something they can remove. The pump's own room compensation is **proportional**
 — it moves supply by `room_comp_factor` per kelvin of error and then stops — so
 a house under load settles a standing offset above its target. Measured
 2026-11-27 on a live install: room 21.1 °C against a 20.3 °C target, the pump's
-term at about −2.4 K (factor 2.0, reading its own blend of the probe and the
-configured sensor), the shared adjustment −1.01 K, and the offset stayed for as
-long as the load did. The indoor cap cannot help: it only forbids *raising* the
+term at about −2.4 K (factor 2.0, on the external reading it was fed), the
+shared adjustment −1.01 K, and the offset stayed for as long as the load did. The indoor cap cannot help: it only forbids *raising* the
 curve when the house is warm, and the trims read the pump's supply.
 
 `room_integral_step` is the missing integrator, and it is the only term in
@@ -666,13 +682,12 @@ Entities:
   `extrapolated_points` lists the curve points outside that observed range:
   their supply comes from the cached table rather than from anything the pump
   was watched doing, so readiness says nothing about them yet. `pump_room_c` is
-  the room value the pump's own compensation term was computed from — in the
-  external-sensor mode the firmware averages the external value with BT2, so
-  that is not the same as the configured sensor's reading and the deviation
-  would carry a constant bias if the term were removed from ours — and
-  `pump_room_source` says which input produced it (`blended`, `configured`,
-  `bt2` or `none`), so a figure built without the blend (an unconnected BT2
-  reports −30 °C) is recognisable in the same attributes.
+  the room value the pump's own compensation term was computed from: the
+  configured reading (the external value in the external-sensor mode), with BT2
+  standing in only when that reading is missing — and `pump_room_source` says
+  which input produced it (`configured`, `bt2` or `none`; `blended` only in rows
+  from builds before 2026-11-28), so a figure built on the fallback (an
+  unconnected BT2 reports −30 °C) is recognisable in the same attributes.
   The indoor cap's three margins travel too: `indoor_margin_c` (the value the cap
   acts on), `indoor_margin_now_c` (the current reading) and
   `indoor_margin_mean_c` (the 24 h window mean). One number cannot separate a cap
@@ -1153,8 +1168,9 @@ fallback: ΔT = curve_slope · G / a                       a = the fitted loss c
 
 The emitter path is tried first and needs the live thermal output `Q`
 (`heating_power_mean_w`), the flow temperature the pump is aiming at
-(`cal_heat_temp`) and the room it serves (`pump_room_c`, i.e. the pump's own
-blended reading, never the target). Absent, non-finite, `Q ≤ 0` or
+(`cal_heat_temp`) and the room it serves (`pump_room_c` — the configured
+reading the pump's term is computed from, never the target). Absent,
+non-finite, `Q ≤ 0` or
 `T_supply ≤ T_room` falls back to the fitted form — absence is not evidence, and
 a thermal `Q` is never stood in for by the electrical input.
 

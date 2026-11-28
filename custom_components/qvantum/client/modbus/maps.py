@@ -75,8 +75,9 @@ MODBUS_INPUT_REGISTER_MAP = {
     "qn8position": (76, "int16", 1.0),
     # Datasheet "BT2 Detected" (0=No, 1=Yes, 2=Detecting). The interior sensor
     # reads -30 C when it is not fitted, which is the firmware's placeholder,
-    # not a room temperature: the curve's pump-room blend reads this bit before
-    # it trusts BT2. Inside the 0-104 block the client already polls.
+    # not a room temperature: the curve reads this bit before it trusts BT2 as
+    # the fallback room reading. Inside the 0-104 block the client already
+    # polls.
     "bt2_detected": (86, "uint16", 1.0),
     "freeze_protection_active": (87, "uint16", 1.0),
     "compressor_run_time": (88, "uint16", 1.0),

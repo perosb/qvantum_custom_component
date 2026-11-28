@@ -637,12 +637,11 @@ async def test_readiness_room_correction_requires_the_matching_sensor() -> None:
 
 
 async def test_readiness_room_correction_uses_the_pump_room_value() -> None:
-    """The term removed is the one the pump added, not our sensor's alone.
+    """The term removed is the one the pump added, not BT2's.
 
-    Measured on a live QE-6 (2026-10-21) in the external mode: ``cal_heat_temp``
-    follows the curve plus a room term on the mean of the external value and
-    BT2. Removing a term built from the external reading alone left a constant
-    ~1.7 °C bias, which is more than the readiness median gate.
+    Measured on a QE-6 running 1.12.8 (2026-11-28) with a 2.6 K room step: the
+    pump follows the external value alone (0.99 K/K at a register gain of 1.0),
+    and a BT2 that sits elsewhere in the house must not enter the correction.
     """
     values = {**VALUES, "sensor_mode": 4, "indoor_temperature_target": 20.0}
     hours = [100 + index * 3600 for index in range(cc.INDOOR_METRIC_MIN_HOURS)]
@@ -674,9 +673,11 @@ async def test_readiness_room_correction_uses_the_pump_room_value() -> None:
         coordinator._async_statistics = AsyncMock(return_value=rows)
         return coordinator
 
-    # External 20.0 and BT2 21.0: the pump's input is 20.5, so the removed
-    # error is 0.5 and not the external sensor's own 0.0.
-    series, _ = await build(external=20.0, bt2=21.0)._async_readiness_hours()
+    # External 20.5 and target 20.0: the pump's input is the external value, so
+    # the removed error is 0.5 whatever BT2 says.
+    series, _ = await build(external=20.5, bt2=21.0)._async_readiness_hours()
+    assert series[100] == pytest.approx(36.0 - 40.0 - 9.0 * 0.5)
+    series, _ = await build(external=20.5, bt2=18.0)._async_readiness_hours()
     assert series[100] == pytest.approx(36.0 - 40.0 - 9.0 * 0.5)
 
     # No external history: the picker falls back to BT2, which no longer
@@ -3183,12 +3184,11 @@ async def test_snapshot_deviation_removes_room_term() -> None:
     with patch.object(cc.asyncio, "sleep", AsyncMock()):
         snapshot = await coordinator._async_compute_snapshot()
 
-    # Raw deviation is 36.0 − 37.0. The pump builds its room term from the mean
-    # of the external value (20.6) and BT2 (21.0) in the external mode, so the
-    # removed term is 9 °C/°C over that mean's 0.7 °C error, not the external
-    # sensor's 0.5 °C.
-    assert snapshot.pump_room_c == pytest.approx(20.8)
-    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.7)
+    # Raw deviation is 36.0 − 37.0. The pump builds its room term from the
+    # configured reading — the external value (20.6) — measured with a room step
+    # on 1.12.8 (2026-11-28), so the removed term is 9 °C/°C over 0.5 °C.
+    assert snapshot.pump_room_c == pytest.approx(20.6)
+    assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.5)
     assert snapshot.room_gain_c == pytest.approx(9.0)
 
 
@@ -3264,8 +3264,13 @@ async def test_snapshot_ignores_a_bt2_the_pump_reports_as_missing() -> None:
     assert snapshot.deviation_c == pytest.approx(36.0 - 37.0 - 9.0 * 0.5)
 
 
-async def test_snapshot_reports_the_blend_source() -> None:
-    """A detected BT2 is blended, and the dump says so."""
+async def test_snapshot_reports_the_configured_source() -> None:
+    """The pump's room value is the configured reading, and the dump says so.
+
+    A detected BT2 does not enter it: the room step of 2026-11-28 (3.0 K over
+    100 samples, least-squares slope -0.990 ± 0.023 K/K at a register gain of
+    1.0) put the blend's weight at 1, i.e. the external value alone.
+    """
     coordinator, _client = make_writable_coordinator(
         settings={"curve_type_heating": 1}, live_curve_type=1
     )
@@ -3292,8 +3297,8 @@ async def test_snapshot_reports_the_blend_source() -> None:
     with patch.object(cc.asyncio, "sleep", AsyncMock()):
         snapshot = await coordinator._async_compute_snapshot()
 
-    assert snapshot.pump_room_c == pytest.approx(20.8)
-    assert snapshot.pump_room_source == "blended"
+    assert snapshot.pump_room_c == pytest.approx(20.6)
+    assert snapshot.pump_room_source == "configured"
 
 
 def test_indoor_series_skips_a_placeholder_bt2() -> None:
