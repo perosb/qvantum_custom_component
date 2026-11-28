@@ -1297,7 +1297,10 @@ use `/local/qvantum-curve-card.js` as the resource URL.
 - **Operating point** — ring, only when `operating_point` is configured.
 - **Status chips** — Active/Shadow (switch), the **advice** verdict, Ready/blocker,
   Pump User-defined/Auto, clamped to supply limits, **extrapolated knots**,
-  indoor cap, solar-model trust. The advice chip is the only one that says what
+  indoor cap, solar-model trust. The term row carries every term that is on:
+  outdoor, night/day, solar, load, trims, the **room-error integral** (on by
+  default, with the 24 h mean it is waiting on while it is still zero) and the
+  opt-in COP-feedback, pre-charge and wind chips. The advice chip is the only one that says what
   to *do* (`reduce` / `ok` / `increase`, from the signed room error over the last
   day); the rest say why. It is absent — not neutralised — until a day of room
   error exists, and its tooltip carries the median and the sample count. The extrapolation chip counts the knots the chart
