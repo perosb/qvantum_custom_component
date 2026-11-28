@@ -108,6 +108,7 @@ const STRINGS = {
     tSolar: "Solar",
     tCop: "COP",
     tPrecharge: "Pre-charge",
+    tRoomIntegral: "Room error",
     tWind: "Wind",
     off: "off",
     tLoad: "Load",
@@ -149,6 +150,7 @@ const STRINGS = {
     tSolar: "Sol",
     tCop: "COP",
     tPrecharge: "Förladdning",
+    tRoomIntegral: "Rumsfel",
     tWind: "Vind",
     off: "av",
     tLoad: "Last",
@@ -533,6 +535,11 @@ class QvantumCurveCard extends HTMLElement {
         solar: num(attr(adj, "solar_c")),
         cop: num(attr(adj, "cop_c")),
         precharge: num(attr(adj, "precharge_c")),
+        // The only term that reads the house's outcome; on by default and
+        // one-sided downward, so a value here is how much of the standing
+        // offset the proportional room loop leaves.
+        roomIntegral: num(attr(adj, "room_integral_c")),
+        roomMean: num(attr(dev, "indoor_margin_mean_c")),
         wind: num(attr(adj, "wind_c")),
         // Which terms are switched on, and whether the wind column could be
         // identified at all: "on but idle" must not look like "off".
@@ -959,6 +966,23 @@ class QvantumCurveCard extends HTMLElement {
       term(t.tSolar, a.solar),
       ...optional(a.terms.cop_feedback, t.tCop, a.cop),
       ...optional(a.terms.precharge, t.tPrecharge, a.precharge),
+      // On by default, like the solar term, so the chip is always there. While
+      // it is still zero the 24 h mean says what it is waiting for — a bare
+      // "+0.0 K" would read as "off" (measured 2026-11-28: the window is
+      // cleared by a setpoint change, so the term is silent for the first
+      // hours after one).
+      a.terms.room_integral
+        ? term(
+            t.tRoomIntegral,
+            a.roomIntegral,
+            "",
+            a.roomIntegral !== null &&
+              Math.abs(a.roomIntegral) < 0.05 &&
+              a.roomMean !== null
+              ? `${signed(a.roomMean)} K · ${t.roomError}`
+              : "",
+          )
+        : term(`${t.tRoomIntegral} (${t.off})`, null, "idle"),
       ...(windChip ? [windChip] : []),
       // The load term is gated on 30 minutes of observed evidence, so a bare
       // "+0.0 K" hides whether it balances or is still filling after a restart.
