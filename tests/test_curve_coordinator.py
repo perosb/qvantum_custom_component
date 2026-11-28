@@ -5046,6 +5046,8 @@ class TestCurveCounters:
             "trim_updates": 5,
             "days_clamped": 2,
             "days_extrapolated": 1,
+            # One day is in both sets, so the union is 2, not 3.
+            "days_at_curve_end": 2,
             "revert_reasons": dict.fromkeys(REVERT_REASONS, 0),
         }
 
@@ -5119,6 +5121,7 @@ class TestCurveCounters:
 
         assert coordinator.counters["days_clamped"] == 1
         assert coordinator.counters["days_extrapolated"] == 1
+        assert coordinator.counters["days_at_curve_end"] == 1
 
     async def test_shadow_does_not_mark_a_day(self):
         """In shadow the table never reaches the pump, so nothing is lived."""

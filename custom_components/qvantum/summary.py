@@ -239,6 +239,10 @@ _ENTITY_PREFIXES = (
 #: pool can answer how large an offset the proportional loop leaves on other
 #: installations, and whether the integral converges (a value pinned at −2 K is
 #: an over-gained integrator, not a warm house). Additive.
+#: v21 also carries `counters.days_at_curve_end`: the union of the clamped and
+#: extrapolated days, because one day can be both (different knots) and the two
+#: counters cannot be added. The pool asked "how often does the end bite" and
+#: had to answer with a rate computed from a double-counting sum.
 SUMMARY_SCHEMA_VERSION = 21
 
 #: Plant settings that describe the control loops. Everything else in the
@@ -654,12 +658,16 @@ def curve_summary(coordinator: Any) -> dict[str, Any] | None:
 #: the pool needs a rate, never a log of when. ``days_clamped`` deliberately
 #: excludes a warm end pinned on the pump's floor: that clamp is structural and
 #: would otherwise fire on every mild day at every installation.
+#: ``days_at_curve_end`` is their **union**, not their sum: one day can be both
+#: (a clamped knot and an extrapolated one), and only the union answers "how
+#: often did the curve leave its measured range at all".
 COUNTER_KEYS: tuple[str, ...] = (
     "since",
     "reverts",
     "trim_updates",
     "days_clamped",
     "days_extrapolated",
+    "days_at_curve_end",
 )
 
 

@@ -496,6 +496,7 @@
   "counters": {
    "days_clamped": 0,
    "days_extrapolated": 7,
+   "days_at_curve_end": 7,
    "revert_reasons": {
     "no_device_id": 0,
     "other": 0,

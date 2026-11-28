@@ -756,6 +756,7 @@ def test_counters_block_is_exported_and_absent_on_cloud():
             "trim_updates": 6,
             "days_clamped": 3,
             "days_extrapolated": 4,
+            "days_at_curve_end": 5,
             "revert_reasons": {"write_failed": 2},
         }
     )
@@ -768,6 +769,7 @@ def test_counters_block_is_exported_and_absent_on_cloud():
         "trim_updates": 6,
         "days_clamped": 3,
         "days_extrapolated": 4,
+        "days_at_curve_end": 5,
         "revert_reasons": {
             "switched_off": 0,
             "write_failed": 2,
