@@ -691,13 +691,14 @@ def _curve_diagnostics(coordinator: Any) -> dict[str, Any] | None:
         "indoor_margin_now_c": getattr(snapshot, "indoor_margin_now_c", None),
         "indoor_margin_mean_c": getattr(snapshot, "indoor_margin_mean_c", None),
         "indoor_cap_armed": getattr(snapshot, "indoor_cap_armed", None),
-        # Which room value the removed room term used: the firmware blends the
-        # external sensor with BT2 in the external mode, so a dump that only
-        # showed the configured sensor could not explain the deviation.
+        # Which room value the removed room term used: the configured reading
+        # (the external value in the external mode), with BT2 only as a gated
+        # fallback when that reading is missing. A dump must show it, because a
+        # deviation built on the fallback means something different.
         "pump_room_c": getattr(snapshot, "pump_room_c", None),
         # Which input that value came from, and what the pump says about BT2:
         # an unconnected probe holds the firmware's -30 C placeholder, so the
-        # blend is skipped and the deviation rests on the configured sensor.
+        # fallback is refused and the deviation rests on the configured sensor.
         "pump_room_source": getattr(snapshot, "pump_room_source", None),
         "bt2_detected": live.get("bt2_detected"),
         "clamped": getattr(snapshot, "clamped", None),

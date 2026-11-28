@@ -185,8 +185,7 @@ INDOOR_CAP_C = 1.0
 #: Room-error integral: the one term that reads the **outcome** and removes the
 #: standing offset a proportional room term leaves behind. `room_comp_factor`
 #: moves supply by ~2 K per K of room error and then stops — it only removes the
-#: part of the error it can see, measured on the pump's own blend of the probe
-#: and the configured reading. Measured 2026-11-27 on a live install: room
+#: part of the error it can see. Measured 2026-11-27 on a live install: room
 #: 21.1 °C against a 20.3 °C target, pump term ≈ −2.4 K, our adjustment −1.01 K,
 #: and the house sat 0.8 K high for as long as the load lasted. The integral is
 #: **one-sided** (it may only reduce supply; a cold house is the cap's floor and
@@ -1392,9 +1391,13 @@ def pump_room_reading(
     Measured on a QE-6 on firmware 1.12.8 (2026-11-28) with two steps, because
     the room step alone only gives ``gain * weight``:
 
-    - a **room step** of 2.6 K (external 20.1 -> 17.6, 100 hourly-resolution
-      samples, adjustment and outdoor flat) moved ``cal_heat_temp`` by 2.97 K,
-      i.e. ``gain * weight = 0.99`` at a register gain of 1.0;
+    - a **room step** of 3.0 K (external 20.20 -> 17.20, 100 samples,
+      adjustment and outdoor flat) gave ``cal_heat_temp`` a least-squares slope
+      of **-0.990 +- 0.023 K/K** (t = -44), i.e. ``gain * weight = 0.99`` at a
+      register gain of 1.0. The fit, not the endpoint difference: the endpoint
+      ratio across the same window reads 1.10, because the table, the pump's own
+      control and our adjustment all move between two samples half an hour
+      apart;
     - a **target step** of +2.0 K at a register gain of 2.0 moved it by 3.85 K
       (4.0 expected), i.e. ``gain = 2.0``: the register *is* the gain, as the
       2026-10-21 measurement also found with a target step.

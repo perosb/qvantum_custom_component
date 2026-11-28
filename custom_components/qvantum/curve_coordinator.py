@@ -328,9 +328,9 @@ class CurveSnapshot:
     #: see which input the removed term used.
     pump_room_c: float | None = None
     #: Which input produced it: ``configured``, ``bt2`` or ``none``. A BT2 the
-    #: pump reports as not detected is never used (it holds
-    #: the firmware's -30 C placeholder), so this says whether a deviation
-    #: figure rests on the measured blend at all.
+    #: pump reports as not detected is never used (it holds the firmware's
+    #: -30 C placeholder), so this says whether a deviation figure rests on the
+    #: gated fallback at all.
     pump_room_source: str | None = None
     #: Points whose outdoor temperature lies outside the range the baseline
     #: was observed at. Their supply is extrapolated from the cached table, so
