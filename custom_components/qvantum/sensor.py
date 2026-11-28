@@ -1236,13 +1236,13 @@ class QvantumCurveDeviationSensor(QvantumCurveSensorEntity):
             # "-0.96 of [-0.96, ...]" instead of only "the cap is binding".
             "indoor_cap_floor_c": snapshot.indoor_cap_floor_c,
             "indoor_cap_ceiling_c": snapshot.indoor_cap_ceiling_c,
-            # In the external mode the pump blends the external value with its
-            # own BT2 for the room term, so this is the input the removed term
-            # used — not the configured sensor's reading.
+            # The value the pump's own room term is computed from: the
+            # configured reading (the external one in the external mode), with
+            # BT2 only as a fallback when that reading is missing.
             "pump_room_c": snapshot.pump_room_c,
-            # "blended" only while BT2 is a detected probe: an unconnected BT2
-            # holds -30 C, and blending that would put the removed room term
-            # ~26 K off (readiness could never pass).
+            # ``configured`` / ``bt2`` / ``none``. BT2 stands in only when it is
+            # a probe the pump reports: an unconnected one holds -30 C, and
+            # handing that to the correction puts it ~26 K off.
             "pump_room_source": snapshot.pump_room_source,
             # The baseline was only observed between the two temperatures
             # above; these points are extrapolated from the cached table, so

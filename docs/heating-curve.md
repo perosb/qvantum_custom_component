@@ -284,19 +284,32 @@ coordinator subtracts `gain × (pump room − target)` from the deviation before
 it feeds the readiness window; without that, the shadow curve could never match
 a compensating pump closely enough to become `ready`.
 
-**Which room value.** In the external-sensor mode (`sensor_mode` = 4) the
-firmware does not use the external value on its own: it averages it with its own
-BT2. Measured on a QE-6, 2026-10-21, the implicit room value behind
-`cal_heat_temp` matched that mean with a median deviation of 0.10 °C, against
-0.32 °C for the external sensor alone and 0.30 °C for BT2. `pump_room_reading()`
-(`heating_curve.py`) reproduces it (mean in the external mode, the configured
-sensor everywhere else — the regime it was measured in), and `pump_room_c`
-publishes the value used.
-Removing a term built from one sensor while the pump built it from the mean
-leaves a constant `gain · (BT2 − configured) / 2` bias: 1.7 °C on that install,
-more than the readiness median gate, which is why the median sat at 2.17 °C with
-a raw 1.43 °C underneath. The trims, the indoor cap and `room_error` stay on the
-configured sensor — those describe the house, this describes the pump's input.
+**Which room value.** The pump's room term uses the **configured** reading —
+the external value we feed to holding 14 in the external-sensor mode
+(`sensor_mode` = 4), BT2 in the BT2 mode — and nothing else. `pump_room_reading()`
+(`heating_curve.py`) returns it and `pump_room_c` publishes it; BT2 only stands
+in when the configured reading is missing, and then only if the pump reports it
+as a probe.
+
+Measured on a QE-6 running **1.12.8** (2026-11-28) with two steps, because a
+room step alone only gives `gain · weight`:
+
+| step | what moved | result |
+|---|---|---|
+| room value 20.1 → 17.6 K (100 samples, adjustment and outdoor flat) | `cal_heat_temp` +2.97 K | `gain · weight = 0.99` at a register gain of 1.0 |
+| target +2.0 K at a register gain of 2.0 | `cal_heat_temp` +3.85 K (4.0 expected) | `gain = 2.0`: the register *is* the gain |
+
+Weight is therefore 1 — no mean with BT2. An earlier reading (QE-6,
+2026-10-21, firmware **1.11.x**, a regression of `cal` against three candidate
+room values over many hours: median deviation 0.10 °C for the mean of the
+external value and BT2, 0.32 °C for the external alone, 0.30 °C for BT2) found
+the opposite; the two are not comparable — different method, different firmware
+— and the step measurement on the current firmware wins. Assuming a mean where
+the pump used the external value removes `gain · (BT2 − external) / 2` too much
+from the deviation, 0.8–1.1 K on the measured install at a gain of 2.0.
+
+The trims, the indoor cap and `room_error` stay on the configured sensor —
+those describe the house; this describes the pump's input.
 
 **Modes without an indoor sensor.** In `sensor_mode` DISABLED / BT3 / AUX there
 is no mode-specific indoor metric, so the configured reading falls back to BT2 —

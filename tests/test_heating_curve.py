@@ -874,76 +874,62 @@ def test_room_corrected_deviation_subtracts_the_room_term() -> None:
     assert room_corrected_deviation(None, 9.0, 0.5) is None
 
 
-def test_pump_room_reading_blends_only_in_the_external_mode() -> None:
-    """The pump's own room input, as measured on a QE-6 in external mode."""
-    # External mode: the firmware averages the external value with BT2.
-    blended = pump_room_reading(19.8, 20.6, external_mode=True)
-    assert blended.value_c == pytest.approx(20.2)
-    assert blended.source == "blended"
-    # BT2 mode (or any other): the configured sensor is what the pump reads.
-    assert pump_room_reading(20.6, 20.6, external_mode=False) == PumpRoomReading(
-        20.6, "configured"
-    )
-    assert pump_room_reading(19.8, 20.6, external_mode=False) == PumpRoomReading(
-        19.8, "configured"
-    )
-    # One reading is enough; none means no term.
-    assert pump_room_reading(19.8, None, external_mode=True) == PumpRoomReading(
-        19.8, "configured"
-    )
-    assert pump_room_reading(None, 20.6, external_mode=True) == PumpRoomReading(
-        20.6, "bt2"
-    )
-    assert pump_room_reading(None, None, external_mode=True) == PumpRoomReading(
-        None, "none"
-    )
+def test_pump_room_reading_is_the_configured_value_in_every_mode() -> None:
+    """The pump's own room input, as measured on a QE-6 running 1.12.8.
+
+    Two steps, because a room step alone only gives ``gain * weight``: a 2.6 K
+    room step moved ``cal_heat_temp`` by 2.97 K (``gain * weight = 0.99`` at a
+    register gain of 1.0) and a +2.0 K target step moved it by 3.85 K at a
+    register gain of 2.0 (``gain = 2.0``). Weight is therefore 1: the pump uses
+    the external value on its own, in every mode.
+    """
+    # The external mode: the configured reading is the external value, alone.
+    assert pump_room_reading(19.8, 20.6) == PumpRoomReading(19.8, "configured")
+    # BT2's value does not enter, however far it sits from the configured one.
+    assert pump_room_reading(19.8, 24.0) == PumpRoomReading(19.8, "configured")
+    # The BT2 mode: the configured reading is BT2, so the two agree.
+    assert pump_room_reading(20.6, 20.6) == PumpRoomReading(20.6, "configured")
+    # One reading is enough; neither means no term.
+    assert pump_room_reading(19.8, None) == PumpRoomReading(19.8, "configured")
+    assert pump_room_reading(None, 20.6) == PumpRoomReading(20.6, "bt2")
+    assert pump_room_reading(None, None) == PumpRoomReading(None, "none")
 
 
 def test_pump_room_reading_skips_a_bt2_the_pump_says_is_missing() -> None:
     """An unconnected BT2 holds the firmware's -30 C placeholder (#411 follow-up).
 
     ``BT2 Detected`` (input 86) is authoritative where it is reported: a 0 or a
-    2 means the interior sensor is not a room reading, so the blend must fall
-    back to the configured sensor instead of averaging -30 C in.
+    2 means the interior sensor is not a room reading, so the fallback must
+    refuse it rather than hand -30 C to the correction. A configured reading is
+    used as it stands — the probe does not enter any more.
     """
-    # Detected: the measured blend.
-    assert pump_room_reading(20.0, 20.6, external_mode=True, bt2_detected=1.0) == (
-        PumpRoomReading(20.3, "blended")
+    assert pump_room_reading(20.0, 20.6, bt2_detected=1.0) == PumpRoomReading(
+        20.0, "configured"
     )
-    # Not detected, and still being probed: the external reading alone.
+    # Only the fallback cares: with no configured reading the bit decides.
+    assert pump_room_reading(None, 20.6, bt2_detected=1.0) == PumpRoomReading(
+        20.6, "bt2"
+    )
     for bit in (0.0, 2.0):
-        reading = pump_room_reading(
-            20.0, -30.0, external_mode=True, bt2_detected=bit
+        assert pump_room_reading(None, 20.6, bt2_detected=bit) == PumpRoomReading(
+            None, "none"
         )
-        assert reading == PumpRoomReading(20.0, "configured")
 
 
 def test_pump_room_reading_rejects_a_placeholder_or_a_stuck_probe() -> None:
-    """Without the bit (cloud) the value itself decides — no 26 K error allowed.
+    """A BT2 that is not a room reading never becomes the pump's room value.
 
-    The bounds are measured: |bt2 - external| on a live QE-6 over 30 days was
-    median 0.54 C, p95 0.77 C, max 0.85 C, so 10 K cannot fire on a healthy
-    install while a placeholder or a frozen probe is caught.
+    The configured reading is used as it stands, so a placeholder probe cannot
+    reach the correction through it; the gate matters for the fallback, where
+    -30 C would otherwise be handed to the deviation.
     """
-    assert pump_room_reading(20.0, -30.0, external_mode=True) == PumpRoomReading(
-        20.0, "configured"
-    )
-    # Outlandish but not the placeholder: still not a room reading.
-    assert pump_room_reading(20.0, 60.0, external_mode=True) == PumpRoomReading(
-        20.0, "configured"
-    )
-    # A stuck probe 15 K off the other indoor reading.
-    assert pump_room_reading(20.0, 35.0, external_mode=True) == PumpRoomReading(
-        20.0, "configured"
-    )
-    # 9 K apart is unusual but still two views of one house: blended.
-    assert pump_room_reading(20.0, 29.0, external_mode=True) == PumpRoomReading(
-        24.5, "blended"
-    )
-    # Bootstrap: no configured reading yet, a plausible BT2 stands alone.
-    assert pump_room_reading(None, 20.6, external_mode=True) == PumpRoomReading(
-        20.6, "bt2"
-    )
+    # With a configured reading, BT2 is irrelevant — even the placeholder.
+    assert pump_room_reading(20.0, -30.0) == PumpRoomReading(20.0, "configured")
+    assert pump_room_reading(20.0, 60.0) == PumpRoomReading(20.0, "configured")
+    # Bootstrap: no configured reading, so BT2 must itself be a room.
+    assert pump_room_reading(None, 20.6) == PumpRoomReading(20.6, "bt2")
+    assert pump_room_reading(None, -30.0) == PumpRoomReading(None, "none")
+    assert pump_room_reading(None, 60.0) == PumpRoomReading(None, "none")
 
 
 def test_pump_room_reading_never_returns_a_non_room_value() -> None:
@@ -953,15 +939,9 @@ def test_pump_room_reading_never_returns_a_non_room_value() -> None:
     BT2, so "configured" *is* the placeholder. A gate on BT2 alone would hand it
     straight through as the pump's room value.
     """
-    assert pump_room_reading(-30.0, None, external_mode=False) == PumpRoomReading(
-        None, "none"
-    )
-    assert pump_room_reading(-30.0, -30.0, external_mode=True) == PumpRoomReading(
-        None, "none"
-    )
-    assert pump_room_reading(None, -30.0, external_mode=True) == PumpRoomReading(
-        None, "none"
-    )
+    assert pump_room_reading(-30.0, None) == PumpRoomReading(None, "none")
+    assert pump_room_reading(-30.0, -30.0) == PumpRoomReading(None, "none")
+    assert pump_room_reading(None, -30.0) == PumpRoomReading(None, "none")
 
 
 def test_trim_evidence_hours_counts_only_qualifying_buckets() -> None:

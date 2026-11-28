@@ -738,13 +738,15 @@ The rules that must not drift:
   and the baseline was fitted to it, so correcting there double-counts. The gain
   is the pump's own `room_comp_factor`, re-read every poll — never fitted over.
   The Auto-hour fit is the fallback for a missing factor and is diagnostics-only.
-- The room **value** is the pump's own input: in the external mode the firmware
-  averages it with BT2 (`pump_room_reading`), and that blend is gated three times
-  (`bt2_detected` = 1, a plausible room temperature, within 10 K of the configured
-  reading — and the result checked again, because in the no-sensor modes the
-  configured reading *is* BT2). Without the gates a placeholder BT2 puts the
-  deviation tens of kelvin off. Trims, the indoor cap and `room_error` stay on
-  the configured sensor: those describe the house.
+- The room **value** the pump's term uses is the **configured** reading, with no
+  mean over anything: measured on 1.12.8 (2026-11-28) with a room step
+  (`gain · weight = 0.99` at a register gain of 1.0) and a target step
+  (`gain = register gain`), so the weight is 1. The older blend with BT2 came
+  from a different method on 1.11.x and is history, not a rule — do not re-add
+  it. BT2 stands in only when the configured reading is missing, gated on
+  `bt2_detected` = 1 and a plausible room value (a placeholder puts the deviation
+  tens of kelvin off). Trims, the indoor cap and `room_error` stay on the
+  configured sensor: those describe the house.
 - `capped_by_indoor` means the adjustment **moved**, not that it touched the
   band: the edge follows the 24 h mean and the total is a float sum, so a clamp
   that changes 7e-16 must not report itself binding — it also pauses the trim
