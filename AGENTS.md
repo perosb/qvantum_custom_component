@@ -362,9 +362,13 @@ no repository secrets, so the job is skipped. Review one on demand with
 default branch for the reviewer's own code (prompt, extensions, `post_review.py`)
 and the PR head into `pr-head/` as **data only** — `repo_read`/`repo_grep` are
 rooted there, and nothing in it is executed — so a PR that edits `.github/pi/`
-cannot rewrite the thing reviewing it. `pi` is pinned at **1.6.0** and the model
-ids are explicit (`z-ai/glm-5.3`, `z-ai/glm-5.3-flash`): the `~…-latest` aliases
-resolve to a dated snapshot that rejects 1.6's mid-conversation reasoning update.
+cannot rewrite the thing reviewing it. `pi` is pinned at **1.7.0**, the review
+runs on the **`opencode-go`** provider (secret `OPENCODE_API_KEY`) and the model
+ids are explicit (`opencode-go/glm-5.3`, `opencode-go/glm-5.3-flash`): a
+`~…-latest` alias resolves to a dated snapshot that moves under a pinned pi, and
+one upgrade already made an alias reject the mid-conversation reasoning update.
+The `openrouter-guardrails` extension is no longer installed in the job — it only
+rewrites `openrouter` requests and is a no-op on `opencode-go`.
 
 The reviewer's output contract is JSON; when the model answers in prose instead,
 `post_review.py` posts that text as a fallback comment and **passes with a
