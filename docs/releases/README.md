@@ -6,6 +6,7 @@ link added to the GitHub release body.
 
 | Version | Released | Highlights |
 | --- | --- | --- |
+| [2026.11.15](2026.11.15.md) | 2026-11-28 | Gradual correction for lingering room-temperature differences |
 | [2026.11.14](2026.11.14.md) | 2026-11-27 | More detail about heating adjustments |
 | [2026.11.13](2026.11.13.md) | 2026-11-25 | Understand efficiency scores and EU energy labels |
 | [2026.11.10](2026.11.10.md) | 2026-11-20 | Clearer adaptive heating-curve advice |
