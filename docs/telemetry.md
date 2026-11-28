@@ -45,7 +45,7 @@ The complete field list:
 | climate | the outdoor span the installation has been observed in, heating hours |
 | curve | both sides of the load term's input (`load_power_mean_w`, `load_power_mean_electrical_w`) with the `load_power_coverage_hours` behind them — the term refuses a thermal mean below 1.5× the compressor's input, so the pair is what says whether it was silent on a healthy counter or on a biased one; the trim layer (`trim_max_abs_c` — how close the largest trim is to the cap — and `trim_cap_days`, how long the oldest capped one has been capped, a duration rather than the diagnostics' date), room gain grouped as `configured` / `applied` / `fitted`, with `window`, `valid`, `notes`, evidence hours, standard error (with `t`), leave-one-out swing and `age_hours` — the measurement's age as a **duration**, not the diagnostics' epoch, because the identity check weighs a fresh configured factor against a measured slope that survives failed refits and can be days old; readiness `median_abs_c` **and** the signed `median_c`, `p95_abs_c`, `window_hours` and the room error over the same window (`room_error_median_abs_c`, `room_error_p90_abs_c`) — plus the `blocker` that says whether the gate failed or was never assessed (while the curve writes the readiness figures are `null` and `blocker` is `active`, because the deviation is then our own trims; while the pump runs a user-defined table we did not author — `plant.curve_type_heating` 1 with the curve not writing — they are `null` and `blocker` is `user_defined`, because the deviation is then our baseline minus somebody else's curve); the solar model (`a`, `b`, trust, days — the hourly `b` keeps its value while `trust` is 0 when it misses the t ≥ 2.5 gate, so the pair is not a bug), the day-block model's evidence (`daily_solar_t_stat`, `daily_solar_r2`, `daily_solar_valid`, `daily_solar_notes`: which gate refused it), the **four-column pair** for a window whose aperture was refused on sign or size (`daily_solar_a_w_per_k_4col`, `daily_solar_b_m2_4col` — reported, never applied: the wind fit runs only after the aperture gate, so without it a negative `b` can never be examined), and the wind column of the same day balance (identified `w` in W/K per m/s, its `t`, the evidence hours *and days* behind it and whether its gates let it act); the **room-error integral** (`room_integral_c`, always `≤ 0`, `0` in shadow — the one term that reads the house's outcome, so its size over days says how large an offset the proportional room loop leaves), and the two preconditions behind a `ready` row — `writable` (can this transport write the pump at all?) and `ready_issue_declined` (did the user answer "not now"?), because the readiness invitation is only raised where the curve can write, so `ready: true` in shadow alone cannot separate "never asked" from "declined" from "asked and waiting") |
 | fitted | heat-loss coefficient (W/K), time constant (h), thermal mass (kWh/K), DHW standing loss (**kWh/day at a 40 K tank-to-ambient difference**, not the raw figure, with `reference_delta_k`, `loss_w_per_k`, the newest window's evidence and the count it rests on — `dhw_standing_episodes`, `dhw_standing_hours`), cycling, SCOP over the 30-day window **and** over the 90-day one (`scop_total_90d` — the health grade reads the 30-day figure, so the longer window is what separates a shoulder-season row from a poor installation), **the four counter deltas that ratio divides** (`scop_heating_kwh`, `scop_dhw_kwh`, `scop_compressor_kwh`, `scop_additional_kwh`), auxiliary-heat share, health grade **and its three component scores** (`efficiency_health_scop_score`, `_aux_share_score`, `_cycling_score` — the letter is their weighted mean, so the weight can be re-scored from a row), and the **coverage** behind each window (`scop_coverage_days`, `scop_coverage_days_90d`, `building_coverage_days`) — without them a SCOP over seven scattered days reads exactly like one over thirty |
-| counters | curve reverts **and their per-code split** (`revert_reasons`: `switched_off`, `write_failed`, `write_not_applied`, `points_unverified`, `point_not_stuck`, `writes_disabled`, `no_device_id`, `table_invalid`, `other` — the total says how often, the code says why), trim updates, days with an actionable clamped or an extrapolated knot, and the date the counters were reset at — populated on every transport that can
+| counters | curve reverts **and their per-code split** (`revert_reasons`: `switched_off`, `write_failed`, `write_not_applied`, `points_unverified`, `point_not_stuck`, `writes_disabled`, `no_device_id`, `table_invalid`, `other` — the total says how often, the code says why), trim updates, days with an actionable clamped or an extrapolated knot **and their union** (`days_at_curve_end` — a single day can carry both, so the two counts cannot be added), and the date the counters were reset at — populated on every transport that can
 run the curve, since the coordinator exists wherever the pump's settings can be
 written |
 | verdicts | reserved for derived analysis results (currently empty) |
@@ -57,7 +57,10 @@ asserts the result carries no identifiers.
 
 The `counters` block is counts, never a log of when: curve reverts, trim updates
 and the days a clamped or extrapolated knot was lived with, plus the date the
-counters were reset at.
+counters were reset at. `days_at_curve_end` is the **union** of the two day
+counts, not their sum: one day can have a clamped knot at one end and an
+extrapolated one at the other, so adding them double-counts — measured on a live
+install 2026-11-28, 8 + 8 days inside an 8-day window.
 
 ## `SUMMARY_SCHEMA_VERSION`
 
@@ -156,7 +159,7 @@ pool question can be asked of `normal` rows alone.
 ### Fixtures move with the schema
 
 `tests/data/pool_rows.json` holds one row per interesting generation — currently
-8, 13, 16 and 19 — and `tests/test_pool_rows.py` compares the current one against
+8, 13, 14, 16, 19, 20 and 21 — and `tests/test_pool_rows.py` compares the current one against
 the live export block by block. **A bump therefore needs a fixture row**, and the
 test fails until it exists: two shapes wearing one version number is exactly what
 the pool cannot detect on its own, so the contract is enforced in CI instead.
@@ -179,6 +182,11 @@ remove. The field exists so the pool can answer two questions at once: how large
 an offset the proportional loop leaves on other installations (`room_error_*` is
 the cause, this is the correction), and whether the integral converges — a value
 pinned at −2 °C is an over-gained integrator, not a warm house.
+
+v21 also carries `counters.days_at_curve_end`, added in place because no release
+had carried 21 when it landed: the union of the clamped and extrapolated days.
+The pool question "how often does the curve end bite" was being answered from a
+sum that double-counts every day on which both ends moved.
 
 v20 adds `curve.room_gain.fitted.age_hours`: how old the active-hour measurement
 is, as a duration (the export carries no timestamp finer than a date; `trim_cap_days`

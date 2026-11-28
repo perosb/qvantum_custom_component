@@ -188,6 +188,7 @@ def _curve_coordinator() -> SimpleNamespace:
             "trim_updates": 6,
             "days_clamped": 3,
             "days_extrapolated": 4,
+            "days_at_curve_end": 5,
         },
         _room_gain=1.8,
         _room_gain_source="room_temp_external",
@@ -689,6 +690,7 @@ async def test_curve_diagnostics_exports_adaptive_state(hass):
         "trim_updates": 6,
         "days_clamped": 3,
         "days_extrapolated": 4,
+        "days_at_curve_end": 5,
     }
     assert curve["trim_evidence"]["curve_30"] == 12
     assert curve["trim_evidence"]["curve_10"] == 0

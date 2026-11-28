@@ -1091,12 +1091,18 @@ class QvantumCurveCoordinator(DataUpdateCoordinator[CurveSnapshot]):
     def counters(self) -> dict[str, Any]:
         """Counters for the summary, as counts rather than date lists."""
         counters = getattr(self, "_counters", None) or {}
+        clamped = set(counters.get("clamped_days") or ())
+        extrapolated = set(counters.get("extrapolated_days") or ())
         return {
             "since": counters.get("since"),
             "reverts": int(counters.get("reverts") or 0),
             "trim_updates": int(counters.get("trim_updates") or 0),
-            "days_clamped": len(counters.get("clamped_days") or ()),
-            "days_extrapolated": len(counters.get("extrapolated_days") or ()),
+            "days_clamped": len(clamped),
+            "days_extrapolated": len(extrapolated),
+            # The same day can be both (one knot clamped, another extrapolated),
+            # so the two counters above cannot be added. This is the union: how
+            # many days the curve actually ended somewhere other than measured.
+            "days_at_curve_end": len(clamped | extrapolated),
             "revert_reasons": {
                 code: int((counters.get("revert_reasons") or {}).get(code) or 0)
                 for code in REVERT_REASONS

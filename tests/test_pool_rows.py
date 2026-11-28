@@ -65,6 +65,7 @@ def test_the_current_row_matches_what_the_code_exports():
         "trim_updates": 12,
         "days_clamped": 0,
         "days_extrapolated": 7,
+        "days_at_curve_end": 7,
         "revert_reasons": {"switched_off": 0},
     }
     live = build(curve=curve)
