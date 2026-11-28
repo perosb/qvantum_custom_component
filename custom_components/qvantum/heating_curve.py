@@ -1316,13 +1316,6 @@ def room_corrected_deviation(
 #: it, so the bound only rejects a placeholder or a dead probe.
 BT2_MIN_PLAUSIBLE_C = -10.0
 BT2_MAX_PLAUSIBLE_C = 45.0
-#: Two indoor readings further apart than this are not two views of one room.
-#: Measured on a live QE-6 over 30 days, |bt2 - external| was median 0.54 C,
-#: p95 0.77 C and max 0.85 C, so this only catches a stuck or placeholder probe
-#: - not the normal offset between the pump's sensor and the room sensor.
-BT2_MAX_DIVERGENCE_C = 10.0
-
-
 def _room_reading_is_plausible(value: object) -> TypeGuard[float]:
     """True for a number that could be an indoor temperature.
 
@@ -1335,16 +1328,15 @@ def _room_reading_is_plausible(value: object) -> TypeGuard[float]:
     return BT2_MIN_PLAUSIBLE_C <= float(value) <= BT2_MAX_PLAUSIBLE_C
 
 
-def _bt2_is_usable(
-    configured_c: float | None, bt2_c: object, bt2_detected: object
-) -> bool:
-    """True when BT2 is a probe the pump can actually read in this room.
+def _bt2_is_usable(bt2_c: object, bt2_detected: object) -> bool:
+    """True when BT2 is a probe the pump can actually read.
 
-    ``bt2_detected`` is the datasheet's ``BT2 Detected`` input register
-    (86: 0=No, 1=Yes, 2=Detecting) and is authoritative when the transport
-    carries it - Modbus does, the cloud does not. Only a confirmed probe (1)
-    counts; 0 and 2 are "no probe" and "not yet decided". Without the bit
-    (cloud, or firmware that does not report it) the value itself decides.
+    Only used for the **fallback** reading, so there is no comparison against a
+    configured value to make: the two gates are the datasheet's ``BT2 Detected``
+    input register (86: 0=No, 1=Yes, 2=Detecting — authoritative where the
+    transport carries it, which Modbus does and the cloud does not; only a
+    confirmed 1 counts) and the value itself being a room temperature at all.
+    Without the bit the value decides.
     """
     if not _room_reading_is_plausible(bt2_c):
         return False
@@ -1354,9 +1346,7 @@ def _bt2_is_usable(
         and int(bt2_detected) != 1
     ):
         return False
-    if configured_c is None:
-        return True
-    return abs(float(bt2_c) - float(configured_c)) <= BT2_MAX_DIVERGENCE_C
+    return True
 
 
 @dataclass(frozen=True)
@@ -1423,7 +1413,7 @@ def pump_room_reading(
     ``gain * 26 K`` on the deviation, while degrading to nothing costs the
     correction it would have made.
     """
-    usable = _bt2_is_usable(configured_c, bt2_c, bt2_detected)
+    usable = _bt2_is_usable(bt2_c, bt2_detected)
     if configured_c is None:
         reading = PumpRoomReading(
             float(bt2_c) if usable and bt2_c is not None else None,

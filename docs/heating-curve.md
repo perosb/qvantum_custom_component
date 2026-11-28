@@ -334,16 +334,14 @@ second opinion averaged in. An installation without an interior probe keeps the
 firmware's placeholder there (a QE4 owner reported a fixed −30 °C,
 2026-10-23), and handing that to the correction would put the removed term about
 26 K off (`gain · 26 K` on the deviation, 13 K even at the minimum gain), so
-readiness could never pass. Three gates apply: the datasheet's `BT2 Detected`
-register (input 86: `0=No`, `1=Yes`, `2=Detecting` — read over Modbus only, and
-listed in `REQUIRED_MODBUS_METRICS` because no entity exposes it and the payload
-is filtered by enabled metrics) must report `1`; the value must be a room
-temperature (`BT2_MIN_PLAUSIBLE_C`/`BT2_MAX_PLAUSIBLE_C`, −10…45 °C) and within
-`BT2_MAX_DIVERGENCE_C` (10 K) of the configured reading (measured on a live QE-6
-over 30 days, the two sensors were 0.54 K apart at the median and 0.85 K at
-most, so the bound only catches a placeholder or a stuck probe); and the
-resulting value is checked again, because in the modes without an indoor sensor
-the configured reading falls back to BT2. Without a usable BT2 the configured
+readiness could never pass. Two gates apply, because the fallback has no
+configured value to be compared against: the datasheet's `BT2 Detected` register
+(input 86: `0=No`, `1=Yes`, `2=Detecting` — read over Modbus only, and listed in
+`REQUIRED_MODBUS_METRICS` because no entity exposes it and the payload is
+filtered by enabled metrics) must report `1`, and the value must be a room
+temperature (`BT2_MIN_PLAUSIBLE_C`/`BT2_MAX_PLAUSIBLE_C`, −10…45 °C). The
+resulting value is checked again as well, because in the modes without an indoor
+sensor the configured reading falls back to BT2. Without a usable BT2 the configured
 sensor is used alone, or nothing at all — `pump_room_source` says which
 (`configured`, `bt2` or `none`; `blended` only appears in rows from builds
 before 2026-11-28).
