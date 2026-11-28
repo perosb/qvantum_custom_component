@@ -296,8 +296,14 @@ room step alone only gives `gain · weight`:
 
 | step | what moved | result |
 |---|---|---|
-| room value 20.1 → 17.6 K (100 samples, adjustment and outdoor flat) | `cal_heat_temp` +2.97 K | `gain · weight = 0.99` at a register gain of 1.0 |
-| target +2.0 K at a register gain of 2.0 | `cal_heat_temp` +3.85 K (4.0 expected) | `gain = 2.0`: the register *is* the gain |
+| room value 20.20 → 17.20 K (3.0 K, 100 samples, adjustment and outdoor flat) | `cal_heat_temp`, least squares over the ramp | **−0.990 ± 0.023 K/K** (t = −44) — `gain · weight` at a register gain of 1.0 |
+| target +2.0 K at a register gain of 2.0 | `cal_heat_temp` +3.85 K (4.0 expected; the 0.15 K outdoor drift across the window is ~0.1 K of the gap) | `gain = 2.0`: the register *is* the gain |
+
+The slope is the statistic, not the difference between two points: the endpoint
+ratio across the same window reads 1.10 K/K, because the table, the pump's own
+control and our adjustment all move between two samples taken half an hour
+apart. A least-squares fit through all 100 pairs cancels that drift and gives
+the same number every time it is re-run.
 
 Weight is therefore 1 — no mean with BT2. An earlier reading (QE-6,
 2026-10-21, firmware **1.11.x**, a regression of `cal` against three candidate

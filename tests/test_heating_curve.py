@@ -877,11 +877,11 @@ def test_room_corrected_deviation_subtracts_the_room_term() -> None:
 def test_pump_room_reading_is_the_configured_value_in_every_mode() -> None:
     """The pump's own room input, as measured on a QE-6 running 1.12.8.
 
-    Two steps, because a room step alone only gives ``gain * weight``: a 2.6 K
-    room step moved ``cal_heat_temp`` by 2.97 K (``gain * weight = 0.99`` at a
-    register gain of 1.0) and a +2.0 K target step moved it by 3.85 K at a
-    register gain of 2.0 (``gain = 2.0``). Weight is therefore 1: the pump uses
-    the external value on its own, in every mode.
+    Two steps, because a room step alone only gives ``gain * weight``: over a
+    3.0 K room step the least-squares slope of ``cal_heat_temp`` was
+    -0.990 ± 0.023 K/K (t = -44) at a register gain of 1.0, and a +2.0 K target
+    step moved it by 3.85 K at a register gain of 2.0 (``gain = 2.0``). Weight
+    is therefore 1: the pump uses the external value on its own, in every mode.
     """
     # The external mode: the configured reading is the external value, alone.
     assert pump_room_reading(19.8, 20.6) == PumpRoomReading(19.8, "configured")

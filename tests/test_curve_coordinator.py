@@ -3267,9 +3267,9 @@ async def test_snapshot_ignores_a_bt2_the_pump_reports_as_missing() -> None:
 async def test_snapshot_reports_the_configured_source() -> None:
     """The pump's room value is the configured reading, and the dump says so.
 
-    A detected BT2 does not enter it: the room step of 2026-11-28 (2.6 K over
-    100 samples, 0.99 K/K at a register gain of 1.0) put the blend's weight at
-    1, i.e. the external value alone.
+    A detected BT2 does not enter it: the room step of 2026-11-28 (3.0 K over
+    100 samples, least-squares slope -0.990 ± 0.023 K/K at a register gain of
+    1.0) put the blend's weight at 1, i.e. the external value alone.
     """
     coordinator, _client = make_writable_coordinator(
         settings={"curve_type_heating": 1}, live_curve_type=1
